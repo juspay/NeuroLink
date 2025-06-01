@@ -1,0 +1,81 @@
+# Zephyr-Mind Project Rules
+
+## Project Structure Patterns
+
+### Provider Pattern
+- Each AI provider (OpenAI, Bedrock, Vertex) has its own implementation file
+- All providers implement the common `AIProvider` interface
+- Provider creation is handled by `AIProviderFactory` using the factory pattern
+- Environment variables are used for configuration and API keys
+
+### Test Environment Setup
+- Tests should use mocked providers to avoid requiring actual API keys
+- Environment variables should be mocked for testing
+- Provider functionality tests should be isolated from actual API calls
+
+### TypeScript Conventions
+- Use strict type checking throughout the codebase
+- Export explicit interfaces for all public APIs
+- Use proper TypeScript module syntax (`.js` extension in imports)
+- Document public functions with JSDoc comments
+
+### Error Handling
+- Log errors with detailed context information
+- Providers should gracefully handle API errors
+- Error boundaries should exist at the provider level
+- Factory should propagate and enhance error information
+
+### Logging Patterns
+- Use consistent log format: `[functionTag] Message {context}`
+- Log initialization, operation start/end, and errors
+- Include provider type, model name, and operation details in logs
+- Use appropriate log levels (error, warn, info, debug)
+
+## Development Workflow
+
+### Git Workflow
+- Repository uses 'release' as the default branch (not 'main')
+- Commits should have descriptive messages with emoji prefixes
+- New features should be tested before committing
+- Memory bank updates should be committed separately
+
+### Testing Guidelines
+- Tests should not require actual API credentials
+- Test for both success and failure cases
+- Ensure providers implement the required interface methods
+- Factory creation patterns should be validated thoroughly
+
+### Documentation Requirements
+- Update memory bank when making significant changes
+- Keep the README.md documentation comprehensive and up-to-date
+- Document environment variables in .env.example
+- Maintain clear API documentation in TypeScript interfaces
+
+## Build and Publication
+
+### Package Configuration
+- Use pnpm as the package manager
+- AI provider SDKs should be peer dependencies
+- Use SvelteKit for package structure and build
+- Support both ESM and CommonJS module formats
+
+### Environment Setup
+- All provider API keys should be configurable via environment variables
+- Document required environment variables in README
+- Support fallback configuration for multiple providers
+- Enable configuration via environment file (.env)
+
+## Memory Bank Management
+
+### Memory Bank Organization
+- Keep `activeContext.md` updated with current development focus
+- Track completed work in `progress.md`
+- Document system architecture in `systemPatterns.md`
+- Record technical decisions in `techContext.md`
+- Track project roadmap in `roadmap.md`
+
+### Feature Status Tracking
+- Mark completed features with ✅ in documentation
+- Track pending tasks with ⏳ in roadmap.md
+- Use checkbox format for task tracking: `- [x] Completed task`
+- Include version numbers for completed features
