@@ -1,5 +1,5 @@
 {
-	"name": "zephyr-mind",
+	"name": "@juspay/zephyr-mind",
 	"version": "1.0.0",
 	"description": "AI toolkit extracted from lighthouse with multi-provider support",
 	"author": "Juspay Technologies",
