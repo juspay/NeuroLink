@@ -1,10 +1,10 @@
-# Contributing to Zephyr-Mind
+# Contributing to NeuroLink
 
-Thank you for your interest in contributing to Zephyr-Mind! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to NeuroLink! This document provides guidelines and instructions for contributing to this project.
 
 ## Table of Contents
 
-- [Contributing to Zephyr-Mind](#contributing-to-zephyr-mind)
+- [Contributing to NeuroLink](#contributing-to-neurolink)
 	- [Table of Contents](#table-of-contents)
 	- [Code of Conduct](#code-of-conduct)
 	- [Getting Started](#getting-started)
@@ -29,7 +29,7 @@ By participating in this project, you agree to abide by our Code of Conduct (to 
 2. **Clone your fork** locally
 3. **Add the upstream repository** as a remote to keep your fork in sync:
    ```bash
-   git remote add upstream https://github.com/juspay/zephyr-mind.git
+   git remote add upstream https://github.com/juspay/neurolink.git
    ```
 4. **Create a new branch** for your changes:
    ```bash
@@ -144,4 +144,4 @@ The maintainers follow this process for releases:
 
 If you have any questions, feel free to open an issue or start a discussion on GitHub.
 
-Thank you for contributing to Zephyr-Mind!
+Thank you for contributing to NeuroLink!

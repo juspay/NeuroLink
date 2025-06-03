@@ -1,4 +1,4 @@
-# Zephyr-Mind Technical Context
+# NeuroLink Technical Context
 
 ## Technology Stack
 
@@ -23,8 +23,8 @@
 ### Setup
 ```bash
 # Clone repository
-git clone https://github.com/juspay/zephyr-mind
-cd zephyr-mind
+git clone https://github.com/juspay/neurolink
+cd neurolink
 
 # Install dependencies
 pnpm install
