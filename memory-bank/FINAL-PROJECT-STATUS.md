@@ -33,7 +33,7 @@
 
 ### **Package Structure**:
 ```
-/Users/sachinsharma/Developer/Official/neurolink/
+neurolink/
 ├── src/lib/
 │   ├── core/
 │   │   ├── factory.ts      ✅ Provider factory implementation
@@ -119,7 +119,7 @@ If you want to enhance the package further, these are **optional**:
 
 ### **Quick Test** (Verify it works):
 ```bash
-cd /Users/sachinsharma/Developer/Official/zephyr-mind
+cd neurolink
 npm test  # Should show 10 tests with expected behavior
 npm run build  # Should compile successfully
 ```
