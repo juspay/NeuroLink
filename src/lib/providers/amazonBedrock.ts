@@ -65,7 +65,7 @@ export class AmazonBedrock implements AIProvider {
     this.modelName = modelName || getBedrockModelId();
 
     try {
-      console.log(`[${functionTag}] Function called`, {
+      log.info(functionTag, 'Function called', {
         modelName: this.modelName,
         envBedrockModel: process.env.BEDROCK_MODEL,
         envBedrockModelId: process.env.BEDROCK_MODEL_ID,
@@ -84,7 +84,7 @@ export class AmazonBedrock implements AIProvider {
         region: getAWSRegion()
       };
 
-      console.log(`[${functionTag}] AWS config validation`, {
+      log.info(functionTag, 'AWS config validation', {
         hasAccessKeyId: !!awsConfig.accessKeyId,
         hasSecretAccessKey: !!awsConfig.secretAccessKey,
         region: awsConfig.region || 'MISSING',
@@ -97,22 +97,22 @@ export class AmazonBedrock implements AIProvider {
         const sessionToken = getAWSSessionToken();
         if (sessionToken) {
           awsConfig.sessionToken = sessionToken;
-          console.log(`[${functionTag}] Session token added`, {
+          log.info(functionTag, 'Session token added', {
             environment: 'dev'
           });
         } else {
-          console.warn(`[${functionTag}] Session token missing`, {
+          log.warn(functionTag, 'Session token missing', {
             environment: 'dev'
           });
         }
       }
 
-      console.log(`[${functionTag}] AWS config created`, {
+      log.info(functionTag, 'AWS config created', {
         region: awsConfig.region,
         hasSessionToken: !!awsConfig.sessionToken
       });
 
-      console.log(`[${functionTag}] Bedrock provider creating`, {
+      log.info(functionTag, 'Bedrock provider creating', {
         modelName: this.modelName
       });
 
