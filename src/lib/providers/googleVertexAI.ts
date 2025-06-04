@@ -20,7 +20,7 @@ async function getCreateVertexAnthropic() {
     return _createVertexAnthropic;
   } catch (error) {
     // Anthropic module not available
-    console.warn('[GoogleVertexAI] Anthropic module not available. Install @ai-sdk/google-vertex ^2.2.0 for Anthropic model support.');
+    log.warn('GoogleVertexAI.getCreateVertexAnthropic', 'Anthropic module not available. Install @ai-sdk/google-vertex ^2.2.0 for Anthropic model support.');
     return null;
   }
 }
@@ -101,7 +101,7 @@ const setupGoogleAuth = async (): Promise<void> => {
   if (hasServiceAccountKeyAuth() && !hasPrincipalAccountAuth()) {
     const serviceAccountKey = getGoogleServiceAccountKey();
 
-    console.log(`[${functionTag}] Service account key auth (JSON string)`, {
+    log.info(functionTag, 'Service account key auth (JSON string)', {
       hasServiceAccountKey: !!serviceAccountKey,
       authMethod: 'service_account_key'
     });
@@ -119,12 +119,12 @@ const setupGoogleAuth = async (): Promise<void> => {
       writeFileSync(tempFile, serviceAccountKey!);
       process.env.GOOGLE_APPLICATION_CREDENTIALS = tempFile;
 
-      console.log(`[${functionTag}] Created temporary credentials file`, {
+      log.info(functionTag, 'Created temporary credentials file', {
         tempFile: '[CREATED]',
         authMethod: 'service_account_key_temp_file'
       });
     } catch (error) {
-      console.error(`[${functionTag}] Failed to parse service account key`, {
+      log.error(functionTag, 'Failed to parse service account key', {
         error: error instanceof Error ? error.message : String(error)
       });
       const sanitizedKey = serviceAccountKey?.substring(0, 10) + '...';
@@ -137,7 +137,7 @@ const setupGoogleAuth = async (): Promise<void> => {
     const clientEmail = getGoogleClientEmail();
     const privateKey = getGooglePrivateKey();
 
-    console.log(`[${functionTag}] Service account env auth (separate variables)`, {
+    log.info(functionTag, 'Service account env auth (separate variables)', {
       hasClientEmail: !!clientEmail,
       hasPrivateKey: !!privateKey,
       authMethod: 'service_account_env'
@@ -163,12 +163,12 @@ const setupGoogleAuth = async (): Promise<void> => {
       writeFileSync(tempFile, JSON.stringify(serviceAccount, null, 2));
       process.env.GOOGLE_APPLICATION_CREDENTIALS = tempFile;
 
-      console.log(`[${functionTag}] Created temporary credentials file from env vars`, {
+      log.info(functionTag, 'Created temporary credentials file from env vars', {
         tempFile: '[CREATED]',
         authMethod: 'service_account_env_temp_file'
       });
     } catch (error) {
-      console.error(`[${functionTag}] Failed to create service account file from env vars`, {
+      log.error(functionTag, 'Failed to create service account file from env vars', {
         error: error instanceof Error ? error.message : String(error)
       });
       throw new Error('Failed to create temporary service account file from environment variables.');
@@ -192,7 +192,7 @@ const createVertexSettings = async (): Promise<GoogleVertexProviderSettings> => 
   if (hasPrincipalAccountAuth()) {
     const credentialsPath = getGoogleApplicationCredentials();
 
-    console.log(`[${functionTag}] Principal account auth (file path)`, {
+    log.info(functionTag, 'Principal account auth (file path)', {
       credentialsPath: credentialsPath ? '[PROVIDED]' : '[NOT_PROVIDED]',
       authMethod: 'principal_account_file'
     });
@@ -202,7 +202,7 @@ const createVertexSettings = async (): Promise<GoogleVertexProviderSettings> => 
 
   // Method 2 & 3: Other methods now set GOOGLE_APPLICATION_CREDENTIALS in setupGoogleAuth()
   if (hasServiceAccountKeyAuth() || hasServiceAccountEnvAuth()) {
-    console.log(`[${functionTag}] Alternative auth method configured`, {
+    log.info(functionTag, 'Alternative auth method configured', {
       authMethod: hasServiceAccountKeyAuth() ? 'service_account_key' : 'service_account_env',
       credentialsSet: !!process.env.GOOGLE_APPLICATION_CREDENTIALS
     });
@@ -211,7 +211,7 @@ const createVertexSettings = async (): Promise<GoogleVertexProviderSettings> => 
   }
 
   // No valid authentication found
-  console.error(`[${functionTag}] No valid authentication method found`, {
+  log.error(functionTag, 'No valid authentication method found', {
     authMethod: 'none',
     hasPrincipalAccount: hasPrincipalAccountAuth(),
     hasServiceAccountKey: hasServiceAccountKeyAuth(),
@@ -260,39 +260,39 @@ export class GoogleVertexAI implements AIProvider {
     this.modelName = modelName || getVertexModelId();
 
     try {
-      console.log(`[${functionTag}] Initialization started`, {
+      log.info(functionTag, 'Initialization started', {
         modelName: this.modelName,
         isAnthropic: isAnthropicModel(this.modelName)
       });
 
       const hasPrincipal = hasPrincipalAccountAuth();
 
-      console.log(`[${functionTag}] Authentication validation`, {
+      log.info(functionTag, 'Authentication validation', {
         hasPrincipalAccountAuth: hasPrincipal,
         projectId: getGCPVertexBreezeProjectId() || 'MISSING',
         location: getGCPVertexBreezeLocation() || 'MISSING'
       });
 
       if (hasPrincipal) {
-        console.log(`[${functionTag}] Auth method selected`, {
+        log.info(functionTag, 'Auth method selected', {
           authMethod: 'principal_account',
           hasGoogleApplicationCredentials: !!getGoogleApplicationCredentials()
         });
       } else {
-        console.warn(`[${functionTag}] Auth method missing`, {
+        log.warn(functionTag, 'Auth method missing', {
           authMethod: 'none',
           hasPrincipalAccountAuth: hasPrincipal
         });
       }
 
-      console.log(`[${functionTag}] Initialization completed`, {
+      log.info(functionTag, 'Initialization completed', {
         modelName: this.modelName,
         isAnthropic: isAnthropicModel(this.modelName),
         authMethod: hasPrincipalAccountAuth() ? 'principal_account' : 'none',
         success: true
       });
     } catch (err) {
-      console.error(`[${functionTag}] Initialization failed`, {
+      log.error(functionTag, 'Initialization failed', {
         message: 'Error in initializing Google Vertex AI',
         modelName: this.modelName,
         isAnthropic: isAnthropicModel(this.modelName),
