@@ -10,7 +10,7 @@ import {
   type GenerateTextResult,
   type LanguageModelV1
 } from 'ai';
-import type { AIProvider } from '../core/types.js';
+import type { AIProvider, TextGenerationOptions, StreamTextOptions } from '../core/types.js';
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
@@ -62,7 +62,7 @@ export class OpenAI implements AIProvider {
   }
 
   async streamText(
-    prompt: string,
+    optionsOrPrompt: StreamTextOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>
   ): Promise<StreamTextResult<ToolSet, unknown> | null> {
     const functionTag = 'OpenAI.streamText';
@@ -70,10 +70,36 @@ export class OpenAI implements AIProvider {
     let chunkCount = 0;
 
     try {
+      // Parse parameters - support both string and options object
+      const options = typeof optionsOrPrompt === 'string'
+        ? { prompt: optionsOrPrompt }
+        : optionsOrPrompt;
+
+      const {
+        prompt,
+        temperature = 0.7,
+        maxTokens = 500,
+        systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+        schema
+      } = options;
+
+      // Use schema from options or fallback parameter
+      const finalSchema = schema || analysisSchema;
+
+      console.log(`[${functionTag}] Stream text started`, {
+        provider,
+        modelName: this.modelName,
+        promptLength: prompt.length,
+        temperature,
+        maxTokens
+      });
+
       const streamOptions = {
         model: this.model,
         prompt: prompt,
-        system: DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+        system: systemPrompt,
+        temperature,
+        maxTokens,
 
         onError: (event: { error: unknown }) => {
           const error = event.error;
@@ -118,15 +144,9 @@ export class OpenAI implements AIProvider {
         }
       } as Parameters<typeof streamText>[0];
 
-      if (analysisSchema) {
-        streamOptions.experimental_output = Output.object({ schema: analysisSchema });
+      if (finalSchema) {
+        streamOptions.experimental_output = Output.object({ schema: finalSchema });
       }
-
-      console.log(`[${functionTag}] Stream text started`, {
-        provider,
-        modelName: this.modelName,
-        promptLength: prompt.length
-      });
 
       const result = streamText(streamOptions);
       return result;
@@ -142,28 +162,48 @@ export class OpenAI implements AIProvider {
   }
 
   async generateText(
-    prompt: string,
+    optionsOrPrompt: TextGenerationOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>
   ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
     const functionTag = 'OpenAI.generateText';
     const provider = 'openai';
 
     try {
-      const generateOptions = {
-        model: this.model,
-        prompt: prompt,
-        system: DEFAULT_SYSTEM_CONTEXT.systemPrompt
-      } as Parameters<typeof generateText>[0];
+      // Parse parameters - support both string and options object
+      const options = typeof optionsOrPrompt === 'string'
+        ? { prompt: optionsOrPrompt }
+        : optionsOrPrompt;
 
-      if (analysisSchema) {
-        generateOptions.experimental_output = Output.object({ schema: analysisSchema });
-      }
+      const {
+        prompt,
+        temperature = 0.7,
+        maxTokens = 500,
+        systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+        schema
+      } = options;
+
+      // Use schema from options or fallback parameter
+      const finalSchema = schema || analysisSchema;
 
       console.log(`[${functionTag}] Generate text started`, {
         provider,
         modelName: this.modelName,
-        promptLength: prompt.length
+        promptLength: prompt.length,
+        temperature,
+        maxTokens
       });
+
+      const generateOptions = {
+        model: this.model,
+        prompt: prompt,
+        system: systemPrompt,
+        temperature,
+        maxTokens
+      } as Parameters<typeof generateText>[0];
+
+      if (finalSchema) {
+        generateOptions.experimental_output = Output.object({ schema: finalSchema });
+      }
 
       const result = await generateText(generateOptions);
 
@@ -171,7 +211,8 @@ export class OpenAI implements AIProvider {
         provider,
         modelName: this.modelName,
         usage: result.usage,
-        finishReason: result.finishReason
+        finishReason: result.finishReason,
+        responseLength: result.text?.length || 0
       });
 
       return result;

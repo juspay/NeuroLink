@@ -10,7 +10,7 @@ import {
   type GenerateTextResult,
   type LanguageModelV1
 } from 'ai';
-import type { AIProvider } from '../core/types.js';
+import type { AIProvider, TextGenerationOptions, StreamTextOptions } from '../core/types.js';
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
@@ -19,7 +19,9 @@ const DEFAULT_SYSTEM_CONTEXT = {
 
 // Configuration helpers
 const getBedrockModelId = (): string => {
-  return process.env.BEDROCK_MODEL_ID || 'arn:aws:bedrock:us-east-2:account:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0';
+  return process.env.BEDROCK_MODEL ||
+         process.env.BEDROCK_MODEL_ID ||
+         'arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0';
 };
 
 const getAWSAccessKeyId = (): string => {
@@ -61,7 +63,12 @@ export class AmazonBedrock implements AIProvider {
     this.modelName = modelName || getBedrockModelId();
 
     try {
-      console.log(`[${functionTag}] Function called`, { modelName: this.modelName });
+      console.log(`[${functionTag}] Function called`, {
+        modelName: this.modelName,
+        envBedrockModel: process.env.BEDROCK_MODEL,
+        envBedrockModelId: process.env.BEDROCK_MODEL_ID,
+        fallbackModel: 'arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0'
+      });
 
       // Configure AWS credentials for custom Bedrock instance
       const awsConfig: {
@@ -78,7 +85,9 @@ export class AmazonBedrock implements AIProvider {
       console.log(`[${functionTag}] AWS config validation`, {
         hasAccessKeyId: !!awsConfig.accessKeyId,
         hasSecretAccessKey: !!awsConfig.secretAccessKey,
-        region: awsConfig.region || 'MISSING'
+        region: awsConfig.region || 'MISSING',
+        accessKeyIdLength: awsConfig.accessKeyId?.length || 0,
+        hasSessionToken: !!process.env.AWS_SESSION_TOKEN
       });
 
       // Add session token for development environment
@@ -147,7 +156,7 @@ export class AmazonBedrock implements AIProvider {
   }
 
   async streamText(
-    prompt: string,
+    optionsOrPrompt: StreamTextOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>
   ): Promise<StreamTextResult<ToolSet, unknown> | null> {
     const functionTag = 'AmazonBedrock.streamText';
@@ -155,16 +164,36 @@ export class AmazonBedrock implements AIProvider {
     let chunkCount = 0;
 
     try {
+      // Parse parameters - support both string and options object
+      const options = typeof optionsOrPrompt === 'string'
+        ? { prompt: optionsOrPrompt }
+        : optionsOrPrompt;
+
+      const {
+        prompt,
+        temperature = 0.7,
+        maxTokens = 500,
+        systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+        schema
+      } = options;
+
+      // Use schema from options or fallback parameter
+      const finalSchema = schema || analysisSchema;
+
       console.log(`[${functionTag}] Stream request started`, {
         provider,
         modelName: this.modelName,
-        promptLength: prompt.length
+        promptLength: prompt.length,
+        temperature,
+        maxTokens
       });
 
       const streamOptions = {
         model: this.model,
         prompt: prompt,
-        system: DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+        system: systemPrompt,
+        temperature,
+        maxTokens,
 
         onError: (event: { error: unknown }) => {
           const error = event.error;
@@ -211,16 +240,9 @@ export class AmazonBedrock implements AIProvider {
         }
       } as Parameters<typeof streamText>[0];
 
-      if (analysisSchema) {
-        streamOptions.experimental_output = Output.object({ schema: analysisSchema });
+      if (finalSchema) {
+        streamOptions.experimental_output = Output.object({ schema: finalSchema });
       }
-
-      console.log(`[${functionTag}] Stream text started`, {
-        provider,
-        modelName: this.modelName,
-        region: getAWSRegion(),
-        promptLength: prompt.length
-      });
 
       // Direct streamText call - let the real error bubble up
       const result = streamText(streamOptions);
@@ -245,29 +267,49 @@ export class AmazonBedrock implements AIProvider {
   }
 
   async generateText(
-    prompt: string,
+    optionsOrPrompt: TextGenerationOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>
   ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
     const functionTag = 'AmazonBedrock.generateText';
     const provider = 'bedrock';
 
     try {
-      const generateOptions = {
-        model: this.model,
-        prompt: prompt,
-        system: DEFAULT_SYSTEM_CONTEXT.systemPrompt
-      } as Parameters<typeof generateText>[0];
+      // Parse parameters - support both string and options object
+      const options = typeof optionsOrPrompt === 'string'
+        ? { prompt: optionsOrPrompt }
+        : optionsOrPrompt;
 
-      if (analysisSchema) {
-        generateOptions.experimental_output = Output.object({ schema: analysisSchema });
-      }
+      const {
+        prompt,
+        temperature = 0.7,
+        maxTokens = 500,
+        systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+        schema
+      } = options;
+
+      // Use schema from options or fallback parameter
+      const finalSchema = schema || analysisSchema;
 
       console.log(`[${functionTag}] Generate text started`, {
         provider,
         modelName: this.modelName,
         region: getAWSRegion(),
-        promptLength: prompt.length
+        promptLength: prompt.length,
+        temperature,
+        maxTokens
       });
+
+      const generateOptions = {
+        model: this.model,
+        prompt: prompt,
+        system: systemPrompt,
+        temperature,
+        maxTokens
+      } as Parameters<typeof generateText>[0];
+
+      if (finalSchema) {
+        generateOptions.experimental_output = Output.object({ schema: finalSchema });
+      }
 
       const result = await generateText(generateOptions);
 
@@ -275,7 +317,8 @@ export class AmazonBedrock implements AIProvider {
         provider,
         modelName: this.modelName,
         usage: result.usage,
-        finishReason: result.finishReason
+        finishReason: result.finishReason,
+        responseLength: result.text?.length || 0
       });
 
       return result;

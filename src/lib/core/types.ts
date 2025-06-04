@@ -63,16 +63,40 @@ export interface StreamingOptions {
 }
 
 /**
- * AI Provider interface
+ * Text generation options interface
+ */
+export interface TextGenerationOptions {
+  prompt: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  systemPrompt?: string;
+  schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
+}
+
+/**
+ * Stream text options interface
+ */
+export interface StreamTextOptions {
+  prompt: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  systemPrompt?: string;
+  schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
+}
+
+/**
+ * AI Provider interface with flexible parameter support
  */
 export interface AIProvider {
   streamText(
-    prompt: string,
+    optionsOrPrompt: StreamTextOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>
   ): Promise<StreamTextResult<ToolSet, unknown> | null>;
 
   generateText(
-    prompt: string,
+    optionsOrPrompt: TextGenerationOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>
   ): Promise<GenerateTextResult<ToolSet, unknown> | null>;
 }

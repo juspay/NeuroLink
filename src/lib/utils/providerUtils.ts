@@ -13,8 +13,8 @@ export function getBestProvider(requestedProvider?: string): string {
     return requestedProvider;
   }
 
-  // Default fallback order based on environment variables
-  const providers = ['bedrock', 'vertex', 'openai'];
+  // Default fallback order based on environment variables - OpenAI first since it's most reliable
+  const providers = ['openai', 'vertex', 'bedrock'];
 
   // Check which providers have their required environment variables
   for (const provider of providers) {

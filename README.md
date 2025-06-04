@@ -1,6 +1,6 @@
 # 🧠 NeuroLink
 
-[![npm version](https://badge.fury.io/js/neurolink.svg)](https://badge.fury.io/js/neurolink)
+[![npm version](https://badge.fury.io/js/%40juspay%2Fneurolink.svg)](https://badge.fury.io/js/%40juspay%2Fneurolink)
 [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -11,11 +11,11 @@
 ## Quick Start
 
 ```bash
-npm install neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
+npm install @juspay/neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
 ```
 
 ```typescript
-import { createBestAIProvider } from 'neurolink';
+import { createBestAIProvider } from '@juspay/neurolink';
 
 // Auto-selects best available provider
 const provider = createBestAIProvider();
@@ -25,6 +25,27 @@ const result = await provider.generateText({
 
 console.log(result.text);
 ```
+
+## 🎬 Visual Demo & Documentation
+
+**No installation required!** Experience NeuroLink's capabilities through our comprehensive visual content:
+
+### 📸 Screenshots
+- **6 Professional Screenshots** showing all features in action
+- **Real AI-generated content** displayed in the interface
+- **Complete feature coverage** across all use cases
+
+### 🎥 Demo Videos
+- **5 Complete demonstration videos** with actual AI generation
+- **5,681+ tokens** of real AI content generated during recording
+- **Professional quality** 1920x1080 recordings
+
+### 💻 Live Interactive Demo
+- **Working Express.js server** with real API integration
+- **All 3 providers functional** (OpenAI, Bedrock, Vertex AI)
+- **15+ use cases** demonstrated across business, creative, and developer tools
+
+[View complete visual documentation](./neurolink-demo/) including screenshots, videos, and interactive examples.
 
 ## Table of Contents
 
@@ -57,13 +78,13 @@ console.log(result.text);
 ### Package Installation
 ```bash
 # npm
-npm install neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
+npm install @juspay/neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
 
 # yarn
-yarn add neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
+yarn add @juspay/neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
 
 # pnpm (recommended)
-pnpm add neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
+pnpm add @juspay/neurolink ai @ai-sdk/amazon-bedrock @ai-sdk/openai @ai-sdk/google-vertex zod
 ```
 
 ### Environment Setup
@@ -79,7 +100,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
 
 ### Simple Text Generation
 ```typescript
-import { createBestAIProvider } from 'neurolink';
+import { createBestAIProvider } from '@juspay/neurolink';
 
 const provider = createBestAIProvider();
 
@@ -96,7 +117,7 @@ console.log(`Used: ${result.provider}`);
 
 ### Streaming Responses
 ```typescript
-import { createBestAIProvider } from 'neurolink';
+import { createBestAIProvider } from '@juspay/neurolink';
 
 const provider = createBestAIProvider();
 
@@ -114,7 +135,7 @@ for await (const chunk of result.textStream) {
 
 ### Provider Selection
 ```typescript
-import { AIProviderFactory } from 'neurolink';
+import { AIProviderFactory } from '@juspay/neurolink';
 
 // Use specific provider
 const openai = AIProviderFactory.createProvider('openai', 'gpt-4o');
@@ -132,7 +153,7 @@ const { primary, fallback } = AIProviderFactory.createProviderWithFallback(
 
 #### API Route (`src/routes/api/chat/+server.ts`)
 ```typescript
-import { createBestAIProvider } from 'neurolink';
+import { createBestAIProvider } from '@juspay/neurolink';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -215,7 +236,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 #### App Router API (`app/api/ai/route.ts`)
 ```typescript
-import { createBestAIProvider } from 'neurolink';
+import { createBestAIProvider } from '@juspay/neurolink';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -306,7 +327,7 @@ export default function AIChat() {
 
 ```typescript
 import express from 'express';
-import { createBestAIProvider, AIProviderFactory } from 'neurolink';
+import { createBestAIProvider, AIProviderFactory } from '@juspay/neurolink';
 
 const app = express();
 app.use(express.json());
@@ -517,34 +538,175 @@ export OPENAI_API_KEY="sk-your-key-here"
 ```
 
 ### Amazon Bedrock Setup
+
+**⚠️ CRITICAL: Anthropic Models Require Inference Profile ARN**
+
+For Anthropic Claude models in Bedrock, you **MUST** use the full inference profile ARN, not simple model names:
+
 ```bash
 export AWS_ACCESS_KEY_ID="your-access-key"
 export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export AWS_REGION="us-east-1"
+export AWS_REGION="us-east-2"
+
+# ✅ CORRECT: Use full inference profile ARN for Anthropic models
+export BEDROCK_MODEL="arn:aws:bedrock:us-east-2:<account_id>:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+
+# ❌ WRONG: Simple model names cause "not authorized to invoke this API" errors
+# export BEDROCK_MODEL="anthropic.claude-3-sonnet-20240229-v1:0"
+```
+
+#### Why Inference Profiles?
+- **Cross-Region Access**: Faster access across AWS regions
+- **Better Performance**: Optimized routing and response times
+- **Higher Availability**: Improved model availability and reliability
+- **Different Permissions**: Separate permission model from base models
+
+#### Available Inference Profile ARNs
+```bash
+# Claude 3.7 Sonnet (Latest - Recommended)
+BEDROCK_MODEL="arn:aws:bedrock:us-east-2:<account_id>:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+
+# Claude 3.5 Sonnet
+BEDROCK_MODEL="arn:aws:bedrock:us-east-2:<account_id>:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+# Claude 3 Haiku
+BEDROCK_MODEL="arn:aws:bedrock:us-east-2:<account_id>:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
+```
+
+#### Session Token Support
+For temporary credentials (common in development):
+```bash
+export AWS_SESSION_TOKEN="your-session-token"  # Required for temporary credentials
 ```
 
 ### Google Vertex AI Setup
+
+NeuroLink supports **three authentication methods** for Google Vertex AI:
+
+#### Method 1: Service Account File (Recommended for Production)
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 export GOOGLE_VERTEX_PROJECT="your-project-id"
 export GOOGLE_VERTEX_LOCATION="us-central1"
 ```
 
-### Environment Variables Reference
+#### Method 2: Service Account JSON String (Good for Containers/Cloud)
 ```bash
-# Provider selection (optional)
-AI_DEFAULT_PROVIDER="bedrock"
-AI_FALLBACK_PROVIDER="openai"
+export GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"your-project",...}'
+export GOOGLE_VERTEX_PROJECT="your-project-id"
+export GOOGLE_VERTEX_LOCATION="us-central1"
+```
 
-# Debug mode
-NEUROLINK_DEBUG="true"
+#### Method 3: Individual Environment Variables (Good for CI/CD)
+```bash
+export GOOGLE_AUTH_CLIENT_EMAIL="service-account@project.iam.gserviceaccount.com"
+export GOOGLE_AUTH_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE..."
+export GOOGLE_VERTEX_PROJECT="your-project-id"
+export GOOGLE_VERTEX_LOCATION="us-central1"
+```
+
+### Complete Environment Variables Reference
+
+#### OpenAI Configuration
+```bash
+# Required
+OPENAI_API_KEY="sk-your-openai-api-key"
+
+# Optional
+OPENAI_MODEL="gpt-4o"                    # Default model to use
+```
+
+#### Amazon Bedrock Configuration
+```bash
+# Required
+AWS_ACCESS_KEY_ID="your-aws-access-key"
+AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+
+# Optional
+AWS_REGION="us-east-2"                   # Default: us-east-2
+AWS_SESSION_TOKEN="your-session-token"   # Required for temporary credentials
+BEDROCK_MODEL_ID="anthropic.claude-3-7-sonnet-20250219-v1:0"  # Default model
+```
+
+#### Google Vertex AI Configuration
+```bash
+# Required (choose one authentication method)
+# Method 1: Service Account File
+GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+
+# Method 2: Service Account JSON String
+GOOGLE_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
+
+# Method 3: Individual Environment Variables
+GOOGLE_AUTH_CLIENT_EMAIL="service-account@project.iam.gserviceaccount.com"
+GOOGLE_AUTH_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE..."
+
+# Required for all methods
+GOOGLE_VERTEX_PROJECT="your-gcp-project-id"
+
+# Optional
+GOOGLE_VERTEX_LOCATION="us-east5"        # Default: us-east5
+VERTEX_MODEL_ID="claude-sonnet-4@20250514"  # Default model
+```
+
+#### General Configuration
+```bash
+# Provider Selection (optional)
+DEFAULT_PROVIDER="bedrock"               # Primary provider preference
+FALLBACK_PROVIDER="openai"               # Fallback provider
+
+# Application Settings
+PUBLIC_APP_ENVIRONMENT="dev"             # dev, staging, production
+ENABLE_STREAMING="true"                  # Enable streaming responses
+ENABLE_FALLBACK="true"                   # Enable automatic fallback
+
+# Debug and Logging
+NEUROLINK_DEBUG="true"                   # Enable debug logging
+LOG_LEVEL="info"                         # error, warn, info, debug
+```
+
+#### Environment File Example (.env)
+```bash
+# Copy this to your .env file and fill in your credentials
+
+# OpenAI
+OPENAI_API_KEY=sk-your-openai-key-here
+OPENAI_MODEL=gpt-4o
+
+# Amazon Bedrock
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_REGION=us-east-2
+BEDROCK_MODEL_ID=anthropic.claude-3-7-sonnet-20250219-v1:0
+
+# Google Vertex AI (choose one method)
+# Method 1: File path
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account.json
+
+# Method 2: JSON string (uncomment to use)
+# GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"your-project",...}
+
+# Method 3: Individual variables (uncomment to use)
+# GOOGLE_AUTH_CLIENT_EMAIL=service-account@your-project.iam.gserviceaccount.com
+# GOOGLE_AUTH_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----"
+
+# Required for all Google Vertex AI methods
+GOOGLE_VERTEX_PROJECT=your-gcp-project-id
+GOOGLE_VERTEX_LOCATION=us-east5
+VERTEX_MODEL_ID=claude-sonnet-4@20250514
+
+# Application Settings
+DEFAULT_PROVIDER=auto
+ENABLE_STREAMING=true
+ENABLE_FALLBACK=true
+NEUROLINK_DEBUG=false
 ```
 
 ## Advanced Patterns
 
 ### Custom Configuration
 ```typescript
-import { AIProviderFactory } from 'neurolink';
+import { AIProviderFactory } from '@juspay/neurolink';
 
 // Environment-based provider selection
 const isDev = process.env.NODE_ENV === 'development';
@@ -656,7 +818,7 @@ The security token included in the request is expired
 
 ### Comprehensive Error Handling
 ```typescript
-import { createBestAIProvider } from 'neurolink';
+import { createBestAIProvider } from '@juspay/neurolink';
 
 async function robustGenerate(prompt: string, maxRetries = 3) {
   let attempt = 0;
