@@ -1,4 +1,4 @@
-# Zephyr-Mind Progress Tracker
+# NeuroLink Progress Tracker
 
 ## Project Milestones
 

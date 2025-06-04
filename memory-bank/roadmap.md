@@ -1,7 +1,7 @@
-# Zephyr-Mind Development Roadmap
+# NeuroLink Development Roadmap
 
 ## Overview
-This roadmap outlines the planned development trajectory for the Zephyr-Mind AI toolkit, spanning from immediate bug fixes to long-term strategic enhancements. The goal is to provide a clear direction for development while allowing flexibility to adapt to user feedback and emerging AI technologies.
+This roadmap outlines the planned development trajectory for the NeuroLink AI toolkit, spanning from immediate bug fixes to long-term strategic enhancements. The goal is to provide a clear direction for development while allowing flexibility to adapt to user feedback and emerging AI technologies.
 
 ## Q2-Q3 2025 (Short-term)
 
