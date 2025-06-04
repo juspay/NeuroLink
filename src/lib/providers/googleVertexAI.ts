@@ -308,7 +308,7 @@ export class GoogleVertexAI implements AIProvider {
    */
   private async getModel(): Promise<LanguageModelV1> {
     if (isAnthropicModel(this.modelName)) {
-      console.log('GoogleVertexAI.getModel - Anthropic model selected', {
+      log.info('GoogleVertexAI.getModel', 'Anthropic model selected', {
         modelName: this.modelName
       });
 
@@ -352,7 +352,7 @@ export class GoogleVertexAI implements AIProvider {
       // Use schema from options or fallback parameter
       const finalSchema = optionsSchema || analysisSchema;
 
-      console.log(`[${functionTag}] Stream request started`, {
+      log.info(functionTag, 'Stream request started', {
         provider,
         modelName: this.modelName,
         isAnthropic: isAnthropicModel(this.modelName),
@@ -376,7 +376,7 @@ export class GoogleVertexAI implements AIProvider {
           const errorMessage = error instanceof Error ? error.message : String(error);
           const errorStack = error instanceof Error ? error.stack : undefined;
 
-          console.error(`[${functionTag}] Stream text error`, {
+          log.error(functionTag, 'Stream text error', {
             provider,
             modelName: this.modelName,
             error: errorMessage,
@@ -391,7 +391,7 @@ export class GoogleVertexAI implements AIProvider {
           usage: Record<string, unknown>;
           text?: string;
         }) => {
-          console.log(`[${functionTag}] Stream text finished`, {
+          log.info(functionTag, 'Stream text finished', {
             provider,
             modelName: this.modelName,
             finishReason: event.finishReason,
@@ -404,7 +404,7 @@ export class GoogleVertexAI implements AIProvider {
 
         onChunk: (event: { chunk: { type: string; text?: string } }) => {
           chunkCount++;
-          console.debug(`[${functionTag}] Stream text chunk`, {
+          log.debug(functionTag, 'Stream text chunk', {
             provider,
             modelName: this.modelName,
             chunkNumber: chunkCount,
@@ -421,7 +421,7 @@ export class GoogleVertexAI implements AIProvider {
       const result = streamText(streamOptions);
       return result;
     } catch (err) {
-      console.error(`[${functionTag}] Exception`, {
+      log.error(functionTag, 'Exception', {
         provider,
         modelName: this.modelName,
         message: 'Error in streaming text',
@@ -455,7 +455,7 @@ export class GoogleVertexAI implements AIProvider {
       // Use schema from options or fallback parameter
       const finalSchema = optionsSchema || analysisSchema;
 
-      console.log(`[${functionTag}] Generate request started`, {
+      log.info(functionTag, 'Generate request started', {
         provider,
         modelName: this.modelName,
         isAnthropic: isAnthropicModel(this.modelName),
@@ -480,7 +480,7 @@ export class GoogleVertexAI implements AIProvider {
 
       const result = await generateText(generateOptions);
 
-      console.log(`[${functionTag}] Generate text completed`, {
+      log.info(functionTag, 'Generate text completed', {
         provider,
         modelName: this.modelName,
         usage: result.usage,
@@ -490,7 +490,7 @@ export class GoogleVertexAI implements AIProvider {
 
       return result;
     } catch (err) {
-      console.error(`[${functionTag}] Exception`, {
+      log.error(functionTag, 'Exception', {
         provider,
         modelName: this.modelName,
         message: 'Error in generating text',
