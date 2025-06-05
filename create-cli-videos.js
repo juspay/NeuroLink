@@ -117,7 +117,7 @@ async function recordScenario(scenario) {
       let cleanOutput = result.output
         .replace(/\x1b\[[0-9;]*m/g, '') // Remove ANSI color codes
         .replace(/⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏/g, '') // Remove spinner characters
-        .replace(/🤖|✅|✔|❌|📊|🔍|🎯/g, '') // Keep emojis but clean spacing
+        .replace(/🤖|✅|✔|❌|📊|🔍|🎯/g, '') // Remove status emojis for clean terminal output
         .trim();
 
       // Add output to terminal

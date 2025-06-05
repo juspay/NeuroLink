@@ -162,7 +162,7 @@ export async function createTerminalSession(page, width = 1920, height = 1080) {
  */
 export async function executeCommand(command) {
   return new Promise((resolve) => {
-    exec(command, { shell: true }, (error, stdout, stderr) => {
+    exec(command, { shell: true, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
       if (error) {
         resolve({
           success: false,
