@@ -249,15 +249,19 @@ export async function typeCommand(page, command, description = null, typingDelay
     content.innerHTML += '<div class="command-line"><span class="prompt">$ </span><span class="command"></span></div>';
   });
 
-  // Type command character by character
-  for (let char of command) {
-    await page.evaluate((c) => {
-      const commandSpan = document.querySelector('.command-line:last-child .command');
-      if (commandSpan) {
-        commandSpan.textContent += c;
-      }
-    }, char);
-    await page.waitForTimeout(typingDelay);
+  // Type command with batched character updates for better performance
+  let typedCommand = '';
+  for (let i = 0; i < command.length; i++) {
+    typedCommand += command[i];
+    if ((i + 1) % 10 === 0 || i === command.length - 1) { // Batch updates every 10 characters or at the end
+      await page.evaluate((cmd) => {
+        const commandSpan = document.querySelector('.command-line:last-child .command');
+        if (commandSpan) {
+          commandSpan.textContent = cmd;
+        }
+      }, typedCommand);
+      await page.waitForTimeout(typingDelay);
+    }
   }
 
   await page.waitForTimeout(500);
