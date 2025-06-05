@@ -16,6 +16,7 @@ export async function createTerminalSession(page, width = 1920, height = 1080) {
   await page.setViewportSize({ width, height });
 
   const { terminalStyle } = AUTOMATION_CONFIG;
+  const { colors, layout, spacing } = terminalStyle;
 
   // Set up a professional dark terminal interface
   await page.setContent(`
@@ -26,89 +27,89 @@ export async function createTerminalSession(page, width = 1920, height = 1080) {
       <style>
         body {
           margin: 0;
-          padding: 20px;
+          padding: ${spacing.bodyPadding};
           background: ${terminalStyle.background};
           color: ${terminalStyle.textColor};
           font-family: ${terminalStyle.fontFamily};
-          font-size: 16px;
-          line-height: 1.5;
+          font-size: ${layout.bodyFontSize};
+          line-height: ${layout.lineHeight};
         }
         .terminal {
           background: ${terminalStyle.terminalBackground};
           border: 1px solid ${terminalStyle.border};
-          border-radius: 8px;
-          padding: 25px;
-          margin: 20px 0;
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-          min-height: 600px;
+          border-radius: ${layout.borderRadius};
+          padding: ${layout.terminalPadding};
+          margin: ${spacing.terminalMargin};
+          box-shadow: ${layout.boxShadow};
+          min-height: ${layout.terminalMinHeight};
         }
         .header {
-          color: ${terminalStyle.colors.primary};
-          font-size: 28px;
+          color: ${colors.primary};
+          font-size: ${layout.headerFontSize};
           font-weight: bold;
-          margin-bottom: 25px;
+          margin-bottom: ${spacing.headerMarginBottom};
           text-align: center;
           border-bottom: 1px solid ${terminalStyle.border};
-          padding-bottom: 15px;
+          padding-bottom: ${spacing.headerPaddingBottom};
         }
         .subheader {
-          color: ${terminalStyle.colors.description};
-          font-size: 16px;
+          color: ${colors.description};
+          font-size: ${layout.subheaderFontSize};
           text-align: center;
-          margin-bottom: 30px;
+          margin-bottom: ${spacing.subheaderMarginBottom};
           font-style: italic;
         }
         .command-section {
-          margin: 25px 0;
+          margin: ${spacing.commandSectionMargin};
         }
         .command-line {
-          margin: 12px 0;
+          margin: ${spacing.commandLineMargin};
           display: flex;
           align-items: flex-start;
         }
         .prompt {
-          color: ${terminalStyle.colors.prompt};
+          color: ${colors.prompt};
           font-weight: bold;
-          margin-right: 8px;
+          margin-right: ${spacing.promptMarginRight};
         }
         .command {
-          color: ${terminalStyle.colors.command};
+          color: ${colors.command};
           font-weight: 500;
         }
         .output {
           color: ${terminalStyle.textColor};
-          margin-left: 24px;
+          margin-left: ${spacing.outputMarginLeft};
           white-space: pre-wrap;
           background: ${terminalStyle.background};
-          padding: 15px;
-          border-radius: 6px;
-          border: 1px solid #21262d;
-          margin-top: 10px;
-          font-size: 14px;
+          padding: ${spacing.outputPadding};
+          border-radius: ${spacing.outputBorderRadius};
+          border: 1px solid ${colors.outputBorder};
+          margin-top: ${spacing.outputMarginTop};
+          font-size: ${layout.outputFontSize};
         }
         .success {
-          color: ${terminalStyle.colors.success};
+          color: ${colors.success};
         }
         .error {
-          color: ${terminalStyle.colors.error};
+          color: ${colors.error};
         }
         .info {
-          color: ${terminalStyle.colors.primary};
+          color: ${colors.primary};
         }
         .description {
-          color: ${terminalStyle.colors.description};
+          color: ${colors.description};
           font-style: italic;
-          margin-bottom: 10px;
-          font-size: 14px;
+          margin-bottom: ${spacing.descriptionMarginBottom};
+          font-size: ${layout.outputFontSize};
         }
         .timestamp {
-          color: ${terminalStyle.colors.timestamp};
-          font-size: 12px;
+          color: ${colors.timestamp};
+          font-size: ${layout.timestampFontSize};
           text-align: right;
-          margin-top: 20px;
+          margin-top: ${spacing.timestampMarginTop};
         }
         .highlight {
-          color: ${terminalStyle.colors.highlight};
+          color: ${colors.highlight};
           font-weight: bold;
         }
       </style>
