@@ -103,17 +103,8 @@ async function captureScreenshot(scenario) {
     console.log(`  🔧 Executing: ${scenario.command}`);
     const result = await executeCommand(scenario.command);
 
-    // Clean up output for display
-    let cleanOutput = result.output
-      .replace(/\x1b\[[0-9;]*m/g, '') // Remove ANSI color codes
-      .replace(/⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏/g, '') // Remove spinner characters
-      .replace(/;[^;]*;[^;]*;[^;]*$/, '') // Remove terminal artifacts
-      .trim();
-
-    // Limit output length for screenshot
-    if (cleanOutput.length > 2000) {
-      cleanOutput = cleanOutput.substring(0, 2000) + '\n...[output truncated for display]';
-    }
+    // Clean up output for display using centralized function
+    const cleanOutput = processCommandOutput(result.output, 2000);
 
     // Add command and output to terminal
     await page.evaluate(({ cmd, output, success }) => {
