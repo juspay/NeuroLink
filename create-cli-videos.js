@@ -219,12 +219,12 @@ async function recordScenario(scenario) {
 
   const browser = await chromium.launch({
     headless: false,
-    slowMo: 500,
-    args: ['--start-maximized']
+    slowMo: AUTOMATION_CONFIG.browser.slowMo,
+    args: AUTOMATION_CONFIG.browser.args
   });
 
   const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
+    viewport: AUTOMATION_CONFIG.browser.viewport,
     recordVideo: {
       dir: path.join(VIDEOS_DIR, scenario.name),
       size: { width: 1920, height: 1080 }
