@@ -10,13 +10,14 @@ import fs from 'fs';
 import path from 'path';
 import { spawn, exec } from 'child_process';
 import { fileURLToPath } from 'url';
+import { AUTOMATION_CONFIG, getDelayForContext } from './cli-automation-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configuration
-const SCREENSHOTS_DIR = path.join(__dirname, 'cli-screenshots');
-const DELAY_BETWEEN_ACTIONS = 1500;
+// Configuration from shared module
+const SCREENSHOTS_DIR = path.join(__dirname, AUTOMATION_CONFIG.directories.screenshots);
+const DELAY_BETWEEN_ACTIONS = getDelayForContext('screenshot');
 
 // Ensure screenshots directory exists
 if (!fs.existsSync(SCREENSHOTS_DIR)) {
