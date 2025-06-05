@@ -4,15 +4,6 @@
  */
 
 export const AUTOMATION_CONFIG = {
-  // Context Constants for delay settings
-  contexts: {
-    DEFAULT: 'default',
-    VIDEO: 'video',
-    SCREENSHOT: 'screenshot',
-    TYPING: 'typing',
-    FINAL: 'final'
-  },
-
   // Timing Configuration
   delays: {
     betweenActions: 2000,      // Default delay between major actions
@@ -54,40 +45,7 @@ export const AUTOMATION_CONFIG = {
       error: '#f85149',        // Error messages
       description: '#8b949e',  // Comments and descriptions
       timestamp: '#6e7681',    // Timestamps
-      highlight: '#ffa657',    // JSON and highlights
-      outputBorder: '#21262d'  // Output section borders
-    },
-
-    // Layout and typography
-    layout: {
-      borderRadius: '8px',
-      terminalPadding: '25px',
-      terminalMinHeight: '600px',
-      boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
-      headerFontSize: '28px',
-      subheaderFontSize: '16px',
-      bodyFontSize: '16px',
-      outputFontSize: '14px',
-      timestampFontSize: '12px',
-      lineHeight: '1.5'
-    },
-
-    // Spacing
-    spacing: {
-      bodyPadding: '20px',
-      terminalMargin: '20px 0',
-      headerMarginBottom: '25px',
-      headerPaddingBottom: '15px',
-      subheaderMarginBottom: '30px',
-      commandSectionMargin: '25px 0',
-      commandLineMargin: '12px 0',
-      promptMarginRight: '8px',
-      outputMarginLeft: '24px',
-      outputMarginTop: '10px',
-      outputPadding: '15px',
-      outputBorderRadius: '6px',
-      descriptionMarginBottom: '10px',
-      timestampMarginTop: '20px'
+      highlight: '#ffa657'     // JSON and highlights
     }
   },
 
@@ -101,14 +59,13 @@ export const AUTOMATION_CONFIG = {
 };
 
 // Helper functions for common operations
-export const getDelayForContext = (context = AUTOMATION_CONFIG.contexts.DEFAULT) => {
+export const getDelayForContext = (context = 'default') => {
   const delays = AUTOMATION_CONFIG.delays;
-  const contexts = AUTOMATION_CONFIG.contexts;
   switch (context) {
-    case contexts.VIDEO: return delays.betweenActions;
-    case contexts.SCREENSHOT: return delays.screenshotActions;
-    case contexts.TYPING: return delays.typing;
-    case contexts.FINAL: return delays.finalWait;
+    case 'video': return delays.betweenActions;
+    case 'screenshot': return delays.screenshotActions;
+    case 'typing': return delays.typing;
+    case 'final': return delays.finalWait;
     default: return delays.betweenActions;
   }
 };
