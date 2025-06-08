@@ -7,7 +7,9 @@ import type { StreamTextResult, ToolSet, Schema, GenerateTextResult } from 'ai';
 export enum AIProviderName {
   BEDROCK = 'bedrock',
   OPENAI = 'openai',
-  VERTEX = 'vertex'
+  VERTEX = 'vertex',
+  ANTHROPIC = 'anthropic',
+  AZURE = 'azure'
 }
 
 /**

@@ -91,7 +91,7 @@ videos/
 ## 🚀 **Working Demo Server Status**
 
 ### ✅ **Fully Functional Features:**
-- **Live Server**: Running at `http://localhost:3000`
+- **Live Server**: Running at `http://localhost:9876`
 - **Real API Integration**: All 3 providers (OpenAI, Bedrock, Vertex AI) working
 - **Interactive Interface**: All buttons, forms, and outputs functional
 - **Real-time Updates**: Metrics update with actual usage

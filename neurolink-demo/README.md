@@ -7,7 +7,7 @@
 ### 1. Install Dependencies
 ```bash
 cd neurolink-demo
-npm install
+pnpm install
 ```
 
 ### 2. Configure Environment
@@ -46,7 +46,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 # GOOGLE_AUTH_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----"
 
 # Demo Configuration
-PORT=3000
+PORT=9876
 DEFAULT_PROVIDER=openai
 ENABLE_STREAMING=true
 ENABLE_FALLBACK=true
@@ -54,11 +54,11 @@ ENABLE_FALLBACK=true
 
 ### 3. Start the Demo Server
 ```bash
-npm start
+pnpm start
 ```
 
 ### 4. Open Demo Interface
-Visit **http://localhost:3000** in your browser
+Visit **http://localhost:9876** in your browser
 
 ## 🎯 What You'll See
 
@@ -108,7 +108,7 @@ Visit **http://localhost:3000** in your browser
 ### Using the NeuroLink CLI with Demo Server
 ```bash
 # Start the demo server in one terminal
-npm start
+pnpm start
 
 # In another terminal, use the CLI to interact with the same providers:
 
@@ -116,7 +116,7 @@ npm start
 npx @juspay/neurolink generate-text "Write a haiku about programming"
 
 # Compare with server API
-curl -X POST http://localhost:3000/api/generate \
+curl -X POST http://localhost:9876/api/generate \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Write a haiku about programming", "provider": "auto"}'
 
@@ -137,7 +137,7 @@ npx @juspay/neurolink stream "Tell me a story about robots"
 npx @juspay/neurolink generate-text "Hello world" --format json
 
 # API approach (programmatic integration)
-curl -X POST http://localhost:3000/api/generate \
+curl -X POST http://localhost:9876/api/generate \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Hello world", "provider": "auto"}'
 ```
@@ -146,35 +146,35 @@ curl -X POST http://localhost:3000/api/generate \
 
 ### Basic Text Generation
 ```bash
-curl -X POST http://localhost:3000/api/generate \
+curl -X POST http://localhost:9876/api/generate \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Write a haiku about artificial intelligence", "provider": "auto"}'
 ```
 
 ### Schema Validation
 ```bash
-curl -X POST http://localhost:3000/api/schema \
+curl -X POST http://localhost:9876/api/schema \
   -H "Content-Type: application/json" \
   -d '{"type": "user-profile"}'
 ```
 
 ### Business Email Generation
 ```bash
-curl -X POST http://localhost:3000/api/business/email \
+curl -X POST http://localhost:9876/api/business/email \
   -H "Content-Type: application/json" \
   -d '{"type": "marketing", "context": "New AI product launch"}'
 ```
 
 ### Performance Benchmark
 ```bash
-curl -X POST http://localhost:3000/api/benchmark \
+curl -X POST http://localhost:9876/api/benchmark \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
 
 ### Provider Status Check
 ```bash
-curl http://localhost:3000/api/status
+curl http://localhost:9876/api/status
 ```
 
 ## 🎬 Complete Visual Documentation Ecosystem
@@ -239,56 +239,56 @@ curl http://localhost:3000/api/status
 #### 1. Provider Configuration Tests
 **Purpose**: Verify all providers are properly configured
 ```bash
-npm run test:config
+pnpm run test:config
 ```
 
 #### 2. API Integration Tests
 **Purpose**: Test actual API calls with real credentials
 ```bash
-npm run test:api
+pnpm run test:api
 ```
 
 #### 3. Fallback Mechanism Tests
 **Purpose**: Verify automatic provider fallback
 ```bash
-npm run test:fallback
+pnpm run test:fallback
 ```
 
 #### 4. Performance Benchmark Tests
 **Purpose**: Compare response times across providers
 ```bash
-npm run test:performance
+pnpm run test:performance
 ```
 
 #### 5. Streaming Tests
 **Purpose**: Test real-time streaming capabilities
 ```bash
-npm run test:streaming
+pnpm run test:streaming
 ```
 
 ### Comprehensive Test Suite
 
 #### Run All Tests
 ```bash
-npm test
+pnpm test
 ```
 
 #### Individual Test Categories
 ```bash
 # Configuration validation
-npm run test:config
+pnpm run test:config
 
 # API functionality
-npm run test:api
+pnpm run test:api
 
 # Error handling
-npm run test:errors
+pnpm run test:errors
 
 # Performance metrics
-npm run test:performance
+pnpm run test:performance
 
 # Web interface
-npm run test:web
+pnpm run test:web
 ```
 
 ### Test Case Descriptions
@@ -328,32 +328,32 @@ npm run test:web
 #### Test with Specific Provider
 ```bash
 # Test OpenAI only
-PROVIDER=openai npm test
+PROVIDER=openai pnpm test
 
 # Test Bedrock only
-PROVIDER=bedrock npm test
+PROVIDER=bedrock pnpm test
 
 # Test Vertex AI only
-PROVIDER=vertex npm test
+PROVIDER=vertex pnpm test
 ```
 
 #### Test with Custom Prompts
 ```bash
 # Test with long prompts
-PROMPT_TYPE=long npm test
+PROMPT_TYPE=long pnpm test
 
 # Test with complex prompts
-PROMPT_TYPE=complex npm test
+PROMPT_TYPE=complex pnpm test
 
 # Test with multilingual prompts
-PROMPT_TYPE=multilingual npm test
+PROMPT_TYPE=multilingual pnpm test
 ```
 
 ## 📡 API Documentation
 
 ### Base URL
 ```
-http://localhost:3000
+http://localhost:9876
 ```
 
 ### Endpoints

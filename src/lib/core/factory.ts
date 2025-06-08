@@ -1,4 +1,4 @@
-import { GoogleVertexAI, AmazonBedrock, OpenAI } from '../providers/index.js';
+import { GoogleVertexAI, AmazonBedrock, OpenAI, AnthropicProvider, AzureOpenAIProvider } from '../providers/index.js';
 import { getBestProvider } from '../utils/providerUtils.js';
 import type { AIProvider, AIProviderName, SupportedModelName } from './types.js';
 
@@ -40,9 +40,17 @@ export class AIProviderFactory {
         case 'gpt':
           provider = new OpenAI(modelName);
           break;
+        case 'anthropic':
+        case 'claude':
+          provider = new AnthropicProvider();
+          break;
+        case 'azure':
+        case 'azure-openai':
+          provider = new AzureOpenAIProvider();
+          break;
         default:
           throw new Error(
-            `Unknown provider: ${providerName}. Supported providers: vertex, bedrock, openai`
+            `Unknown provider: ${providerName}. Supported providers: vertex, bedrock, openai, anthropic, azure`
           );
       }
 

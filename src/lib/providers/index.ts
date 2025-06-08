@@ -6,6 +6,8 @@
 export { GoogleVertexAI } from './googleVertexAI.js';
 export { AmazonBedrock } from './amazonBedrock.js';
 export { OpenAI } from './openAI.js';
+export { AnthropicProvider } from './anthropic.js';
+export { AzureOpenAIProvider } from './azureOpenAI.js';
 
 // Re-export the AIProvider interface for convenience
 export type { AIProvider } from '../core/types.js';
@@ -16,7 +18,9 @@ export type { AIProvider } from '../core/types.js';
 export const PROVIDERS = {
   vertex: 'GoogleVertexAI',
   bedrock: 'AmazonBedrock',
-  openai: 'OpenAI'
+  openai: 'OpenAI',
+  anthropic: 'AnthropicProvider',
+  azure: 'AzureOpenAIProvider'
 } as const;
 
 /**

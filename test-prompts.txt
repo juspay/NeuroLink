@@ -1,3 +1,0 @@
-Write a haiku about programming
-Explain what TypeScript is in one sentence
-Generate a creative product name for an AI tool

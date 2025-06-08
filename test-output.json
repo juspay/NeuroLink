@@ -1,0 +1,14 @@
+[
+  {
+    "prompt": "Write a haiku about coding",
+    "response": "Lines of logic flow,  \nSilent keys craft dreams anew—  \nWorlds in symbols born."
+  },
+  {
+    "prompt": "Explain what AI is",
+    "response": "Artificial Intelligence (AI) is a branch of computer science focused on creating systems capable of performing tasks that typically require human intelligence. These tasks include reasoning, learning, problem-solving, perception, language understanding, and decision-making. AI systems can be categorized into several types, including:\n\n1. **Narrow AI (Weak AI)**: These systems are designed to handle a specific task or a limited range of tasks. They operate under a set of pre-defined rules and lack generalization capabilities beyond their specific area. Examples include virtual personal assistants like Siri or Alexa and recommendation algorithms used by streaming services.\n\n2. **General AI (Strong AI)**: This is a theoretical concept of AI that possesses the ability to understand, learn, and apply intelligence broadly across a diverse range of tasks, similar to a human being. As of now, general AI does not exist.\n\n3. **Superintelligent AI**: Another theoretical concept where AI surpasses the cognitive abilities of humans in all aspects, including creativity, problem-solving, and emotional intelligence.\n\nAI technologies often involve various subfields and techniques, such as:\n\n- **Machine Learning (ML)**: A subset of AI where systems learn from data and improve their performance over time without being explicitly programmed. Techniques include supervised learning, unsupervised learning, and reinforcement learning.\n\n- **Deep Learning**: A subfield of ML that uses neural networks with many layers (deep neural networks) to model complex patterns in data. It has been particularly effective in areas like image and speech recognition.\n\n- **Natural Language Processing (NLP)**: The ability of a computer program to understand, interpret, and generate human language. This is used in applications like chatbots and language translation services.\n\n- **Computer Vision**: The capability of machines to interpret and make decisions based on visual data, such as images and videos.\n\nAI systems can be implemented through various approaches, including rule-based systems, statistical methods, and neural networks. The applications of AI are vast, spanning industries like healthcare, finance, automotive, entertainment, and more, transforming how we interact with technology and information."
+  },
+  {
+    "prompt": "Generate a simple joke",
+    "response": "Why did the scarecrow win an award? Because he was outstanding in his field!"
+  }
+]

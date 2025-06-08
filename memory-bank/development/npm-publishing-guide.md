@@ -31,9 +31,9 @@ The automated workflow uses **Changesets** to manage versioning and publishing t
   - Creates version bump PR OR publishes to NPM
 
 ### 3. Package.json Scripts
-- `npm run changeset` - Create a new changeset
-- `npm run changeset:version` - Apply version changes
-- `npm run publish` - Build and publish to NPM
+- `pnpm run changeset` - Create a new changeset
+- `pnpm run changeset:version` - Apply version changes
+- `pnpm run publish` - Build and publish to NPM
 
 ## How to Use the Workflow
 
@@ -43,7 +43,7 @@ When you make changes that should be released:
 
 ```bash
 # Create a changeset for your changes
-npm run changeset
+pnpm run changeset
 ```
 
 This will prompt you for:
@@ -115,7 +115,7 @@ npm token create --access=public
 - Small improvements
 
 ```bash
-npm run changeset
+pnpm run changeset
 # Select "patch"
 ```
 
@@ -125,7 +125,7 @@ npm run changeset
 - API additions
 
 ```bash
-npm run changeset
+pnpm run changeset
 # Select "minor"
 ```
 
@@ -135,7 +135,7 @@ npm run changeset
 - Major redesigns
 
 ```bash
-npm run changeset
+pnpm run changeset
 # Select "major"
 ```
 
@@ -148,7 +148,7 @@ git checkout -b feature/new-provider
 # ... make changes ...
 
 # Create changeset for the feature
-npm run changeset
+pnpm run changeset
 # Type: minor
 # Description: "Add support for Claude 3.5 Sonnet model"
 
@@ -163,13 +163,13 @@ git push origin feature/new-provider
 ### Scenario 2: Multiple Changes Before Release
 ```bash
 # Developer A adds authentication fix
-npm run changeset  # patch: "Fix AWS session token handling"
+pnpm run changeset  # patch: "Fix AWS session token handling"
 
 # Developer B adds new documentation
-npm run changeset  # patch: "Improve setup documentation"
+pnpm run changeset  # patch: "Improve setup documentation"
 
 # Developer C adds streaming feature
-npm run changeset  # minor: "Add streaming response support"
+pnpm run changeset  # minor: "Add streaming response support"
 
 # When all merged to release:
 # - Version goes from 1.2.0 → 1.3.0 (highest change type)
@@ -182,7 +182,7 @@ npm run changeset  # minor: "Add streaming response support"
 git checkout -b hotfix/critical-auth-bug
 # ... fix the bug ...
 
-npm run changeset
+pnpm run changeset
 # Type: patch
 # Description: "Fix critical authentication error in production"
 
@@ -242,7 +242,7 @@ jobs:
 ## Benefits of This Approach
 
 ### For Developers
-- ✅ **Simple**: Just run `npm run changeset` after making changes
+- ✅ **Simple**: Just run `pnpm run changeset` after making changes
 - ✅ **Safe**: No manual version bumping or publishing
 - ✅ **Collaborative**: Multiple developers can contribute to same release
 - ✅ **Traceable**: Clear changelog showing what changed
@@ -263,7 +263,7 @@ jobs:
 
 ### "No changesets found"
 - **Cause**: No changesets were created before merging
-- **Solution**: Create changeset with `npm run changeset`
+- **Solution**: Create changeset with `pnpm run changeset`
 
 ### "NPM publish failed"
 - **Cause**: NPM_TOKEN expired or invalid

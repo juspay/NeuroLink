@@ -11,7 +11,7 @@ import type { AIProvider, AIProviderName } from './core/types.js';
 
 export interface TextGenerationOptions {
   prompt: string;
-  provider?: 'openai' | 'bedrock' | 'vertex' | 'auto';
+  provider?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'auto';
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
@@ -20,7 +20,7 @@ export interface TextGenerationOptions {
 
 export interface StreamTextOptions {
   prompt: string;
-  provider?: 'openai' | 'bedrock' | 'vertex' | 'auto';
+  provider?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'auto';
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
@@ -71,7 +71,7 @@ export class NeuroLink {
       const responseTime = Date.now() - startTime;
 
       return {
-        content: result.text,
+        content: result.content || result.text || '',
         provider: providerName,
         usage: result.usage,
         responseTime

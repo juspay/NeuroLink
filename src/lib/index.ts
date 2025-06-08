@@ -28,7 +28,7 @@ export {
 } from './core/types.js';
 
 // Provider exports
-export { GoogleVertexAI, AmazonBedrock, OpenAI } from './providers/index.js';
+export { GoogleVertexAI, AmazonBedrock, OpenAI, AnthropicProvider, AzureOpenAIProvider } from './providers/index.js';
 export type { ProviderName } from './providers/index.js';
 export { PROVIDERS, AVAILABLE_PROVIDERS } from './providers/index.js';
 
@@ -39,7 +39,7 @@ export {
   isValidProvider
 } from './utils/providerUtils.js';
 
-// Main NeuroLink wrapper class export
+// Main NeuroLink wrapper class
 export { NeuroLink } from './neurolink.js';
 export type {
   TextGenerationOptions,
