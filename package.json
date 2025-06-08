@@ -7,7 +7,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && pnpm run prepack",
-		"build:cli": "tsc src/cli/index.ts --outDir dist/cli --target es2022 --module esnext --moduleResolution bundler --allowImportingTsExtensions false --resolveJsonModule --esModuleInterop --allowSyntheticDefaultImports --strict --rootDir src/cli",
+		"build:cli": "echo 'Building CLI...' && tsc src/cli/index.ts --outDir dist/cli --target es2022 --module esnext --moduleResolution bundler --allowImportingTsExtensions false --resolveJsonModule --esModuleInterop --allowSyntheticDefaultImports --strict --rootDir src/cli",
 		"cli": "node dist/cli/index.js",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -19,9 +19,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"changeset": "changeset",
-		"changeset:version": "changeset version && git add --all",
-		"release": "pnpm run build && changeset publish",
-		"publish": "npm publish --access public"
+		"changeset:version": "changeset version && git add --all"
 	},
 	"files": [
 		"dist",
