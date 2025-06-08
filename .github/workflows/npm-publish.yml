@@ -31,12 +31,15 @@ jobs:
       - name: Installing dependencies
         run: pnpm i
 
+      - name: Build package
+        run: pnpm run build
+
       - name: Create Release Pull Request or Publish NPM
         id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm run changeset:version
-          publish: pnpm run publish
+          publish: pnpm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

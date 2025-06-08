@@ -20,7 +20,8 @@
 		"format": "prettier --write .",
 		"changeset": "changeset",
 		"changeset:version": "changeset version && git add --all",
-		"publish": "pnpm run build && npm publish --access public"
+		"release": "pnpm run build && changeset publish",
+		"publish": "npm publish --access public"
 	},
 	"files": [
 		"dist",
