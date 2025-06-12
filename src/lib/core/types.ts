@@ -9,7 +9,8 @@ export enum AIProviderName {
   OPENAI = 'openai',
   VERTEX = 'vertex',
   ANTHROPIC = 'anthropic',
-  AZURE = 'azure'
+  AZURE = 'azure',
+  GOOGLE_AI = 'google-ai'
 }
 
 /**
@@ -42,9 +43,19 @@ export enum VertexModels {
 }
 
 /**
+ * Supported Models for Google AI Studio
+ */
+export enum GoogleAIModels {
+  GEMINI_1_5_PRO_LATEST = 'gemini-1.5-pro-latest',
+  GEMINI_1_5_FLASH_LATEST = 'gemini-1.5-flash-latest',
+  GEMINI_2_0_FLASH_EXP = 'gemini-2.0-flash-exp',
+  GEMINI_1_0_PRO = 'gemini-1.0-pro'
+}
+
+/**
  * Union type of all supported model names
  */
-export type SupportedModelName = BedrockModels | OpenAIModels | VertexModels;
+export type SupportedModelName = BedrockModels | OpenAIModels | VertexModels | GoogleAIModels;
 
 /**
  * Provider configuration specifying provider and its available models

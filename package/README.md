@@ -6,7 +6,7 @@
 
 > Production-ready AI toolkit with multi-provider support, automatic fallback, and full TypeScript integration. **Now with a professional CLI!**
 
-**NeuroLink** provides a unified interface for AI providers (OpenAI, Amazon Bedrock, Google Vertex AI) with intelligent fallback, streaming support, and type-safe APIs. Available as both a **programmatic SDK** and a **professional CLI tool**. Extracted from production use at Juspay.
+**NeuroLink** provides a unified interface for AI providers (OpenAI, Amazon Bedrock, Google Vertex AI, Google AI Studio) with intelligent fallback, streaming support, and type-safe APIs. Available as both a **programmatic SDK** and a **professional CLI tool**. Extracted from production use at Juspay.
 
 ## 🚀 Quick Start
 
@@ -117,7 +117,7 @@ console.log(result.text);
 
 ## Features
 
-🔄 **Multi-Provider Support** - OpenAI, Amazon Bedrock, Google Vertex AI
+🔄 **Multi-Provider Support** - OpenAI, Amazon Bedrock, Google Vertex AI, Google AI Studio
 ⚡ **Automatic Fallback** - Seamless provider switching on failures
 📡 **Streaming & Non-Streaming** - Real-time responses and standard generation
 🎯 **TypeScript First** - Full type safety and IntelliSense support

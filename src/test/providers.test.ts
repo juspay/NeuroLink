@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi, beforeEach } from 'vitest';
 import { OpenAI } from '../lib/providers/openAI.js';
 import { AmazonBedrock } from '../lib/providers/amazonBedrock.js';
 import { GoogleVertexAI } from '../lib/providers/googleVertexAI.js';
+import { GoogleAIStudio } from '../lib/providers/googleAIStudio.js';
 import { AIProviderFactory } from '../lib/core/factory.js';
 
 // Mock environment setup
@@ -15,6 +16,8 @@ beforeAll(() => {
   process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
   process.env.GOOGLE_VERTEX_PROJECT = 'test-vertex-project';
   process.env.GOOGLE_VERTEX_LOCATION = 'us-central1';
+  process.env.GOOGLE_AI_API_KEY = 'test-google-ai-key';
+  process.env.GOOGLE_AI_MODEL = 'gemini-1.5-pro-latest';
 });
 
 // Mock the AI SDK functions
@@ -112,6 +115,32 @@ describe('NeuroLink AI Providers', () => {
     });
   });
 
+  describe('Google AI Studio Provider', () => {
+    it('should create Google AI Studio provider successfully', () => {
+      const provider = new GoogleAIStudio('gemini-1.5-pro-latest');
+
+      expect(provider).toBeDefined();
+      expect(provider.constructor.name).toBe('GoogleAIStudio');
+    });
+
+    it('should be an AI provider', () => {
+      const provider = new GoogleAIStudio('gemini-1.5-pro-latest');
+
+      expect(provider).toBeDefined();
+      expect(typeof provider.generateText).toBe('function');
+    });
+
+    it('should support different Gemini models', () => {
+      const proProvider = new GoogleAIStudio('gemini-1.5-pro-latest');
+      const flashProvider = new GoogleAIStudio('gemini-1.5-flash-latest');
+      const expProvider = new GoogleAIStudio('gemini-2.0-flash-exp');
+
+      expect(proProvider).toBeDefined();
+      expect(flashProvider).toBeDefined();
+      expect(expProvider).toBeDefined();
+    });
+  });
+
   describe('AI Provider Factory', () => {
     beforeEach(() => {
       // Ensure environment variables are set for each test
@@ -126,10 +155,12 @@ describe('NeuroLink AI Providers', () => {
       const openaiProvider = AIProviderFactory.createProvider('openai');
       const bedrockProvider = AIProviderFactory.createProvider('bedrock');
       const vertexProvider = AIProviderFactory.createProvider('vertex');
+      const googleAIProvider = AIProviderFactory.createProvider('google-ai');
 
       expect(openaiProvider).toBeDefined();
       expect(bedrockProvider).toBeDefined();
       expect(vertexProvider).toBeDefined();
+      expect(googleAIProvider).toBeDefined();
     });
 
     it('should create best available provider', () => {

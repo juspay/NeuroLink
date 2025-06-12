@@ -69,18 +69,27 @@ async function createVideo(name, actions) {
   }
 }
 
-// 1. Basic Examples - Core SDK functionality
+// 1. Basic Examples - Core SDK functionality (including Google AI Studio)
 const basicExamplesActions = [
   {
-    description: "Show main interface and provider selection",
+    description: "Show main interface and provider selection including Google AI Studio",
     execute: async (page) => {
       await page.waitForSelector('#basic-provider', { timeout: 5000 });
       await page.hover('h1');
       await page.waitForTimeout(1000);
 
-      // Show provider options
+      // Show provider options including Google AI Studio
       await page.click('#basic-provider');
       await page.waitForTimeout(1000);
+
+      // First show Google AI Studio option
+      const hasGoogleAI = await page.locator('option[value="google-ai"]').count() > 0;
+      if (hasGoogleAI) {
+        await page.selectOption('#basic-provider', 'google-ai');
+        await page.waitForTimeout(1500);
+      }
+
+      // Then show auto-selection
       await page.selectOption('#basic-provider', 'auto');
     }
   },

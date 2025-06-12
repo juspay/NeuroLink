@@ -7,6 +7,7 @@ NeuroLink supports multiple AI providers with flexible authentication methods. T
 - **OpenAI** - GPT-4o, GPT-4o-mini, GPT-4-turbo
 - **Amazon Bedrock** - Claude 3.7 Sonnet, Claude 3.5 Sonnet, Claude 3 Haiku
 - **Google Vertex AI** - Gemini 2.5 Flash, Claude 4.0 Sonnet
+- **Google AI Studio** - Gemini 1.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Flash
 - **Anthropic** - Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
 - **Azure OpenAI** - GPT-4, GPT-3.5-Turbo
 
@@ -257,6 +258,108 @@ Your service account needs these IAM roles:
 - `Vertex AI User` or `Vertex AI Admin`
 - `Service Account Token Creator` (if using impersonation)
 
+## Google AI Studio Configuration
+
+Google AI Studio provides direct access to Google's Gemini models with a simple API key authentication.
+
+### Basic Setup
+```bash
+export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
+```
+
+### Optional Configuration
+```bash
+export GOOGLE_AI_MODEL="gemini-1.5-pro-latest"  # Default model to use
+```
+
+### Supported Models
+- `gemini-1.5-pro-latest` (default) - Latest Gemini Pro with enhanced capabilities
+- `gemini-2.0-flash-exp` - Experimental model with cutting-edge features
+- `gemini-1.5-flash-latest` - Fast, efficient responses for most tasks
+- `gemini-1.0-pro` - Stable legacy option
+
+### Usage Example
+```typescript
+import { AIProviderFactory } from '@juspay/neurolink';
+
+const googleAI = AIProviderFactory.createProvider('google-ai', 'gemini-1.5-pro-latest');
+const result = await googleAI.generateText({
+  prompt: "Explain the future of AI",
+  temperature: 0.7,
+  maxTokens: 1000
+});
+```
+
+### How to Get Google AI Studio API Key
+
+1. **Visit Google AI Studio**: Go to [aistudio.google.com](https://aistudio.google.com)
+2. **Sign In**: Use your Google account credentials
+3. **Create API Key**:
+   - Navigate to the **API Keys** section
+   - Click **Create API Key**
+   - Copy the generated key (starts with `AIza`)
+4. **Set Environment**: Add to your `.env` file or export directly
+
+### Google AI Studio vs Vertex AI
+
+| Feature | Google AI Studio | Google Vertex AI |
+|---------|------------------|------------------|
+| **Setup Complexity** | 🟢 Simple (API key only) | 🟡 Complex (Service account) |
+| **Authentication** | API key | Service account JSON |
+| **Free Tier** | ✅ Generous free limits | ❌ Pay-per-use only |
+| **Enterprise Features** | ❌ Limited | ✅ Full enterprise support |
+| **Model Selection** | 🎯 Latest Gemini models | 🔄 Broader model catalog |
+| **Best For** | Prototyping, small projects | Production, enterprise apps |
+
+### Complete Google AI Studio Configuration
+```bash
+# Required: API key from Google AI Studio
+export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
+
+# Optional: Default model selection
+export GOOGLE_AI_MODEL="gemini-1.5-pro-latest"
+
+# Alternative environment variable names (backward compatibility)
+export GOOGLE_GENERATIVE_AI_API_KEY="AIza-your-google-ai-api-key"
+```
+
+### Rate Limits and Quotas
+
+Google AI Studio includes generous free tier limits:
+- **Free Tier**: 15 requests per minute, 1,500 requests per day
+- **Paid Usage**: Higher limits available with billing enabled
+- **Model-Specific**: Different models may have different rate limits
+
+### Error Handling for Google AI Studio
+```typescript
+import { AIProviderFactory } from '@juspay/neurolink';
+
+try {
+  const provider = AIProviderFactory.createProvider('google-ai');
+  const result = await provider.generateText({
+    prompt: "Generate a creative story",
+    temperature: 0.8,
+    maxTokens: 500
+  });
+  console.log(result.text);
+} catch (error) {
+  if (error.message.includes('API_KEY_INVALID')) {
+    console.error('Invalid Google AI API key. Check your GOOGLE_AI_API_KEY environment variable.');
+  } else if (error.message.includes('QUOTA_EXCEEDED')) {
+    console.error('Rate limit exceeded. Wait before making more requests.');
+  } else {
+    console.error('Google AI Studio error:', error.message);
+  }
+}
+```
+
+### Security Considerations
+
+- **API Key Security**: Treat API keys as sensitive credentials
+- **Environment Variables**: Never commit API keys to version control
+- **Rate Limiting**: Implement client-side rate limiting for production apps
+- **Monitoring**: Monitor usage to avoid unexpected charges
+
 ## Environment File Template
 
 Create a `.env` file in your project root:
@@ -290,6 +393,10 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account.json
 GOOGLE_VERTEX_PROJECT=your-gcp-project-id
 GOOGLE_VERTEX_LOCATION=us-east5
 VERTEX_MODEL_ID=claude-sonnet-4@20250514
+
+# Google AI Studio
+GOOGLE_AI_API_KEY=AIza-your-google-ai-studio-key
+GOOGLE_AI_MODEL=gemini-1.5-pro-latest
 
 # Anthropic
 ANTHROPIC_API_KEY=sk-ant-api03-your-key

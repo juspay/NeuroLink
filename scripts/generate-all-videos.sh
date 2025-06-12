@@ -113,14 +113,16 @@ generate_cli_videos() {
            "$CLI_OUTPUT_DIR/cli-overview/cli-help.mp4" \
            -y
 
-    # Provider Status Video
+    # Provider Status Video (including Google AI Studio)
     ffmpeg -f lavfi \
-           -i color=c=black:s=1280x800:d=10 \
+           -i color=c=black:s=1280x800:d=12 \
            -vf "drawtext=text='Provider Status Check':fontcolor=white:fontsize=32:x=(w-text_w)/2:y=100,\
                 drawtext=text='Testing connectivity and response times':fontcolor=gray:fontsize=18:x=(w-text_w)/2:y=200,\
-                drawtext=text='✅ openai\: Working (1200ms)':fontcolor=green:fontsize=20:x=(w-text_w)/2:y=400,\
-                drawtext=text='✅ vertex\: Working (2100ms)':fontcolor=green:fontsize=20:x=(w-text_w)/2:y=450,\
-                drawtext=text='⚠️  bedrock\: Auth required':fontcolor=yellow:fontsize=20:x=(w-text_w)/2:y=500" \
+                drawtext=text='✅ openai\: Working (1200ms)':fontcolor=green:fontsize=20:x=(w-text_w)/2:y=380,\
+                drawtext=text='✅ google-ai\: Working (945ms)':fontcolor=green:fontsize=20:x=(w-text_w)/2:y=420,\
+                drawtext=text='✅ vertex\: Working (2100ms)':fontcolor=green:fontsize=20:x=(w-text_w)/2:y=460,\
+                drawtext=text='⚠️  bedrock\: Auth required':fontcolor=yellow:fontsize=20:x=(w-text_w)/2:y=500,\
+                drawtext=text='6 providers supported total':fontcolor=cyan:fontsize=16:x=(w-text_w)/2:y=550" \
            -pix_fmt yuv420p \
            -movflags +faststart \
            "$CLI_OUTPUT_DIR/cli-overview/cli-provider-status.mp4" \

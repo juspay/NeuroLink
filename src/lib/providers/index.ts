@@ -8,6 +8,7 @@ export { AmazonBedrock } from './amazonBedrock.js';
 export { OpenAI } from './openAI.js';
 export { AnthropicProvider } from './anthropic.js';
 export { AzureOpenAIProvider } from './azureOpenAI.js';
+export { GoogleAIStudio } from './googleAIStudio.js';
 
 // Re-export the AIProvider interface for convenience
 export type { AIProvider } from '../core/types.js';
@@ -20,7 +21,8 @@ export const PROVIDERS = {
   bedrock: 'AmazonBedrock',
   openai: 'OpenAI',
   anthropic: 'AnthropicProvider',
-  azure: 'AzureOpenAIProvider'
+  azure: 'AzureOpenAIProvider',
+  'google-ai': 'GoogleAIStudio'
 } as const;
 
 /**

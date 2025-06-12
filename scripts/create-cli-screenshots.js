@@ -103,6 +103,35 @@ Examples:
 🚀 Universal AI platform with multi-provider support and MCP integration`
   },
   {
+    name: '06-google-ai-provider-list',
+    title: 'Google AI Studio Provider Support',
+    command: 'npx @juspay/neurolink generate-text --help',
+    output: `Usage: neurolink generate-text [options] <prompt>
+
+Generate AI text content using specified provider
+
+Arguments:
+  prompt                          Text prompt for AI generation
+
+Options:
+  -p, --provider <provider>       AI provider (choices: "openai", "bedrock", "vertex",
+                                  "google-ai", "anthropic", "azure")
+  -m, --model <model>            Specific model to use
+  -t, --temperature <number>     Temperature for generation (0.0-1.0)
+  --max-tokens <number>          Maximum tokens to generate
+  --system <prompt>              System prompt for context
+  --format <format>              Output format (choices: "text", "json")
+  --stream                       Enable streaming output
+  -h, --help                     display help for command
+
+Examples:
+  neurolink generate-text "Hello, AI!" --provider google-ai
+  neurolink generate-text "Write a story" --provider google-ai --model gemini-1.5-pro-latest
+  neurolink generate-text "Explain quantum computing" --provider google-ai --temperature 0.7
+
+🤖 Google AI Studio: Simple API key setup, generous free tier, latest Gemini models`
+  },
+  {
     name: '02-provider-status',
     title: 'Provider Status Check',
     command: 'npx @juspay/neurolink status --verbose',

@@ -16,13 +16,13 @@ import { getBestProvider, getAvailableProviders } from '../../../utils/providerU
 const AnalyzeUsageSchema = z.object({
   sessionId: z.string().optional(),
   timeRange: z.enum(['1h', '24h', '7d', '30d']).default('24h'),
-  provider: z.enum(['openai', 'bedrock', 'vertex', 'anthropic']).optional(),
+  provider: z.enum(['openai', 'bedrock', 'vertex', 'anthropic', 'google-ai']).optional(),
   includeTokenBreakdown: z.boolean().default(true),
   includeCostEstimation: z.boolean().default(true)
 });
 
 const BenchmarkSchema = z.object({
-  providers: z.array(z.enum(['openai', 'bedrock', 'vertex', 'anthropic'])).optional(),
+  providers: z.array(z.enum(['openai', 'bedrock', 'vertex', 'anthropic', 'google-ai'])).optional(),
   testPrompts: z.array(z.string()).optional(),
   iterations: z.number().min(1).max(5).default(2),
   metrics: z.array(z.enum(['latency', 'quality', 'cost', 'tokens'])).default(['latency', 'quality']),
@@ -31,7 +31,7 @@ const BenchmarkSchema = z.object({
 
 const OptimizeParametersSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required for optimization'),
-  provider: z.enum(['openai', 'bedrock', 'vertex', 'anthropic']).optional(),
+  provider: z.enum(['openai', 'bedrock', 'vertex', 'anthropic', 'google-ai']).optional(),
   targetLength: z.number().positive().optional(),
   style: z.enum(['creative', 'balanced', 'precise', 'factual']).default('balanced'),
   optimizeFor: z.enum(['speed', 'quality', 'cost', 'tokens']).default('quality'),

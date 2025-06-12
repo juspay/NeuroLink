@@ -168,9 +168,9 @@ const cli = yargs(args)
   .alias('V', 'version')
   .strictOptions()
   .strictCommands()
-  .demandCommand(1, 'You need at least one command before moving on')
+  .demandCommand(1, '')
   .epilogue('For more info: https://github.com/juspay/neurolink')
-  .showHelpOnFail(false)
+  .showHelpOnFail(true, 'Specify --help for available options')
   .middleware((argv) => {
     // Middleware for NEUROLINK_QUIET is fine
     if (process.env.NEUROLINK_QUIET === 'true' && typeof argv.quiet === 'undefined') {
@@ -242,7 +242,7 @@ const cli = yargs(args)
         demandOption: true,
       })
       .option('provider', {
-        choices: ['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure'] as const,
+        choices: ['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai'] as const,
         default: 'auto',
         description: 'AI provider to use (auto-selects best available)'
       })
@@ -295,6 +295,9 @@ const cli = yargs(args)
           console.log(JSON.stringify({ provider: result.provider, usage: result.usage, responseTime: result.responseTime }, null, 2));
           if (result.usage) console.log(chalk.blue(`ℹ️  ${result.usage.totalTokens} tokens used`));
         }
+
+        // Explicitly exit to prevent hanging, especially with Google AI Studio
+        process.exit(0);
       } catch (error) {
         if (argv.format === 'json' && originalConsole.log) { Object.assign(console, originalConsole); }
         if (spinner) spinner.fail();
@@ -315,7 +318,7 @@ const cli = yargs(args)
     (yargsInstance) => yargsInstance
       .usage('Usage: $0 stream <prompt> [options]')
       .positional('prompt', { type: 'string', description: 'Text prompt for streaming', demandOption: true })
-      .option('provider', { choices: ['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure'] as const, default: 'auto', description: 'AI provider to use' })
+      .option('provider', { choices: ['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai'] as const, default: 'auto', description: 'AI provider to use' })
       .option('temperature', { type: 'number', default: 0.7, description: 'Creativity level' })
       .example('$0 stream "Tell me a story"', 'Stream a story in real-time'),
     async (argv) => {
@@ -343,7 +346,7 @@ const cli = yargs(args)
       .positional('file', { type: 'string', description: 'File with prompts (one per line)', demandOption: true })
       .option('output', { type: 'string', description: 'Output file for results (default: stdout)' })
       .option('delay', { type: 'number', default: 1000, description: 'Delay between requests in milliseconds' })
-      .option('provider', { choices: ['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure'] as const, default: 'auto', description: 'AI provider to use' })
+      .option('provider', { choices: ['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai'] as const, default: 'auto', description: 'AI provider to use' })
       .option('timeout', { type: 'number', default: 30000, description: 'Timeout for each request in milliseconds' })
       .option('temperature', { type: 'number', description: 'Global temperature for batch jobs' })
       .option('max-tokens', { type: 'number', description: 'Global max tokens for batch jobs' })
@@ -420,7 +423,7 @@ const cli = yargs(args)
             // Middleware sets argv.verbose if NEUROLINK_DEBUG is true and --verbose is not specified
             // Removed the spinner.stopAndPersist logic from here as it's handled before spinner start
 
-            const providers = ['openai', 'bedrock', 'vertex', 'anthropic', 'azure'] as const;
+            const providers = ['openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai'] as const;
             const results: Array<{provider: string, status: string, responseTime?: number, error?: string}> = [];
             for (const p of providers) {
               if (spinner) spinner.text = `Testing ${p}...`;
@@ -450,7 +453,7 @@ const cli = yargs(args)
         .command('list', 'List available AI providers',
           (y) => y.usage('Usage: $0 provider list'),
           async () => {
-            console.log('Available providers: openai, bedrock, vertex, anthropic, azure');
+            console.log('Available providers: openai, bedrock, vertex, anthropic, azure, google-ai');
           }
         )
         .command('configure <providerName>', 'Display configuration guidance for a provider',
@@ -458,7 +461,7 @@ const cli = yargs(args)
             .usage('Usage: $0 provider configure <providerName>')
             .positional('providerName', {
               type: 'string',
-              choices: ['openai', 'bedrock', 'vertex', 'anthropic', 'azure'],
+              choices: ['openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai'],
               description: 'Name of the provider to configure',
               demandOption: true,
             })
@@ -498,7 +501,7 @@ const cli = yargs(args)
       // Middleware sets argv.verbose if NEUROLINK_DEBUG is true and --verbose is not specified
       // Removed the spinner.stopAndPersist logic from here as it's handled before spinner start
 
-      const providers = ['openai', 'bedrock', 'vertex', 'anthropic', 'azure'] as const;
+      const providers = ['openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai'] as const;
       const results: Array<{provider: string, status: string, responseTime?: number, error?: string}> = [];
       for (const p of providers) {
         if (spinner) spinner.text = `Testing ${p}...`;

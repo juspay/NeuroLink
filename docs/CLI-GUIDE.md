@@ -372,7 +372,7 @@ MCP servers are automatically configured in `.mcp-config.json`:
 - `--version, -v` - Show version number
 
 ### Generation Options
-- `--provider <name>` - Choose provider: `auto` (default), `openai`, `bedrock`, `vertex`, `anthropic`, `azure`
+- `--provider <name>` - Choose provider: `auto` (default), `openai`, `bedrock`, `vertex`, `anthropic`, `azure`, `google-ai`
 - `--temperature <number>` - Creativity level: `0.0` (focused) to `1.0` (creative), default: `0.7`
 - `--max-tokens <number>` - Maximum tokens to generate, default: `500`
 - `--format <type>` - Output format: `text` (default) or `json`

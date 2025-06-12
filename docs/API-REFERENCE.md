@@ -16,7 +16,7 @@ function createBestAIProvider(
 ```
 
 **Parameters:**
-- `requestedProvider` (optional): Preferred provider name (`'openai'`, `'bedrock'`, `'vertex'`, `'anthropic'`, `'azure'`, or `'auto'`)
+- `requestedProvider` (optional): Preferred provider name (`'openai'`, `'bedrock'`, `'vertex'`, `'anthropic'`, `'azure'`, `'google-ai'`, or `'auto'`)
 - `modelName` (optional): Specific model to use
 
 **Returns:** `AIProvider` instance
@@ -84,7 +84,7 @@ static createProvider(
 ```
 
 **Parameters:**
-- `providerName`: Provider name (`'openai'`, `'bedrock'`, `'vertex'`, `'anthropic'`, `'azure'`)
+- `providerName`: Provider name (`'openai'`, `'bedrock'`, `'vertex'`, `'anthropic'`, `'azure'`, `'google-ai'`)
 - `modelName` (optional): Specific model to use
 
 **Returns:** `AIProvider` instance
@@ -286,6 +286,17 @@ GOOGLE_AUTH_CLIENT_EMAIL?: string                // Method 3a: Individual vars
 GOOGLE_AUTH_PRIVATE_KEY?: string                 // Method 3b: Individual vars
 GOOGLE_VERTEX_PROJECT: string                    // Required for all methods
 GOOGLE_VERTEX_LOCATION?: string                  // Default: 'us-east5'
+
+// Google AI Studio
+GOOGLE_AI_API_KEY: string                        // API key from AI Studio
+
+// Anthropic
+ANTHROPIC_API_KEY?: string                       // Direct Anthropic API
+
+// Azure OpenAI
+AZURE_OPENAI_API_KEY?: string                    // Azure OpenAI API key
+AZURE_OPENAI_ENDPOINT?: string                   // Azure OpenAI endpoint
+AZURE_OPENAI_DEPLOYMENT_ID?: string              // Deployment ID
 ```
 
 ### Optional Configuration Variables
@@ -309,7 +320,7 @@ LOG_LEVEL?: 'error' | 'warn' | 'info' | 'debug'
 ### Core Types
 
 ```typescript
-type ProviderName = 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure';
+type ProviderName = 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'google-ai';
 
 interface AIProvider {
   generateText(options: GenerateTextOptions | string): Promise<GenerateTextResult>;

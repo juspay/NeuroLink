@@ -179,7 +179,35 @@ ANTHROPIC_BASE_URL="https://api.anthropic.com" # Default endpoint
 
 ---
 
-### 5. Azure OpenAI
+### 5. Google AI Studio
+
+#### Required Variables
+```bash
+GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
+```
+
+#### Optional Variables
+```bash
+GOOGLE_AI_MODEL="gemini-1.5-pro-latest"     # Default model
+```
+
+#### How to Get Google AI Studio API Key
+1. Visit [Google AI Studio](https://aistudio.google.com)
+2. Sign in with your Google account
+3. Navigate to **API Keys** section
+4. Click **Create API Key**
+5. Copy the key (starts with `AIza`)
+6. Note: Google AI Studio provides free tier with generous limits
+
+#### Supported Models
+- `gemini-1.5-pro-latest` (default) - Latest Gemini Pro
+- `gemini-2.0-flash-exp` - Experimental model with enhanced capabilities
+- `gemini-1.5-flash-latest` - Fast, efficient responses
+- `gemini-1.0-pro` - Legacy stable option
+
+---
+
+### 6. Azure OpenAI
 
 #### Required Variables
 ```bash
@@ -238,6 +266,10 @@ VERTEX_MODEL="gemini-1.5-pro"
 
 # Anthropic Configuration
 ANTHROPIC_API_KEY="sk-ant-api03-your-key"
+
+# Google AI Studio Configuration
+GOOGLE_AI_API_KEY="AIza-your-google-ai-key"
+GOOGLE_AI_MODEL="gemini-1.5-pro-latest"
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY="your-azure-key"

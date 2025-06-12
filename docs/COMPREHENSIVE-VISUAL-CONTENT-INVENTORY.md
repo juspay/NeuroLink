@@ -7,15 +7,16 @@
 
 ## 📊 **Executive Summary**
 
-### **Total Visual Assets**: 41 files
-- **Videos**: 15 files (10 WebM + 5 MP4 only)
+### **Total Visual Assets**: 50 files
+- **Videos**: 18 files (10 WebM + 5 MP4 + 3 Google AI MP4)
 - **Screenshots**: 26 PNG files across multiple categories
-- **CLI Recordings**: 6 asciinema .cast files (in separate directory)
+- **CLI Recordings**: 9 asciinema .cast files (6 original + 3 Google AI Studio)
 
 ### **Content Categories**
 1. **Web Demo Content** (neurolink-demo/)
 2. **CLI Documentation** (docs/visual-content/)
 3. **MCP Integration** (mixed locations)
+4. **Google AI Studio Integration** (NEW - December 2025)
 
 ---
 
@@ -98,7 +99,9 @@ This directory contains subdirectories for different categories of CLI videos, b
 
 ## 📋 **CLI Recordings** (`docs/cli-recordings/`)
 
-### **Asciinema Recordings** (6 files)
+### **Asciinema Recordings** (9 files total)
+
+#### **Original CLI Recordings** (6 files)
 | Recording | File | Purpose |
 |-----------|------|---------|
 | **CLI Help** | `latest/cli-help-working.cast` | Command help demonstration |
@@ -107,6 +110,39 @@ This directory contains subdirectories for different categories of CLI videos, b
 | **MCP Help** | `mcp/mcp-help-working.cast` | MCP commands |
 | **MCP Listing** | `mcp/mcp-list-working.cast` | Server listing |
 | **Test Recording** | `test/test-recording.cast` | Testing purposes |
+
+#### **Google AI Studio CLI Recordings** (3 files - NEW December 2025)
+| Recording | File | Purpose |
+|-----------|------|---------|
+| **Google AI Provider List** | `latest/google-ai-provider-list-updated.cast` | Shows google-ai in provider list |
+| **Google AI Configuration** | `latest/google-ai-provider-configure.cast` | Google AI Studio setup guidance |
+| **CLI Help with Google AI** | `latest/cli-help-with-google-ai.cast` | Updated help showing google-ai options |
+
+---
+
+## 🔥 **Google AI Studio Integration Content** (NEW - December 2025)
+
+### **🎥 Google AI Studio CLI Videos** (3 files)
+| Video | File | Purpose | Generated |
+|-------|------|---------|-----------|
+| **Provider List** | `docs/visual-content/cli-videos/google-ai-provider-list-updated.mp4` | Shows google-ai in CLI provider list | Dec 6, 2025 |
+| **Configuration** | `docs/visual-content/cli-videos/google-ai-provider-configure.mp4` | Google AI Studio setup guidance | Dec 6, 2025 |
+| **CLI Help** | `docs/visual-content/cli-videos/cli-help-with-google-ai.mp4` | CLI help with google-ai options | Dec 6, 2025 |
+
+### **📋 Google AI Integration Features**
+- ✅ **Provider Integration**: Complete Google AI Studio provider as 6th major AI provider
+- ✅ **CLI Support**: `--provider google-ai` in all CLI commands
+- ✅ **Documentation**: All docs updated with Google AI Studio examples
+- ✅ **Visual Content**: 3 CLI recordings + 3 MP4 videos demonstrating integration
+- ✅ **Demo Applications**: Interactive web demo includes Google AI Studio selection
+- ✅ **MCP Integration**: All 10 MCP tools support Google AI Studio provider
+
+### **🔧 Google AI Studio Content Creation Tools**
+| Script | File | Purpose |
+|--------|------|---------|
+| **CLI Screenshots** | `scripts/create-google-ai-cli-screenshots.js` | Automated screenshot generation |
+| **Demo Videos** | `scripts/create-google-ai-demo-video.js` | Playwright-based demo recording |
+| **MP4 Conversion** | `scripts/convert-google-ai-recordings-to-mp4.sh` | Convert .cast to MP4 format |
 
 ---
 
@@ -157,20 +193,23 @@ This directory contains subdirectories for different categories of CLI videos, b
 
 ### **File Count by Type**
 - **PNG Screenshots**: 26 files
-- **WebM Videos**: 6 files
-- **MP4 Videos**: 9 files
-- **Asciinema Recordings**: 6 files
-- **Total Visual Assets**: 47 files
+- **WebM Videos**: 10 files
+- **MP4 Videos**: 8 files
+- **Google AI Studio MP4 Videos**: 3 files
+- **Asciinema Recordings**: 9 files (6 original + 3 Google AI)
+- **Total Visual Assets**: 56 files
 
 ### **Content by Purpose**
 - **Web Demo Documentation**: 16 files (6 screenshots + 10 videos)
 - **CLI Documentation**: 25 files (20 screenshots + 5 videos)
 - **MCP Integration**: 6 files (5 videos + documentation)
+- **Google AI Studio Integration**: 9 files (3 recordings + 3 MP4 videos + 3 automation scripts)
 
 ### **Generation Timeline**
 - **June 4, 2025**: Web demo content
 - **June 8, 2025**: Updated CLI screenshots
 - **June 9-10, 2025**: MCP integration content
+- **December 6, 2025**: Google AI Studio integration content
 - **Ongoing**: Asciinema recordings
 
 ---
@@ -194,6 +233,5 @@ This directory contains subdirectories for different categories of CLI videos, b
 
 ---
 
-**Last Updated**: June 10, 2025
-**Next Review**: July 10, 2025
+**Last Updated**: June 12, 2025
 **Maintainer**: NeuroLink Documentation Team

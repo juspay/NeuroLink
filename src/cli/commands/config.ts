@@ -15,7 +15,7 @@ import { z } from 'zod';
 
 // Configuration schema for validation
 const ConfigSchema = z.object({
-  defaultProvider: z.enum(['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'huggingface']).default('auto'),
+  defaultProvider: z.enum(['auto', 'openai', 'bedrock', 'vertex', 'anthropic', 'azure', 'google-ai', 'huggingface']).default('auto'),
   providers: z.object({
     openai: z.object({
       apiKey: z.string().optional(),
@@ -47,6 +47,10 @@ const ConfigSchema = z.object({
       endpoint: z.string().optional(),
       deploymentId: z.string().optional(),
       model: z.string().default('gpt-4')
+    }).optional(),
+    'google-ai': z.object({
+      apiKey: z.string().optional(),
+      model: z.string().default('gemini-1.5-pro-latest')
     }).optional(),
     huggingface: z.object({
       apiKey: z.string().optional(),
@@ -134,6 +138,7 @@ export class ConfigManager {
             { name: 'Google Vertex AI - Gemini models', value: 'vertex' },
             { name: 'Anthropic - Claude models (direct)', value: 'anthropic' },
             { name: 'Azure OpenAI - Enterprise GPT', value: 'azure' },
+            { name: 'Google AI Studio - Gemini models (direct)', value: 'google-ai' },
             { name: 'Hugging Face - Open source models', value: 'huggingface' }
           ],
           default: this.config.defaultProvider
@@ -200,6 +205,7 @@ export class ConfigManager {
           { name: 'Google Vertex AI (Gemini)', value: 'vertex' },
           { name: 'Anthropic Direct (Claude)', value: 'anthropic' },
           { name: 'Azure OpenAI (Enterprise)', value: 'azure' },
+          { name: 'Google AI Studio (Gemini Direct)', value: 'google-ai' },
           { name: 'Hugging Face (Open Source)', value: 'huggingface' }
         ]
       }
@@ -231,6 +237,9 @@ export class ConfigManager {
         break;
       case 'azure':
         await this.setupAzure();
+        break;
+      case 'google-ai':
+        await this.setupGoogleAI();
         break;
       case 'huggingface':
         await this.setupHuggingFace();
@@ -474,6 +483,34 @@ export class ConfigManager {
     ]);
 
     this.config.providers.azure = answers;
+  }
+
+  /**
+   * Google AI Studio provider setup
+   */
+  private async setupGoogleAI(): Promise<void> {
+    const answers = await inquirer.prompt([
+      {
+        type: 'password',
+        name: 'apiKey',
+        message: 'Google AI API Key:',
+        validate: (value: string) => value.length > 0 || 'API key is required'
+      },
+      {
+        type: 'list',
+        name: 'model',
+        message: 'Default model:',
+        choices: [
+          'gemini-1.5-pro-latest',
+          'gemini-2.0-flash-exp',
+          'gemini-1.5-flash-latest',
+          'gemini-1.0-pro'
+        ],
+        default: 'gemini-1.5-pro-latest'
+      }
+    ]);
+
+    this.config.providers['google-ai'] = answers;
   }
 
   /**

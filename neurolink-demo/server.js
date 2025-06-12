@@ -45,6 +45,8 @@ function getModelForProvider(provider) {
       return process.env.BEDROCK_MODEL || 'arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0';
     case 'vertex':
       return process.env.VERTEX_MODEL || 'gemini-1.5-pro';
+    case 'google-ai':
+      return process.env.GOOGLE_AI_MODEL || 'gemini-1.5-pro-latest';
     default:
       return 'gpt-4';
   }
@@ -58,6 +60,8 @@ function isProviderConfigured(provider) {
       return !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
     case 'vertex':
       return !!(process.env.GOOGLE_VERTEX_PROJECT || process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GOOGLE_AUTH_CLIENT_EMAIL);
+    case 'google-ai':
+      return !!process.env.GOOGLE_AI_API_KEY;
     default:
       return false;
   }

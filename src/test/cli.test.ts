@@ -77,7 +77,7 @@ describe('NeuroLink CLI Tests', () => {
       const output = result.stdout + result.stderr;
 
       // Should contain provider information
-      expect(output).toMatch(/(openai|bedrock|vertex)/i);
+      expect(output).toMatch(/(openai|bedrock|vertex|google-ai)/i);
       expect(output).toMatch(/(provider|status|configuration|available|failed)/i);
     });
 
@@ -130,6 +130,14 @@ describe('NeuroLink CLI Tests', () => {
 
       // Should show provider-specific response or error
       expect(output).toMatch(/(openai|provider|configuration|generated|error)/i);
+    });
+
+    it('should handle Google AI Studio provider specification', () => {
+      const result = execCLI(`node ${CLI_PATH} generate-text "Test" --provider google-ai`);
+      const output = result.stdout + result.stderr;
+
+      // Should show Google AI Studio provider-specific response or error
+      expect(output).toMatch(/(google-ai|provider|configuration|generated|error)/i);
     });
   });
 

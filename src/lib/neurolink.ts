@@ -11,7 +11,7 @@ import type { AIProvider, AIProviderName } from './core/types.js';
 
 export interface TextGenerationOptions {
   prompt: string;
-  provider?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'auto';
+  provider?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'auto';
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
@@ -20,7 +20,7 @@ export interface TextGenerationOptions {
 
 export interface StreamTextOptions {
   prompt: string;
-  provider?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'auto';
+  provider?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'auto';
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
@@ -47,7 +47,7 @@ export class NeuroLink {
     const functionTag = 'NeuroLink.generateText';
 
     // Define fallback provider priority order
-    const providerPriority = ['openai', 'vertex', 'bedrock'];
+    const providerPriority = ['openai', 'vertex', 'bedrock', 'google-ai'];
     const requestedProvider = options.provider === 'auto' ? undefined : options.provider;
 
     // If specific provider requested, try that first, then fallback to priority order
@@ -125,7 +125,7 @@ export class NeuroLink {
     const functionTag = 'NeuroLink.generateTextStream';
 
     // Define fallback provider priority order
-    const providerPriority = ['openai', 'vertex', 'bedrock'];
+    const providerPriority = ['openai', 'vertex', 'bedrock', 'google-ai'];
     const requestedProvider = options.provider === 'auto' ? undefined : options.provider;
 
     // If specific provider requested, try that first, then fallback to priority order

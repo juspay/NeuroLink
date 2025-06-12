@@ -1,5 +1,67 @@
 # @juspay/neurolink
 
+## 1.5.0
+
+### Major Changes
+
+- **🧠 Google AI Studio Integration**: Added Google AI Studio as 5th AI provider with Gemini models
+  - **🔧 New Provider**: Complete GoogleAIStudio provider with Gemini 1.5/2.0 Flash/Pro models
+  - **🆓 Free Tier Access**: Leverage Google's generous free tier for development and testing
+  - **🖥️ CLI Support**: Full `--provider google-ai` integration across all commands
+  - **⚡ Auto-Selection**: Included in automatic provider selection algorithm
+  - **🔑 Simple Setup**: Single `GOOGLE_AI_API_KEY` environment variable configuration
+
+### Features
+
+- **📚 Documentation Architecture Overhaul**: Complete README.md restructuring for better UX
+  - **75% Size Reduction**: Transformed from 800+ lines to ~200 lines focused on quick start
+  - **Progressive Disclosure**: Clear path from basic → intermediate → advanced documentation
+  - **Specialized Documentation**: Created 4 dedicated docs files for different audiences
+  - **Cross-References**: Complete navigation system between all documentation files
+
+### New Documentation Structure
+
+```
+docs/
+├── AI-ANALYSIS-TOOLS.md          # AI optimization and analysis tools
+├── AI-WORKFLOW-TOOLS.md          # Development lifecycle tools
+├── MCP-FOUNDATION.md             # Technical MCP architecture
+└── GOOGLE-AI-STUDIO-INTEGRATION-ARCHIVE.md  # Integration details
+```
+
+### Google AI Studio Provider
+
+```typescript
+// New Google AI Studio usage
+import { createBestAIProvider } from '@juspay/neurolink';
+
+const provider = createBestAIProvider(); // Auto-includes Google AI Studio
+const result = await provider.generateText("Hello, Gemini!");
+```
+
+```bash
+# Quick setup with Google AI Studio (free tier)
+export GOOGLE_AI_API_KEY="AIza-your-google-ai-key"
+npx @juspay/neurolink generate-text "Hello, AI!" --provider google-ai
+```
+
+### Enhanced Visual Content
+
+- **Google AI Studio Demos**: Complete visual documentation for new provider
+- **CLI Demonstrations**: Updated CLI videos showing google-ai provider
+- **Professional Quality**: 6 new videos and asciinema recordings
+
+### Technical Implementation
+
+- **Provider Integration**: `src/lib/providers/googleAIStudio.ts`
+- **Models Supported**: Gemini 1.5 Pro/Flash, Gemini 2.0 Flash/Pro
+- **Authentication**: Simple API key authentication via Google AI Studio
+- **Testing**: Complete test coverage including provider and CLI tests
+
+### Breaking Changes
+
+- None - 100% backward compatibility maintained
+
 ## 1.4.0
 
 ### Major Changes

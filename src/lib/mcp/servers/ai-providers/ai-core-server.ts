@@ -50,7 +50,7 @@ export const aiCoreServer = createMCPServer({
  */
 const TextGenerationSchema = z.object({
   prompt: z.string().min(1, 'Prompt is required'),
-  provider: z.enum(['openai', 'bedrock', 'vertex', 'anthropic']).optional(),
+  provider: z.enum(['openai', 'bedrock', 'vertex', 'anthropic', 'google-ai']).optional(),
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().positive().optional(),
