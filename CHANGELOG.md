@@ -1,5 +1,38 @@
 # @juspay/neurolink
 
+## 1.5.3
+
+### Patch Changes
+
+- **🔧 CLI Debug Log Persistence Fix**: Fixed unwanted debug logs appearing in production deployments
+  - **Issue**: CLI showed debug logs even when `--debug` flag was not provided, cluttering production output
+  - **Root Cause**: CLI middleware had logical gap where `NEUROLINK_DEBUG` wasn't explicitly set to `'false'` when no debug flag provided, allowing inherited environment variables to persist
+  - **Solution**: Updated middleware to always set `NEUROLINK_DEBUG = 'false'` when debug mode not enabled
+  - **Impact**: **Deterministic logging behavior** - debug logs only appear when explicitly requested with `--debug` flag
+
+### Technical Changes
+
+- **Clean Production Output**: No debug logs in deployed CLI unless `--debug` flag explicitly provided
+- **Deterministic Behavior**: Logging controlled by CLI flags, not inherited environment variables
+- **Backward Compatible**: Debug mode still works perfectly when `--debug` flag is used
+- **Environment Independence**: CLI output no longer affected by external `NEUROLINK_DEBUG` settings
+
+### CLI Behavior Fix
+
+```bash
+# Before Fix (Problematic)
+neurolink generate-text "test"
+# Could show debug logs if NEUROLINK_DEBUG was set in environment
+
+# After Fix (Clean)
+neurolink generate-text "test"
+# Output: ⠋ 🤖 Generating text... ✔ ✅ Text generated successfully! [content]
+
+# Debug still works when requested
+neurolink generate-text "test" --debug
+# Output: [debug logs] + spinner + success + content
+```
+
 ## 1.5.2
 
 ### Patch Changes

@@ -180,8 +180,8 @@ const cli = yargs(args)
     // Control SDK logging based on debug flag
     if (argv.debug) {
       process.env.NEUROLINK_DEBUG = 'true';
-    } else if (typeof argv.debug !== 'undefined') {
-      // Only set to false if debug flag was explicitly provided
+    } else {
+      // Always set to false when debug is not enabled (including when not provided)
       process.env.NEUROLINK_DEBUG = 'false';
     }
     // Keep existing quiet middleware
