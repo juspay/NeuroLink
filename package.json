@@ -1,6 +1,6 @@
 {
 	"name": "@juspay/neurolink",
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"description": "Universal AI Development Platform with external MCP server integration, multi-provider support, and professional CLI. Connect to 65+ MCP servers for filesystem, GitHub, database operations, and more. Build, test, and deploy AI applications with OpenAI, Anthropic, Google Vertex AI, and AWS Bedrock.",
 	"author": {
 		"name": "Juspay Technologies",
@@ -75,26 +75,12 @@
 			"default": "./dist/cli/index.js"
 		}
 	},
-	"peerDependencies": {
+	"dependencies": {
 		"@ai-sdk/amazon-bedrock": "^1.0.0",
+		"@ai-sdk/google": "^1.2.19",
 		"@ai-sdk/google-vertex": "^2.2.0",
 		"@ai-sdk/openai": "^1.0.0",
 		"ai": "^4.0.0",
-		"zod": "^3.22.0"
-	},
-	"peerDependenciesMeta": {
-		"@ai-sdk/amazon-bedrock": {
-			"optional": true
-		},
-		"@ai-sdk/google-vertex": {
-			"optional": true
-		},
-		"@ai-sdk/openai": {
-			"optional": true
-		}
-	},
-	"dependencies": {
-		"@ai-sdk/google": "^1.2.19",
 		"chalk": "^5.3.0",
 		"dotenv": "^16.5.0",
 		"inquirer": "^9.2.15",
