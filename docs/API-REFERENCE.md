@@ -6,7 +6,7 @@ Complete reference for NeuroLink's TypeScript API.
 
 ### `createBestAIProvider(requestedProvider?, modelName?)`
 
-Creates the best available AI provider based on environment configuration and provider availability.
+Creates the best available AI provider based on environment configuration and provider availability. This now includes authentication and model availability checks.
 
 ```typescript
 function createBestAIProvider(

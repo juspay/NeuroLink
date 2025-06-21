@@ -1,8 +1,8 @@
 # Active Context
 
-## Current Focus: MCP Multi-turn Function Calling Integration Complete
+## Current Focus: CLI Provider Status & Error Handling Fixes
 
-### Session Status: BREAKTHROUGH ACHIEVED - AI SDK Function Calling Working
+### Session Status: BUG FIXES COMPLETE - Accurate Provider Status & Error Handling
 
 **Date**: June 17, 2025
 **Phase**: MCP Function Calling Integration
@@ -16,11 +16,10 @@
 - **Result**: AI now calls tools AND generates responses with tool results
 
 ### Current Capabilities Validated ✅
-- ✅ **82 MCP tools auto-discovered** and available for calling
-- ✅ **Multi-turn function calling** working end-to-end
-- ✅ **Real-time data access** (current time, calculations, etc.)
-- ✅ **CLI integration complete** with debug logging
-- ✅ **All 27 MCP foundation tests passing**
+- ✅ **CLI Provider Status**: Accurately reports provider status, distinguishing between "not configured", "invalid credentials", and "working".
+- ✅ **Enhanced Ollama Status Check**: Verifies service is running and required model is available.
+- ✅ **Improved Error Handling**: Prevents confusing fallback behavior and provides clear, actionable error messages.
+- ✅ **Circular Dependency Fix**: Resolved `SyntaxError` in `generate-text` command.
 
 ### Implementation Completed ✅
 

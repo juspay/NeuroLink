@@ -199,25 +199,98 @@ function updateUsageStats(usage) {
 }
 
 /**
+ * Test if Ollama is actually running
+ * @returns {Promise<boolean>} True if Ollama is accessible
+ */
+async function testOllamaConnection() {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags', {
+      method: 'GET',
+      signal: AbortSignal.timeout(2000) // 2 second timeout
+    });
+    return response.ok;
+  } catch (error) {
+    console.log('[Ollama] Connection test failed:', error.message);
+    return false;
+  }
+}
+
+/**
  * Test a single provider's availability
  * @param {string} providerName - Name of the provider to test
  * @returns {Object} Provider status information
  */
 async function testProviderAvailability(providerName) {
+  const result = {
+    available: false,
+    configured: false,
+    authenticated: false,
+    model: getModelForProvider(providerName),
+    error: null
+  };
+
+  // Special handling for Ollama
+  if (providerName === "ollama") {
+    const isRunning = await testOllamaConnection();
+    result.configured = isRunning;
+    result.available = isRunning;
+    result.authenticated = isRunning;
+    if (!isRunning) {
+      result.error = "Ollama is not running. Please start Ollama with: ollama serve";
+    }
+    return result;
+  }
+
+  // Check if environment variables are set
+  const hasEnvVars = isProviderConfigured(providerName);
+  result.configured = hasEnvVars;
+
+  if (!hasEnvVars) {
+    result.error = `Missing required environment variables: ${PROVIDER_ENV_VARS[providerName]?.join(', ') || 'Unknown'}`;
+    return result;
+  }
+
+  // Try to create provider and test with a simple request
   try {
     const provider = await createAIProvider(providerName);
-    return {
-      available: true,
+
+    // Try a minimal test request to verify authentication
+    const testPrompt = "Hi";
+    const testResult = await provider.generateText({
+      prompt: testPrompt,
       model: getModelForProvider(providerName),
-      configured: isProviderConfigured(providerName),
-    };
+      maxTokens: 5, // Minimal tokens to reduce cost
+      temperature: 0.1,
+    });
+
+    // If we got here without throwing, the provider is authenticated
+    result.available = true;
+    result.authenticated = true;
+
   } catch (error) {
-    return {
-      available: false,
-      error: error.message,
-      configured: isProviderConfigured(providerName),
-    };
+    result.available = false;
+    result.authenticated = false;
+
+    // Parse error message to determine if it's auth or other issue
+    const errorMsg = error.message || String(error);
+
+    if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') ||
+        errorMsg.includes('Invalid API') || errorMsg.includes('Authentication') ||
+        errorMsg.includes('API key') || errorMsg.includes('not authorized')) {
+      result.error = "Invalid API key or authentication failed";
+    } else if (errorMsg.includes('404') || errorMsg.includes('not found')) {
+      result.error = "Model or endpoint not found";
+    } else if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+      result.error = "Rate limit exceeded";
+      result.authenticated = true; // Auth is OK, just rate limited
+    } else if (errorMsg.includes('timeout') || errorMsg.includes('ECONNREFUSED')) {
+      result.error = "Connection failed - service may be down";
+    } else {
+      result.error = errorMsg;
+    }
   }
+
+  return result;
 }
 
 /**
@@ -440,11 +513,15 @@ app.get(
         await testProviderAvailability(providerName);
     }
 
-    // Get the best available provider
-    try {
-      status.bestProvider = await getBestProvider();
-    } catch (error) {
-      status.bestProvider = { error: error.message };
+    // Get the best available provider (only from authenticated providers)
+    const authenticatedProviders = ALL_PROVIDERS.filter(
+      p => status.providers[p].authenticated
+    );
+
+    if (authenticatedProviders.length > 0) {
+      status.bestProvider = authenticatedProviders[0];
+    } else {
+      status.bestProvider = null;
     }
 
     res.json(status);

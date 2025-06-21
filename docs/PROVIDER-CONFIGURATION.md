@@ -731,8 +731,8 @@ npx @juspay/neurolink status --verbose
 # Expected output:
 # 🔍 Checking AI provider status...
 # ✅ openai: ✅ Working (234ms)
-# ✅ bedrock: ✅ Working (456ms)
-# ✅ vertex: ✅ Working (123ms)
+# ❌ bedrock: ❌ Invalid credentials - The security token included in the request is expired
+# ⚪ vertex: ⚪ Not configured - Missing environment variables
 ```
 
 ### Programmatic Testing

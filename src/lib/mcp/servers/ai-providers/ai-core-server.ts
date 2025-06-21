@@ -9,7 +9,7 @@ import { createMCPServer } from "../../factory.js";
 import type { NeuroLinkExecutionContext, ToolResult } from "../../factory.js";
 import { AIProviderFactory } from "../../../core/factory.js";
 import {
-  getBestProvider,
+  getBestProviderSync as getBestProvider,
   getAvailableProviders,
 } from "../../../utils/providerUtils.js";
 import { logger } from "../../../utils/logger.js";

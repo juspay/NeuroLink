@@ -88,6 +88,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 
 ### 1. Pull Your First Model
 
+NeuroLink's CLI now checks for the default model (`llama3.2:latest`) and will prompt you to pull it if it's missing. You can also pull other models manually:
+
 ```bash
 # Pull Llama 2 (default)
 ollama pull llama2

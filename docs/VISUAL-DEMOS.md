@@ -97,7 +97,7 @@ npm start
 
 #### **Provider Status** - [🎬 MP4](./visual-content/cli-videos/cli-02-provider-status.mp4)
 
-- All provider connectivity verification
+- All provider connectivity verification (now with authentication and model availability checks)
 - Response time measurements
 - Authentication status checking
 - **Size**: 496KB - Professional MP4 showing provider connectivity

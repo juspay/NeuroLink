@@ -202,6 +202,12 @@ class OllamaLanguageModel implements LanguageModelV1 {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        if (response.status === 404) {
+          const errorData = await response.json();
+          if (errorData.error && errorData.error.includes("not found")) {
+            throw new Error(`Model '${this.modelId}' not found. Please run 'ollama pull ${this.modelId}'`);
+          }
+        }
         throw new Error(
           `Ollama API error: ${response.status} ${response.statusText}`,
         );
@@ -294,6 +300,12 @@ class OllamaLanguageModel implements LanguageModelV1 {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        if (response.status === 404) {
+          const errorData = await response.json();
+          if (errorData.error && errorData.error.includes("not found")) {
+            throw new Error(`Model '${this.modelId}' not found. Please run 'ollama pull ${this.modelId}'`);
+          }
+        }
         throw new Error(
           `Ollama API error: ${response.status} ${response.statusText}`,
         );
@@ -580,6 +592,10 @@ export class Ollama implements AIProvider {
       }
 
       const result = await generateText(generateOptions);
+
+      if (result.text.includes("model not found")) {
+        throw new Error(`Model '${this.modelName}' not found. Please run 'ollama pull ${this.modelName}'`);
+      }
 
       logger.debug(`[${functionTag}] Generate text completed`, {
         provider,

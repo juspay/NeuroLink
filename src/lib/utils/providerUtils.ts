@@ -8,7 +8,7 @@ import { logger } from "./logger.js";
  * @param requestedProvider - Optional preferred provider name
  * @returns The best provider name to use
  */
-export function getBestProvider(requestedProvider?: string): string {
+export function getBestProviderSync(requestedProvider?: string): string {
   // If a specific provider is requested, return it
   if (requestedProvider) {
     return requestedProvider;
@@ -49,6 +49,16 @@ export function getBestProvider(requestedProvider?: string): string {
  * @returns True if the provider appears to be configured
  */
 function isProviderConfigured(provider: string): boolean {
+  return hasProviderEnvVars(provider);
+}
+
+/**
+ * Check if a provider has the minimum required environment variables
+ * NOTE: This only checks if variables exist, not if they're valid
+ * @param provider - Provider name to check
+ * @returns True if the provider has required environment variables
+ */
+export function hasProviderEnvVars(provider: string): boolean {
   switch (provider.toLowerCase()) {
     case "bedrock":
     case "amazon":

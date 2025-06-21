@@ -10,10 +10,10 @@ import type { AIProviderName } from "./core/types.js";
 import { AIProviderFactory } from "./index.js";
 import { ContextManager } from "./mcp/context-manager.js";
 import { mcpLogger } from "./mcp/logging.js";
-import { defaultToolRegistry } from "./mcp/registry.js";
+import { getDefaultToolRegistry } from "./mcp/registry.js";
 import { defaultUnifiedRegistry } from "./mcp/unified-registry.js";
 import { logger } from "./utils/logger.js";
-import { getBestProvider } from "./utils/providerUtils.js";
+import { getBestProvider } from "./utils/providerUtils-fixed.js";
 
 export interface TextGenerationOptions {
   prompt: string;
@@ -208,8 +208,8 @@ export class NeuroLink {
         category?: string;
       }> = [];
       try {
-        // Use defaultToolRegistry directly instead of unified registry to avoid hanging
-        const allTools = defaultToolRegistry.listTools();
+        // Use getDefaultToolRegistry() to avoid circular dependencies
+        const allTools = getDefaultToolRegistry().listTools();
         availableTools = allTools.map((tool) => ({
           name: tool.name,
           description: tool.description || "No description available",

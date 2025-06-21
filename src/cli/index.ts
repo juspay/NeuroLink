@@ -758,27 +758,129 @@ const cli = yargs(args)
               "ollama",
               "mistral",
             ] as const;
+
+            // Import hasProviderEnvVars to check environment variables
+            const { hasProviderEnvVars } = await import("../lib/utils/providerUtils.js");
+
             const results: Array<{
               provider: string;
               status: string;
+              configured: boolean;
+              authenticated?: boolean;
               responseTime?: number;
               error?: string;
             }> = [];
+
             for (const p of providers) {
               if (spinner) {
                 spinner.text = `Testing ${p}...`;
               }
+
+              // First check if provider has env vars configured
+              const hasEnvVars = hasProviderEnvVars(p);
+
+              if (!hasEnvVars && p !== "ollama") {
+                // No env vars, don't even try to test
+                results.push({
+                  provider: p,
+                  status: "not-configured",
+                  configured: false,
+                  error: "Missing required environment variables",
+                });
+                if (spinner) {
+                  spinner.fail(
+                    `${p}: ${chalk.gray("⚪ Not configured")} - Missing environment variables`,
+                  );
+                } else if (!argv.quiet) {
+                  console.log(
+                    `${p}: ${chalk.gray("⚪ Not configured")} - Missing environment variables`,
+                  );
+                }
+                continue;
+              }
+
+              // Special handling for Ollama
+              if (p === "ollama") {
+                try {
+                  // First, check if the service is running
+                  const serviceResponse = await fetch('http://localhost:11434/api/tags', {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(2000)
+                  });
+
+                  if (!serviceResponse.ok) {
+                    throw new Error("Ollama service not responding");
+                  }
+
+                  // Service is running, now check if the default model is available
+                  const { models } = await serviceResponse.json();
+                  const defaultOllamaModel = "llama3.2:latest";
+                  const modelIsAvailable = models.some((m: any) => m.name === defaultOllamaModel);
+
+                  if (modelIsAvailable) {
+                    results.push({
+                      provider: p,
+                      status: "working",
+                      configured: true,
+                      authenticated: true,
+                      responseTime: 0,
+                    });
+                    if (spinner) {
+                      spinner.succeed(
+                        `${p}: ${chalk.green("✅ Working")} - Service running and model '${defaultOllamaModel}' is available.`,
+                      );
+                    }
+                  } else {
+                     results.push({
+                      provider: p,
+                      status: "failed",
+                      configured: true,
+                      authenticated: false,
+                      error: `Ollama service is running, but model '${defaultOllamaModel}' is not found. Please run 'ollama pull ${defaultOllamaModel}'.`,
+                    });
+                    if (spinner) {
+                      spinner.fail(
+                        `${p}: ${chalk.red("❌ Model Not Found")} - Run 'ollama pull ${defaultOllamaModel}'`,
+                      );
+                    }
+                  }
+                } catch (error) {
+                  results.push({
+                    provider: p,
+                    status: "failed",
+                    configured: false,
+                    authenticated: false,
+                    error: "Ollama is not running. Please start with: ollama serve",
+                  });
+                  if (spinner) {
+                    spinner.fail(
+                      `${p}: ${chalk.red("❌ Failed")} - Service not running`,
+                    );
+                  }
+                }
+                continue;
+              }
+
+              // Provider has env vars, now test authentication
               try {
                 const start = Date.now();
-                await sdk.generateText({
+
+                // Import AIProviderFactory to test providers directly without fallback
+                const { AIProviderFactory } = await import("../lib/core/factory.js");
+
+                // Create and test provider directly to avoid automatic fallback
+                const provider = await AIProviderFactory.createProvider(p);
+                await provider.generateText({
                   prompt: "test",
-                  provider: p,
                   maxTokens: 1,
                 });
+
                 const duration = Date.now() - start;
                 results.push({
                   provider: p,
                   status: "working",
+                  configured: true,
+                  authenticated: true,
                   responseTime: duration,
                 });
                 if (spinner) {
@@ -791,35 +893,56 @@ const cli = yargs(args)
                   );
                 }
               } catch (error) {
+                const errorMsg = (error as Error).message;
+                let authStatus = false;
+                let statusText = "Failed";
+
+                // Check if it's an authentication error
+                if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') ||
+                    errorMsg.includes('Invalid API') || errorMsg.includes('Authentication') ||
+                    errorMsg.includes('API key') || errorMsg.includes('not authorized') ||
+                    errorMsg.includes('ExpiredToken') || errorMsg.includes('expired')) {
+                  statusText = "Invalid credentials";
+                } else if (errorMsg.includes('fetch') || errorMsg.includes('blob')) {
+                  statusText = "Service error";
+                }
+
                 results.push({
                   provider: p,
                   status: "failed",
-                  error: (error as Error).message,
+                  configured: true,
+                  authenticated: authStatus,
+                  error: errorMsg,
                 });
                 if (spinner) {
                   spinner.fail(
-                    `${p}: ${chalk.red("❌ Failed")} - ${(error as Error).message.split("\n")[0]}`,
+                    `${p}: ${chalk.red("❌ " + statusText)} - ${errorMsg.split("\n")[0]}`,
                   );
                 } else if (!argv.quiet) {
                   console.error(
-                    `${p}: ${chalk.red("❌ Failed")} - ${(error as Error).message.split("\n")[0]}`,
+                    `${p}: ${chalk.red("❌ " + statusText)} - ${errorMsg.split("\n")[0]}`,
                   );
                 }
               }
             }
+
             const working = results.filter(
               (r) => r.status === "working",
             ).length;
+            const configured = results.filter(
+              (r) => r.configured,
+            ).length;
+
             if (spinner) {
               spinner.info(
                 chalk.blue(
-                  `\n📊 Summary: ${working}/${results.length} providers working`,
+                  `\n📊 Summary: ${working}/${results.length} providers working, ${configured}/${results.length} configured`,
                 ),
               );
             } else if (!argv.quiet) {
               console.log(
                 chalk.blue(
-                  `\n📊 Summary: ${working}/${results.length} providers working`,
+                  `\n📊 Summary: ${working}/${results.length} providers working, ${configured}/${results.length} configured`,
                 ),
               );
             }

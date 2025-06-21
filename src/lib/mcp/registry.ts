@@ -545,7 +545,28 @@ export class MCPToolRegistry {
  * Default registry instance
  * Can be used across the application for consistent tool management
  */
-export const defaultToolRegistry = new MCPToolRegistry();
+let defaultRegistryInstance: MCPToolRegistry | null = null;
+
+/**
+ * Get the default singleton instance of the MCPToolRegistry.
+ * This function ensures that the registry is only instantiated once.
+ * Using a function getter helps prevent circular dependency issues during module initialization.
+ *
+ * @returns The singleton MCPToolRegistry instance.
+ */
+export function getDefaultToolRegistry(): MCPToolRegistry {
+  if (!defaultRegistryInstance) {
+    defaultRegistryInstance = new MCPToolRegistry();
+  }
+  return defaultRegistryInstance;
+}
+
+/**
+ * @deprecated The direct export `defaultToolRegistry` is deprecated and will be removed.
+ * Please use `getDefaultToolRegistry()` instead to avoid circular dependency issues.
+ */
+export const defaultToolRegistry = getDefaultToolRegistry();
+
 
 /**
  * Utility function to register server with default registry
@@ -555,7 +576,7 @@ export const defaultToolRegistry = new MCPToolRegistry();
 export async function registerServer(
   server: NeuroLinkMCPServer,
 ): Promise<void> {
-  return defaultToolRegistry.registerServer(server);
+  return getDefaultToolRegistry().registerServer(server);
 }
 
 /**
@@ -573,7 +594,7 @@ export async function executeTool(
   context: NeuroLinkExecutionContext,
   options?: ToolExecutionOptions,
 ): Promise<ToolResult> {
-  return defaultToolRegistry.executeTool(toolName, params, context, options);
+  return getDefaultToolRegistry().executeTool(toolName, params, context, options);
 }
 
 /**
@@ -583,5 +604,5 @@ export async function executeTool(
  * @returns Array of tool information
  */
 export function listTools(criteria?: ToolSearchCriteria) {
-  return defaultToolRegistry.listTools(criteria);
+  return getDefaultToolRegistry().listTools(criteria);
 }

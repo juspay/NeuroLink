@@ -133,6 +133,7 @@ export const POST: RequestHandler = async ({ request }) => {
 OPENAI_API_KEY="sk-your-key"
 AWS_ACCESS_KEY_ID="your-aws-key"
 AWS_SECRET_ACCESS_KEY="your-aws-secret"
+# Add other provider keys as needed
 ```
 
 ### Dynamic Model Integration (v1.8.0+)

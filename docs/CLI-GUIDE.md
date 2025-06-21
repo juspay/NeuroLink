@@ -261,7 +261,7 @@ neurolink generate-text "Describe this" --capability vision --optimize-cost
 
 ### `status` - Provider Diagnostics
 
-Check the health and connectivity of all configured AI providers.
+Check the health and connectivity of all configured AI providers. This now includes authentication and model availability checks.
 
 ```bash
 # Check all provider connectivity

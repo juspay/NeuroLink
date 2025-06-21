@@ -112,7 +112,7 @@ const pipeline = [
 - **Core AI tools**: 3 essential tools for AI operations
 - **Schema validation**: JSON Schema validation for all inputs/outputs
 - **Provider abstraction**: Unified interface across all AI providers
-- **Error standardization**: Consistent error handling and reporting
+- **Error standardization**: Consistent error handling and reporting (now with specific "model not found" errors for Ollama)
 
 ```typescript
 // AI Provider MCP Tools

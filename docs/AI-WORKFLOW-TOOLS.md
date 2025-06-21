@@ -293,7 +293,7 @@ const workflowTools = [
 ### Prerequisites
 
 1. **Install NeuroLink**: `npm install @juspay/neurolink`
-2. **Configure Providers**: Set up at least one AI provider (see [Provider Configuration](./PROVIDER-CONFIGURATION.md))
+2. **Configure Providers**: Set up at least one AI provider (see [Provider Configuration](./PROVIDER-CONFIGURATION.md)) (now with authentication and model availability checks)
 3. **Verify Setup**: Run `npx @juspay/neurolink status` to check connectivity
 
 ### Quick Examples

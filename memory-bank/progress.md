@@ -144,17 +144,13 @@
 
 ## Recent Achievements
 
-### June 17, 2025
+### June 21, 2025
 
-- ✅ **MCP Automatic Tool Detection Implementation Complete**
-  - Implemented automatic tool detection following Lighthouse pattern
-  - Tools are now invoked automatically based on prompt analysis
-  - Successfully tested with Google AI Studio provider
-  - Time queries automatically use `get-current-time` tool
-  - Math calculations automatically use calculator tool
-  - Regular queries proceed without tools as expected
-  - Implementation includes NeuroLinkMCPClient and MCPAwareProviderV2
-  - All 9 AI providers supported with MCP integration
+- ✅ **CLI Provider Status & Error Handling Fixes Complete**
+  - **CLI Provider Status**: Accurately reports provider status, distinguishing between "not configured", "invalid credentials", and "working".
+  - **Enhanced Ollama Status Check**: Verifies service is running and required model is available.
+  - **Improved Error Handling**: Prevents confusing fallback behavior and provides clear, actionable error messages.
+  - **Circular Dependency Fix**: Resolved `SyntaxError` in `generate-text` command.
 
 ### June 13, 2025
 

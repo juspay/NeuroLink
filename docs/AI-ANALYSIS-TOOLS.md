@@ -205,7 +205,7 @@ const mcpTools = [
 ## 🚀 Getting Started
 
 1. **Install NeuroLink**: `npm install @juspay/neurolink`
-2. **Set up providers**: Configure at least one AI provider (see [Provider Configuration](./PROVIDER-CONFIGURATION.md))
+2. **Set up providers**: Configure at least one AI provider (see [Provider Configuration](./PROVIDER-CONFIGURATION.md)) (now with authentication and model availability checks)
 3. **Try the tools**: Use factory methods or visit the demo application
 4. **Integrate APIs**: Use REST endpoints for web applications
 

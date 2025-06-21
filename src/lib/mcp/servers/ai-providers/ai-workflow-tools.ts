@@ -11,7 +11,7 @@ import type {
 } from "../../factory.js";
 import { AIProviderFactory } from "../../../core/factory.js";
 import type { AIProvider } from "../../../core/types.js";
-import { getBestProvider } from "../../../utils/providerUtils.js";
+import { getBestProviderSync as getBestProvider } from "../../../utils/providerUtils.js";
 
 // Tool-specific schemas with comprehensive validation
 const generateTestCasesSchema = z.object({

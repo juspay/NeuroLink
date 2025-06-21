@@ -47,6 +47,30 @@ src/lib/mcp/
 
 ---
 
+## 🐞 **CLI Provider Status & Error Handling Fixes** (Learned 2025-06-21)
+
+### **🏆 BUG FIX SUCCESS: Accurate Provider Status Reporting**
+- **LESSON**: SDK's automatic fallback can mask authentication and availability errors.
+- **PATTERN**: Bypass SDK fallback during status checks to test providers directly.
+- **IMPLEMENTATION**: Use `AIProviderFactory.createProvider()` directly in CLI status command.
+- **IMPACT**: CLI now accurately reports provider status, distinguishing between "not configured", "invalid credentials", and "working".
+
+### **Enhanced Ollama Status Check (CRITICAL)**
+- **LESSON**: For local services like Ollama, service availability and model availability are two different things.
+- **PATTERN**: Implement a two-step check for Ollama:
+  1. Check if the Ollama service is running.
+  2. If the service is running, check if the required model is available.
+- **IMPLEMENTATION**: Added a check for the default Ollama model (`llama3.2:latest`) in the `provider status` command.
+- **IMPACT**: Clear, actionable error messages for users (e.g., "Model 'llama3.2:latest' not found. Please run 'ollama pull llama3.2:latest'").
+
+### **Improved Error Handling in Ollama Provider**
+- **LESSON**: Providers should throw specific, helpful errors instead of relying on generic HTTP status codes.
+- **PATTERN**: Catch "model not found" errors and re-throw them with a clear, user-friendly message.
+- **IMPLEMENTATION**: Added a check for "model not found" in the `Ollama.generateText` method.
+- **IMPACT**: Prevents confusing fallback behavior and provides clear guidance to the user.
+
+---
+
 ## 🧠 **AI ANALYSIS TOOLS SUCCESS PATTERNS** (Learned 2025-01-11)
 
 ### **🏆 PRODUCTION DEPLOYMENT SUCCESS: 20/20 TESTS PASSING (100% SUCCESS RATE)**
