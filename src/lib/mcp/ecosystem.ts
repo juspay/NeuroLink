@@ -98,10 +98,7 @@ export class MCPEcosystem {
       );
 
       // Create MCP instance
-      const mcpInstance = await pluginManager.createInstance<MCP>(
-        name,
-        config,
-      );
+      const mcpInstance = await pluginManager.createInstance<MCP>(name, config);
 
       // Execute the MCP
       mcpLogger.debug(`[${functionTag}] Executing ${name}`, { args });

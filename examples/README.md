@@ -2,7 +2,19 @@
 
 This directory contains practical examples demonstrating NeuroLink's capabilities.
 
-## 🚀 **Quick Start Examples**
+## � **Enhanced Examples: Developer Experience 2.0** (June 22, 2025)
+
+**NEW AUTOMATION EXAMPLES**: Complete enterprise automation workflows with 9 systems and 72+ commands!
+
+## �🚀 **Quick Start Examples**
+
+### **Developer Experience Automation (NEW v2.0)**
+
+- `automation-setup.js` - Complete project setup automation
+- `adaptive-testing.js` - Intelligent test selection examples
+- `environment-automation.js` - Safe .env management and backup
+- `build-pipeline.js` - 7-phase enterprise build system
+- `health-monitoring.js` - System health and performance monitoring
 
 ### **Basic Usage**
 

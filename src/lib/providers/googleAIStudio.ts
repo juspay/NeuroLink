@@ -17,6 +17,16 @@ import type {
 } from "../core/types.js";
 import { logger } from "../utils/logger.js";
 
+// CRITICAL: Setup environment variables early for AI SDK compatibility
+// The AI SDK specifically looks for GOOGLE_GENERATIVE_AI_API_KEY
+// We need to ensure this is set before any AI SDK operations
+if (
+  !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+  process.env.GOOGLE_AI_API_KEY
+) {
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
+}
+
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
   systemPrompt: "You are a helpful AI assistant.",
@@ -36,7 +46,10 @@ const getGoogleAIApiKey = (): string => {
 
   // Ensure GOOGLE_GENERATIVE_AI_API_KEY is set for @ai-sdk/google compatibility
   // The AI SDK specifically looks for this variable name
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_AI_API_KEY) {
+  if (
+    !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
+    process.env.GOOGLE_AI_API_KEY
+  ) {
     process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
   }
 

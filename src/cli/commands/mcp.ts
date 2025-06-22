@@ -17,10 +17,7 @@ import { ContextManager } from "../../lib/mcp/context-manager.js";
 import { MCPOrchestrator } from "../../lib/mcp/orchestrator.js";
 import type { DiscoveryOptions } from "../../lib/mcp/auto-discovery.js";
 import { initializeNeuroLinkMCP } from "../../lib/mcp/initialize.js";
-import {
-  mcpLogger,
-  setGlobalMCPLogLevel,
-} from "../../lib/mcp/logging.js";
+import { mcpLogger, setGlobalMCPLogLevel } from "../../lib/mcp/logging.js";
 import type { LogLevel } from "../../lib/mcp/logging.js";
 
 // MCP Server Configuration

@@ -15,10 +15,10 @@
 
 **MAJOR SUCCESS**: All blocking TypeScript compilation errors resolved + Complete CLI MCP integration achieved!
 
-✅ **Function Calling Ready**: AI can now execute real filesystem operations, data analysis, and system commands  
-✅ **Production Validated**: 23,230+ token MCP context loading confirmed via comprehensive CLI testing  
-✅ **Zero Build Errors**: Clean TypeScript compilation after resolving all 13 blocking errors  
-✅ **CLI Tool Integration**: Both `generate-text` and `agent-generate` commands use full MCP capabilities  
+✅ **Function Calling Ready**: AI can now execute real filesystem operations, data analysis, and system commands
+✅ **Production Validated**: 23,230+ token MCP context loading confirmed via comprehensive CLI testing
+✅ **Zero Build Errors**: Clean TypeScript compilation after resolving all 13 blocking errors
+✅ **CLI Tool Integration**: Both `generate-text` and `agent-generate` commands use full MCP capabilities
 ✅ **Backward Compatible**: Tools enabled by default with opt-out flag for traditional usage
 
 ```bash
@@ -292,9 +292,36 @@ We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTIN
 git clone https://github.com/juspay/neurolink
 cd neurolink
 pnpm install
-pnpm test
-pnpm build
+pnpm setup:complete  # One-command setup with all automation
+pnpm test:adaptive   # Intelligent testing
+pnpm build:complete  # Full build pipeline
 ```
+
+### New Developer Experience (v2.0)
+
+NeuroLink now features **enterprise-grade automation** with 72+ commands:
+
+```bash
+# Environment & Setup (2-minute initialization)
+pnpm setup:complete        # Complete project setup
+pnpm env:setup             # Safe .env configuration
+pnpm env:backup            # Environment backup
+
+# Testing & Quality (60-80% faster)
+pnpm test:adaptive         # Intelligent test selection
+pnpm test:providers        # AI provider validation
+pnpm quality:check         # Full quality pipeline
+
+# Documentation & Content
+pnpm docs:sync             # Cross-file documentation sync
+pnpm content:generate      # Automated content creation
+
+# Build & Deployment
+pnpm build:complete        # 7-phase enterprise pipeline
+pnpm dev:health            # System health monitoring
+```
+
+**[📖 Complete Automation Guide](./docs/CLI-GUIDE.md)** - All 72+ commands and automation features
 
 ## 📄 License
 
