@@ -1,3 +1,15 @@
+# [2.0.0](https://github.com/juspay/neurolink/compare/v1.11.3...v2.0.0) (2025-06-28)
+
+
+### Features
+
+* **cli:** add command variations and stream agent support ([5fc4c26](https://github.com/juspay/neurolink/commit/5fc4c26b23bd189be52272521bdd2ca40dd55837))
+
+
+### BREAKING CHANGES
+
+* **cli:** 'generate-text' command is deprecated and will be removed in v2.0
+
 ## [1.11.3](https://github.com/juspay/neurolink/compare/v1.11.2...v1.11.3) (2025-06-22)
 
 
