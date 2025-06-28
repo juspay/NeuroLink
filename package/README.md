@@ -254,20 +254,41 @@ npx neurolink generate-text "Explain TypeScript"
 
 ### CLI Commands
 
-#### `generate-text <prompt>` - Core Text Generation
+#### `generate <prompt>` - Core Text Generation (Recommended)
 
 ```bash
 # Basic text generation
-neurolink generate-text "Explain quantum computing"
+npx @juspay/neurolink generate "Explain quantum computing"
 
 # With provider selection
-neurolink generate-text "Write a story" --provider openai
+npx @juspay/neurolink generate "Write a story" --provider openai
 
-# With temperature and token control
-neurolink generate-text "Creative writing" --temperature 0.9 --max-tokens 1000
+# With temperature control
+npx @juspay/neurolink generate "Creative writing" --temperature 0.9
 
 # JSON output for scripting
-neurolink generate-text "Summary of AI" --format json
+npx @juspay/neurolink generate "Summary of AI" --format json
+```
+
+#### `gen <prompt>` - Shortest Form
+
+```bash
+# Quick generation (shortest command)
+npx @juspay/neurolink gen "Explain quantum computing"
+
+# With provider
+npx @juspay/neurolink gen "Write a story" --provider openai
+```
+
+#### `generate-text <prompt>` - ⚠️ Deprecated
+
+**DEPRECATION NOTICE**: This command is deprecated and will be removed in v2.0.
+- **Migration**: Replace `generate-text` with `generate` or `gen`
+- **Timeline**: Removal planned for NeuroLink v2.0 (Est. Q2 2025)
+
+```bash
+# Legacy usage (shows deprecation warning)
+npx @juspay/neurolink generate-text "Explain quantum computing"
 ```
 
 **Output Example:**

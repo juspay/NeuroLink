@@ -272,7 +272,7 @@ const cli = yargs(args)
 
   // Generate Text Command
   .command(
-    ["generate-text <prompt>", "generate <prompt>"],
+    ["generate-text <prompt>", "generate <prompt>", "gen <prompt>"],
     "Generate text using AI providers",
     (yargsInstance) =>
       yargsInstance
@@ -348,6 +348,12 @@ const cli = yargs(args)
           "Use without tool integration",
         ),
     async (argv) => {
+      // Check if generate-text was used specifically (for deprecation warning)
+      const usedCommand = argv._[0];
+      if (usedCommand === 'generate-text' && !argv.quiet) {
+        console.warn(chalk.yellow('⚠️  Warning: "generate-text" is deprecated. Use "generate" or "gen" instead for multimodal support.'));
+      }
+
       let originalConsole: any = {};
       if (argv.format === "json" && !argv.quiet) {
         // Suppress only if not quiet, as quiet implies no spinners anyway
@@ -557,7 +563,21 @@ const cli = yargs(args)
           default: false,
           description: "Enable debug mode with interleaved logging",
         })
-        .example('$0 stream "Tell me a story"', "Stream a story in real-time"),
+        .option("disable-tools", {
+          type: "boolean",
+          default: false,
+          description:
+            "Disable MCP tool integration (tools enabled by default)",
+        })
+        .example('$0 stream "Tell me a story"', "Stream a story in real-time")
+        .example(
+          '$0 stream "What time is it?"',
+          "Stream with natural tool integration (default)",
+        )
+        .example(
+          '$0 stream "Tell me a story" --disable-tools',
+          "Stream without tool integration",
+        ),
     async (argv) => {
       // Default mode: Simple streaming message
       // Debug mode: More detailed information
@@ -572,14 +592,56 @@ const cli = yargs(args)
       }
 
       try {
-        const stream = await sdk.generateTextStream({
-          prompt: argv.prompt as string,
-          provider:
-            argv.provider === "auto"
-              ? undefined
-              : (argv.provider as AIProviderName),
-          temperature: argv.temperature,
-        });
+        let stream;
+
+        if (argv.disableTools === true) {
+          // Tools disabled - use standard SDK
+          stream = await sdk.generateTextStream({
+            prompt: argv.prompt as string,
+            provider:
+              argv.provider === "auto"
+                ? undefined
+                : (argv.provider as AIProviderName),
+            temperature: argv.temperature,
+          });
+        } else {
+          // Tools enabled - use AgentEnhancedProvider for streaming tool calls
+          // Map provider to supported AgentEnhancedProvider types
+          const supportedProvider = (() => {
+            switch (argv.provider) {
+              case "openai":
+              case "anthropic":
+              case "google-ai":
+                return argv.provider;
+              case "auto":
+              default:
+                return "google-ai"; // Default to google-ai for best tool support
+            }
+          })();
+
+          const agentProvider = new AgentEnhancedProvider({
+            provider: supportedProvider,
+            model: undefined, // Use default model for provider
+            toolCategory: "all", // Enable all tool categories
+          });
+
+          // Note: AgentEnhancedProvider doesn't support streaming with tools yet
+          // Fall back to generateText for now
+          const result = await agentProvider.generateText(argv.prompt as string);
+          // Simulate streaming by outputting the result
+          const text = result?.text || "";
+					const CHUNK_SIZE = 10;
+          const DELAY_MS = 50;
+          for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+            process.stdout.write(text.slice(i, i + CHUNK_SIZE));
+            await new Promise(resolve => setTimeout(resolve, DELAY_MS)); // Small delay
+          }
+
+          if (!argv.quiet) {
+            process.stdout.write("\n");
+          }
+          return; // Exit early for agent mode
+        }
 
         for await (const chunk of stream) {
           process.stdout.write(chunk.content);

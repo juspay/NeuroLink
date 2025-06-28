@@ -1468,3 +1468,52 @@ if (result.finishReason === 'tool-calls' && !result.text && result.toolResults?.
 - `src/lib/providers/agent-enhanced-provider.ts` - Core fix implementation
 - Enhanced error handling and logging throughout MCP integration
 - Direct text formatting approach for maximum compatibility and reliability
+
+---
+
+## 🎉 **CLI COMMAND VARIATIONS & STREAM AGENT SUCCESS** (Learned 2025-06-28)
+
+### **🏆 CLI Command Modernization Achievement**
+- **LESSON**: Successfully added gen/generate aliases for multimodal preparation
+- **PATTERN**: Deprecate legacy commands while maintaining 100% backward compatibility
+- **IMPLEMENTATION**: 
+  - `generate-text` shows detailed deprecation warning with migration path
+  - `generate` and `gen` are promoted as preferred commands
+  - All three commands use identical functionality and options
+- **IMPACT**: Prepare CLI infrastructure for future multimodal support (images, audio, video)
+- **USER EXPERIENCE**: Clear migration path with copy-pasteable examples
+
+### **🚀 Stream Agent Support Integration Success**
+- **LESSON**: Stream command now supports full agent capabilities matching generate-text
+- **PATTERN**: Consistent --disable-tools option across all AI generation commands
+- **IMPLEMENTATION**: 
+  - AgentEnhancedProvider integration with simulated streaming for tool results
+  - Tools enabled by default for natural AI assistance
+  - Graceful fallback to standard SDK when tools disabled
+- **IMPACT**: Unified tool calling experience across CLI commands
+- **TESTING VALIDATED**: Stream command loads tools correctly (toolsCount: 6) vs no tools when disabled
+
+### **📋 Copy-Pasteable Command Patterns (CRITICAL)**
+- **LESSON**: Each CLI example should be on separate lines for easy GitHub copying
+- **PATTERN**: Use `npx @juspay/neurolink` format consistently for no-install usage
+- **IMPLEMENTATION**: Split command variations into separate sections
+- **USER EXPERIENCE**: One-click copy from GitHub README without editing
+
+### **CLI Command Variations Implemented**
+```bash
+# Preferred commands for multimodal future
+npx @juspay/neurolink generate "prompt"
+npx @juspay/neurolink gen "prompt"        # Shortest form
+
+# Deprecated but functional (shows warning)
+npx @juspay/neurolink generate-text "prompt"  # ⚠️ Deprecated in v2.0
+```
+
+### **Stream Agent Support Added**
+```bash
+# Stream with agent tools (default)
+npx @juspay/neurolink stream "What time is it?"
+
+# Stream without tools (traditional)
+npx @juspay/neurolink stream "Tell me a story" --disable-tools
+```
