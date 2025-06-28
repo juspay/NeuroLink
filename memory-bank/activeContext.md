@@ -41,6 +41,20 @@
 - ✅ **Enhanced Ollama Status Check**: Verifies service is running and required model is available.
 - ✅ **Improved Error Handling**: Prevents confusing fallback behavior and provides clear, actionable error messages.
 - ✅ **Circular Dependency Fix**: Resolved `SyntaxError` in `generate-text` command.
+
+### ✅ CLI Command Variations & Stream Agent Support (2025-06-28)
+
+**Recent Achievements**:
+- ✅ **Command Aliases**: Added 'gen' and 'generate' as primary commands
+- ✅ **Deprecation Handling**: generate-text shows warning but still works
+- ✅ **Stream Agent Support**: Enhanced stream command with --disable-tools option
+- ✅ **Multimodal Preparation**: CLI ready for future image/audio/video support
+
+**Technical Implementation**:
+- Command aliases: ["generate-text <prompt>", "generate <prompt>", "gen <prompt>"]
+- Deprecation warning: Only shows for generate-text usage
+- Stream enhancement: AgentEnhancedProvider integration with tool support
+- Testing validated: All variations work correctly with agent capabilities
 ### Current Implementation Achievements ✅
 - ✅ **MCP Abstract Contract** - Complete with TypeScript generics
 - ✅ **Plugin Manager** - Manifest-based discovery and loading

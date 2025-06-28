@@ -35,31 +35,56 @@ npx neurolink generate-text "Explain TypeScript"
 
 ## Commands Reference
 
-### `generate-text <prompt>` - Core Text Generation
+### `generate <prompt>` - Core Text Generation (Recommended)
 
-Generate AI content with customizable parameters.
+Generate AI content with customizable parameters. Prepared for multimodal support.
 
 ```bash
 # Basic text generation
-neurolink generate-text "Explain quantum computing"
+npx @juspay/neurolink generate "Explain quantum computing"
 
 # With provider selection
-neurolink generate-text "Write a story" --provider openai
+npx @juspay/neurolink generate "Write a story" --provider openai
 
-# With temperature and token control
-neurolink generate-text "Creative writing" --temperature 0.9 --max-tokens 1000
+# With temperature control
+npx @juspay/neurolink generate "Creative writing" --temperature 0.9
 
-# With system prompt and timeout
-neurolink generate-text "Write code" --system "You are a senior developer" --timeout 60000
+# With system prompt
+npx @juspay/neurolink generate "Write code" --system "You are a senior developer"
 
 # JSON output for scripting
-neurolink generate-text "Summary of AI" --format json
+npx @juspay/neurolink generate "Summary of AI" --format json
 
 # Debug mode with detailed metadata
-neurolink generate-text "Hello AI" --debug
+npx @juspay/neurolink generate "Hello AI" --debug
+```
 
-# Quiet mode (no spinners)
-neurolink generate-text "Hello AI" --quiet
+### `gen <prompt>` - Shortest Form
+
+Quick command alias for fast usage.
+
+```bash
+# Basic generation (shortest)
+npx @juspay/neurolink gen "Explain quantum computing"
+
+# With provider
+npx @juspay/neurolink gen "Write a story" --provider openai
+
+# With temperature
+npx @juspay/neurolink gen "Creative writing" --temperature 0.9
+```
+
+### `generate-text <prompt>` - ⚠️ Deprecated
+
+**DEPRECATION NOTICE**: This command is deprecated and will be removed in v2.0.
+- **Reason**: Preparing for multimodal support (images, audio, video)
+- **Migration**: Replace `generate-text` with `generate` or `gen`
+- **Timeline**: Removal planned for NeuroLink v2.0 (Est. Q2 2025)
+- **Current Status**: Still functional but shows warning message
+
+```bash
+# Legacy usage (shows deprecation warning)
+npx @juspay/neurolink generate-text "Explain quantum computing"
 ```
 
 **Available Options:**
@@ -125,19 +150,26 @@ Quantum computing represents a revolutionary approach to information processing.
 
 ### `stream <prompt>` - Real-time Streaming
 
-Stream text generation in real-time for better user experience.
+Stream AI generation in real-time with optional agent support.
 
 ```bash
-# Stream text generation in real-time
-neurolink stream "Tell me a story about robots"
+# Basic streaming
+npx @juspay/neurolink stream "Tell me a story"
 
-# With provider selection and temperature
-neurolink stream "Explain machine learning" --provider vertex --temperature 0.8
+# With specific provider
+npx @juspay/neurolink stream "Tell me a story" --provider openai
 
-# Debug mode with detailed logging
-neurolink stream "Write a poem" --debug
+# With agent tool support (default - AI can use tools)
+npx @juspay/neurolink stream "What time is it?" --provider google-ai
 
-# Quiet mode (minimal output)
+# Without tools (traditional text-only mode)
+npx @juspay/neurolink stream "Tell me a story" --disable-tools
+
+# Debug mode with tool execution logging
+npx @juspay/neurolink stream "What time is it?" --debug
+
+# Temperature control for creative streaming
+npx @juspay/neurolink stream "Write a poem" --temperature 0.9
 neurolink stream "Hello world" --quiet
 ```
 

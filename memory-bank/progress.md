@@ -30,7 +30,9 @@
 
 **Major Accomplishments**:
 - ✅ **ALL 13 TypeScript Errors Resolved**: Complete compilation success after systematic debugging
-- ✅ **CLI MCP Integration Fixed**: `generate-text` command now uses AgentEnhancedProvider for tool calling
+- ✅ **CLI Command Modernization**: Added `gen` and `generate` aliases, deprecated `generate-text` with clear migration path
+- ✅ **Stream Agent Support**: Enhanced stream command with --disable-tools option and full tool calling capabilities
+- ✅ **CLI MCP Integration Fixed**: All generation commands now use AgentEnhancedProvider for tool calling
 - ✅ **Function Calling Operational**: AI successfully executes filesystem tools with real results
 - ✅ **Response Handling Fixed**: Proper handling of result.text vs result.content between providers
 - ✅ **Testing Validation Complete**: CLI commands confirmed working with 23,230+ token MCP context

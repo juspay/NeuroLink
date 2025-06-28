@@ -18,13 +18,19 @@
 ✅ **Function Calling Ready**: AI can now execute real filesystem operations, data analysis, and system commands
 ✅ **Production Validated**: 23,230+ token MCP context loading confirmed via comprehensive CLI testing
 ✅ **Zero Build Errors**: Clean TypeScript compilation after resolving all 13 blocking errors
-✅ **CLI Tool Integration**: Both `generate-text` and `agent-generate` commands use full MCP capabilities
+✅ **CLI Tool Integration**: Both `generate`/`gen` and `agent-generate` commands use full MCP capabilities
 ✅ **Backward Compatible**: Tools enabled by default with opt-out flag for traditional usage
 
 ```bash
-# NEW: AI can now access your filesystem and execute tools
+# NEW: AI can now access your filesystem and execute tools (use preferred commands)
+npx @juspay/neurolink generate "List files in this directory" --provider google-ai
+
+# Alternative shorter command
+npx @juspay/neurolink gen "List files in this directory" --provider google-ai
+
+# ⚠️ DEPRECATED: generate-text will be removed in v2.0 (use 'generate' or 'gen' instead)
+# This command shows a deprecation warning and is kept for backward compatibility only
 npx @juspay/neurolink generate-text "List files in this directory" --provider google-ai
-# Result: AI uses listDirectory tool and returns actual file listing
 ```
 
 ## 🚀 Quick Start
@@ -36,7 +42,8 @@ npx @juspay/neurolink generate-text "List files in this directory" --provider go
 export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
 
 # CLI - No installation required
-npx @juspay/neurolink generate-text "Hello, AI"
+npx @juspay/neurolink generate "Hello, AI"
+npx @juspay/neurolink gen "Hello, AI"        # Shortest form
 npx @juspay/neurolink status
 ```
 
@@ -106,12 +113,16 @@ npx @juspay/neurolink status
 
 ```bash
 # Test built-in tools (works immediately)
-npx @juspay/neurolink generate-text "What time is it?" --debug
-# Returns: "The current time is Friday, December 13, 2024 at 10:30:45 AM PST"
+npx @juspay/neurolink generate "What time is it?" --debug
+
+# Alternative short form
+npx @juspay/neurolink gen "What time is it?" --debug
 
 # Test tool discovery
-npx @juspay/neurolink generate-text "What tools do you have access to?" --debug
-# AI will list 5+ built-in tools and 58+ discovered external servers
+npx @juspay/neurolink generate "What tools do you have access to?" --debug
+
+# Alternative short form
+npx @juspay/neurolink gen "What tools do you have access to?" --debug
 
 # Test external server discovery
 npx @juspay/neurolink mcp discover --format table
@@ -134,13 +145,13 @@ NeuroLink now features a revolutionary dynamic model configuration system that e
 
 ```bash
 # Cost optimization - automatically use cheapest model
-npx @juspay/neurolink generate-text "Hello" --optimize-cost
+npx @juspay/neurolink generate "Hello" --optimize-cost
 
 # Capability search - find models with specific features
-npx @juspay/neurolink generate-text "Describe this image" --capability vision
+npx @juspay/neurolink generate "Describe this image" --capability vision
 
 # Model aliases - use friendly names
-npx @juspay/neurolink generate-text "Write code" --model best-coding
+npx @juspay/neurolink gen "Write code" --model best-coding
 
 # Test dynamic model server
 npm run model-server  # Starts config server on localhost:3001
@@ -163,14 +174,19 @@ npm run test:dynamic-models  # Comprehensive test suite
 
 ```bash
 # Text generation with automatic MCP tool detection (default)
-npx @juspay/neurolink generate-text "What time is it?"
-# AI automatically uses time tool for real-time data
+npx @juspay/neurolink generate "What time is it?"
+
+# Alternative short form
+npx @juspay/neurolink gen "What time is it?"
 
 # Disable tools for training-data-only responses
-npx @juspay/neurolink generate-text "What time is it?" --disable-tools
+npx @juspay/neurolink generate "What time is it?" --disable-tools
 
-# Real-time streaming
-npx @juspay/neurolink stream "Tell me a story about robots"
+# Real-time streaming with agent support (default)
+npx @juspay/neurolink stream "What time is it?"
+
+# Streaming without tools (traditional mode)
+npx @juspay/neurolink stream "Tell me a story" --disable-tools
 
 # Provider diagnostics
 npx @juspay/neurolink status --verbose
