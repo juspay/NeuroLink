@@ -95,7 +95,7 @@ npx @juspay/neurolink generate-text "Explain quantum computing"
 - `--system <text>` - System prompt to guide AI behavior
 - `--format <type>` - Output format: 'text' or 'json' (default: text)
 - `--debug` - Enable debug mode with verbose output and metadata
-- `--timeout <ms>` - Request timeout in milliseconds (default: 30000)
+- `--timeout <duration>` - Request timeout (default: 30s). Accepts: '30s', '2m', '5000' (ms), '1h'
 - `--quiet` - Suppress spinners and progress indicators
 
 ### `agent-generate <prompt>` - Agent-Based Generation
@@ -170,15 +170,23 @@ npx @juspay/neurolink stream "What time is it?" --debug
 
 # Temperature control for creative streaming
 npx @juspay/neurolink stream "Write a poem" --temperature 0.9
-neurolink stream "Hello world" --quiet
+
+# With custom timeout for long streaming operations
+npx @juspay/neurolink stream "Write a long story" --timeout 5m
+
+# Quiet mode with timeout
+npx @juspay/neurolink stream "Hello world" --quiet --timeout 10s
 ```
 
 **Available Options:**
 
 - `--provider <name>` - Choose specific provider or 'auto' (default: auto)
+- `--provider <name>` - Choose specific provider or 'auto' (default: auto)
 - `--temperature <number>` - Creativity level 0.0-1.0 (default: 0.7)
 - `--debug` - Enable debug mode with interleaved logging
 - `--quiet` - Suppress progress messages and status updates
+- `--timeout <duration>` - Request timeout (default: 2m for streaming). Accepts: '30s', '2m', '5000' (ms), '1h'
+- `--disable-tools` - Disable agent tool support for text-only mode
 
 **Output Example:**
 
@@ -216,6 +224,12 @@ neurolink batch prompts.txt --output results.json
 
 # Add delay between requests (rate limiting)
 neurolink batch prompts.txt --delay 2000
+
+# With custom timeout per request
+neurolink batch prompts.txt --timeout 45s
+
+# Process with specific provider and timeout
+neurolink batch prompts.txt --provider openai --timeout 1m --output results.json
 ```
 
 **Output Example:**
@@ -905,6 +919,7 @@ MCP servers are automatically configured in `.mcp-config.json`:
 
 - `--output <file>` - Save results to JSON file
 - `--delay <ms>` - Delay between requests in milliseconds, default: `1000`
+- `--timeout <duration>` - Request timeout per prompt (default: 30s). Accepts: '30s', '2m', '5000' (ms), '1h'
 
 ### Status Options
 

@@ -30,6 +30,17 @@ async function basicUsageExample() {
     console.log(result.text);
     console.log(`\n📊 Provider used: ${result.provider}`);
     console.log(`📊 Tokens used: ${result.usage?.totalTokens || "unknown"}`);
+
+    // 3. Using custom timeout (new in v1.12.0)
+    console.log("\n3. Generating with custom timeout...");
+    const timeoutResult = await provider.generateText({
+      prompt: "Explain quantum computing in simple terms",
+      timeout: '45s', // 45 seconds timeout
+      maxTokens: 300,
+    });
+
+    console.log("✅ Generated with timeout:");
+    console.log(timeoutResult.text);
   } catch (error) {
     console.error("❌ Error:", error.message);
 

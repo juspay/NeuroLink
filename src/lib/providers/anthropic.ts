@@ -12,6 +12,7 @@ import type {
 } from "../core/types.js";
 import { AIProviderName } from "../core/types.js";
 import { logger } from "../utils/logger.js";
+import { createTimeoutController, TimeoutError, getDefaultTimeout } from "../utils/timeout.js";
 
 // Anthropic-specific types
 interface AnthropicMessage {
@@ -68,6 +69,15 @@ interface AnthropicRequestBody {
   stream?: boolean;
 }
 
+// Declare process for TypeScript
+declare const process: {
+  env: {
+    ANTHROPIC_API_KEY?: string;
+    ANTHROPIC_BASE_URL?: string;
+    ANTHROPIC_MODEL?: string;
+  };
+};
+
 export class AnthropicProvider implements AIProvider {
   readonly name: AIProviderName = AIProviderName.ANTHROPIC;
   private apiKey: string;
@@ -102,6 +112,7 @@ export class AnthropicProvider implements AIProvider {
     endpoint: string,
     body: any,
     stream: boolean = false,
+    signal?: AbortSignal,
   ): Promise<Response> {
     const url = `${this.baseURL}/v1/${endpoint}`;
 
@@ -123,6 +134,7 @@ export class AnthropicProvider implements AIProvider {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal, // Add abort signal for timeout support
     });
 
     if (!response.ok) {
@@ -140,7 +152,10 @@ export class AnthropicProvider implements AIProvider {
     optionsOrPrompt: TextGenerationOptions | string,
     schema?: any,
   ): Promise<any> {
-    logger.debug("[AnthropicProvider.generateText] Starting text generation");
+    const functionTag = "AnthropicProvider.generateText";
+    const provider = "anthropic";
+    
+    logger.debug(`[${functionTag}] Starting text generation`);
 
     // Parse parameters with backward compatibility
     const options =
@@ -153,10 +168,11 @@ export class AnthropicProvider implements AIProvider {
       temperature = 0.7,
       maxTokens = 1000,
       systemPrompt = "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest.",
+      timeout = getDefaultTimeout(provider, 'generate'),
     } = options;
 
     logger.debug(
-      `[AnthropicProvider.generateText] Prompt: "${prompt.substring(0, 100)}...", Temperature: ${temperature}, Max tokens: ${maxTokens}`,
+      `[${functionTag}] Prompt: "${prompt.substring(0, 100)}...", Temperature: ${temperature}, Max tokens: ${maxTokens}, Timeout: ${timeout}`,
     );
 
     const requestBody: AnthropicRequestBody = {
@@ -172,12 +188,23 @@ export class AnthropicProvider implements AIProvider {
       system: systemPrompt,
     };
 
+    // Create timeout controller if timeout is specified
+    const timeoutController = createTimeoutController(timeout, provider, 'generate');
+
     try {
-      const response = await this.makeRequest("messages", requestBody);
+      const response = await this.makeRequest(
+        "messages", 
+        requestBody,
+        false,
+        timeoutController?.controller.signal
+      );
       const data: AnthropicResponse = await response.json();
 
+      // Clean up timeout if successful
+      timeoutController?.cleanup();
+
       logger.debug(
-        `[AnthropicProvider.generateText] Success. Generated ${data.usage.output_tokens} tokens`,
+        `[${functionTag}] Success. Generated ${data.usage.output_tokens} tokens`,
       );
 
       const content = data.content.map((block) => block.text).join("");
@@ -194,7 +221,33 @@ export class AnthropicProvider implements AIProvider {
         finishReason: data.stop_reason,
       };
     } catch (error) {
-      logger.error("[AnthropicProvider.generateText] Error:", error);
+      // Always cleanup timeout
+      timeoutController?.cleanup();
+      
+      // Log timeout errors specifically
+      if (error instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          timeout: error.timeout,
+          message: error.message,
+        });
+      } else if ((error as any)?.name === 'AbortError') {
+        // Convert AbortError to TimeoutError
+        const timeoutError = new TimeoutError(
+          `${provider} generate operation timed out after ${timeout}`,
+          timeoutController?.timeoutMs || 0,
+          provider,
+          'generate'
+        );
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          timeout: timeoutController?.timeoutMs,
+          message: timeoutError.message,
+        });
+        throw timeoutError;
+      } else {
+        logger.error(`[${functionTag}] Error:`, error);
+      }
       throw error;
     }
   }
@@ -203,7 +256,10 @@ export class AnthropicProvider implements AIProvider {
     optionsOrPrompt: StreamTextOptions | string,
     schema?: any,
   ): Promise<any> {
-    logger.debug("[AnthropicProvider.streamText] Starting text streaming");
+    const functionTag = "AnthropicProvider.streamText";
+    const provider = "anthropic";
+    
+    logger.debug(`[${functionTag}] Starting text streaming`);
 
     // Parse parameters with backward compatibility
     const options =
@@ -216,10 +272,11 @@ export class AnthropicProvider implements AIProvider {
       temperature = 0.7,
       maxTokens = 1000,
       systemPrompt = "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest.",
+      timeout = getDefaultTimeout(provider, 'stream'),
     } = options;
 
     logger.debug(
-      `[AnthropicProvider.streamText] Streaming prompt: "${prompt.substring(0, 100)}..."`,
+      `[${functionTag}] Streaming prompt: "${prompt.substring(0, 100)}...", Timeout: ${timeout}`,
     );
 
     const requestBody: AnthropicRequestBody = {
@@ -236,28 +293,65 @@ export class AnthropicProvider implements AIProvider {
       stream: true,
     };
 
+    // Create timeout controller if timeout is specified
+    const timeoutController = createTimeoutController(timeout, provider, 'stream');
+
     try {
-      const response = await this.makeRequest("messages", requestBody, true);
+      const response = await this.makeRequest(
+        "messages", 
+        requestBody, 
+        true,
+        timeoutController?.controller.signal
+      );
 
       if (!response.body) {
         throw new Error("No response body received");
       }
 
-      // Return a StreamTextResult-like object
+      // Return a StreamTextResult-like object with timeout signal
       return {
-        textStream: this.createAsyncIterable(response.body),
+        textStream: this.createAsyncIterable(response.body, timeoutController?.controller.signal),
         text: "",
         usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
         finishReason: "end_turn",
+        // Store timeout controller for external cleanup if needed
+        _timeoutController: timeoutController,
       };
     } catch (error) {
-      logger.error("[AnthropicProvider.streamText] Error:", error);
+      // Cleanup timeout on error
+      timeoutController?.cleanup();
+      
+      // Log timeout errors specifically
+      if (error instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          timeout: error.timeout,
+          message: error.message,
+        });
+      } else if ((error as any)?.name === 'AbortError') {
+        // Convert AbortError to TimeoutError
+        const timeoutError = new TimeoutError(
+          `${provider} stream operation timed out after ${timeout}`,
+          timeoutController?.timeoutMs || 0,
+          provider,
+          'stream'
+        );
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          timeout: timeoutController?.timeoutMs,
+          message: timeoutError.message,
+        });
+        throw timeoutError;
+      } else {
+        logger.error(`[${functionTag}] Error:`, error);
+      }
       throw error;
     }
   }
 
   private async *createAsyncIterable(
     body: ReadableStream<Uint8Array>,
+    signal?: AbortSignal,
   ): AsyncGenerator<string, void, unknown> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
@@ -265,6 +359,11 @@ export class AnthropicProvider implements AIProvider {
 
     try {
       while (true) {
+        // Check if aborted
+        if (signal?.aborted) {
+          throw new Error('AbortError');
+        }
+        
         const { done, value } = await reader.read();
         if (done) {
           break;

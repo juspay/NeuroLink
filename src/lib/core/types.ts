@@ -99,6 +99,7 @@ export interface TextGenerationOptions {
   systemPrompt?: string;
   schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
   tools?: Record<string, Tool>; // Enable MCP tools integration
+  timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
 }
 
 /**
@@ -112,6 +113,7 @@ export interface StreamTextOptions {
   systemPrompt?: string;
   schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
   tools?: Record<string, Tool>; // Enable MCP tools integration
+  timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
 }
 
 /**

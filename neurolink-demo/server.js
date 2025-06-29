@@ -305,7 +305,7 @@ async function testProviderAvailability(providerName) {
  * Generate AI content with standardized parameters and automatic fallback
  * @param {string} providerName - Provider to use ('auto' for smart fallback)
  * @param {string} prompt - Text prompt
- * @param {Object} options - Generation options
+ * @param {Object} options - Generation options (includes timeout)
  * @returns {Object} Generation result with timing and usage info
  */
 async function generateWithProvider(providerName, prompt, options = {}) {
@@ -352,6 +352,7 @@ async function generateWithProvider(providerName, prompt, options = {}) {
         maxTokens: options.maxTokens || DEFAULT_GENERATION_PARAMS.maxTokens,
         temperature:
           options.temperature || DEFAULT_GENERATION_PARAMS.temperature,
+        timeout: options.timeout, // Pass through timeout option
         ...options,
       });
 

@@ -25,6 +25,7 @@ import type {
 } from "../core/types.js";
 import { UnifiedMCPSystem } from "../mcp/unified-mcp.js";
 import { mcpLogger } from "../mcp/logging.js";
+import { parseTimeout } from "../utils/timeout.js";
 
 /**
  * Agent configuration options
@@ -36,7 +37,8 @@ interface AgentConfig {
   maxSteps?: number;
   enableTools?: boolean;
   enableMCP?: boolean;
-	mcpInitTimeoutMs?: number; // Timeout for MCP initialization in milliseconds
+  mcpInitTimeoutMs?: number; // Timeout for MCP initialization in milliseconds
+  toolExecutionTimeout?: number | string; // Timeout for individual tool execution
   mcpDiscoveryOptions?: {
     searchPaths?: string[];
     configFiles?: string[];
@@ -168,7 +170,24 @@ export class AgentEnhancedProvider implements AIProvider {
             description: toolInfo.description || `MCP tool: ${toolInfo.name}`,
             parameters: toolInfo.inputSchema || {},
             execute: async (args: any) => {
+              let timeoutId: NodeJS.Timeout | undefined;
+              
               try {
+                // Create timeout controller for tool execution if configured
+                const toolTimeout = this.config.toolExecutionTimeout;
+                const toolAbortController = toolTimeout
+                  ? new AbortController()
+                  : undefined;
+                
+                if (toolAbortController && toolTimeout) {
+                  const timeoutMs = typeof toolTimeout === 'string' 
+                    ? parseTimeout(toolTimeout) 
+                    : toolTimeout;
+                  timeoutId = setTimeout(() => {
+                    toolAbortController.abort();
+                  }, timeoutMs);
+                }
+
                 const context: any = {
                   sessionId: 'cli-session',
                   userId: 'cli-user',
@@ -237,13 +256,38 @@ export class AgentEnhancedProvider implements AIProvider {
                     }
                   }
                 };
-                const result = await this.mcpSystem!.executeTool(
+                const toolPromise = this.mcpSystem!.executeTool(
                   toolInfo.name,
                   args,
                   context
                 );
+
+                let result: any;
+                if (toolAbortController) {
+                  // Race between tool execution and timeout
+                  result = await Promise.race([
+                    toolPromise,
+                    new Promise((_, reject) => {
+                      toolAbortController.signal.addEventListener('abort', () => {
+                        reject(new Error(`Tool ${toolInfo.name} timed out after ${this.config.toolExecutionTimeout}`));
+                      });
+                    })
+                  ]);
+                } else {
+                  result = await toolPromise;
+                }
+
+                // Clear timeout if successful
+                if (timeoutId) {
+                  clearTimeout(timeoutId);
+                }
+
                 return result.data || result;
-              } catch (error) {
+              } catch (error: any) {
+                // Clear timeout on error
+                if (timeoutId) {
+                  clearTimeout(timeoutId);
+                }
                 mcpLogger.error(`MCP tool ${toolInfo.name} execution failed:`, error);
                 throw error;
               }
@@ -273,6 +317,7 @@ export class AgentEnhancedProvider implements AIProvider {
       maxTokens = 1000,
       systemPrompt,
       schema,
+      timeout,
     } = options;
 
     // Get combined tools (direct + MCP) if enabled
@@ -291,6 +336,15 @@ export class AgentEnhancedProvider implements AIProvider {
     });
 
     try {
+      // Parse timeout if provided
+      let abortSignal: AbortSignal | undefined;
+      if (timeout) {
+        const timeoutMs = typeof timeout === 'string' ? parseTimeout(timeout) : timeout;
+        if (timeoutMs !== undefined) {
+          abortSignal = AbortSignal.timeout(timeoutMs);
+        }
+      }
+
       // The AI SDK with maxSteps automatically handles tool calling and result integration
       const result = await generateText({
         model: this.model,
@@ -302,6 +356,7 @@ export class AgentEnhancedProvider implements AIProvider {
         temperature,
         maxTokens,
         toolChoice: this.shouldForceToolUsage(prompt) ? "required" : "auto",
+        abortSignal, // Pass abort signal for timeout support
       });
 
       log('Generation completed', {
@@ -396,6 +451,7 @@ export class AgentEnhancedProvider implements AIProvider {
       temperature = 0.7,
       maxTokens = 1000,
       systemPrompt,
+      timeout,
     } = options;
 
     // Get combined tools (direct + MCP) if enabled
@@ -404,6 +460,15 @@ export class AgentEnhancedProvider implements AIProvider {
       : {};
 
     try {
+      // Parse timeout if provided
+      let abortSignal: AbortSignal | undefined;
+      if (timeout) {
+        const timeoutMs = typeof timeout === 'string' ? parseTimeout(timeout) : timeout;
+        if (timeoutMs !== undefined) {
+          abortSignal = AbortSignal.timeout(timeoutMs);
+        }
+      }
+
       const result = await streamText({
         model: this.model,
         prompt: systemPrompt
@@ -414,6 +479,7 @@ export class AgentEnhancedProvider implements AIProvider {
         temperature,
         maxTokens,
         toolChoice: this.shouldForceToolUsage(prompt) ? "required" : "auto",
+        abortSignal, // Pass abort signal for timeout support
       });
 
       return result;

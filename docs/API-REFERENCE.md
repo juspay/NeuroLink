@@ -151,6 +151,7 @@ interface GenerateTextOptions {
   maxTokens?: number;
   systemPrompt?: string;
   schema?: any; // For structured output
+  timeout?: number | string; // Timeout in ms or human-readable format (e.g., '30s', '2m', '1h')
 }
 ```
 
@@ -201,6 +202,7 @@ interface StreamTextOptions {
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  timeout?: number | string; // Timeout in ms or human-readable format (e.g., '30s', '2m', '1h')
 }
 ```
 
@@ -251,6 +253,39 @@ const result1 = await provider.generateText({
 // String format (convenient for simple prompts)
 const result2 = await provider.generateText("Hello");
 ```
+
+### Using Timeouts
+
+NeuroLink supports flexible timeout configuration for all AI operations:
+
+```typescript
+// Numeric milliseconds
+const result1 = await provider.generateText({
+  prompt: "Write a story",
+  timeout: 30000 // 30 seconds
+});
+
+// Human-readable formats
+const result2 = await provider.generateText({
+  prompt: "Complex calculation",
+  timeout: '2m' // 2 minutes
+});
+
+// Streaming with longer timeout
+const stream = await provider.streamText({
+  prompt: "Generate long content",
+  timeout: '5m' // 5 minutes for streaming
+});
+
+// Provider-specific default timeouts
+const provider = createBestAIProvider('ollama'); // Uses 5m default timeout
+```
+
+**Supported Timeout Formats:**
+- Milliseconds: `5000`, `30000`
+- Seconds: `'30s'`, `'1.5s'`
+- Minutes: `'2m'`, `'0.5m'`
+- Hours: `'1h'`, `'0.5h'`
 
 ## Usage Examples
 
@@ -1051,6 +1086,12 @@ class AIProviderError extends Error {
   originalError?: Error;
 }
 
+class TimeoutError extends AIProviderError {
+  // Thrown when operation exceeds specified timeout
+  timeout: number; // Timeout in milliseconds
+  operation?: string; // Operation that timed out (e.g., 'generate', 'stream')
+}
+
 class ConfigurationError extends AIProviderError {
   // Thrown when provider configuration is invalid
 }
@@ -1077,12 +1118,19 @@ import {
   ConfigurationError,
   AuthenticationError,
   RateLimitError,
+  TimeoutError,
 } from "@juspay/neurolink";
 
 try {
-  const result = await provider.generateText({ prompt: "Hello" });
+  const result = await provider.generateText({ 
+    prompt: "Hello",
+    timeout: '30s'
+  });
 } catch (error) {
-  if (error instanceof ConfigurationError) {
+  if (error instanceof TimeoutError) {
+    console.error(`Operation timed out after ${error.timeout}ms`);
+    console.error(`Provider: ${error.provider}, Operation: ${error.operation}`);
+  } else if (error instanceof ConfigurationError) {
     console.error("Provider not configured:", error.message);
   } else if (error instanceof AuthenticationError) {
     console.error("Authentication failed:", error.message);
@@ -1185,6 +1233,7 @@ const prompts = [
 const results = await processBatch(prompts, {
   temperature: 0.7,
   maxTokens: 200,
+  timeout: '45s' // Set reasonable timeout for batch operations
 });
 ```
 

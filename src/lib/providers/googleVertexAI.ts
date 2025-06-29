@@ -46,10 +46,24 @@ import type {
   StreamTextOptions,
 } from "../core/types.js";
 import { logger } from "../utils/logger.js";
+import { createTimeoutController, TimeoutError, getDefaultTimeout } from "../utils/timeout.js";
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
   systemPrompt: "You are a helpful AI assistant.",
+};
+
+// Declare process for TypeScript
+declare const process: {
+  env: {
+    GOOGLE_VERTEX_PROJECT?: string;
+    GOOGLE_VERTEX_LOCATION?: string;
+    GOOGLE_APPLICATION_CREDENTIALS?: string;
+    GOOGLE_SERVICE_ACCOUNT_KEY?: string;
+    GOOGLE_AUTH_CLIENT_EMAIL?: string;
+    GOOGLE_AUTH_PRIVATE_KEY?: string;
+    VERTEX_MODEL_ID?: string;
+  };
 };
 
 // Configuration helpers
@@ -386,6 +400,7 @@ export class GoogleVertexAI implements AIProvider {
         maxTokens = 1000,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
+        timeout = getDefaultTimeout(provider, 'stream'),
       } = options;
 
       // Use schema from options or fallback parameter
@@ -399,9 +414,13 @@ export class GoogleVertexAI implements AIProvider {
         temperature,
         maxTokens,
         hasSchema: !!finalSchema,
+        timeout,
       });
 
       const model = await this.getModel();
+
+      // Create timeout controller if timeout is specified
+      const timeoutController = createTimeoutController(timeout, provider, 'stream');
 
       const streamOptions = {
         model: model,
@@ -409,6 +428,8 @@ export class GoogleVertexAI implements AIProvider {
         system: systemPrompt,
         temperature,
         maxTokens,
+        // Add abort signal if available
+        ...(timeoutController && { abortSignal: timeoutController.controller.signal }),
 
         onError: (event: { error: unknown }) => {
           const error = event.error;
@@ -461,15 +482,30 @@ export class GoogleVertexAI implements AIProvider {
       }
 
       const result = streamText(streamOptions);
+      
+      // For streaming, we can't clean up immediately, but the timeout will auto-clean
+      // The user should handle the stream and any timeout errors
+      
       return result;
     } catch (err) {
-      logger.error(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in streaming text",
-        err: String(err),
-        promptLength: prompt.length,
-      });
+      // Log timeout errors specifically
+      if (err instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          modelName: this.modelName,
+          isAnthropic: isAnthropicModel(this.modelName),
+          timeout: err.timeout,
+          message: err.message,
+        });
+      } else {
+        logger.error(`[${functionTag}] Exception`, {
+          provider,
+          modelName: this.modelName,
+          message: "Error in streaming text",
+          err: String(err),
+          promptLength: prompt.length,
+        });
+      }
       throw err; // Re-throw error to trigger fallback
     }
   }
@@ -500,6 +536,7 @@ export class GoogleVertexAI implements AIProvider {
         maxTokens = 1000,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
+        timeout = getDefaultTimeout(provider, 'generate'),
       } = options;
 
       // Use schema from options or fallback parameter
@@ -512,9 +549,13 @@ export class GoogleVertexAI implements AIProvider {
         promptLength: prompt.length,
         temperature,
         maxTokens,
+        timeout,
       });
 
       const model = await this.getModel();
+
+      // Create timeout controller if timeout is specified
+      const timeoutController = createTimeoutController(timeout, provider, 'generate');
 
       const generateOptions = {
         model: model,
@@ -522,6 +563,8 @@ export class GoogleVertexAI implements AIProvider {
         system: systemPrompt,
         temperature,
         maxTokens,
+        // Add abort signal if available
+        ...(timeoutController && { abortSignal: timeoutController.controller.signal }),
       } as Parameters<typeof generateText>[0];
 
       if (finalSchema) {
@@ -530,24 +573,44 @@ export class GoogleVertexAI implements AIProvider {
         });
       }
 
-      const result = await generateText(generateOptions);
+      try {
+        const result = await generateText(generateOptions);
+        
+        // Clean up timeout if successful
+        timeoutController?.cleanup();
+        
+        logger.debug(`[${functionTag}] Generate text completed`, {
+          provider,
+          modelName: this.modelName,
+          usage: result.usage,
+          finishReason: result.finishReason,
+          responseLength: result.text?.length || 0,
+          timeout,
+        });
 
-      logger.debug(`[${functionTag}] Generate text completed`, {
-        provider,
-        modelName: this.modelName,
-        usage: result.usage,
-        finishReason: result.finishReason,
-        responseLength: result.text?.length || 0,
-      });
-
-      return result;
+        return result;
+      } finally {
+        // Always cleanup timeout
+        timeoutController?.cleanup();
+      }
     } catch (err) {
-      logger.error(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in generating text",
-        err: String(err),
-      });
+      // Log timeout errors specifically
+      if (err instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          modelName: this.modelName,
+          isAnthropic: isAnthropicModel(this.modelName),
+          timeout: err.timeout,
+          message: err.message,
+        });
+      } else {
+        logger.error(`[${functionTag}] Exception`, {
+          provider,
+          modelName: this.modelName,
+          message: "Error in generating text",
+          err: String(err),
+        });
+      }
       throw err; // Re-throw error to trigger fallback
     }
   }

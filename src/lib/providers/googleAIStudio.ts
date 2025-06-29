@@ -16,6 +16,16 @@ import type {
   StreamTextOptions,
 } from "../core/types.js";
 import { logger } from "../utils/logger.js";
+import { createTimeoutController, TimeoutError, getDefaultTimeout } from "../utils/timeout.js";
+
+// Declare process for TypeScript
+declare const process: {
+  env: {
+    GOOGLE_AI_API_KEY?: string;
+    GOOGLE_GENERATIVE_AI_API_KEY?: string;
+    GOOGLE_AI_MODEL?: string;
+  };
+};
 
 // CRITICAL: Setup environment variables early for AI SDK compatibility
 // The AI SDK specifically looks for GOOGLE_GENERATIVE_AI_API_KEY
@@ -162,6 +172,7 @@ export class GoogleAIStudio implements AIProvider {
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
         tools,
+        timeout = getDefaultTimeout(provider, 'stream'),
       } = options;
 
       // Use schema from options or fallback parameter
@@ -176,9 +187,13 @@ export class GoogleAIStudio implements AIProvider {
         hasSchema: !!finalSchema,
         hasTools: !!tools,
         toolCount: tools ? Object.keys(tools).length : 0,
+        timeout,
       });
 
       const model = this.getModel();
+      
+      // Create timeout controller if timeout is specified
+      const timeoutController = createTimeoutController(timeout, provider, 'stream');
 
       const streamOptions = {
         model: model,
@@ -187,6 +202,8 @@ export class GoogleAIStudio implements AIProvider {
         temperature,
         maxTokens,
         ...(tools && { tools }), // Add tools if provided
+        // Add abort signal if available
+        ...(timeoutController && { abortSignal: timeoutController.controller.signal }),
 
         onError: (event: { error: unknown }) => {
           const error = event.error;
@@ -239,18 +256,32 @@ export class GoogleAIStudio implements AIProvider {
       }
 
       const result = streamText(streamOptions);
+      
+      // For streaming, we can't clean up immediately, but the timeout will auto-clean
+      // The user should handle the stream and any timeout errors
+      
       return result;
     } catch (err) {
-      logger.error(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in streaming text",
-        err: String(err),
-        promptLength:
-          typeof optionsOrPrompt === "string"
-            ? optionsOrPrompt.length
-            : optionsOrPrompt.prompt.length,
-      });
+      // Log timeout errors specifically
+      if (err instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          modelName: this.modelName,
+          timeout: err.timeout,
+          message: err.message,
+        });
+      } else {
+        logger.error(`[${functionTag}] Exception`, {
+          provider,
+          modelName: this.modelName,
+          message: "Error in streaming text",
+          err: String(err),
+          promptLength:
+            typeof optionsOrPrompt === "string"
+              ? optionsOrPrompt.length
+              : optionsOrPrompt.prompt.length,
+        });
+      }
       throw err; // Re-throw error to trigger fallback
     }
   }
@@ -282,6 +313,7 @@ export class GoogleAIStudio implements AIProvider {
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
         tools,
+        timeout = getDefaultTimeout(provider, 'generate'),
       } = options;
 
       // Use schema from options or fallback parameter
@@ -295,9 +327,13 @@ export class GoogleAIStudio implements AIProvider {
         maxTokens,
         hasTools: !!tools,
         toolCount: tools ? Object.keys(tools).length : 0,
+        timeout,
       });
 
       const model = this.getModel();
+      
+      // Create timeout controller if timeout is specified
+      const timeoutController = createTimeoutController(timeout, provider, 'generate');
 
       const generateOptions = {
         model: model,
@@ -309,6 +345,8 @@ export class GoogleAIStudio implements AIProvider {
           tools,
           maxSteps: 5, // Allow multiple steps for tool execution and response generation
         }), // Add tools if provided
+        // Add abort signal if available
+        ...(timeoutController && { abortSignal: timeoutController.controller.signal }),
       } as Parameters<typeof generateText>[0];
 
       if (finalSchema) {
@@ -317,24 +355,43 @@ export class GoogleAIStudio implements AIProvider {
         });
       }
 
-      const result = await generateText(generateOptions);
+      try {
+        const result = await generateText(generateOptions);
+        
+        // Clean up timeout if successful
+        timeoutController?.cleanup();
+        
+        logger.debug(`[${functionTag}] Generate text completed`, {
+          provider,
+          modelName: this.modelName,
+          usage: result.usage,
+          finishReason: result.finishReason,
+          responseLength: result.text?.length || 0,
+          timeout,
+        });
 
-      logger.debug(`[${functionTag}] Generate text completed`, {
-        provider,
-        modelName: this.modelName,
-        usage: result.usage,
-        finishReason: result.finishReason,
-        responseLength: result.text?.length || 0,
-      });
-
-      return result;
+        return result;
+      } finally {
+        // Always cleanup timeout
+        timeoutController?.cleanup();
+      }
     } catch (err) {
-      logger.error(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in generating text",
-        err: String(err),
-      });
+      // Log timeout errors specifically
+      if (err instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          modelName: this.modelName,
+          timeout: err.timeout,
+          message: err.message,
+        });
+      } else {
+        logger.error(`[${functionTag}] Exception`, {
+          provider,
+          modelName: this.modelName,
+          message: "Error in generating text",
+          err: String(err),
+        });
+      }
       throw err; // Re-throw error to trigger fallback
     }
   }

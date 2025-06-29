@@ -20,6 +20,7 @@ This directory contains practical examples demonstrating NeuroLink's capabilitie
 
 - `basic-usage.js` - Simple text generation and provider selection
 - `environment-setup.js` - Setting up API keys and configuration
+- `timeout-usage.js` - Timeout configuration and error handling (NEW v1.12.0)
 
 ### **MCP Integration (v1.7.1)**
 

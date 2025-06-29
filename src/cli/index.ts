@@ -324,9 +324,9 @@ const cli = yargs(args)
           description: "Enable debug mode with verbose output",
         }) // Kept for potential specific debug logic
         .option("timeout", {
-          type: "number",
-          default: 30000,
-          description: "Timeout for the request in milliseconds",
+          type: "string",
+          default: "30s",
+          description: "Timeout for the request (e.g., 30s, 2m, 1h, 5000)",
         })
         .option("disable-tools", {
           type: "boolean",
@@ -373,12 +373,8 @@ const cli = yargs(args)
           : ora("🤖 Generating text...").start();
 
       try {
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(
-            () => reject(new Error(`Request timeout (${argv.timeout}ms)`)),
-            argv.timeout,
-          );
-        });
+        // The SDK will handle the timeout internally, so we don't need this wrapper anymore
+        // Just pass the timeout to the SDK
 
         // Use AgentEnhancedProvider when tools are enabled, otherwise use standard SDK
         let generatePromise;
@@ -394,6 +390,7 @@ const cli = yargs(args)
             temperature: argv.temperature,
             maxTokens: argv.maxTokens,
             systemPrompt: argv.system,
+            timeout: argv.timeout,
           });
         } else {
           // Tools enabled - use AgentEnhancedProvider for tool calling capabilities
@@ -419,10 +416,7 @@ const cli = yargs(args)
           generatePromise = agentProvider.generateText(argv.prompt as string);
         }
 
-        const result = (await Promise.race([
-          generatePromise,
-          timeoutPromise,
-        ])) as any;
+        const result = await generatePromise;
 
         if (argv.format === "json" && originalConsole.log) {
           Object.assign(console, originalConsole);
@@ -432,21 +426,21 @@ const cli = yargs(args)
         }
 
         // Handle both AgentEnhancedProvider (AI SDK) and standard NeuroLink SDK responses
-        const responseText = result.text || result.content || "";
-        const responseUsage = result.usage || {
+        const responseText = result ? ((result as any).text || (result as any).content || "") : "";
+        const responseUsage = result ? ((result as any).usage || {
           promptTokens: 0,
           completionTokens: 0,
           totalTokens: 0,
-        };
+        }) : { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
         if (argv.format === "json") {
           const jsonOutput = {
             content: responseText,
-            provider: result.provider || argv.provider,
+            provider: result ? ((result as any).provider || argv.provider) : argv.provider,
             usage: responseUsage,
-            responseTime: result.responseTime || 0,
-            toolCalls: result.toolCalls || [],
-            toolResults: result.toolResults || [],
+            responseTime: result ? ((result as any).responseTime || 0) : 0,
+            toolCalls: result ? ((result as any).toolCalls || []) : [],
+            toolResults: result ? ((result as any).toolResults || []) : [],
           };
           process.stdout.write(JSON.stringify(jsonOutput, null, 2) + "\n");
         } else if (argv.debug) {
@@ -456,9 +450,9 @@ const cli = yargs(args)
           }
 
           // Show tool calls if any
-          if (result.toolCalls && result.toolCalls.length > 0) {
+          if (result && (result as any).toolCalls && (result as any).toolCalls.length > 0) {
             console.log(chalk.blue("🔧 Tools Called:"));
-            for (const toolCall of result.toolCalls) {
+            for (const toolCall of (result as any).toolCalls) {
               console.log(`- ${toolCall.toolName}`);
               console.log(`  Args: ${JSON.stringify(toolCall.args)}`);
             }
@@ -466,9 +460,9 @@ const cli = yargs(args)
           }
 
           // Show tool results if any
-          if (result.toolResults && result.toolResults.length > 0) {
+          if (result && (result as any).toolResults && (result as any).toolResults.length > 0) {
             console.log(chalk.blue("📋 Tool Results:"));
-            for (const toolResult of result.toolResults) {
+            for (const toolResult of (result as any).toolResults) {
               console.log(`- ${toolResult.toolCallId}`);
               console.log(
                 `  Result: ${JSON.stringify(toolResult.result).substring(0, 200)}...`,
@@ -480,9 +474,9 @@ const cli = yargs(args)
           console.log(
             JSON.stringify(
               {
-                provider: result.provider || argv.provider,
+                provider: result ? ((result as any).provider || argv.provider) : argv.provider,
                 usage: responseUsage,
-                responseTime: result.responseTime || 0,
+                responseTime: result ? ((result as any).responseTime || 0) : 0,
               },
               null,
               2,
@@ -558,6 +552,11 @@ const cli = yargs(args)
           default: 0.7,
           description: "Creativity level",
         })
+        .option("timeout", {
+          type: "string",
+          default: "2m",
+          description: "Timeout for streaming (e.g., 30s, 2m, 1h)",
+        })
         .option("debug", {
           type: "boolean",
           default: false,
@@ -603,6 +602,7 @@ const cli = yargs(args)
                 ? undefined
                 : (argv.provider as AIProviderName),
             temperature: argv.temperature,
+            timeout: argv.timeout,
           });
         } else {
           // Tools enabled - use AgentEnhancedProvider for streaming tool calls
@@ -696,9 +696,9 @@ const cli = yargs(args)
           description: "AI provider to use",
         })
         .option("timeout", {
-          type: "number",
-          default: 30000,
-          description: "Timeout for each request in milliseconds",
+          type: "string",
+          default: "30s",
+          description: "Timeout for each request (e.g., 30s, 2m, 1h)",
         })
         .option("temperature", {
           type: "number",
@@ -767,13 +767,7 @@ const cli = yargs(args)
             spinner.text = `Processing ${i + 1}/${prompts.length}: ${prompts[i].substring(0, 30)}...`;
           }
           try {
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(
-                () => reject(new Error("Request timeout")),
-                argv.timeout,
-              ),
-            );
-            const generatePromise = sdk.generateText({
+            const result = await sdk.generateText({
               prompt: prompts[i],
               provider:
                 argv.provider === "auto"
@@ -782,11 +776,8 @@ const cli = yargs(args)
               temperature: argv.temperature,
               maxTokens: argv.maxTokens,
               systemPrompt: argv.system,
+              timeout: argv.timeout,
             });
-            const result = (await Promise.race([
-              generatePromise,
-              timeoutPromise,
-            ])) as any;
             results.push({ prompt: prompts[i], response: result.content });
             if (spinner) {
               spinner.render();

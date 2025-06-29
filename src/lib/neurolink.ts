@@ -13,6 +13,7 @@ import { toolRegistry } from "./mcp/tool-registry.js";
 import { unifiedRegistry } from "./mcp/unified-registry.js";
 import { logger } from "./utils/logger.js";
 import { getBestProvider } from "./utils/providerUtils-fixed.js";
+import { TimeoutError } from "./utils/timeout.js";
 
 export interface TextGenerationOptions {
   prompt: string;
@@ -31,6 +32,7 @@ export interface TextGenerationOptions {
   maxTokens?: number;
   systemPrompt?: string;
   schema?: any;
+  timeout?: number | string; // NEW: Optional timeout (e.g., 30000, '30s', '2m', '1h')
   disableTools?: boolean; // NEW: Disable MCP tool integration (tools enabled by default)
 }
 
@@ -50,6 +52,7 @@ export interface StreamTextOptions {
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  timeout?: number | string; // NEW: Optional timeout (e.g., 30000, '30s', '2m', '1h')
 }
 
 export interface TextGenerationResult {
@@ -103,10 +106,9 @@ export class NeuroLink {
       const mcpInitPromise = Promise.race([
         this.doIsolatedMCPInitialization(),
         new Promise<void>((_, reject) => {
-          const timer = setTimeout(() => {
+          setTimeout(() => {
             reject(new Error("MCP initialization timeout after 3s"));
           }, initTimeout);
-          timer.unref(); // Don't keep process alive
         }),
       ]);
 
@@ -248,6 +250,7 @@ export class NeuroLink {
           temperature: options.temperature,
           maxTokens: options.maxTokens,
           systemPrompt: enhancedSystemPrompt,
+          timeout: options.timeout,
         },
         options.schema,
       );
@@ -365,6 +368,7 @@ export class NeuroLink {
             temperature: options.temperature,
             maxTokens: options.maxTokens,
             systemPrompt: options.systemPrompt,
+            timeout: options.timeout,
           },
           options.schema,
         );
@@ -404,9 +408,19 @@ export class NeuroLink {
           error instanceof Error ? error.message : String(error);
         lastError = error instanceof Error ? error : new Error(errorMessage);
 
+        // Special handling for timeout errors
+        if (error instanceof TimeoutError) {
+          logger.warn(`[${functionTag}] Provider timed out`, {
+            provider: providerName,
+            timeout: error.timeout,
+            operation: error.operation,
+          });
+        }
+
         logger.debug(`[${functionTag}] Provider failed, trying next`, {
           provider: providerName,
           error: errorMessage,
+          isTimeout: error instanceof TimeoutError,
           remainingProviders: tryProviders.slice(
             tryProviders.indexOf(providerName) + 1,
           ),
@@ -523,6 +537,7 @@ Note: Tool integration is currently in development. Please provide helpful respo
           temperature: options.temperature,
           maxTokens: options.maxTokens,
           systemPrompt: options.systemPrompt,
+          timeout: options.timeout,
         });
 
         if (!result) {
@@ -548,9 +563,19 @@ Note: Tool integration is currently in development. Please provide helpful respo
           error instanceof Error ? error.message : String(error);
         lastError = error instanceof Error ? error : new Error(errorMessage);
 
+        // Special handling for timeout errors
+        if (error instanceof TimeoutError) {
+          logger.warn(`[${functionTag}] Provider timed out`, {
+            provider: providerName,
+            timeout: error.timeout,
+            operation: error.operation,
+          });
+        }
+
         logger.debug(`[${functionTag}] Provider failed, trying next`, {
           provider: providerName,
           error: errorMessage,
+          isTimeout: error instanceof TimeoutError,
           remainingProviders: tryProviders.slice(
             tryProviders.indexOf(providerName) + 1,
           ),

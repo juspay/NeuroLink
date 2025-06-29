@@ -16,10 +16,24 @@ import type {
   StreamTextOptions,
 } from "../core/types.js";
 import { logger } from "../utils/logger.js";
+import { createTimeoutController, TimeoutError, getDefaultTimeout } from "../utils/timeout.js";
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
   systemPrompt: "You are a helpful AI assistant.",
+};
+
+// Declare process for TypeScript
+declare const process: {
+  env: {
+    BEDROCK_MODEL?: string;
+    BEDROCK_MODEL_ID?: string;
+    AWS_ACCESS_KEY_ID?: string;
+    AWS_SECRET_ACCESS_KEY?: string;
+    AWS_REGION?: string;
+    AWS_SESSION_TOKEN?: string;
+    PUBLIC_APP_ENVIRONMENT?: string;
+  };
 };
 
 // Configuration helpers
@@ -184,6 +198,7 @@ export class AmazonBedrock implements AIProvider {
         maxTokens = 1000,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
+        timeout = getDefaultTimeout(provider, 'stream'),
       } = options;
 
       // Use schema from options or fallback parameter
@@ -195,7 +210,11 @@ export class AmazonBedrock implements AIProvider {
         promptLength: prompt.length,
         temperature,
         maxTokens,
+        timeout,
       });
+
+      // Create timeout controller if timeout is specified
+      const timeoutController = createTimeoutController(timeout, provider, 'stream');
 
       const streamOptions = {
         model: this.model,
@@ -203,6 +222,8 @@ export class AmazonBedrock implements AIProvider {
         system: systemPrompt,
         temperature,
         maxTokens,
+        // Add abort signal if available
+        ...(timeoutController && { abortSignal: timeoutController.controller.signal }),
 
         onError: (event: { error: unknown }) => {
           const error = event.error;
@@ -265,15 +286,29 @@ export class AmazonBedrock implements AIProvider {
         promptLength: prompt.length,
       });
 
+      // For streaming, we can't clean up immediately, but the timeout will auto-clean
+      // The user should handle the stream and any timeout errors
+
       return result;
     } catch (err) {
-      logger.error(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        region: getAWSRegion(),
-        message: "Error in streaming text",
-        err: String(err),
-      });
+      // Log timeout errors specifically
+      if (err instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          modelName: this.modelName,
+          region: getAWSRegion(),
+          timeout: err.timeout,
+          message: err.message,
+        });
+      } else {
+        logger.error(`[${functionTag}] Exception`, {
+          provider,
+          modelName: this.modelName,
+          region: getAWSRegion(),
+          message: "Error in streaming text",
+          err: String(err),
+        });
+      }
       throw err; // Re-throw error to trigger fallback
     }
   }
@@ -298,6 +333,7 @@ export class AmazonBedrock implements AIProvider {
         maxTokens = 1000,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
+        timeout = getDefaultTimeout(provider, 'generate'),
       } = options;
 
       // Use schema from options or fallback parameter
@@ -310,7 +346,11 @@ export class AmazonBedrock implements AIProvider {
         promptLength: prompt.length,
         temperature,
         maxTokens,
+        timeout,
       });
+
+      // Create timeout controller if timeout is specified
+      const timeoutController = createTimeoutController(timeout, provider, 'generate');
 
       const generateOptions = {
         model: this.model,
@@ -318,6 +358,8 @@ export class AmazonBedrock implements AIProvider {
         system: systemPrompt,
         temperature,
         maxTokens,
+        // Add abort signal if available
+        ...(timeoutController && { abortSignal: timeoutController.controller.signal }),
       } as Parameters<typeof generateText>[0];
 
       if (finalSchema) {
@@ -326,24 +368,44 @@ export class AmazonBedrock implements AIProvider {
         });
       }
 
-      const result = await generateText(generateOptions);
+      try {
+        const result = await generateText(generateOptions);
+        
+        // Clean up timeout if successful
+        timeoutController?.cleanup();
+        
+        logger.debug(`[${functionTag}] Generate text completed`, {
+          provider,
+          modelName: this.modelName,
+          usage: result.usage,
+          finishReason: result.finishReason,
+          responseLength: result.text?.length || 0,
+          timeout,
+        });
 
-      logger.debug(`[${functionTag}] Generate text completed`, {
-        provider,
-        modelName: this.modelName,
-        usage: result.usage,
-        finishReason: result.finishReason,
-        responseLength: result.text?.length || 0,
-      });
-
-      return result;
+        return result;
+      } finally {
+        // Always cleanup timeout
+        timeoutController?.cleanup();
+      }
     } catch (err) {
-      logger.error(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in generating text",
-        err: String(err),
-      });
+      // Log timeout errors specifically
+      if (err instanceof TimeoutError) {
+        logger.error(`[${functionTag}] Timeout error`, {
+          provider,
+          modelName: this.modelName,
+          region: getAWSRegion(),
+          timeout: err.timeout,
+          message: err.message,
+        });
+      } else {
+        logger.error(`[${functionTag}] Exception`, {
+          provider,
+          modelName: this.modelName,
+          message: "Error in generating text",
+          err: String(err),
+        });
+      }
       throw err; // Re-throw error to trigger fallback instead of returning null
     }
   }

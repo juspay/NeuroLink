@@ -44,8 +44,15 @@ const result = await openai.generateText({
   prompt: "Explain machine learning",
   temperature: 0.7,
   maxTokens: 500,
+  timeout: '30s' // Optional: Override default 30s timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 30 seconds
+- **Supported Formats**: Milliseconds (`30000`), human-readable (`'30s'`, `'1m'`, `'5m'`)
+- **Environment Variable**: `OPENAI_TIMEOUT='45s'` (optional)
 
 ## Amazon Bedrock Configuration
 
@@ -129,8 +136,15 @@ const result = await bedrock.generateText({
   prompt: "Write a haiku about AI",
   temperature: 0.8,
   maxTokens: 100,
+  timeout: '45s' // Optional: Override default 45s timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 45 seconds (longer due to cold starts)
+- **Supported Formats**: Milliseconds (`45000`), human-readable (`'45s'`, `'1m'`, `'2m'`)
+- **Environment Variable**: `BEDROCK_TIMEOUT='1m'` (optional)
 
 ### Account Setup Requirements
 
@@ -253,8 +267,15 @@ const result = await vertex.generateText({
   prompt: "Explain quantum computing",
   temperature: 0.6,
   maxTokens: 800,
+  timeout: '1m' // Optional: Override default 60s timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 60 seconds (longer due to GCP initialization)
+- **Supported Formats**: Milliseconds (`60000`), human-readable (`'60s'`, `'1m'`, `'2m'`)
+- **Environment Variable**: `VERTEX_TIMEOUT='90s'` (optional)
 
 ### Supported Models
 
@@ -313,8 +334,15 @@ const result = await googleAI.generateText({
   prompt: "Explain the future of AI",
   temperature: 0.7,
   maxTokens: 1000,
+  timeout: '30s' // Optional: Override default 30s timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 30 seconds
+- **Supported Formats**: Milliseconds (`30000`), human-readable (`'30s'`, `'1m'`, `'5m'`)
+- **Environment Variable**: `GOOGLE_AI_TIMEOUT='45s'` (optional)
 
 ### How to Get Google AI Studio API Key
 
@@ -428,8 +456,16 @@ const result = await huggingface.generateText({
   prompt: "Explain machine learning",
   temperature: 0.8,
   maxTokens: 200,
+  timeout: '45s' // Optional: Override default 30s timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 30 seconds
+- **Supported Formats**: Milliseconds (`30000`), human-readable (`'30s'`, `'1m'`, `'5m'`)
+- **Environment Variable**: `HUGGINGFACE_TIMEOUT='45s'` (optional)
+- **Note**: Model loading may take additional time on first request
 
 ### Popular Models
 
@@ -498,8 +534,16 @@ const result = await ollama.generateText({
   prompt: "Write a poem about privacy",
   temperature: 0.7,
   maxTokens: 300,
+  timeout: '10m' // Optional: Override default 5m timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 5 minutes (longer for local model processing)
+- **Supported Formats**: Milliseconds (`300000`), human-readable (`'5m'`, `'10m'`, `'30m'`)
+- **Environment Variable**: `OLLAMA_TIMEOUT='10m'` (optional)
+- **Note**: Local models may need longer timeouts for complex prompts
 
 ### Popular Models
 
@@ -567,8 +611,15 @@ const result = await mistral.generateText({
   prompt: "Translate to French: Hello world",
   temperature: 0.3,
   maxTokens: 100,
+  timeout: '30s' // Optional: Override default 30s timeout
 });
 ```
+
+### Timeout Configuration
+
+- **Default Timeout**: 30 seconds
+- **Supported Formats**: Milliseconds (`30000`), human-readable (`'30s'`, `'1m'`, `'5m'`)
+- **Environment Variable**: `MISTRAL_TIMEOUT='45s'` (optional)
 
 ### Getting Started with Mistral AI
 

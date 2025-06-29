@@ -28,10 +28,20 @@ import { streamText, generateText, Output } from "ai";
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema } from "ai";
 import { logger } from "../utils/logger.js";
+import { getDefaultTimeout, TimeoutError } from "../utils/timeout.js";
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
   systemPrompt: "You are a helpful AI assistant.",
+};
+
+// Declare process for TypeScript
+declare const process: {
+  env: {
+    OLLAMA_BASE_URL?: string;
+    OLLAMA_MODEL?: string;
+    OLLAMA_TIMEOUT?: string;
+  };
 };
 
 /**
@@ -413,17 +423,19 @@ class OllamaLanguageModel implements LanguageModelV1 {
 export class Ollama implements AIProvider {
   private baseUrl: string;
   private modelName: string;
-  private timeout: number;
+  private defaultTimeout: number;
 
   constructor(modelName?: string) {
     this.baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
     this.modelName = modelName || process.env.OLLAMA_MODEL || "llama2";
-    this.timeout = parseInt(process.env.OLLAMA_TIMEOUT || "60000"); // 60 seconds default
+    // Use environment variable for backward compatibility, but convert to format used by other providers
+    const envTimeout = process.env.OLLAMA_TIMEOUT ? parseInt(process.env.OLLAMA_TIMEOUT) : undefined;
+    this.defaultTimeout = envTimeout || parseInt(getDefaultTimeout('ollama', 'generate').replace(/[^\d]/g, ''));
 
     logger.debug("[Ollama] Initialized", {
       baseUrl: this.baseUrl,
       modelName: this.modelName,
-      timeout: this.timeout,
+      defaultTimeout: this.defaultTimeout,
     });
   }
 
@@ -431,12 +443,13 @@ export class Ollama implements AIProvider {
    * Gets the appropriate model instance
    * @private
    */
-  private getModel(): LanguageModelV1 {
+  private getModel(timeout?: number): LanguageModelV1 {
     logger.debug("Ollama.getModel - Ollama model selected", {
       modelName: this.modelName,
+      timeout: timeout || this.defaultTimeout,
     });
 
-    return new OllamaLanguageModel(this.modelName, this.baseUrl, this.timeout);
+    return new OllamaLanguageModel(this.modelName, this.baseUrl, timeout || this.defaultTimeout);
   }
 
   /**
@@ -446,7 +459,7 @@ export class Ollama implements AIProvider {
     const model = new OllamaLanguageModel(
       this.modelName,
       this.baseUrl,
-      this.timeout,
+      this.defaultTimeout,
     );
     return await model["checkHealth"]();
   }
@@ -566,10 +579,16 @@ export class Ollama implements AIProvider {
         maxTokens = 1000,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
+        timeout,
       } = options;
 
       // Use schema from options or fallback parameter
       const finalSchema = schema || analysisSchema;
+
+      // Convert timeout to milliseconds if provided as string
+      const timeoutMs = timeout 
+        ? (typeof timeout === 'string' ? parseInt(getDefaultTimeout('ollama', 'generate').replace(/[^\d]/g, '')) : timeout)
+        : this.defaultTimeout;
 
       logger.debug(`[${functionTag}] Generate request started`, {
         provider,
@@ -577,9 +596,10 @@ export class Ollama implements AIProvider {
         promptLength: prompt.length,
         temperature,
         maxTokens,
+        timeout: timeoutMs,
       });
 
-      const model = this.getModel();
+      const model = this.getModel(timeoutMs);
 
       const generateOptions = {
         model: model,
@@ -647,10 +667,16 @@ export class Ollama implements AIProvider {
         maxTokens = 1000,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
+        timeout,
       } = options;
 
       // Use schema from options or fallback parameter
       const finalSchema = schema || analysisSchema;
+
+      // Convert timeout to milliseconds if provided as string
+      const timeoutMs = timeout 
+        ? (typeof timeout === 'string' ? parseInt(getDefaultTimeout('ollama', 'stream').replace(/[^\d]/g, '')) : timeout)
+        : this.defaultTimeout;
 
       logger.debug(`[${functionTag}] Stream request started`, {
         provider,
@@ -659,9 +685,10 @@ export class Ollama implements AIProvider {
         temperature,
         maxTokens,
         hasSchema: !!finalSchema,
+        timeout: timeoutMs,
       });
 
-      const model = this.getModel();
+      const model = this.getModel(timeoutMs);
 
       const streamOptions = {
         model: model,

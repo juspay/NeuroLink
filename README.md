@@ -61,6 +61,7 @@ import { createBestAIProvider } from "@juspay/neurolink";
 const provider = createBestAIProvider();
 const result = await provider.generateText({
   prompt: "Write a haiku about programming",
+  timeout: '30s' // Optional: Set custom timeout (default: 30s)
 });
 
 console.log(result.text);
@@ -182,11 +183,17 @@ npx @juspay/neurolink gen "What time is it?"
 # Disable tools for training-data-only responses
 npx @juspay/neurolink generate "What time is it?" --disable-tools
 
+# With custom timeout for complex prompts
+npx @juspay/neurolink generate "Explain quantum computing in detail" --timeout 1m
+
 # Real-time streaming with agent support (default)
 npx @juspay/neurolink stream "What time is it?"
 
 # Streaming without tools (traditional mode)
 npx @juspay/neurolink stream "Tell me a story" --disable-tools
+
+# Streaming with extended timeout
+npx @juspay/neurolink stream "Write a long story" --timeout 5m
 
 # Provider diagnostics
 npx @juspay/neurolink status --verbose
@@ -194,24 +201,43 @@ npx @juspay/neurolink status --verbose
 # Batch processing
 echo -e "Write a haiku\nExplain gravity" > prompts.txt
 npx @juspay/neurolink batch prompts.txt --output results.json
+
+# Batch with custom timeout per request
+npx @juspay/neurolink batch prompts.txt --timeout 45s --output results.json
 ```
 
 ### SDK Integration
 
 ```typescript
-// SvelteKit API route
+// SvelteKit API route with timeout handling
 export const POST: RequestHandler = async ({ request }) => {
   const { message } = await request.json();
   const provider = createBestAIProvider();
-  const result = await provider.streamText({ prompt: message });
-  return new Response(result.toReadableStream());
+  
+  try {
+    const result = await provider.streamText({ 
+      prompt: message,
+      timeout: '2m' // 2 minutes for streaming
+    });
+    return new Response(result.toReadableStream());
+  } catch (error) {
+    if (error.name === 'TimeoutError') {
+      return new Response('Request timed out', { status: 408 });
+    }
+    throw error;
+  }
 };
 
-// Next.js API route
+// Next.js API route with timeout
 export async function POST(request: NextRequest) {
   const { prompt } = await request.json();
   const provider = createBestAIProvider();
-  const result = await provider.generateText({ prompt });
+  
+  const result = await provider.generateText({ 
+    prompt,
+    timeout: process.env.AI_TIMEOUT || '30s' // Configurable timeout
+  });
+  
   return NextResponse.json({ text: result.text });
 }
 ```
