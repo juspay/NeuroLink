@@ -1,3 +1,28 @@
+# [3.0.0](https://github.com/juspay/neurolink/compare/v2.1.0...v3.0.0) (2025-07-01)
+
+
+### Features
+
+* **proxy:** add comprehensive enterprise proxy support across all providers ([9668e67](https://github.com/juspay/neurolink/commit/9668e67dfaa27831ba85d45fdf5b7739de902b28))
+
+
+### BREAKING CHANGES
+
+* **proxy:** None - fully backward compatible
+
+Files modified:
+- docs/ENTERPRISE-PROXY-SETUP.md (NEW) - Comprehensive enterprise proxy guide
+- docs/PROVIDER-CONFIGURATION.md - Added proxy configuration section
+- docs/CLI-GUIDE.md - Added proxy environment variables documentation
+- docs/ENVIRONMENT-VARIABLES.md - Added proxy configuration examples
+- docs/TROUBLESHOOTING.md - Added proxy troubleshooting procedures
+- .env.example - Added proxy environment variables
+- memory-bank/ - Updated with proxy implementation milestone
+- .clinerules - Added proxy success patterns
+- CHANGELOG.md - Added v2.2.0 proxy support entry
+- package.json - Updated description with enterprise features
+- README.md - Removed outdated content
+
 # [2.1.0](https://github.com/juspay/neurolink/compare/v2.0.0...v2.1.0) (2025-06-29)
 
 ### Features
