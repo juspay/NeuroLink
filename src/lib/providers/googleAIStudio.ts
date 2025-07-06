@@ -14,6 +14,7 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
 } from "../core/types.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -21,7 +22,9 @@ import {
   TimeoutError,
   getDefaultTimeout,
 } from "../utils/timeout.js";
+import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 import { createProxyFetch } from "../proxy/proxy-fetch.js";
+import { evaluateResponse } from "../core/evaluation.js";
 
 // Declare process for TypeScript
 declare const process: {
@@ -176,7 +179,7 @@ export class GoogleAIStudio implements AIProvider {
       const {
         prompt,
         temperature = 0.7,
-        maxTokens = 1000,
+        maxTokens = DEFAULT_MAX_TOKENS,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
         tools,
@@ -312,6 +315,7 @@ export class GoogleAIStudio implements AIProvider {
   ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
     const functionTag = "GoogleAIStudio.generateText";
     const provider = "google-ai";
+    const startTime = Date.now();
 
     try {
       // Parse parameters - support both string and options object
@@ -323,7 +327,7 @@ export class GoogleAIStudio implements AIProvider {
       const {
         prompt,
         temperature = 0.7,
-        maxTokens = 1000,
+        maxTokens = DEFAULT_MAX_TOKENS,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
         tools,
@@ -390,6 +394,30 @@ export class GoogleAIStudio implements AIProvider {
           timeout,
         });
 
+        // Add analytics if enabled
+        if (options.enableAnalytics) {
+          const { createAnalytics } = await import("./analytics-helper.js");
+          (result as any).analytics = createAnalytics(
+            provider,
+            this.modelName,
+            result,
+            Date.now() - startTime,
+            options.context,
+          );
+        }
+
+        // Add evaluation if enabled
+        if (options.enableEvaluation) {
+          (result as any).evaluation = await evaluateResponse(
+            prompt,
+            result.text,
+            options.context,
+            options.evaluationDomain,
+            options.toolUsageContext,
+            options.conversationHistory,
+          );
+        }
+
         return result;
       } finally {
         // Always cleanup timeout
@@ -414,5 +442,31 @@ export class GoogleAIStudio implements AIProvider {
       }
       throw err; // Re-throw error to trigger fallback
     }
+  }
+
+  /**
+   * Alias for generateText() - CLI-SDK consistency
+   * @param optionsOrPrompt - TextGenerationOptions object or prompt string
+   * @param analysisSchema - Optional schema for output validation
+   * @returns Promise resolving to GenerateTextResult or null
+   */
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
+  }
+
+  /**
+   * Short alias for generateText() - CLI-SDK consistency
+   * @param optionsOrPrompt - TextGenerationOptions object or prompt string
+   * @param analysisSchema - Optional schema for output validation
+   * @returns Promise resolving to GenerateTextResult or null
+   */
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
   }
 }

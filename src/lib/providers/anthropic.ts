@@ -9,7 +9,10 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
 } from "../core/types.js";
+import type { ZodType, ZodTypeDef } from "zod";
+import type { Schema, GenerateTextResult } from "ai";
 import { AIProviderName } from "../core/types.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -17,6 +20,9 @@ import {
   TimeoutError,
   getDefaultTimeout,
 } from "../utils/timeout.js";
+import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { evaluateResponse } from "../core/evaluation.js";
+import { createAnalytics } from "../core/analytics.js";
 import { createProxyFetch } from "../proxy/proxy-fetch.js";
 
 // Anthropic-specific types
@@ -160,6 +166,7 @@ export class AnthropicProvider implements AIProvider {
   ): Promise<any> {
     const functionTag = "AnthropicProvider.generateText";
     const provider = "anthropic";
+    const startTime = Date.now();
 
     logger.debug(`[${functionTag}] Starting text generation`);
 
@@ -172,9 +179,12 @@ export class AnthropicProvider implements AIProvider {
     const {
       prompt,
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = DEFAULT_MAX_TOKENS,
       systemPrompt = "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest.",
       timeout = getDefaultTimeout(provider, "generate"),
+      enableAnalytics = false,
+      enableEvaluation = false,
+      context,
     } = options;
 
     logger.debug(
@@ -219,7 +229,7 @@ export class AnthropicProvider implements AIProvider {
 
       const content = data.content.map((block) => block.text).join("");
 
-      return {
+      const result: any = {
         content,
         provider: this.name,
         model: data.model,
@@ -230,6 +240,28 @@ export class AnthropicProvider implements AIProvider {
         },
         finishReason: data.stop_reason,
       };
+
+      // Add analytics if enabled
+      if (options.enableAnalytics) {
+        result.analytics = createAnalytics(
+          provider,
+          this.defaultModel,
+          result,
+          Date.now() - startTime,
+          options.context,
+        );
+      }
+
+      // Add evaluation if enabled
+      if (options.enableEvaluation) {
+        result.evaluation = await evaluateResponse(
+          prompt,
+          result.content,
+          options.context,
+        );
+      }
+
+      return result;
     } catch (error) {
       // Always cleanup timeout
       timeoutController?.cleanup();
@@ -280,7 +312,7 @@ export class AnthropicProvider implements AIProvider {
     const {
       prompt,
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = DEFAULT_MAX_TOKENS,
       systemPrompt = "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest.",
       timeout = getDefaultTimeout(provider, "stream"),
     } = options;
@@ -438,7 +470,7 @@ export class AnthropicProvider implements AIProvider {
     const {
       prompt,
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = DEFAULT_MAX_TOKENS,
       systemPrompt = "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest.",
     } = options;
 
@@ -610,5 +642,25 @@ export class AnthropicProvider implements AIProvider {
       "system-prompts",
       "long-context", // Claude models support up to 200k tokens
     ];
+  }
+
+  /**
+   * Alias for generateText() - CLI-SDK consistency
+   */
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
+  }
+
+  /**
+   * Short alias for generateText() - CLI-SDK consistency
+   */
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
   }
 }

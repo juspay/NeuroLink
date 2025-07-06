@@ -101,7 +101,10 @@ export class MCPOrchestrator {
   private async initializeDefaultServers(): Promise<void> {
     try {
       await this.registry.registerServer(aiCoreServer.id, aiCoreServer);
-      console.log("[Orchestrator] Initialized with AI Core Server");
+      // Only log in debug mode
+      if (process.env.NEUROLINK_DEBUG === "true") {
+        console.log("[Orchestrator] Initialized with AI Core Server");
+      }
     } catch (error) {
       console.warn("[Orchestrator] Failed to register AI Core Server:", error);
     }
@@ -125,18 +128,22 @@ export class MCPOrchestrator {
     // Create execution context
     const context = this.contextManager.createContext(contextRequest);
 
-    console.log(
-      `[Orchestrator] Executing tool '${toolName}' in session ${context.sessionId}`,
-    );
+    if (process.env.NEUROLINK_DEBUG === "true") {
+      console.log(
+        `[Orchestrator] Executing tool '${toolName}' in session ${context.sessionId}`,
+      );
+    }
 
     // Execute tool through registry
     const result = await this.registry.executeTool(toolName, params, context);
 
-    console.log(
-      `[Orchestrator] Tool '${toolName}' execution ${result.success ? "completed" : "failed"}`,
-    );
+    if (process.env.NEUROLINK_DEBUG === "true") {
+      console.log(
+        `[Orchestrator] Tool '${toolName}' execution ${(result as ToolResult).success ? "completed" : "failed"}`,
+      );
+    }
 
-    return result;
+    return result as ToolResult;
   }
 
   /**
@@ -203,14 +210,15 @@ export class MCPOrchestrator {
               context,
             );
 
-            results.set(stepId, stepResult);
+            results.set(stepId, stepResult as ToolResult);
             stepsExecuted++;
 
-            if (!stepResult.success) {
+            if (!(stepResult as ToolResult).success) {
+              const error = (stepResult as ToolResult).error;
               const errorMessage =
-                stepResult.error instanceof Error
-                  ? stepResult.error.message
-                  : stepResult.error || "Unknown error";
+                error instanceof Error
+                  ? error.message
+                  : String(error) || "Unknown error";
               errors.set(stepId, errorMessage);
 
               if (stopOnError) {
@@ -492,13 +500,14 @@ export class MCPOrchestrator {
             context,
           );
 
-          results.set(stepId, result);
+          results.set(stepId, result as ToolResult);
 
-          if (!result.success) {
+          if (!(result as ToolResult).success) {
+            const error = (result as ToolResult).error;
             const errorMessage =
-              result.error instanceof Error
-                ? result.error.message
-                : result.error || "Unknown error";
+              error instanceof Error
+                ? error.message
+                : String(error) || "Unknown error";
             errors.set(stepId, errorMessage);
           }
         } catch (error) {

@@ -42,7 +42,7 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
 
       // Register discovered plugins
       for (const plugin of result.plugins) {
-        this.register(plugin);
+        this.register(plugin as any);
         this.autoDiscoveredServers.push(plugin);
         this.availableServers.add(plugin.metadata.name);
       }
@@ -108,7 +108,14 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
       try {
         // Get tools from plugin metadata if available
         const tools = await this.listTools();
-        allTools.push(...tools);
+        allTools.push(
+          ...tools.map((tool) => ({
+            ...tool,
+            id: tool.name,
+            serverId: tool.serverId || plugin.metadata.name,
+            source: "unified",
+          })),
+        );
       } catch (error) {
         unifiedRegistryLogger.warn(
           `Failed to get tools from ${plugin.metadata.name}:`,
@@ -123,13 +130,13 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
   /**
    * Execute a tool through the registry
    */
-  async executeTool(
+  async executeTool<T = unknown>(
     toolName: string,
-    args: any,
-    context: ExecutionContext,
-  ): Promise<ToolExecutionResult> {
+    args?: unknown,
+    context?: ExecutionContext,
+  ): Promise<T> {
     unifiedRegistryLogger.info(`Executing tool: ${toolName}`);
-    return super.executeTool(toolName, args, context);
+    return super.executeTool<T>(toolName, args, context);
   }
 
   /**
@@ -170,9 +177,20 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
   }
 
   /**
-   * Get registry statistics
+   * Get registry statistics (override parent method)
    */
-  async getStats(): Promise<{
+  getStats(): Record<
+    string,
+    { count: number; averageTime: number; totalTime: number }
+  > {
+    // Return execution stats in the expected format
+    return super.getStats();
+  }
+
+  /**
+   * Get detailed registry statistics
+   */
+  async getDetailedStats(): Promise<{
     total: number;
     bySource: Record<string, number>;
     byType: Record<string, number>;
@@ -185,7 +203,8 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
     const byType: Record<string, number> = {};
 
     for (const plugin of plugins) {
-      bySource[plugin.source] = (bySource[plugin.source] || 0) + 1;
+      const source = (plugin as any).source || "unknown";
+      bySource[source] = (bySource[source] || 0) + 1;
 
       // Extract type from name or metadata
       const type =

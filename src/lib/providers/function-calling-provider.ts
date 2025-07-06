@@ -8,6 +8,7 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
 } from "../core/types.js";
 import {
   generateText as aiGenerateText,
@@ -28,6 +29,7 @@ import {
 import { createExecutionContext } from "../mcp/context-manager.js";
 import type { NeuroLinkExecutionContext } from "../mcp/factory.js";
 import { mcpLogger } from "../mcp/logging.js";
+import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 
 /**
  * Enhanced provider that enables real function calling with MCP tools
@@ -196,7 +198,7 @@ export class FunctionCallingProvider implements AIProvider {
         prompt: options.prompt,
         system: options.systemPrompt || "You are a helpful AI assistant.",
         temperature: options.temperature || 0.7,
-        maxTokens: options.maxTokens || 500,
+        maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
         tools: toolsWithExecution,
         toolChoice: "auto", // Let the AI decide when to use tools
         maxSteps: 5, // CRITICAL: Enable multi-turn tool execution
@@ -521,6 +523,26 @@ These functions provide accurate, real-time data. Use them actively to enhance y
       );
       return this.baseProvider.streamText(options, analysisSchema);
     }
+  }
+
+  /**
+   * Alias for generateText() - CLI-SDK consistency
+   */
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
+  }
+
+  /**
+   * Short alias for generateText() - CLI-SDK consistency
+   */
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
   }
 }
 

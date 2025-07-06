@@ -14,7 +14,10 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createAIProvider, getBestProvider } from "neurolink";
+
+// Configurable import: use published package for production, local for development
+const NEUROLINK_PACKAGE = process.env.NEUROLINK_PACKAGE || "@juspay/neurolink";
+const { createAIProvider, getBestProvider } = await import(NEUROLINK_PACKAGE);
 
 // ================================
 // CONFIGURATION & CONSTANTS
@@ -49,8 +52,8 @@ const DEFAULT_MODELS = {
   openai: "gpt-4o",
   bedrock:
     "arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-  vertex: "gemini-1.5-pro",
-  "google-ai": "gemini-1.5-pro-latest",
+  vertex: "gemini-2.5-pro",
+  "google-ai": "gemini-2.5-pro",
   anthropic: "claude-3-5-sonnet-20241022",
   azure: "gpt-4o",
   huggingface: "microsoft/DialoGPT-medium",

@@ -15,6 +15,7 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
 } from "../core/types.js";
 import type {
   GenerateTextResult,
@@ -29,6 +30,8 @@ import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema } from "ai";
 import { logger } from "../utils/logger.js";
 import { getDefaultTimeout, TimeoutError } from "../utils/timeout.js";
+import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { evaluateResponse } from "../core/evaluation.js";
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
@@ -194,7 +197,7 @@ class OllamaLanguageModel implements LanguageModelV1 {
       stream: false,
       options: {
         temperature: options.temperature || 0.7,
-        num_predict: options.maxTokens || 500,
+        num_predict: options.maxTokens ?? DEFAULT_MAX_TOKENS,
       },
     };
 
@@ -294,7 +297,7 @@ class OllamaLanguageModel implements LanguageModelV1 {
       stream: true,
       options: {
         temperature: options.temperature || 0.7,
-        num_predict: options.maxTokens || 500,
+        num_predict: options.maxTokens ?? DEFAULT_MAX_TOKENS,
       },
     };
 
@@ -573,6 +576,7 @@ export class Ollama implements AIProvider {
   ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
     const functionTag = "Ollama.generateText";
     const provider = "ollama";
+    const startTime = Date.now();
 
     try {
       // Parse parameters - support both string and options object
@@ -584,7 +588,7 @@ export class Ollama implements AIProvider {
       const {
         prompt,
         temperature = 0.7,
-        maxTokens = 1000,
+        maxTokens = DEFAULT_MAX_TOKENS,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
         timeout,
@@ -643,6 +647,26 @@ export class Ollama implements AIProvider {
         responseLength: result.text?.length || 0,
       });
 
+      // Add analytics if enabled
+      if (options.enableAnalytics) {
+        (result as any).analytics = {
+          provider,
+          model: this.modelName,
+          tokens: result.usage,
+          responseTime: Date.now() - startTime,
+          context: options.context,
+        };
+      }
+
+      // Add evaluation if enabled
+      if (options.enableEvaluation) {
+        (result as any).evaluation = await evaluateResponse(
+          prompt,
+          result.text,
+          options.context,
+        );
+      }
+
       return result;
     } catch (err) {
       logger.debug(`[${functionTag}] Exception`, {
@@ -676,7 +700,7 @@ export class Ollama implements AIProvider {
       const {
         prompt,
         temperature = 0.7,
-        maxTokens = 1000,
+        maxTokens = DEFAULT_MAX_TOKENS,
         systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
         schema,
         timeout,
@@ -778,5 +802,19 @@ export class Ollama implements AIProvider {
       });
       throw err; // Re-throw error to trigger fallback
     }
+  }
+
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
+  }
+
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
   }
 }

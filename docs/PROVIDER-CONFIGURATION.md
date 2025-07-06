@@ -324,7 +324,7 @@ export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
 ### Optional Configuration
 
 ```bash
-export GOOGLE_AI_MODEL="gemini-1.5-pro-latest"  # Default model to use
+export GOOGLE_AI_MODEL="gemini-2.5-pro"  # Default model to use
 ```
 
 ### Supported Models
@@ -385,7 +385,7 @@ export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
 export GOOGLE_GENERATIVE_AI_API_KEY="AIza-your-google-ai-api-key"
 
 # Optional: Default model selection
-export GOOGLE_AI_MODEL="gemini-1.5-pro-latest"
+export GOOGLE_AI_MODEL="gemini-2.5-pro"
 ```
 
 ### Rate Limits and Quotas
@@ -696,7 +696,7 @@ VERTEX_MODEL_ID=claude-sonnet-4@20250514
 
 # Google AI Studio
 GOOGLE_AI_API_KEY=AIza-your-google-ai-studio-key
-GOOGLE_AI_MODEL=gemini-1.5-pro-latest
+GOOGLE_AI_MODEL=gemini-2.5-pro
 
 # Anthropic
 ANTHROPIC_API_KEY=sk-ant-api03-your-key

@@ -49,7 +49,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 # Google AI Studio Configuration
 GOOGLE_AI_API_KEY=AIza-your-google-ai-api-key
-GOOGLE_AI_MODEL=gemini-1.5-pro-latest
+GOOGLE_AI_MODEL=gemini-2.5-pro
 
 # Anthropic Configuration
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
@@ -475,7 +475,7 @@ http://localhost:9876
     },
     "vertex": {
       "available": true,
-      "model": "gemini-1.5-pro",
+      "model": "gemini-2.5-pro",
       "configured": true
     }
   },

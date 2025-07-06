@@ -228,7 +228,11 @@ export async function getAvailableFunctionTools(): Promise<{
             let originalFunctionName: string;
 
             // Convert server name to underscore format to check if it's embedded in tool name
-            const sanitizedServerCheck = (toolInfo.server || "unknown").replace(
+            const serverName =
+              typeof toolInfo.serverId === "string"
+                ? toolInfo.serverId
+                : "unknown";
+            const sanitizedServerCheck = serverName.replace(
               /[^a-zA-Z0-9_]/g,
               "_",
             );
@@ -298,9 +302,14 @@ export async function getAvailableFunctionTools(): Promise<{
               originalFunctionName = toolInfo.name;
             } else {
               // Tool name doesn't include server info, create compound name
-              const sanitizedServerName = (
-                toolInfo.server || "unknown"
-              ).replace(/[^a-zA-Z0-9_]/g, "_");
+              const serverName =
+                typeof toolInfo.serverId === "string"
+                  ? toolInfo.serverId
+                  : "unknown";
+              const sanitizedServerName = serverName.replace(
+                /[^a-zA-Z0-9_]/g,
+                "_",
+              );
               const sanitizedToolName = toolInfo.name.replace(
                 /[^a-zA-Z0-9_]/g,
                 "_",
@@ -395,7 +404,10 @@ export async function getAvailableFunctionTools(): Promise<{
 
             // Store mapping for execution - CRITICAL: Use sanitized functionName as key
             toolMap.set(functionName, {
-              serverId: toolInfo.server || "unknown",
+              serverId:
+                typeof toolInfo.serverId === "string"
+                  ? toolInfo.serverId
+                  : "unknown",
               toolName: toolInfo.name,
             });
 
@@ -518,7 +530,7 @@ export async function executeFunctionCall(
           actualParameters,
           finalContext,
         );
-        return result;
+        return result as ToolResult;
       }
     }
 
@@ -555,8 +567,8 @@ export async function executeFunctionCall(
           actualParameters,
           finalContext,
         );
-        if (result.success) {
-          return result;
+        if ((result as ToolResult).success) {
+          return result as ToolResult;
         }
       } catch {
         mcpLogger.debug(
@@ -584,11 +596,11 @@ export async function executeFunctionCall(
               actualParameters,
               finalContext,
             );
-            if (result.success) {
+            if ((result as ToolResult).success) {
               mcpLogger.debug(
                 `[${functionTag}] Filesystem tool executed successfully with: ${attempt}`,
               );
-              return result;
+              return result as ToolResult;
             }
           } catch {
             // Continue to next attempt
@@ -635,12 +647,12 @@ export async function executeFunctionCall(
     mcpLogger.debug(
       `[${functionTag}] Function call completed: ${functionName}`,
       {
-        success: result.success,
-        hasData: !!result.data,
+        success: (result as ToolResult).success,
+        hasData: !!(result as ToolResult).data,
       },
     );
 
-    return result;
+    return result as ToolResult;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     mcpLogger.error(`[${functionTag}] Function call failed: ${functionName}`, {

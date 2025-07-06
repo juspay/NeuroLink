@@ -107,37 +107,39 @@ export class AIProviderFactory {
       //   });
       // }
 
-      // Resolve dynamic model if available
-      let resolvedModelName = modelName;
-      if (!modelName || modelName === "default") {
-        try {
-          const normalizedProvider = this.normalizeProviderName(providerName);
-          const dynamicModel = dynamicModelProvider.resolveModel(
-            normalizedProvider,
-            modelName || undefined,
-          );
-          if (dynamicModel) {
-            resolvedModelName = dynamicModel.id;
-            logger.debug(`[${functionTag}] Resolved dynamic model`, {
-              provider: normalizedProvider,
-              requestedModel: modelName || "default",
-              resolvedModel: resolvedModelName,
-              displayName: dynamicModel.displayName,
-              pricing: dynamicModel.pricing.input,
-            });
-          }
-        } catch (resolveError) {
-          logger.debug(
-            `[${functionTag}] Dynamic model resolution failed, using fallback`,
-            {
-              error:
-                resolveError instanceof Error
-                  ? resolveError.message
-                  : String(resolveError),
-            },
-          );
-        }
-      }
+      // COMPREHENSIVE FIX: Disable dynamic model resolution completely until provider is fixed
+      // This prevents stale gemini-1.5-pro-latest from overriding correct gemini-2.5-pro defaults
+      const resolvedModelName = modelName;
+      // COMMENTED OUT: Dynamic model resolution causing 1.5 vs 2.5 Pro issues
+      // if (!modelName || modelName === "default") {
+      //   try {
+      //     const normalizedProvider = this.normalizeProviderName(providerName);
+      //     const dynamicModel = dynamicModelProvider.resolveModel(
+      //       normalizedProvider,
+      //       modelName || undefined,
+      //     );
+      //     if (dynamicModel) {
+      //       resolvedModelName = dynamicModel.id;
+      //       logger.debug(`[${functionTag}] Resolved dynamic model`, {
+      //         provider: normalizedProvider,
+      //         requestedModel: modelName || "default",
+      //         resolvedModel: resolvedModelName,
+      //         displayName: dynamicModel.displayName,
+      //         pricing: dynamicModel.pricing.input,
+      //       });
+      //     }
+      //   } catch (resolveError) {
+      //     logger.debug(
+      //       `[${functionTag}] Dynamic model resolution failed, using fallback`,
+      //       {
+      //         error:
+      //           resolveError instanceof Error
+      //             ? resolveError.message
+      //             : String(resolveError),
+      //       },
+      //     );
+      //   }
+      // }
 
       let provider: AIProvider;
 

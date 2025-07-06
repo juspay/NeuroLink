@@ -1,29 +1,32 @@
 /**
  * MCP Tool Registry - Extended Registry with Tool Management
+ * Updated to match industry standard camelCase interfaces
  */
 
 import type {
-  DiscoveredMCP,
+  DiscoveredMcp,
   ExecutionContext,
-} from "./contracts/mcp-contract.js";
+  ToolInfo,
+} from "./contracts/mcpContract.js";
 import type { ToolResult } from "./factory.js";
 import { MCPRegistry } from "./registry.js";
 import { registryLogger } from "./logging.js";
 
-export interface ToolInfo {
-  id: string;
-  name: string;
-  description?: string;
-  inputSchema?: any;
-  outputSchema?: any;
-  serverId: string;
-  source: "manual" | "auto" | "default";
-  isImplemented?: boolean;
-  server?: string; // Alias for serverId for backward compatibility
-}
-
 // Use the compatible ToolResult from factory.ts
 export type ToolExecutionResult = ToolResult;
+
+/**
+ * Tool execution options
+ */
+export interface ToolExecutionOptions {
+  timeout?: number;
+  retries?: number;
+  context?: ExecutionContext;
+  preferredSource?: string;
+  fallbackEnabled?: boolean;
+  validateBeforeExecution?: boolean;
+  timeoutMs?: number;
+}
 
 export class MCPToolRegistry extends MCPRegistry {
   private tools: Map<string, ToolInfo> = new Map();
@@ -33,105 +36,94 @@ export class MCPToolRegistry extends MCPRegistry {
   > = new Map();
 
   /**
-   * Register a server with its tools
+   * Register a server with its tools (updated signature)
    */
-  async registerServer(serverId: string, serverInfo: any): Promise<void> {
+  async registerServer(
+    serverId: string,
+    serverConfig?: unknown,
+    context?: ExecutionContext,
+  ): Promise<void> {
     registryLogger.info(`Registering server: ${serverId}`);
 
+    // Convert to DiscoveredMcp format for compatibility
+    const plugin: DiscoveredMcp = {
+      metadata: {
+        name: serverId,
+        description:
+          typeof serverConfig === "object" && serverConfig
+            ? (serverConfig as any).description || "No description"
+            : "No description",
+      },
+      tools:
+        typeof serverConfig === "object" && serverConfig
+          ? (serverConfig as any).tools
+          : {},
+      configuration:
+        typeof serverConfig === "object" && serverConfig
+          ? (serverConfig as Record<string, string | number | boolean>)
+          : {},
+    };
+
+    // Call the parent register method
+    this.register(plugin);
+
     // Extract tools from server info if available
-    if (serverInfo.tools) {
-      for (const [toolName, toolDef] of Object.entries(serverInfo.tools)) {
-        const toolId = `${serverId}.${toolName}`;
-        this.tools.set(toolId, {
-          id: toolId,
-          name: toolName,
-          description: (toolDef as any).description,
-          inputSchema: (toolDef as any).inputSchema,
-          outputSchema: (toolDef as any).outputSchema,
-          serverId,
-          server: serverId, // Backward compatibility alias
-          source: "manual",
-          isImplemented: true,
-        });
-      }
+    const tools = plugin.tools || {};
+    for (const [toolName, toolDef] of Object.entries(tools)) {
+      const toolId = `${serverId}.${toolName}`;
+      this.tools.set(toolId, {
+        name: toolName,
+        description: (toolDef as any)?.description,
+        inputSchema: (toolDef as any)?.inputSchema,
+        outputSchema: (toolDef as any)?.outputSchema,
+        serverId,
+        category: (toolDef as any)?.category || "general",
+      });
     }
   }
 
   /**
-   * Unregister a server and its tools
+   * Execute a tool with enhanced context
    */
-  async unregisterServer(serverId: string): Promise<void> {
-    registryLogger.info(`Unregistering server: ${serverId}`);
-
-    // Remove all tools for this server
-    for (const [toolId, toolInfo] of this.tools) {
-      if (toolInfo.serverId === serverId) {
-        this.tools.delete(toolId);
-        this.toolExecutionStats.delete(toolId);
-      }
-    }
-  }
-
-  /**
-   * Execute a tool
-   */
-  async executeTool(
+  async executeTool<T = unknown>(
     toolName: string,
-    args: any,
-    context: ExecutionContext,
-  ): Promise<ToolExecutionResult> {
+    args?: unknown,
+    context?: ExecutionContext,
+  ): Promise<T> {
     const startTime = Date.now();
 
     try {
-      const toolInfo = this.getToolInfo(toolName);
-      if (!toolInfo) {
-        throw new Error(`Tool not found: ${toolName}`);
-      }
-
       registryLogger.info(`Executing tool: ${toolName}`);
 
-      // Get the plugin that provides this tool
-      const plugin = this.get(toolInfo.serverId);
-      if (!plugin) {
-        throw new Error(`Plugin not found for tool: ${toolName}`);
-      }
+      // Create execution context if not provided
+      const execContext: ExecutionContext = {
+        sessionId: context?.sessionId || crypto.randomUUID(),
+        userId: context?.userId,
+        ...context,
+      };
 
-      // Execute through the plugin (stub implementation)
+      // Mock execution for now
       const result = {
-        success: true,
-        data: `Tool ${toolInfo.name} executed with args: ${JSON.stringify(args)}`,
-      };
+        result: `Mock execution of ${toolName}`,
+        args,
+        context: execContext,
+      } as T;
 
-      const executionTime = Date.now() - startTime;
-      this.updateStats(toolName, executionTime);
+      // Update statistics
+      const duration = Date.now() - startTime;
+      this.updateStats(toolName, duration);
 
-      return {
-        success: true,
-        data: result,
-        metadata: {
-          toolName,
-          executionTime,
-          timestamp: Date.now(),
-        },
-      };
+      return result;
     } catch (error) {
       registryLogger.error(`Tool execution failed: ${toolName}`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-        metadata: {
-          toolName,
-          executionTime: Date.now() - startTime,
-          timestamp: Date.now(),
-        },
-      };
+      throw error;
     }
   }
 
   /**
-   * List all available tools
+   * List all available tools (updated signature)
    */
-  async listTools(): Promise<ToolInfo[]> {
+  async listTools(context?: ExecutionContext): Promise<ToolInfo[]> {
     return Array.from(this.tools.values());
   }
 
@@ -150,70 +142,114 @@ export class MCPToolRegistry extends MCPRegistry {
       count: 0,
       totalTime: 0,
     };
-    stats.count++;
+
+    stats.count += 1;
     stats.totalTime += executionTime;
+
     this.toolExecutionStats.set(toolName, stats);
   }
 
   /**
-   * Get tool execution statistics
+   * Get execution statistics
    */
-  getToolStats(toolName?: string): any {
-    if (toolName) {
-      const stats = this.toolExecutionStats.get(toolName);
-      return stats
-        ? {
-            ...stats,
-            averageTime: stats.totalTime / stats.count,
-          }
-        : null;
-    }
+  getExecutionStats(): Record<
+    string,
+    { count: number; averageTime: number; totalTime: number }
+  > {
+    const result: Record<
+      string,
+      { count: number; averageTime: number; totalTime: number }
+    > = {};
 
-    // Return all stats
-    const allStats: any = {};
-    for (const [tool, stats] of this.toolExecutionStats) {
-      allStats[tool] = {
-        ...stats,
+    for (const [toolName, stats] of this.toolExecutionStats.entries()) {
+      result[toolName] = {
+        count: stats.count,
+        totalTime: stats.totalTime,
         averageTime: stats.totalTime / stats.count,
       };
     }
-    return allStats;
+
+    return result;
   }
 
   /**
-   * Get tool execution statistics
+   * Clear execution statistics
    */
-  async getStats(): Promise<any> {
-    const tools = await this.listTools();
-    return {
-      totalTools: tools.length,
-      totalExecutions: Array.from(this.toolExecutionStats.values()).reduce(
-        (acc, stats) => acc + stats.count,
-        0,
-      ),
-    };
-  }
-
-  /**
-   * Clear all tools and stats
-   */
-  clear(): void {
-    super.clear();
-    this.tools.clear();
+  clearStats(): void {
     this.toolExecutionStats.clear();
   }
+
+  /**
+   * Get tools by category
+   */
+  getToolsByCategory(category: string): ToolInfo[] {
+    return Array.from(this.tools.values()).filter(
+      (tool) => tool.category === category,
+    );
+  }
+
+  /**
+   * Check if tool exists
+   */
+  hasTool(toolName: string): boolean {
+    return this.tools.has(toolName);
+  }
+
+  /**
+   * Remove a tool
+   */
+  removeTool(toolName: string): boolean {
+    const removed = this.tools.delete(toolName);
+    if (removed) {
+      this.toolExecutionStats.delete(toolName);
+      registryLogger.info(`Removed tool: ${toolName}`);
+    }
+    return removed;
+  }
+
+  /**
+   * Get tool count
+   */
+  getToolCount(): number {
+    return this.tools.size;
+  }
+
+  /**
+   * Get statistics (alias for getExecutionStats)
+   */
+  getStats(): Record<
+    string,
+    { count: number; averageTime: number; totalTime: number }
+  > {
+    return this.getExecutionStats();
+  }
+
+  /**
+   * Unregister a server
+   */
+  unregisterServer(serverId: string): boolean {
+    // Remove all tools for this server
+    const removedTools: string[] = [];
+    for (const [toolId, tool] of this.tools.entries()) {
+      if (tool.serverId === serverId) {
+        this.tools.delete(toolId);
+        removedTools.push(toolId);
+      }
+    }
+
+    // Remove from parent registry
+    const removed = this.unregister(serverId);
+
+    registryLogger.info(
+      `Unregistered server ${serverId}, removed ${removedTools.length} tools`,
+    );
+    return removed;
+  }
 }
 
-// Export singleton instance
+// Create default instance
 export const toolRegistry = new MCPToolRegistry();
-
-// Additional exports for backward compatibility
 export const defaultToolRegistry = toolRegistry;
 
-// Export tool execution options type
-export interface ToolExecutionOptions {
-  preferredSource?: string;
-  fallbackEnabled?: boolean;
-  validateBeforeExecution?: boolean;
-  timeoutMs?: number;
-}
+// Export ToolInfo for other modules
+export type { ToolInfo } from "./contracts/mcpContract.js";

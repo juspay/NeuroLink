@@ -61,7 +61,7 @@ export const VERSION = "1.0.0";
  *
  * @example
  * ```typescript
- * import { createAIProvider } from 'neurolink';
+ * import { createAIProvider } from '@juspay/neurolink';
  *
  * const provider = await createAIProvider('bedrock');
  * const result = await provider.streamText('Hello, AI!');
@@ -82,7 +82,7 @@ export async function createAIProvider(
  *
  * @example
  * ```typescript
- * import { createAIProviderWithFallback } from 'neurolink';
+ * import { createAIProviderWithFallback } from '@juspay/neurolink';
  *
  * const { primary, fallback } = await createAIProviderWithFallback('bedrock', 'vertex');
  * ```
@@ -104,7 +104,7 @@ export async function createAIProviderWithFallback(
  *
  * @example
  * ```typescript
- * import { createBestAIProvider } from 'neurolink';
+ * import { createBestAIProvider } from '@juspay/neurolink';
  *
  * const provider = await createBestAIProvider();
  * ```
@@ -131,7 +131,7 @@ export async function createBestAIProvider(
  *
  * @example
  * ```typescript
- * import { mcpEcosystem, readFile, writeFile } from 'neurolink';
+ * import { mcpEcosystem, readFile, writeFile } from '@juspay/neurolink';
  *
  * // Initialize the ecosystem
  * await mcpEcosystem.initialize();
@@ -180,3 +180,31 @@ export type {
   DiscoveredMCP,
   LogLevel,
 } from "./mcp/index.js";
+
+// ============================================================================
+// REAL-TIME SERVICES & TELEMETRY - Enterprise Platform Features
+// ============================================================================
+
+// Real-time Services (Phase 1) - Basic SSE functionality only
+// export { createEnhancedChatService } from './chat/index.js';
+// export type * from './services/types.js';
+
+// Optional Telemetry (Phase 2) - Conditional export based on feature flag
+export async function initializeTelemetry(): Promise<boolean> {
+  if (process.env.NEUROLINK_TELEMETRY_ENABLED === "true") {
+    const { initializeTelemetry: init } = await import("./telemetry/index.js");
+    const result = await init();
+    return !!result; // Convert TelemetryService to boolean
+  }
+  return Promise.resolve(false);
+}
+
+export function getTelemetryStatus(): {
+  enabled: boolean;
+  initialized: boolean;
+} {
+  if (process.env.NEUROLINK_TELEMETRY_ENABLED === "true") {
+    return { enabled: true, initialized: false };
+  }
+  return { enabled: false, initialized: false };
+}

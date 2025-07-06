@@ -7,6 +7,7 @@ import { HuggingFace } from "../lib/providers/huggingFace.js";
 import { Ollama } from "../lib/providers/ollama.js";
 import { MistralAI } from "../lib/providers/mistralAI.js";
 import { AIProviderFactory } from "../lib/core/factory.js";
+import type { AIProvider } from "../lib/core/types.js";
 
 // Mock environment setup
 beforeAll(() => {
@@ -20,7 +21,7 @@ beforeAll(() => {
   process.env.GOOGLE_VERTEX_PROJECT = "test-vertex-project";
   process.env.GOOGLE_VERTEX_LOCATION = "us-central1";
   process.env.GOOGLE_AI_API_KEY = "test-google-ai-key";
-  process.env.GOOGLE_AI_MODEL = "gemini-1.5-pro-latest";
+  process.env.GOOGLE_AI_MODEL = "gemini-2.5-pro";
   process.env.HUGGINGFACE_API_KEY = "test-hf-key";
   process.env.HUGGINGFACE_MODEL = "microsoft/DialoGPT-medium";
   process.env.OLLAMA_BASE_URL = "http://localhost:11434";
@@ -130,23 +131,23 @@ describe("NeuroLink AI Providers", () => {
 
   describe("Google AI Studio Provider", () => {
     it("should create Google AI Studio provider successfully", () => {
-      const provider = new GoogleAIStudio("gemini-1.5-pro-latest");
+      const provider = new GoogleAIStudio("gemini-2.5-pro");
 
       expect(provider).toBeDefined();
       expect(provider.constructor.name).toBe("GoogleAIStudio");
     });
 
     it("should be an AI provider", () => {
-      const provider = new GoogleAIStudio("gemini-1.5-pro-latest");
+      const provider = new GoogleAIStudio("gemini-2.5-pro");
 
       expect(provider).toBeDefined();
       expect(typeof (provider as any).generateText).toBe("function");
     });
 
     it("should support different Gemini models", () => {
-      const proProvider = new GoogleAIStudio("gemini-1.5-pro-latest");
-      const flashProvider = new GoogleAIStudio("gemini-1.5-flash-latest");
-      const expProvider = new GoogleAIStudio("gemini-2.0-flash-exp");
+      const proProvider = new GoogleAIStudio("gemini-2.5-pro");
+      const flashProvider = new GoogleAIStudio("gemini-2.5-flash");
+      const expProvider = new GoogleAIStudio("gemini-2.5-flash-lite");
 
       expect(proProvider).toBeDefined();
       expect(flashProvider).toBeDefined();
@@ -331,6 +332,98 @@ describe("NeuroLink AI Providers", () => {
       expect(() => {
         AIProviderFactory.createProvider("unknown");
       }).toThrow("Unknown provider: unknown");
+    });
+  });
+
+  // Phase 1.1: CLI-SDK Consistency - Method Alias Tests
+  describe("SDK Method Aliases (Phase 1.1)", () => {
+    const testProviders = [
+      "openai",
+      "bedrock",
+      "vertex",
+      "google-ai",
+      "huggingface",
+      "ollama",
+      "mistral-ai",
+    ];
+
+    testProviders.forEach((providerName) => {
+      describe(`${providerName} method aliases`, () => {
+        let provider: any;
+
+        beforeEach(async () => {
+          provider = AIProviderFactory.createProvider(providerName);
+          // Handle async providers
+          if (provider && typeof provider.then === "function") {
+            provider = await provider;
+          }
+        });
+
+        it("should have generate() method", () => {
+          expect(typeof provider.generate).toBe("function");
+        });
+
+        it("should have gen() method", () => {
+          expect(typeof provider.gen).toBe("function");
+        });
+
+        it("should have generateText() method (original)", () => {
+          expect(typeof provider.generateText).toBe("function");
+        });
+
+        it("generate() should be an alias for generateText()", () => {
+          // Both methods should be functions
+          expect(typeof provider.generate).toBe("function");
+          expect(typeof provider.generateText).toBe("function");
+
+          // They should have the same function signature length
+          expect(provider.generate.length).toBe(provider.generateText.length);
+        });
+
+        it("gen() should be an alias for generateText()", () => {
+          // Both methods should be functions
+          expect(typeof provider.gen).toBe("function");
+          expect(typeof provider.generateText).toBe("function");
+
+          // They should have the same function signature length
+          expect(provider.gen.length).toBe(provider.generateText.length);
+        });
+      });
+    });
+
+    it("should ensure all providers implement method aliases", () => {
+      const providers = [
+        new OpenAI(),
+        new AmazonBedrock(),
+        new GoogleVertexAI(),
+        new GoogleAIStudio(),
+        new HuggingFace(),
+        new Ollama(),
+        new MistralAI(),
+      ];
+
+      providers.forEach((provider) => {
+        expect(typeof provider.generateText).toBe("function");
+        expect(typeof provider.generate).toBe("function");
+        expect(typeof provider.gen).toBe("function");
+      });
+    });
+
+    it("should maintain backward compatibility", async () => {
+      let provider: AIProvider | Promise<AIProvider> =
+        AIProviderFactory.createBestProvider();
+
+      // Handle async providers
+      if (provider && typeof (provider as any).then === "function") {
+        provider = await (provider as Promise<AIProvider>);
+      }
+
+      // Original method must still exist
+      expect(typeof (provider as any).generateText).toBe("function");
+
+      // New aliases must exist
+      expect(typeof (provider as any).generate).toBe("function");
+      expect(typeof (provider as any).gen).toBe("function");
     });
   });
 });

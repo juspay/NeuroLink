@@ -1,5 +1,109 @@
 # NeuroLink System Patterns
 
+## ✅ **Enterprise Configuration Architecture** (2025-01-07) - PRODUCTION READY
+
+### **Automatic Backup Pattern**
+```typescript
+// Every config change creates timestamped backups
+const configManager = new ConfigManager();
+await configManager.updateConfig(newConfig);
+// ✅ Backup created: .neurolink.backups/neurolink-config-2025-01-07T10-30-00.js
+```
+
+### **Factory-First MCP Pattern**
+```typescript
+// Lighthouse-compatible MCP architecture
+src/lib/mcp/
+├── factory.ts                  # createMCPServer() - Lighthouse compatible
+├── context-manager.ts          # Rich context (15+ fields) + tool chain tracking
+├── registry.ts                 # Tool discovery, registration, execution + statistics
+├── orchestrator.ts             # Single tools + sequential pipelines + error handling
+└── contracts/mcpContract.ts    # Industry-standard interfaces
+```
+
+### **Optional Interface Methods Pattern**
+```typescript
+// Maximum flexibility with optional methods
+interface McpRegistry {
+  registerServer?(serverId: string, config?: unknown, context?: ExecutionContext): Promise<void>;
+  executeTool?<T>(toolName: string, args?: unknown, context?: ExecutionContext): Promise<T>;
+  listTools?(context?: ExecutionContext): Promise<ToolInfo[]>;
+}
+```
+
+### **Rich Context Flow Pattern**
+```typescript
+// Context flows through all MCP operations
+interface ExecutionContext {
+  sessionId?: string;
+  userId?: string;
+  aiProvider?: string;
+  permissions?: string[];
+  cacheOptions?: CacheOptions;
+  fallbackOptions?: FallbackOptions;
+  metadata?: Record<string, unknown>;
+}
+```
+
+### **Error Recovery Pattern**
+```typescript
+// Automatic restore on config failures
+try {
+  await configManager.updateConfig(newConfig);
+} catch (error) {
+  // ✅ Auto-restore from backup triggered
+  logger.info('Config restored from backup due to update failure');
+}
+```
+
+## ✅ **Enhancement Integration Architecture** (2025-01-03) - PRODUCTION READY
+
+### **CLI Enhancement Pattern**
+```bash
+# Enhanced CLI with analytics/evaluation display
+node cli.js generate-text "prompt" --enable-analytics --enable-evaluation --debug
+
+# Displays:
+# 📊 Analytics: {provider, tokens, responseTime, context}
+# ⭐ Response Evaluation: {relevance, accuracy, completeness, overall}
+```
+
+### **SDK Enhancement Pattern**
+```typescript
+// Enhanced SDK response structure
+const result = await neurolink.generateText({
+  prompt: "test",
+  enableAnalytics: true,
+  enableEvaluation: true,
+  context: {project: "demo"}
+});
+
+// Returns: {content, analytics, evaluation, ...existing fields}
+```
+
+### **Provider Reliability Pattern**
+```typescript
+// Google AI Model Configuration (CRITICAL)
+GOOGLE_AI_MODEL=gemini-2.5-pro  // ✅ Working
+// NOT: gemini-2.5-pro-preview-05-06  // ❌ Deprecated
+
+// Token Counting Validation
+usage: {promptTokens: 358, completionTokens: 48, totalTokens: 406}  // ✅ Real values
+// NOT: {promptTokens: 365, completionTokens: NaN, totalTokens: NaN}  // ❌ Invalid
+```
+
+### **Diagnostic Debugging Pattern**
+```typescript
+// CLI Diagnostic Logging (Added)
+if (argv.debug) {
+  console.log("🔍 DEBUG: Result object keys:", Object.keys(result));
+  console.log("🔍 DEBUG: Has analytics:", !!result.analytics);
+  console.log("🔍 DEBUG: Has evaluation:", !!result.evaluation);
+}
+```
+
+---
+
 ## 🔧 **Parameter Passing Patterns** (July 1, 2025)
 
 ### **CLI Parameter Flow Pattern**
@@ -30,7 +134,7 @@ const provider = createBestProvider(providerName, options.model, true);
 ```typescript
 // Type Safety Patterns
 - String undefined type errors → Proper null checks and type assertions
-- Async method signatures → Fixed Promise return types and async/await patterns  
+- Async method signatures → Fixed Promise return types and async/await patterns
 - Interface compliance → Complete NeuroLinkExecutionContext objects with all required properties
 - Method parameter alignment → Corrected method calls to match expected signatures
 - Smart type guards → Implemented proper filtering to eliminate undefined values

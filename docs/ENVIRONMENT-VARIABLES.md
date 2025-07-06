@@ -25,6 +25,202 @@ export AWS_ACCESS_KEY_ID="your-key"
 npx @juspay/neurolink status
 ```
 
+## 🏗️ Enterprise Configuration Management
+
+### **✨ NEW: Automatic Backup System**
+
+```bash
+# Configure backup settings
+NEUROLINK_BACKUP_ENABLED=true              # Enable automatic backups (default: true)
+NEUROLINK_BACKUP_RETENTION=30              # Days to keep backups (default: 30)
+NEUROLINK_BACKUP_DIRECTORY=.neurolink.backups  # Backup directory (default: .neurolink.backups)
+
+# Config validation settings
+NEUROLINK_VALIDATION_STRICT=false          # Strict validation mode (default: false)
+NEUROLINK_VALIDATION_WARNINGS=true         # Show validation warnings (default: true)
+
+# Provider status monitoring
+NEUROLINK_PROVIDER_STATUS_CHECK=true       # Monitor provider availability (default: true)
+NEUROLINK_PROVIDER_TIMEOUT=30000           # Provider timeout in ms (default: 30000)
+```
+
+### **Interface Configuration**
+
+```bash
+# MCP Registry settings
+NEUROLINK_REGISTRY_CACHE_TTL=300           # Cache TTL in seconds (default: 300)
+NEUROLINK_REGISTRY_AUTO_DISCOVERY=true     # Auto-discover MCP servers (default: true)
+NEUROLINK_REGISTRY_STATS_ENABLED=true      # Enable registry statistics (default: true)
+
+# Execution context settings
+NEUROLINK_DEFAULT_TIMEOUT=30000            # Default execution timeout (default: 30000)
+NEUROLINK_DEFAULT_RETRIES=3                # Default retry count (default: 3)
+NEUROLINK_CONTEXT_LOGGING=info             # Context logging level (default: info)
+```
+
+### **Performance & Optimization**
+
+```bash
+# Tool execution settings
+NEUROLINK_TOOL_EXECUTION_TIMEOUT=1000      # Tool execution timeout in ms (default: 1000)
+NEUROLINK_PIPELINE_TIMEOUT=22000           # Pipeline execution timeout (default: 22000)
+NEUROLINK_CACHE_ENABLED=true               # Enable execution caching (default: true)
+
+# Error handling
+NEUROLINK_AUTO_RESTORE_ENABLED=true        # Enable auto-restore on config failures (default: true)
+NEUROLINK_ERROR_RECOVERY_ATTEMPTS=3        # Error recovery attempts (default: 3)
+NEUROLINK_GRACEFUL_DEGRADATION=true        # Enable graceful degradation (default: true)
+```
+
+## 🆕 AI Enhancement Features
+
+### Basic Enhancement Configuration
+
+```bash
+# AI response quality evaluation model (optional)
+NEUROLINK_EVALUATION_MODEL="gemini-2.5-flash"
+```
+
+**Description**: Configures the AI model used for response quality evaluation when `--enable-evaluation` flag is used. Uses Google AI's fast Gemini 2.5 Flash model for quick quality assessment.
+
+**Supported Models**:
+
+- `gemini-2.5-flash` (default) - Fast evaluation processing
+- `gemini-2.5-pro` - More detailed evaluation (slower)
+
+**Usage**:
+
+```bash
+# Enable evaluation with default model
+npx @juspay/neurolink generate "prompt" --enable-evaluation
+
+# Enable both analytics and evaluation
+npx @juspay/neurolink generate "prompt" --enable-analytics --enable-evaluation
+```
+
+## 🌐 Universal Evaluation System (Advanced)
+
+### Primary Configuration
+
+```bash
+# Primary evaluation provider
+NEUROLINK_EVALUATION_PROVIDER="google-ai"        # Default: google-ai
+
+# Evaluation performance mode
+NEUROLINK_EVALUATION_MODE="fast"                 # Options: fast, balanced, quality
+```
+
+**NEUROLINK_EVALUATION_PROVIDER**: Primary AI provider for evaluation
+
+- **Options**: `google-ai`, `openai`, `anthropic`, `vertex`, `bedrock`, `azure`, `ollama`, `huggingface`, `mistral`
+- **Default**: `google-ai`
+- **Usage**: Determines which AI provider performs the quality evaluation
+
+**NEUROLINK_EVALUATION_MODE**: Performance vs quality trade-off
+
+- **Options**: `fast` (cost-effective), `balanced` (optimal), `quality` (highest accuracy)
+- **Default**: `fast`
+- **Usage**: Selects appropriate model for the provider (e.g., gemini-2.5-flash vs gemini-2.5-pro)
+
+### Fallback Configuration
+
+```bash
+# Enable automatic fallback when primary provider fails
+NEUROLINK_EVALUATION_FALLBACK_ENABLED="true"     # Default: true
+
+# Fallback provider order (comma-separated)
+NEUROLINK_EVALUATION_FALLBACK_PROVIDERS="openai,anthropic,vertex,bedrock"
+```
+
+**NEUROLINK_EVALUATION_FALLBACK_ENABLED**: Enable intelligent fallback system
+
+- **Options**: `true`, `false`
+- **Default**: `true`
+- **Usage**: When enabled, automatically tries backup providers if primary fails
+
+**NEUROLINK_EVALUATION_FALLBACK_PROVIDERS**: Backup provider order
+
+- **Format**: Comma-separated provider names
+- **Default**: `openai,anthropic,vertex,bedrock`
+- **Usage**: Defines the order of providers to try if primary fails
+
+### Performance Tuning
+
+```bash
+# Evaluation timeout (milliseconds)
+NEUROLINK_EVALUATION_TIMEOUT="10000"             # Default: 10000 (10 seconds)
+
+# Maximum tokens for evaluation response
+NEUROLINK_EVALUATION_MAX_TOKENS="500"            # Default: 500
+
+# Temperature for consistent evaluation
+NEUROLINK_EVALUATION_TEMPERATURE="0.1"           # Default: 0.1 (low for consistency)
+
+# Retry attempts for failed evaluations
+NEUROLINK_EVALUATION_RETRY_ATTEMPTS="2"          # Default: 2
+```
+
+**Performance Variables**:
+
+- **TIMEOUT**: Maximum time to wait for evaluation (prevents hanging)
+- **MAX_TOKENS**: Limits evaluation response length (controls cost)
+- **TEMPERATURE**: Lower values = more consistent scoring
+- **RETRY_ATTEMPTS**: Number of retry attempts for transient failures
+
+### Cost Optimization
+
+```bash
+# Prefer cost-effective models and providers
+NEUROLINK_EVALUATION_PREFER_CHEAP="true"         # Default: true
+
+# Maximum cost per evaluation (USD)
+NEUROLINK_EVALUATION_MAX_COST_PER_EVAL="0.01"    # Default: $0.01
+```
+
+**NEUROLINK_EVALUATION_PREFER_CHEAP**: Cost optimization preference
+
+- **Options**: `true`, `false`
+- **Default**: `true`
+- **Usage**: When enabled, prioritizes cheaper providers and models
+
+**NEUROLINK_EVALUATION_MAX_COST_PER_EVAL**: Cost limit per evaluation
+
+- **Format**: Decimal number (USD)
+- **Default**: `0.01` ($0.01)
+- **Usage**: Prevents expensive evaluations, switches to cheaper providers if needed
+
+### Complete Universal Evaluation Example
+
+```bash
+# Comprehensive evaluation configuration
+NEUROLINK_EVALUATION_PROVIDER="google-ai"
+NEUROLINK_EVALUATION_MODEL="gemini-2.5-flash"
+NEUROLINK_EVALUATION_MODE="balanced"
+NEUROLINK_EVALUATION_FALLBACK_ENABLED="true"
+NEUROLINK_EVALUATION_FALLBACK_PROVIDERS="openai,anthropic,vertex"
+NEUROLINK_EVALUATION_TIMEOUT="15000"
+NEUROLINK_EVALUATION_MAX_TOKENS="750"
+NEUROLINK_EVALUATION_TEMPERATURE="0.2"
+NEUROLINK_EVALUATION_PREFER_CHEAP="false"
+NEUROLINK_EVALUATION_MAX_COST_PER_EVAL="0.05"
+NEUROLINK_EVALUATION_RETRY_ATTEMPTS="3"
+```
+
+### Testing Universal Evaluation
+
+```bash
+# Test primary provider
+npx @juspay/neurolink generate "What is AI?" --enable-evaluation --debug
+
+# Test with custom domain
+npx @juspay/neurolink generate "Fix this Python code" --enable-evaluation --evaluation-domain "Python expert"
+
+# Test Lighthouse-style evaluation
+npx @juspay/neurolink generate "Business analysis" --lighthouse-style --evaluation-domain "Business consultant"
+```
+
+---
+
 ## 🏢 Enterprise Proxy Configuration
 
 ### Proxy Environment Variables
@@ -175,7 +371,7 @@ GOOGLE_VERTEX_LOCATION="us-central1"
 #### Optional Variables
 
 ```bash
-VERTEX_MODEL="gemini-1.5-pro"           # Default: gemini-1.5-pro
+VERTEX_MODEL="gemini-2.5-pro"           # Default: gemini-2.5-pro
 ```
 
 #### How to Set Up Google Vertex AI
@@ -191,9 +387,8 @@ VERTEX_MODEL="gemini-1.5-pro"           # Default: gemini-1.5-pro
 
 #### Supported Models
 
-- `gemini-1.5-pro` (default) - Most capable model
-- `gemini-1.5-flash` - Faster responses
-- `gemini-1.0-pro` - Legacy option
+- `gemini-2.5-pro` (default) - Most capable model
+- `gemini-2.5-flash` - Faster responses
 - `claude-3-5-sonnet@20241022` - Claude via Vertex AI
 
 ---
@@ -241,7 +436,7 @@ GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
 #### Optional Variables
 
 ```bash
-GOOGLE_AI_MODEL="gemini-1.5-pro-latest"     # Default model
+GOOGLE_AI_MODEL="gemini-2.5-pro-"     # Default model
 ```
 
 #### How to Get Google AI Studio API Key
@@ -255,10 +450,8 @@ GOOGLE_AI_MODEL="gemini-1.5-pro-latest"     # Default model
 
 #### Supported Models
 
-- `gemini-1.5-pro-latest` (default) - Latest Gemini Pro
-- `gemini-2.0-flash-exp` - Experimental model with enhanced capabilities
-- `gemini-1.5-flash-latest` - Fast, efficient responses
-- `gemini-1.0-pro` - Legacy stable option
+- `gemini-2.5-pro` (default) - Latest Gemini Pro
+- `gemini-2.0-flash` - Fast, efficient responses
 
 ---
 
@@ -431,14 +624,14 @@ BEDROCK_MODEL="arn:aws:bedrock:us-east-1:123456789:inference-profile/us.anthropi
 GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 GOOGLE_VERTEX_PROJECT="your-gcp-project"
 GOOGLE_VERTEX_LOCATION="us-central1"
-VERTEX_MODEL="gemini-1.5-pro"
+VERTEX_MODEL="gemini-2.5-pro"
 
 # Anthropic Configuration
 ANTHROPIC_API_KEY="sk-ant-api03-your-key"
 
 # Google AI Studio Configuration
 GOOGLE_AI_API_KEY="AIza-your-google-ai-key"
-GOOGLE_AI_MODEL="gemini-1.5-pro-latest"
+GOOGLE_AI_MODEL="gemini-2.5-pro"
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY="your-azure-key"

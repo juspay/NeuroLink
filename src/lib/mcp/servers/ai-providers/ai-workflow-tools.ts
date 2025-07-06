@@ -12,6 +12,7 @@ import type {
 import { AIProviderFactory } from "../../../core/factory.js";
 import type { AIProvider } from "../../../core/types.js";
 import { getBestProviderSync as getBestProvider } from "../../../utils/providerUtils.js";
+import { DEFAULT_MAX_TOKENS } from "../../../core/constants.js";
 
 // Tool-specific schemas with comprehensive validation
 const generateTestCasesSchema = z.object({
@@ -216,7 +217,7 @@ Generate 3-5 comprehensive test cases covering the requested types.`;
 
       const result = await provider.generateText({
         prompt,
-        maxTokens: 1200,
+        maxTokens: Math.floor(DEFAULT_MAX_TOKENS * 1.2),
         temperature: 0.3, // Lower temperature for more consistent structured output
       });
 
@@ -343,7 +344,7 @@ Focus on real, actionable improvements based on the specified objectives.`;
 
       const result = await provider.generateText({
         prompt,
-        maxTokens: 1000,
+        maxTokens: DEFAULT_MAX_TOKENS,
         temperature: 0.2, // Very low temperature for consistent refactoring
       });
 
@@ -472,7 +473,7 @@ Focus on creating accurate, useful documentation that explains the code's purpos
 
       const result = await provider.generateText({
         prompt,
-        maxTokens: 1200,
+        maxTokens: Math.floor(DEFAULT_MAX_TOKENS * 1.2),
         temperature: 0.3, // Moderate temperature for creative but structured documentation
       });
 
@@ -622,7 +623,7 @@ Provide thorough, actionable analysis focused on improving AI output quality.`;
 
       const result = await provider.generateText({
         prompt,
-        maxTokens: 1000,
+        maxTokens: DEFAULT_MAX_TOKENS,
         temperature: 0.4, // Moderate temperature for analytical thinking
       });
 

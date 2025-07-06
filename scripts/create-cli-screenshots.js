@@ -129,7 +129,7 @@ Options:
 
 Examples:
   neurolink generate-text "Hello, AI!" --provider google-ai
-  neurolink generate-text "Write a story" --provider google-ai --model gemini-1.5-pro-latest
+  neurolink generate-text "Write a story" --provider google-ai --model gemini-2.5-pro-latest
   neurolink generate-text "Explain quantum computing" --provider google-ai --temperature 0.7
 
 🤖 Google AI Studio: Simple API key setup, generous free tier, latest Gemini models`,

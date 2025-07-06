@@ -62,7 +62,10 @@ export function agentGenerateCommand(cli: any) {
           }
           if (result.toolResults && result.toolResults.length > 0) {
             console.log(chalk.blue("\nTool Results:"));
-            for (const toolResult of result.toolResults as any) {
+            for (const toolResult of result.toolResults as Array<{
+              toolName: string;
+              result: any;
+            }>) {
               console.log(`- ${toolResult.toolName}`);
               console.log(`  Result: ${JSON.stringify(toolResult.result)}`);
             }

@@ -7,6 +7,7 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
 } from "../core/types.js";
 import type { StreamTextResult, ToolSet, Schema, GenerateTextResult } from "ai";
 import type { ZodType, ZodTypeDef } from "zod";
@@ -266,6 +267,26 @@ Please provide a response based on this information.`;
       await removeMCPManager(this.sessionId);
       this.mcpInitialized = false;
     }
+  }
+
+  /**
+   * Alias for generateText() - CLI-SDK consistency
+   */
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
+  }
+
+  /**
+   * Short alias for generateText() - CLI-SDK consistency
+   */
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
   }
 }
 

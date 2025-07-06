@@ -30,6 +30,12 @@ class MCPLogger {
   }
 
   private shouldLog(level: LogLevel): boolean {
+    // CRITICAL: Respect CLI debug flag - hide all logs except errors unless debugging
+    const isDebugMode = process.argv.includes("--debug");
+    if (!isDebugMode && level !== "error") {
+      return false;
+    }
+
     const levels = ["debug", "info", "warn", "error"];
     return levels.indexOf(level) >= levels.indexOf(this.logLevel);
   }

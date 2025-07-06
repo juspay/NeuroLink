@@ -29,6 +29,303 @@ node dist/cli/index.js generate-text "What time is it?" --debug
 
 **If still having issues**:
 
+---
+
+## 🏗️ **Configuration Management Issues** (NEW v3.0)
+
+### **Config Update Failures**
+
+**Symptoms**: Config updates fail with validation errors or backup issues
+
+**Solutions**:
+
+```bash
+# Check config validation
+npx @juspay/neurolink config validate
+
+# Check backup system
+ls -la .neurolink.backups/
+
+# Manual backup creation
+npx @juspay/neurolink config backup --reason "manual-backup"
+
+# Restore from backup
+npx @juspay/neurolink config restore --backup latest
+```
+
+### **Backup System Issues**
+
+**Symptoms**: Backups not created or corrupted
+
+**Solutions**:
+
+```bash
+# Verify backup directory permissions
+ls -la .neurolink.backups/
+
+# Check backup integrity
+npx @juspay/neurolink config verify-backups
+
+# Cleanup corrupted backups
+npx @juspay/neurolink config cleanup --verify
+
+# Reset backup system
+rm -rf .neurolink.backups/
+mkdir .neurolink.backups/
+```
+
+### **Provider Configuration Issues**
+
+**Symptoms**: Providers not loading or failing validation
+
+**Solutions**:
+
+```bash
+# Test individual provider
+npx @juspay/neurolink test-provider google
+
+# Check provider status
+npx @juspay/neurolink status
+
+# Reset provider configuration
+npx @juspay/neurolink config reset-provider google
+
+# Validate environment variables
+npx @juspay/neurolink env check
+```
+
+---
+
+## 🔧 **TypeScript Compilation Issues** (NEW v3.0)
+
+### **Build Failures**
+
+**Symptoms**: `pnpm run build:cli` fails with TypeScript errors
+
+**Common Errors & Solutions**:
+
+```typescript
+// ERROR: Argument of type 'unknown' is not assignable to parameter of type 'string'
+// SOLUTION: Use type casting
+const value = String(unknownValue || "default");
+
+// ERROR: Property 'success' does not exist on type 'unknown'
+// SOLUTION: Cast to expected type
+const result = response as ToolResult;
+if (result.success) {
+  /* ... */
+}
+
+// ERROR: Interface compatibility issues
+// SOLUTION: Use optional methods
+if (registry.executeTool) {
+  const result = await registry.executeTool("tool", args, context);
+}
+```
+
+**Build Validation**:
+
+```bash
+# Check TypeScript compilation
+npx tsc --noEmit --project tsconfig.cli.json
+
+# Full CLI build
+pnpm run build:cli
+
+# Check for type errors
+npx tsc --listFiles --project tsconfig.cli.json
+```
+
+### **Interface Compatibility Issues**
+
+**Symptoms**: Type errors when using new interfaces
+
+**Solutions**:
+
+```typescript
+// Use optional chaining for new methods
+registry.registerServer?.("server", config, context);
+
+// Type casting for unknown returns
+const result = (await registry.executeTool("tool", args)) as ToolResult;
+
+// Handle both legacy and new interfaces
+if ("registerServer" in registry) {
+  await registry.registerServer("server", config, context);
+} else {
+  registry.register_server("server", config);
+}
+```
+
+---
+
+## ⚡ **Performance Issues** (NEW v3.0)
+
+### **Slow Tool Execution**
+
+**Symptoms**: Tool execution taking longer than expected (>1ms target)
+
+**Solutions**:
+
+```bash
+# Enable performance monitoring
+NEUROLINK_PERFORMANCE_MONITORING=true
+
+# Check execution statistics
+npx @juspay/neurolink stats
+
+# Optimize cache settings
+NEUROLINK_CACHE_ENABLED=true
+NEUROLINK_CACHE_TTL=300
+
+# Reduce timeout for faster failures
+NEUROLINK_DEFAULT_TIMEOUT=10000
+```
+
+### **Pipeline Performance**
+
+**Symptoms**: Sequential pipeline execution slower than ~22ms target
+
+**Solutions**:
+
+```typescript
+// Use parallel execution where possible
+const results = await Promise.all([
+  registry.executeTool("tool1", args1, context),
+  registry.executeTool("tool2", args2, context),
+]);
+
+// Enable caching for repeated operations
+const context: ExecutionContext = {
+  cacheOptions: {
+    enabled: true,
+    ttl: 300,
+    key: "operation-cache",
+  },
+};
+
+// Use fallback options for reliability
+const context: ExecutionContext = {
+  fallbackOptions: {
+    enabled: true,
+    maxRetries: 2,
+    providers: ["openai", "anthropic"],
+  },
+};
+```
+
+---
+
+## 🔄 **Interface Migration Issues** (NEW v3.0)
+
+### **Property Name Errors**
+
+**Symptoms**: `Property 'session_id' does not exist` type errors
+
+**Solutions**:
+
+```typescript
+// OLD (snake_case) - causes errors
+const context = {
+  session_id: "session123",
+  user_id: "user456",
+  ai_provider: "google",
+};
+
+// NEW (camelCase) - correct
+const context: ExecutionContext = {
+  sessionId: "session123",
+  userId: "user456",
+  aiProvider: "google",
+};
+```
+
+### **Method Call Issues**
+
+**Symptoms**: `Cannot call undefined method` runtime errors
+
+**Solutions**:
+
+```typescript
+// WRONG: Direct call may fail
+registry.executeTool("tool", args);
+
+// CORRECT: Use optional chaining
+registry.executeTool?.("tool", args, context);
+
+// ALTERNATIVE: Check method exists
+if (registry.executeTool) {
+  const result = await registry.executeTool("tool", args, context);
+}
+```
+
+### **Generic Type Issues**
+
+**Symptoms**: `Type 'unknown' is not assignable` errors
+
+**Solutions**:
+
+```typescript
+// WRONG: Unknown return type
+const result = await registry.executeTool("tool", args);
+
+// CORRECT: Use generics
+const result = await registry.executeTool<MyResultType>("tool", args, context);
+
+// ALTERNATIVE: Type assertion
+const result = (await registry.executeTool("tool", args)) as MyResultType;
+```
+
+---
+
+## 🛡️ **Error Recovery** (NEW v3.0)
+
+### **Automatic Recovery**
+
+**Config Auto-Restore**:
+
+```bash
+# Check if auto-restore triggered
+grep "Config restored" ~/.neurolink/logs/config.log
+
+# Verify restored config
+npx @juspay/neurolink config validate
+
+# Manual recovery if needed
+npx @juspay/neurolink config restore --backup latest
+```
+
+**Provider Fallback**:
+
+```typescript
+// Configure automatic fallback
+const context: ExecutionContext = {
+  fallbackOptions: {
+    enabled: true,
+    providers: ["google-ai", "openai", "anthropic"],
+    maxRetries: 3,
+    retryDelay: 1000,
+  },
+};
+```
+
+### **Manual Recovery**
+
+**Reset to Defaults**:
+
+```bash
+# Reset all configuration
+npx @juspay/neurolink config reset --confirm
+
+# Reset specific provider
+npx @juspay/neurolink config reset-provider google
+
+# Restore from specific backup
+npx @juspay/neurolink config restore --backup neurolink-config-2025-01-07T10-30-00.js
+```
+
+**If still having issues**:
+
 1. Ensure you're using v1.7.1 or later: `npm list @juspay/neurolink`
 2. Clear node modules and reinstall: `rm -rf node_modules && npm install`
 3. Rebuild the project: `npm run build`
@@ -219,6 +516,7 @@ npx tsc --noEmit
 **Symptom**: CLI `--model` parameter is ignored, always uses default model
 
 **Example Issue**:
+
 ```bash
 # Command specifies model but output shows default model being used
 node dist/cli/index.js generate "test" --provider google-ai --model gemini-2.5-flash
@@ -230,6 +528,7 @@ node dist/cli/index.js generate "test" --provider google-ai --model gemini-2.5-f
 **Solution**: Update to latest version where model parameter fix has been applied.
 
 **Verification**:
+
 ```bash
 # Test that model parameter works correctly
 node dist/cli/index.js generate "what is deepest you can think?" --provider google-ai --model gemini-2.5-flash --debug
@@ -237,6 +536,7 @@ node dist/cli/index.js generate "what is deepest you can think?" --provider goog
 ```
 
 **Available Models for Google AI**:
+
 - `gemini-2.5-flash` - Fast, efficient responses
 - `gemini-2.5-pro` - Comprehensive, detailed responses
 

@@ -123,9 +123,9 @@
           "quality": "highest"
         }
       },
-      "gemini-2.0-flash": {
-        "id": "gemini-2.0-flash-exp",
-        "displayName": "Gemini 2.0 Flash",
+      "gemini-2.5-flash": {
+        "id": "gemini-2.5-flash",
+        "displayName": "Gemini 2.5 Flash",
         "capabilities": ["function-calling", "vision", "code-execution"],
         "deprecated": false,
         "pricing": { "input": 0.000075, "output": 0.0003 },
@@ -136,21 +136,6 @@
           "useCase": "speed",
           "speed": "fastest",
           "quality": "medium"
-        }
-      },
-      "gemini-1.5-pro": {
-        "id": "gemini-1.5-pro-latest",
-        "displayName": "Gemini 1.5 Pro",
-        "capabilities": ["function-calling", "vision"],
-        "deprecated": false,
-        "pricing": { "input": 0.00125, "output": 0.005 },
-        "contextWindow": 2000000,
-        "releaseDate": "2024-02-15",
-        "metadata": {
-          "description": "Stable production Google AI model",
-          "useCase": "general",
-          "speed": "medium",
-          "quality": "high"
         }
       }
     },

@@ -12,6 +12,7 @@ import path from "path";
 import os from "os";
 import chalk from "chalk";
 import { z } from "zod";
+import { CLI_LIMITS } from "../../lib/core/constants.js";
 
 // Configuration schema for validation
 const ConfigSchema = z.object({
@@ -59,7 +60,7 @@ const ConfigSchema = z.object({
           serviceAccountKey: z.string().optional(),
           clientEmail: z.string().optional(),
           privateKey: z.string().optional(),
-          model: z.string().default("gemini-1.5-pro"),
+          model: z.string().default("gemini-2.5-pro"),
         })
         .optional(),
       anthropic: z
@@ -79,7 +80,7 @@ const ConfigSchema = z.object({
       "google-ai": z
         .object({
           apiKey: z.string().optional(),
-          model: z.string().default("gemini-1.5-pro-latest"),
+          model: z.string().default("gemini-2.5-pro"),
         })
         .optional(),
       huggingface: z
@@ -108,7 +109,11 @@ const ConfigSchema = z.object({
     .object({
       outputFormat: z.enum(["text", "json", "yaml"]).default("text"),
       temperature: z.number().min(0).max(2).default(0.7),
-      maxTokens: z.number().min(1).max(4000).default(1000),
+      maxTokens: z
+        .number()
+        .min(CLI_LIMITS.maxTokens.min)
+        .max(CLI_LIMITS.maxTokens.max)
+        .default(CLI_LIMITS.maxTokens.default),
       enableLogging: z.boolean().default(false),
       enableCaching: z.boolean().default(true),
       cacheStrategy: z.enum(["memory", "file", "redis"]).default("memory"),
@@ -445,8 +450,8 @@ export class ConfigManager {
         type: "list",
         name: "model",
         message: "Default model:",
-        choices: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"],
-        default: "gemini-1.5-pro",
+        choices: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-pro"],
+        default: "gemini-2.5-pro",
       },
     ]);
 
@@ -594,13 +599,8 @@ export class ConfigManager {
         type: "list",
         name: "model",
         message: "Default model:",
-        choices: [
-          "gemini-1.5-pro-latest",
-          "gemini-2.0-flash-exp",
-          "gemini-1.5-flash-latest",
-          "gemini-1.0-pro",
-        ],
-        default: "gemini-1.5-pro-latest",
+        choices: ["gemini-2.5-pro", "gemini-2.5-flash"],
+        default: "gemini-2.5-pro",
       },
     ]);
 

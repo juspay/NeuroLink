@@ -35,6 +35,15 @@ export interface TextGenerationOptions {
   schema?: any;
   timeout?: number | string; // NEW: Optional timeout (e.g., 30000, '30s', '2m', '1h')
   disableTools?: boolean; // NEW: Disable MCP tool integration (tools enabled by default)
+  // NEW: Analytics and Evaluation Support
+  enableAnalytics?: boolean; // Default: false - Usage tracking
+  enableEvaluation?: boolean; // Default: false - AI quality scoring
+  context?: Record<string, any>; // Default: undefined - Custom context
+
+  // NEW: Lighthouse-Compatible Domain-Aware Evaluation
+  evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
+  toolUsageContext?: string; // Tools/MCPs used in this interaction
+  conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
 }
 
 export interface StreamTextOptions {
@@ -50,11 +59,17 @@ export interface StreamTextOptions {
     | "ollama"
     | "mistral"
     | "auto";
-  model?: string; // NEW: Specific model to use
+  model?: string;
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
-  timeout?: number | string; // NEW: Optional timeout (e.g., 30000, '30s', '2m', '1h')
+  schema?: any;
+  timeout?: number | string;
+  disableTools?: boolean;
+  // NEW: Analytics and Evaluation Support
+  enableAnalytics?: boolean;
+  enableEvaluation?: boolean;
+  context?: Record<string, any>;
 }
 
 export interface TextGenerationResult {
@@ -253,6 +268,14 @@ export class NeuroLink {
           maxTokens: options.maxTokens,
           systemPrompt: enhancedSystemPrompt,
           timeout: options.timeout,
+          // NEW: Pass enhancement options
+          enableAnalytics: options.enableAnalytics,
+          enableEvaluation: options.enableEvaluation,
+          context: options.context,
+          // NEW: Lighthouse-compatible domain-aware evaluation
+          evaluationDomain: options.evaluationDomain,
+          toolUsageContext: options.toolUsageContext,
+          conversationHistory: options.conversationHistory,
         },
         options.schema,
       );
@@ -296,6 +319,9 @@ export class NeuroLink {
         toolsUsed: metadata.toolsUsed || [],
         enhancedWithTools: metadata.enhancedWithTools || false,
         availableTools: availableTools.length > 0 ? availableTools : undefined,
+        // NEW: Preserve enhancement data from provider
+        ...(result.analytics && { analytics: result.analytics }),
+        ...(result.evaluation && { evaluation: result.evaluation }),
       };
     } catch (error) {
       // Fall back to regular generation if MCP fails
@@ -362,7 +388,10 @@ export class NeuroLink {
           provider: providerName,
         });
 
-        const provider = await AIProviderFactory.createProvider(providerName, options.model);
+        const provider = await AIProviderFactory.createProvider(
+          providerName,
+          options.model,
+        );
 
         const result = await provider.generateText(
           {
@@ -372,6 +401,14 @@ export class NeuroLink {
             maxTokens: options.maxTokens,
             systemPrompt: options.systemPrompt,
             timeout: options.timeout,
+            // NEW: Pass enhancement options
+            enableAnalytics: options.enableAnalytics,
+            enableEvaluation: options.enableEvaluation,
+            context: options.context,
+            // NEW: Lighthouse-compatible domain-aware evaluation
+            evaluationDomain: options.evaluationDomain,
+            toolUsageContext: options.toolUsageContext,
+            conversationHistory: options.conversationHistory,
           },
           options.schema,
         );
@@ -405,6 +442,9 @@ export class NeuroLink {
           provider: providerName,
           usage: result.usage,
           responseTime,
+          // NEW: Preserve enhancement data from provider
+          ...(result.analytics && { analytics: result.analytics }),
+          ...(result.evaluation && { evaluation: result.evaluation }),
         };
       } catch (error) {
         const errorMessage =
@@ -533,7 +573,10 @@ Note: Tool integration is currently in development. Please provide helpful respo
           provider: providerName,
         });
 
-        const provider = await AIProviderFactory.createProvider(providerName, options.model);
+        const provider = await AIProviderFactory.createProvider(
+          providerName,
+          options.model,
+        );
 
         const result = await provider.streamText({
           prompt: options.prompt,
@@ -617,7 +660,11 @@ Note: Tool integration is currently in development. Please provide helpful respo
   ): Promise<boolean> {
     try {
       const provider = await AIProviderFactory.createProvider(providerName);
-      await provider.generateText(testPrompt);
+      await provider.generateText({
+        prompt: testPrompt,
+        enableAnalytics: false,
+        enableEvaluation: false,
+      });
       return true;
     } catch (error) {
       return false;
@@ -656,5 +703,25 @@ Note: Tool integration is currently in development. Please provide helpful respo
         hasServer: true,
       })),
     };
+  }
+
+  /**
+   * Alias for generateText() - CLI-SDK consistency
+   * @param options - Text generation options
+   * @returns Promise resolving to text generation result
+   */
+  async generate(
+    options: TextGenerationOptions,
+  ): Promise<TextGenerationResult> {
+    return this.generateText(options);
+  }
+
+  /**
+   * Short alias for generateText() - CLI-SDK consistency
+   * @param options - Text generation options
+   * @returns Promise resolving to text generation result
+   */
+  async gen(options: TextGenerationOptions): Promise<TextGenerationResult> {
+    return this.generateText(options);
   }
 }

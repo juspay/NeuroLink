@@ -134,7 +134,27 @@ All providers implement the `AIProvider` interface with these methods:
 interface AIProvider {
   generateText(options: GenerateTextOptions): Promise<GenerateTextResult>;
   streamText(options: StreamTextOptions): Promise<StreamTextResult>;
+
+  // CLI-SDK Consistency: Method aliases (Phase 1.1)
+  generate(options: GenerateTextOptions): Promise<GenerateTextResult>;
+  gen(options: GenerateTextOptions): Promise<GenerateTextResult>;
 }
+```
+
+### 🔗 CLI-SDK Consistency
+
+All providers now include method aliases that match CLI command names for consistent developer experience:
+
+- **`generate()`** - Alias for `generateText()` (matches `neurolink generate` CLI command)
+- **`gen()`** - Short alias for `generateText()` (matches `neurolink gen` CLI command)
+
+These methods have identical signatures and behavior to `generateText()`.
+
+```typescript
+// All three methods are equivalent:
+const result1 = await provider.generateText({ prompt: "Hello" });
+const result2 = await provider.generate({ prompt: "Hello" });
+const result3 = await provider.gen({ prompt: "Hello" });
 ```
 
 ### `generateText(options)`
@@ -171,6 +191,410 @@ interface GenerateTextResult {
     totalTokens: number;
   };
   responseTime?: number;
+
+  // 🆕 NEW: AI Enhancement Features
+  analytics?: {
+    provider: string;
+    model: string;
+    tokens: { input: number; output: number; total: number };
+    cost?: number;
+    responseTime: number;
+    context?: Record<string, any>;
+  };
+
+  evaluation?: {
+    relevanceScore: number; // 1-10 scale
+    accuracyScore: number; // 1-10 scale
+    completenessScore: number; // 1-10 scale
+    overallScore: number; // 1-10 scale
+    alertLevel?: string; // 'none', 'low', 'medium', 'high'
+    reasoning?: string; // AI reasoning for the evaluation
+
+    // Enhanced evaluation fields (when available)
+    domainAlignment?: number; // 1-10 scale
+    terminologyAccuracy?: number; // 1-10 scale
+    toolEffectiveness?: number; // 1-10 scale
+    alertSeverity?: string; // Legacy field
+    contextUtilization?: {
+      conversationUsed: boolean;
+      toolsUsed: boolean;
+      domainKnowledgeUsed: boolean;
+    };
+  };
+}
+```
+
+## 🆕 Enterprise Configuration Interfaces
+
+### `NeuroLinkConfig`
+
+Main configuration interface for enterprise features:
+
+```typescript
+interface NeuroLinkConfig {
+  providers: ProviderConfig;
+  performance: PerformanceConfig;
+  analytics: AnalyticsConfig;
+  backup: BackupConfig;
+  validation: ValidationConfig;
+}
+```
+
+### `ExecutionContext`
+
+Rich context interface for all MCP operations:
+
+```typescript
+interface ExecutionContext {
+  sessionId?: string;
+  userId?: string;
+  aiProvider?: string;
+  permissions?: string[];
+  cacheOptions?: CacheOptions;
+  fallbackOptions?: FallbackOptions;
+  metadata?: Record<string, unknown>;
+  priority?: "low" | "normal" | "high";
+  timeout?: number;
+  retries?: number;
+  correlationId?: string;
+  requestId?: string;
+  userAgent?: string;
+  clientVersion?: string;
+  environment?: string;
+}
+```
+
+### `ToolInfo`
+
+Comprehensive tool metadata interface:
+
+```typescript
+interface ToolInfo {
+  name: string;
+  description?: string;
+  serverId?: string;
+  category?: string;
+  version?: string;
+  parameters?: unknown;
+  capabilities?: string[];
+  lastUsed?: Date;
+  usageCount?: number;
+  averageExecutionTime?: number;
+}
+```
+
+### `ConfigUpdateOptions`
+
+Flexible configuration update options:
+
+```typescript
+interface ConfigUpdateOptions {
+  createBackup?: boolean;
+  validateBeforeUpdate?: boolean;
+  mergeStrategy?: "replace" | "merge" | "deep-merge";
+  backupRetention?: number;
+  onValidationError?: (errors: ValidationError[]) => void;
+  onBackupCreated?: (backupPath: string) => void;
+}
+```
+
+### `McpRegistry`
+
+Registry interface with optional methods for maximum flexibility:
+
+```typescript
+interface McpRegistry {
+  registerServer?(serverId: string, config?: unknown, context?: ExecutionContext): Promise<void>;
+  executeTool?<T>(toolName: string, args?: unknown, context?: ExecutionContext): Promise<T>;
+  listTools?(context?: ExecutionContext): Promise<ToolInfo[]>;
+  getStats?(): Record<string, { count: number; averageTime: number; totalTime: number }>;
+  unregisterServer?(serverId: string): Promise<void>;
+  getServerInfo?(serverId: string): Promise<unknown>;
+}
+}
+```
+
+## 🌐 Enterprise Real-time Services API
+
+### `createEnhancedChatService(options)`
+
+Creates an enhanced chat service with WebSocket and SSE support for real-time applications.
+
+```typescript
+function createEnhancedChatService(options: {
+  provider: AIProvider;
+  enableSSE?: boolean;
+  enableWebSocket?: boolean;
+  streamingConfig?: StreamingConfig;
+}): EnhancedChatService;
+```
+
+**Parameters:**
+
+```typescript
+interface EnhancedChatServiceOptions {
+  provider: AIProvider; // AI provider instance
+  enableSSE?: boolean; // Enable Server-Sent Events (default: true)
+  enableWebSocket?: boolean; // Enable WebSocket support (default: false)
+  streamingConfig?: {
+    bufferSize?: number; // Buffer size in bytes (default: 8192)
+    compressionEnabled?: boolean; // Enable compression (default: true)
+    latencyTarget?: number; // Target latency in ms (default: 100)
+  };
+}
+```
+
+**Returns:** `EnhancedChatService` instance
+
+**Example:**
+
+```typescript
+import {
+  createEnhancedChatService,
+  createBestAIProvider,
+} from "@juspay/neurolink";
+
+const provider = await createBestAIProvider();
+const chatService = createEnhancedChatService({
+  provider,
+  enableWebSocket: true,
+  enableSSE: true,
+  streamingConfig: {
+    bufferSize: 4096,
+    compressionEnabled: true,
+    latencyTarget: 50, // 50ms target latency
+  },
+});
+
+// Stream chat with enhanced capabilities
+await chatService.streamChat({
+  prompt: "Generate a story",
+  onChunk: (chunk) => console.log(chunk),
+  onComplete: (result) => console.log("Complete:", result),
+});
+```
+
+### `NeuroLinkWebSocketServer`
+
+Professional-grade WebSocket server for real-time AI applications.
+
+```typescript
+class NeuroLinkWebSocketServer {
+  constructor(options?: WebSocketOptions);
+  joinRoom(connectionId: string, roomId: string): boolean;
+  broadcastToRoom(roomId: string, message: WebSocketMessage): void;
+  createStreamingChannel(
+    connectionId: string,
+    channelId: string,
+  ): StreamingChannel;
+  sendMessage(connectionId: string, message: WebSocketMessage): boolean;
+  on(event: string, handler: Function): void;
+}
+```
+
+**Constructor Options:**
+
+```typescript
+interface WebSocketOptions {
+  port?: number; // Server port (default: 8080)
+  maxConnections?: number; // Max concurrent connections (default: 1000)
+  heartbeatInterval?: number; // Heartbeat interval in ms (default: 30000)
+  enableCompression?: boolean; // Enable WebSocket compression (default: true)
+  bufferSize?: number; // Message buffer size (default: 8192)
+}
+```
+
+**Example:**
+
+```typescript
+import { NeuroLinkWebSocketServer } from "@juspay/neurolink";
+
+const wsServer = new NeuroLinkWebSocketServer({
+  port: 8080,
+  maxConnections: 1000,
+  enableCompression: true,
+});
+
+// Handle connections
+wsServer.on("connection", ({ connectionId, userAgent }) => {
+  console.log(`New connection: ${connectionId}`);
+  wsServer.joinRoom(connectionId, "general-chat");
+});
+
+// Handle chat messages
+wsServer.on("chat-message", async ({ connectionId, message }) => {
+  // Process with AI and broadcast response
+  const aiResponse = await processWithAI(message.data.prompt);
+  wsServer.broadcastToRoom("general-chat", {
+    type: "ai-response",
+    data: { text: aiResponse },
+  });
+});
+```
+
+## 📊 Enterprise Telemetry API
+
+### `initializeTelemetry(config)`
+
+Initializes enterprise telemetry with OpenTelemetry integration. Zero overhead when disabled.
+
+```typescript
+function initializeTelemetry(config: TelemetryConfig): TelemetryResult;
+```
+
+**Parameters:**
+
+```typescript
+interface TelemetryConfig {
+  serviceName: string; // Service name for telemetry
+  endpoint?: string; // OpenTelemetry endpoint
+  enableTracing?: boolean; // Enable distributed tracing (default: true)
+  enableMetrics?: boolean; // Enable metrics collection (default: true)
+  enableLogs?: boolean; // Enable log collection (default: true)
+  samplingRate?: number; // Trace sampling rate 0-1 (default: 0.1)
+}
+```
+
+**Returns:**
+
+```typescript
+interface TelemetryResult {
+  success: boolean;
+  tracingEnabled: boolean;
+  metricsEnabled: boolean;
+  logsEnabled: boolean;
+  endpoint?: string;
+  error?: string;
+}
+```
+
+**Example:**
+
+```typescript
+import { initializeTelemetry } from "@juspay/neurolink";
+
+const telemetry = initializeTelemetry({
+  serviceName: "my-ai-application",
+  endpoint: "http://localhost:4318",
+  enableTracing: true,
+  enableMetrics: true,
+  enableLogs: true,
+  samplingRate: 0.1, // Sample 10% of traces
+});
+
+if (telemetry.success) {
+  console.log("Telemetry initialized successfully");
+} else {
+  console.error("Telemetry initialization failed:", telemetry.error);
+}
+```
+
+### `getTelemetryStatus()`
+
+Returns current telemetry status and configuration.
+
+```typescript
+function getTelemetryStatus(): Promise<TelemetryStatus>;
+```
+
+**Returns:**
+
+```typescript
+interface TelemetryStatus {
+  enabled: boolean; // Whether telemetry is active
+  endpoint?: string; // Current endpoint
+  service: string; // Service name
+  version: string; // NeuroLink version
+  features: {
+    tracing: boolean;
+    metrics: boolean;
+    logs: boolean;
+  };
+  stats?: {
+    tracesCollected: number;
+    metricsCollected: number;
+    logsCollected: number;
+  };
+}
+```
+
+**Example:**
+
+```typescript
+import { getTelemetryStatus } from "@juspay/neurolink";
+
+const status = await getTelemetryStatus();
+console.log("Telemetry enabled:", status.enabled);
+console.log("Service:", status.service);
+console.log("Features:", status.features);
+
+if (status.stats) {
+  console.log("Traces collected:", status.stats.tracesCollected);
+  console.log("Metrics collected:", status.stats.metricsCollected);
+}
+```
+
+## 🔧 Enhanced Generation Options
+
+The base `GenerateTextOptions` interface now supports enterprise features:
+
+```typescript
+interface GenerateTextOptions {
+  prompt: string;
+  temperature?: number;
+  maxTokens?: number;
+  systemPrompt?: string;
+  schema?: any;
+  timeout?: number | string;
+
+  // 🆕 NEW: AI Enhancement Features
+  enableAnalytics?: boolean; // Enable usage analytics
+  enableEvaluation?: boolean; // Enable AI quality scoring
+  context?: Record<string, any>; // Custom context for analytics
+}
+```
+
+**Enhanced Usage Example:**
+
+```typescript
+const result = await provider.generateText({
+  prompt: 'Write a business proposal',
+  enableAnalytics: true,
+  enableEvaluation: true,
+  context: {
+    userId: '12345',
+    session: 'business-meeting',
+    department: 'sales'
+  }
+});
+
+// Access enhancement data
+console.log('📊 Analytics:', result.analytics);
+// { provider: 'openai', model: 'gpt-4o', tokens: {...}, cost: 0.02, responseTime: 2340 }
+
+console.log('⭐ Evaluation:', result.evaluation);
+// { relevance: 9, accuracy: 8, completeness: 9, overall: 8.7 }
+
+// 🆕 Enhanced Evaluation (NEW)
+const enhancedResult = await performEnhancedEvaluation({
+  userQuery: 'Write a business proposal',
+  aiResponse: result.text,
+  primaryDomain: 'Business development',
+  assistantRole: 'Business proposal assistant',
+  toolsUsed: ['generate-text'],
+  conversationHistory: [
+    { role: 'user', content: 'I need help with proposals' },
+    { role: 'assistant', content: 'I can help you create effective proposals' }
+  ]
+});
+
+console.log('🎯 Enhanced Evaluation:', enhancedResult);
+// {
+//   relevanceScore: 9, accuracyScore: 8, completenessScore: 9,
+//   domainAlignment: 9, terminologyAccuracy: 8, toolEffectiveness: 9,
+//   overall: 8.7, alertSeverity: 'none',
+//   contextUtilization: { conversationUsed: true, toolsUsed: true, domainKnowledgeUsed: true }
+// }
 }
 ```
 
@@ -508,10 +932,8 @@ type VertexModel =
 
 ```typescript
 type GoogleAIModel =
-  | "gemini-1.5-pro-latest" // Default - Latest Gemini Pro
-  | "gemini-2.0-flash-exp" // Experimental enhanced capabilities
-  | "gemini-1.5-flash-latest" // Fast, efficient responses
-  | "gemini-1.0-pro"; // Stable legacy option
+  | "gemini-2.5-pro" // Default - Latest Gemini Pro
+  | "gemini-2.5-flash"; // Fast, efficient responses
 ```
 
 ### Azure OpenAI Models

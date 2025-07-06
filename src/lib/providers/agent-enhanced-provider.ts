@@ -22,10 +22,21 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
+  EnhancedStreamTextOptions,
+  StreamingProgressData,
+  ProgressCallback,
 } from "../core/types.js";
+import {
+  StreamingEnhancer,
+  StreamingMonitor,
+} from "../utils/streaming-utils.js";
 import { UnifiedMCPSystem } from "../mcp/unified-mcp.js";
 import { mcpLogger } from "../mcp/logging.js";
 import { parseTimeout } from "../utils/timeout.js";
+import { evaluateResponse } from "../core/evaluation.js";
+import { createAnalytics } from "../core/analytics.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Agent configuration options
@@ -54,6 +65,7 @@ interface AgentConfig {
 export class AgentEnhancedProvider implements AIProvider {
   private config: AgentConfig;
   private model: any;
+  private resolvedModelName: string = "default";
   private mcpSystem: UnifiedMCPSystem | null = null;
   private mcpInitialized = false;
   private mcpInitializing = false;
@@ -73,7 +85,7 @@ export class AgentEnhancedProvider implements AIProvider {
       ...config,
     };
 
-    // Initialize the AI model based on provider
+    // Initialize the AI model based on provider and store resolved model name
     this.model = this.createModel();
 
     // Initialize MCP registry if enabled
@@ -87,15 +99,16 @@ export class AgentEnhancedProvider implements AIProvider {
 
     switch (provider) {
       case "google-ai":
-        return google(
-          model || process.env.GOOGLE_AI_MODEL || "gemini-2.0-flash-exp",
-        );
+        this.resolvedModelName =
+          model || process.env.GOOGLE_AI_MODEL || "gemini-2.5-flash";
+        return google(this.resolvedModelName);
       case "openai":
-        return openai(model || process.env.OPENAI_MODEL || "gpt-4o");
+        this.resolvedModelName = model || process.env.OPENAI_MODEL || "gpt-4o";
+        return openai(this.resolvedModelName);
       case "anthropic":
-        return anthropic(
-          model || process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
-        );
+        this.resolvedModelName =
+          model || process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
+        return anthropic(this.resolvedModelName);
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -341,6 +354,7 @@ export class AgentEnhancedProvider implements AIProvider {
   async generateText(
     optionsOrPrompt: TextGenerationOptions | string,
   ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
+    const startTime = Date.now();
     const options =
       typeof optionsOrPrompt === "string"
         ? { prompt: optionsOrPrompt }
@@ -474,6 +488,26 @@ export class AgentEnhancedProvider implements AIProvider {
         }
       }
 
+      // Add analytics if enabled
+      if (options.enableAnalytics) {
+        (result as any).analytics = createAnalytics(
+          this.config.provider,
+          this.resolvedModelName,
+          result,
+          Date.now() - startTime,
+          options.context,
+        );
+      }
+
+      // Add evaluation if enabled
+      if (options.enableEvaluation) {
+        (result as any).evaluation = await evaluateResponse(
+          prompt,
+          result.text,
+          options.context,
+        );
+      }
+
       // Return the full result - the AI SDK has already handled tool execution and integration
       return result;
     } catch (error) {
@@ -483,7 +517,7 @@ export class AgentEnhancedProvider implements AIProvider {
   }
 
   async streamText(
-    optionsOrPrompt: StreamTextOptions | string,
+    optionsOrPrompt: EnhancedStreamTextOptions | string,
   ): Promise<StreamTextResult<ToolSet, unknown> | null> {
     const options =
       typeof optionsOrPrompt === "string"
@@ -496,7 +530,22 @@ export class AgentEnhancedProvider implements AIProvider {
       maxTokens = 1000,
       systemPrompt,
       timeout,
+      // Phase 2: Enhanced streaming options
+      enableProgressTracking,
+      progressCallback,
+      includeStreamingMetadata,
+      streamingBufferSize,
+      enableStreamingHeaders,
+      customStreamingConfig,
     } = options;
+
+    // Phase 2.1: Setup streaming enhancements
+    const streamId = `agent_stream_${Date.now()}`;
+    const streamingConfig = StreamingEnhancer.createStreamingConfig(options);
+
+    if (enableProgressTracking) {
+      StreamingMonitor.registerStream(streamId);
+    }
 
     // Get combined tools (direct + MCP) if enabled
     const tools = this.config.enableTools ? await this.getCombinedTools() : {};
@@ -524,6 +573,46 @@ export class AgentEnhancedProvider implements AIProvider {
         toolChoice: this.shouldForceToolUsage(prompt) ? "required" : "auto",
         abortSignal, // Pass abort signal for timeout support
       });
+
+      // Phase 2.1: Apply streaming enhancements if enabled
+      if (streamingConfig.progressTracking && result.textStream) {
+        const enhancedCallback = streamingConfig.callback
+          ? (progress: StreamingProgressData) => {
+              StreamingMonitor.updateStream(streamId, progress);
+              streamingConfig.callback!(progress);
+
+              if (progress.phase === "complete") {
+                StreamingMonitor.completeStream(streamId);
+              }
+            }
+          : undefined;
+
+        // Enhance the stream with progress tracking
+        const enhancedStream = StreamingEnhancer.addProgressTracking(
+          result.textStream,
+          enhancedCallback,
+          { streamId, bufferSize: streamingConfig.bufferSize },
+        );
+
+        // Return enhanced result with tracking
+        return {
+          ...result,
+          textStream: enhancedStream,
+          // Phase 2.1: Add streaming metadata
+          streamingMetadata: streamingConfig.metadata
+            ? {
+                streamId,
+                provider: this.getProviderName(),
+                model: this.getModelName(),
+                enabledFeatures: {
+                  progressTracking: true,
+                  metadata: streamingConfig.metadata,
+                  headers: streamingConfig.headers,
+                },
+              }
+            : undefined,
+        } as any;
+      }
 
       return result;
     } catch (error) {
@@ -584,7 +673,7 @@ export class AgentEnhancedProvider implements AIProvider {
 
     for (const prompt of testPrompts) {
       try {
-        console.log(`Testing: "${prompt}"`);
+        logger.debug(`Testing: "${prompt}"`);
         const result = await this.generateText(prompt);
 
         if (!result) {
@@ -593,7 +682,7 @@ export class AgentEnhancedProvider implements AIProvider {
             success: false,
             error: "No result returned from generateText",
           });
-          console.log(`❌ No result returned`);
+          logger.warn(`❌ No result returned`);
           continue;
         }
 
@@ -611,7 +700,7 @@ export class AgentEnhancedProvider implements AIProvider {
           response: result.text.substring(0, 100) + "...",
         });
 
-        console.log(
+        logger.debug(
           `✅ Tools called: ${toolsCalled}, Response: ${result.text.substring(0, 50)}...`,
         );
       } catch (error) {
@@ -620,7 +709,7 @@ export class AgentEnhancedProvider implements AIProvider {
           success: false,
           error: error instanceof Error ? error.message : String(error),
         });
-        console.log(`❌ Error: ${error}`);
+        logger.error(`❌ Error: ${error}`);
       }
     }
 
@@ -662,6 +751,26 @@ export class AgentEnhancedProvider implements AIProvider {
 
     return providers;
   }
+
+  /**
+   * Alias for generateText() - CLI-SDK consistency
+   */
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt);
+  }
+
+  /**
+   * Short alias for generateText() - CLI-SDK consistency
+   */
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt);
+  }
 }
 
 /**
@@ -681,29 +790,29 @@ export function createAgentProvider(
  * Test all available agent providers
  */
 export async function testAllAgentProviders(): Promise<void> {
-  console.log("🧪 Testing All Agent Providers\n");
+  logger.info("🧪 Testing All Agent Providers\n");
 
   const providers = AgentEnhancedProvider.createMultiProviderAgents();
 
   if (Object.keys(providers).length === 0) {
-    console.log(
+    logger.warn(
       "❌ No API keys found. Please configure at least one provider.",
     );
     return;
   }
 
   for (const [name, provider] of Object.entries(providers)) {
-    console.log(`\n🔬 Testing ${name.toUpperCase()} Agent Provider:`);
+    logger.info(`\n🔬 Testing ${name.toUpperCase()} Agent Provider:`);
     try {
       const testResult = await provider.testAgentCapabilities();
 
       if (testResult.success) {
-        console.log(`✅ ${name} agent provider working correctly`);
+        logger.info(`✅ ${name} agent provider working correctly`);
       } else {
-        console.log(`❌ ${name} agent provider failed tests`);
+        logger.warn(`❌ ${name} agent provider failed tests`);
       }
     } catch (error) {
-      console.log(`❌ ${name} provider error:`, error);
+      logger.error(`❌ ${name} provider error:`, error);
     }
   }
 }

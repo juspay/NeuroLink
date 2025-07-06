@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// CRITICAL: Set MCP logging level before ANY imports
+if (!process.argv.includes("--debug")) {
+  process.env.MCP_LOG_LEVEL = "error"; // Only show MCP errors unless debugging
+} else {
+  process.env.MCP_LOG_LEVEL = "info"; // Show MCP logs when debugging
+}
+
 /**
  * NeuroLink CLI - Enhanced Simplified Approach
  *
@@ -19,6 +26,98 @@ import { addMCPCommands } from "./commands/mcp.js";
 import { addOllamaCommands } from "./commands/ollama.js";
 import { agentGenerateCommand } from "./commands/agent-generate.js";
 import { AgentEnhancedProvider } from "../lib/providers/agent-enhanced-provider.js";
+import { logger } from "../lib/utils/logger.js";
+
+/**
+ * Helper functions for displaying analytics and evaluation results
+ * Addresses DRY principle - extracted shared parts into reusable functions
+ */
+
+function displayDebugInfo(title: string, data: any, debug: boolean) {
+  if (debug) {
+    console.log(chalk.blue(title));
+    console.log(JSON.stringify(data, null, 2));
+    console.log();
+  }
+}
+
+function displayMissingDataWarning(type: string) {
+  console.log();
+  console.log(chalk.red(`⚠️  ${type} enabled but no data received`));
+  console.log();
+}
+
+function formatAnalytics(analytics: any) {
+  console.log();
+  console.log(chalk.blue("📊 Analytics:"));
+  console.log(`   🚀 Provider: ${analytics.provider}`);
+  console.log(`   🤖 Model: ${analytics.model}`);
+  if (analytics.tokens) {
+    console.log(
+      `   💬 Tokens: ${analytics.tokens.totalTokens || analytics.tokens.total || "unknown"}`,
+    );
+  }
+  console.log(`   ⏱️  Response Time: ${analytics.responseTime}ms`);
+  if (analytics.context) {
+    console.log(
+      `   📋 Context: ${Object.keys(analytics.context).length} fields`,
+    );
+  }
+  console.log();
+}
+
+function formatEvaluation(evaluation: any) {
+  console.log();
+  console.log(chalk.blue("⭐ Response Quality Evaluation:"));
+  console.log(
+    `   📊 Scores: Relevance ${evaluation.relevanceScore || evaluation.relevance}/10, Accuracy ${evaluation.accuracyScore || evaluation.accuracy}/10, Completeness ${evaluation.completenessScore || evaluation.completeness}/10`,
+  );
+  console.log(`   🎯 Overall Quality: ${evaluation.overall}/10`);
+
+  const severity = evaluation.alertSeverity || "none";
+  const severityColors: { [key: string]: any } = {
+    high: chalk.red,
+    medium: chalk.yellow,
+    low: chalk.blue,
+    none: chalk.green,
+  };
+  const severityColor = severityColors[severity] || chalk.gray;
+  console.log(`   🚨 Alert Level: ${severityColor(severity)}`);
+
+  if (evaluation.reasoning) {
+    console.log(`   💭 Analysis: ${evaluation.reasoning}`);
+  }
+  if (evaluation.suggestedImprovements) {
+    console.log(`   💡 Improvements: ${evaluation.suggestedImprovements}`);
+  }
+
+  const evalModel = evaluation.evaluationModel || "unknown";
+  const evalTime = evaluation.evaluationTime
+    ? `${evaluation.evaluationTime}ms`
+    : "unknown";
+  console.log(`   🤖 Evaluated by: ${evalModel} (${evalTime})`);
+  console.log();
+}
+
+function displayAnalyticsAndEvaluation(result: any, argv: any) {
+  if (result && result.analytics) {
+    displayDebugInfo("📊 Analytics:", result.analytics, argv.debug);
+    if (!argv.debug) {
+      formatAnalytics(result.analytics);
+    }
+  } else if (argv.enableAnalytics) {
+    displayMissingDataWarning("Analytics");
+  }
+
+  if (result && result.evaluation) {
+    displayDebugInfo("⭐ Response Evaluation:", result.evaluation, argv.debug);
+    if (!argv.debug) {
+      formatEvaluation(result.evaluation);
+    }
+  } else if (argv.enableEvaluation) {
+    displayMissingDataWarning("Evaluation");
+  }
+}
 
 // Load environment variables from .env file
 try {
@@ -184,9 +283,11 @@ const cli = yargs(args)
     // Control SDK logging based on debug flag
     if (argv.debug) {
       process.env.NEUROLINK_DEBUG = "true";
+      process.env.MCP_LOG_LEVEL = "info"; // Show MCP logs in debug mode
     } else {
       // Always set to false when debug is not enabled (including when not provided)
       process.env.NEUROLINK_DEBUG = "false";
+      process.env.MCP_LOG_LEVEL = "error"; // Hide MCP info logs when not debugging
     }
     // Keep existing quiet middleware
     if (
@@ -208,7 +309,8 @@ const cli = yargs(args)
       // handleError already prints and calls process.exit(1).
       // If we're here, it means handleError's process.exit might not have been caught by the top-level async IIFE.
       // Or, it's a synchronous yargs error during parsing that yargs itself throws.
-      const alreadyExitedByHandleError = (err as any)?.exitCode !== undefined;
+      const alreadyExitedByHandleError =
+        (err as Error & { exitCode?: number })?.exitCode !== undefined;
       // A simple heuristic: if the error message doesn't look like one of our handled generic messages,
       // it might be a direct yargs parsing error.
       const isLikelyYargsInternalError =
@@ -323,20 +425,50 @@ const cli = yargs(args)
           default: false,
           description: "Enable debug mode with verbose output",
         }) // Kept for potential specific debug logic
-        .option("timeout", {
-          type: "string",
-          default: "30s",
-          description: "Timeout for the request (e.g., 30s, 2m, 1h, 5000)",
-        })
         .option("model", {
           type: "string",
-          description: "Specific model to use (e.g. gemini-2.5-pro, gemini-2.5-flash)",
+          description:
+            "Specific model to use (e.g. gemini-2.5-pro, gemini-2.5-flash)",
+        })
+        .option("timeout", {
+          type: "number",
+          default: 120,
+          description: "Maximum execution time in seconds (default: 120)",
         })
         .option("disable-tools", {
           type: "boolean",
           default: false,
           description:
             "Disable MCP tool integration (tools enabled by default)",
+        })
+        .option("enable-analytics", {
+          type: "boolean",
+          default: false,
+          description: "Enable usage analytics collection",
+        })
+        .option("enable-evaluation", {
+          type: "boolean",
+          default: false,
+          description: "Enable AI response quality evaluation",
+        })
+        .option("evaluation-domain", {
+          type: "string",
+          description:
+            "Domain expertise for evaluation (e.g., 'AI coding assistant', 'Customer service expert')",
+        })
+        .option("tool-usage-context", {
+          type: "string",
+          description:
+            "Tool usage context for evaluation (e.g., 'Used sales-data MCP tools')",
+        })
+        .option("lighthouse-style", {
+          type: "boolean",
+          default: false,
+          description: "Use Lighthouse-compatible domain-aware evaluation",
+        })
+        .option("context", {
+          type: "string",
+          description: "JSON context object for custom data",
         })
         .example('$0 generate-text "Hello world"', "Basic text generation")
         .example(
@@ -369,7 +501,7 @@ const cli = yargs(args)
         (Object.keys(originalConsole) as Array<keyof Console>).forEach(
           (key) => {
             if (typeof console[key] === "function") {
-              (console as any)[key] = () => {};
+              (console[key] as any) = () => {};
             }
           },
         );
@@ -381,11 +513,30 @@ const cli = yargs(args)
           : ora("🤖 Generating text...").start();
 
       try {
-        // The SDK will handle the timeout internally, so we don't need this wrapper anymore
-        // Just pass the timeout to the SDK
+        // CRITICAL: Add master timeout to prevent infinite hangs
+        const cliTimeout = argv.timeout ? argv.timeout * 1000 : 120000; // Default 2 minutes
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(
+              new Error(
+                `CLI operation timed out after ${cliTimeout / 1000} seconds. Use --timeout to adjust.`,
+              ),
+            );
+          }, cliTimeout);
+        });
 
         // Use AgentEnhancedProvider when tools are enabled, otherwise use standard SDK
         let generatePromise;
+
+        // Parse context if provided
+        let contextObj: Record<string, any> | undefined;
+        if (argv.context) {
+          try {
+            contextObj = JSON.parse(argv.context);
+          } catch {
+            throw new Error("Invalid JSON provided for --context option");
+          }
+        }
 
         if (argv.disableTools === true) {
           // Tools disabled - use standard SDK
@@ -400,6 +551,13 @@ const cli = yargs(args)
             maxTokens: argv.maxTokens,
             systemPrompt: argv.system,
             timeout: argv.timeout,
+            // NEW: Analytics and evaluation support
+            enableAnalytics: argv.enableAnalytics as boolean,
+            enableEvaluation: argv.enableEvaluation as boolean,
+            context: contextObj,
+            // NEW: Lighthouse-compatible domain-aware evaluation
+            evaluationDomain: argv.evaluationDomain,
+            toolUsageContext: argv.toolUsageContext,
           });
         } else {
           // Tools enabled - use AgentEnhancedProvider for tool calling capabilities
@@ -422,10 +580,23 @@ const cli = yargs(args)
             toolCategory: "all", // Enable all tool categories
           });
 
-          generatePromise = agentProvider.generateText(argv.prompt as string);
+          generatePromise = agentProvider.generateText({
+            prompt: argv.prompt as string,
+            temperature: argv.temperature,
+            maxTokens: argv.maxTokens, // Respect user's token limit - no artificial caps
+            systemPrompt: argv.system,
+            // NEW: Analytics and evaluation support
+            enableAnalytics: argv.enableAnalytics as boolean,
+            enableEvaluation: argv.enableEvaluation as boolean,
+            context: contextObj,
+            // NEW: Lighthouse-compatible domain-aware evaluation
+            evaluationDomain: argv.evaluationDomain,
+            toolUsageContext: argv.toolUsageContext,
+          });
         }
 
-        const result = await generatePromise;
+        // Wrap generation with master timeout to prevent infinite hangs
+        const result = await Promise.race([generatePromise, timeoutPromise]);
 
         if (argv.format === "json" && originalConsole.log) {
           Object.assign(console, originalConsole);
@@ -435,28 +606,50 @@ const cli = yargs(args)
         }
 
         // Handle both AgentEnhancedProvider (AI SDK) and standard NeuroLink SDK responses
-        const responseText = result
-          ? (result as any).text || (result as any).content || ""
-          : "";
-        const responseUsage = result
-          ? (result as any).usage || {
-              promptTokens: 0,
-              completionTokens: 0,
-              totalTokens: 0,
-            }
-          : { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+        interface AIResponse {
+          text?: string;
+          content?: string;
+          usage?: {
+            promptTokens: number;
+            completionTokens: number;
+            totalTokens: number;
+          };
+          provider?: string;
+          responseTime?: number;
+          toolCalls?: any[];
+          toolResults?: any[];
+          analytics?: any;
+          evaluation?: any;
+        }
+
+        const typedResult = result as AIResponse | undefined;
+        const responseText = typedResult?.text || typedResult?.content || "";
+        const responseUsage = typedResult?.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        };
 
         if (argv.format === "json") {
-          const jsonOutput = {
+          const jsonOutput: any = {
             content: responseText,
-            provider: result
-              ? (result as any).provider || argv.provider
-              : argv.provider,
+            provider: typedResult?.provider || argv.provider,
             usage: responseUsage,
-            responseTime: result ? (result as any).responseTime || 0 : 0,
-            toolCalls: result ? (result as any).toolCalls || [] : [],
-            toolResults: result ? (result as any).toolResults || [] : [],
+            responseTime: typedResult?.responseTime || 0,
+            toolCalls: typedResult?.toolCalls || [],
+            toolResults: typedResult?.toolResults || [],
           };
+
+          // Include analytics if present
+          if (typedResult?.analytics) {
+            jsonOutput.analytics = typedResult.analytics;
+          }
+
+          // Include evaluation if present
+          if (typedResult?.evaluation) {
+            jsonOutput.evaluation = typedResult.evaluation;
+          }
+
           process.stdout.write(JSON.stringify(jsonOutput, null, 2) + "\n");
         } else if (argv.debug) {
           // Debug mode: Show AI response + full metadata
@@ -494,6 +687,23 @@ const cli = yargs(args)
             console.log();
           }
 
+          // DEBUG: Show what's in the result object
+          if (argv.debug) {
+            logger.debug("Result object keys:", {
+              keys: Object.keys(result || {}),
+            });
+            logger.debug("Enhancement status:", {
+              hasAnalytics: !!(result && (result as any).analytics),
+              hasEvaluation: !!(result && (result as any).evaluation),
+              enableAnalytics: argv.enableAnalytics,
+              enableEvaluation: argv.enableEvaluation,
+              hasContext: !!contextObj,
+            });
+          }
+
+          // Show analytics and evaluation if enabled
+          displayAnalyticsAndEvaluation(result, argv);
+
           console.log(
             JSON.stringify(
               {
@@ -517,6 +727,9 @@ const cli = yargs(args)
           if (responseText) {
             console.log(responseText);
           }
+
+          // Show analytics and evaluation if enabled
+          displayAnalyticsAndEvaluation(result, argv);
         }
 
         // Explicitly exit to prevent hanging, especially with Google AI Studio
@@ -584,7 +797,8 @@ const cli = yargs(args)
         })
         .option("model", {
           type: "string",
-          description: "Specific model to use (e.g., gemini-1.5-pro-latest, gemini-2.0-flash-exp)",
+          description:
+            "Specific model to use (e.g., gemini-2.5-pro, gemini-2.5-flash)",
         })
         .option("debug", {
           type: "boolean",
@@ -596,6 +810,35 @@ const cli = yargs(args)
           default: false,
           description:
             "Disable MCP tool integration (tools enabled by default)",
+        })
+        .option("enable-analytics", {
+          type: "boolean",
+          default: false,
+          description: "Enable usage analytics collection",
+        })
+        .option("enable-evaluation", {
+          type: "boolean",
+          default: false,
+          description: "Enable AI response quality evaluation",
+        })
+        .option("evaluation-domain", {
+          type: "string",
+          description:
+            "Domain expertise for evaluation (e.g., 'AI coding assistant', 'Customer service expert')",
+        })
+        .option("tool-usage-context", {
+          type: "string",
+          description:
+            "Tool usage context for evaluation (e.g., 'Used sales-data MCP tools')",
+        })
+        .option("lighthouse-style", {
+          type: "boolean",
+          default: false,
+          description: "Use Lighthouse-compatible domain-aware evaluation",
+        })
+        .option("context", {
+          type: "string",
+          description: "JSON context object for custom data",
         })
         .example('$0 stream "Tell me a story"', "Stream a story in real-time")
         .example(
@@ -620,6 +863,16 @@ const cli = yargs(args)
       }
 
       try {
+        // Parse context if provided
+        let contextObj: Record<string, any> | undefined;
+        if (argv.context) {
+          try {
+            contextObj = JSON.parse(argv.context);
+          } catch {
+            throw new Error("Invalid JSON provided for --context option");
+          }
+        }
+
         let stream;
 
         if (argv.disableTools === true) {
@@ -633,6 +886,10 @@ const cli = yargs(args)
             model: argv.model,
             temperature: argv.temperature,
             timeout: argv.timeout,
+            // NEW: Analytics and evaluation support
+            enableAnalytics: argv.enableAnalytics as boolean,
+            enableEvaluation: argv.enableEvaluation as boolean,
+            context: contextObj,
           });
         } else {
           // Tools enabled - use AgentEnhancedProvider for streaming tool calls
@@ -657,9 +914,14 @@ const cli = yargs(args)
 
           // Note: AgentEnhancedProvider doesn't support streaming with tools yet
           // Fall back to generateText for now
-          const result = await agentProvider.generateText(
-            argv.prompt as string,
-          );
+          const result = await agentProvider.generateText({
+            prompt: argv.prompt as string,
+            temperature: argv.temperature,
+            // NEW: Analytics and evaluation support
+            enableAnalytics: argv.enableAnalytics as boolean,
+            enableEvaluation: argv.enableEvaluation as boolean,
+            context: contextObj,
+          });
           // Simulate streaming by outputting the result
           const text = result?.text || "";
           const CHUNK_SIZE = 10;
@@ -672,6 +934,11 @@ const cli = yargs(args)
           if (!argv.quiet) {
             process.stdout.write("\n");
           }
+
+          // Show analytics if enabled
+          // Show analytics and evaluation if enabled
+          displayAnalyticsAndEvaluation(result, argv);
+
           return; // Exit early for agent mode
         }
 

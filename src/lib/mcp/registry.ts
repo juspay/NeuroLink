@@ -1,20 +1,44 @@
 /**
- * MCP Registry - Plugin Registration and Management
+ * MCP Registry - Industry Standard Interface with camelCase
  */
 
-import type { MCPMetadata, DiscoveredMCP } from "./contracts/mcp-contract.js";
+import type {
+  McpMetadata,
+  DiscoveredMcp,
+  ExecutionContext,
+  ToolInfo,
+} from "./contracts/mcpContract.js";
 import { registryLogger } from "./logging.js";
 
 /**
- * Simple MCP registry for plugin management
+ * MCP Registry interface with optional methods for maximum flexibility
  */
-export class MCPRegistry {
-  private plugins = new Map<string, DiscoveredMCP>();
+export interface McpRegistry {
+  // All methods optional (maximum flexibility)
+  registerServer?(
+    serverId: string,
+    serverConfig?: unknown,
+    context?: ExecutionContext,
+  ): Promise<void>;
+  executeTool?<T = unknown>(
+    toolName: string,
+    args?: unknown,
+    context?: ExecutionContext,
+  ): Promise<T>;
+  listTools?(context?: ExecutionContext): Promise<ToolInfo[]>;
+}
+
+/**
+ * Simple MCP registry for plugin management
+ * Maintains backward compatibility with existing code
+ */
+export class MCPRegistry implements McpRegistry {
+  private plugins = new Map<string, DiscoveredMcp>();
 
   /**
    * Register a plugin
    */
-  register(plugin: DiscoveredMCP): void {
+  register(plugin: DiscoveredMcp): void {
     this.plugins.set(plugin.metadata.name, plugin);
     registryLogger.info(`Registered plugin: ${plugin.metadata.name}`);
   }
@@ -33,14 +57,14 @@ export class MCPRegistry {
   /**
    * Get a plugin
    */
-  get(name: string): DiscoveredMCP | undefined {
+  get(name: string): DiscoveredMcp | undefined {
     return this.plugins.get(name);
   }
 
   /**
    * List all plugins
    */
-  list(): DiscoveredMCP[] {
+  list(): DiscoveredMcp[] {
     return Array.from(this.plugins.values());
   }
 
@@ -58,24 +82,115 @@ export class MCPRegistry {
     this.plugins.clear();
     registryLogger.info("Registry cleared");
   }
+
+  /**
+   * Register a server (compatible with new interface)
+   */
+  async registerServer(
+    serverId: string,
+    serverConfig?: unknown,
+    context?: ExecutionContext,
+  ): Promise<void> {
+    const plugin: DiscoveredMcp = {
+      metadata: {
+        name: serverId,
+        description:
+          typeof serverConfig === "object" && serverConfig
+            ? (serverConfig as any).description || "No description"
+            : "No description",
+      },
+      tools:
+        typeof serverConfig === "object" && serverConfig
+          ? (serverConfig as any).tools
+          : {},
+      configuration:
+        typeof serverConfig === "object" && serverConfig
+          ? (serverConfig as Record<string, string | number | boolean>)
+          : {},
+    };
+
+    this.register(plugin);
+  }
+
+  /**
+   * Execute a tool (mock implementation for tests)
+   */
+  async executeTool<T = unknown>(
+    toolName: string,
+    args?: unknown,
+    context?: ExecutionContext,
+  ): Promise<T> {
+    registryLogger.info(`Executing tool: ${toolName}`);
+    return { result: `Mock execution of ${toolName}`, args } as T;
+  }
+
+  /**
+   * List all tools (compatible with new interface)
+   */
+  async listTools(context?: ExecutionContext): Promise<ToolInfo[]> {
+    const tools = this.list().map((plugin) => ({
+      name: plugin.metadata.name,
+      description: plugin.metadata.description || "No description",
+      serverId: plugin.metadata.name,
+      category: "general",
+    }));
+    return tools;
+  }
+
+  // Legacy methods for backward compatibility
+
+  /**
+   * Register a server (legacy sync version)
+   */
+  registerServerSync(plugin: DiscoveredMcp): void {
+    this.register(plugin);
+  }
+
+  /**
+   * Execute a tool (legacy sync version)
+   */
+  executeToolSync(toolName: string, args?: unknown): any {
+    registryLogger.info(`Executing tool (sync): ${toolName}`);
+    return { result: `Mock execution of ${toolName}`, args };
+  }
+
+  /**
+   * List all tools (legacy sync version)
+   */
+  listToolsSync(): Array<{ name: string; description?: string }> {
+    const tools = this.list().map((plugin) => ({
+      name: plugin.metadata.name,
+      description: plugin.metadata.description || "No description",
+    }));
+    return tools;
+  }
 }
 
 /**
- * Default registry instance
+ * Enhanced MCP Registry implementation with config integration
+ * Will be implemented in Phase 3.2
  */
-export const mcpRegistry = new MCPRegistry();
+export class McpRegistryImpl implements McpRegistry {
+  private baseRegistry = new MCPRegistry();
+  // Additional implementation will be added in Phase 3.2
 
-// Type aliases for backward compatibility
-export type MCPToolRegistry = MCPRegistry;
-export const defaultToolRegistry = mcpRegistry;
+  async registerServer(
+    serverId: string,
+    serverConfig?: unknown,
+    context?: ExecutionContext,
+  ): Promise<void> {
+    return this.baseRegistry.registerServer(serverId, serverConfig, context);
+  }
 
-// Additional exports for compatibility
-export { mcpRegistry as defaultMCPRegistry };
+  async executeTool<T = unknown>(
+    toolName: string,
+    args?: unknown,
+    context?: ExecutionContext,
+  ): Promise<T> {
+    return this.baseRegistry.executeTool<T>(toolName, args, context);
+  }
 
-// Export tool execution options type
-export interface ToolExecutionOptions {
-  preferredSource?: string;
-  fallbackEnabled?: boolean;
-  validateBeforeExecution?: boolean;
-  timeoutMs?: number;
+  async listTools(context?: ExecutionContext): Promise<ToolInfo[]> {
+    return this.baseRegistry.listTools(context);
+  }
 }

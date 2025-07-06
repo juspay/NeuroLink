@@ -139,6 +139,7 @@ export default [
       "scripts/**",
       "memory-bank/**",
       "archive/**",
+      "examples/**",
       "*.config.js",
       "*.config.ts",
       ".changeset/**",

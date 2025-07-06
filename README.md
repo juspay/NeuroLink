@@ -7,9 +7,69 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 [![CI](https://github.com/juspay/neurolink/workflows/CI/badge.svg)](https://github.com/juspay/neurolink/actions)
 
-> Universal AI toolkit with multiple provider support, automatic fallback, and both CLI + SDK interfaces. Production-ready with TypeScript support.
+> Enterprise AI Development Platform with real-time capabilities, advanced telemetry, and universal provider support. Production-ready with TypeScript support.
 
-**NeuroLink** unifies OpenAI, Bedrock, Vertex AI, Google AI Studio, Anthropic, Azure OpenAI, Hugging Face, Ollama, and Mistral AI with intelligent fallback and streaming support. Available as both a **programmatic SDK** and **professional CLI tool**. Extracted from production use at Juspay.
+**NeuroLink** is an Enterprise AI Development Platform that unifies 9 major AI providers with intelligent fallback, real-time WebSocket infrastructure, and optional enterprise telemetry. Available as both a **programmatic SDK** and **professional CLI tool**. Extracted from production use at Juspay.
+
+## 🚀 Enterprise Platform Features
+
+- **🌐 Real-time WebSocket Infrastructure** - Professional-grade streaming with session management
+- **📊 Advanced Telemetry** - Optional OpenTelemetry monitoring with zero overhead when disabled
+- **💬 Enhanced Chat Services** - Dual-mode SSE + WebSocket support for enterprise applications
+- **🏗️ Enterprise Architecture** - Production-ready scaling with connection pooling and optimization
+
+## 🏗️ Enterprise Configuration Management
+
+### **✨ NEW: Automatic Backup System**
+
+```bash
+# All config changes create automatic backups
+npm run config:update
+# ✅ Backup created: .neurolink.backups/neurolink-config-2025-01-07T10-30-00.js
+
+# Auto-restore on failures
+npm run config:validate
+# ✅ Config validated with suggestions and warnings
+```
+
+### **✨ NEW: Industry-Standard Interfaces**
+
+```typescript
+// Modern camelCase interfaces with rich context
+interface ExecutionContext {
+  sessionId?: string;
+  userId?: string;
+  aiProvider?: string;
+  permissions?: string[];
+  cacheOptions?: CacheOptions;
+  fallbackOptions?: FallbackOptions;
+  metadata?: Record<string, unknown>;
+}
+
+// Optional methods for maximum flexibility
+interface McpRegistry {
+  registerServer?(
+    serverId: string,
+    config?: unknown,
+    context?: ExecutionContext,
+  ): Promise<void>;
+  executeTool?<T>(
+    toolName: string,
+    args?: unknown,
+    context?: ExecutionContext,
+  ): Promise<T>;
+  listTools?(context?: ExecutionContext): Promise<ToolInfo[]>;
+}
+```
+
+### **Enterprise Features**
+
+- **🔄 Automatic Backup/Restore** - Timestamped backups with hash verification
+- **✅ Config Validation** - Comprehensive validation with suggestions
+- **🏗️ Factory-First MCP** - Lighthouse-compatible architecture (99% compatible)
+- **🔧 Type Safety** - Industry-standard TypeScript interfaces
+- **⚡ Performance** - Tool execution <1ms, pipeline execution ~22ms
+- **🛡️ Error Recovery** - Graceful failures with auto-restore
 
 ## 🚀 Quick Start
 
@@ -22,6 +82,12 @@ export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
 # CLI - No installation required
 npx @juspay/neurolink generate "Hello, AI"
 npx @juspay/neurolink gen "Hello, AI"        # Shortest form
+
+# 🆕 NEW: AI Enhancement Features
+npx @juspay/neurolink generate "Explain AI" --enable-analytics --debug
+npx @juspay/neurolink generate "Write code" --enable-evaluation --debug
+npx @juspay/neurolink generate "Help me" --context '{"userId":"123"}' --debug
+
 npx @juspay/neurolink status
 ```
 
@@ -44,6 +110,173 @@ const result = await provider.generateText({
 
 console.log(result.text);
 console.log(`Used: ${result.provider}`);
+```
+
+#### 🔗 CLI-SDK Consistency (NEW! ✨)
+
+Method aliases that match CLI command names:
+
+```typescript
+// All three methods are equivalent:
+const result1 = await provider.generateText({ prompt: "Hello" }); // Original
+const result2 = await provider.generate({ prompt: "Hello" }); // Matches CLI 'generate'
+const result3 = await provider.gen({ prompt: "Hello" }); // Matches CLI 'gen'
+
+// Use whichever style you prefer:
+const provider = createBestAIProvider();
+
+// Detailed method name
+const story = await provider.generateText({
+  prompt: "Write a short story about AI",
+  maxTokens: 200,
+});
+
+// CLI-style method names
+const poem = await provider.generate({ prompt: "Write a poem" });
+const joke = await provider.gen({ prompt: "Tell me a joke" });
+```
+
+### 🆕 Enhanced Usage (NEW! ✨)
+
+#### Enhanced CLI with Analytics & Evaluation
+
+```bash
+# Basic AI generation
+npx @juspay/neurolink generate "Write a business email"
+
+# With analytics and evaluation (NEW!)
+npx @juspay/neurolink generate "Write a business email" --enable-analytics --enable-evaluation --debug
+
+# See detailed usage data:
+# 📊 Analytics: Provider usage, token costs, response times
+# ⭐ Response Evaluation: AI-powered quality scores
+
+# With custom context
+npx @juspay/neurolink generate "Create a proposal" --context '{"company":"TechCorp"}' --debug
+```
+
+#### Enhanced SDK with Analytics & Evaluation
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+// Basic usage
+const result = await neurolink.generateText("Write a story");
+
+// With enhancements (NEW!)
+const enhancedResult = await neurolink.generateText({
+  prompt: "Write a business proposal",
+  enableAnalytics: true, // Get usage & cost data
+  enableEvaluation: true, // Get AI quality scores
+  context: { project: "Q1-sales" }, // Custom context
+});
+
+// Access enhancement data
+console.log("📊 Usage:", enhancedResult.analytics);
+console.log("⭐ Quality:", enhancedResult.evaluation);
+console.log("Response:", enhancedResult.content);
+
+// 🆕 NEW: Enhanced Evaluation with Domain Awareness
+import {
+  performEnhancedEvaluation,
+  createEnhancedContext,
+} from "@juspay/neurolink";
+
+const enhancedContext = createEnhancedContext(
+  "Write a business proposal for Q1 expansion",
+  enhancedResult.text,
+  {
+    domain: "Business development",
+    role: "Business proposal assistant",
+    toolsUsed: ["generate-text", "analytics-helper"],
+    conversationHistory: [
+      { role: "user", content: "I need help with our Q1 business plan" },
+      {
+        role: "assistant",
+        content: "I can help you create a comprehensive plan",
+      },
+    ],
+  },
+);
+
+const domainEvaluation = await performEnhancedEvaluation(enhancedContext);
+console.log("🎯 Enhanced Evaluation:", domainEvaluation);
+// {
+//   relevanceScore: 9, accuracyScore: 8, completenessScore: 9,
+//   domainAlignment: 9, terminologyAccuracy: 8, toolEffectiveness: 9,
+//   overall: 8.7, alertSeverity: 'none'
+// }
+```
+
+### 🌐 Enterprise Real-time Features (NEW! 🚀)
+
+#### Real-time WebSocket Chat
+
+```typescript
+import {
+  createEnhancedChatService,
+  NeuroLinkWebSocketServer,
+} from "@juspay/neurolink";
+
+// Enhanced chat with WebSocket support
+const chatService = createEnhancedChatService({
+  provider: await createBestAIProvider(),
+  enableWebSocket: true,
+  enableSSE: true,
+  streamingConfig: {
+    bufferSize: 8192,
+    compressionEnabled: true,
+  },
+});
+
+// WebSocket server for real-time applications
+const wsServer = new NeuroLinkWebSocketServer({
+  port: 8080,
+  maxConnections: 1000,
+  enableCompression: true,
+});
+
+// Handle real-time chat
+wsServer.on("chat-message", async ({ connectionId, message }) => {
+  await chatService.streamChat({
+    prompt: message.data.prompt,
+    onChunk: (chunk) => {
+      wsServer.sendMessage(connectionId, {
+        type: "ai-chunk",
+        data: { chunk },
+      });
+    },
+  });
+});
+```
+
+#### Enterprise Telemetry Integration
+
+```typescript
+import { initializeTelemetry, getTelemetryStatus } from "@juspay/neurolink";
+
+// Optional enterprise monitoring (zero overhead when disabled)
+const telemetry = initializeTelemetry({
+  serviceName: "my-ai-app",
+  endpoint: "http://localhost:4318",
+  enableTracing: true,
+  enableMetrics: true,
+  enableLogs: true,
+});
+
+// Check telemetry status
+const status = await getTelemetryStatus();
+console.log("Telemetry enabled:", status.enabled);
+console.log("Service:", status.service);
+console.log("Version:", status.version);
+
+// All AI operations are now automatically monitored
+const provider = await createBestAIProvider();
+const result = await provider.generateText({
+  prompt: "Generate business report",
+});
+// Telemetry automatically tracks: response time, token usage, cost, errors
 ```
 
 ### Environment Setup

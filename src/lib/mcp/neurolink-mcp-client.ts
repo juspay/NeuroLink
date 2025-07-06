@@ -13,6 +13,7 @@ import type {
 } from "./factory.js";
 import { logger } from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
+import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 
 /**
  * Tool Detection Pattern
@@ -491,7 +492,7 @@ Please provide a natural response based on the tool results.`;
     const response = await this.provider.generateText({
       prompt: enhancedPrompt,
       temperature: 0.7,
-      maxTokens: 1000,
+      maxTokens: DEFAULT_MAX_TOKENS,
     });
 
     return response?.text || toolResultsText;

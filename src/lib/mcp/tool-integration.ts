@@ -122,7 +122,7 @@ export class MCPToolIntegration {
         results.push({
           name: toolInfo.name,
           description: toolInfo.description || "No description available",
-          serverId: toolInfo.server || "unknown",
+          serverId: toolInfo.serverId || "unknown",
           relevance,
         });
       }
@@ -150,7 +150,7 @@ export class MCPToolIntegration {
         this.context,
       );
 
-      return result;
+      return result as ToolResult;
     } catch (error) {
       logger.error("[Tool Integration] Tool execution failed:", error);
       return {

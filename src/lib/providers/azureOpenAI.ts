@@ -9,6 +9,7 @@ import type {
   AIProvider,
   TextGenerationOptions,
   StreamTextOptions,
+  EnhancedGenerateTextResult,
 } from "../core/types.js";
 import { AIProviderName } from "../core/types.js";
 import { logger } from "../utils/logger.js";
@@ -17,6 +18,9 @@ import {
   TimeoutError,
   getDefaultTimeout,
 } from "../utils/timeout.js";
+import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { evaluateResponse } from "../core/evaluation.js";
+import { createAnalytics } from "../core/analytics.js";
 
 // Azure OpenAI specific types
 interface AzureOpenAIMessage {
@@ -176,6 +180,7 @@ export class AzureOpenAIProvider implements AIProvider {
   ): Promise<any> {
     const functionTag = "AzureOpenAIProvider.generateText";
     const provider = "azure";
+    const startTime = Date.now();
 
     logger.debug(`[${functionTag}] Starting text generation`);
 
@@ -188,7 +193,7 @@ export class AzureOpenAIProvider implements AIProvider {
     const {
       prompt,
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = DEFAULT_MAX_TOKENS,
       systemPrompt = "You are a helpful AI assistant.",
       timeout = getDefaultTimeout(provider, "generate"),
     } = options;
@@ -241,7 +246,7 @@ export class AzureOpenAIProvider implements AIProvider {
 
       const content = data.choices[0]?.message?.content || "";
 
-      return {
+      const result: any = {
         content,
         provider: this.name,
         model: data.model,
@@ -252,6 +257,28 @@ export class AzureOpenAIProvider implements AIProvider {
         },
         finishReason: data.choices[0]?.finish_reason || "stop",
       };
+
+      // Add analytics if enabled
+      if (options.enableAnalytics) {
+        result.analytics = {
+          provider: this.name,
+          model: data.model,
+          tokens: result.usage,
+          responseTime: Date.now() - startTime,
+          context: options.context,
+        };
+      }
+
+      // Add evaluation if enabled
+      if (options.enableEvaluation) {
+        result.evaluation = await evaluateResponse(
+          options.prompt,
+          content,
+          options.context,
+        );
+      }
+
+      return result;
     } catch (error) {
       // Always cleanup timeout
       timeoutController?.cleanup();
@@ -302,7 +329,7 @@ export class AzureOpenAIProvider implements AIProvider {
     const {
       prompt,
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = DEFAULT_MAX_TOKENS,
       systemPrompt = "You are a helpful AI assistant.",
       timeout = getDefaultTimeout(provider, "stream"),
     } = options;
@@ -466,7 +493,7 @@ export class AzureOpenAIProvider implements AIProvider {
     const {
       prompt,
       temperature = 0.7,
-      maxTokens = 1000,
+      maxTokens = DEFAULT_MAX_TOKENS,
       systemPrompt = "You are a helpful AI assistant.",
     } = options;
 
@@ -654,5 +681,19 @@ export class AzureOpenAIProvider implements AIProvider {
       "enterprise-security",
       "content-filtering",
     ];
+  }
+
+  async generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
+  }
+
+  async gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: any,
+  ): Promise<EnhancedGenerateTextResult | null> {
+    return this.generateText(optionsOrPrompt, analysisSchema);
   }
 }

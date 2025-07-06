@@ -55,10 +55,9 @@ export enum VertexModels {
  * Supported Models for Google AI Studio
  */
 export enum GoogleAIModels {
-  GEMINI_1_5_PRO_LATEST = "gemini-1.5-pro-latest",
-  GEMINI_1_5_FLASH_LATEST = "gemini-1.5-flash-latest",
-  GEMINI_2_0_FLASH_EXP = "gemini-2.0-flash-exp",
-  GEMINI_1_0_PRO = "gemini-1.0-pro",
+  GEMINI_2_5_PRO = "gemini-2.5-pro",
+  GEMINI_2_5_FLASH = "gemini-2.5-flash",
+  GEMINI_1_5_FLASH_LITE = "gemini-2.5-flash-lite",
 }
 
 /**
@@ -100,6 +99,15 @@ export interface TextGenerationOptions {
   schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
   tools?: Record<string, Tool>; // Enable MCP tools integration
   timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
+  // NEW: Analytics and Evaluation Support
+  enableEvaluation?: boolean; // Default: false - AI quality scoring
+  enableAnalytics?: boolean; // Default: false - Usage tracking
+  context?: Record<string, any>; // Default: undefined - Custom context
+
+  // NEW: Lighthouse-Compatible Domain-Aware Evaluation
+  evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
+  toolUsageContext?: string; // Tools/MCPs used in this interaction
+  conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
 }
 
 /**
@@ -114,6 +122,179 @@ export interface StreamTextOptions {
   schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
   tools?: Record<string, Tool>; // Enable MCP tools integration
   timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
+  // NEW: Analytics and Evaluation Support
+  enableEvaluation?: boolean; // Default: false - AI quality scoring
+  enableAnalytics?: boolean; // Default: false - Usage tracking
+  context?: Record<string, any>; // Default: undefined - Custom context
+
+  // NEW: Lighthouse-Compatible Domain-Aware Evaluation
+  evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
+  toolUsageContext?: string; // Tools/MCPs used in this interaction
+  conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
+}
+
+/**
+ * Analytics data for usage tracking
+ */
+export interface AnalyticsData {
+  provider: string;
+  model: string;
+  tokens: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  cost?: number; // Optional cost calculation
+  responseTime: number; // Milliseconds
+  timestamp: string; // ISO timestamp
+  context?: Record<string, any>; // User context
+}
+
+/**
+ * Response quality evaluation scores (Lighthouse-Compatible Schema)
+ * Updated to match Lighthouse's exact evaluation interface for consistency
+ */
+export interface EvaluationData {
+  // Core scores (1-10 scale) - Lighthouse field names
+  relevanceScore: number; // How well response addresses query intent and domain alignment
+  accuracyScore: number; // Factual correctness and terminological accuracy
+  completenessScore: number; // How completely the response addresses the query
+  overall: number; // Overall quality (derived from above scores)
+
+  // Advanced insights (exact Lighthouse schema)
+  isOffTopic: boolean; // True if response significantly deviates from query/domain
+  alertSeverity: "low" | "medium" | "high" | "none"; // Quality alert level
+  reasoning: string; // Brief justification for scores (max 150 words)
+  suggestedImprovements?: string; // How to improve the response (max 100 words)
+
+  // Metadata
+  evaluationModel: string; // Model used for evaluation
+  evaluationTime: number; // Time taken for evaluation (ms)
+
+  // Enhanced metadata (Universal Evaluation System)
+  evaluationProvider?: string; // Provider used for evaluation
+  evaluationAttempt?: number; // Attempt number (for retry logic)
+  evaluationConfig?: {
+    // Evaluation configuration details
+    mode: string;
+    fallbackUsed: boolean;
+    costEstimate: number;
+  };
+}
+
+/**
+ * BACKWARD COMPATIBILITY: Legacy evaluation interface
+ * Maintains existing field names for backward compatibility
+ */
+export interface LegacyEvaluationData {
+  relevance: number; // Legacy field name
+  accuracy: number; // Legacy field name
+  completeness: number; // Legacy field name
+  overall: number;
+  isOffTopic: boolean;
+  alertSeverity: "low" | "medium" | "high" | "none";
+  reasoning: string;
+  suggestedImprovements?: string;
+  evaluationModel: string;
+  evaluationTime: number;
+}
+
+/**
+ * Evaluation system configuration for multi-provider support
+ */
+export interface EvaluationConfig {
+  provider: string;
+  model: string;
+  mode: "fast" | "balanced" | "quality";
+  fallbackEnabled: boolean;
+  fallbackProviders: string[];
+  timeout: number;
+  maxTokens: number;
+  temperature: number;
+  preferCheap: boolean;
+  maxCostPerEval: number;
+  retryAttempts: number;
+}
+
+/**
+ * Provider model configuration for evaluation
+ */
+export interface ProviderModelConfig {
+  provider: string;
+  models: {
+    fast: string;
+    balanced: string;
+    quality: string;
+  };
+  costPerToken: {
+    input: number;
+    output: number;
+  };
+  requiresApiKey: string[];
+  performance: {
+    speed: number; // 1-3 scale
+    quality: number; // 1-3 scale
+    cost: number; // 1-3 scale (higher = cheaper)
+  };
+}
+
+/**
+ * Enhanced result interfaces with optional analytics/evaluation
+ */
+export interface EnhancedGenerateTextResult
+  extends GenerateTextResult<ToolSet, unknown> {
+  analytics?: AnalyticsData;
+  evaluation?: EvaluationData;
+}
+
+export interface EnhancedStreamTextResult
+  extends StreamTextResult<ToolSet, unknown> {
+  analytics?: AnalyticsData;
+  evaluation?: EvaluationData;
+}
+
+/**
+ * Phase 2: Enhanced Streaming Infrastructure
+ * Progress tracking and metadata for streaming operations
+ */
+export interface StreamingProgressData {
+  chunkCount: number;
+  totalBytes: number;
+  chunkSize: number;
+  elapsedTime: number;
+  estimatedRemaining?: number;
+  streamId?: string;
+  phase: "initializing" | "streaming" | "processing" | "complete" | "error";
+}
+
+export interface StreamingMetadata {
+  startTime: number;
+  endTime?: number;
+  totalDuration?: number;
+  averageChunkSize: number;
+  maxChunkSize: number;
+  minChunkSize: number;
+  throughputBytesPerSecond?: number;
+  streamingProvider: string;
+  modelUsed: string;
+}
+
+export type ProgressCallback = (progress: StreamingProgressData) => void;
+
+export interface EnhancedStreamTextOptions extends StreamTextOptions {
+  // Phase 2.1: Streaming Progress Tracking
+  enableProgressTracking?: boolean;
+  progressCallback?: ProgressCallback;
+  includeStreamingMetadata?: boolean;
+  streamingBufferSize?: number;
+
+  // Phase 2.2: Response Enhancement
+  enableStreamingHeaders?: boolean;
+  customStreamingConfig?: {
+    chunkDelayMs?: number;
+    maxConcurrentChunks?: number;
+    compressionEnabled?: boolean;
+  };
 }
 
 /**
@@ -123,12 +304,23 @@ export interface AIProvider {
   streamText(
     optionsOrPrompt: StreamTextOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<StreamTextResult<ToolSet, unknown> | null>;
+  ): Promise<EnhancedStreamTextResult | null>;
 
   generateText(
     optionsOrPrompt: TextGenerationOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<GenerateTextResult<ToolSet, unknown> | null>;
+  ): Promise<EnhancedGenerateTextResult | null>;
+
+  // CLI-SDK Consistency: Aliases for generateText
+  generate(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<EnhancedGenerateTextResult | null>;
+
+  gen(
+    optionsOrPrompt: TextGenerationOptions | string,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<EnhancedGenerateTextResult | null>;
 }
 
 /**

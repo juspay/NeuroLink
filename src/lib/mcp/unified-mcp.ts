@@ -226,6 +226,13 @@ export class UnifiedMCPSystem {
       0,
     );
 
+    // Calculate total tools from registry
+    const registryToolCount = this.registry.getToolCount
+      ? this.registry.getToolCount()
+      : 0;
+    const totalTools =
+      internalToolCount + externalStatus.totalTools + registryToolCount;
+
     return {
       isInitialized: this.isInitialized,
       internalServers: {
@@ -237,7 +244,7 @@ export class UnifiedMCPSystem {
         connected: externalStatus.connected,
         tools: externalStatus.totalTools,
       },
-      totalTools: registryStats.totalTools,
+      totalTools,
       registryStats,
     };
   }

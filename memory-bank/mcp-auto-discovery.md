@@ -303,7 +303,7 @@ $ npx neurolink generate-text "Can you help me refactor code and tell me the tim
 ```typescript
 // CRITICAL: maxSteps enables multi-turn conversations
 generateText({
-  model: google('gemini-1.5-pro-latest'),
+  model: google('gemini-2.5-pro'),
   tools: discoveredTools,
   maxSteps: 5, // NOT maxToolRoundtrips - this was the key fix
   prompt: "What time is it right now?"

@@ -205,7 +205,7 @@ npm run build  # Should compile successfully
 import { AIProviderFactory } from "neurolink";
 
 // Automatically selects best available provider
-const provider = AIProviderFactory.createBestProvider();
+const provider = AIProviderFactory.createBestAIProvider();
 
 // Use with your AI application
 const response = await provider.generateText({

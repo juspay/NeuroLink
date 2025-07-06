@@ -3,6 +3,8 @@
  * Implements the proven Vercel AI SDK proxy pattern using undici
  */
 
+import { logger } from "../utils/logger.js";
+
 /**
  * Create a proxy-aware fetch function
  * This implements the community-validated approach for Vercel AI SDK
@@ -13,15 +15,15 @@ export function createProxyFetch(): typeof fetch {
 
   // If no proxy configured, return standard fetch
   if (!httpsProxy && !httpProxy) {
-    console.log(
+    logger.debug(
       "[Proxy Fetch] No proxy environment variables found - using standard fetch",
     );
     return fetch;
   }
 
-  console.log(`[Proxy Fetch] Configuring proxy with undici ProxyAgent:`);
-  console.log(`[Proxy Fetch] HTTP_PROXY: ${httpProxy || "not set"}`);
-  console.log(`[Proxy Fetch] HTTPS_PROXY: ${httpsProxy || "not set"}`);
+  logger.debug(`[Proxy Fetch] Configuring proxy with undici ProxyAgent`);
+  logger.debug(`[Proxy Fetch] HTTP_PROXY: ${httpProxy || "not set"}`);
+  logger.debug(`[Proxy Fetch] HTTPS_PROXY: ${httpsProxy || "not set"}`);
 
   // Return proxy-aware fetch function
   return async (
@@ -42,7 +44,7 @@ export function createProxyFetch(): typeof fetch {
       const proxyUrl = url.protocol === "https:" ? httpsProxy : httpProxy;
 
       if (proxyUrl) {
-        console.log(
+        logger.debug(
           `[Proxy Fetch] Creating ProxyAgent for ${url.hostname} via ${proxyUrl}`,
         );
 
@@ -58,13 +60,13 @@ export function createProxyFetch(): typeof fetch {
           } as any,
         );
 
-        console.log(
+        logger.debug(
           `[Proxy Fetch] ✅ Request proxied successfully to ${url.hostname}`,
         );
         return response as any; // Type assertion to avoid complex type issues
       }
     } catch (error: any) {
-      console.warn(
+      logger.warn(
         `[Proxy Fetch] Proxy failed (${error.message}), falling back to direct connection`,
       );
     }

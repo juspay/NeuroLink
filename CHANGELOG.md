@@ -1,23 +1,21 @@
 ## [3.0.1](https://github.com/juspay/neurolink/compare/v3.0.0...v3.0.1) (2025-07-01)
 
-
 ### Bug Fixes
 
-* **cli:** honor --model parameter in CLI commands ([467ea85](https://github.com/juspay/neurolink/commit/467ea8548688a9db6046c98dbfd268ecd297605c))
+- **cli:** honor --model parameter in CLI commands ([467ea85](https://github.com/juspay/neurolink/commit/467ea8548688a9db6046c98dbfd268ecd297605c))
 
 # [3.0.0](https://github.com/juspay/neurolink/compare/v2.1.0...v3.0.0) (2025-07-01)
 
-
 ### Features
 
-* **proxy:** add comprehensive enterprise proxy support across all providers ([9668e67](https://github.com/juspay/neurolink/commit/9668e67dfaa27831ba85d45fdf5b7739de902b28))
-
+- **proxy:** add comprehensive enterprise proxy support across all providers ([9668e67](https://github.com/juspay/neurolink/commit/9668e67dfaa27831ba85d45fdf5b7739de902b28))
 
 ### BREAKING CHANGES
 
-* **proxy:** None - fully backward compatible
+- **proxy:** None - fully backward compatible
 
 Files modified:
+
 - docs/ENTERPRISE-PROXY-SETUP.md (NEW) - Comprehensive enterprise proxy guide
 - docs/PROVIDER-CONFIGURATION.md - Added proxy configuration section
 - docs/CLI-GUIDE.md - Added proxy environment variables documentation

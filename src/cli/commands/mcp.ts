@@ -1116,14 +1116,14 @@ export function addMCPCommands(yargs: Argv): Argv {
               console.log(chalk.gray("─".repeat(80)));
 
               filteredServers.forEach((server, index) => {
-                const sourceIcon = getSourceTypeIcon(server.source);
-                const priorityColor = chalk.gray; // Default color
-
+                const sourceIcon = getSourceTypeIcon(
+                  String(server.source || "unknown"),
+                );
                 console.log(
                   `${chalk.white(`${index + 1}.`)} ${sourceIcon} ${chalk.cyan(server.metadata.name)}`,
                 );
                 console.log(
-                  `   ${chalk.gray("Version:")} ${server.metadata.version}`,
+                  `   ${chalk.gray("Version:")} ${String(server.metadata.version || "unknown")}`,
                 );
                 console.log(`   ${chalk.gray("Source:")} ${server.source}`);
                 console.log(`   ${chalk.gray("Entry:")} ${server.entryPath}`);
@@ -1140,7 +1140,7 @@ export function addMCPCommands(yargs: Argv): Argv {
               });
 
               // Display statistics
-              const stats = await unifiedRegistry.getStats();
+              const stats = await unifiedRegistry.getDetailedStats();
               console.log(chalk.blue("📊 Registry Statistics:"));
               console.log(`   ${chalk.gray("Total plugins:")} ${stats.total}`);
               console.log(
@@ -1229,7 +1229,11 @@ export function addMCPCommands(yargs: Argv): Argv {
               });
 
               const executionOptions = {
-                preferredSource: argv.source as any,
+                preferredSource: argv.source as
+                  | "manual"
+                  | "auto"
+                  | "default"
+                  | "all",
                 fallbackEnabled: !argv["no-fallback"],
                 validateBeforeExecution: true,
                 timeoutMs: 30000,
