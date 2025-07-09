@@ -17,8 +17,8 @@ const { NeuroLink } = require("@juspay/neurolink");
 const neurolink = new NeuroLink();
 
 const result = await neurolink.generateText({
-  prompt: "Write a professional email",
-  enableAnalytics: true,
+	prompt: "Write a professional email",
+	enableAnalytics: true,
 });
 
 console.log("📊 Analytics:", result.analytics);
@@ -28,8 +28,8 @@ console.log("📊 Analytics:", result.analytics);
 
 ```javascript
 const result = await neurolink.generateText({
-  prompt: "Explain quantum computing",
-  enableEvaluation: true,
+	prompt: "Explain quantum computing",
+	enableEvaluation: true,
 });
 
 console.log("⭐ Quality:", result.evaluation);
@@ -46,25 +46,25 @@ const app = express();
 const neurolink = new NeuroLink();
 
 app.post("/api/generate", async (req, res) => {
-  const result = await neurolink.generateText({
-    prompt: req.body.prompt,
-    enableAnalytics: true,
-    enableEvaluation: true,
-    context: {
-      department: req.body.department,
-      user_id: req.headers["user-id"],
-    },
-  });
+	const result = await neurolink.generateText({
+		prompt: req.body.prompt,
+		enableAnalytics: true,
+		enableEvaluation: true,
+		context: {
+			department: req.body.department,
+			user_id: req.headers["user-id"],
+		},
+	});
 
-  // Quality gate
-  if (result.evaluation.overall < 7) {
-    return res.status(400).json({
-      error: "Quality threshold not met",
-      quality_score: result.evaluation.overall,
-    });
-  }
+	// Quality gate
+	if (result.evaluation.overall < 7) {
+		return res.status(400).json({
+			error: "Quality threshold not met",
+			quality_score: result.evaluation.overall,
+		});
+	}
 
-  res.json(result);
+	res.json(result);
 });
 ```
 
@@ -74,17 +74,17 @@ app.post("/api/generate", async (req, res) => {
 
 ```javascript
 class CostOptimizer {
-  getOptimalConfig(maxCost, qualityTarget) {
-    const configs = [
-      { provider: "openai", model: "gpt-4", cost: 0.08, quality: 9 },
-      { provider: "google-ai", model: "gemini-pro", cost: 0.04, quality: 8 },
-      { provider: "google-ai", model: "gemini-flash", cost: 0.01, quality: 7 },
-    ];
+	getOptimalConfig(maxCost, qualityTarget) {
+		const configs = [
+			{ provider: "openai", model: "gpt-4", cost: 0.08, quality: 9 },
+			{ provider: "google-ai", model: "gemini-pro", cost: 0.04, quality: 8 },
+			{ provider: "google-ai", model: "gemini-flash", cost: 0.01, quality: 7 },
+		];
 
-    return configs
-      .filter((c) => c.cost <= maxCost && c.quality >= qualityTarget)
-      .sort((a, b) => b.quality - a.quality)[0];
-  }
+		return configs
+			.filter((c) => c.cost <= maxCost && c.quality >= qualityTarget)
+			.sort((a, b) => b.quality - a.quality)[0];
+	}
 }
 ```
 
@@ -95,29 +95,29 @@ const fs = require("fs");
 const csv = require("csv-parser");
 
 class BatchProcessor {
-  async processCSV(inputFile) {
-    const items = [];
+	async processCSV(inputFile) {
+		const items = [];
 
-    await new Promise((resolve) => {
-      fs.createReadStream(inputFile)
-        .pipe(csv())
-        .on("data", (row) => items.push(row))
-        .on("end", resolve);
-    });
+		await new Promise((resolve) => {
+			fs.createReadStream(inputFile)
+				.pipe(csv())
+				.on("data", (row) => items.push(row))
+				.on("end", resolve);
+		});
 
-    for (const item of items) {
-      const result = await neurolink.generateText({
-        prompt: `Create marketing copy for: ${item.name}`,
-        enableAnalytics: true,
-        enableEvaluation: true,
-        context: { product_id: item.id, batch: true },
-      });
+		for (const item of items) {
+			const result = await neurolink.generateText({
+				prompt: `Create marketing copy for: ${item.name}`,
+				enableAnalytics: true,
+				enableEvaluation: true,
+				context: { product_id: item.id, batch: true },
+			});
 
-      console.log(
-        `Processed ${item.name}: Quality ${result.evaluation.overall}/10`,
-      );
-    }
-  }
+			console.log(
+				`Processed ${item.name}: Quality ${result.evaluation.overall}/10`,
+			);
+		}
+	}
 }
 ```
 
@@ -130,34 +130,34 @@ class BatchProcessor {
 const analyticsStore = { requests: [], stats: {} };
 
 app.post("/api/generate", async (req, res) => {
-  const result = await neurolink.generateText({
-    ...req.body,
-    enableAnalytics: true,
-    enableEvaluation: true,
-  });
+	const result = await neurolink.generateText({
+		...req.body,
+		enableAnalytics: true,
+		enableEvaluation: true,
+	});
 
-  // Store analytics
-  analyticsStore.requests.push({
-    timestamp: new Date(),
-    ...result.analytics,
-    quality: result.evaluation,
-  });
+	// Store analytics
+	analyticsStore.requests.push({
+		timestamp: new Date(),
+		...result.analytics,
+		quality: result.evaluation,
+	});
 
-  res.json(result);
+	res.json(result);
 });
 
 // Dashboard endpoint
 app.get("/api/dashboard", (req, res) => {
-  const last24h = analyticsStore.requests.filter(
-    (r) => r.timestamp > new Date(Date.now() - 24 * 60 * 60 * 1000),
-  );
+	const last24h = analyticsStore.requests.filter(
+		(r) => r.timestamp > new Date(Date.now() - 24 * 60 * 60 * 1000),
+	);
 
-  res.json({
-    totalRequests: last24h.length,
-    totalCost: last24h.reduce((sum, r) => sum + (r.cost || 0), 0),
-    avgQuality:
-      last24h.reduce((sum, r) => sum + r.quality.overall, 0) / last24h.length,
-  });
+	res.json({
+		totalRequests: last24h.length,
+		totalCost: last24h.reduce((sum, r) => sum + (r.cost || 0), 0),
+		avgQuality:
+			last24h.reduce((sum, r) => sum + r.quality.overall, 0) / last24h.length,
+	});
 });
 ```
 
@@ -192,18 +192,18 @@ npx @juspay/neurolink generate "Business proposal" \
 
 ```javascript
 const productResult = await neurolink.generateText({
-  prompt: `Product: ${product.name}\nFeatures: ${product.features}`,
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    category: product.category,
-    price_tier: product.priceTier,
-  },
+	prompt: `Product: ${product.name}\nFeatures: ${product.features}`,
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		category: product.category,
+		price_tier: product.priceTier,
+	},
 });
 
 // Cost optimization by category
 if (product.category === "basic" && productResult.analytics.cost > 0.05) {
-  // Switch to cheaper model for basic products
+	// Switch to cheaper model for basic products
 }
 ```
 
@@ -211,17 +211,17 @@ if (product.category === "basic" && productResult.analytics.cost > 0.05) {
 
 ```javascript
 const medicalContent = await neurolink.generateText({
-  prompt: "Diabetes management guide for patients",
-  enableEvaluation: true,
-  context: {
-    content_type: "medical",
-    accuracy_required: 95,
-  },
+	prompt: "Diabetes management guide for patients",
+	enableEvaluation: true,
+	context: {
+		content_type: "medical",
+		accuracy_required: 95,
+	},
 });
 
 // Strict medical accuracy requirements
 if (medicalContent.evaluation.accuracy < 9) {
-  await medicalReview(medicalContent);
+	await medicalReview(medicalContent);
 }
 ```
 
@@ -229,18 +229,18 @@ if (medicalContent.evaluation.accuracy < 9) {
 
 ```javascript
 const supportResponse = await neurolink.generateText({
-  prompt: `Customer issue: ${ticket.description}`,
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    customer_tier: customer.tier,
-    urgency: ticket.priority,
-  },
+	prompt: `Customer issue: ${ticket.description}`,
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		customer_tier: customer.tier,
+		urgency: ticket.priority,
+	},
 });
 
 // Quality gates based on customer tier
 if (customer.tier === "enterprise" && supportResponse.evaluation.overall < 9) {
-  await escalateToHuman(ticket);
+	await escalateToHuman(ticket);
 }
 ```
 

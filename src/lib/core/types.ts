@@ -1,153 +1,153 @@
 import type { ZodType, ZodTypeDef } from "zod";
 import type {
-  StreamTextResult,
-  ToolSet,
-  Schema,
-  GenerateTextResult,
-  Tool,
+	StreamTextResult,
+	ToolSet,
+	Schema,
+	GenerateTextResult,
+	Tool,
 } from "ai";
 
 /**
  * Supported AI Provider Names
  */
 export enum AIProviderName {
-  BEDROCK = "bedrock",
-  OPENAI = "openai",
-  VERTEX = "vertex",
-  ANTHROPIC = "anthropic",
-  AZURE = "azure",
-  GOOGLE_AI = "google-ai",
-  HUGGINGFACE = "huggingface",
-  OLLAMA = "ollama",
-  MISTRAL = "mistral",
+	BEDROCK = "bedrock",
+	OPENAI = "openai",
+	VERTEX = "vertex",
+	ANTHROPIC = "anthropic",
+	AZURE = "azure",
+	GOOGLE_AI = "google-ai",
+	HUGGINGFACE = "huggingface",
+	OLLAMA = "ollama",
+	MISTRAL = "mistral",
 }
 
 /**
  * Supported Models for Amazon Bedrock
  */
 export enum BedrockModels {
-  CLAUDE_3_SONNET = "anthropic.claude-3-sonnet-20240229-v1:0",
-  CLAUDE_3_HAIKU = "anthropic.claude-3-haiku-20240307-v1:0",
-  CLAUDE_3_5_SONNET = "anthropic.claude-3-5-sonnet-20240620-v1:0",
-  CLAUDE_3_7_SONNET = "arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+	CLAUDE_3_SONNET = "anthropic.claude-3-sonnet-20240229-v1:0",
+	CLAUDE_3_HAIKU = "anthropic.claude-3-haiku-20240307-v1:0",
+	CLAUDE_3_5_SONNET = "anthropic.claude-3-5-sonnet-20240620-v1:0",
+	CLAUDE_3_7_SONNET = "arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
 }
 
 /**
  * Supported Models for OpenAI
  */
 export enum OpenAIModels {
-  GPT_4 = "gpt-4",
-  GPT_4_TURBO = "gpt-4-turbo",
-  GPT_4O = "gpt-4o",
-  GPT_4O_MINI = "gpt-4o-mini",
-  GPT_3_5_TURBO = "gpt-3.5-turbo",
+	GPT_4 = "gpt-4",
+	GPT_4_TURBO = "gpt-4-turbo",
+	GPT_4O = "gpt-4o",
+	GPT_4O_MINI = "gpt-4o-mini",
+	GPT_3_5_TURBO = "gpt-3.5-turbo",
 }
 
 /**
  * Supported Models for Google Vertex AI
  */
 export enum VertexModels {
-  CLAUDE_4_0_SONNET = "claude-sonnet-4@20250514",
-  GEMINI_2_5_FLASH = "gemini-2.5-flash-preview-05-20",
+	CLAUDE_4_0_SONNET = "claude-sonnet-4@20250514",
+	GEMINI_2_5_FLASH = "gemini-2.5-flash-preview-05-20",
 }
 
 /**
  * Supported Models for Google AI Studio
  */
 export enum GoogleAIModels {
-  GEMINI_2_5_PRO = "gemini-2.5-pro",
-  GEMINI_2_5_FLASH = "gemini-2.5-flash",
-  GEMINI_1_5_FLASH_LITE = "gemini-2.5-flash-lite",
+	GEMINI_2_5_PRO = "gemini-2.5-pro",
+	GEMINI_2_5_FLASH = "gemini-2.5-flash",
+	GEMINI_1_5_FLASH_LITE = "gemini-2.5-flash-lite",
 }
 
 /**
  * Union type of all supported model names
  */
 export type SupportedModelName =
-  | BedrockModels
-  | OpenAIModels
-  | VertexModels
-  | GoogleAIModels;
+	| BedrockModels
+	| OpenAIModels
+	| VertexModels
+	| GoogleAIModels;
 
 /**
  * Provider configuration specifying provider and its available models
  */
 export interface ProviderConfig {
-  provider: AIProviderName;
-  models: SupportedModelName[];
+	provider: AIProviderName;
+	models: SupportedModelName[];
 }
 
 /**
  * Options for AI requests with unified provider configuration
  */
 export interface StreamingOptions {
-  providers: ProviderConfig[];
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
+	providers: ProviderConfig[];
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
 }
 
 /**
  * Text generation options interface
  */
 export interface TextGenerationOptions {
-  prompt: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
-  tools?: Record<string, Tool>; // Enable MCP tools integration
-  timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
-  // NEW: Analytics and Evaluation Support
-  enableEvaluation?: boolean; // Default: false - AI quality scoring
-  enableAnalytics?: boolean; // Default: false - Usage tracking
-  context?: Record<string, any>; // Default: undefined - Custom context
+	prompt: string;
+	model?: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
+	schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
+	tools?: Record<string, Tool>; // Enable MCP tools integration
+	timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
+	// NEW: Analytics and Evaluation Support
+	enableEvaluation?: boolean; // Default: false - AI quality scoring
+	enableAnalytics?: boolean; // Default: false - Usage tracking
+	context?: Record<string, any>; // Default: undefined - Custom context
 
-  // NEW: Lighthouse-Compatible Domain-Aware Evaluation
-  evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
-  toolUsageContext?: string; // Tools/MCPs used in this interaction
-  conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
+	// NEW: Lighthouse-Compatible Domain-Aware Evaluation
+	evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
+	toolUsageContext?: string; // Tools/MCPs used in this interaction
+	conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
 }
 
 /**
  * Stream text options interface
  */
 export interface StreamTextOptions {
-  prompt: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
-  tools?: Record<string, Tool>; // Enable MCP tools integration
-  timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
-  // NEW: Analytics and Evaluation Support
-  enableEvaluation?: boolean; // Default: false - AI quality scoring
-  enableAnalytics?: boolean; // Default: false - Usage tracking
-  context?: Record<string, any>; // Default: undefined - Custom context
+	prompt: string;
+	model?: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
+	schema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>;
+	tools?: Record<string, Tool>; // Enable MCP tools integration
+	timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
+	// NEW: Analytics and Evaluation Support
+	enableEvaluation?: boolean; // Default: false - AI quality scoring
+	enableAnalytics?: boolean; // Default: false - Usage tracking
+	context?: Record<string, any>; // Default: undefined - Custom context
 
-  // NEW: Lighthouse-Compatible Domain-Aware Evaluation
-  evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
-  toolUsageContext?: string; // Tools/MCPs used in this interaction
-  conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
+	// NEW: Lighthouse-Compatible Domain-Aware Evaluation
+	evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
+	toolUsageContext?: string; // Tools/MCPs used in this interaction
+	conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
 }
 
 /**
  * Analytics data for usage tracking
  */
 export interface AnalyticsData {
-  provider: string;
-  model: string;
-  tokens: {
-    input: number;
-    output: number;
-    total: number;
-  };
-  cost?: number; // Optional cost calculation
-  responseTime: number; // Milliseconds
-  timestamp: string; // ISO timestamp
-  context?: Record<string, any>; // User context
+	provider: string;
+	model: string;
+	tokens: {
+		input: number;
+		output: number;
+		total: number;
+	};
+	cost?: number; // Optional cost calculation
+	responseTime: number; // Milliseconds
+	timestamp: string; // ISO timestamp
+	context?: Record<string, any>; // User context
 }
 
 /**
@@ -155,31 +155,31 @@ export interface AnalyticsData {
  * Updated to match Lighthouse's exact evaluation interface for consistency
  */
 export interface EvaluationData {
-  // Core scores (1-10 scale) - Lighthouse field names
-  relevanceScore: number; // How well response addresses query intent and domain alignment
-  accuracyScore: number; // Factual correctness and terminological accuracy
-  completenessScore: number; // How completely the response addresses the query
-  overall: number; // Overall quality (derived from above scores)
+	// Core scores (1-10 scale) - Lighthouse field names
+	relevanceScore: number; // How well response addresses query intent and domain alignment
+	accuracyScore: number; // Factual correctness and terminological accuracy
+	completenessScore: number; // How completely the response addresses the query
+	overall: number; // Overall quality (derived from above scores)
 
-  // Advanced insights (exact Lighthouse schema)
-  isOffTopic: boolean; // True if response significantly deviates from query/domain
-  alertSeverity: "low" | "medium" | "high" | "none"; // Quality alert level
-  reasoning: string; // Brief justification for scores (max 150 words)
-  suggestedImprovements?: string; // How to improve the response (max 100 words)
+	// Advanced insights (exact Lighthouse schema)
+	isOffTopic: boolean; // True if response significantly deviates from query/domain
+	alertSeverity: "low" | "medium" | "high" | "none"; // Quality alert level
+	reasoning: string; // Brief justification for scores (max 150 words)
+	suggestedImprovements?: string; // How to improve the response (max 100 words)
 
-  // Metadata
-  evaluationModel: string; // Model used for evaluation
-  evaluationTime: number; // Time taken for evaluation (ms)
+	// Metadata
+	evaluationModel: string; // Model used for evaluation
+	evaluationTime: number; // Time taken for evaluation (ms)
 
-  // Enhanced metadata (Universal Evaluation System)
-  evaluationProvider?: string; // Provider used for evaluation
-  evaluationAttempt?: number; // Attempt number (for retry logic)
-  evaluationConfig?: {
-    // Evaluation configuration details
-    mode: string;
-    fallbackUsed: boolean;
-    costEstimate: number;
-  };
+	// Enhanced metadata (Universal Evaluation System)
+	evaluationProvider?: string; // Provider used for evaluation
+	evaluationAttempt?: number; // Attempt number (for retry logic)
+	evaluationConfig?: {
+		// Evaluation configuration details
+		mode: string;
+		fallbackUsed: boolean;
+		costEstimate: number;
+	};
 }
 
 /**
@@ -187,70 +187,70 @@ export interface EvaluationData {
  * Maintains existing field names for backward compatibility
  */
 export interface LegacyEvaluationData {
-  relevance: number; // Legacy field name
-  accuracy: number; // Legacy field name
-  completeness: number; // Legacy field name
-  overall: number;
-  isOffTopic: boolean;
-  alertSeverity: "low" | "medium" | "high" | "none";
-  reasoning: string;
-  suggestedImprovements?: string;
-  evaluationModel: string;
-  evaluationTime: number;
+	relevance: number; // Legacy field name
+	accuracy: number; // Legacy field name
+	completeness: number; // Legacy field name
+	overall: number;
+	isOffTopic: boolean;
+	alertSeverity: "low" | "medium" | "high" | "none";
+	reasoning: string;
+	suggestedImprovements?: string;
+	evaluationModel: string;
+	evaluationTime: number;
 }
 
 /**
  * Evaluation system configuration for multi-provider support
  */
 export interface EvaluationConfig {
-  provider: string;
-  model: string;
-  mode: "fast" | "balanced" | "quality";
-  fallbackEnabled: boolean;
-  fallbackProviders: string[];
-  timeout: number;
-  maxTokens: number;
-  temperature: number;
-  preferCheap: boolean;
-  maxCostPerEval: number;
-  retryAttempts: number;
+	provider: string;
+	model: string;
+	mode: "fast" | "balanced" | "quality";
+	fallbackEnabled: boolean;
+	fallbackProviders: string[];
+	timeout: number;
+	maxTokens: number;
+	temperature: number;
+	preferCheap: boolean;
+	maxCostPerEval: number;
+	retryAttempts: number;
 }
 
 /**
  * Provider model configuration for evaluation
  */
 export interface ProviderModelConfig {
-  provider: string;
-  models: {
-    fast: string;
-    balanced: string;
-    quality: string;
-  };
-  costPerToken: {
-    input: number;
-    output: number;
-  };
-  requiresApiKey: string[];
-  performance: {
-    speed: number; // 1-3 scale
-    quality: number; // 1-3 scale
-    cost: number; // 1-3 scale (higher = cheaper)
-  };
+	provider: string;
+	models: {
+		fast: string;
+		balanced: string;
+		quality: string;
+	};
+	costPerToken: {
+		input: number;
+		output: number;
+	};
+	requiresApiKey: string[];
+	performance: {
+		speed: number; // 1-3 scale
+		quality: number; // 1-3 scale
+		cost: number; // 1-3 scale (higher = cheaper)
+	};
 }
 
 /**
  * Enhanced result interfaces with optional analytics/evaluation
  */
 export interface EnhancedGenerateTextResult
-  extends GenerateTextResult<ToolSet, unknown> {
-  analytics?: AnalyticsData;
-  evaluation?: EvaluationData;
+	extends GenerateTextResult<ToolSet, unknown> {
+	analytics?: AnalyticsData;
+	evaluation?: EvaluationData;
 }
 
 export interface EnhancedStreamTextResult
-  extends StreamTextResult<ToolSet, unknown> {
-  analytics?: AnalyticsData;
-  evaluation?: EvaluationData;
+	extends StreamTextResult<ToolSet, unknown> {
+	analytics?: AnalyticsData;
+	evaluation?: EvaluationData;
 }
 
 /**
@@ -258,96 +258,96 @@ export interface EnhancedStreamTextResult
  * Progress tracking and metadata for streaming operations
  */
 export interface StreamingProgressData {
-  chunkCount: number;
-  totalBytes: number;
-  chunkSize: number;
-  elapsedTime: number;
-  estimatedRemaining?: number;
-  streamId?: string;
-  phase: "initializing" | "streaming" | "processing" | "complete" | "error";
+	chunkCount: number;
+	totalBytes: number;
+	chunkSize: number;
+	elapsedTime: number;
+	estimatedRemaining?: number;
+	streamId?: string;
+	phase: "initializing" | "streaming" | "processing" | "complete" | "error";
 }
 
 export interface StreamingMetadata {
-  startTime: number;
-  endTime?: number;
-  totalDuration?: number;
-  averageChunkSize: number;
-  maxChunkSize: number;
-  minChunkSize: number;
-  throughputBytesPerSecond?: number;
-  streamingProvider: string;
-  modelUsed: string;
+	startTime: number;
+	endTime?: number;
+	totalDuration?: number;
+	averageChunkSize: number;
+	maxChunkSize: number;
+	minChunkSize: number;
+	throughputBytesPerSecond?: number;
+	streamingProvider: string;
+	modelUsed: string;
 }
 
 export type ProgressCallback = (progress: StreamingProgressData) => void;
 
 export interface EnhancedStreamTextOptions extends StreamTextOptions {
-  // Phase 2.1: Streaming Progress Tracking
-  enableProgressTracking?: boolean;
-  progressCallback?: ProgressCallback;
-  includeStreamingMetadata?: boolean;
-  streamingBufferSize?: number;
+	// Phase 2.1: Streaming Progress Tracking
+	enableProgressTracking?: boolean;
+	progressCallback?: ProgressCallback;
+	includeStreamingMetadata?: boolean;
+	streamingBufferSize?: number;
 
-  // Phase 2.2: Response Enhancement
-  enableStreamingHeaders?: boolean;
-  customStreamingConfig?: {
-    chunkDelayMs?: number;
-    maxConcurrentChunks?: number;
-    compressionEnabled?: boolean;
-  };
+	// Phase 2.2: Response Enhancement
+	enableStreamingHeaders?: boolean;
+	customStreamingConfig?: {
+		chunkDelayMs?: number;
+		maxConcurrentChunks?: number;
+		compressionEnabled?: boolean;
+	};
 }
 
 /**
  * AI Provider interface with flexible parameter support
  */
 export interface AIProvider {
-  streamText(
-    optionsOrPrompt: StreamTextOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<EnhancedStreamTextResult | null>;
+	streamText(
+		optionsOrPrompt: StreamTextOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<EnhancedStreamTextResult | null>;
 
-  generateText(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<EnhancedGenerateTextResult | null>;
+	generateText(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<EnhancedGenerateTextResult | null>;
 
-  // CLI-SDK Consistency: Aliases for generateText
-  generate(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<EnhancedGenerateTextResult | null>;
+	// CLI-SDK Consistency: Aliases for generateText
+	generate(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<EnhancedGenerateTextResult | null>;
 
-  gen(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<EnhancedGenerateTextResult | null>;
+	gen(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<EnhancedGenerateTextResult | null>;
 }
 
 /**
  * Provider attempt result for iteration tracking
  */
 export interface ProviderAttempt {
-  provider: AIProviderName;
-  model: SupportedModelName;
-  success: boolean;
-  error?: string;
-  stack?: string;
+	provider: AIProviderName;
+	model: SupportedModelName;
+	success: boolean;
+	error?: string;
+	stack?: string;
 }
 
 /**
  * Default provider configurations
  */
 export const DEFAULT_PROVIDER_CONFIGS: ProviderConfig[] = [
-  {
-    provider: AIProviderName.BEDROCK,
-    models: [BedrockModels.CLAUDE_3_7_SONNET, BedrockModels.CLAUDE_3_5_SONNET],
-  },
-  {
-    provider: AIProviderName.VERTEX,
-    models: [VertexModels.CLAUDE_4_0_SONNET, VertexModels.GEMINI_2_5_FLASH],
-  },
-  {
-    provider: AIProviderName.OPENAI,
-    models: [OpenAIModels.GPT_4O, OpenAIModels.GPT_4O_MINI],
-  },
+	{
+		provider: AIProviderName.BEDROCK,
+		models: [BedrockModels.CLAUDE_3_7_SONNET, BedrockModels.CLAUDE_3_5_SONNET],
+	},
+	{
+		provider: AIProviderName.VERTEX,
+		models: [VertexModels.CLAUDE_4_0_SONNET, VertexModels.GEMINI_2_5_FLASH],
+	},
+	{
+		provider: AIProviderName.OPENAI,
+		models: [OpenAIModels.GPT_4O, OpenAIModels.GPT_4O_MINI],
+	},
 ];

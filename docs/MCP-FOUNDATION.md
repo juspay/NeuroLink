@@ -42,10 +42,48 @@ const result = await provider.generateText("Create a React component");
 ```typescript
 // Factory creates MCP servers with Lighthouse compatibility
 const server = createMCPServer({
-  name: "ai-providers-server",
-  version: "1.0.0",
-  tools: ["generate-text", "select-provider", "check-provider-status"],
+	name: "ai-providers-server",
+	version: "1.0.0",
+	tools: ["generate-text", "select-provider", "check-provider-status"],
 });
+```
+
+#### 🔧 Dynamic Server Management (NEW!)
+
+**Programmatic MCP server addition** for runtime tool ecosystem expansion:
+
+- **External Integration**: Add Bitbucket, Slack, database servers dynamically
+- **Custom Tools**: Register your own MCP servers programmatically
+- **Enterprise Workflows**: Runtime server management based on project needs
+- **Unified Registry**: Seamless integration with existing MCP infrastructure
+
+```typescript
+// Add external servers at runtime
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+// Enterprise integration example
+await neurolink.addMCPServer("bitbucket", {
+	command: "npx",
+	args: ["-y", "@nexus2520/bitbucket-mcp-server"],
+	env: {
+		BITBUCKET_USERNAME: process.env.BITBUCKET_USER,
+		BITBUCKET_APP_PASSWORD: process.env.BITBUCKET_TOKEN,
+	},
+});
+
+// Custom tool registration
+await neurolink.addMCPServer("custom-analytics", {
+	command: "node",
+	args: ["./analytics-mcp-server.js"],
+	env: { DATABASE_URL: process.env.ANALYTICS_DB },
+	cwd: "/path/to/server",
+});
+
+// Verify dynamic registration
+const status = await neurolink.getMCPStatus();
+console.log(`Total servers: ${status.totalServers}`);
+console.log(`Available tools: ${status.totalTools}`);
 ```
 
 #### 🧠 Context Management (5/5 tests ✅)
@@ -57,15 +95,15 @@ const server = createMCPServer({
 
 ```typescript
 interface MCPContext {
-  sessionId: string;
-  userId?: string;
-  aiProvider: string;
-  permissions: string[];
-  metadata: Record<string, any>;
-  parentContext?: MCPContext;
-  toolChain: string[];
-  performance: PerformanceMetrics;
-  // + 8 more fields
+	sessionId: string;
+	userId?: string;
+	aiProvider: string;
+	permissions: string[];
+	metadata: Record<string, any>;
+	parentContext?: MCPContext;
+	toolChain: string[];
+	performance: PerformanceMetrics;
+	// + 8 more fields
 }
 ```
 
@@ -79,15 +117,15 @@ interface MCPContext {
 ```typescript
 // Registry tracks all available tools with metadata
 const registry = {
-  "generate-text": {
-    description: "Generate AI text content",
-    schema: {
-      /* JSON Schema */
-    },
-    provider: "ai-core-server",
-    executionCount: 1247,
-    averageLatency: 850,
-  },
+	"generate-text": {
+		description: "Generate AI text content",
+		schema: {
+			/* JSON Schema */
+		},
+		provider: "ai-core-server",
+		executionCount: 1247,
+		averageLatency: 850,
+	},
 };
 ```
 
@@ -101,9 +139,9 @@ const registry = {
 ```typescript
 // Orchestrate complex workflows with multiple tools
 const pipeline = [
-  { tool: "analyze-ai-usage", params: { timeframe: "24h" } },
-  { tool: "optimize-prompt-parameters", params: { prompt: "user-input" } },
-  { tool: "generate-text", params: { optimizedParams: true } },
+	{ tool: "analyze-ai-usage", params: { timeframe: "24h" } },
+	{ tool: "optimize-prompt-parameters", params: { prompt: "user-input" } },
+	{ tool: "generate-text", params: { optimizedParams: true } },
 ];
 ```
 
@@ -117,9 +155,9 @@ const pipeline = [
 ```typescript
 // AI Provider MCP Tools
 const aiTools = [
-  "generate-text", // Text generation with provider selection
-  "select-provider", // Automatic provider selection
-  "check-provider-status", // Provider connectivity and health
+	"generate-text", // Text generation with provider selection
+	"select-provider", // Automatic provider selection
+	"check-provider-status", // Provider connectivity and health
 ];
 ```
 
@@ -212,9 +250,9 @@ import { createMCPServer } from "@juspay/neurolink/mcp";
 ```typescript
 // Permission-based tool execution
 const context = {
-  userId: "user123",
-  permissions: ["ai:generate", "ai:analyze"],
-  securityLevel: "enterprise",
+	userId: "user123",
+	permissions: ["ai:generate", "ai:analyze"],
+	securityLevel: "enterprise",
 };
 ```
 

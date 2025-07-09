@@ -2,80 +2,108 @@
  * NeuroLink MCP Tool Orchestration Engine
  * Central orchestrator for coordinated tool execution with pipeline management
  * Coordinates factory, registry, context, and AI tools for seamless operation
+ * Now with semaphore-based race condition prevention
  */
 
 import type { NeuroLinkExecutionContext, ToolResult } from "./factory.js";
 import {
-  MCPToolRegistry,
-  defaultToolRegistry,
-  type ToolExecutionOptions,
+	MCPToolRegistry,
+	defaultToolRegistry,
+	type ToolExecutionOptions,
 } from "./tool-registry.js";
 import {
-  ContextManager,
-  defaultContextManager,
-  createExecutionContext,
-  type ContextRequest,
+	ContextManager,
+	defaultContextManager,
+	createExecutionContext,
+	type ContextRequest,
 } from "./context-manager.js";
+import {
+	SemaphoreManager,
+	defaultSemaphoreManager,
+	type SemaphoreResult,
+} from "./semaphore-manager.js";
+import {
+	SessionManager,
+	defaultSessionManager,
+	type OrchestratorSession,
+	type SessionOptions,
+} from "./session-manager.js";
+import {
+	ErrorManager,
+	defaultErrorManager,
+	ErrorCategory,
+	ErrorSeverity,
+} from "./error-manager.js";
+import {
+	HealthMonitor,
+	initializeHealthMonitor,
+	type HealthMonitorOptions,
+} from "./health-monitor.js";
+import {
+	TransportManager,
+	type TransportConfig,
+	type TransportManagerOptions,
+} from "./transport-manager.js";
 import { aiCoreServer } from "./servers/ai-providers/ai-core-server.js";
 
 /**
  * Pipeline execution options
  */
 export interface PipelineOptions {
-  stopOnError?: boolean;
-  parallel?: boolean;
-  timeout?: number;
-  trackMetrics?: boolean;
-  validateInputs?: boolean;
+	stopOnError?: boolean;
+	parallel?: boolean;
+	timeout?: number;
+	trackMetrics?: boolean;
+	validateInputs?: boolean;
 }
 
 /**
  * Tool execution step in a pipeline
  */
 export interface PipelineStep {
-  toolName: string;
-  params: any;
-  options?: ToolExecutionOptions;
-  dependsOn?: string[]; // Step dependencies for parallel execution
-  stepId?: string; // Unique identifier for the step
+	toolName: string;
+	params: any;
+	options?: ToolExecutionOptions;
+	dependsOn?: string[]; // Step dependencies for parallel execution
+	stepId?: string; // Unique identifier for the step
 }
 
 /**
  * Pipeline execution result
  */
 export interface PipelineResult {
-  success: boolean;
-  results: Map<string, ToolResult>;
-  errors: Map<string, string>;
-  executionTime: number;
-  stepsExecuted: number;
-  stepsSkipped: number;
-  metadata: {
-    pipelineId: string;
-    sessionId: string;
-    timestamp: number;
-    parallel: boolean;
-  };
+	success: boolean;
+	results: Map<string, ToolResult>;
+	errors: Map<string, string>;
+	executionTime: number;
+	stepsExecuted: number;
+	stepsSkipped: number;
+	metadata: {
+		pipelineId: string;
+		sessionId: string;
+		timestamp: number;
+		parallel: boolean;
+	};
 }
 
 /**
  * Text generation pipeline result
  */
 export interface TextPipelineResult {
-  success: boolean;
-  text?: string;
-  provider?: string;
-  model?: string;
-  executionTime: number;
-  usage?: {
-    tokens?: number;
-    cost?: number;
-  };
-  metadata: {
-    sessionId: string;
-    timestamp: number;
-    toolsUsed: string[];
-  };
+	success: boolean;
+	text?: string;
+	provider?: string;
+	model?: string;
+	executionTime: number;
+	usage?: {
+		tokens?: number;
+		cost?: number;
+	};
+	metadata: {
+		sessionId: string;
+		timestamp: number;
+		toolsUsed: string[];
+	};
 }
 
 /**
@@ -83,463 +111,849 @@ export interface TextPipelineResult {
  * Central coordination engine for tool execution, pipelines, and AI operations
  */
 export class MCPOrchestrator {
-  private registry: MCPToolRegistry;
-  private contextManager: ContextManager;
-  private pipelineCounter: number = 0;
+	protected registry: MCPToolRegistry;
+	protected contextManager: ContextManager;
+	protected semaphoreManager: SemaphoreManager;
+	protected sessionManager: SessionManager;
+	protected errorManager: ErrorManager;
+	protected healthMonitor: HealthMonitor | null = null;
+	protected transportManager: TransportManager | null = null;
+	protected pipelineCounter: number = 0;
 
-  constructor(registry?: MCPToolRegistry, contextManager?: ContextManager) {
-    this.registry = registry || defaultToolRegistry;
-    this.contextManager = contextManager || defaultContextManager;
+	constructor(
+		registry?: MCPToolRegistry,
+		contextManager?: ContextManager,
+		semaphoreManager?: SemaphoreManager,
+		sessionManager?: SessionManager,
+		errorManager?: ErrorManager,
+	) {
+		this.registry = registry || defaultToolRegistry;
+		this.contextManager = contextManager || defaultContextManager;
+		this.semaphoreManager = semaphoreManager || defaultSemaphoreManager;
+		this.sessionManager = sessionManager || defaultSessionManager;
+		this.errorManager = errorManager || defaultErrorManager;
 
-    // Initialize with AI Core Server
-    this.initializeDefaultServers();
-  }
+		// Initialize with AI Core Server
+		this.initializeDefaultServers();
+	}
 
-  /**
-   * Initialize with default servers (AI Core)
-   */
-  private async initializeDefaultServers(): Promise<void> {
-    try {
-      await this.registry.registerServer(aiCoreServer.id, aiCoreServer);
-      // Only log in debug mode
-      if (process.env.NEUROLINK_DEBUG === "true") {
-        console.log("[Orchestrator] Initialized with AI Core Server");
-      }
-    } catch (error) {
-      console.warn("[Orchestrator] Failed to register AI Core Server:", error);
-    }
-  }
+	/**
+	 * Initialize with default servers (AI Core)
+	 */
+	private async initializeDefaultServers(): Promise<void> {
+		try {
+			await this.registry.registerServer(aiCoreServer.id, aiCoreServer);
+			// Only log in debug mode
+			if (process.env.NEUROLINK_DEBUG === "true") {
+				console.log("[Orchestrator] Initialized with AI Core Server");
+			}
+		} catch (error) {
+			console.warn("[Orchestrator] Failed to register AI Core Server:", error);
+		}
+	}
 
-  /**
-   * Execute a single tool with full orchestration
-   *
-   * @param toolName Tool name to execute
-   * @param params Tool parameters
-   * @param contextRequest Context creation request
-   * @param options Execution options
-   * @returns Tool execution result
-   */
-  async executeTool(
-    toolName: string,
-    params: any,
-    contextRequest: ContextRequest = {},
-    options: ToolExecutionOptions = {},
-  ): Promise<ToolResult> {
-    // Create execution context
-    const context = this.contextManager.createContext(contextRequest);
+	/**
+	 * Execute a single tool with full orchestration
+	 *
+	 * @param toolName Tool name to execute
+	 * @param params Tool parameters
+	 * @param contextRequest Context creation request
+	 * @param options Execution options
+	 * @returns Tool execution result
+	 */
+	async executeTool(
+		toolName: string,
+		params: any,
+		contextRequest: ContextRequest = {},
+		options: ToolExecutionOptions & { sessionOptions?: SessionOptions } = {},
+	): Promise<ToolResult> {
+		// Create execution context
+		const context = this.contextManager.createContext(contextRequest);
 
-    if (process.env.NEUROLINK_DEBUG === "true") {
-      console.log(
-        `[Orchestrator] Executing tool '${toolName}' in session ${context.sessionId}`,
-      );
-    }
+		// Get or create session for continuous tool calling
+		let session: OrchestratorSession | null = null;
+		if (context.sessionId) {
+			session = await this.sessionManager.getSession(context.sessionId);
+		}
 
-    // Execute tool through registry
-    const result = await this.registry.executeTool(toolName, params, context);
+		if (!session) {
+			// Create new session with options
+			session = await this.sessionManager.createSession(
+				context,
+				options.sessionOptions,
+			);
+			// Update context with new session ID
+			context.sessionId = session.id;
+		}
 
-    if (process.env.NEUROLINK_DEBUG === "true") {
-      console.log(
-        `[Orchestrator] Tool '${toolName}' execution ${(result as ToolResult).success ? "completed" : "failed"}`,
-      );
-    }
+		if (process.env.NEUROLINK_DEBUG === "true") {
+			console.log(
+				`[Orchestrator] Executing tool '${toolName}' in session ${context.sessionId}`,
+			);
+		}
 
-    return result as ToolResult;
-  }
+		// Use semaphore to prevent race conditions for the same tool
+		// Each tool gets its own semaphore key to allow parallel execution of different tools
+		const semaphoreKey = `tool:${toolName}`;
 
-  /**
-   * Execute a pipeline of tools with dependency management
-   *
-   * @param steps Pipeline steps to execute
-   * @param contextRequest Context creation request
-   * @param options Pipeline execution options
-   * @returns Pipeline execution result
-   */
-  async executePipeline(
-    steps: PipelineStep[],
-    contextRequest: ContextRequest = {},
-    options: PipelineOptions = {},
-  ): Promise<PipelineResult> {
-    const startTime = Date.now();
-    const pipelineId = this.generatePipelineId();
+		const semaphoreResult = await this.semaphoreManager.acquire(
+			semaphoreKey,
+			async () => {
+				try {
+					// Execute tool through registry
+					const result = await this.registry.executeTool(
+						toolName,
+						params,
+						context,
+					);
 
-    const {
-      stopOnError = true,
-      parallel = false,
-      timeout = 60000,
-      trackMetrics = true,
-      validateInputs = true,
-    } = options;
+					if (process.env.NEUROLINK_DEBUG === "true") {
+						console.log(
+							`[Orchestrator] Tool '${toolName}' execution ${(result as ToolResult).success ? "completed" : "failed"}`,
+						);
+					}
 
-    // Create shared execution context
-    const context = this.contextManager.createContext({
-      ...contextRequest,
-      sessionId: contextRequest.sessionId || pipelineId,
-    });
+					// Record error if tool execution failed
+					if (!(result as ToolResult).success && (result as ToolResult).error) {
+						this.errorManager.recordError((result as ToolResult).error, {
+							category: ErrorCategory.TOOL_ERROR,
+							severity: ErrorSeverity.HIGH,
+							sessionId: session.id,
+							toolName,
+							parameters: params,
+							executionContext: context,
+						});
+					}
 
-    const results = new Map<string, ToolResult>();
-    const errors = new Map<string, string>();
-    let stepsExecuted = 0;
-    let stepsSkipped = 0;
+					return result;
+				} catch (error) {
+					// Record unexpected errors
+					const errorEntry = await this.errorManager.recordError(error, {
+						category: ErrorCategory.TOOL_ERROR,
+						severity: ErrorSeverity.CRITICAL,
+						sessionId: session.id,
+						toolName,
+						parameters: params,
+						executionContext: context,
+					});
 
-    console.log(
-      `[Orchestrator] Starting pipeline ${pipelineId} with ${steps.length} steps`,
-    );
+					// Return error result
+					return {
+						success: false,
+						data: null,
+						error: errorEntry.error,
+						usage: {},
+					} as ToolResult;
+				}
+			},
+			context,
+		);
 
-    try {
-      if (parallel) {
-        // Execute steps in parallel with dependency management
-        await this.executeParallelPipeline(steps, context, results, errors, {
-          timeout,
-          trackMetrics,
-          validateInputs,
-          stopOnError,
-        });
-      } else {
-        // Execute steps sequentially
-        for (const step of steps) {
-          const stepId = step.stepId || `step-${stepsExecuted + 1}`;
+		// Handle semaphore errors
+		if (!semaphoreResult.success) {
+			const errorResult = {
+				success: false,
+				data: null,
+				error:
+					semaphoreResult.error || new Error("Semaphore acquisition failed"),
+				usage: {
+					executionTime: semaphoreResult.executionTime,
+					waitTime: semaphoreResult.waitTime,
+				},
+			} as ToolResult;
 
-          try {
-            console.log(
-              `[Orchestrator] Executing step: ${stepId} (${step.toolName})`,
-            );
+			// Update session with error result
+			await this.sessionManager.updateSession(session.id, errorResult);
 
-            const stepResult = await this.registry.executeTool(
-              step.toolName,
-              step.params,
-              context,
-            );
+			return errorResult;
+		}
 
-            results.set(stepId, stepResult as ToolResult);
-            stepsExecuted++;
+		const result = semaphoreResult.result as ToolResult;
 
-            if (!(stepResult as ToolResult).success) {
-              const error = (stepResult as ToolResult).error;
-              const errorMessage =
-                error instanceof Error
-                  ? error.message
-                  : String(error) || "Unknown error";
-              errors.set(stepId, errorMessage);
+		// Update session with tool result
+		await this.sessionManager.updateSession(session.id, result);
 
-              if (stopOnError) {
-                console.error(
-                  `[Orchestrator] Pipeline ${pipelineId} stopped due to error in step ${stepId}`,
-                );
-                break;
-              }
-            }
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            errors.set(stepId, errorMessage);
+		// Enhance result with session information
+		return {
+			...result,
+			sessionId: session.id,
+			sessionData: {
+				toolHistory: session.toolHistory.length,
+				state: Object.fromEntries(session.state),
+			},
+		} as ToolResult;
+	}
 
-            if (stopOnError) {
-              console.error(
-                `[Orchestrator] Pipeline ${pipelineId} stopped due to exception in step ${stepId}: ${errorMessage}`,
-              );
-              break;
-            }
+	/**
+	 * Execute a pipeline of tools with dependency management
+	 *
+	 * @param steps Pipeline steps to execute
+	 * @param contextRequest Context creation request
+	 * @param options Pipeline execution options
+	 * @returns Pipeline execution result
+	 */
+	async executePipeline(
+		steps: PipelineStep[],
+		contextRequest: ContextRequest = {},
+		options: PipelineOptions = {},
+	): Promise<PipelineResult> {
+		const startTime = Date.now();
+		const pipelineId = this.generatePipelineId();
 
-            stepsSkipped++;
-          }
-        }
-      }
+		const {
+			stopOnError = true,
+			parallel = false,
+			timeout = 60000,
+			trackMetrics = true,
+			validateInputs = true,
+		} = options;
 
-      const executionTime = Date.now() - startTime;
-      const success = errors.size === 0 || !stopOnError;
+		// Create shared execution context
+		const context = this.contextManager.createContext({
+			...contextRequest,
+			sessionId: contextRequest.sessionId || pipelineId,
+		});
 
-      console.log(
-        `[Orchestrator] Pipeline ${pipelineId} completed in ${executionTime}ms - ${success ? "SUCCESS" : "FAILED"}`,
-      );
+		const results = new Map<string, ToolResult>();
+		const errors = new Map<string, string>();
+		let stepsExecuted = 0;
+		let stepsSkipped = 0;
 
-      return {
-        success,
-        results,
-        errors,
-        executionTime,
-        stepsExecuted,
-        stepsSkipped,
-        metadata: {
-          pipelineId,
-          sessionId: context.sessionId,
-          timestamp: Date.now(),
-          parallel,
-        },
-      };
-    } catch (error) {
-      const executionTime = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+		console.log(
+			`[Orchestrator] Starting pipeline ${pipelineId} with ${steps.length} steps`,
+		);
 
-      console.error(
-        `[Orchestrator] Pipeline ${pipelineId} failed: ${errorMessage}`,
-      );
+		try {
+			if (parallel) {
+				// Execute steps in parallel with dependency management
+				await this.executeParallelPipeline(steps, context, results, errors, {
+					timeout,
+					trackMetrics,
+					validateInputs,
+					stopOnError,
+				});
+			} else {
+				// Execute steps sequentially
+				for (const step of steps) {
+					const stepId = step.stepId || `step-${stepsExecuted + 1}`;
 
-      return {
-        success: false,
-        results,
-        errors: new Map([["pipeline", errorMessage]]),
-        executionTime,
-        stepsExecuted,
-        stepsSkipped,
-        metadata: {
-          pipelineId,
-          sessionId: context.sessionId,
-          timestamp: Date.now(),
-          parallel,
-        },
-      };
-    }
-  }
+					try {
+						console.log(
+							`[Orchestrator] Executing step: ${stepId} (${step.toolName})`,
+						);
 
-  /**
-   * Execute AI text generation pipeline (high-level convenience method)
-   *
-   * @param prompt Text prompt for generation
-   * @param contextRequest Context creation request
-   * @param options Additional generation options
-   * @returns Text generation result
-   */
-  async executeTextPipeline(
-    prompt: string,
-    contextRequest: ContextRequest = {},
-    options: {
-      provider?: string;
-      model?: string;
-      temperature?: number;
-      maxTokens?: number;
-      systemPrompt?: string;
-      customTools?: string[];
-    } = {},
-  ): Promise<TextPipelineResult> {
-    const startTime = Date.now();
+						// Use semaphore for each tool execution in pipeline
+						const semaphoreKey = `tool:${step.toolName}`;
+						const semaphoreResult = await this.semaphoreManager.acquire(
+							semaphoreKey,
+							async () => {
+								return await this.registry.executeTool(
+									step.toolName,
+									step.params,
+									context,
+								);
+							},
+							context,
+						);
 
-    // Create execution context
-    const context = this.contextManager.createContext(contextRequest);
+						const stepResult = semaphoreResult.success
+							? semaphoreResult.result
+							: {
+									success: false,
+									data: null,
+									error:
+										semaphoreResult.error ||
+										new Error("Semaphore acquisition failed"),
+									usage: {
+										executionTime: semaphoreResult.executionTime,
+										waitTime: semaphoreResult.waitTime,
+									},
+								};
 
-    try {
-      console.log(
-        `[Orchestrator] Starting text pipeline for prompt: "${prompt.substring(0, 50)}..."`,
-      );
+						results.set(stepId, stepResult as ToolResult);
+						stepsExecuted++;
 
-      // Build pipeline steps
-      const steps: PipelineStep[] = [];
+						if (!(stepResult as ToolResult).success) {
+							const error = (stepResult as ToolResult).error;
+							const errorMessage =
+								error instanceof Error
+									? error.message
+									: String(error) || "Unknown error";
+							errors.set(stepId, errorMessage);
 
-      // Step 1: Provider selection (if not specified)
-      if (!options.provider) {
-        steps.push({
-          stepId: "select-provider",
-          toolName: "select-provider",
-          params: {
-            requirements: {
-              maxTokens: options.maxTokens,
-              costEfficient: true,
-            },
-          },
-        });
-      }
+							if (stopOnError) {
+								console.error(
+									`[Orchestrator] Pipeline ${pipelineId} stopped due to error in step ${stepId}`,
+								);
+								break;
+							}
+						}
+					} catch (error) {
+						const errorMessage =
+							error instanceof Error ? error.message : String(error);
+						errors.set(stepId, errorMessage);
 
-      // Step 2: Text generation
-      steps.push({
-        stepId: "generate-text",
-        toolName: "generate-text",
-        params: {
-          prompt,
-          provider: options.provider,
-          model: options.model,
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          systemPrompt: options.systemPrompt,
-        },
-        dependsOn: options.provider ? [] : ["select-provider"],
-      });
+						if (stopOnError) {
+							console.error(
+								`[Orchestrator] Pipeline ${pipelineId} stopped due to exception in step ${stepId}: ${errorMessage}`,
+							);
+							break;
+						}
 
-      // Step 3: Custom tools (if specified)
-      if (options.customTools && options.customTools.length > 0) {
-        for (const toolName of options.customTools) {
-          steps.push({
-            stepId: `custom-${toolName}`,
-            toolName,
-            params: {
-              /* tool-specific params */
-            },
-            dependsOn: ["generate-text"],
-          });
-        }
-      }
+						stepsSkipped++;
+					}
+				}
+			}
 
-      // Execute pipeline
-      const pipelineResult = await this.executePipeline(steps, contextRequest, {
-        stopOnError: true,
-        parallel: false,
-        trackMetrics: true,
-      });
+			const executionTime = Date.now() - startTime;
+			const success = errors.size === 0 || !stopOnError;
 
-      const executionTime = Date.now() - startTime;
+			console.log(
+				`[Orchestrator] Pipeline ${pipelineId} completed in ${executionTime}ms - ${success ? "SUCCESS" : "FAILED"}`,
+			);
 
-      // Extract text generation result
-      const textResult = pipelineResult.results.get("generate-text");
-      const providerResult = pipelineResult.results.get("select-provider");
+			return {
+				success,
+				results,
+				errors,
+				executionTime,
+				stepsExecuted,
+				stepsSkipped,
+				metadata: {
+					pipelineId,
+					sessionId: context.sessionId,
+					timestamp: Date.now(),
+					parallel,
+				},
+			};
+		} catch (error) {
+			const executionTime = Date.now() - startTime;
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 
-      if (!textResult || !textResult.success) {
-        throw new Error("Text generation failed");
-      }
+			console.error(
+				`[Orchestrator] Pipeline ${pipelineId} failed: ${errorMessage}`,
+			);
 
-      const toolsUsed = Array.from(pipelineResult.results.keys());
+			return {
+				success: false,
+				results,
+				errors: new Map([["pipeline", errorMessage]]),
+				executionTime,
+				stepsExecuted,
+				stepsSkipped,
+				metadata: {
+					pipelineId,
+					sessionId: context.sessionId,
+					timestamp: Date.now(),
+					parallel,
+				},
+			};
+		}
+	}
 
-      console.log(
-        `[Orchestrator] Text pipeline completed in ${executionTime}ms`,
-      );
+	/**
+	 * Execute AI text generation pipeline (high-level convenience method)
+	 *
+	 * @param prompt Text prompt for generation
+	 * @param contextRequest Context creation request
+	 * @param options Additional generation options
+	 * @returns Text generation result
+	 */
+	async executeTextPipeline(
+		prompt: string,
+		contextRequest: ContextRequest = {},
+		options: {
+			provider?: string;
+			model?: string;
+			temperature?: number;
+			maxTokens?: number;
+			systemPrompt?: string;
+			customTools?: string[];
+		} = {},
+	): Promise<TextPipelineResult> {
+		const startTime = Date.now();
 
-      return {
-        success: true,
-        text: textResult.data?.text,
-        provider: textResult.data?.provider || providerResult?.data?.provider,
-        model: textResult.data?.model,
-        executionTime,
-        usage: textResult.usage,
-        metadata: {
-          sessionId: context.sessionId,
-          timestamp: Date.now(),
-          toolsUsed,
-        },
-      };
-    } catch (error) {
-      const executionTime = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+		// Create execution context
+		const context = this.contextManager.createContext(contextRequest);
 
-      console.error(`[Orchestrator] Text pipeline failed: ${errorMessage}`);
+		try {
+			console.log(
+				`[Orchestrator] Starting text pipeline for prompt: "${prompt.substring(0, 50)}..."`,
+			);
 
-      return {
-        success: false,
-        executionTime,
-        metadata: {
-          sessionId: context.sessionId,
-          timestamp: Date.now(),
-          toolsUsed: [],
-        },
-      };
-    }
-  }
+			// Build pipeline steps
+			const steps: PipelineStep[] = [];
 
-  /**
-   * Get orchestrator statistics
-   *
-   * @returns Comprehensive orchestrator statistics
-   */
-  getStats(): {
-    registry: any;
-    context: any;
-    orchestrator: {
-      pipelinesExecuted: number;
-    };
-  } {
-    return {
-      registry: this.registry.getStats(),
-      context: this.contextManager.getStats(),
-      orchestrator: {
-        pipelinesExecuted: this.pipelineCounter,
-      },
-    };
-  }
+			// Step 1: Provider selection (if not specified)
+			if (!options.provider) {
+				steps.push({
+					stepId: "select-provider",
+					toolName: "select-provider",
+					params: {
+						requirements: {
+							maxTokens: options.maxTokens,
+							costEfficient: true,
+						},
+					},
+				});
+			}
 
-  /**
-   * Execute parallel pipeline with dependency management
-   *
-   * @private
-   */
-  private async executeParallelPipeline(
-    steps: PipelineStep[],
-    context: NeuroLinkExecutionContext,
-    results: Map<string, ToolResult>,
-    errors: Map<string, string>,
-    options: {
-      timeout: number;
-      trackMetrics: boolean;
-      validateInputs: boolean;
-      stopOnError: boolean;
-    },
-  ): Promise<void> {
-    // Build dependency graph
-    const stepMap = new Map<string, PipelineStep>();
-    const dependencyGraph = new Map<string, string[]>();
+			// Step 2: Text generation
+			steps.push({
+				stepId: "generate-text",
+				toolName: "generate-text",
+				params: {
+					prompt,
+					provider: options.provider,
+					model: options.model,
+					temperature: options.temperature,
+					maxTokens: options.maxTokens,
+					systemPrompt: options.systemPrompt,
+				},
+				dependsOn: options.provider ? [] : ["select-provider"],
+			});
 
-    for (const step of steps) {
-      const stepId = step.stepId || `step-${stepMap.size + 1}`;
-      stepMap.set(stepId, { ...step, stepId });
-      dependencyGraph.set(stepId, step.dependsOn || []);
-    }
+			// Step 3: Custom tools (if specified)
+			if (options.customTools && options.customTools.length > 0) {
+				for (const toolName of options.customTools) {
+					steps.push({
+						stepId: `custom-${toolName}`,
+						toolName,
+						params: {
+							/* tool-specific params */
+						},
+						dependsOn: ["generate-text"],
+					});
+				}
+			}
 
-    // Execute steps in dependency order
-    const completed = new Set<string>();
-    const executing = new Set<string>();
+			// Execute pipeline
+			const pipelineResult = await this.executePipeline(steps, contextRequest, {
+				stopOnError: true,
+				parallel: false,
+				trackMetrics: true,
+			});
 
-    while (completed.size < steps.length) {
-      const readySteps = Array.from(stepMap.keys()).filter((stepId) => {
-        if (completed.has(stepId) || executing.has(stepId)) {
-          return false;
-        }
-        const dependencies = dependencyGraph.get(stepId) || [];
-        return dependencies.every((dep) => completed.has(dep));
-      });
+			const executionTime = Date.now() - startTime;
 
-      if (readySteps.length === 0) {
-        throw new Error("Circular dependency detected in pipeline");
-      }
+			// Extract text generation result
+			const textResult = pipelineResult.results.get("generate-text");
+			const providerResult = pipelineResult.results.get("select-provider");
 
-      // Execute ready steps in parallel
-      const executePromises = readySteps.map(async (stepId) => {
-        executing.add(stepId);
-        const step = stepMap.get(stepId)!;
+			if (!textResult || !textResult.success) {
+				throw new Error("Text generation failed");
+			}
 
-        try {
-          const result = await this.registry.executeTool(
-            step.toolName,
-            step.params,
-            context,
-          );
+			const toolsUsed = Array.from(pipelineResult.results.keys());
 
-          results.set(stepId, result as ToolResult);
+			console.log(
+				`[Orchestrator] Text pipeline completed in ${executionTime}ms`,
+			);
 
-          if (!(result as ToolResult).success) {
-            const error = (result as ToolResult).error;
-            const errorMessage =
-              error instanceof Error
-                ? error.message
-                : String(error) || "Unknown error";
-            errors.set(stepId, errorMessage);
-          }
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          errors.set(stepId, errorMessage);
-        } finally {
-          executing.delete(stepId);
-          completed.add(stepId);
-        }
-      });
+			return {
+				success: true,
+				text: textResult.data?.text,
+				provider: textResult.data?.provider || providerResult?.data?.provider,
+				model: textResult.data?.model,
+				executionTime,
+				usage: textResult.usage,
+				metadata: {
+					sessionId: context.sessionId,
+					timestamp: Date.now(),
+					toolsUsed,
+				},
+			};
+		} catch (error) {
+			const executionTime = Date.now() - startTime;
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 
-      await Promise.all(executePromises);
+			console.error(`[Orchestrator] Text pipeline failed: ${errorMessage}`);
 
-      // Check for errors and stop if configured
-      if (options.stopOnError && errors.size > 0) {
-        break;
-      }
-    }
-  }
+			return {
+				success: false,
+				executionTime,
+				metadata: {
+					sessionId: context.sessionId,
+					timestamp: Date.now(),
+					toolsUsed: [],
+				},
+			};
+		}
+	}
 
-  /**
-   * Generate unique pipeline ID
-   *
-   * @private
-   */
-  private generatePipelineId(): string {
-    this.pipelineCounter++;
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `nlpipe-${timestamp}-${this.pipelineCounter}-${random}`;
-  }
+	/**
+	 * Get orchestrator statistics
+	 *
+	 * @returns Comprehensive orchestrator statistics
+	 */
+	getStats(): {
+		registry: any;
+		context: any;
+		session: any;
+		error: any;
+		health?: any;
+		orchestrator: {
+			pipelinesExecuted: number;
+		};
+	} {
+		const stats: any = {
+			registry: this.registry.getStats(),
+			context: this.contextManager.getStats(),
+			session: this.sessionManager.getStats(),
+			error: this.errorManager.getStats(),
+			orchestrator: {
+				pipelinesExecuted: this.pipelineCounter,
+			},
+		};
+
+		if (this.healthMonitor) {
+			const healthStatus = this.healthMonitor.getHealthStatus();
+			stats.health = {
+				servers: Array.from(healthStatus.entries()).map(([id, health]) => ({
+					id,
+					status: health.status,
+					checkCount: health.checkCount,
+					errorCount: health.errorCount,
+					lastSuccessfulCheck: health.lastSuccessfulCheck,
+				})),
+			};
+		}
+
+		return stats;
+	}
+
+	/**
+	 * Get session by ID
+	 *
+	 * @param sessionId Session identifier
+	 * @param extend Whether to extend session expiration
+	 * @returns Session or null if not found
+	 */
+	async getSession(
+		sessionId: string,
+		extend: boolean = true,
+	): Promise<OrchestratorSession | null> {
+		return this.sessionManager.getSession(sessionId, extend);
+	}
+
+	/**
+	 * Create a new session for continuous tool calling
+	 *
+	 * @param contextRequest Context creation request
+	 * @param sessionOptions Session configuration options
+	 * @returns Created session
+	 */
+	async createSession(
+		contextRequest: ContextRequest = {},
+		sessionOptions?: SessionOptions,
+	): Promise<OrchestratorSession> {
+		const context = this.contextManager.createContext(contextRequest);
+		return this.sessionManager.createSession(context, sessionOptions);
+	}
+
+	/**
+	 * Set session state value
+	 *
+	 * @param sessionId Session identifier
+	 * @param key State key
+	 * @param value State value
+	 * @returns Success status
+	 */
+	async setSessionState(
+		sessionId: string,
+		key: string,
+		value: any,
+	): Promise<boolean> {
+		return this.sessionManager.setSessionState(sessionId, key, value) !== null;
+	}
+
+	/**
+	 * Get session state value
+	 *
+	 * @param sessionId Session identifier
+	 * @param key State key
+	 * @returns State value or undefined
+	 */
+	async getSessionState(sessionId: string, key: string): Promise<any> {
+		return this.sessionManager.getSessionState(sessionId, key);
+	}
+
+	/**
+	 * Get all active sessions
+	 *
+	 * @returns Array of active sessions
+	 */
+	async getActiveSessions(): Promise<OrchestratorSession[]> {
+		return this.sessionManager.getActiveSessions();
+	}
+
+	/**
+	 * Clean up expired sessions
+	 *
+	 * @returns Number of sessions cleaned
+	 */
+	async cleanupSessions(): Promise<number> {
+		return this.sessionManager.cleanup();
+	}
+
+	/**
+	 * Get error history
+	 *
+	 * @param filter Optional filter criteria
+	 * @returns Filtered error history
+	 */
+	getErrorHistory(filter?: Parameters<ErrorManager["getErrorHistory"]>[0]) {
+		return this.errorManager.getErrorHistory(filter);
+	}
+
+	/**
+	 * Clear error history
+	 */
+	clearErrorHistory(): void {
+		this.errorManager.clearHistory();
+	}
+
+	/**
+	 * Get recovery suggestion for last error
+	 *
+	 * @param sessionId Optional session ID to get last error from
+	 * @returns Recovery suggestion or null
+	 */
+	getLastErrorRecovery(sessionId?: string): string | null {
+		const filter = sessionId ? { sessionId, limit: 1 } : { limit: 1 };
+		const errors = this.errorManager.getErrorHistory(filter);
+
+		if (errors.length > 0) {
+			return this.errorManager.getRecoverySuggestion(errors[0]);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Initialize health monitoring
+	 *
+	 * @param options Health monitor options
+	 */
+	initializeHealthMonitor(options?: HealthMonitorOptions): void {
+		this.healthMonitor = initializeHealthMonitor(
+			this.registry,
+			this.errorManager,
+			options,
+		);
+	}
+
+	/**
+	 * Start health monitoring for all registered servers
+	 */
+	startHealthMonitoring(): void {
+		if (!this.healthMonitor) {
+			this.initializeHealthMonitor();
+		}
+		this.healthMonitor!.startMonitoring();
+	}
+
+	/**
+	 * Stop health monitoring
+	 */
+	stopHealthMonitoring(): void {
+		this.healthMonitor?.stopMonitoring();
+	}
+
+	/**
+	 * Register recovery callback for a server
+	 *
+	 * @param serverId Server ID
+	 * @param callback Recovery callback
+	 */
+	registerRecoveryCallback(
+		serverId: string,
+		callback: (serverId: string) => Promise<void>,
+	): void {
+		if (!this.healthMonitor) {
+			this.initializeHealthMonitor();
+		}
+		this.healthMonitor!.registerRecoveryCallback(serverId, callback);
+	}
+
+	/**
+	 * Get health status for all servers
+	 *
+	 * @returns Map of server health status
+	 */
+	getHealthStatus() {
+		return this.healthMonitor?.getHealthStatus() || new Map();
+	}
+
+	/**
+	 * Initialize transport manager for MCP connections
+	 *
+	 * @param options Transport manager options
+	 */
+	initializeTransportManager(options?: TransportManagerOptions): void {
+		this.transportManager = new TransportManager(this.errorManager, options);
+	}
+
+	/**
+	 * Connect to MCP server using specified transport
+	 *
+	 * @param config Transport configuration
+	 * @returns Connected MCP client
+	 */
+	async connectTransport(config: TransportConfig): Promise<any> {
+		if (!this.transportManager) {
+			this.initializeTransportManager();
+		}
+		return this.transportManager!.connect(config);
+	}
+
+	/**
+	 * Disconnect from MCP server
+	 */
+	async disconnectTransport(): Promise<void> {
+		await this.transportManager?.disconnect();
+	}
+
+	/**
+	 * Get transport connection status
+	 */
+	getTransportStatus() {
+		return (
+			this.transportManager?.getStatus() || {
+				connected: false,
+				type: "stdio" as const,
+				reconnectAttempts: 0,
+			}
+		);
+	}
+
+	/**
+	 * Check if transport is connected
+	 */
+	isTransportConnected(): boolean {
+		return this.transportManager?.isConnected() || false;
+	}
+
+	/**
+	 * Execute parallel pipeline with dependency management
+	 *
+	 * @private
+	 */
+	private async executeParallelPipeline(
+		steps: PipelineStep[],
+		context: NeuroLinkExecutionContext,
+		results: Map<string, ToolResult>,
+		errors: Map<string, string>,
+		options: {
+			timeout: number;
+			trackMetrics: boolean;
+			validateInputs: boolean;
+			stopOnError: boolean;
+		},
+	): Promise<void> {
+		// Build dependency graph
+		const stepMap = new Map<string, PipelineStep>();
+		const dependencyGraph = new Map<string, string[]>();
+
+		for (const step of steps) {
+			const stepId = step.stepId || `step-${stepMap.size + 1}`;
+			stepMap.set(stepId, { ...step, stepId });
+			dependencyGraph.set(stepId, step.dependsOn || []);
+		}
+
+		// Execute steps in dependency order
+		const completed = new Set<string>();
+		const executing = new Set<string>();
+
+		while (completed.size < steps.length) {
+			const readySteps = Array.from(stepMap.keys()).filter((stepId) => {
+				if (completed.has(stepId) || executing.has(stepId)) {
+					return false;
+				}
+				const dependencies = dependencyGraph.get(stepId) || [];
+				return dependencies.every((dep) => completed.has(dep));
+			});
+
+			if (readySteps.length === 0) {
+				throw new Error("Circular dependency detected in pipeline");
+			}
+
+			// Execute ready steps in parallel
+			const executePromises = readySteps.map(async (stepId) => {
+				executing.add(stepId);
+				const step = stepMap.get(stepId)!;
+
+				try {
+					// Use semaphore for parallel execution to prevent race conditions
+					const semaphoreKey = `tool:${step.toolName}`;
+					const semaphoreResult = await this.semaphoreManager.acquire(
+						semaphoreKey,
+						async () => {
+							return await this.registry.executeTool(
+								step.toolName,
+								step.params,
+								context,
+							);
+						},
+						context,
+					);
+
+					const result = semaphoreResult.success
+						? semaphoreResult.result
+						: {
+								success: false,
+								data: null,
+								error:
+									semaphoreResult.error ||
+									new Error("Semaphore acquisition failed"),
+								usage: {
+									executionTime: semaphoreResult.executionTime,
+									waitTime: semaphoreResult.waitTime,
+								},
+							};
+
+					results.set(stepId, result as ToolResult);
+
+					if (!(result as ToolResult).success) {
+						const error = (result as ToolResult).error;
+						const errorMessage =
+							error instanceof Error
+								? error.message
+								: String(error) || "Unknown error";
+						errors.set(stepId, errorMessage);
+					}
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					errors.set(stepId, errorMessage);
+				} finally {
+					executing.delete(stepId);
+					completed.add(stepId);
+				}
+			});
+
+			await Promise.all(executePromises);
+
+			// Check for errors and stop if configured
+			if (options.stopOnError && errors.size > 0) {
+				break;
+			}
+		}
+	}
+
+	/**
+	 * Generate unique pipeline ID
+	 *
+	 * @private
+	 */
+	private generatePipelineId(): string {
+		this.pipelineCounter++;
+		const timestamp = Date.now();
+		const random = Math.random().toString(36).substring(2, 8);
+		return `nlpipe-${timestamp}-${this.pipelineCounter}-${random}`;
+	}
 }
 
 /**
@@ -558,17 +972,17 @@ export const defaultOrchestrator = new MCPOrchestrator();
  * @returns Tool execution result
  */
 export async function executeTool(
-  toolName: string,
-  params: any,
-  contextRequest?: ContextRequest,
-  options?: ToolExecutionOptions,
+	toolName: string,
+	params: any,
+	contextRequest?: ContextRequest,
+	options?: ToolExecutionOptions,
 ): Promise<ToolResult> {
-  return defaultOrchestrator.executeTool(
-    toolName,
-    params,
-    contextRequest,
-    options,
-  );
+	return defaultOrchestrator.executeTool(
+		toolName,
+		params,
+		contextRequest,
+		options,
+	);
 }
 
 /**
@@ -580,15 +994,15 @@ export async function executeTool(
  * @returns Text generation result
  */
 export async function executeTextPipeline(
-  prompt: string,
-  contextRequest?: ContextRequest,
-  options?: any,
+	prompt: string,
+	contextRequest?: ContextRequest,
+	options?: any,
 ): Promise<TextPipelineResult> {
-  return defaultOrchestrator.executeTextPipeline(
-    prompt,
-    contextRequest,
-    options,
-  );
+	return defaultOrchestrator.executeTextPipeline(
+		prompt,
+		contextRequest,
+		options,
+	);
 }
 
 /**
@@ -600,9 +1014,9 @@ export async function executeTextPipeline(
  * @returns Pipeline execution result
  */
 export async function executePipeline(
-  steps: PipelineStep[],
-  contextRequest?: ContextRequest,
-  options?: PipelineOptions,
+	steps: PipelineStep[],
+	contextRequest?: ContextRequest,
+	options?: PipelineOptions,
 ): Promise<PipelineResult> {
-  return defaultOrchestrator.executePipeline(steps, contextRequest, options);
+	return defaultOrchestrator.executePipeline(steps, contextRequest, options);
 }

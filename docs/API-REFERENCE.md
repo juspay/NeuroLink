@@ -10,8 +10,8 @@ Creates the best available AI provider based on environment configuration and pr
 
 ```typescript
 function createBestAIProvider(
-  requestedProvider?: string,
-  modelName?: string,
+	requestedProvider?: string,
+	modelName?: string,
 ): AIProvider;
 ```
 
@@ -46,9 +46,9 @@ Creates a provider with automatic fallback mechanism.
 
 ```typescript
 function createAIProviderWithFallback(
-  primary: string,
-  fallback: string,
-  modelName?: string,
+	primary: string,
+	fallback: string,
+	modelName?: string,
 ): { primary: AIProvider; fallback: AIProvider };
 ```
 
@@ -68,10 +68,10 @@ import { createAIProviderWithFallback } from "@juspay/neurolink";
 const { primary, fallback } = createAIProviderWithFallback("bedrock", "openai");
 
 try {
-  const result = await primary.generateText({ prompt: "Hello AI!" });
+	const result = await primary.generateText({ prompt: "Hello AI!" });
 } catch (error) {
-  console.log("Primary failed, trying fallback...");
-  const result = await fallback.generateText({ prompt: "Hello AI!" });
+	console.log("Primary failed, trying fallback...");
+	const result = await fallback.generateText({ prompt: "Hello AI!" });
 }
 ```
 
@@ -105,8 +105,8 @@ import { AIProviderFactory } from "@juspay/neurolink";
 // Create specific providers
 const openai = AIProviderFactory.createProvider("openai", "gpt-4o");
 const bedrock = AIProviderFactory.createProvider(
-  "bedrock",
-  "claude-3-7-sonnet",
+	"bedrock",
+	"claude-3-7-sonnet",
 );
 const vertex = AIProviderFactory.createProvider("vertex", "gemini-2.5-flash");
 
@@ -132,12 +132,12 @@ All providers implement the `AIProvider` interface with these methods:
 
 ```typescript
 interface AIProvider {
-  generateText(options: GenerateTextOptions): Promise<GenerateTextResult>;
-  streamText(options: StreamTextOptions): Promise<StreamTextResult>;
+	generateText(options: GenerateTextOptions): Promise<GenerateTextResult>;
+	streamText(options: StreamTextOptions): Promise<StreamTextResult>;
 
-  // CLI-SDK Consistency: Method aliases (Phase 1.1)
-  generate(options: GenerateTextOptions): Promise<GenerateTextResult>;
-  gen(options: GenerateTextOptions): Promise<GenerateTextResult>;
+	// CLI-SDK Consistency: Method aliases (Phase 1.1)
+	generate(options: GenerateTextOptions): Promise<GenerateTextResult>;
+	gen(options: GenerateTextOptions): Promise<GenerateTextResult>;
 }
 ```
 
@@ -147,6 +147,91 @@ All providers now include method aliases that match CLI command names for consis
 
 - **`generate()`** - Alias for `generateText()` (matches `neurolink generate` CLI command)
 - **`gen()`** - Short alias for `generateText()` (matches `neurolink gen` CLI command)
+
+## 🆕 NeuroLink Class API
+
+### `addMCPServer(serverId, config)`
+
+**NEW!** Programmatically add MCP servers at runtime for dynamic tool ecosystem management.
+
+```typescript
+async addMCPServer(
+  serverId: string,
+  config: {
+    command: string;
+    args?: string[];
+    env?: Record<string, string>;
+    cwd?: string;
+  }
+): Promise<void>
+```
+
+**Parameters:**
+
+- `serverId`: Unique identifier for the MCP server
+- `config.command`: Command to execute (e.g., 'npx', 'node')
+- `config.args`: Optional command arguments array
+- `config.env`: Optional environment variables
+- `config.cwd`: Optional working directory
+
+**Examples:**
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+// Add Bitbucket integration
+await neurolink.addMCPServer("bitbucket", {
+	command: "npx",
+	args: ["-y", "@nexus2520/bitbucket-mcp-server"],
+	env: {
+		BITBUCKET_USERNAME: "your-username",
+		BITBUCKET_APP_PASSWORD: "your-app-password",
+	},
+});
+
+// Add custom database server
+await neurolink.addMCPServer("database", {
+	command: "node",
+	args: ["./custom-db-mcp-server.js"],
+	env: { DB_CONNECTION_STRING: "postgresql://..." },
+	cwd: "/path/to/server",
+});
+
+// Add any MCP-compatible server
+await neurolink.addMCPServer("slack", {
+	command: "npx",
+	args: ["-y", "@slack/mcp-server"],
+	env: { SLACK_BOT_TOKEN: "xoxb-..." },
+});
+```
+
+**Use Cases:**
+
+- External service integration (Bitbucket, Slack, Jira)
+- Custom tool development
+- Dynamic workflow configuration
+- Enterprise application toolchain management
+
+### `getMCPStatus()`
+
+Get current MCP server status and statistics.
+
+```typescript
+async getMCPStatus(): Promise<{
+  totalServers: number;
+  availableServers: number;
+  totalTools: number;
+}>
+```
+
+### `getUnifiedRegistry()`
+
+Access the unified MCP registry for advanced server management.
+
+```typescript
+getUnifiedRegistry(): UnifiedMCPRegistry
+```
 
 These methods have identical signatures and behavior to `generateText()`.
 
@@ -169,12 +254,12 @@ async generateText(options: GenerateTextOptions): Promise<GenerateTextResult>
 
 ```typescript
 interface GenerateTextOptions {
-  prompt: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  schema?: any; // For structured output
-  timeout?: number | string; // Timeout in ms or human-readable format (e.g., '30s', '2m', '1h')
+	prompt: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
+	schema?: any; // For structured output
+	timeout?: number | string; // Timeout in ms or human-readable format (e.g., '30s', '2m', '1h')
 }
 ```
 
@@ -182,45 +267,45 @@ interface GenerateTextOptions {
 
 ```typescript
 interface GenerateTextResult {
-  text: string;
-  provider: string;
-  model: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  responseTime?: number;
+	text: string;
+	provider: string;
+	model: string;
+	usage?: {
+		promptTokens: number;
+		completionTokens: number;
+		totalTokens: number;
+	};
+	responseTime?: number;
 
-  // 🆕 NEW: AI Enhancement Features
-  analytics?: {
-    provider: string;
-    model: string;
-    tokens: { input: number; output: number; total: number };
-    cost?: number;
-    responseTime: number;
-    context?: Record<string, any>;
-  };
+	// 🆕 NEW: AI Enhancement Features
+	analytics?: {
+		provider: string;
+		model: string;
+		tokens: { input: number; output: number; total: number };
+		cost?: number;
+		responseTime: number;
+		context?: Record<string, any>;
+	};
 
-  evaluation?: {
-    relevanceScore: number; // 1-10 scale
-    accuracyScore: number; // 1-10 scale
-    completenessScore: number; // 1-10 scale
-    overallScore: number; // 1-10 scale
-    alertLevel?: string; // 'none', 'low', 'medium', 'high'
-    reasoning?: string; // AI reasoning for the evaluation
+	evaluation?: {
+		relevanceScore: number; // 1-10 scale
+		accuracyScore: number; // 1-10 scale
+		completenessScore: number; // 1-10 scale
+		overallScore: number; // 1-10 scale
+		alertLevel?: string; // 'none', 'low', 'medium', 'high'
+		reasoning?: string; // AI reasoning for the evaluation
 
-    // Enhanced evaluation fields (when available)
-    domainAlignment?: number; // 1-10 scale
-    terminologyAccuracy?: number; // 1-10 scale
-    toolEffectiveness?: number; // 1-10 scale
-    alertSeverity?: string; // Legacy field
-    contextUtilization?: {
-      conversationUsed: boolean;
-      toolsUsed: boolean;
-      domainKnowledgeUsed: boolean;
-    };
-  };
+		// Enhanced evaluation fields (when available)
+		domainAlignment?: number; // 1-10 scale
+		terminologyAccuracy?: number; // 1-10 scale
+		toolEffectiveness?: number; // 1-10 scale
+		alertSeverity?: string; // Legacy field
+		contextUtilization?: {
+			conversationUsed: boolean;
+			toolsUsed: boolean;
+			domainKnowledgeUsed: boolean;
+		};
+	};
 }
 ```
 
@@ -232,11 +317,11 @@ Main configuration interface for enterprise features:
 
 ```typescript
 interface NeuroLinkConfig {
-  providers: ProviderConfig;
-  performance: PerformanceConfig;
-  analytics: AnalyticsConfig;
-  backup: BackupConfig;
-  validation: ValidationConfig;
+	providers: ProviderConfig;
+	performance: PerformanceConfig;
+	analytics: AnalyticsConfig;
+	backup: BackupConfig;
+	validation: ValidationConfig;
 }
 ```
 
@@ -246,21 +331,21 @@ Rich context interface for all MCP operations:
 
 ```typescript
 interface ExecutionContext {
-  sessionId?: string;
-  userId?: string;
-  aiProvider?: string;
-  permissions?: string[];
-  cacheOptions?: CacheOptions;
-  fallbackOptions?: FallbackOptions;
-  metadata?: Record<string, unknown>;
-  priority?: "low" | "normal" | "high";
-  timeout?: number;
-  retries?: number;
-  correlationId?: string;
-  requestId?: string;
-  userAgent?: string;
-  clientVersion?: string;
-  environment?: string;
+	sessionId?: string;
+	userId?: string;
+	aiProvider?: string;
+	permissions?: string[];
+	cacheOptions?: CacheOptions;
+	fallbackOptions?: FallbackOptions;
+	metadata?: Record<string, unknown>;
+	priority?: "low" | "normal" | "high";
+	timeout?: number;
+	retries?: number;
+	correlationId?: string;
+	requestId?: string;
+	userAgent?: string;
+	clientVersion?: string;
+	environment?: string;
 }
 ```
 
@@ -270,16 +355,16 @@ Comprehensive tool metadata interface:
 
 ```typescript
 interface ToolInfo {
-  name: string;
-  description?: string;
-  serverId?: string;
-  category?: string;
-  version?: string;
-  parameters?: unknown;
-  capabilities?: string[];
-  lastUsed?: Date;
-  usageCount?: number;
-  averageExecutionTime?: number;
+	name: string;
+	description?: string;
+	serverId?: string;
+	category?: string;
+	version?: string;
+	parameters?: unknown;
+	capabilities?: string[];
+	lastUsed?: Date;
+	usageCount?: number;
+	averageExecutionTime?: number;
 }
 ```
 
@@ -289,12 +374,12 @@ Flexible configuration update options:
 
 ```typescript
 interface ConfigUpdateOptions {
-  createBackup?: boolean;
-  validateBeforeUpdate?: boolean;
-  mergeStrategy?: "replace" | "merge" | "deep-merge";
-  backupRetention?: number;
-  onValidationError?: (errors: ValidationError[]) => void;
-  onBackupCreated?: (backupPath: string) => void;
+	createBackup?: boolean;
+	validateBeforeUpdate?: boolean;
+	mergeStrategy?: "replace" | "merge" | "deep-merge";
+	backupRetention?: number;
+	onValidationError?: (errors: ValidationError[]) => void;
+	onBackupCreated?: (backupPath: string) => void;
 }
 ```
 
@@ -322,10 +407,10 @@ Creates an enhanced chat service with WebSocket and SSE support for real-time ap
 
 ```typescript
 function createEnhancedChatService(options: {
-  provider: AIProvider;
-  enableSSE?: boolean;
-  enableWebSocket?: boolean;
-  streamingConfig?: StreamingConfig;
+	provider: AIProvider;
+	enableSSE?: boolean;
+	enableWebSocket?: boolean;
+	streamingConfig?: StreamingConfig;
 }): EnhancedChatService;
 ```
 
@@ -333,14 +418,14 @@ function createEnhancedChatService(options: {
 
 ```typescript
 interface EnhancedChatServiceOptions {
-  provider: AIProvider; // AI provider instance
-  enableSSE?: boolean; // Enable Server-Sent Events (default: true)
-  enableWebSocket?: boolean; // Enable WebSocket support (default: false)
-  streamingConfig?: {
-    bufferSize?: number; // Buffer size in bytes (default: 8192)
-    compressionEnabled?: boolean; // Enable compression (default: true)
-    latencyTarget?: number; // Target latency in ms (default: 100)
-  };
+	provider: AIProvider; // AI provider instance
+	enableSSE?: boolean; // Enable Server-Sent Events (default: true)
+	enableWebSocket?: boolean; // Enable WebSocket support (default: false)
+	streamingConfig?: {
+		bufferSize?: number; // Buffer size in bytes (default: 8192)
+		compressionEnabled?: boolean; // Enable compression (default: true)
+		latencyTarget?: number; // Target latency in ms (default: 100)
+	};
 }
 ```
 
@@ -350,27 +435,27 @@ interface EnhancedChatServiceOptions {
 
 ```typescript
 import {
-  createEnhancedChatService,
-  createBestAIProvider,
+	createEnhancedChatService,
+	createBestAIProvider,
 } from "@juspay/neurolink";
 
 const provider = await createBestAIProvider();
 const chatService = createEnhancedChatService({
-  provider,
-  enableWebSocket: true,
-  enableSSE: true,
-  streamingConfig: {
-    bufferSize: 4096,
-    compressionEnabled: true,
-    latencyTarget: 50, // 50ms target latency
-  },
+	provider,
+	enableWebSocket: true,
+	enableSSE: true,
+	streamingConfig: {
+		bufferSize: 4096,
+		compressionEnabled: true,
+		latencyTarget: 50, // 50ms target latency
+	},
 });
 
 // Stream chat with enhanced capabilities
 await chatService.streamChat({
-  prompt: "Generate a story",
-  onChunk: (chunk) => console.log(chunk),
-  onComplete: (result) => console.log("Complete:", result),
+	prompt: "Generate a story",
+	onChunk: (chunk) => console.log(chunk),
+	onComplete: (result) => console.log("Complete:", result),
 });
 ```
 
@@ -380,15 +465,15 @@ Professional-grade WebSocket server for real-time AI applications.
 
 ```typescript
 class NeuroLinkWebSocketServer {
-  constructor(options?: WebSocketOptions);
-  joinRoom(connectionId: string, roomId: string): boolean;
-  broadcastToRoom(roomId: string, message: WebSocketMessage): void;
-  createStreamingChannel(
-    connectionId: string,
-    channelId: string,
-  ): StreamingChannel;
-  sendMessage(connectionId: string, message: WebSocketMessage): boolean;
-  on(event: string, handler: Function): void;
+	constructor(options?: WebSocketOptions);
+	joinRoom(connectionId: string, roomId: string): boolean;
+	broadcastToRoom(roomId: string, message: WebSocketMessage): void;
+	createStreamingChannel(
+		connectionId: string,
+		channelId: string,
+	): StreamingChannel;
+	sendMessage(connectionId: string, message: WebSocketMessage): boolean;
+	on(event: string, handler: Function): void;
 }
 ```
 
@@ -396,11 +481,11 @@ class NeuroLinkWebSocketServer {
 
 ```typescript
 interface WebSocketOptions {
-  port?: number; // Server port (default: 8080)
-  maxConnections?: number; // Max concurrent connections (default: 1000)
-  heartbeatInterval?: number; // Heartbeat interval in ms (default: 30000)
-  enableCompression?: boolean; // Enable WebSocket compression (default: true)
-  bufferSize?: number; // Message buffer size (default: 8192)
+	port?: number; // Server port (default: 8080)
+	maxConnections?: number; // Max concurrent connections (default: 1000)
+	heartbeatInterval?: number; // Heartbeat interval in ms (default: 30000)
+	enableCompression?: boolean; // Enable WebSocket compression (default: true)
+	bufferSize?: number; // Message buffer size (default: 8192)
 }
 ```
 
@@ -410,25 +495,25 @@ interface WebSocketOptions {
 import { NeuroLinkWebSocketServer } from "@juspay/neurolink";
 
 const wsServer = new NeuroLinkWebSocketServer({
-  port: 8080,
-  maxConnections: 1000,
-  enableCompression: true,
+	port: 8080,
+	maxConnections: 1000,
+	enableCompression: true,
 });
 
 // Handle connections
 wsServer.on("connection", ({ connectionId, userAgent }) => {
-  console.log(`New connection: ${connectionId}`);
-  wsServer.joinRoom(connectionId, "general-chat");
+	console.log(`New connection: ${connectionId}`);
+	wsServer.joinRoom(connectionId, "general-chat");
 });
 
 // Handle chat messages
 wsServer.on("chat-message", async ({ connectionId, message }) => {
-  // Process with AI and broadcast response
-  const aiResponse = await processWithAI(message.data.prompt);
-  wsServer.broadcastToRoom("general-chat", {
-    type: "ai-response",
-    data: { text: aiResponse },
-  });
+	// Process with AI and broadcast response
+	const aiResponse = await processWithAI(message.data.prompt);
+	wsServer.broadcastToRoom("general-chat", {
+		type: "ai-response",
+		data: { text: aiResponse },
+	});
 });
 ```
 
@@ -446,12 +531,12 @@ function initializeTelemetry(config: TelemetryConfig): TelemetryResult;
 
 ```typescript
 interface TelemetryConfig {
-  serviceName: string; // Service name for telemetry
-  endpoint?: string; // OpenTelemetry endpoint
-  enableTracing?: boolean; // Enable distributed tracing (default: true)
-  enableMetrics?: boolean; // Enable metrics collection (default: true)
-  enableLogs?: boolean; // Enable log collection (default: true)
-  samplingRate?: number; // Trace sampling rate 0-1 (default: 0.1)
+	serviceName: string; // Service name for telemetry
+	endpoint?: string; // OpenTelemetry endpoint
+	enableTracing?: boolean; // Enable distributed tracing (default: true)
+	enableMetrics?: boolean; // Enable metrics collection (default: true)
+	enableLogs?: boolean; // Enable log collection (default: true)
+	samplingRate?: number; // Trace sampling rate 0-1 (default: 0.1)
 }
 ```
 
@@ -459,12 +544,12 @@ interface TelemetryConfig {
 
 ```typescript
 interface TelemetryResult {
-  success: boolean;
-  tracingEnabled: boolean;
-  metricsEnabled: boolean;
-  logsEnabled: boolean;
-  endpoint?: string;
-  error?: string;
+	success: boolean;
+	tracingEnabled: boolean;
+	metricsEnabled: boolean;
+	logsEnabled: boolean;
+	endpoint?: string;
+	error?: string;
 }
 ```
 
@@ -474,18 +559,18 @@ interface TelemetryResult {
 import { initializeTelemetry } from "@juspay/neurolink";
 
 const telemetry = initializeTelemetry({
-  serviceName: "my-ai-application",
-  endpoint: "http://localhost:4318",
-  enableTracing: true,
-  enableMetrics: true,
-  enableLogs: true,
-  samplingRate: 0.1, // Sample 10% of traces
+	serviceName: "my-ai-application",
+	endpoint: "http://localhost:4318",
+	enableTracing: true,
+	enableMetrics: true,
+	enableLogs: true,
+	samplingRate: 0.1, // Sample 10% of traces
 });
 
 if (telemetry.success) {
-  console.log("Telemetry initialized successfully");
+	console.log("Telemetry initialized successfully");
 } else {
-  console.error("Telemetry initialization failed:", telemetry.error);
+	console.error("Telemetry initialization failed:", telemetry.error);
 }
 ```
 
@@ -501,20 +586,20 @@ function getTelemetryStatus(): Promise<TelemetryStatus>;
 
 ```typescript
 interface TelemetryStatus {
-  enabled: boolean; // Whether telemetry is active
-  endpoint?: string; // Current endpoint
-  service: string; // Service name
-  version: string; // NeuroLink version
-  features: {
-    tracing: boolean;
-    metrics: boolean;
-    logs: boolean;
-  };
-  stats?: {
-    tracesCollected: number;
-    metricsCollected: number;
-    logsCollected: number;
-  };
+	enabled: boolean; // Whether telemetry is active
+	endpoint?: string; // Current endpoint
+	service: string; // Service name
+	version: string; // NeuroLink version
+	features: {
+		tracing: boolean;
+		metrics: boolean;
+		logs: boolean;
+	};
+	stats?: {
+		tracesCollected: number;
+		metricsCollected: number;
+		logsCollected: number;
+	};
 }
 ```
 
@@ -529,8 +614,8 @@ console.log("Service:", status.service);
 console.log("Features:", status.features);
 
 if (status.stats) {
-  console.log("Traces collected:", status.stats.tracesCollected);
-  console.log("Metrics collected:", status.stats.metricsCollected);
+	console.log("Traces collected:", status.stats.tracesCollected);
+	console.log("Metrics collected:", status.stats.metricsCollected);
 }
 ```
 
@@ -540,17 +625,17 @@ The base `GenerateTextOptions` interface now supports enterprise features:
 
 ```typescript
 interface GenerateTextOptions {
-  prompt: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  schema?: any;
-  timeout?: number | string;
+	prompt: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
+	schema?: any;
+	timeout?: number | string;
 
-  // 🆕 NEW: AI Enhancement Features
-  enableAnalytics?: boolean; // Enable usage analytics
-  enableEvaluation?: boolean; // Enable AI quality scoring
-  context?: Record<string, any>; // Custom context for analytics
+	// 🆕 NEW: AI Enhancement Features
+	enableAnalytics?: boolean; // Enable usage analytics
+	enableEvaluation?: boolean; // Enable AI quality scoring
+	context?: Record<string, any>; // Custom context for analytics
 }
 ```
 
@@ -602,10 +687,10 @@ console.log('🎯 Enhanced Evaluation:', enhancedResult);
 
 ```typescript
 const result = await provider.generateText({
-  prompt: "Explain quantum computing in simple terms",
-  temperature: 0.7,
-  maxTokens: 500,
-  systemPrompt: "You are a helpful science teacher",
+	prompt: "Explain quantum computing in simple terms",
+	temperature: 0.7,
+	maxTokens: 500,
+	systemPrompt: "You are a helpful science teacher",
 });
 
 console.log(result.text);
@@ -625,11 +710,11 @@ async streamText(options: StreamTextOptions): Promise<StreamTextResult>
 
 ```typescript
 interface StreamTextOptions {
-  prompt: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  timeout?: number | string; // Timeout in ms or human-readable format (e.g., '30s', '2m', '1h')
+	prompt: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
+	timeout?: number | string; // Timeout in ms or human-readable format (e.g., '30s', '2m', '1h')
 }
 ```
 
@@ -637,10 +722,10 @@ interface StreamTextOptions {
 
 ```typescript
 interface StreamTextResult {
-  textStream: AsyncIterable<string>;
-  provider: string;
-  model: string;
-  toReadableStream(): ReadableStream<Uint8Array>;
+	textStream: AsyncIterable<string>;
+	provider: string;
+	model: string;
+	toReadableStream(): ReadableStream<Uint8Array>;
 }
 ```
 
@@ -648,20 +733,20 @@ interface StreamTextResult {
 
 ```typescript
 const result = await provider.streamText({
-  prompt: "Write a story about AI and humanity",
-  temperature: 0.8,
-  maxTokens: 1000,
+	prompt: "Write a story about AI and humanity",
+	temperature: 0.8,
+	maxTokens: 1000,
 });
 
 // Stream to console
 for await (const chunk of result.textStream) {
-  process.stdout.write(chunk);
+	process.stdout.write(chunk);
 }
 
 // Or convert to ReadableStream for web APIs
 const stream = result.toReadableStream();
 return new Response(stream, {
-  headers: { "Content-Type": "text/plain" },
+	headers: { "Content-Type": "text/plain" },
 });
 ```
 
@@ -672,9 +757,9 @@ NeuroLink supports both object-based and string-based parameters for convenience
 ```typescript
 // Object format (recommended for complex options)
 const result1 = await provider.generateText({
-  prompt: "Hello",
-  temperature: 0.7,
-  maxTokens: 100,
+	prompt: "Hello",
+	temperature: 0.7,
+	maxTokens: 100,
 });
 
 // String format (convenient for simple prompts)
@@ -688,20 +773,20 @@ NeuroLink supports flexible timeout configuration for all AI operations:
 ```typescript
 // Numeric milliseconds
 const result1 = await provider.generateText({
-  prompt: "Write a story",
-  timeout: 30000, // 30 seconds
+	prompt: "Write a story",
+	timeout: 30000, // 30 seconds
 });
 
 // Human-readable formats
 const result2 = await provider.generateText({
-  prompt: "Complex calculation",
-  timeout: "2m", // 2 minutes
+	prompt: "Complex calculation",
+	timeout: "2m", // 2 minutes
 });
 
 // Streaming with longer timeout
 const stream = await provider.streamText({
-  prompt: "Generate long content",
-  timeout: "5m", // 5 minutes for streaming
+	prompt: "Generate long content",
+	timeout: "5m", // 5 minutes for streaming
 });
 
 // Provider-specific default timeouts
@@ -739,26 +824,26 @@ const registry = new DynamicModelRegistry();
 
 // Use model aliases for convenient access
 const provider1 = await factory.createProvider({
-  provider: "anthropic",
-  model: "claude-latest", // Auto-resolves to latest Claude model
+	provider: "anthropic",
+	model: "claude-latest", // Auto-resolves to latest Claude model
 });
 
 // Capability-based model selection
 const provider2 = await factory.createProvider({
-  provider: "auto",
-  capability: "vision", // Automatically selects best vision model
-  optimizeFor: "cost", // Prefer cost-effective options
+	provider: "auto",
+	capability: "vision", // Automatically selects best vision model
+	optimizeFor: "cost", // Prefer cost-effective options
 });
 
 // Advanced model resolution
 const bestCodingModel = await registry.findBestModel({
-  capability: "code",
-  maxPrice: 0.005, // Max $0.005 per 1K tokens
-  provider: "anthropic", // Prefer Anthropic models
+	capability: "code",
+	maxPrice: 0.005, // Max $0.005 per 1K tokens
+	provider: "anthropic", // Prefer Anthropic models
 });
 
 console.log(
-  `Selected: ${bestCodingModel.modelId} (${bestCodingModel.reasoning})`,
+	`Selected: ${bestCodingModel.modelId} (${bestCodingModel.reasoning})`,
 );
 ```
 
@@ -772,18 +857,18 @@ const registry = new DynamicModelRegistry();
 // Get the cheapest model for general tasks
 const cheapestModel = await registry.getCheapestModel("general");
 const provider = await factory.createProvider({
-  provider: cheapestModel.provider,
-  model: cheapestModel.id,
+	provider: cheapestModel.provider,
+	model: cheapestModel.id,
 });
 
 // Generate text with cost optimization
 const result = await provider.generateText({
-  prompt: "Summarize the benefits of renewable energy",
-  maxTokens: 200, // Control output length for cost
+	prompt: "Summarize the benefits of renewable energy",
+	maxTokens: 200, // Control output length for cost
 });
 
 console.log(
-  `Generated with ${result.model} - Cost: $${calculateCost(result.usage, cheapestModel.pricing)}`,
+	`Generated with ${result.model} - Cost: $${calculateCost(result.usage, cheapestModel.pricing)}`,
 );
 ```
 
@@ -792,14 +877,14 @@ console.log(
 ```typescript
 // Automatically select best vision model
 const visionProvider = await factory.createProvider({
-  capability: "vision",
-  optimizeFor: "quality", // Prefer highest quality vision model
+	capability: "vision",
+	optimizeFor: "quality", // Prefer highest quality vision model
 });
 
 const result = await visionProvider.generateText({
-  prompt: "Describe what you see in this image",
-  images: ["data:image/jpeg;base64,/9j/4AAQSkZJRgABA..."], // Base64 image
-  maxTokens: 500,
+	prompt: "Describe what you see in this image",
+	images: ["data:image/jpeg;base64,/9j/4AAQSkZJRgABA..."], // Base64 image
+	maxTokens: 500,
 });
 ```
 
@@ -808,20 +893,20 @@ const result = await visionProvider.generateText({
 ```typescript
 // Select model optimized for function calling
 const functionProvider = await factory.createProvider({
-  capability: "function-calling",
-  optimizeFor: "speed", // Fast function execution
+	capability: "function-calling",
+	optimizeFor: "speed", // Fast function execution
 });
 
 const result = await functionProvider.generateText({
-  prompt: "What's the weather in San Francisco?",
-  schema: {
-    type: "object",
-    properties: {
-      location: { type: "string" },
-      temperature: { type: "number" },
-      conditions: { type: "string" },
-    },
-  },
+	prompt: "What's the weather in San Francisco?",
+	schema: {
+		type: "object",
+		properties: {
+			location: { type: "string" },
+			temperature: { type: "number" },
+			conditions: { type: "string" },
+		},
+	},
 });
 
 console.log(JSON.parse(result.text)); // Structured weather data
@@ -836,19 +921,19 @@ const registry = new DynamicModelRegistry();
 
 // Search for vision models under $0.001 per 1K tokens
 const affordableVisionModels = await registry.searchModels({
-  capability: "vision",
-  maxPrice: 0.001,
-  excludeDeprecated: true,
+	capability: "vision",
+	maxPrice: 0.001,
+	excludeDeprecated: true,
 });
 
 console.log("Affordable Vision Models:");
 affordableVisionModels.forEach((model) => {
-  console.log(`- ${model.name}: $${model.pricing.input}/1K tokens`);
+	console.log(`- ${model.name}: $${model.pricing.input}/1K tokens`);
 });
 
 // Get all models from a specific provider
 const anthropicModels = await registry.searchModels({
-  provider: "anthropic",
+	provider: "anthropic",
 });
 
 // Resolve aliases to actual model IDs
@@ -861,17 +946,17 @@ console.log(`claude-latest resolves to: ${resolvedModel}`);
 ```typescript
 // Use fastest model for streaming
 const streamingProvider = await factory.createProvider({
-  model: "fastest", // Alias for fastest available model
+	model: "fastest", // Alias for fastest available model
 });
 
 const stream = await streamingProvider.streamText({
-  prompt: "Write a story about space exploration",
-  maxTokens: 1000,
+	prompt: "Write a story about space exploration",
+	maxTokens: 1000,
 });
 
 // Process streaming response
 for await (const chunk of stream.textStream) {
-  process.stdout.write(chunk);
+	process.stdout.write(chunk);
 }
 ```
 
@@ -880,21 +965,21 @@ for await (const chunk of stream.textStream) {
 ```typescript
 // Primary: Best quality model, Fallback: Fastest cheap model
 const primaryProvider = await factory.createProvider({
-  provider: "anthropic",
-  model: "claude-latest",
+	provider: "anthropic",
+	model: "claude-latest",
 });
 
 const fallbackProvider = await factory.createProvider({
-  model: "fastest",
+	model: "fastest",
 });
 
 try {
-  const result = await primaryProvider.generateText("Complex reasoning task");
-  console.log(result.text);
+	const result = await primaryProvider.generateText("Complex reasoning task");
+	console.log(result.text);
 } catch (error) {
-  console.log("Primary failed, using fallback...");
-  const result = await fallbackProvider.generateText("Complex reasoning task");
-  console.log(result.text);
+	console.log("Primary failed, using fallback...");
+	const result = await fallbackProvider.generateText("Complex reasoning task");
+	console.log(result.text);
 }
 ```
 
@@ -904,18 +989,18 @@ try {
 
 ```typescript
 type OpenAIModel =
-  | "gpt-4o" // Default - Latest multimodal model
-  | "gpt-4o-mini" // Cost-effective variant
-  | "gpt-4-turbo"; // High-performance model
+	| "gpt-4o" // Default - Latest multimodal model
+	| "gpt-4o-mini" // Cost-effective variant
+	| "gpt-4-turbo"; // High-performance model
 ```
 
 ### Amazon Bedrock Models
 
 ```typescript
 type BedrockModel =
-  | "claude-3-7-sonnet" // Default - Latest Claude model
-  | "claude-3-5-sonnet" // Previous generation
-  | "claude-3-haiku"; // Fast, lightweight model
+	| "claude-3-7-sonnet" // Default - Latest Claude model
+	| "claude-3-5-sonnet" // Previous generation
+	| "claude-3-haiku"; // Fast, lightweight model
 ```
 
 **Note:** Bedrock requires full inference profile ARNs in environment variables.
@@ -924,16 +1009,16 @@ type BedrockModel =
 
 ```typescript
 type VertexModel =
-  | "gemini-2.5-flash" // Default - Fast, efficient
-  | "claude-sonnet-4@20250514"; // High-quality reasoning
+	| "gemini-2.5-flash" // Default - Fast, efficient
+	| "claude-sonnet-4@20250514"; // High-quality reasoning
 ```
 
 ### Google AI Studio Models
 
 ```typescript
 type GoogleAIModel =
-  | "gemini-2.5-pro" // Default - Latest Gemini Pro
-  | "gemini-2.5-flash"; // Fast, efficient responses
+	| "gemini-2.5-pro" // Default - Latest Gemini Pro
+	| "gemini-2.5-flash"; // Fast, efficient responses
 ```
 
 ### Azure OpenAI Models
@@ -972,10 +1057,10 @@ type OllamaModel = string; // Any locally installed model
 
 ```typescript
 type MistralModel =
-  | "mistral-tiny"
-  | "mistral-small" // Default
-  | "mistral-medium"
-  | "mistral-large";
+	| "mistral-tiny"
+	| "mistral-small" // Default
+	| "mistral-medium"
+	| "mistral-large";
 ```
 
 ## Dynamic Model System (v1.8.0+)
@@ -1012,23 +1097,23 @@ Models are defined in `config/models.json` with comprehensive metadata:
 
 ```typescript
 interface ModelConfig {
-  id: string; // Unique model identifier
-  name: string; // Display name
-  provider: string; // Provider name (anthropic, openai, etc.)
-  pricing: {
-    input: number; // Cost per 1K input tokens
-    output: number; // Cost per 1K output tokens
-  };
-  capabilities: string[]; // ['function-calling', 'vision', 'code']
-  contextWindow: number; // Maximum context length
-  deprecated: boolean; // Whether model is deprecated
-  aliases: string[]; // Alternative names
-  metadata: {
-    description: string;
-    useCase: string; // 'general', 'coding', 'vision', etc.
-    speed: "fast" | "medium" | "slow";
-    quality: "high" | "medium" | "low";
-  };
+	id: string; // Unique model identifier
+	name: string; // Display name
+	provider: string; // Provider name (anthropic, openai, etc.)
+	pricing: {
+		input: number; // Cost per 1K input tokens
+		output: number; // Cost per 1K output tokens
+	};
+	capabilities: string[]; // ['function-calling', 'vision', 'code']
+	contextWindow: number; // Maximum context length
+	deprecated: boolean; // Whether model is deprecated
+	aliases: string[]; // Alternative names
+	metadata: {
+		description: string;
+		useCase: string; // 'general', 'coding', 'vision', etc.
+		speed: "fast" | "medium" | "slow";
+		quality: "high" | "medium" | "low";
+	};
 }
 ```
 
@@ -1048,9 +1133,9 @@ await registry.resolveModel("best-coding"); // → 'claude-3-5-sonnet'
 
 // Find best model for specific criteria
 await registry.findBestModel({
-  capability: "vision",
-  maxPrice: 0.001, // Maximum cost per 1K tokens
-  provider: "anthropic", // Optional provider preference
+	capability: "vision",
+	maxPrice: 0.001, // Maximum cost per 1K tokens
+	provider: "anthropic", // Optional provider preference
 });
 
 // Get models by capability
@@ -1072,21 +1157,21 @@ const factory = new AIProviderFactory();
 
 // Use model aliases
 const provider1 = await factory.createProvider({
-  provider: "anthropic",
-  model: "claude-latest", // Resolves to latest Claude model
+	provider: "anthropic",
+	model: "claude-latest", // Resolves to latest Claude model
 });
 
 // Use capability-based selection
 const provider2 = await factory.createProvider({
-  provider: "auto",
-  model: "best-vision", // Selects best vision model
-  optimizeFor: "cost", // Prefer cost-effective models
+	provider: "auto",
+	model: "best-vision", // Selects best vision model
+	optimizeFor: "cost", // Prefer cost-effective models
 });
 
 // Use direct model IDs (still supported)
 const provider3 = await factory.createProvider({
-  provider: "openai",
-  model: "gpt-4o", // Direct model specification
+	provider: "openai",
+	model: "gpt-4o", // Direct model specification
 });
 ```
 
@@ -1111,31 +1196,31 @@ The `config/models.json` file defines all available models:
 
 ```json
 {
-  "models": [
-    {
-      "id": "claude-3-5-sonnet",
-      "name": "Claude 3.5 Sonnet",
-      "provider": "anthropic",
-      "pricing": { "input": 0.003, "output": 0.015 },
-      "capabilities": ["function-calling", "vision", "code"],
-      "contextWindow": 200000,
-      "deprecated": false,
-      "aliases": ["claude-latest", "best-coding", "claude-sonnet"],
-      "metadata": {
-        "description": "Most capable Claude model",
-        "useCase": "general",
-        "speed": "medium",
-        "quality": "high"
-      }
-    }
-  ],
-  "aliases": {
-    "claude-latest": "claude-3-5-sonnet",
-    "fastest": "gpt-4o-mini",
-    "cheapest": "claude-3-haiku",
-    "best-vision": "gpt-4o",
-    "best-coding": "claude-3-5-sonnet"
-  }
+	"models": [
+		{
+			"id": "claude-3-5-sonnet",
+			"name": "Claude 3.5 Sonnet",
+			"provider": "anthropic",
+			"pricing": { "input": 0.003, "output": 0.015 },
+			"capabilities": ["function-calling", "vision", "code"],
+			"contextWindow": 200000,
+			"deprecated": false,
+			"aliases": ["claude-latest", "best-coding", "claude-sonnet"],
+			"metadata": {
+				"description": "Most capable Claude model",
+				"useCase": "general",
+				"speed": "medium",
+				"quality": "high"
+			}
+		}
+	],
+	"aliases": {
+		"claude-latest": "claude-3-5-sonnet",
+		"fastest": "gpt-4o-mini",
+		"cheapest": "claude-3-haiku",
+		"best-vision": "gpt-4o",
+		"best-coding": "claude-3-5-sonnet"
+	}
 }
 ```
 
@@ -1168,33 +1253,33 @@ neurolink generate-text "Describe this" --capability vision --optimize-cost
 
 ```typescript
 interface DynamicModelOptions {
-  // Specify exact model ID
-  model?: string;
+	// Specify exact model ID
+	model?: string;
 
-  // OR specify requirements for automatic selection
-  capability?: "function-calling" | "vision" | "code" | "general";
-  maxPrice?: number; // Maximum cost per 1K tokens
-  optimizeFor?: "cost" | "speed" | "quality";
-  provider?: string; // Preferred provider
+	// OR specify requirements for automatic selection
+	capability?: "function-calling" | "vision" | "code" | "general";
+	maxPrice?: number; // Maximum cost per 1K tokens
+	optimizeFor?: "cost" | "speed" | "quality";
+	provider?: string; // Preferred provider
 }
 
 interface ModelResolutionResult {
-  modelId: string; // Resolved model ID
-  provider: string; // Provider name
-  reasoning: string; // Why this model was selected
-  pricing: {
-    input: number;
-    output: number;
-  };
-  capabilities: string[];
+	modelId: string; // Resolved model ID
+	provider: string; // Provider name
+	reasoning: string; // Why this model was selected
+	pricing: {
+		input: number;
+		output: number;
+	};
+	capabilities: string[];
 }
 
 interface ModelSearchOptions {
-  capability?: string;
-  provider?: string;
-  maxPrice?: number;
-  minContextWindow?: number;
-  excludeDeprecated?: boolean;
+	capability?: string;
+	provider?: string;
+	maxPrice?: number;
+	minContextWindow?: number;
+	excludeDeprecated?: boolean;
 }
 ```
 
@@ -1205,21 +1290,21 @@ For existing code using static model enums, the transition is seamless:
 ```typescript
 // OLD: Static enum usage (still works)
 const provider = await factory.createProvider({
-  provider: "anthropic",
-  model: "claude-3-5-sonnet",
+	provider: "anthropic",
+	model: "claude-3-5-sonnet",
 });
 
 // NEW: Dynamic model usage (recommended)
 const provider = await factory.createProvider({
-  provider: "anthropic",
-  model: "claude-latest", // Auto-resolves to latest Claude
+	provider: "anthropic",
+	model: "claude-latest", // Auto-resolves to latest Claude
 });
 
 // ADVANCED: Capability-based selection
 const provider = await factory.createProvider({
-  provider: "auto",
-  capability: "vision",
-  optimizeFor: "cost",
+	provider: "auto",
+	capability: "vision",
+	optimizeFor: "cost",
 });
 ```
 
@@ -1301,57 +1386,57 @@ LOG_LEVEL?: 'error' | 'warn' | 'info' | 'debug'
 
 ```typescript
 type ProviderName =
-  | "openai"
-  | "bedrock"
-  | "vertex"
-  | "anthropic"
-  | "azure"
-  | "google-ai"
-  | "huggingface"
-  | "ollama"
-  | "mistral";
+	| "openai"
+	| "bedrock"
+	| "vertex"
+	| "anthropic"
+	| "azure"
+	| "google-ai"
+	| "huggingface"
+	| "ollama"
+	| "mistral";
 
 interface AIProvider {
-  generateText(
-    options: GenerateTextOptions | string,
-  ): Promise<GenerateTextResult>;
-  streamText(options: StreamTextOptions | string): Promise<StreamTextResult>;
+	generateText(
+		options: GenerateTextOptions | string,
+	): Promise<GenerateTextResult>;
+	streamText(options: StreamTextOptions | string): Promise<StreamTextResult>;
 }
 
 interface GenerateTextOptions {
-  prompt: string;
-  temperature?: number; // 0.0 to 1.0, default: 0.7
-  maxTokens?: number; // Default: 1000
-  systemPrompt?: string; // System message
-  schema?: any; // For structured output
+	prompt: string;
+	temperature?: number; // 0.0 to 1.0, default: 0.7
+	maxTokens?: number; // Default: 1000
+	systemPrompt?: string; // System message
+	schema?: any; // For structured output
 }
 
 interface StreamTextOptions {
-  prompt: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
+	prompt: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
 }
 
 interface GenerateTextResult {
-  text: string;
-  provider: string;
-  model: string;
-  usage?: TokenUsage;
-  responseTime?: number; // Milliseconds
+	text: string;
+	provider: string;
+	model: string;
+	usage?: TokenUsage;
+	responseTime?: number; // Milliseconds
 }
 
 interface StreamTextResult {
-  textStream: AsyncIterable<string>;
-  provider: string;
-  model: string;
-  toReadableStream(): ReadableStream<Uint8Array>;
+	textStream: AsyncIterable<string>;
+	provider: string;
+	model: string;
+	toReadableStream(): ReadableStream<Uint8Array>;
 }
 
 interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
+	promptTokens: number;
+	completionTokens: number;
+	totalTokens: number;
 }
 ```
 
@@ -1359,64 +1444,64 @@ interface TokenUsage {
 
 ```typescript
 interface ModelConfig {
-  id: string; // Unique model identifier
-  name: string; // Display name
-  provider: string; // Provider name (anthropic, openai, etc.)
-  pricing: {
-    input: number; // Cost per 1K input tokens
-    output: number; // Cost per 1K output tokens
-  };
-  capabilities: string[]; // ['function-calling', 'vision', 'code']
-  contextWindow: number; // Maximum context length
-  deprecated: boolean; // Whether model is deprecated
-  aliases: string[]; // Alternative names
-  metadata: {
-    description: string;
-    useCase: string; // 'general', 'coding', 'vision', etc.
-    speed: "fast" | "medium" | "slow";
-    quality: "high" | "medium" | "low";
-  };
+	id: string; // Unique model identifier
+	name: string; // Display name
+	provider: string; // Provider name (anthropic, openai, etc.)
+	pricing: {
+		input: number; // Cost per 1K input tokens
+		output: number; // Cost per 1K output tokens
+	};
+	capabilities: string[]; // ['function-calling', 'vision', 'code']
+	contextWindow: number; // Maximum context length
+	deprecated: boolean; // Whether model is deprecated
+	aliases: string[]; // Alternative names
+	metadata: {
+		description: string;
+		useCase: string; // 'general', 'coding', 'vision', etc.
+		speed: "fast" | "medium" | "slow";
+		quality: "high" | "medium" | "low";
+	};
 }
 
 interface DynamicModelOptions {
-  // Specify exact model ID
-  model?: string;
+	// Specify exact model ID
+	model?: string;
 
-  // OR specify requirements for automatic selection
-  capability?: "function-calling" | "vision" | "code" | "general";
-  maxPrice?: number; // Maximum cost per 1K tokens
-  optimizeFor?: "cost" | "speed" | "quality";
-  provider?: string; // Preferred provider
+	// OR specify requirements for automatic selection
+	capability?: "function-calling" | "vision" | "code" | "general";
+	maxPrice?: number; // Maximum cost per 1K tokens
+	optimizeFor?: "cost" | "speed" | "quality";
+	provider?: string; // Preferred provider
 }
 
 interface ModelResolutionResult {
-  modelId: string; // Resolved model ID
-  provider: string; // Provider name
-  reasoning: string; // Why this model was selected
-  pricing: {
-    input: number;
-    output: number;
-  };
-  capabilities: string[];
+	modelId: string; // Resolved model ID
+	provider: string; // Provider name
+	reasoning: string; // Why this model was selected
+	pricing: {
+		input: number;
+		output: number;
+	};
+	capabilities: string[];
 }
 
 interface ModelSearchOptions {
-  capability?: string;
-  provider?: string;
-  maxPrice?: number;
-  minContextWindow?: number;
-  excludeDeprecated?: boolean;
+	capability?: string;
+	provider?: string;
+	maxPrice?: number;
+	minContextWindow?: number;
+	excludeDeprecated?: boolean;
 }
 
 interface DynamicModelRegistry {
-  resolveModel(alias: string): Promise<string>;
-  findBestModel(options: DynamicModelOptions): Promise<ModelResolutionResult>;
-  getModelsByCapability(capability: string): Promise<ModelConfig[]>;
-  getCheapestModel(useCase: string): Promise<ModelConfig>;
-  getFastestModel(useCase: string): Promise<ModelConfig>;
-  searchModels(options: ModelSearchOptions): Promise<ModelConfig[]>;
-  getModelConfig(modelId: string): Promise<ModelConfig | null>;
-  getAllModels(): Promise<ModelConfig[]>;
+	resolveModel(alias: string): Promise<string>;
+	findBestModel(options: DynamicModelOptions): Promise<ModelResolutionResult>;
+	getModelsByCapability(capability: string): Promise<ModelConfig[]>;
+	getCheapestModel(useCase: string): Promise<ModelConfig>;
+	getFastestModel(useCase: string): Promise<ModelConfig>;
+	searchModels(options: ModelSearchOptions): Promise<ModelConfig[]>;
+	getModelConfig(modelId: string): Promise<ModelConfig | null>;
+	getAllModels(): Promise<ModelConfig[]>;
 }
 ```
 
@@ -1425,80 +1510,80 @@ interface DynamicModelRegistry {
 ```typescript
 // OpenAI specific
 interface OpenAIOptions extends GenerateTextOptions {
-  user?: string; // User identifier
-  stop?: string | string[]; // Stop sequences
-  topP?: number; // Nucleus sampling
-  frequencyPenalty?: number; // Reduce repetition
-  presencePenalty?: number; // Encourage diversity
+	user?: string; // User identifier
+	stop?: string | string[]; // Stop sequences
+	topP?: number; // Nucleus sampling
+	frequencyPenalty?: number; // Reduce repetition
+	presencePenalty?: number; // Encourage diversity
 }
 
 // Bedrock specific
 interface BedrockOptions extends GenerateTextOptions {
-  region?: string; // AWS region override
-  inferenceProfile?: string; // Inference profile ARN
+	region?: string; // AWS region override
+	inferenceProfile?: string; // Inference profile ARN
 }
 
 // Vertex AI specific
 interface VertexOptions extends GenerateTextOptions {
-  project?: string; // GCP project override
-  location?: string; // GCP location override
-  safetySettings?: any[]; // Safety filter settings
+	project?: string; // GCP project override
+	location?: string; // GCP location override
+	safetySettings?: any[]; // Safety filter settings
 }
 
 // Google AI Studio specific
 interface GoogleAIOptions extends GenerateTextOptions {
-  safetySettings?: any[]; // Safety filter settings
-  generationConfig?: {
-    // Additional generation settings
-    stopSequences?: string[];
-    candidateCount?: number;
-    topK?: number;
-    topP?: number;
-  };
+	safetySettings?: any[]; // Safety filter settings
+	generationConfig?: {
+		// Additional generation settings
+		stopSequences?: string[];
+		candidateCount?: number;
+		topK?: number;
+		topP?: number;
+	};
 }
 
 // Anthropic specific
 interface AnthropicOptions extends GenerateTextOptions {
-  stopSequences?: string[]; // Custom stop sequences
-  metadata?: {
-    // Usage tracking
-    userId?: string;
-  };
+	stopSequences?: string[]; // Custom stop sequences
+	metadata?: {
+		// Usage tracking
+		userId?: string;
+	};
 }
 
 // Azure OpenAI specific
 interface AzureOptions extends GenerateTextOptions {
-  deploymentId?: string; // Override deployment
-  apiVersion?: string; // API version override
-  user?: string; // User tracking
+	deploymentId?: string; // Override deployment
+	apiVersion?: string; // API version override
+	user?: string; // User tracking
 }
 
 // Hugging Face specific
 interface HuggingFaceOptions extends GenerateTextOptions {
-  waitForModel?: boolean; // Wait for model to load
-  useCache?: boolean; // Use cached responses
-  options?: {
-    // Model-specific options
-    useGpu?: boolean;
-    precision?: string;
-  };
+	waitForModel?: boolean; // Wait for model to load
+	useCache?: boolean; // Use cached responses
+	options?: {
+		// Model-specific options
+		useGpu?: boolean;
+		precision?: string;
+	};
 }
 
 // Ollama specific
 interface OllamaOptions extends GenerateTextOptions {
-  format?: string; // Response format (e.g., 'json')
-  context?: number[]; // Conversation context
-  stream?: boolean; // Enable streaming
-  raw?: boolean; // Raw mode (no templating)
-  keepAlive?: string; // Model keep-alive duration
+	format?: string; // Response format (e.g., 'json')
+	context?: number[]; // Conversation context
+	stream?: boolean; // Enable streaming
+	raw?: boolean; // Raw mode (no templating)
+	keepAlive?: string; // Model keep-alive duration
 }
 
 // Mistral AI specific
 interface MistralOptions extends GenerateTextOptions {
-  topP?: number; // Nucleus sampling
-  randomSeed?: number; // Reproducible outputs
-  safeMode?: boolean; // Enable safe mode
-  safePrompt?: boolean; // Add safe prompt
+	topP?: number; // Nucleus sampling
+	randomSeed?: number; // Reproducible outputs
+	safeMode?: boolean; // Enable safe mode
+	safePrompt?: boolean; // Add safe prompt
 }
 ```
 
@@ -1508,31 +1593,31 @@ interface MistralOptions extends GenerateTextOptions {
 
 ```typescript
 class AIProviderError extends Error {
-  provider: string;
-  originalError?: Error;
+	provider: string;
+	originalError?: Error;
 }
 
 class TimeoutError extends AIProviderError {
-  // Thrown when operation exceeds specified timeout
-  timeout: number; // Timeout in milliseconds
-  operation?: string; // Operation that timed out (e.g., 'generate', 'stream')
+	// Thrown when operation exceeds specified timeout
+	timeout: number; // Timeout in milliseconds
+	operation?: string; // Operation that timed out (e.g., 'generate', 'stream')
 }
 
 class ConfigurationError extends AIProviderError {
-  // Thrown when provider configuration is invalid
+	// Thrown when provider configuration is invalid
 }
 
 class AuthenticationError extends AIProviderError {
-  // Thrown when authentication fails
+	// Thrown when authentication fails
 }
 
 class RateLimitError extends AIProviderError {
-  // Thrown when rate limits are exceeded
-  retryAfter?: number; // Seconds to wait before retrying
+	// Thrown when rate limits are exceeded
+	retryAfter?: number; // Seconds to wait before retrying
 }
 
 class QuotaExceededError extends AIProviderError {
-  // Thrown when usage quotas are exceeded
+	// Thrown when usage quotas are exceeded
 }
 ```
 
@@ -1540,33 +1625,33 @@ class QuotaExceededError extends AIProviderError {
 
 ```typescript
 import {
-  AIProviderError,
-  ConfigurationError,
-  AuthenticationError,
-  RateLimitError,
-  TimeoutError,
+	AIProviderError,
+	ConfigurationError,
+	AuthenticationError,
+	RateLimitError,
+	TimeoutError,
 } from "@juspay/neurolink";
 
 try {
-  const result = await provider.generateText({
-    prompt: "Hello",
-    timeout: "30s",
-  });
+	const result = await provider.generateText({
+		prompt: "Hello",
+		timeout: "30s",
+	});
 } catch (error) {
-  if (error instanceof TimeoutError) {
-    console.error(`Operation timed out after ${error.timeout}ms`);
-    console.error(`Provider: ${error.provider}, Operation: ${error.operation}`);
-  } else if (error instanceof ConfigurationError) {
-    console.error("Provider not configured:", error.message);
-  } else if (error instanceof AuthenticationError) {
-    console.error("Authentication failed:", error.message);
-  } else if (error instanceof RateLimitError) {
-    console.error(`Rate limit exceeded. Retry after ${error.retryAfter}s`);
-  } else if (error instanceof AIProviderError) {
-    console.error(`Provider ${error.provider} failed:`, error.message);
-  } else {
-    console.error("Unexpected error:", error);
-  }
+	if (error instanceof TimeoutError) {
+		console.error(`Operation timed out after ${error.timeout}ms`);
+		console.error(`Provider: ${error.provider}, Operation: ${error.operation}`);
+	} else if (error instanceof ConfigurationError) {
+		console.error("Provider not configured:", error.message);
+	} else if (error instanceof AuthenticationError) {
+		console.error("Authentication failed:", error.message);
+	} else if (error instanceof RateLimitError) {
+		console.error(`Rate limit exceeded. Retry after ${error.retryAfter}s`);
+	} else if (error instanceof AIProviderError) {
+		console.error(`Provider ${error.provider} failed:`, error.message);
+	} else {
+		console.error("Unexpected error:", error);
+	}
 }
 ```
 
@@ -1576,16 +1661,16 @@ try {
 
 ```typescript
 interface ProviderSelector {
-  selectProvider(available: ProviderName[]): ProviderName;
+	selectProvider(available: ProviderName[]): ProviderName;
 }
 
 class CustomSelector implements ProviderSelector {
-  selectProvider(available: ProviderName[]): ProviderName {
-    // Custom logic for provider selection
-    if (available.includes("bedrock")) return "bedrock";
-    if (available.includes("openai")) return "openai";
-    return available[0];
-  }
+	selectProvider(available: ProviderName[]): ProviderName {
+		// Custom logic for provider selection
+		if (available.includes("bedrock")) return "bedrock";
+		if (available.includes("openai")) return "openai";
+		return available[0];
+	}
 }
 
 // Usage with custom selector
@@ -1596,25 +1681,25 @@ const provider = createBestAIProvider(); // Uses default selection logic
 
 ```typescript
 interface AIMiddleware {
-  beforeRequest?(options: GenerateTextOptions): GenerateTextOptions;
-  afterResponse?(result: GenerateTextResult): GenerateTextResult;
-  onError?(error: Error): Error;
+	beforeRequest?(options: GenerateTextOptions): GenerateTextOptions;
+	afterResponse?(result: GenerateTextResult): GenerateTextResult;
+	onError?(error: Error): Error;
 }
 
 class LoggingMiddleware implements AIMiddleware {
-  beforeRequest(options: GenerateTextOptions): GenerateTextOptions {
-    console.log(
-      `Generating text for prompt: ${options.prompt.slice(0, 50)}...`,
-    );
-    return options;
-  }
+	beforeRequest(options: GenerateTextOptions): GenerateTextOptions {
+		console.log(
+			`Generating text for prompt: ${options.prompt.slice(0, 50)}...`,
+		);
+		return options;
+	}
 
-  afterResponse(result: GenerateTextResult): GenerateTextResult {
-    console.log(
-      `Generated ${result.text.length} characters using ${result.provider}`,
-    );
-    return result;
-  }
+	afterResponse(result: GenerateTextResult): GenerateTextResult {
+		console.log(
+			`Generated ${result.text.length} characters using ${result.provider}`,
+		);
+		return result;
+	}
 }
 
 // Note: Middleware is a planned feature for future versions
@@ -1624,42 +1709,42 @@ class LoggingMiddleware implements AIMiddleware {
 
 ```typescript
 async function processBatch(
-  prompts: string[],
-  options: GenerateTextOptions = {},
+	prompts: string[],
+	options: GenerateTextOptions = {},
 ) {
-  const provider = createBestAIProvider();
-  const results = [];
+	const provider = createBestAIProvider();
+	const results = [];
 
-  for (const prompt of prompts) {
-    try {
-      const result = await provider.generateText({ ...options, prompt });
-      results.push({ success: true, ...result });
-    } catch (error) {
-      results.push({
-        success: false,
-        prompt,
-        error: error.message,
-      });
-    }
+	for (const prompt of prompts) {
+		try {
+			const result = await provider.generateText({ ...options, prompt });
+			results.push({ success: true, ...result });
+		} catch (error) {
+			results.push({
+				success: false,
+				prompt,
+				error: error.message,
+			});
+		}
 
-    // Rate limiting: wait 1 second between requests
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
+		// Rate limiting: wait 1 second between requests
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+	}
 
-  return results;
+	return results;
 }
 
 // Usage
 const prompts = [
-  "Explain photosynthesis",
-  "What is machine learning?",
-  "Describe the solar system",
+	"Explain photosynthesis",
+	"What is machine learning?",
+	"Describe the solar system",
 ];
 
 const results = await processBatch(prompts, {
-  temperature: 0.7,
-  maxTokens: 200,
-  timeout: "45s", // Set reasonable timeout for batch operations
+	temperature: 0.7,
+	maxTokens: 200,
+	timeout: "45s", // Set reasonable timeout for batch operations
 });
 ```
 
@@ -1667,31 +1752,31 @@ const results = await processBatch(prompts, {
 
 ```typescript
 class CachedProvider implements AIProvider {
-  private cache = new Map<string, GenerateTextResult>();
-  private provider: AIProvider;
+	private cache = new Map<string, GenerateTextResult>();
+	private provider: AIProvider;
 
-  constructor(provider: AIProvider) {
-    this.provider = provider;
-  }
+	constructor(provider: AIProvider) {
+		this.provider = provider;
+	}
 
-  async generateText(
-    options: GenerateTextOptions,
-  ): Promise<GenerateTextResult> {
-    const key = JSON.stringify(options);
+	async generateText(
+		options: GenerateTextOptions,
+	): Promise<GenerateTextResult> {
+		const key = JSON.stringify(options);
 
-    if (this.cache.has(key)) {
-      return { ...this.cache.get(key)!, fromCache: true };
-    }
+		if (this.cache.has(key)) {
+			return { ...this.cache.get(key)!, fromCache: true };
+		}
 
-    const result = await this.provider.generateText(options);
-    this.cache.set(key, result);
-    return result;
-  }
+		const result = await this.provider.generateText(options);
+		this.cache.set(key, result);
+		return result;
+	}
 
-  async streamText(options: StreamTextOptions): Promise<StreamTextResult> {
-    // Streaming responses are not cached
-    return this.provider.streamText(options);
-  }
+	async streamText(options: StreamTextOptions): Promise<StreamTextResult> {
+		// Streaming responses are not cached
+		return this.provider.streamText(options);
+	}
 }
 
 // Usage
@@ -1705,23 +1790,23 @@ const cachedProvider = new CachedProvider(baseProvider);
 
 ```typescript
 interface NeuroLinkConfig {
-  defaultProvider?: ProviderName;
-  fallbackProvider?: ProviderName;
-  defaultOptions?: Partial<GenerateTextOptions>;
-  enableFallback?: boolean;
-  enableStreaming?: boolean;
-  debug?: boolean;
+	defaultProvider?: ProviderName;
+	fallbackProvider?: ProviderName;
+	defaultOptions?: Partial<GenerateTextOptions>;
+	enableFallback?: boolean;
+	enableStreaming?: boolean;
+	debug?: boolean;
 }
 
 const config: NeuroLinkConfig = {
-  defaultProvider: "openai",
-  fallbackProvider: "bedrock",
-  defaultOptions: {
-    temperature: 0.7,
-    maxTokens: 500,
-  },
-  enableFallback: true,
-  debug: false,
+	defaultProvider: "openai",
+	fallbackProvider: "bedrock",
+	defaultOptions: {
+		temperature: 0.7,
+		maxTokens: 500,
+	},
+	enableFallback: true,
+	debug: false,
 };
 ```
 
@@ -1729,23 +1814,23 @@ const config: NeuroLinkConfig = {
 
 ```typescript
 interface TypedAIProvider<
-  TOptions = GenerateTextOptions,
-  TResult = GenerateTextResult,
+	TOptions = GenerateTextOptions,
+	TResult = GenerateTextResult,
 > {
-  generateText(options: TOptions): Promise<TResult>;
+	generateText(options: TOptions): Promise<TResult>;
 }
 
 // Custom typed provider
 interface CustomOptions extends GenerateTextOptions {
-  customParameter?: string;
+	customParameter?: string;
 }
 
 interface CustomResult extends GenerateTextResult {
-  customData?: any;
+	customData?: any;
 }
 
 const typedProvider: TypedAIProvider<CustomOptions, CustomResult> =
-  createBestAIProvider() as any;
+	createBestAIProvider() as any;
 ```
 
 ## MCP (Model Context Protocol) APIs
@@ -1816,11 +1901,11 @@ NeuroLink includes built-in installation support for popular MCP servers:
 
 ```typescript
 type PopularMCPServer =
-  | "filesystem" // File operations
-  | "github" // GitHub integration
-  | "postgres" // PostgreSQL database
-  | "puppeteer" // Web browsing
-  | "brave-search"; // Web search
+	| "filesystem" // File operations
+	| "github" // GitHub integration
+	| "postgres" // PostgreSQL database
+	| "puppeteer" // Web browsing
+	| "brave-search"; // Web search
 ```
 
 **Additional MCP Servers**
@@ -1861,22 +1946,22 @@ MCP servers are configured in `.mcp-config.json`:
 
 ```typescript
 interface MCPConfig {
-  mcpServers: {
-    [serverName: string]: {
-      command: string; // Command to start server
-      args?: string[]; // Optional command arguments
-      env?: Record<string, string>; // Environment variables
-      cwd?: string; // Working directory
-      timeout?: number; // Connection timeout (ms)
-      retry?: number; // Retry attempts
-      enabled?: boolean; // Server enabled status
-    };
-  };
-  global?: {
-    timeout?: number; // Global timeout
-    maxConnections?: number; // Max concurrent connections
-    logLevel?: "debug" | "info" | "warn" | "error";
-  };
+	mcpServers: {
+		[serverName: string]: {
+			command: string; // Command to start server
+			args?: string[]; // Optional command arguments
+			env?: Record<string, string>; // Environment variables
+			cwd?: string; // Working directory
+			timeout?: number; // Connection timeout (ms)
+			retry?: number; // Retry attempts
+			enabled?: boolean; // Server enabled status
+		};
+	};
+	global?: {
+		timeout?: number; // Global timeout
+		maxConnections?: number; // Max concurrent connections
+		logLevel?: "debug" | "info" | "warn" | "error";
+	};
 }
 ```
 
@@ -1884,38 +1969,38 @@ interface MCPConfig {
 
 ```json
 {
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
-      "timeout": 5000,
-      "enabled": true
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
-      },
-      "timeout": 10000,
-      "enabled": true
-    },
-    "postgres": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "${POSTGRES_CONNECTION_STRING}"
-      ],
-      "timeout": 8000,
-      "enabled": false
-    }
-  },
-  "global": {
-    "timeout": 10000,
-    "maxConnections": 5,
-    "logLevel": "info"
-  }
+	"mcpServers": {
+		"filesystem": {
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+			"timeout": 5000,
+			"enabled": true
+		},
+		"github": {
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-github"],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+			},
+			"timeout": 10000,
+			"enabled": true
+		},
+		"postgres": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-postgres",
+				"${POSTGRES_CONNECTION_STRING}"
+			],
+			"timeout": 8000,
+			"enabled": false
+		}
+	},
+	"global": {
+		"timeout": 10000,
+		"maxConnections": 5,
+		"logLevel": "info"
+	}
 }
 ```
 
@@ -1946,38 +2031,38 @@ MCP_CUSTOM_API_KEY=key_...
 
 ```typescript
 interface MCPToolCategory {
-  filesystem: {
-    read_file: { path: string };
-    write_file: { path: string; content: string };
-    list_directory: { path: string };
-    search_files: { query: string; path?: string };
-  };
+	filesystem: {
+		read_file: { path: string };
+		write_file: { path: string; content: string };
+		list_directory: { path: string };
+		search_files: { query: string; path?: string };
+	};
 
-  github: {
-    get_repository: { owner: string; repo: string };
-    create_issue: { owner: string; repo: string; title: string; body?: string };
-    list_issues: { owner: string; repo: string; state?: "open" | "closed" };
-    create_pull_request: {
-      owner: string;
-      repo: string;
-      title: string;
-      head: string;
-      base: string;
-    };
-  };
+	github: {
+		get_repository: { owner: string; repo: string };
+		create_issue: { owner: string; repo: string; title: string; body?: string };
+		list_issues: { owner: string; repo: string; state?: "open" | "closed" };
+		create_pull_request: {
+			owner: string;
+			repo: string;
+			title: string;
+			head: string;
+			base: string;
+		};
+	};
 
-  database: {
-    execute_query: { query: string; params?: any[] };
-    list_tables: {};
-    describe_table: { table: string };
-  };
+	database: {
+		execute_query: { query: string; params?: any[] };
+		list_tables: {};
+		describe_table: { table: string };
+	};
 
-  web: {
-    navigate: { url: string };
-    click: { selector: string };
-    type: { selector: string; text: string };
-    screenshot: { name?: string };
-  };
+	web: {
+		navigate: { url: string };
+		click: { selector: string };
+		type: { selector: string; text: string };
+		screenshot: { name?: string };
+	};
 }
 ```
 
@@ -2023,116 +2108,116 @@ curl -X POST http://localhost:9876/api/mcp/install -d '{"serverName": "filesyste
 ```typescript
 // ALL ENDPOINTS WORKING IN DEMO SERVER
 interface MCPDemoEndpoints {
-  "GET /api/mcp/servers": {
-    // List all configured MCP servers with live status
-    response: {
-      servers: Array<{
-        name: string;
-        status: "connected" | "disconnected" | "error";
-        tools: string[];
-        lastConnected?: string;
-      }>;
-    };
-  };
+	"GET /api/mcp/servers": {
+		// List all configured MCP servers with live status
+		response: {
+			servers: Array<{
+				name: string;
+				status: "connected" | "disconnected" | "error";
+				tools: string[];
+				lastConnected?: string;
+			}>;
+		};
+	};
 
-  "POST /api/mcp/install": {
-    // Install popular MCP servers (filesystem, github, postgres, etc.)
-    body: { serverName: string };
-    response: {
-      success: boolean;
-      message: string;
-      configuration?: Record<string, any>;
-    };
-  };
+	"POST /api/mcp/install": {
+		// Install popular MCP servers (filesystem, github, postgres, etc.)
+		body: { serverName: string };
+		response: {
+			success: boolean;
+			message: string;
+			configuration?: Record<string, any>;
+		};
+	};
 
-  "DELETE /api/mcp/servers/:name": {
-    // Remove MCP servers
-    params: { name: string };
-    response: {
-      success: boolean;
-      message: string;
-    };
-  };
+	"DELETE /api/mcp/servers/:name": {
+		// Remove MCP servers
+		params: { name: string };
+		response: {
+			success: boolean;
+			message: string;
+		};
+	};
 
-  "POST /api/mcp/test/:name": {
-    // Test server connectivity and get diagnostics
-    params: { name: string };
-    response: {
-      success: boolean;
-      status: "connected" | "disconnected" | "error";
-      responseTime?: number;
-      error?: string;
-    };
-  };
+	"POST /api/mcp/test/:name": {
+		// Test server connectivity and get diagnostics
+		params: { name: string };
+		response: {
+			success: boolean;
+			status: "connected" | "disconnected" | "error";
+			responseTime?: number;
+			error?: string;
+		};
+	};
 
-  "GET /api/mcp/tools/:name": {
-    // Get available tools for specific server
-    params: { name: string };
-    response: {
-      success: boolean;
-      tools: Array<{
-        name: string;
-        description: string;
-        parameters: Record<string, any>;
-      }>;
-    };
-  };
+	"GET /api/mcp/tools/:name": {
+		// Get available tools for specific server
+		params: { name: string };
+		response: {
+			success: boolean;
+			tools: Array<{
+				name: string;
+				description: string;
+				parameters: Record<string, any>;
+			}>;
+		};
+	};
 
-  "POST /api/mcp/execute": {
-    // Execute MCP tools via HTTP API
-    body: {
-      serverName: string;
-      toolName: string;
-      params: Record<string, any>;
-    };
-    response: {
-      success: boolean;
-      result?: any;
-      error?: string;
-      executionTime?: number;
-    };
-  };
+	"POST /api/mcp/execute": {
+		// Execute MCP tools via HTTP API
+		body: {
+			serverName: string;
+			toolName: string;
+			params: Record<string, any>;
+		};
+		response: {
+			success: boolean;
+			result?: any;
+			error?: string;
+			executionTime?: number;
+		};
+	};
 
-  "POST /api/mcp/servers/custom": {
-    // Add custom MCP servers
-    body: {
-      name: string;
-      command: string;
-      options?: Record<string, any>;
-    };
-    response: {
-      success: boolean;
-      message: string;
-    };
-  };
+	"POST /api/mcp/servers/custom": {
+		// Add custom MCP servers
+		body: {
+			name: string;
+			command: string;
+			options?: Record<string, any>;
+		};
+		response: {
+			success: boolean;
+			message: string;
+		};
+	};
 
-  "GET /api/mcp/status": {
-    // Get comprehensive MCP system status
-    response: {
-      summary: {
-        totalServers: number;
-        availableServers: number;
-        cliAvailable: boolean;
-      };
-      servers: Record<string, any>;
-    };
-  };
+	"GET /api/mcp/status": {
+		// Get comprehensive MCP system status
+		response: {
+			summary: {
+				totalServers: number;
+				availableServers: number;
+				cliAvailable: boolean;
+			};
+			servers: Record<string, any>;
+		};
+	};
 
-  "POST /api/mcp/workflow": {
-    // Execute predefined MCP workflows
-    body: {
-      workflowType: string;
-      description?: string;
-      servers?: string[];
-    };
-    response: {
-      success: boolean;
-      workflowType: string;
-      steps: string[];
-      result: string;
-      data: any;
-    };
-  };
+	"POST /api/mcp/workflow": {
+		// Execute predefined MCP workflows
+		body: {
+			workflowType: string;
+			description?: string;
+			servers?: string[];
+		};
+		response: {
+			success: boolean;
+			workflowType: string;
+			steps: string[];
+			result: string;
+			data: any;
+		};
+	};
 }
 ```
 
@@ -2188,19 +2273,19 @@ curl -X POST http://localhost:9876/api/mcp/execute \
 ```javascript
 // JavaScript example for web applications
 async function callMCPTool(serverName, toolName, params) {
-  const response = await fetch("http://localhost:9876/api/mcp/execute", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ serverName, toolName, params }),
-  });
+	const response = await fetch("http://localhost:9876/api/mcp/execute", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ serverName, toolName, params }),
+	});
 
-  const result = await response.json();
-  return result;
+	const result = await response.json();
+	return result;
 }
 
 // Use in your web app
 const fileContent = await callMCPTool("filesystem", "read_file", {
-  path: "/path/to/file.txt",
+	path: "/path/to/file.txt",
 });
 ```
 
@@ -2262,36 +2347,36 @@ curl http://localhost:9876/api/mcp/servers
 
 ```typescript
 class MCPError extends Error {
-  server: string;
-  tool?: string;
-  originalError?: Error;
+	server: string;
+	tool?: string;
+	originalError?: Error;
 }
 
 class MCPConnectionError extends MCPError {
-  // Thrown when server connection fails
+	// Thrown when server connection fails
 }
 
 class MCPToolError extends MCPError {
-  // Thrown when tool execution fails
+	// Thrown when tool execution fails
 }
 
 class MCPConfigurationError extends MCPError {
-  // Thrown when server configuration is invalid
+	// Thrown when server configuration is invalid
 }
 
 // Error handling example
 try {
-  const result = await executeCommand(
-    'neurolink mcp execute filesystem read_file --path="/nonexistent"',
-  );
+	const result = await executeCommand(
+		'neurolink mcp execute filesystem read_file --path="/nonexistent"',
+	);
 } catch (error) {
-  if (error instanceof MCPConnectionError) {
-    console.error(`Failed to connect to server ${error.server}`);
-  } else if (error instanceof MCPToolError) {
-    console.error(
-      `Tool ${error.tool} failed on server ${error.server}: ${error.message}`,
-    );
-  }
+	if (error instanceof MCPConnectionError) {
+		console.error(`Failed to connect to server ${error.server}`);
+	} else if (error instanceof MCPToolError) {
+		console.error(
+			`Tool ${error.tool} failed on server ${error.server}: ${error.message}`,
+		);
+	}
 }
 ```
 

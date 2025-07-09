@@ -5,9 +5,9 @@
  */
 
 import {
-  parseTimeout,
-  TimeoutError,
-  createTimeoutPromise,
+	parseTimeout,
+	TimeoutError,
+	createTimeoutPromise,
 } from "../utils/timeout.js";
 
 /**
@@ -19,20 +19,20 @@ import {
  * @returns The result of the promise or throws TimeoutError
  */
 export async function withTimeout<T>(
-  promise: Promise<T>,
-  timeout: number | string | undefined,
-  provider: string,
-  operation: "generate" | "stream",
+	promise: Promise<T>,
+	timeout: number | string | undefined,
+	provider: string,
+	operation: "generate" | "stream",
 ): Promise<T> {
-  const timeoutPromise = createTimeoutPromise(timeout, provider, operation);
+	const timeoutPromise = createTimeoutPromise(timeout, provider, operation);
 
-  if (!timeoutPromise) {
-    // No timeout specified, return original promise
-    return promise;
-  }
+	if (!timeoutPromise) {
+		// No timeout specified, return original promise
+		return promise;
+	}
 
-  // Race between the actual operation and timeout
-  return Promise.race([promise, timeoutPromise]);
+	// Race between the actual operation and timeout
+	return Promise.race([promise, timeoutPromise]);
 }
 
 /**
@@ -43,40 +43,40 @@ export async function withTimeout<T>(
  * @returns Wrapped async generator that respects timeout
  */
 export async function* withStreamingTimeout<T>(
-  generator: AsyncGenerator<T>,
-  timeout: number | string | undefined,
-  provider: string,
+	generator: AsyncGenerator<T>,
+	timeout: number | string | undefined,
+	provider: string,
 ): AsyncGenerator<T> {
-  const timeoutMs = parseTimeout(timeout);
+	const timeoutMs = parseTimeout(timeout);
 
-  if (!timeoutMs) {
-    // No timeout, pass through original generator
-    yield* generator;
-    return;
-  }
+	if (!timeoutMs) {
+		// No timeout, pass through original generator
+		yield* generator;
+		return;
+	}
 
-  const startTime = Date.now();
+	const startTime = Date.now();
 
-  try {
-    for await (const chunk of generator) {
-      // Check if we've exceeded the timeout
-      if (Date.now() - startTime > timeoutMs) {
-        throw new TimeoutError(
-          `${provider} streaming operation timed out after ${timeout}`,
-          timeoutMs,
-          provider,
-          "stream",
-        );
-      }
+	try {
+		for await (const chunk of generator) {
+			// Check if we've exceeded the timeout
+			if (Date.now() - startTime > timeoutMs) {
+				throw new TimeoutError(
+					`${provider} streaming operation timed out after ${timeout}`,
+					timeoutMs,
+					provider,
+					"stream",
+				);
+			}
 
-      yield chunk;
-    }
-  } finally {
-    // Ensure generator is properly closed
-    if (generator.return) {
-      await generator.return(undefined as any);
-    }
-  }
+			yield chunk;
+		}
+	} finally {
+		// Ensure generator is properly closed
+		if (generator.return) {
+			await generator.return(undefined as any);
+		}
+	}
 }
 
 /**
@@ -87,39 +87,39 @@ export async function* withStreamingTimeout<T>(
  * @returns AbortController and cleanup function
  */
 export function createTimeoutController(
-  timeout: number | string | undefined,
-  provider: string,
-  operation: "generate" | "stream",
+	timeout: number | string | undefined,
+	provider: string,
+	operation: "generate" | "stream",
 ): {
-  controller: AbortController;
-  cleanup: () => void;
-  timeoutMs: number;
+	controller: AbortController;
+	cleanup: () => void;
+	timeoutMs: number;
 } | null {
-  const timeoutMs = parseTimeout(timeout);
+	const timeoutMs = parseTimeout(timeout);
 
-  if (!timeoutMs) {
-    return null;
-  }
+	if (!timeoutMs) {
+		return null;
+	}
 
-  const controller = new AbortController();
+	const controller = new AbortController();
 
-  const timer = setTimeout(() => {
-    controller.abort(
-      new TimeoutError(
-        `${provider} ${operation} operation timed out after ${timeout}`,
-        timeoutMs,
-        provider,
-        operation,
-      ),
-    );
-  }, timeoutMs);
+	const timer = setTimeout(() => {
+		controller.abort(
+			new TimeoutError(
+				`${provider} ${operation} operation timed out after ${timeout}`,
+				timeoutMs,
+				provider,
+				operation,
+			),
+		);
+	}, timeoutMs);
 
-  // Cleanup function to clear the timer
-  const cleanup = () => {
-    clearTimeout(timer);
-  };
+	// Cleanup function to clear the timer
+	const cleanup = () => {
+		clearTimeout(timer);
+	};
 
-  return { controller, cleanup, timeoutMs };
+	return { controller, cleanup, timeoutMs };
 }
 
 /**
@@ -128,26 +128,26 @@ export function createTimeoutController(
  * @returns Combined abort controller
  */
 export function mergeAbortSignals(
-  signals: (AbortSignal | undefined)[],
+	signals: (AbortSignal | undefined)[],
 ): AbortController {
-  const controller = new AbortController();
+	const controller = new AbortController();
 
-  // Listen to all signals and abort when any fires
-  for (const signal of signals) {
-    if (signal && !signal.aborted) {
-      signal.addEventListener("abort", () => {
-        if (!controller.signal.aborted) {
-          controller.abort(signal.reason);
-        }
-      });
-    }
+	// Listen to all signals and abort when any fires
+	for (const signal of signals) {
+		if (signal && !signal.aborted) {
+			signal.addEventListener("abort", () => {
+				if (!controller.signal.aborted) {
+					controller.abort(signal.reason);
+				}
+			});
+		}
 
-    // If any signal is already aborted, abort immediately
-    if (signal?.aborted) {
-      controller.abort(signal.reason);
-      break;
-    }
-  }
+		// If any signal is already aborted, abort immediately
+		if (signal?.aborted) {
+			controller.abort(signal.reason);
+			break;
+		}
+	}
 
-  return controller;
+	return controller;
 }

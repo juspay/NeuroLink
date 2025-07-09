@@ -20,15 +20,15 @@ export type { AIProvider } from "../core/types.js";
  * Provider registry for dynamic provider instantiation
  */
 export const PROVIDERS = {
-  vertex: "GoogleVertexAI",
-  bedrock: "AmazonBedrock",
-  openai: "OpenAI",
-  anthropic: "AnthropicProvider",
-  azure: "AzureOpenAIProvider",
-  "google-ai": "GoogleAIStudio",
-  huggingface: "HuggingFace",
-  ollama: "Ollama",
-  mistral: "MistralAI",
+	vertex: "GoogleVertexAI",
+	bedrock: "AmazonBedrock",
+	openai: "OpenAI",
+	anthropic: "AnthropicProvider",
+	azure: "AzureOpenAIProvider",
+	"google-ai": "GoogleAIStudio",
+	huggingface: "HuggingFace",
+	ollama: "Ollama",
+	mistral: "MistralAI",
 } as const;
 
 /**
@@ -40,5 +40,5 @@ export type ProviderName = keyof typeof PROVIDERS;
  * List of all available provider names
  */
 export const AVAILABLE_PROVIDERS: ProviderName[] = Object.keys(
-  PROVIDERS,
+	PROVIDERS,
 ) as ProviderName[];

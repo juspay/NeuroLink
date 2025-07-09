@@ -8,13 +8,13 @@ Most AI development tools store MCP configurations in JSON files with a common s
 
 ```json
 {
-  "mcpServers": {
-    "server-name": {
-      "command": "node",
-      "args": ["path/to/server.js"],
-      "env": { "KEY": "value" }
-    }
-  }
+	"mcpServers": {
+		"server-name": {
+			"command": "node",
+			"args": ["path/to/server.js"],
+			"env": { "KEY": "value" }
+		}
+	}
 }
 ```
 
@@ -89,30 +89,30 @@ Most tools follow a similar JSON structure:
 
 ```json
 {
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "@modelcontextprotocol/server-filesystem",
-        "/path/to/allowed/directory"
-      ]
-    },
-    "github": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_TOKEN": "your-github-token"
-      }
-    },
-    "custom-server": {
-      "command": "node",
-      "args": ["/path/to/custom/server.js"],
-      "cwd": "/path/to/working/directory",
-      "env": {
-        "CUSTOM_VAR": "value"
-      }
-    }
-  }
+	"mcpServers": {
+		"filesystem": {
+			"command": "npx",
+			"args": [
+				"@modelcontextprotocol/server-filesystem",
+				"/path/to/allowed/directory"
+			]
+		},
+		"github": {
+			"command": "npx",
+			"args": ["@modelcontextprotocol/server-github"],
+			"env": {
+				"GITHUB_TOKEN": "your-github-token"
+			}
+		},
+		"custom-server": {
+			"command": "node",
+			"args": ["/path/to/custom/server.js"],
+			"cwd": "/path/to/working/directory",
+			"env": {
+				"CUSTOM_VAR": "value"
+			}
+		}
+	}
 }
 ```
 

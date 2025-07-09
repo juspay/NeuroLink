@@ -33,40 +33,40 @@ Create a test file to explore MCP functionality:
 // test-mcp.ts
 import { createMCPServer } from "@juspay/neurolink/mcp";
 import {
-  NeuroLinkMCPTool,
-  NeuroLinkExecutionContext,
-  ToolResult,
+	NeuroLinkMCPTool,
+	NeuroLinkExecutionContext,
+	ToolResult,
 } from "@juspay/neurolink/mcp";
 
 // Create a custom MCP server
 const testServer = createMCPServer({
-  id: "my-test-server",
-  title: "My Test Server",
-  description: "Testing custom MCP tools",
-  category: "custom",
-  visibility: "private",
+	id: "my-test-server",
+	title: "My Test Server",
+	description: "Testing custom MCP tools",
+	category: "custom",
+	visibility: "private",
 });
 
 // Add a simple tool
 testServer.registerTool({
-  name: "hello-world",
-  description: "Simple hello world tool for testing",
-  execute: async (
-    params: any,
-    context: NeuroLinkExecutionContext,
-  ): Promise<ToolResult> => {
-    console.log("Hello World tool executed!");
-    console.log("Context:", context.sessionId);
+	name: "hello-world",
+	description: "Simple hello world tool for testing",
+	execute: async (
+		params: any,
+		context: NeuroLinkExecutionContext,
+	): Promise<ToolResult> => {
+		console.log("Hello World tool executed!");
+		console.log("Context:", context.sessionId);
 
-    return {
-      success: true,
-      data: { message: `Hello, ${params.name || "World"}!` },
-      metadata: {
-        toolName: "hello-world",
-        timestamp: Date.now(),
-      },
-    };
-  },
+		return {
+			success: true,
+			data: { message: `Hello, ${params.name || "World"}!` },
+			metadata: {
+				toolName: "hello-world",
+				timestamp: Date.now(),
+			},
+		};
+	},
 });
 
 console.log("Test server created:", testServer.id);
@@ -81,65 +81,65 @@ import { aiCoreServer } from "@juspay/neurolink/mcp/servers/ai-providers/ai-core
 import { ContextManager } from "@juspay/neurolink/mcp";
 
 async function testAICoreServer() {
-  // Create execution context
-  const context = ContextManager.createExecutionContext({
-    sessionId: "test-session-123",
-    userId: "test-user",
-    aiProvider: "openai",
-    environmentType: "development",
-  });
+	// Create execution context
+	const context = ContextManager.createExecutionContext({
+		sessionId: "test-session-123",
+		userId: "test-user",
+		aiProvider: "openai",
+		environmentType: "development",
+	});
 
-  console.log("🧪 Testing AI Core Server...");
+	console.log("🧪 Testing AI Core Server...");
 
-  // Test text generation tool
-  try {
-    const result = await aiCoreServer.tools["generate-text"].execute(
-      {
-        prompt: "Write a haiku about AI",
-        temperature: 0.7,
-        maxTokens: 100,
-      },
-      context,
-    );
+	// Test text generation tool
+	try {
+		const result = await aiCoreServer.tools["generate-text"].execute(
+			{
+				prompt: "Write a haiku about AI",
+				temperature: 0.7,
+				maxTokens: 100,
+			},
+			context,
+		);
 
-    console.log("✅ Text Generation Result:", result);
-  } catch (error) {
-    console.error("❌ Text Generation Error:", error);
-  }
+		console.log("✅ Text Generation Result:", result);
+	} catch (error) {
+		console.error("❌ Text Generation Error:", error);
+	}
 
-  // Test provider selection tool
-  try {
-    const providerResult = await aiCoreServer.tools["select-provider"].execute(
-      {
-        preferred: "openai",
-        requirements: {
-          streaming: true,
-          costEfficient: true,
-        },
-      },
-      context,
-    );
+	// Test provider selection tool
+	try {
+		const providerResult = await aiCoreServer.tools["select-provider"].execute(
+			{
+				preferred: "openai",
+				requirements: {
+					streaming: true,
+					costEfficient: true,
+				},
+			},
+			context,
+		);
 
-    console.log("✅ Provider Selection Result:", providerResult);
-  } catch (error) {
-    console.error("❌ Provider Selection Error:", error);
-  }
+		console.log("✅ Provider Selection Result:", providerResult);
+	} catch (error) {
+		console.error("❌ Provider Selection Error:", error);
+	}
 
-  // Test provider status tool
-  try {
-    const statusResult = await aiCoreServer.tools[
-      "check-provider-status"
-    ].execute(
-      {
-        includeCapabilities: true,
-      },
-      context,
-    );
+	// Test provider status tool
+	try {
+		const statusResult = await aiCoreServer.tools[
+			"check-provider-status"
+		].execute(
+			{
+				includeCapabilities: true,
+			},
+			context,
+		);
 
-    console.log("✅ Provider Status Result:", statusResult);
-  } catch (error) {
-    console.error("❌ Provider Status Error:", error);
-  }
+		console.log("✅ Provider Status Result:", statusResult);
+	} catch (error) {
+		console.error("❌ Provider Status Error:", error);
+	}
 }
 
 testAICoreServer();
@@ -155,61 +155,61 @@ import { ContextManager } from "@juspay/neurolink/mcp";
 import { aiCoreServer } from "@juspay/neurolink/mcp/servers/ai-providers/ai-core-server";
 
 async function testOrchestration() {
-  // Initialize registry and orchestrator
-  const registry = new MCPRegistry();
-  const orchestrator = new ToolOrchestrator(registry);
+	// Initialize registry and orchestrator
+	const registry = new MCPRegistry();
+	const orchestrator = new ToolOrchestrator(registry);
 
-  // Register AI Core Server
-  registry.registerServer(aiCoreServer);
+	// Register AI Core Server
+	registry.registerServer(aiCoreServer);
 
-  // Create execution context
-  const context = ContextManager.createExecutionContext({
-    sessionId: "orchestration-test",
-    environmentType: "development",
-  });
+	// Create execution context
+	const context = ContextManager.createExecutionContext({
+		sessionId: "orchestration-test",
+		environmentType: "development",
+	});
 
-  console.log("🎼 Testing Tool Orchestration...");
+	console.log("🎼 Testing Tool Orchestration...");
 
-  // Execute single tool
-  try {
-    const result = await orchestrator.executeTool(
-      "neurolink-ai-core",
-      "generate-text",
-      { prompt: "Explain quantum computing in one sentence", maxTokens: 50 },
-      context,
-    );
+	// Execute single tool
+	try {
+		const result = await orchestrator.executeTool(
+			"neurolink-ai-core",
+			"generate-text",
+			{ prompt: "Explain quantum computing in one sentence", maxTokens: 50 },
+			context,
+		);
 
-    console.log("✅ Single Tool Execution:", result);
-  } catch (error) {
-    console.error("❌ Single Tool Error:", error);
-  }
+		console.log("✅ Single Tool Execution:", result);
+	} catch (error) {
+		console.error("❌ Single Tool Error:", error);
+	}
 
-  // Execute pipeline (sequential tools)
-  try {
-    const pipelineResult = await orchestrator.executePipeline(
-      [
-        {
-          serverId: "neurolink-ai-core",
-          toolName: "select-provider",
-          params: { preferred: "openai" },
-        },
-        {
-          serverId: "neurolink-ai-core",
-          toolName: "generate-text",
-          params: { prompt: "Write a technical joke", maxTokens: 100 },
-        },
-      ],
-      context,
-    );
+	// Execute pipeline (sequential tools)
+	try {
+		const pipelineResult = await orchestrator.executePipeline(
+			[
+				{
+					serverId: "neurolink-ai-core",
+					toolName: "select-provider",
+					params: { preferred: "openai" },
+				},
+				{
+					serverId: "neurolink-ai-core",
+					toolName: "generate-text",
+					params: { prompt: "Write a technical joke", maxTokens: 100 },
+				},
+			],
+			context,
+		);
 
-    console.log("✅ Pipeline Execution:", pipelineResult);
-  } catch (error) {
-    console.error("❌ Pipeline Error:", error);
-  }
+		console.log("✅ Pipeline Execution:", pipelineResult);
+	} catch (error) {
+		console.error("❌ Pipeline Error:", error);
+	}
 
-  // Get orchestrator statistics
-  const stats = orchestrator.getStatistics();
-  console.log("📊 Orchestrator Statistics:", stats);
+	// Get orchestrator statistics
+	const stats = orchestrator.getStatistics();
+	console.log("📊 Orchestrator Statistics:", stats);
 }
 
 testOrchestration();
@@ -226,61 +226,61 @@ testOrchestration();
 import { createMCPServer } from "@juspay/neurolink/mcp";
 import { z } from "zod";
 import type {
-  NeuroLinkExecutionContext,
-  ToolResult,
+	NeuroLinkExecutionContext,
+	ToolResult,
 } from "@juspay/neurolink/mcp";
 
 // Create development tools server
 export const devToolsServer = createMCPServer({
-  id: "neurolink-dev-tools",
-  title: "NeuroLink Development Tools",
-  description: "Code generation, testing, and development utilities",
-  category: "development",
-  version: "1.0.0",
-  capabilities: [
-    "code-generation",
-    "test-creation",
-    "documentation",
-    "refactoring",
-  ],
+	id: "neurolink-dev-tools",
+	title: "NeuroLink Development Tools",
+	description: "Code generation, testing, and development utilities",
+	category: "development",
+	version: "1.0.0",
+	capabilities: [
+		"code-generation",
+		"test-creation",
+		"documentation",
+		"refactoring",
+	],
 });
 
 // Code Generation Tool
 devToolsServer.registerTool({
-  name: "generate-component",
-  description: "Generate React/Vue/Svelte components with TypeScript",
-  inputSchema: z.object({
-    framework: z.enum(["react", "vue", "svelte"]),
-    componentName: z.string(),
-    props: z
-      .array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-          required: z.boolean().default(false),
-        }),
-      )
-      .optional(),
-    styling: z
-      .enum(["css", "scss", "styled-components", "tailwind"])
-      .optional(),
-  }),
-  execute: async (
-    params: any,
-    context: NeuroLinkExecutionContext,
-  ): Promise<ToolResult> => {
-    const { framework, componentName, props = [], styling = "css" } = params;
+	name: "generate-component",
+	description: "Generate React/Vue/Svelte components with TypeScript",
+	inputSchema: z.object({
+		framework: z.enum(["react", "vue", "svelte"]),
+		componentName: z.string(),
+		props: z
+			.array(
+				z.object({
+					name: z.string(),
+					type: z.string(),
+					required: z.boolean().default(false),
+				}),
+			)
+			.optional(),
+		styling: z
+			.enum(["css", "scss", "styled-components", "tailwind"])
+			.optional(),
+	}),
+	execute: async (
+		params: any,
+		context: NeuroLinkExecutionContext,
+	): Promise<ToolResult> => {
+		const { framework, componentName, props = [], styling = "css" } = params;
 
-    // Generate component code based on framework
-    let componentCode = "";
+		// Generate component code based on framework
+		let componentCode = "";
 
-    if (framework === "react") {
-      const propsInterface =
-        props.length > 0
-          ? `interface ${componentName}Props {\n${props.map((p) => `  ${p.name}${p.required ? "" : "?"}: ${p.type};`).join("\n")}\n}\n\n`
-          : "";
+		if (framework === "react") {
+			const propsInterface =
+				props.length > 0
+					? `interface ${componentName}Props {\n${props.map((p) => `  ${p.name}${p.required ? "" : "?"}: ${p.type};`).join("\n")}\n}\n\n`
+					: "";
 
-      componentCode = `${propsInterface}export function ${componentName}(${props.length > 0 ? `props: ${componentName}Props` : ""}) {
+			componentCode = `${propsInterface}export function ${componentName}(${props.length > 0 ? `props: ${componentName}Props` : ""}) {
   return (
     <div className="${componentName.toLowerCase()}">
       <h1>${componentName} Component</h1>
@@ -288,13 +288,13 @@ devToolsServer.registerTool({
     </div>
   );
 }`;
-    } else if (framework === "svelte") {
-      const scriptProps =
-        props.length > 0
-          ? `<script lang="ts">\n${props.map((p) => `  export let ${p.name}: ${p.type}${p.required ? "" : " | undefined"};`).join("\n")}\n</script>\n\n`
-          : "";
+		} else if (framework === "svelte") {
+			const scriptProps =
+				props.length > 0
+					? `<script lang="ts">\n${props.map((p) => `  export let ${p.name}: ${p.type}${p.required ? "" : " | undefined"};`).join("\n")}\n</script>\n\n`
+					: "";
 
-      componentCode = `${scriptProps}<div class="${componentName.toLowerCase()}">
+			componentCode = `${scriptProps}<div class="${componentName.toLowerCase()}">
   <h1>${componentName} Component</h1>
   <!-- Add your component markup here -->
 </div>
@@ -304,76 +304,76 @@ devToolsServer.registerTool({
     /* Add your styles here */
   }
 </style>`;
-    }
+		}
 
-    return {
-      success: true,
-      data: {
-        code: componentCode,
-        framework,
-        componentName,
-        propsCount: props.length,
-        styling,
-      },
-      metadata: {
-        toolName: "generate-component",
-        serverId: "neurolink-dev-tools",
-        timestamp: Date.now(),
-      },
-    };
-  },
+		return {
+			success: true,
+			data: {
+				code: componentCode,
+				framework,
+				componentName,
+				propsCount: props.length,
+				styling,
+			},
+			metadata: {
+				toolName: "generate-component",
+				serverId: "neurolink-dev-tools",
+				timestamp: Date.now(),
+			},
+		};
+	},
 });
 
 // Test Generation Tool
 devToolsServer.registerTool({
-  name: "generate-tests",
-  description: "Generate unit tests for components or functions",
-  inputSchema: z.object({
-    testFramework: z.enum(["vitest", "jest", "playwright"]),
-    targetFile: z.string(),
-    functions: z.array(z.string()),
-    coverage: z.enum(["basic", "comprehensive"]).default("basic"),
-  }),
-  execute: async (
-    params: any,
-    context: NeuroLinkExecutionContext,
-  ): Promise<ToolResult> => {
-    const { testFramework, targetFile, functions, coverage } = params;
+	name: "generate-tests",
+	description: "Generate unit tests for components or functions",
+	inputSchema: z.object({
+		testFramework: z.enum(["vitest", "jest", "playwright"]),
+		targetFile: z.string(),
+		functions: z.array(z.string()),
+		coverage: z.enum(["basic", "comprehensive"]).default("basic"),
+	}),
+	execute: async (
+		params: any,
+		context: NeuroLinkExecutionContext,
+	): Promise<ToolResult> => {
+		const { testFramework, targetFile, functions, coverage } = params;
 
-    const testTemplate = `import { describe, it, expect } from '${testFramework}';
+		const testTemplate = `import { describe, it, expect } from '${testFramework}';
 import { ${functions.join(", ")} } from '${targetFile}';
 
 ${functions
-  .map(
-    (fn) => `describe('${fn}', () => {
+	.map(
+		(fn) => `describe('${fn}', () => {
   it('should ${coverage === "comprehensive" ? "handle all edge cases" : "work correctly"}', () => {
     // Test implementation for ${fn}
     expect(${fn}).toBeDefined();
   });
 });`,
-  )
-  .join("\n\n")}`;
+	)
+	.join("\n\n")}`;
 
-    return {
-      success: true,
-      data: {
-        testCode: testTemplate,
-        testFramework,
-        functionsCount: functions.length,
-        coverage,
-      },
-      metadata: {
-        toolName: "generate-tests",
-        serverId: "neurolink-dev-tools",
-        timestamp: Date.now(),
-      },
-    };
-  },
+		return {
+			success: true,
+			data: {
+				testCode: testTemplate,
+				testFramework,
+				functionsCount: functions.length,
+				coverage,
+			},
+			metadata: {
+				toolName: "generate-tests",
+				serverId: "neurolink-dev-tools",
+				timestamp: Date.now(),
+			},
+		};
+	},
 });
 
 console.log(
-  "[DevTools] Development Tools Server created with tools:",
-  Object.keys(devToolsServer.tools),
+	"[DevTools] Development Tools Server created with tools:",
+	Object.keys(devToolsServer.tools),
 );
 ```
 
@@ -384,72 +384,72 @@ console.log(
 import { createMCPServer } from "@juspay/neurolink/mcp";
 import { z } from "zod";
 import type {
-  NeuroLinkExecutionContext,
-  ToolResult,
+	NeuroLinkExecutionContext,
+	ToolResult,
 } from "@juspay/neurolink/mcp";
 
 export const contentServer = createMCPServer({
-  id: "neurolink-content",
-  title: "NeuroLink Content Creation",
-  description: "Blog posts, documentation, and marketing content generation",
-  category: "content",
-  version: "1.0.0",
+	id: "neurolink-content",
+	title: "NeuroLink Content Creation",
+	description: "Blog posts, documentation, and marketing content generation",
+	category: "content",
+	version: "1.0.0",
 });
 
 // Blog Post Generation Tool
 contentServer.registerTool({
-  name: "generate-blog-post",
-  description: "Generate blog posts with SEO optimization",
-  inputSchema: z.object({
-    topic: z.string(),
-    audience: z.enum(["technical", "business", "general"]),
-    length: z.enum(["short", "medium", "long"]),
-    tone: z.enum(["professional", "casual", "educational"]),
-    includeSEO: z.boolean().default(true),
-  }),
-  execute: async (
-    params: any,
-    context: NeuroLinkExecutionContext,
-  ): Promise<ToolResult> => {
-    // Use AI Core Server for content generation
-    const aiResult = (await context.toolChain?.includes("neurolink-ai-core"))
-      ? { content: `Generated blog post about ${params.topic}...` }
-      : {
-          content: `Mock blog post about ${params.topic} for ${params.audience} audience`,
-        };
+	name: "generate-blog-post",
+	description: "Generate blog posts with SEO optimization",
+	inputSchema: z.object({
+		topic: z.string(),
+		audience: z.enum(["technical", "business", "general"]),
+		length: z.enum(["short", "medium", "long"]),
+		tone: z.enum(["professional", "casual", "educational"]),
+		includeSEO: z.boolean().default(true),
+	}),
+	execute: async (
+		params: any,
+		context: NeuroLinkExecutionContext,
+	): Promise<ToolResult> => {
+		// Use AI Core Server for content generation
+		const aiResult = (await context.toolChain?.includes("neurolink-ai-core"))
+			? { content: `Generated blog post about ${params.topic}...` }
+			: {
+					content: `Mock blog post about ${params.topic} for ${params.audience} audience`,
+				};
 
-    const metadata = {
-      wordCount:
-        params.length === "short"
-          ? 500
-          : params.length === "medium"
-            ? 1000
-            : 2000,
-      readingTime:
-        params.length === "short" ? 2 : params.length === "medium" ? 5 : 8,
-      seoOptimized: params.includeSEO,
-    };
+		const metadata = {
+			wordCount:
+				params.length === "short"
+					? 500
+					: params.length === "medium"
+						? 1000
+						: 2000,
+			readingTime:
+				params.length === "short" ? 2 : params.length === "medium" ? 5 : 8,
+			seoOptimized: params.includeSEO,
+		};
 
-    return {
-      success: true,
-      data: {
-        content: aiResult.content,
-        ...metadata,
-        topic: params.topic,
-        audience: params.audience,
-      },
-      metadata: {
-        toolName: "generate-blog-post",
-        serverId: "neurolink-content",
-        timestamp: Date.now(),
-      },
-    };
-  },
+		return {
+			success: true,
+			data: {
+				content: aiResult.content,
+				...metadata,
+				topic: params.topic,
+				audience: params.audience,
+			},
+			metadata: {
+				toolName: "generate-blog-post",
+				serverId: "neurolink-content",
+				timestamp: Date.now(),
+			},
+		};
+	},
 });
 
 console.log(
-  "[Content] Content Creation Server created with tools:",
-  Object.keys(contentServer.tools),
+	"[Content] Content Creation Server created with tools:",
+	Object.keys(contentServer.tools),
 );
 ```
 

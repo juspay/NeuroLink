@@ -117,23 +117,23 @@ Create or modify `config/models.json` to define available models:
 
 ```json
 {
-  "models": [
-    {
-      "id": "claude-3-5-sonnet",
-      "name": "Claude 3.5 Sonnet",
-      "provider": "anthropic",
-      "pricing": { "input": 0.003, "output": 0.015 },
-      "capabilities": ["function-calling", "vision", "code"],
-      "contextWindow": 200000,
-      "deprecated": false,
-      "aliases": ["claude-latest", "best-coding"]
-    }
-  ],
-  "aliases": {
-    "claude-latest": "claude-3-5-sonnet",
-    "fastest": "gpt-4o-mini",
-    "cheapest": "claude-3-haiku"
-  }
+	"models": [
+		{
+			"id": "claude-3-5-sonnet",
+			"name": "Claude 3.5 Sonnet",
+			"provider": "anthropic",
+			"pricing": { "input": 0.003, "output": 0.015 },
+			"capabilities": ["function-calling", "vision", "code"],
+			"contextWindow": 200000,
+			"deprecated": false,
+			"aliases": ["claude-latest", "best-coding"]
+		}
+	],
+	"aliases": {
+		"claude-latest": "claude-3-5-sonnet",
+		"fastest": "gpt-4o-mini",
+		"cheapest": "claude-3-haiku"
+	}
 }
 ```
 
@@ -164,22 +164,22 @@ const registry = new DynamicModelRegistry();
 
 // Use aliases for easy access
 const provider = await factory.createProvider({
-  provider: "anthropic",
-  model: "claude-latest", // Auto-resolves to latest Claude
+	provider: "anthropic",
+	model: "claude-latest", // Auto-resolves to latest Claude
 });
 
 // Capability-based selection
 const visionProvider = await factory.createProvider({
-  provider: "auto",
-  capability: "vision", // Automatically selects best vision model
-  optimizeFor: "cost", // Prefer cost-effective options
+	provider: "auto",
+	capability: "vision", // Automatically selects best vision model
+	optimizeFor: "cost", // Prefer cost-effective options
 });
 
 // Find optimal model for specific needs
 const bestModel = await registry.findBestModel({
-  capability: "code",
-  maxPrice: 0.005, // Max $0.005 per 1K tokens
-  provider: "anthropic", // Prefer Anthropic models
+	capability: "code",
+	maxPrice: 0.005, // Max $0.005 per 1K tokens
+	provider: "anthropic", // Prefer Anthropic models
 });
 ```
 
@@ -201,10 +201,10 @@ Built-in tools are automatically available in v1.7.1:
 
 ```json
 {
-  "builtInTools": {
-    "enabled": true,
-    "tools": ["time", "utilities", "registry", "configuration", "validation"]
-  }
+	"builtInTools": {
+		"enabled": true,
+		"tools": ["time", "utilities", "registry", "configuration", "validation"]
+	}
 }
 ```
 
@@ -250,29 +250,29 @@ Create `.mcp-config.json` in your project root:
 
 ```json
 {
-  "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
-      "transport": "stdio"
-    },
-    "github": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-github"],
-      "transport": "stdio",
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token"
-      }
-    },
-    "postgres": {
-      "command": "npx",
-      "args": ["@modelcontextprotocol/server-postgres"],
-      "transport": "stdio",
-      "env": {
-        "POSTGRES_CONNECTION_STRING": "postgresql://user:pass@localhost:5432/db"
-      }
-    }
-  }
+	"mcpServers": {
+		"filesystem": {
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+			"transport": "stdio"
+		},
+		"github": {
+			"command": "npx",
+			"args": ["@modelcontextprotocol/server-github"],
+			"transport": "stdio",
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token"
+			}
+		},
+		"postgres": {
+			"command": "npx",
+			"args": ["@modelcontextprotocol/server-postgres"],
+			"transport": "stdio",
+			"env": {
+				"POSTGRES_CONNECTION_STRING": "postgresql://user:pass@localhost:5432/db"
+			}
+		}
+	}
 }
 ```
 
@@ -335,13 +335,13 @@ For TypeScript projects, add to your `tsconfig.json`:
 
 ```json
 {
-  "compilerOptions": {
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "strict": true
-  },
-  "include": ["src/**/*", "node_modules/@juspay/neurolink/dist/**/*"]
+	"compilerOptions": {
+		"moduleResolution": "node",
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"strict": true
+	},
+	"include": ["src/**/*", "node_modules/@juspay/neurolink/dist/**/*"]
 }
 ```
 
@@ -351,12 +351,12 @@ Add useful scripts to your `package.json`:
 
 ```json
 {
-  "scripts": {
-    "neurolink:status": "npx neurolink status --verbose",
-    "neurolink:test": "npx neurolink generate-text 'Test message'",
-    "neurolink:mcp-discover": "npx neurolink mcp discover --format table",
-    "neurolink:mcp-test": "npx neurolink generate-text 'What time is it?' --debug"
-  }
+	"scripts": {
+		"neurolink:status": "npx neurolink status --verbose",
+		"neurolink:test": "npx neurolink generate-text 'Test message'",
+		"neurolink:mcp-discover": "npx neurolink mcp discover --format table",
+		"neurolink:mcp-test": "npx neurolink generate-text 'What time is it?' --debug"
+	}
 }
 ```
 
@@ -439,10 +439,10 @@ import { createAIProvider } from "@juspay/neurolink";
 
 // Custom provider settings
 const provider = createAIProvider("openai", {
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: "https://api.openai.com/v1",
-  timeout: 30000,
-  retries: 3,
+	apiKey: process.env.OPENAI_API_KEY,
+	baseURL: "https://api.openai.com/v1",
+	timeout: 30000,
+	retries: 3,
 });
 ```
 
@@ -451,12 +451,12 @@ const provider = createAIProvider("openai", {
 ```typescript
 // Enable/disable tools
 const result = await provider.generateText({
-  prompt: "Hello",
-  tools: {
-    enabled: true,
-    allowedTools: ["time", "utilities"],
-    maxToolCalls: 5,
-  },
+	prompt: "Hello",
+	tools: {
+		enabled: true,
+		allowedTools: ["time", "utilities"],
+		maxToolCalls: 5,
+	},
 });
 ```
 
@@ -489,11 +489,11 @@ echo ".env" >> .gitignore
 
 ```json
 {
-  "toolSecurity": {
-    "allowedDomains": ["api.example.com"],
-    "blockedTools": ["dangerous-tool"],
-    "requireConfirmation": true
-  }
+	"toolSecurity": {
+		"allowedDomains": ["api.example.com"],
+		"blockedTools": ["dangerous-tool"],
+		"requireConfirmation": true
+	}
 }
 ```
 

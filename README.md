@@ -1,4 +1,15 @@
-# 🧠 NeuroLink
+# @juspay/neurolink
+
+<!-- TOC -->
+
+- [📄 License](#[object Object])
+- [🔗 Related Projects](#-related-projects)
+<!-- /TOC -->
+
+Universal AI Development Platform with working MCP integration, multi-provider support, and professional CLI. Built-in tools operational, 58+ external MCP servers discoverable. Connect to filesystem, GitHub, database operations, and more. Build, test, and deploy AI applications with 9 major providers: OpenAI, Anthropic, Google AI, AWS Bedrock, Azure, Hugging Face, Ollama, and Mistral AI.
+
+**Version:** 4.0.0
+**License:** MIT
 
 [![NPM Version](https://img.shields.io/npm/v/@juspay/neurolink)](https://www.npmjs.com/package/@juspay/neurolink)
 [![Downloads](https://img.shields.io/npm/dm/@juspay/neurolink)](https://www.npmjs.com/package/@juspay/neurolink)
@@ -37,28 +48,28 @@ npm run config:validate
 ```typescript
 // Modern camelCase interfaces with rich context
 interface ExecutionContext {
-  sessionId?: string;
-  userId?: string;
-  aiProvider?: string;
-  permissions?: string[];
-  cacheOptions?: CacheOptions;
-  fallbackOptions?: FallbackOptions;
-  metadata?: Record<string, unknown>;
+	sessionId?: string;
+	userId?: string;
+	aiProvider?: string;
+	permissions?: string[];
+	cacheOptions?: CacheOptions;
+	fallbackOptions?: FallbackOptions;
+	metadata?: Record<string, unknown>;
 }
 
 // Optional methods for maximum flexibility
 interface McpRegistry {
-  registerServer?(
-    serverId: string,
-    config?: unknown,
-    context?: ExecutionContext,
-  ): Promise<void>;
-  executeTool?<T>(
-    toolName: string,
-    args?: unknown,
-    context?: ExecutionContext,
-  ): Promise<T>;
-  listTools?(context?: ExecutionContext): Promise<ToolInfo[]>;
+	registerServer?(
+		serverId: string,
+		config?: unknown,
+		context?: ExecutionContext,
+	): Promise<void>;
+	executeTool?<T>(
+		toolName: string,
+		args?: unknown,
+		context?: ExecutionContext,
+	): Promise<T>;
+	listTools?(context?: ExecutionContext): Promise<ToolInfo[]>;
 }
 ```
 
@@ -104,8 +115,8 @@ import { createBestAIProvider } from "@juspay/neurolink";
 // Auto-selects best available provider
 const provider = createBestAIProvider();
 const result = await provider.generateText({
-  prompt: "Write a haiku about programming",
-  timeout: "30s", // Optional: Set custom timeout (default: 30s)
+	prompt: "Write a haiku about programming",
+	timeout: "30s", // Optional: Set custom timeout (default: 30s)
 });
 
 console.log(result.text);
@@ -127,8 +138,8 @@ const provider = createBestAIProvider();
 
 // Detailed method name
 const story = await provider.generateText({
-  prompt: "Write a short story about AI",
-  maxTokens: 200,
+	prompt: "Write a short story about AI",
+	maxTokens: 200,
 });
 
 // CLI-style method names
@@ -166,10 +177,10 @@ const result = await neurolink.generateText("Write a story");
 
 // With enhancements (NEW!)
 const enhancedResult = await neurolink.generateText({
-  prompt: "Write a business proposal",
-  enableAnalytics: true, // Get usage & cost data
-  enableEvaluation: true, // Get AI quality scores
-  context: { project: "Q1-sales" }, // Custom context
+	prompt: "Write a business proposal",
+	enableAnalytics: true, // Get usage & cost data
+	enableEvaluation: true, // Get AI quality scores
+	context: { project: "Q1-sales" }, // Custom context
 });
 
 // Access enhancement data
@@ -179,25 +190,25 @@ console.log("Response:", enhancedResult.content);
 
 // 🆕 NEW: Enhanced Evaluation with Domain Awareness
 import {
-  performEnhancedEvaluation,
-  createEnhancedContext,
+	performEnhancedEvaluation,
+	createEnhancedContext,
 } from "@juspay/neurolink";
 
 const enhancedContext = createEnhancedContext(
-  "Write a business proposal for Q1 expansion",
-  enhancedResult.text,
-  {
-    domain: "Business development",
-    role: "Business proposal assistant",
-    toolsUsed: ["generate-text", "analytics-helper"],
-    conversationHistory: [
-      { role: "user", content: "I need help with our Q1 business plan" },
-      {
-        role: "assistant",
-        content: "I can help you create a comprehensive plan",
-      },
-    ],
-  },
+	"Write a business proposal for Q1 expansion",
+	enhancedResult.text,
+	{
+		domain: "Business development",
+		role: "Business proposal assistant",
+		toolsUsed: ["generate-text", "analytics-helper"],
+		conversationHistory: [
+			{ role: "user", content: "I need help with our Q1 business plan" },
+			{
+				role: "assistant",
+				content: "I can help you create a comprehensive plan",
+			},
+		],
+	},
 );
 
 const domainEvaluation = await performEnhancedEvaluation(enhancedContext);
@@ -215,39 +226,39 @@ console.log("🎯 Enhanced Evaluation:", domainEvaluation);
 
 ```typescript
 import {
-  createEnhancedChatService,
-  NeuroLinkWebSocketServer,
+	createEnhancedChatService,
+	NeuroLinkWebSocketServer,
 } from "@juspay/neurolink";
 
 // Enhanced chat with WebSocket support
 const chatService = createEnhancedChatService({
-  provider: await createBestAIProvider(),
-  enableWebSocket: true,
-  enableSSE: true,
-  streamingConfig: {
-    bufferSize: 8192,
-    compressionEnabled: true,
-  },
+	provider: await createBestAIProvider(),
+	enableWebSocket: true,
+	enableSSE: true,
+	streamingConfig: {
+		bufferSize: 8192,
+		compressionEnabled: true,
+	},
 });
 
 // WebSocket server for real-time applications
 const wsServer = new NeuroLinkWebSocketServer({
-  port: 8080,
-  maxConnections: 1000,
-  enableCompression: true,
+	port: 8080,
+	maxConnections: 1000,
+	enableCompression: true,
 });
 
 // Handle real-time chat
 wsServer.on("chat-message", async ({ connectionId, message }) => {
-  await chatService.streamChat({
-    prompt: message.data.prompt,
-    onChunk: (chunk) => {
-      wsServer.sendMessage(connectionId, {
-        type: "ai-chunk",
-        data: { chunk },
-      });
-    },
-  });
+	await chatService.streamChat({
+		prompt: message.data.prompt,
+		onChunk: (chunk) => {
+			wsServer.sendMessage(connectionId, {
+				type: "ai-chunk",
+				data: { chunk },
+			});
+		},
+	});
 });
 ```
 
@@ -258,11 +269,11 @@ import { initializeTelemetry, getTelemetryStatus } from "@juspay/neurolink";
 
 // Optional enterprise monitoring (zero overhead when disabled)
 const telemetry = initializeTelemetry({
-  serviceName: "my-ai-app",
-  endpoint: "http://localhost:4318",
-  enableTracing: true,
-  enableMetrics: true,
-  enableLogs: true,
+	serviceName: "my-ai-app",
+	endpoint: "http://localhost:4318",
+	enableTracing: true,
+	enableMetrics: true,
+	enableLogs: true,
 });
 
 // Check telemetry status
@@ -274,7 +285,7 @@ console.log("Version:", status.version);
 // All AI operations are now automatically monitored
 const provider = await createBestAIProvider();
 const result = await provider.generateText({
-  prompt: "Generate business report",
+	prompt: "Generate business report",
 });
 // Telemetry automatically tracks: response time, token usage, cost, errors
 ```
@@ -422,34 +433,34 @@ npx @juspay/neurolink batch prompts.txt --timeout 45s --output results.json
 ```typescript
 // SvelteKit API route with timeout handling
 export const POST: RequestHandler = async ({ request }) => {
-  const { message } = await request.json();
-  const provider = createBestAIProvider();
+	const { message } = await request.json();
+	const provider = createBestAIProvider();
 
-  try {
-    const result = await provider.streamText({
-      prompt: message,
-      timeout: "2m", // 2 minutes for streaming
-    });
-    return new Response(result.toReadableStream());
-  } catch (error) {
-    if (error.name === "TimeoutError") {
-      return new Response("Request timed out", { status: 408 });
-    }
-    throw error;
-  }
+	try {
+		const result = await provider.streamText({
+			prompt: message,
+			timeout: "2m", // 2 minutes for streaming
+		});
+		return new Response(result.toReadableStream());
+	} catch (error) {
+		if (error.name === "TimeoutError") {
+			return new Response("Request timed out", { status: 408 });
+		}
+		throw error;
+	}
 };
 
 // Next.js API route with timeout
 export async function POST(request: NextRequest) {
-  const { prompt } = await request.json();
-  const provider = createBestAIProvider();
+	const { prompt } = await request.json();
+	const provider = createBestAIProvider();
 
-  const result = await provider.generateText({
-    prompt,
-    timeout: process.env.AI_TIMEOUT || "30s", // Configurable timeout
-  });
+	const result = await provider.generateText({
+		prompt,
+		timeout: process.env.AI_TIMEOUT || "30s", // Configurable timeout
+	});
 
-  return NextResponse.json({ text: result.text });
+	return NextResponse.json({ text: result.text });
 }
 ```
 
@@ -536,6 +547,53 @@ cd neurolink-demo && node server.js
 - **Analysis Tools**: Usage optimization, performance benchmarking, parameter tuning
 - **Workflow Tools**: Test generation, code refactoring, documentation, debugging
 - **Extensibility**: Connect external tools and services via MCP protocol
+- **🆕 Dynamic Server Management**: Programmatically add MCP servers at runtime
+
+### 🔧 NEW: Programmatic MCP Server Management
+
+**Add external MCP servers dynamically** for enhanced tool ecosystem:
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+// Add Bitbucket integration
+await neurolink.addMCPServer("bitbucket", {
+	command: "npx",
+	args: ["-y", "@nexus2520/bitbucket-mcp-server"],
+	env: {
+		BITBUCKET_USERNAME: "your-username",
+		BITBUCKET_APP_PASSWORD: "your-app-password",
+	},
+});
+
+// Add custom database connector
+await neurolink.addMCPServer("database", {
+	command: "node",
+	args: ["./custom-db-mcp-server.js"],
+	env: { DB_CONNECTION_STRING: "postgresql://..." },
+});
+
+// Add any MCP-compatible server
+await neurolink.addMCPServer("slack-integration", {
+	command: "npx",
+	args: ["-y", "@slack/mcp-server"],
+	env: { SLACK_BOT_TOKEN: "xoxb-..." },
+	cwd: "/tmp",
+});
+
+// Verify servers are registered
+const status = await neurolink.getMCPStatus();
+console.log("Active servers:", status.totalServers);
+console.log("Available tools:", status.totalTools);
+```
+
+**Perfect for:**
+
+- **External Service Integration**: Bitbucket, Slack, Jira, databases
+- **Custom Tool Development**: Your own MCP servers
+- **Dynamic Workflows**: Add servers based on project needs
+- **Enterprise Applications**: Runtime tool ecosystem management
 
 ## 🤝 Contributing
 

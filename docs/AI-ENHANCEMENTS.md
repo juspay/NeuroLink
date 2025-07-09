@@ -75,15 +75,15 @@ import { NeuroLink } from "@juspay/neurolink";
 const sdk = new NeuroLink();
 
 const result = await sdk.generateText({
-  prompt: "Explain artificial intelligence in simple terms",
-  provider: "openai",
-  enableAnalytics: true, // 🆕 NEW: Track usage and costs
-  context: {
-    // 🆕 NEW: Custom context
-    userId: "user-123",
-    department: "engineering",
-    requestType: "explanation",
-  },
+	prompt: "Explain artificial intelligence in simple terms",
+	provider: "openai",
+	enableAnalytics: true, // 🆕 NEW: Track usage and costs
+	context: {
+		// 🆕 NEW: Custom context
+		userId: "user-123",
+		department: "engineering",
+		requestType: "explanation",
+	},
 });
 
 console.log(result.text); // AI response
@@ -103,14 +103,14 @@ console.log(result.analytics); // Usage metrics
 
 ```typescript
 const result = await sdk.generateText({
-  prompt: "Write a technical explanation of machine learning",
-  provider: "google-ai",
-  enableEvaluation: true, // 🆕 NEW: AI quality scoring
-  context: {
-    domain: "technology",
-    audience: "technical",
-    expectedLength: "detailed",
-  },
+	prompt: "Write a technical explanation of machine learning",
+	provider: "google-ai",
+	enableEvaluation: true, // 🆕 NEW: AI quality scoring
+	context: {
+		domain: "technology",
+		audience: "technical",
+		expectedLength: "detailed",
+	},
 });
 
 console.log(result.evaluation);
@@ -128,14 +128,14 @@ console.log(result.evaluation);
 
 ```typescript
 const result = await sdk.generateText({
-  prompt: "Generate a product description for AI software",
-  enableAnalytics: true, // Track usage and costs
-  enableEvaluation: true, // Score response quality
-  context: {
-    productId: "ai-toolkit-v2",
-    userId: "marketing-001",
-    campaign: "product-launch-2025",
-  },
+	prompt: "Generate a product description for AI software",
+	enableAnalytics: true, // Track usage and costs
+	enableEvaluation: true, // Score response quality
+	context: {
+		productId: "ai-toolkit-v2",
+		userId: "marketing-001",
+		campaign: "product-launch-2025",
+	},
 });
 
 // Access all enhancement data
@@ -143,19 +143,19 @@ const { text, analytics, evaluation } = result;
 
 // Custom monitoring logic
 if (evaluation.overall < 7) {
-  console.warn("Low quality response detected");
+	console.warn("Low quality response detected");
 }
 
 if (analytics.cost > 0.1) {
-  console.warn("High cost request detected");
+	console.warn("High cost request detected");
 }
 
 // Send to your monitoring system
 sendToMonitoring({
-  requestId: analytics.context.productId,
-  quality: evaluation.overall,
-  cost: analytics.cost,
-  responseTime: analytics.responseTime,
+	requestId: analytics.context.productId,
+	quality: evaluation.overall,
+	cost: analytics.cost,
+	responseTime: analytics.responseTime,
 });
 ```
 
@@ -252,8 +252,8 @@ NEUROLINK_EVALUATION_RETRY_ATTEMPTS=2
 ```typescript
 // Automatic provider selection
 const result = await sdk.generateText({
-  prompt: "Explain quantum computing",
-  enableEvaluation: true, // Uses configured evaluation system
+	prompt: "Explain quantum computing",
+	enableEvaluation: true, // Uses configured evaluation system
 });
 
 // Will try: google-ai → openai → anthropic → vertex (if primary fails)
@@ -309,26 +309,26 @@ npx @juspay/neurolink generate "Analyze sales performance" \
 
 ```typescript
 import {
-  performEnhancedEvaluation,
-  createEnhancedContext,
+	performEnhancedEvaluation,
+	createEnhancedContext,
 } from "@juspay/neurolink";
 
 // Create enhanced evaluation context
 const enhancedContext = createEnhancedContext(
-  "Write a business proposal for Q1 expansion",
-  result.text,
-  {
-    domain: "Business development",
-    role: "Business proposal assistant",
-    toolsUsed: ["generate-text", "analytics-helper"],
-    conversationHistory: [
-      { role: "user", content: "I need help with our Q1 business plan" },
-      {
-        role: "assistant",
-        content: "I can help you create a comprehensive plan",
-      },
-    ],
-  },
+	"Write a business proposal for Q1 expansion",
+	result.text,
+	{
+		domain: "Business development",
+		role: "Business proposal assistant",
+		toolsUsed: ["generate-text", "analytics-helper"],
+		conversationHistory: [
+			{ role: "user", content: "I need help with our Q1 business plan" },
+			{
+				role: "assistant",
+				content: "I can help you create a comprehensive plan",
+			},
+		],
+	},
 );
 
 // Perform enhanced evaluation
@@ -347,20 +347,20 @@ console.log("🎯 Enhanced Evaluation:", domainEvaluation);
 
 ```typescript
 interface TextGenerationOptions {
-  // Existing fields (unchanged)
-  prompt: string;
-  provider?: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  timeout?: number | string;
-  disableTools?: boolean;
+	// Existing fields (unchanged)
+	prompt: string;
+	provider?: string;
+	model?: string;
+	temperature?: number;
+	maxTokens?: number;
+	systemPrompt?: string;
+	timeout?: number | string;
+	disableTools?: boolean;
 
-  // 🆕 NEW: AI Enhancement fields
-  enableAnalytics?: boolean; // Default: false
-  enableEvaluation?: boolean; // Default: false
-  context?: Record<string, any>; // Default: undefined
+	// 🆕 NEW: AI Enhancement fields
+	enableAnalytics?: boolean; // Default: false
+	enableEvaluation?: boolean; // Default: false
+	context?: Record<string, any>; // Default: undefined
 }
 ```
 
@@ -368,17 +368,17 @@ interface TextGenerationOptions {
 
 ```typescript
 interface AnalyticsData {
-  provider: string; // AI provider used
-  model: string; // Specific model name
-  tokens: {
-    input: number; // Input tokens
-    output: number; // Output tokens
-    total: number; // Total tokens
-  };
-  cost?: number; // Estimated cost (USD)
-  responseTime: number; // Response time (ms)
-  timestamp: string; // ISO timestamp
-  context?: Record<string, any>; // User context
+	provider: string; // AI provider used
+	model: string; // Specific model name
+	tokens: {
+		input: number; // Input tokens
+		output: number; // Output tokens
+		total: number; // Total tokens
+	};
+	cost?: number; // Estimated cost (USD)
+	responseTime: number; // Response time (ms)
+	timestamp: string; // ISO timestamp
+	context?: Record<string, any>; // User context
 }
 ```
 
@@ -386,12 +386,12 @@ interface AnalyticsData {
 
 ```typescript
 interface EvaluationData {
-  relevance: number; // 1-10 scale
-  accuracy: number; // 1-10 scale
-  completeness: number; // 1-10 scale
-  overall: number; // 1-10 scale
-  evaluationModel: string; // Model used for evaluation
-  evaluationTime: number; // Evaluation time (ms)
+	relevance: number; // 1-10 scale
+	accuracy: number; // 1-10 scale
+	completeness: number; // 1-10 scale
+	overall: number; // 1-10 scale
+	evaluationModel: string; // Model used for evaluation
+	evaluationTime: number; // Evaluation time (ms)
 }
 ```
 
@@ -417,20 +417,20 @@ Built-in pricing for major providers (updated regularly):
 
 ```typescript
 const costMap = {
-  openai: {
-    "gpt-4": { input: 0.03, output: 0.06 },
-    "gpt-4-turbo": { input: 0.01, output: 0.03 },
-    "gpt-3.5-turbo": { input: 0.0015, output: 0.002 },
-  },
-  anthropic: {
-    "claude-3-opus": { input: 0.015, output: 0.075 },
-    "claude-3-sonnet": { input: 0.003, output: 0.015 },
-    "claude-3-haiku": { input: 0.00025, output: 0.00125 },
-  },
-  "google-ai": {
-    "gemini-pro": { input: 0.00035, output: 0.00105 },
-    "gemini-2.5-flash": { input: 0.000075, output: 0.0003 },
-  },
+	openai: {
+		"gpt-4": { input: 0.03, output: 0.06 },
+		"gpt-4-turbo": { input: 0.01, output: 0.03 },
+		"gpt-3.5-turbo": { input: 0.0015, output: 0.002 },
+	},
+	anthropic: {
+		"claude-3-opus": { input: 0.015, output: 0.075 },
+		"claude-3-sonnet": { input: 0.003, output: 0.015 },
+		"claude-3-haiku": { input: 0.00025, output: 0.00125 },
+	},
+	"google-ai": {
+		"gemini-pro": { input: 0.00035, output: 0.00105 },
+		"gemini-2.5-flash": { input: 0.000075, output: 0.0003 },
+	},
 };
 ```
 
@@ -472,17 +472,17 @@ const costMap = {
 ```typescript
 // Existing code (still works)
 const result = await sdk.generateText({
-  prompt: "Hello world",
-  provider: "openai",
+	prompt: "Hello world",
+	provider: "openai",
 });
 
 // Enhanced with new features (optional)
 const result = await sdk.generateText({
-  prompt: "Hello world",
-  provider: "openai",
-  enableAnalytics: true, // Add analytics
-  enableEvaluation: true, // Add evaluation
-  context: { userId: "123" }, // Add context
+	prompt: "Hello world",
+	provider: "openai",
+	enableAnalytics: true, // Add analytics
+	enableEvaluation: true, // Add evaluation
+	context: { userId: "123" }, // Add context
 });
 ```
 
@@ -504,23 +504,23 @@ npx @juspay/neurolink generate "Hello world" --context '{"key":"value"}'
 
 ```typescript
 const result = await sdk.generateText({
-  prompt: customerQuery,
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    customerId: customer.id,
-    priority: ticket.priority,
-    department: "support",
-    agent: agent.id,
-  },
+	prompt: customerQuery,
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		customerId: customer.id,
+		priority: ticket.priority,
+		department: "support",
+		agent: agent.id,
+	},
 });
 
 // Track support quality and costs
 trackSupportMetrics({
-  ticketId: ticket.id,
-  responseQuality: result.evaluation.overall,
-  cost: result.analytics.cost,
-  responseTime: result.analytics.responseTime,
+	ticketId: ticket.id,
+	responseQuality: result.evaluation.overall,
+	cost: result.analytics.cost,
+	responseTime: result.analytics.responseTime,
 });
 ```
 
@@ -528,21 +528,21 @@ trackSupportMetrics({
 
 ```typescript
 const results = await Promise.all([
-  sdk.generateText({
-    prompt: "Write blog title",
-    enableEvaluation: true,
-    context: { contentType: "title", campaign: "q1-launch" },
-  }),
-  sdk.generateText({
-    prompt: "Write blog intro",
-    enableEvaluation: true,
-    context: { contentType: "intro", campaign: "q1-launch" },
-  }),
-  sdk.generateText({
-    prompt: "Write blog conclusion",
-    enableEvaluation: true,
-    context: { contentType: "conclusion", campaign: "q1-launch" },
-  }),
+	sdk.generateText({
+		prompt: "Write blog title",
+		enableEvaluation: true,
+		context: { contentType: "title", campaign: "q1-launch" },
+	}),
+	sdk.generateText({
+		prompt: "Write blog intro",
+		enableEvaluation: true,
+		context: { contentType: "intro", campaign: "q1-launch" },
+	}),
+	sdk.generateText({
+		prompt: "Write blog conclusion",
+		enableEvaluation: true,
+		context: { contentType: "conclusion", campaign: "q1-launch" },
+	}),
 ]);
 
 // Quality gate: only publish high-quality content
@@ -553,28 +553,28 @@ const highQualityContent = results.filter((r) => r.evaluation.overall >= 8);
 
 ```typescript
 function createCostDashboard() {
-  const dailyCosts = [];
-  const qualityMetrics = [];
+	const dailyCosts = [];
+	const qualityMetrics = [];
 
-  // Track all AI requests
-  sdk.onResponse((result) => {
-    if (result.analytics) {
-      dailyCosts.push({
-        date: new Date(result.analytics.timestamp),
-        cost: result.analytics.cost,
-        provider: result.analytics.provider,
-        tokens: result.analytics.tokens.total,
-      });
-    }
+	// Track all AI requests
+	sdk.onResponse((result) => {
+		if (result.analytics) {
+			dailyCosts.push({
+				date: new Date(result.analytics.timestamp),
+				cost: result.analytics.cost,
+				provider: result.analytics.provider,
+				tokens: result.analytics.tokens.total,
+			});
+		}
 
-    if (result.evaluation) {
-      qualityMetrics.push({
-        date: new Date(),
-        quality: result.evaluation.overall,
-        prompt: result.analytics?.context?.promptType,
-      });
-    }
-  });
+		if (result.evaluation) {
+			qualityMetrics.push({
+				date: new Date(),
+				quality: result.evaluation.overall,
+				prompt: result.analytics?.context?.promptType,
+			});
+		}
+	});
 }
 ```
 

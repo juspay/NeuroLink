@@ -108,28 +108,28 @@ curl "http://localhost:3001/api/v1/search?capability=function-calling&maxPrice=0
 
 ```json
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-06-18T12:00:00Z",
-  "models": {
-    "anthropic": {
-      "claude-3-opus": {
-        "id": "claude-3-opus-20240229",
-        "displayName": "Claude 3 Opus",
-        "capabilities": ["function-calling", "vision", "analysis"],
-        "deprecated": false,
-        "pricing": { "input": 0.015, "output": 0.075 },
-        "contextWindow": 200000,
-        "releaseDate": "2024-02-29"
-      }
-    }
-  },
-  "aliases": {
-    "claude-latest": "anthropic/claude-3-opus",
-    "best-coding": "anthropic/claude-3-opus"
-  },
-  "defaults": {
-    "anthropic": "claude-3-sonnet"
-  }
+	"version": "1.0.0",
+	"lastUpdated": "2025-06-18T12:00:00Z",
+	"models": {
+		"anthropic": {
+			"claude-3-opus": {
+				"id": "claude-3-opus-20240229",
+				"displayName": "Claude 3 Opus",
+				"capabilities": ["function-calling", "vision", "analysis"],
+				"deprecated": false,
+				"pricing": { "input": 0.015, "output": 0.075 },
+				"contextWindow": 200000,
+				"releaseDate": "2024-02-29"
+			}
+		}
+	},
+	"aliases": {
+		"claude-latest": "anthropic/claude-3-opus",
+		"best-coding": "anthropic/claude-3-opus"
+	},
+	"defaults": {
+		"anthropic": "claude-3-sonnet"
+	}
 }
 ```
 
@@ -174,9 +174,9 @@ resolveModel("anthropic", "opus"); // Matches 'claude-3-opus'
 
 ```typescript
 searchByCapability("function-calling", {
-  provider: "openai", // Filter by provider
-  maxPrice: 0.001, // Maximum input price per 1K tokens
-  excludeDeprecated: true, // Exclude deprecated models
+	provider: "openai", // Filter by provider
+	maxPrice: 0.001, // Maximum input price per 1K tokens
+	excludeDeprecated: true, // Exclude deprecated models
 });
 ```
 
@@ -186,8 +186,8 @@ searchByCapability("function-calling", {
 
 ```typescript
 export enum BedrockModels {
-  CLAUDE_3_SONNET = "anthropic.claude-3-sonnet-20240229-v1:0",
-  // Hard to maintain, becomes stale
+	CLAUDE_3_SONNET = "anthropic.claude-3-sonnet-20240229-v1:0",
+	// Hard to maintain, becomes stale
 }
 ```
 
@@ -196,16 +196,16 @@ export enum BedrockModels {
 ```typescript
 // Backward compatible aliases
 export const ModelAliases = {
-  CLAUDE_LATEST: () =>
-    dynamicModelProvider.resolveModel("anthropic", "claude-3"),
-  GPT_LATEST: () => dynamicModelProvider.resolveModel("openai", "gpt-4"),
-  BEST_CODING: () => dynamicModelProvider.getBestFor("coding"),
+	CLAUDE_LATEST: () =>
+		dynamicModelProvider.resolveModel("anthropic", "claude-3"),
+	GPT_LATEST: () => dynamicModelProvider.resolveModel("openai", "gpt-4"),
+	BEST_CODING: () => dynamicModelProvider.getBestFor("coding"),
 } as const;
 
 // Usage stays the same
 const provider = AIProviderFactory.createProvider(
-  "anthropic",
-  ModelAliases.CLAUDE_LATEST(),
+	"anthropic",
+	ModelAliases.CLAUDE_LATEST(),
 );
 ```
 

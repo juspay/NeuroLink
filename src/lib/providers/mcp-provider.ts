@@ -4,10 +4,10 @@
  */
 
 import type {
-  AIProvider,
-  TextGenerationOptions,
-  StreamTextOptions,
-  EnhancedGenerateTextResult,
+	AIProvider,
+	TextGenerationOptions,
+	StreamTextOptions,
+	EnhancedGenerateTextResult,
 } from "../core/types.js";
 import type { StreamTextResult, ToolSet, Schema, GenerateTextResult } from "ai";
 import type { ZodType, ZodTypeDef } from "zod";
@@ -21,13 +21,13 @@ import { v4 as uuidv4 } from "uuid";
  * MCP-Aware Provider Configuration
  */
 export interface MCPProviderConfig {
-  baseProvider: AIProvider;
-  providerName?: string;
-  modelName?: string;
-  enableMCP?: boolean;
-  sessionId?: string;
-  userId?: string;
-  organizationId?: string;
+	baseProvider: AIProvider;
+	providerName?: string;
+	modelName?: string;
+	enableMCP?: boolean;
+	sessionId?: string;
+	userId?: string;
+	organizationId?: string;
 }
 
 /**
@@ -35,123 +35,123 @@ export interface MCPProviderConfig {
  * Wraps any AI provider with MCP tool capabilities
  */
 export class MCPAwareProvider implements AIProvider {
-  private baseProvider: AIProvider;
-  private config: MCPProviderConfig;
-  private sessionId: string;
-  private mcpInitialized = false;
+	private baseProvider: AIProvider;
+	private config: MCPProviderConfig;
+	private sessionId: string;
+	private mcpInitialized = false;
 
-  constructor(config: MCPProviderConfig) {
-    this.baseProvider = config.baseProvider;
-    this.config = config;
-    this.sessionId = config.sessionId || uuidv4();
-  }
+	constructor(config: MCPProviderConfig) {
+		this.baseProvider = config.baseProvider;
+		this.config = config;
+		this.sessionId = config.sessionId || uuidv4();
+	}
 
-  /**
-   * Initialize MCP tools for this session
-   */
-  private async initializeMCP(): Promise<void> {
-    if (this.mcpInitialized || this.config.enableMCP === false) {
-      return;
-    }
+	/**
+	 * Initialize MCP tools for this session
+	 */
+	private async initializeMCP(): Promise<void> {
+		if (this.mcpInitialized || this.config.enableMCP === false) {
+			return;
+		}
 
-    try {
-      // Get or create MCP client for this session
-      const mcpClient = getMCPManager(this.sessionId, {
-        userId: this.config.userId || "anonymous",
-        aiProvider: this.config.providerName || "unknown",
-        modelId: this.config.modelName,
-      });
+		try {
+			// Get or create MCP client for this session
+			const mcpClient = getMCPManager(this.sessionId, {
+				userId: this.config.userId || "anonymous",
+				aiProvider: this.config.providerName || "unknown",
+				modelId: this.config.modelName,
+			});
 
-      // Create execution context
-      const context: NeuroLinkExecutionContext = {
-        sessionId: this.sessionId,
-        userId: this.config.userId || "anonymous",
-        organizationId: this.config.organizationId || "default",
-        aiProvider: this.config.providerName || "unknown",
-        modelId: this.config.modelName,
-        timestamp: Date.now(),
-        // Required properties
-        secureFS: {
-          readFile: async () => {
-            throw new Error("secureFS not configured");
-          },
-          writeFile: async () => {
-            throw new Error("secureFS not configured");
-          },
-          readdir: async () => {
-            throw new Error("secureFS not configured");
-          },
-          stat: async () => {
-            throw new Error("secureFS not configured");
-          },
-          mkdir: async () => {
-            throw new Error("secureFS not configured");
-          },
-          exists: async () => false,
-        },
-        path: {
-          join: (...paths: string[]) => require("path").join(...paths),
-          resolve: (...paths: string[]) => require("path").resolve(...paths),
-          relative: (from: string, to: string) =>
-            require("path").relative(from, to),
-          dirname: (path: string) => require("path").dirname(path),
-          basename: (path: string, ext?: string) =>
-            require("path").basename(path, ext),
-        },
-        grantedPermissions: [],
-        log: console.log,
-      };
+			// Create execution context
+			const context: NeuroLinkExecutionContext = {
+				sessionId: this.sessionId,
+				userId: this.config.userId || "anonymous",
+				organizationId: this.config.organizationId || "default",
+				aiProvider: this.config.providerName || "unknown",
+				modelId: this.config.modelName,
+				timestamp: Date.now(),
+				// Required properties
+				secureFS: {
+					readFile: async () => {
+						throw new Error("secureFS not configured");
+					},
+					writeFile: async () => {
+						throw new Error("secureFS not configured");
+					},
+					readdir: async () => {
+						throw new Error("secureFS not configured");
+					},
+					stat: async () => {
+						throw new Error("secureFS not configured");
+					},
+					mkdir: async () => {
+						throw new Error("secureFS not configured");
+					},
+					exists: async () => false,
+				},
+				path: {
+					join: (...paths: string[]) => require("path").join(...paths),
+					resolve: (...paths: string[]) => require("path").resolve(...paths),
+					relative: (from: string, to: string) =>
+						require("path").relative(from, to),
+					dirname: (path: string) => require("path").dirname(path),
+					basename: (path: string, ext?: string) =>
+						require("path").basename(path, ext),
+				},
+				grantedPermissions: [],
+				log: console.log,
+			};
 
-      // Initialize all MCP tools
-      initializeMCPTools(this.sessionId, mcpClient, context);
+			// Initialize all MCP tools
+			initializeMCPTools(this.sessionId, mcpClient, context);
 
-      this.mcpInitialized = true;
+			this.mcpInitialized = true;
 
-      const tools = mcpClient.getTools();
-      const toolCount = Object.keys(tools).length;
+			const tools = mcpClient.getTools();
+			const toolCount = Object.keys(tools).length;
 
-      logger.info(
-        `[MCP Provider] Initialized ${toolCount} tools for session ${this.sessionId}`,
-      );
-    } catch (error) {
-      logger.error(
-        `[MCP Provider] Failed to initialize MCP for session ${this.sessionId}`,
-        error,
-      );
-      // Continue without MCP tools if initialization fails
-    }
-  }
+			logger.info(
+				`[MCP Provider] Initialized ${toolCount} tools for session ${this.sessionId}`,
+			);
+		} catch (error) {
+			logger.error(
+				`[MCP Provider] Failed to initialize MCP for session ${this.sessionId}`,
+				error,
+			);
+			// Continue without MCP tools if initialization fails
+		}
+	}
 
-  async generateText(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
-    // Ensure MCP is initialized
-    await this.initializeMCP();
+	async generateText(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<GenerateTextResult<ToolSet, unknown> | null> {
+		// Ensure MCP is initialized
+		await this.initializeMCP();
 
-    // Parse options
-    const options =
-      typeof optionsOrPrompt === "string"
-        ? { prompt: optionsOrPrompt }
-        : optionsOrPrompt;
+		// Parse options
+		const options =
+			typeof optionsOrPrompt === "string"
+				? { prompt: optionsOrPrompt }
+				: optionsOrPrompt;
 
-    // Check if prompt requests tool usage
-    const needsTools = this.detectToolRequest(options.prompt);
+		// Check if prompt requests tool usage
+		const needsTools = this.detectToolRequest(options.prompt);
 
-    if (needsTools && this.mcpInitialized) {
-      // Get MCP client
-      const mcpClient = getMCPManager(this.sessionId);
+		if (needsTools && this.mcpInitialized) {
+			// Get MCP client
+			const mcpClient = getMCPManager(this.sessionId);
 
-      // Create enhanced prompt with available tools
-      const tools = mcpClient.getTools();
-      const toolList = Object.keys(tools)
-        .map((name) => {
-          const tool = tools[name];
-          return `- ${name}: ${tool.description || "No description"}`;
-        })
-        .join("\n");
+			// Create enhanced prompt with available tools
+			const tools = mcpClient.getTools();
+			const toolList = Object.keys(tools)
+				.map((name) => {
+					const tool = tools[name];
+					return `- ${name}: ${tool.description || "No description"}`;
+				})
+				.join("\n");
 
-      const enhancedPrompt = `${options.prompt}
+			const enhancedPrompt = `${options.prompt}
 
 Available tools:
 ${toolList}
@@ -162,153 +162,153 @@ PARAMS: <json_params>
 
 Otherwise, provide a direct response.`;
 
-      // Generate response with enhanced prompt
-      const response = await this.baseProvider.generateText(
-        {
-          ...options,
-          prompt: enhancedPrompt,
-        },
-        analysisSchema,
-      );
+			// Generate response with enhanced prompt
+			const response = await this.baseProvider.generateText(
+				{
+					...options,
+					prompt: enhancedPrompt,
+				},
+				analysisSchema,
+			);
 
-      if (!response) {
-        return null;
-      }
+			if (!response) {
+				return null;
+			}
 
-      // Check if response includes tool invocation
-      const toolMatch = response.text.match(
-        /TOOL:\s*(\S+)\s*\nPARAMS:\s*({.*})/s,
-      );
+			// Check if response includes tool invocation
+			const toolMatch = response.text.match(
+				/TOOL:\s*(\S+)\s*\nPARAMS:\s*({.*})/s,
+			);
 
-      if (toolMatch) {
-        const toolName = toolMatch[1];
-        const toolParams = JSON.parse(toolMatch[2]);
+			if (toolMatch) {
+				const toolName = toolMatch[1];
+				const toolParams = JSON.parse(toolMatch[2]);
 
-        // Execute tool
-        const toolResult = await mcpClient.executeTool(toolName, toolParams);
+				// Execute tool
+				const toolResult = await mcpClient.executeTool(toolName, toolParams);
 
-        // Generate final response with tool result
-        const finalPrompt = `${options.prompt}
+				// Generate final response with tool result
+				const finalPrompt = `${options.prompt}
 
 Tool ${toolName} was executed with result:
 ${JSON.stringify(toolResult, null, 2)}
 
 Please provide a response based on this information.`;
 
-        const finalResponse = await this.baseProvider.generateText(
-          {
-            ...options,
-            prompt: finalPrompt,
-          },
-          analysisSchema,
-        );
+				const finalResponse = await this.baseProvider.generateText(
+					{
+						...options,
+						prompt: finalPrompt,
+					},
+					analysisSchema,
+				);
 
-        if (!finalResponse) {
-          return null;
-        }
+				if (!finalResponse) {
+					return null;
+				}
 
-        // Return response (tool usage is tracked internally)
-        return finalResponse;
-      }
+				// Return response (tool usage is tracked internally)
+				return finalResponse;
+			}
 
-      return response;
-    }
+			return response;
+		}
 
-    // Regular generation without tools
-    return this.baseProvider.generateText(options);
-  }
+		// Regular generation without tools
+		return this.baseProvider.generateText(options);
+	}
 
-  async streamText(
-    optionsOrPrompt: StreamTextOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<StreamTextResult<ToolSet, unknown> | null> {
-    // For now, streaming doesn't support tool usage
-    // This matches Lighthouse's approach where MCP is used for non-streaming requests
-    return this.baseProvider.streamText(optionsOrPrompt, analysisSchema);
-  }
+	async streamText(
+		optionsOrPrompt: StreamTextOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<StreamTextResult<ToolSet, unknown> | null> {
+		// For now, streaming doesn't support tool usage
+		// This matches Lighthouse's approach where MCP is used for non-streaming requests
+		return this.baseProvider.streamText(optionsOrPrompt, analysisSchema);
+	}
 
-  /**
-   * Detect if the prompt is requesting tool usage
-   */
-  private detectToolRequest(prompt: string): boolean {
-    const toolKeywords = [
-      "use tool",
-      "call tool",
-      "execute tool",
-      "run tool",
-      "invoke tool",
-      "what tools",
-      "available tools",
-      "list tools",
-    ];
+	/**
+	 * Detect if the prompt is requesting tool usage
+	 */
+	private detectToolRequest(prompt: string): boolean {
+		const toolKeywords = [
+			"use tool",
+			"call tool",
+			"execute tool",
+			"run tool",
+			"invoke tool",
+			"what tools",
+			"available tools",
+			"list tools",
+		];
 
-    const lowerPrompt = prompt.toLowerCase();
-    return toolKeywords.some((keyword) => lowerPrompt.includes(keyword));
-  }
+		const lowerPrompt = prompt.toLowerCase();
+		return toolKeywords.some((keyword) => lowerPrompt.includes(keyword));
+	}
 
-  /**
-   * Get session statistics
-   */
-  getSessionStats() {
-    if (!this.mcpInitialized) {
-      return null;
-    }
+	/**
+	 * Get session statistics
+	 */
+	getSessionStats() {
+		if (!this.mcpInitialized) {
+			return null;
+		}
 
-    const mcpClient = getMCPManager(this.sessionId);
-    return mcpClient.getStats();
-  }
+		const mcpClient = getMCPManager(this.sessionId);
+		return mcpClient.getStats();
+	}
 
-  /**
-   * Clean up session
-   */
-  async cleanup(): Promise<void> {
-    if (this.mcpInitialized) {
-      const { removeMCPManager } = await import("../mcp/manager.js");
-      await removeMCPManager(this.sessionId);
-      this.mcpInitialized = false;
-    }
-  }
+	/**
+	 * Clean up session
+	 */
+	async cleanup(): Promise<void> {
+		if (this.mcpInitialized) {
+			const { removeMCPManager } = await import("../mcp/manager.js");
+			await removeMCPManager(this.sessionId);
+			this.mcpInitialized = false;
+		}
+	}
 
-  /**
-   * Alias for generateText() - CLI-SDK consistency
-   */
-  async generate(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: any,
-  ): Promise<EnhancedGenerateTextResult | null> {
-    return this.generateText(optionsOrPrompt, analysisSchema);
-  }
+	/**
+	 * Alias for generateText() - CLI-SDK consistency
+	 */
+	async generate(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: any,
+	): Promise<EnhancedGenerateTextResult | null> {
+		return this.generateText(optionsOrPrompt, analysisSchema);
+	}
 
-  /**
-   * Short alias for generateText() - CLI-SDK consistency
-   */
-  async gen(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: any,
-  ): Promise<EnhancedGenerateTextResult | null> {
-    return this.generateText(optionsOrPrompt, analysisSchema);
-  }
+	/**
+	 * Short alias for generateText() - CLI-SDK consistency
+	 */
+	async gen(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: any,
+	): Promise<EnhancedGenerateTextResult | null> {
+		return this.generateText(optionsOrPrompt, analysisSchema);
+	}
 }
 
 /**
  * Create an MCP-aware provider
  */
 export function createMCPAwareProvider(
-  baseProvider: AIProvider,
-  config?: Partial<MCPProviderConfig>,
+	baseProvider: AIProvider,
+	config?: Partial<MCPProviderConfig>,
 ): MCPAwareProvider {
-  return new MCPAwareProvider({
-    baseProvider,
-    enableMCP: true,
-    ...config,
-  });
+	return new MCPAwareProvider({
+		baseProvider,
+		enableMCP: true,
+		...config,
+	});
 }
 
 /**
  * Check if a provider is MCP-aware
  */
 export function isMCPAwareProvider(
-  provider: AIProvider,
+	provider: AIProvider,
 ): provider is MCPAwareProvider {
-  return provider instanceof MCPAwareProvider;
+	return provider instanceof MCPAwareProvider;
 }

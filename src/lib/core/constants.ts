@@ -15,41 +15,41 @@ export const DEFAULT_DOCUMENTATION_MAX_TOKENS = 12000; // For documentation gene
 
 // Provider-specific configurations
 export const PROVIDER_CONFIG = {
-  evaluation: {
-    maxTokens: DEFAULT_EVALUATION_MAX_TOKENS,
-    model: "gemini-2.5-flash",
-    temperature: 0.3, // Lower temperature for consistent evaluation
-  },
-  analysis: {
-    maxTokens: DEFAULT_ANALYSIS_MAX_TOKENS,
-    temperature: 0.5,
-  },
-  documentation: {
-    maxTokens: DEFAULT_DOCUMENTATION_MAX_TOKENS,
-    temperature: 0.4,
-  },
+	evaluation: {
+		maxTokens: DEFAULT_EVALUATION_MAX_TOKENS,
+		model: "gemini-2.5-flash",
+		temperature: 0.3, // Lower temperature for consistent evaluation
+	},
+	analysis: {
+		maxTokens: DEFAULT_ANALYSIS_MAX_TOKENS,
+		temperature: 0.5,
+	},
+	documentation: {
+		maxTokens: DEFAULT_DOCUMENTATION_MAX_TOKENS,
+		temperature: 0.4,
+	},
 };
 
 // CLI Validation Limits
 export const CLI_LIMITS = {
-  maxTokens: {
-    min: 1,
-    max: 50000,
-    default: DEFAULT_MAX_TOKENS,
-  },
-  temperature: {
-    min: 0,
-    max: 2,
-    default: DEFAULT_TEMPERATURE,
-  },
+	maxTokens: {
+		min: 1,
+		max: 50000,
+		default: DEFAULT_MAX_TOKENS,
+	},
+	temperature: {
+		min: 0,
+		max: 2,
+		default: DEFAULT_TEMPERATURE,
+	},
 };
 
 // Environment Variable Support (for future use)
 export const ENV_DEFAULTS = {
-  maxTokens: process.env.NEUROLINK_DEFAULT_MAX_TOKENS
-    ? parseInt(process.env.NEUROLINK_DEFAULT_MAX_TOKENS, 10)
-    : DEFAULT_MAX_TOKENS,
-  temperature: process.env.NEUROLINK_DEFAULT_TEMPERATURE
-    ? parseFloat(process.env.NEUROLINK_DEFAULT_TEMPERATURE)
-    : DEFAULT_TEMPERATURE,
+	maxTokens: process.env.NEUROLINK_DEFAULT_MAX_TOKENS
+		? parseInt(process.env.NEUROLINK_DEFAULT_MAX_TOKENS, 10)
+		: DEFAULT_MAX_TOKENS,
+	temperature: process.env.NEUROLINK_DEFAULT_TEMPERATURE
+		? parseFloat(process.env.NEUROLINK_DEFAULT_TEMPERATURE)
+		: DEFAULT_TEMPERATURE,
 };

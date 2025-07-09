@@ -29,14 +29,14 @@ const configManager = new ConfigManager();
 
 // Update configuration (automatic backup created)
 await configManager.updateConfig({
-  providers: {
-    google: { enabled: true, model: "gemini-2.5-pro" },
-    openai: { enabled: true, model: "gpt-4o" },
-  },
-  performance: {
-    timeout: 30000,
-    retries: 3,
-  },
+	providers: {
+		google: { enabled: true, model: "gemini-2.5-pro" },
+		openai: { enabled: true, model: "gpt-4o" },
+	},
+	performance: {
+		timeout: 30000,
+		retries: 3,
+	},
 });
 // ✅ Backup created: .neurolink.backups/neurolink-config-2025-01-07T10-30-00.js
 ```
@@ -66,11 +66,11 @@ NEUROLINK_PROVIDER_TIMEOUT=30000
 
 ```typescript
 interface NeuroLinkConfig {
-  providers: ProviderConfig; // AI provider settings
-  performance: PerformanceConfig; // Performance optimization
-  analytics: AnalyticsConfig; // Analytics configuration
-  backup: BackupConfig; // Backup system settings
-  validation: ValidationConfig; // Validation rules
+	providers: ProviderConfig; // AI provider settings
+	performance: PerformanceConfig; // Performance optimization
+	analytics: AnalyticsConfig; // Analytics configuration
+	backup: BackupConfig; // Backup system settings
+	validation: ValidationConfig; // Validation rules
 }
 ```
 
@@ -78,19 +78,19 @@ interface NeuroLinkConfig {
 
 ```typescript
 interface ProviderConfig {
-  google?: {
-    enabled: boolean;
-    model?: string;
-    apiKey?: string;
-    timeout?: number;
-  };
-  openai?: {
-    enabled: boolean;
-    model?: string;
-    apiKey?: string;
-    timeout?: number;
-  };
-  // ... other providers
+	google?: {
+		enabled: boolean;
+		model?: string;
+		apiKey?: string;
+		timeout?: number;
+	};
+	openai?: {
+		enabled: boolean;
+		model?: string;
+		apiKey?: string;
+		timeout?: number;
+	};
+	// ... other providers
 }
 ```
 
@@ -98,11 +98,11 @@ interface ProviderConfig {
 
 ```typescript
 interface PerformanceConfig {
-  timeout: number; // Default timeout (ms)
-  retries: number; // Default retry count
-  cacheEnabled: boolean; // Enable execution caching
-  cacheTTL: number; // Cache TTL (seconds)
-  concurrency: number; // Max concurrent operations
+	timeout: number; // Default timeout (ms)
+	retries: number; // Default retry count
+	cacheEnabled: boolean; // Enable execution caching
+	cacheTTL: number; // Cache TTL (seconds)
+	concurrency: number; // Max concurrent operations
 }
 ```
 
@@ -131,13 +131,13 @@ interface PerformanceConfig {
 
 ```typescript
 interface BackupMetadata {
-  timestamp: string;
-  hash: string; // SHA-256 hash
-  size: number; // File size in bytes
-  reason: string; // Reason for backup
-  version: string; // Config version
-  environment: string; // Environment context
-  user?: string; // User who made change
+	timestamp: string;
+	hash: string; // SHA-256 hash
+	size: number; // File size in bytes
+	reason: string; // Reason for backup
+	version: string; // Config version
+	environment: string; // Environment context
+	user?: string; // User who made change
 }
 ```
 
@@ -154,7 +154,7 @@ console.log("Available backups:", backups);
 
 // Restore from specific backup
 await configManager.restoreFromBackup(
-  "neurolink-config-2025-01-07T10-30-00.js",
+	"neurolink-config-2025-01-07T10-30-00.js",
 );
 ```
 
@@ -177,16 +177,16 @@ await configManager.restoreFromBackup(
 const validation = await configManager.validateConfig();
 
 if (!validation.isValid) {
-  console.log("Validation errors:", validation.errors);
-  console.log("Suggestions:", validation.suggestions);
+	console.log("Validation errors:", validation.errors);
+	console.log("Suggestions:", validation.suggestions);
 }
 
 // Validate before update
 await configManager.updateConfig(newConfig, {
-  validateBeforeUpdate: true,
-  onValidationError: (errors) => {
-    console.log("Validation failed:", errors);
-  },
+	validateBeforeUpdate: true,
+	onValidationError: (errors) => {
+		console.log("Validation failed:", errors);
+	},
 });
 ```
 
@@ -226,17 +226,17 @@ await configManager.updateConfig(newConfig, {
 ```typescript
 // Replace entire config
 await configManager.updateConfig(newConfig, {
-  mergeStrategy: "replace",
+	mergeStrategy: "replace",
 });
 
 // Merge with existing config
 await configManager.updateConfig(partialConfig, {
-  mergeStrategy: "merge",
+	mergeStrategy: "merge",
 });
 
 // Deep merge (preserves nested objects)
 await configManager.updateConfig(partialConfig, {
-  mergeStrategy: "deep-merge",
+	mergeStrategy: "deep-merge",
 });
 ```
 
@@ -245,14 +245,14 @@ await configManager.updateConfig(partialConfig, {
 ```typescript
 // Add custom validation
 configManager.addValidator("performance", (config) => {
-  if (config.performance.timeout < 5000) {
-    return {
-      isValid: false,
-      message: "Timeout too low for production use",
-      suggestion: "Use timeout >= 5000ms",
-    };
-  }
-  return { isValid: true };
+	if (config.performance.timeout < 5000) {
+		return {
+			isValid: false,
+			message: "Timeout too low for production use",
+			suggestion: "Use timeout >= 5000ms",
+		};
+	}
+	return { isValid: true };
 });
 ```
 
@@ -261,15 +261,15 @@ configManager.addValidator("performance", (config) => {
 ```typescript
 // Listen for config events
 configManager.on("configUpdated", (newConfig, oldConfig) => {
-  console.log("Config updated:", { newConfig, oldConfig });
+	console.log("Config updated:", { newConfig, oldConfig });
 });
 
 configManager.on("backupCreated", (backupPath) => {
-  console.log("Backup created:", backupPath);
+	console.log("Backup created:", backupPath);
 });
 
 configManager.on("configRestored", (backupPath) => {
-  console.log("Config restored from:", backupPath);
+	console.log("Config restored from:", backupPath);
 });
 ```
 
@@ -291,18 +291,18 @@ configManager.on("configRestored", (backupPath) => {
 // Check config health
 const health = await configManager.checkHealth();
 if (!health.isHealthy) {
-  console.log("Config issues detected:", health.issues);
+	console.log("Config issues detected:", health.issues);
 
-  // Restore from backup
-  await configManager.autoRestore();
+	// Restore from backup
+	await configManager.autoRestore();
 }
 
 // Recovery from specific backup
 try {
-  await configManager.restoreFromBackup("backup-name.js");
-  console.log("Successfully restored from backup");
+	await configManager.restoreFromBackup("backup-name.js");
+	console.log("Successfully restored from backup");
 } catch (error) {
-  console.error("Restore failed:", error.message);
+	console.error("Restore failed:", error.message);
 }
 ```
 
@@ -322,11 +322,11 @@ try {
 ```typescript
 // Configure automatic cleanup
 await configManager.updateConfig({
-  backup: {
-    retention: 30, // Keep backups for 30 days
-    maxBackups: 100, // Keep max 100 backups
-    autoCleanup: true, // Enable automatic cleanup
-  },
+	backup: {
+		retention: 30, // Keep backups for 30 days
+		maxBackups: 100, // Keep max 100 backups
+		autoCleanup: true, // Enable automatic cleanup
+	},
 });
 ```
 
@@ -335,8 +335,8 @@ await configManager.updateConfig({
 ```typescript
 // Clean old backups
 const cleaned = await configManager.cleanupBackups({
-  olderThan: 30, // Days
-  keepMinimum: 5, // Always keep at least 5 backups
+	olderThan: 30, // Days
+	keepMinimum: 5, // Always keep at least 5 backups
 });
 console.log(`Cleaned ${cleaned.count} old backups`);
 
@@ -355,10 +355,10 @@ console.log("Backup verification:", verification);
 // Get config status
 const status = await configManager.getStatus();
 console.log("Config status:", {
-  isValid: status.isValid,
-  lastUpdated: status.lastUpdated,
-  backupCount: status.backupCount,
-  providerStatus: status.providers,
+	isValid: status.isValid,
+	lastUpdated: status.lastUpdated,
+	backupCount: status.backupCount,
+	providerStatus: status.providers,
 });
 ```
 
@@ -368,10 +368,10 @@ console.log("Config status:", {
 // Check provider health
 const providers = await configManager.checkProviderHealth();
 providers.forEach((provider) => {
-  console.log(`${provider.name}: ${provider.status}`);
-  if (provider.status === "error") {
-    console.log(`Error: ${provider.error}`);
-  }
+	console.log(`${provider.name}: ${provider.status}`);
+	if (provider.status === "error") {
+		console.log(`Error: ${provider.error}`);
+	}
 });
 ```
 
@@ -381,9 +381,9 @@ providers.forEach((provider) => {
 // Get performance metrics
 const metrics = await configManager.getMetrics();
 console.log("Config performance:", {
-  updateTime: metrics.averageUpdateTime,
-  validationTime: metrics.averageValidationTime,
-  backupTime: metrics.averageBackupTime,
+	updateTime: metrics.averageUpdateTime,
+	validationTime: metrics.averageValidationTime,
+	backupTime: metrics.averageBackupTime,
 });
 ```
 

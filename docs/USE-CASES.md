@@ -13,34 +13,34 @@ This guide shows how different industries use NeuroLink's analytics and evaluati
 ```javascript
 // E-commerce product description with cost optimization
 const productResult = await provider.generateText({
-  prompt: `Write compelling product description for: ${product.name}
+	prompt: `Write compelling product description for: ${product.name}
   Features: ${product.features.join(", ")}
   Target audience: ${product.targetAudience}`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    department: "marketing",
-    product_category: product.category,
-    price_tier: product.priceTier, // budget, mid-range, premium
-    word_count_target: 150,
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		department: "marketing",
+		product_category: product.category,
+		price_tier: product.priceTier, // budget, mid-range, premium
+		word_count_target: 150,
+	},
 });
 
 // Quality gates based on product value
 if (product.priceTier === "premium" && productResult.evaluation.overall < 8) {
-  // Premium products need high-quality descriptions
-  await humanReview(productResult);
+	// Premium products need high-quality descriptions
+	await humanReview(productResult);
 } else if (productResult.evaluation.relevance < 7) {
-  // Regenerate if not relevant to product
-  await regenerateDescription(product);
+	// Regenerate if not relevant to product
+	await regenerateDescription(product);
 }
 
 // Cost optimization by category
 const costPerDescription = productResult.analytics.cost;
 if (product.category === "basic-apparel" && costPerDescription > 0.05) {
-  // Switch to cheaper model for basic items
-  await optimizeModelSelection(product.category);
+	// Switch to cheaper model for basic items
+	await optimizeModelSelection(product.category);
 }
 ```
 
@@ -79,35 +79,35 @@ npx @juspay/neurolink generate "Professional response to: 'Product broke after 2
 ```javascript
 // Medical content with strict accuracy requirements
 const medicalContent = await provider.generateText({
-  prompt: `Create patient education content about diabetes management.
+	prompt: `Create patient education content about diabetes management.
   Include: diet guidelines, exercise recommendations, monitoring tips.
   Audience: Adult patients, 6th grade reading level.`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    content_type: "patient_education",
-    medical_condition: "diabetes",
-    audience_level: "general_public",
-    regulatory_compliance: "FDA_guidelines",
-    accuracy_threshold: 95,
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		content_type: "patient_education",
+		medical_condition: "diabetes",
+		audience_level: "general_public",
+		regulatory_compliance: "FDA_guidelines",
+		accuracy_threshold: 95,
+	},
 });
 
 // Strict medical content quality gates
 if (medicalContent.evaluation.accuracy < 9) {
-  // Medical accuracy is critical - require professional review
-  await medicalProfessionalReview(medicalContent);
-  await regulatoryComplianceCheck(medicalContent);
+	// Medical accuracy is critical - require professional review
+	await medicalProfessionalReview(medicalContent);
+	await regulatoryComplianceCheck(medicalContent);
 } else if (medicalContent.evaluation.completeness < 8) {
-  // Ensure all aspects of condition are covered
-  await enhanceContentCompleteness(medicalContent);
+	// Ensure all aspects of condition are covered
+	await enhanceContentCompleteness(medicalContent);
 }
 
 // Track costs by medical department
 const departmentCosts = await analytics.getCostsByDepartment({
-  department: "patient_education",
-  timeframe: "monthly",
+	department: "patient_education",
+	timeframe: "monthly",
 });
 ```
 
@@ -146,38 +146,38 @@ npx @juspay/neurolink generate "Summarize patient symptoms and recommended treat
 ```javascript
 // Financial report with compliance tracking
 const investmentReport = await provider.generateText({
-  prompt: `Generate quarterly investment performance report.
+	prompt: `Generate quarterly investment performance report.
   Portfolio: ${portfolio.name}
   Performance data: ${portfolio.quarterlyData}
   Market context: ${marketData.summary}
   Regulatory requirements: SEC compliance required.`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    report_type: "investment_performance",
-    compliance_framework: "SEC_regulations",
-    client_tier: portfolio.clientTier,
-    confidentiality: "high",
-    fact_check_required: true,
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		report_type: "investment_performance",
+		compliance_framework: "SEC_regulations",
+		client_tier: portfolio.clientTier,
+		confidentiality: "high",
+		fact_check_required: true,
+	},
 });
 
 // Financial compliance quality gates
 if (investmentReport.evaluation.accuracy < 9.5) {
-  // Financial accuracy is critical for regulatory compliance
-  await complianceOfficerReview(investmentReport);
-  await factCheckingProcess(investmentReport);
+	// Financial accuracy is critical for regulatory compliance
+	await complianceOfficerReview(investmentReport);
+	await factCheckingProcess(investmentReport);
 }
 
 // Track costs by client tier for profitability analysis
 const clientProfitability = {
-  premium_clients: await analytics.getCostsByContext({
-    client_tier: "premium",
-  }),
-  standard_clients: await analytics.getCostsByContext({
-    client_tier: "standard",
-  }),
+	premium_clients: await analytics.getCostsByContext({
+		client_tier: "premium",
+	}),
+	standard_clients: await analytics.getCostsByContext({
+		client_tier: "standard",
+	}),
 };
 ```
 
@@ -216,39 +216,39 @@ npx @juspay/neurolink generate "Investment advice for retirement planning" \
 ```javascript
 // Automated customer support with quality control
 const supportResponse = await provider.generateText({
-  prompt: `Customer issue: "${ticket.description}"
+	prompt: `Customer issue: "${ticket.description}"
   Product: ${ticket.product}
   Customer tier: ${customer.tier}
   Previous interactions: ${ticket.history}
   Create helpful, professional response.`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    ticket_type: ticket.category,
-    customer_tier: customer.tier,
-    urgency: ticket.priority,
-    product_area: ticket.product,
-    response_time_target: "< 2 minutes",
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		ticket_type: ticket.category,
+		customer_tier: customer.tier,
+		urgency: ticket.priority,
+		product_area: ticket.product,
+		response_time_target: "< 2 minutes",
+	},
 });
 
 // Tiered quality control based on customer value
 if (customer.tier === "enterprise") {
-  // Enterprise customers get highest quality
-  if (supportResponse.evaluation.overall < 9) {
-    await seniorSupportReview(supportResponse);
-  }
+	// Enterprise customers get highest quality
+	if (supportResponse.evaluation.overall < 9) {
+		await seniorSupportReview(supportResponse);
+	}
 } else if (supportResponse.evaluation.relevance < 7) {
-  // All customers need relevant responses
-  await regenerateResponse(ticket);
+	// All customers need relevant responses
+	await regenerateResponse(ticket);
 }
 
 // Track support costs by customer tier
 const supportMetrics = {
-  cost_per_ticket: supportResponse.analytics.cost,
-  response_time: supportResponse.analytics.responseTime,
-  quality_score: supportResponse.evaluation.overall,
+	cost_per_ticket: supportResponse.analytics.cost,
+	response_time: supportResponse.analytics.responseTime,
+	quality_score: supportResponse.evaluation.overall,
 };
 ```
 
@@ -287,30 +287,30 @@ npx @juspay/neurolink generate "API documentation for user authentication endpoi
 ```javascript
 // Educational content with learning outcome tracking
 const courseContent = await provider.generateText({
-  prompt: `Create lesson content: "${lesson.title}"
+	prompt: `Create lesson content: "${lesson.title}"
   Learning objectives: ${lesson.objectives.join(", ")}
   Target audience: ${course.audience}
   Duration: ${lesson.duration} minutes
   Include examples, exercises, and key takeaways.`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    content_type: "educational",
-    subject_area: course.subject,
-    grade_level: course.gradeLevel,
-    learning_style: "mixed",
-    engagement_required: true,
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		content_type: "educational",
+		subject_area: course.subject,
+		grade_level: course.gradeLevel,
+		learning_style: "mixed",
+		engagement_required: true,
+	},
 });
 
 // Educational quality standards
 if (courseContent.evaluation.completeness < 8) {
-  // Ensure all learning objectives covered
-  await pedagogyReview(courseContent);
+	// Ensure all learning objectives covered
+	await pedagogyReview(courseContent);
 } else if (courseContent.evaluation.relevance < 7) {
-  // Content must be relevant to learning objectives
-  await curriculumAlignment(courseContent);
+	// Content must be relevant to learning objectives
+	await curriculumAlignment(courseContent);
 }
 
 // Track content creation costs by subject
@@ -335,28 +335,28 @@ const subjectCosts = await analytics.getCostsBySubject(course.subject);
 ```javascript
 // Safety documentation with compliance tracking
 const safetyDoc = await provider.generateText({
-  prompt: `Create safety procedure for: ${equipment.name}
+	prompt: `Create safety procedure for: ${equipment.name}
   Hazards: ${equipment.hazards.join(", ")}
   Safety requirements: ${equipment.safetyReqs}
   Regulatory standards: OSHA compliance required
   Include step-by-step procedures and emergency protocols.`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    document_type: "safety_procedure",
-    equipment_category: equipment.category,
-    risk_level: equipment.riskLevel,
-    compliance_standard: "OSHA",
-    safety_critical: true,
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		document_type: "safety_procedure",
+		equipment_category: equipment.category,
+		risk_level: equipment.riskLevel,
+		compliance_standard: "OSHA",
+		safety_critical: true,
+	},
 });
 
 // Safety documentation requires maximum accuracy
 if (safetyDoc.evaluation.accuracy < 9.5) {
-  // Safety information must be completely accurate
-  await safetyEngineerReview(safetyDoc);
-  await complianceValidation(safetyDoc);
+	// Safety information must be completely accurate
+	await safetyEngineerReview(safetyDoc);
+	await complianceValidation(safetyDoc);
 }
 
 // Track documentation costs by risk level
@@ -400,34 +400,34 @@ npx @juspay/neurolink generate "App store description for fitness tracking app" 
 ```javascript
 // Hotel marketing content with booking optimization
 const hotelDescription = await provider.generateText({
-  prompt: `Write compelling hotel description for: ${hotel.name}
+	prompt: `Write compelling hotel description for: ${hotel.name}
   Location: ${hotel.location}
   Amenities: ${hotel.amenities.join(", ")}
   Target guests: ${hotel.targetGuests}
   Emphasize unique selling points and local attractions.`,
 
-  enableAnalytics: true,
-  enableEvaluation: true,
-  context: {
-    content_type: "hotel_marketing",
-    hotel_category: hotel.starRating,
-    location_type: hotel.locationType,
-    booking_conversion_goal: true,
-    brand_voice: hotel.brandVoice,
-  },
+	enableAnalytics: true,
+	enableEvaluation: true,
+	context: {
+		content_type: "hotel_marketing",
+		hotel_category: hotel.starRating,
+		location_type: hotel.locationType,
+		booking_conversion_goal: true,
+		brand_voice: hotel.brandVoice,
+	},
 });
 
 // Hospitality content quality standards
 if (hotelDescription.evaluation.relevance < 8) {
-  // Must accurately represent hotel features
-  await hospitalityMarketingReview(hotelDescription);
+	// Must accurately represent hotel features
+	await hospitalityMarketingReview(hotelDescription);
 }
 
 // Track marketing content ROI
 const marketingROI = {
-  content_cost: hotelDescription.analytics.cost,
-  estimated_bookings: await estimateBookingIncrease(hotelDescription),
-  roi_projection: await calculateMarketingROI(hotelDescription),
+	content_cost: hotelDescription.analytics.cost,
+	estimated_bookings: await estimateBookingIncrease(hotelDescription),
+	roi_projection: await calculateMarketingROI(hotelDescription),
 };
 ```
 

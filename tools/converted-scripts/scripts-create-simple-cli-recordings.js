@@ -16,10 +16,10 @@ const __dirname = path.dirname(__filename);
 // Configuration
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const RECORDINGS_DIR = path.join(
-  PROJECT_ROOT,
-  "docs",
-  "cli-recordings",
-  "three-providers",
+	PROJECT_ROOT,
+	"docs",
+	"cli-recordings",
+	"three-providers",
 );
 const CLI_PATH = path.join(PROJECT_ROOT, "dist", "cli", "index.js");
 
@@ -32,94 +32,94 @@ const log_error = (message) => console.error(`\x1b[0;31m❌ ${message}\x1b[0m`);
  * Main execution function
  */
 async function run() {
-  console.log("🎬 Creating CLI recordings for three new providers...");
+	console.log("🎬 Creating CLI recordings for three new providers...");
 
-  await fs.mkdir(RECORDINGS_DIR, { recursive: true });
+	await fs.mkdir(RECORDINGS_DIR, { recursive: true });
 
-  log_info("🔨 Building CLI...");
-  try {
-    execSync("pnpm run build:cli", { cwd: PROJECT_ROOT, stdio: "inherit" });
-  } catch (error) {
-    log_error("CLI build failed. Please check the build process.");
-    process.exit(1);
-  }
+	log_info("🔨 Building CLI...");
+	try {
+		execSync("pnpm run build:cli", { cwd: PROJECT_ROOT, stdio: "inherit" });
+	} catch (error) {
+		log_error("CLI build failed. Please check the build process.");
+		process.exit(1);
+	}
 
-  const recordings = [
-    {
-      name: "huggingface-demo",
-      provider: "huggingface",
-      question: "What makes open source AI special?",
-    },
-    {
-      name: "ollama-demo",
-      provider: "ollama",
-      question: "Why is local AI important for privacy?",
-    },
-    {
-      name: "mistral-demo",
-      provider: "mistral",
-      question: "Explain GDPR compliance in AI",
-    },
-    {
-      name: "ollama-commands",
-      command: `node ${CLI_PATH} ollama --help`,
-      title: "NeuroLink - Ollama Commands",
-    },
-    {
-      name: "all-providers",
-      command: `node ${CLI_PATH} config providers`,
-      title: "NeuroLink - All 9 Providers",
-    },
-  ];
+	const recordings = [
+		{
+			name: "huggingface-demo",
+			provider: "huggingface",
+			question: "What makes open source AI special?",
+		},
+		{
+			name: "ollama-demo",
+			provider: "ollama",
+			question: "Why is local AI important for privacy?",
+		},
+		{
+			name: "mistral-demo",
+			provider: "mistral",
+			question: "Explain GDPR compliance in AI",
+		},
+		{
+			name: "ollama-commands",
+			command: `node ${CLI_PATH} ollama --help`,
+			title: "NeuroLink - Ollama Commands",
+		},
+		{
+			name: "all-providers",
+			command: `node ${CLI_PATH} config providers`,
+			title: "NeuroLink - All 9 Providers",
+		},
+	];
 
-  for (const rec of recordings) {
-    log_info(`📹 Recording ${rec.name}...`);
-    const cast_path = path.join(RECORDINGS_DIR, `${rec.name}.cast`);
-    const command =
-      rec.command ||
-      `node ${CLI_PATH} generate-text '${rec.question}' --provider ${rec.provider}`;
-    const title =
-      rec.title ||
-      `NeuroLink - ${rec.provider.charAt(0).toUpperCase() + rec.provider.slice(1)} Provider Demo`;
+	for (const rec of recordings) {
+		log_info(`📹 Recording ${rec.name}...`);
+		const cast_path = path.join(RECORDINGS_DIR, `${rec.name}.cast`);
+		const command =
+			rec.command ||
+			`node ${CLI_PATH} generate-text '${rec.question}' --provider ${rec.provider}`;
+		const title =
+			rec.title ||
+			`NeuroLink - ${rec.provider.charAt(0).toUpperCase() + rec.provider.slice(1)} Provider Demo`;
 
-    try {
-      execSync(
-        `asciinema rec --quiet --title "${title}" --command "${command}" --overwrite "${cast_path}"`,
-        { stdio: "inherit" },
-      );
-      log_success(`Created ${rec.name}.cast`);
-    } catch (error) {
-      log_error(`Failed to record ${rec.name}.cast`);
-      log_error(error.message);
-    }
-  }
+		try {
+			execSync(
+				`asciinema rec --quiet --title "${title}" --command "${command}" --overwrite "${cast_path}"`,
+				{ stdio: "inherit" },
+			);
+			log_success(`Created ${rec.name}.cast`);
+		} catch (error) {
+			log_error(`Failed to record ${rec.name}.cast`);
+			log_error(error.message);
+		}
+	}
 
-  log_success("✅ All CLI recordings created!");
-  log_info(`📁 Recordings saved to: ${RECORDINGS_DIR}`);
+	log_success("✅ All CLI recordings created!");
+	log_info(`📁 Recordings saved to: ${RECORDINGS_DIR}`);
 
-  console.log("\n🔄 Converting recordings to MP4...");
-  const castFiles = await fs
-    .readdir(RECORDINGS_DIR)
-    .then((files) => files.filter((f) => f.endsWith(".cast")));
+	console.log("\n🔄 Converting recordings to MP4...");
+	const castFiles = await fs
+		.readdir(RECORDINGS_DIR)
+		.then((files) => files.filter((f) => f.endsWith(".cast")));
 
-  for (const cast_file of castFiles) {
-    const base_name = path.basename(cast_file, ".cast");
-    const mp4_file = path.join(RECORDINGS_DIR, `${base_name}.mp4`);
-    log_info(`  Converting ${cast_file} to MP4...`);
-    try {
-      const ffmpeg_command = `ffmpeg -f lavfi -i color=c=black:s=1280x800:d=10 -vf "drawtext=text='${base_name}':fontcolor=white:fontsize=24:x=(w-text_w)/2:y=(h-text_h)/2" -pix_fmt yuv420p -movflags +faststart "${mp4_file}" -y -loglevel quiet`;
-      execSync(ffmpeg_command);
-      log_success(`  ✅ Created ${base_name}.mp4`);
-    } catch (error) {
-      log_error(`  ❌ Failed to convert ${cast_file}`);
-      log_error(error.message);
-    }
-  }
-  log_success("✅ All conversions complete!");
+	for (const cast_file of castFiles) {
+		const base_name = path.basename(cast_file, ".cast");
+		const mp4_file = path.join(RECORDINGS_DIR, `${base_name}.mp4`);
+		log_info(`  Converting ${cast_file} to MP4...`);
+		try {
+			const ffmpeg_command = `ffmpeg -f lavfi -i color=c=black:s=1280x800:d=10 -vf "drawtext=text='${base_name}':fontcolor=white:fontsize=24:x=(w-text_w)/2:y=(h-text_h)/2" -pix_fmt yuv420p -movflags +faststart "${mp4_file}" -y -loglevel quiet`;
+			execSync(ffmpeg_command);
+			log_success(`  ✅ Created ${base_name}.mp4`);
+		} catch (error) {
+			log_error(`  ❌ Failed to convert ${cast_file}`);
+			log_error(error.message);
+		}
+	}
+	log_success("✅ All conversions complete!");
 }
 
 run().catch((error) => {
-  log_error("Script execution failed:");
-  console.error(error);
-  process.exit(1);
+	log_error("Script execution failed:");
+	console.error(error);
+	process.exit(1);
 });

@@ -16,120 +16,120 @@ import fs from "fs/promises";
 import path from "path";
 
 class ShellConverter {
-  constructor() {
-    this.scriptsDir = "./scripts";
-    this.outputDir = "./tools/converted-scripts";
+	constructor() {
+		this.scriptsDir = "./scripts";
+		this.outputDir = "./tools/converted-scripts";
 
-    // Common shell command to Node.js conversions
-    this.conversionMap = {
-      echo: "console.log",
-      "mkdir -p": "await fs.mkdir(path, { recursive: true })",
-      "cp -r": "await fs.cp(source, dest, { recursive: true })",
-      mv: "await fs.rename(oldPath, newPath)",
-      "rm -rf": "await fs.rm(path, { recursive: true, force: true })",
-      "rm -f": "await fs.unlink(path)",
-      ls: "await fs.readdir(path)",
-      pwd: "process.cwd()",
-      cd: "process.chdir(path)",
-      cat: 'await fs.readFile(path, "utf-8")',
-      touch: 'await fs.writeFile(path, "")',
-      chmod: "// Use fs.chmod(path, mode) if needed",
-    };
+		// Common shell command to Node.js conversions
+		this.conversionMap = {
+			echo: "console.log",
+			"mkdir -p": "await fs.mkdir(path, { recursive: true })",
+			"cp -r": "await fs.cp(source, dest, { recursive: true })",
+			mv: "await fs.rename(oldPath, newPath)",
+			"rm -rf": "await fs.rm(path, { recursive: true, force: true })",
+			"rm -f": "await fs.unlink(path)",
+			ls: "await fs.readdir(path)",
+			pwd: "process.cwd()",
+			cd: "process.chdir(path)",
+			cat: 'await fs.readFile(path, "utf-8")',
+			touch: 'await fs.writeFile(path, "")',
+			chmod: "// Use fs.chmod(path, mode) if needed",
+		};
 
-    this.results = {
-      converted: [],
-      failed: [],
-      total: 0,
-    };
-  }
+		this.results = {
+			converted: [],
+			failed: [],
+			total: 0,
+		};
+	}
 
-  /**
-   * Convert all shell scripts in the scripts directory
-   */
-  async convertAllShellScripts() {
-    console.log("🔄 Starting shell-to-JavaScript conversion...");
-    console.log("🎯 Target: Cross-platform Node.js compatibility");
+	/**
+	 * Convert all shell scripts in the scripts directory
+	 */
+	async convertAllShellScripts() {
+		console.log("🔄 Starting shell-to-JavaScript conversion...");
+		console.log("🎯 Target: Cross-platform Node.js compatibility");
 
-    try {
-      // Ensure output directory exists
-      await fs.mkdir(this.outputDir, { recursive: true });
-      console.log(`📁 Output directory: ${this.outputDir}`);
+		try {
+			// Ensure output directory exists
+			await fs.mkdir(this.outputDir, { recursive: true });
+			console.log(`📁 Output directory: ${this.outputDir}`);
 
-      // Find all shell scripts
-      const shellScripts = await this.findShellScripts();
-      this.results.total = shellScripts.length;
+			// Find all shell scripts
+			const shellScripts = await this.findShellScripts();
+			this.results.total = shellScripts.length;
 
-      console.log(`🐚 Found ${shellScripts.length} shell scripts to convert:`);
-      shellScripts.forEach((script) => console.log(`  • ${script}`));
+			console.log(`🐚 Found ${shellScripts.length} shell scripts to convert:`);
+			shellScripts.forEach((script) => console.log(`  • ${script}`));
 
-      // Convert each script
-      for (const script of shellScripts) {
-        try {
-          await this.convertScript(script);
-          this.results.converted.push(script);
-          console.log(`✅ Converted: ${script}`);
-        } catch (error) {
-          this.results.failed.push({ script, error: error.message });
-          console.log(`❌ Failed: ${script} - ${error.message}`);
-        }
-      }
+			// Convert each script
+			for (const script of shellScripts) {
+				try {
+					await this.convertScript(script);
+					this.results.converted.push(script);
+					console.log(`✅ Converted: ${script}`);
+				} catch (error) {
+					this.results.failed.push({ script, error: error.message });
+					console.log(`❌ Failed: ${script} - ${error.message}`);
+				}
+			}
 
-      this.reportResults();
-      return this.results;
-    } catch (error) {
-      console.error("❌ Conversion process failed:", error.message);
-      throw error;
-    }
-  }
+			this.reportResults();
+			return this.results;
+		} catch (error) {
+			console.error("❌ Conversion process failed:", error.message);
+			throw error;
+		}
+	}
 
-  /**
-   * Find all shell scripts in the scripts directory
-   */
-  async findShellScripts() {
-    try {
-      const files = await fs.readdir(this.scriptsDir);
-      return files.filter((file) => file.endsWith(".sh"));
-    } catch (error) {
-      throw new Error(`Failed to read scripts directory: ${error.message}`);
-    }
-  }
+	/**
+	 * Find all shell scripts in the scripts directory
+	 */
+	async findShellScripts() {
+		try {
+			const files = await fs.readdir(this.scriptsDir);
+			return files.filter((file) => file.endsWith(".sh"));
+		} catch (error) {
+			throw new Error(`Failed to read scripts directory: ${error.message}`);
+		}
+	}
 
-  /**
-   * Convert a single shell script to JavaScript
-   */
-  async convertScript(shellFile) {
-    console.log(`🔄 Converting ${shellFile} to JavaScript...`);
+	/**
+	 * Convert a single shell script to JavaScript
+	 */
+	async convertScript(shellFile) {
+		console.log(`🔄 Converting ${shellFile} to JavaScript...`);
 
-    const shellPath = path.join(this.scriptsDir, shellFile);
-    const jsFileName = shellFile.replace(".sh", ".js");
-    const jsPath = path.join(this.outputDir, jsFileName);
+		const shellPath = path.join(this.scriptsDir, shellFile);
+		const jsFileName = shellFile.replace(".sh", ".js");
+		const jsPath = path.join(this.outputDir, jsFileName);
 
-    try {
-      // Read shell script content
-      const content = await fs.readFile(shellPath, "utf-8");
-      const lines = content.split("\n");
+		try {
+			// Read shell script content
+			const content = await fs.readFile(shellPath, "utf-8");
+			const lines = content.split("\n");
 
-      // Generate JavaScript equivalent
-      const jsContent =
-        this.generateJSTemplate(shellFile) +
-        this.convertShellCommands(lines) +
-        this.generateJSFooter();
+			// Generate JavaScript equivalent
+			const jsContent =
+				this.generateJSTemplate(shellFile) +
+				this.convertShellCommands(lines) +
+				this.generateJSFooter();
 
-      // Write JavaScript file
-      await fs.writeFile(jsPath, jsContent);
+			// Write JavaScript file
+			await fs.writeFile(jsPath, jsContent);
 
-      console.log(`✅ Created: ${jsPath}`);
-      return jsPath;
-    } catch (error) {
-      throw new Error(`Failed to convert ${shellFile}: ${error.message}`);
-    }
-  }
+			console.log(`✅ Created: ${jsPath}`);
+			return jsPath;
+		} catch (error) {
+			throw new Error(`Failed to convert ${shellFile}: ${error.message}`);
+		}
+	}
 
-  /**
-   * Generate JavaScript template with imports and setup
-   */
-  generateJSTemplate(originalFile) {
-    return `#!/usr/bin/env node
+	/**
+	 * Generate JavaScript template with imports and setup
+	 */
+	generateJSTemplate(originalFile) {
+		return `#!/usr/bin/env node
 /**
  * JavaScript conversion of ${path.basename(originalFile)}
  * Auto-generated by NeuroLink Shell Converter
@@ -154,156 +154,156 @@ async function main() {
     console.log('🚀 Starting ${originalFile} (JavaScript version)...');
 
 `;
-  }
+	}
 
-  /**
-   * Convert shell commands to JavaScript equivalents
-   */
-  convertShellCommands(lines) {
-    let jsCode = "";
+	/**
+	 * Convert shell commands to JavaScript equivalents
+	 */
+	convertShellCommands(lines) {
+		let jsCode = "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
+		for (const line of lines) {
+			const trimmed = line.trim();
 
-      // Skip shebang, empty lines, and comments
-      if (trimmed.startsWith("#") || !trimmed) {
-        if (trimmed.startsWith("#") && !trimmed.startsWith("#!/")) {
-          jsCode += `    // ${trimmed.substring(1)}\n`;
-        }
-        continue;
-      }
+			// Skip shebang, empty lines, and comments
+			if (trimmed.startsWith("#") || !trimmed) {
+				if (trimmed.startsWith("#") && !trimmed.startsWith("#!/")) {
+					jsCode += `    // ${trimmed.substring(1)}\n`;
+				}
+				continue;
+			}
 
-      // Convert the line
-      const converted = this.convertLine(trimmed);
-      jsCode += `    ${converted}\n`;
-    }
+			// Convert the line
+			const converted = this.convertLine(trimmed);
+			jsCode += `    ${converted}\n`;
+		}
 
-    return jsCode;
-  }
+		return jsCode;
+	}
 
-  /**
-   * Convert a single shell command line to JavaScript
-   */
-  convertLine(shellLine) {
-    // Handle variable assignments
-    if (
-      shellLine.includes("=") &&
-      !shellLine.includes(" ") &&
-      !shellLine.includes("==")
-    ) {
-      const [key, value] = shellLine.split("=");
-      return `const ${key} = ${this.convertValue(value)};`;
-    }
+	/**
+	 * Convert a single shell command line to JavaScript
+	 */
+	convertLine(shellLine) {
+		// Handle variable assignments
+		if (
+			shellLine.includes("=") &&
+			!shellLine.includes(" ") &&
+			!shellLine.includes("==")
+		) {
+			const [key, value] = shellLine.split("=");
+			return `const ${key} = ${this.convertValue(value)};`;
+		}
 
-    // Handle echo commands
-    if (shellLine.startsWith("echo ")) {
-      const message = shellLine.substring(5).replace(/['"]/g, "");
-      return `console.log('${message}');`;
-    }
+		// Handle echo commands
+		if (shellLine.startsWith("echo ")) {
+			const message = shellLine.substring(5).replace(/['"]/g, "");
+			return `console.log('${message}');`;
+		}
 
-    // Handle cd commands
-    if (shellLine.startsWith("cd ")) {
-      const targetDir = shellLine.substring(3).trim().replace(/['"]/g, "");
-      return `process.chdir('${targetDir}');`;
-    }
+		// Handle cd commands
+		if (shellLine.startsWith("cd ")) {
+			const targetDir = shellLine.substring(3).trim().replace(/['"]/g, "");
+			return `process.chdir('${targetDir}');`;
+		}
 
-    // Handle mkdir commands
-    if (shellLine.startsWith("mkdir -p ") || shellLine.startsWith("mkdir ")) {
-      const dirPath = shellLine
-        .replace(/mkdir\s+(-p\s+)?/, "")
-        .trim()
-        .replace(/['"]/g, "");
-      return `await fs.mkdir('${dirPath}', { recursive: true });`;
-    }
+		// Handle mkdir commands
+		if (shellLine.startsWith("mkdir -p ") || shellLine.startsWith("mkdir ")) {
+			const dirPath = shellLine
+				.replace(/mkdir\s+(-p\s+)?/, "")
+				.trim()
+				.replace(/['"]/g, "");
+			return `await fs.mkdir('${dirPath}', { recursive: true });`;
+		}
 
-    // Handle rm commands
-    if (shellLine.startsWith("rm -rf ")) {
-      const targetPath = shellLine.substring(7).trim().replace(/['"]/g, "");
-      return `await fs.rm('${targetPath}', { recursive: true, force: true });`;
-    }
+		// Handle rm commands
+		if (shellLine.startsWith("rm -rf ")) {
+			const targetPath = shellLine.substring(7).trim().replace(/['"]/g, "");
+			return `await fs.rm('${targetPath}', { recursive: true, force: true });`;
+		}
 
-    if (shellLine.startsWith("rm -f ")) {
-      const targetPath = shellLine.substring(6).trim().replace(/['"]/g, "");
-      return `await fs.unlink('${targetPath}');`;
-    }
+		if (shellLine.startsWith("rm -f ")) {
+			const targetPath = shellLine.substring(6).trim().replace(/['"]/g, "");
+			return `await fs.unlink('${targetPath}');`;
+		}
 
-    // Handle cp commands
-    if (shellLine.startsWith("cp -r ")) {
-      const parts = shellLine.substring(6).trim().split(/\s+/);
-      if (parts.length >= 2) {
-        const source = parts[0].replace(/['"]/g, "");
-        const dest = parts[1].replace(/['"]/g, "");
-        return `await fs.cp('${source}', '${dest}', { recursive: true });`;
-      }
-    }
+		// Handle cp commands
+		if (shellLine.startsWith("cp -r ")) {
+			const parts = shellLine.substring(6).trim().split(/\s+/);
+			if (parts.length >= 2) {
+				const source = parts[0].replace(/['"]/g, "");
+				const dest = parts[1].replace(/['"]/g, "");
+				return `await fs.cp('${source}', '${dest}', { recursive: true });`;
+			}
+		}
 
-    // Handle mv commands
-    if (shellLine.startsWith("mv ")) {
-      const parts = shellLine.substring(3).trim().split(/\s+/);
-      if (parts.length >= 2) {
-        const oldPath = parts[0].replace(/['"]/g, "");
-        const newPath = parts[1].replace(/['"]/g, "");
-        return `await fs.rename('${oldPath}', '${newPath}');`;
-      }
-    }
+		// Handle mv commands
+		if (shellLine.startsWith("mv ")) {
+			const parts = shellLine.substring(3).trim().split(/\s+/);
+			if (parts.length >= 2) {
+				const oldPath = parts[0].replace(/['"]/g, "");
+				const newPath = parts[1].replace(/['"]/g, "");
+				return `await fs.rename('${oldPath}', '${newPath}');`;
+			}
+		}
 
-    // Handle ls commands
-    if (shellLine.startsWith("ls ")) {
-      const dirPath = shellLine.substring(3).trim().replace(/['"]/g, "") || ".";
-      return `const files = await fs.readdir('${dirPath}'); console.log(files);`;
-    }
+		// Handle ls commands
+		if (shellLine.startsWith("ls ")) {
+			const dirPath = shellLine.substring(3).trim().replace(/['"]/g, "") || ".";
+			return `const files = await fs.readdir('${dirPath}'); console.log(files);`;
+		}
 
-    // Handle cat commands
-    if (shellLine.startsWith("cat ")) {
-      const filePath = shellLine.substring(4).trim().replace(/['"]/g, "");
-      return `const content = await fs.readFile('${filePath}', 'utf-8'); console.log(content);`;
-    }
+		// Handle cat commands
+		if (shellLine.startsWith("cat ")) {
+			const filePath = shellLine.substring(4).trim().replace(/['"]/g, "");
+			return `const content = await fs.readFile('${filePath}', 'utf-8'); console.log(content);`;
+		}
 
-    // Handle find commands (basic conversion)
-    if (shellLine.startsWith("find ")) {
-      return `// TODO: Convert find command: ${shellLine}`;
-    }
+		// Handle find commands (basic conversion)
+		if (shellLine.startsWith("find ")) {
+			return `// TODO: Convert find command: ${shellLine}`;
+		}
 
-    // Handle grep commands
-    if (shellLine.includes(" | grep ")) {
-      return `// TODO: Convert grep pipeline: ${shellLine}`;
-    }
+		// Handle grep commands
+		if (shellLine.includes(" | grep ")) {
+			return `// TODO: Convert grep pipeline: ${shellLine}`;
+		}
 
-    // Fallback: execute as shell command with warning
-    return `// Shell command: ${shellLine}
+		// Fallback: execute as shell command with warning
+		return `// Shell command: ${shellLine}
     try {
       execSync('${shellLine.replace(/'/g, "\\'")}', { stdio: 'inherit' });
     } catch (error) {
       console.warn('Shell command failed:', error.message);
     }`;
-  }
+	}
 
-  /**
-   * Convert shell variable values to JavaScript
-   */
-  convertValue(value) {
-    // Remove quotes and return as string literal
-    const cleanValue = value.replace(/^['"]|['"]$/g, "");
+	/**
+	 * Convert shell variable values to JavaScript
+	 */
+	convertValue(value) {
+		// Remove quotes and return as string literal
+		const cleanValue = value.replace(/^['"]|['"]$/g, "");
 
-    // Check if it's a number
-    if (/^\d+$/.test(cleanValue)) {
-      return cleanValue;
-    }
+		// Check if it's a number
+		if (/^\d+$/.test(cleanValue)) {
+			return cleanValue;
+		}
 
-    // Check if it's a boolean
-    if (cleanValue === "true" || cleanValue === "false") {
-      return cleanValue;
-    }
+		// Check if it's a boolean
+		if (cleanValue === "true" || cleanValue === "false") {
+			return cleanValue;
+		}
 
-    // Default to string
-    return `'${cleanValue}'`;
-  }
+		// Default to string
+		return `'${cleanValue}'`;
+	}
 
-  /**
-   * Generate JavaScript footer with error handling
-   */
-  generateJSFooter() {
-    return `
+	/**
+	 * Generate JavaScript footer with error handling
+	 */
+	generateJSFooter() {
+		return `
     console.log('✅ Script execution completed successfully');
 
   } catch (error) {
@@ -323,37 +323,37 @@ if (import.meta.url === \`file://\${process.argv[1]}\`) {
   });
 }
 `;
-  }
+	}
 
-  /**
-   * Create specific conversions for known NeuroLink scripts
-   */
-  async createSpecificConversions() {
-    console.log("🎯 Creating specific conversions for NeuroLink scripts...");
+	/**
+	 * Create specific conversions for known NeuroLink scripts
+	 */
+	async createSpecificConversions() {
+		console.log("🎯 Creating specific conversions for NeuroLink scripts...");
 
-    const specificConversions = {
-      "cleanup-hash-named-videos.sh": this.generateVideoCleanupScript(),
-      "generate-all-videos.sh": this.generateVideoGenerationScript(),
-    };
+		const specificConversions = {
+			"cleanup-hash-named-videos.sh": this.generateVideoCleanupScript(),
+			"generate-all-videos.sh": this.generateVideoGenerationScript(),
+		};
 
-    for (const [shellFile, jsContent] of Object.entries(specificConversions)) {
-      const jsFileName = shellFile.replace(".sh", ".js");
-      const jsPath = path.join(this.outputDir, jsFileName);
+		for (const [shellFile, jsContent] of Object.entries(specificConversions)) {
+			const jsFileName = shellFile.replace(".sh", ".js");
+			const jsPath = path.join(this.outputDir, jsFileName);
 
-      try {
-        await fs.writeFile(jsPath, jsContent);
-        console.log(`✅ Created specific conversion: ${jsFileName}`);
-      } catch (error) {
-        console.log(`❌ Failed to create ${jsFileName}: ${error.message}`);
-      }
-    }
-  }
+			try {
+				await fs.writeFile(jsPath, jsContent);
+				console.log(`✅ Created specific conversion: ${jsFileName}`);
+			} catch (error) {
+				console.log(`❌ Failed to create ${jsFileName}: ${error.message}`);
+			}
+		}
+	}
 
-  /**
-   * Generate optimized video cleanup script
-   */
-  generateVideoCleanupScript() {
-    return `#!/usr/bin/env node
+	/**
+	 * Generate optimized video cleanup script
+	 */
+	generateVideoCleanupScript() {
+		return `#!/usr/bin/env node
 /**
  * Video Cleanup Script - JavaScript Version
  * Removes hash-named video files from the visual content directory
@@ -424,13 +424,13 @@ if (import.meta.url === \`file://\${process.argv[1]}\`) {
   });
 }
 `;
-  }
+	}
 
-  /**
-   * Generate optimized video generation orchestrator script
-   */
-  generateVideoGenerationScript() {
-    return `#!/usr/bin/env node
+	/**
+	 * Generate optimized video generation orchestrator script
+	 */
+	generateVideoGenerationScript() {
+		return `#!/usr/bin/env node
 /**
  * Video Generation Orchestrator - JavaScript Version
  * Coordinates execution of all video generation scripts
@@ -517,45 +517,45 @@ if (import.meta.url === \`file://\${process.argv[1]}\`) {
   });
 }
 `;
-  }
+	}
 
-  /**
-   * Report conversion results
-   */
-  reportResults() {
-    console.log("\n📊 SHELL-TO-JS CONVERSION RESULTS");
-    console.log("═".repeat(50));
-    console.log(`🎯 Total scripts: ${this.results.total}`);
-    console.log(`✅ Successfully converted: ${this.results.converted.length}`);
-    console.log(`❌ Failed conversions: ${this.results.failed.length}`);
+	/**
+	 * Report conversion results
+	 */
+	reportResults() {
+		console.log("\n📊 SHELL-TO-JS CONVERSION RESULTS");
+		console.log("═".repeat(50));
+		console.log(`🎯 Total scripts: ${this.results.total}`);
+		console.log(`✅ Successfully converted: ${this.results.converted.length}`);
+		console.log(`❌ Failed conversions: ${this.results.failed.length}`);
 
-    if (this.results.converted.length > 0) {
-      console.log("\n🎉 Successfully converted:");
-      this.results.converted.forEach((script) => {
-        const jsName = script.replace(".sh", ".js");
-        console.log(`  ✅ ${script} → ${jsName}`);
-      });
-    }
+		if (this.results.converted.length > 0) {
+			console.log("\n🎉 Successfully converted:");
+			this.results.converted.forEach((script) => {
+				const jsName = script.replace(".sh", ".js");
+				console.log(`  ✅ ${script} → ${jsName}`);
+			});
+		}
 
-    if (this.results.failed.length > 0) {
-      console.log("\n⚠️ Failed conversions:");
-      this.results.failed.forEach(({ script, error }) => {
-        console.log(`  ❌ ${script}: ${error}`);
-      });
-    }
+		if (this.results.failed.length > 0) {
+			console.log("\n⚠️ Failed conversions:");
+			this.results.failed.forEach(({ script, error }) => {
+				console.log(`  ❌ ${script}: ${error}`);
+			});
+		}
 
-    const successRate = (
-      (this.results.converted.length / this.results.total) *
-      100
-    ).toFixed(1);
-    console.log(`\n📈 Success rate: ${successRate}%`);
-    console.log(`📁 Output directory: ${this.outputDir}`);
-    console.log("\n💡 Next steps:");
-    console.log("1. Review converted scripts for accuracy");
-    console.log("2. Test JavaScript versions");
-    console.log("3. Update package.json scripts to use JS versions");
-    console.log("4. Remove original shell scripts after validation");
-  }
+		const successRate = (
+			(this.results.converted.length / this.results.total) *
+			100
+		).toFixed(1);
+		console.log(`\n📈 Success rate: ${successRate}%`);
+		console.log(`📁 Output directory: ${this.outputDir}`);
+		console.log("\n💡 Next steps:");
+		console.log("1. Review converted scripts for accuracy");
+		console.log("2. Test JavaScript versions");
+		console.log("3. Update package.json scripts to use JS versions");
+		console.log("4. Remove original shell scripts after validation");
+	}
 }
 
 // Export for module use
@@ -563,19 +563,19 @@ export { ShellConverter };
 
 // CLI execution when run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const converter = new ShellConverter();
+	const converter = new ShellConverter();
 
-  try {
-    if (process.argv.includes("--specific")) {
-      await converter.createSpecificConversions();
-    } else {
-      await converter.convertAllShellScripts();
-    }
+	try {
+		if (process.argv.includes("--specific")) {
+			await converter.createSpecificConversions();
+		} else {
+			await converter.convertAllShellScripts();
+		}
 
-    console.log("\n✅ Shell-to-JavaScript conversion complete!");
-    process.exit(0);
-  } catch (error) {
-    console.error("❌ Conversion failed:", error.message);
-    process.exit(1);
-  }
+		console.log("\n✅ Shell-to-JavaScript conversion complete!");
+		process.exit(0);
+	} catch (error) {
+		console.error("❌ Conversion failed:", error.message);
+		process.exit(1);
+	}
 }

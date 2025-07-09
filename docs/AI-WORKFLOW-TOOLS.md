@@ -19,10 +19,10 @@ Generate comprehensive test cases for code and AI applications with multiple tes
 
 ```typescript
 const testCases = await provider.generateTestCases({
-  codeFunction:
-    "function calculateTotal(items) { return items.reduce((sum, item) => sum + item.price, 0); }",
-  testTypes: ["unit", "integration", "edge-cases"],
-  framework: "jest",
+	codeFunction:
+		"function calculateTotal(items) { return items.reduce((sum, item) => sum + item.price, 0); }",
+	testTypes: ["unit", "integration", "edge-cases"],
+	framework: "jest",
 });
 
 console.log(testCases.unitTests); // Unit test scenarios
@@ -44,7 +44,7 @@ AI-powered code refactoring and optimization with performance and maintainabilit
 
 ```typescript
 const refactoring = await provider.refactorCode({
-  sourceCode: `
+	sourceCode: `
     function processUsers(users) {
       var result = [];
       for (var i = 0; i < users.length; i++) {
@@ -55,8 +55,8 @@ const refactoring = await provider.refactorCode({
       return result;
     }
   `,
-  target: "modern-es6",
-  focusAreas: ["performance", "readability", "maintainability"],
+	target: "modern-es6",
+	focusAreas: ["performance", "readability", "maintainability"],
 });
 
 console.log(refactoring.optimizedCode); // Refactored implementation
@@ -78,7 +78,7 @@ Automatic documentation generation from code, APIs, and AI outputs with multiple
 
 ```typescript
 const docs = await provider.generateDocumentation({
-  codeBase: `
+	codeBase: `
     class UserService {
       async createUser(userData) { /* implementation */ }
       async getUserById(id) { /* implementation */ }
@@ -86,9 +86,9 @@ const docs = await provider.generateDocumentation({
       async deleteUser(id) { /* implementation */ }
     }
   `,
-  outputFormat: "markdown",
-  includeExamples: true,
-  apiDocumentation: true,
+	outputFormat: "markdown",
+	includeExamples: true,
+	apiDocumentation: true,
 });
 
 console.log(docs.apiReference); // Auto-generated API docs
@@ -110,7 +110,7 @@ AI output analysis and debugging assistance with issue identification and correc
 
 ```typescript
 const debugging = await provider.debugAIOutput({
-  aiResponse: `{
+	aiResponse: `{
     "name": "John Doe",
     "age": "thirty-five",
     "email": "invalid-email",
@@ -118,8 +118,8 @@ const debugging = await provider.debugAIOutput({
       "theme": "dark
     }
   }`,
-  expectedFormat: "json",
-  issueTypes: ["format", "logic", "completeness"],
+	expectedFormat: "json",
+	issueTypes: ["format", "logic", "completeness"],
 });
 
 console.log(debugging.issues); // Identified problems
@@ -260,10 +260,10 @@ AI Workflow Tools are implemented as MCP (Model Context Protocol) tools that wor
 ```typescript
 // Internal MCP tool execution (transparent to users)
 const workflowTools = [
-  "generate-test-cases",
-  "refactor-code",
-  "generate-documentation",
-  "debug-ai-output",
+	"generate-test-cases",
+	"refactor-code",
+	"generate-documentation",
+	"debug-ai-output",
 ];
 ```
 
@@ -305,9 +305,9 @@ import { createBestAIProvider } from "@juspay/neurolink";
 
 const provider = createBestAIProvider();
 const tests = await provider.generateTestCases({
-  codeFunction: "your-function-here",
-  testTypes: ["unit", "edge-cases"],
-  framework: "jest",
+	codeFunction: "your-function-here",
+	testTypes: ["unit", "edge-cases"],
+	framework: "jest",
 });
 ```
 
@@ -315,9 +315,9 @@ const tests = await provider.generateTestCases({
 
 ```typescript
 const refactored = await provider.refactorCode({
-  sourceCode: "legacy-code-here",
-  target: "modern-es6",
-  focusAreas: ["performance", "readability"],
+	sourceCode: "legacy-code-here",
+	target: "modern-es6",
+	focusAreas: ["performance", "readability"],
 });
 ```
 
@@ -325,9 +325,9 @@ const refactored = await provider.refactorCode({
 
 ```typescript
 const docs = await provider.generateDocumentation({
-  codeBase: "your-code-here",
-  outputFormat: "markdown",
-  includeExamples: true,
+	codeBase: "your-code-here",
+	outputFormat: "markdown",
+	includeExamples: true,
 });
 ```
 

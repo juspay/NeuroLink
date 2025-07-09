@@ -22,11 +22,12 @@ This directory contains practical examples demonstrating NeuroLink's capabilitie
 - `environment-setup.js` - Setting up API keys and configuration
 - `timeout-usage.js` - Timeout configuration and error handling (NEW v1.12.0)
 
-### **MCP Integration (v1.7.1)**
+### **MCP Integration (v4.0.0)**
 
 - `mcp-built-in-tools.js` - Using built-in tools (time, utilities)
 - `mcp-discovery.js` - Discovering external MCP servers
 - `mcp-testing.js` - Testing and validation examples
+- **`dynamic-mcp-servers.js`** - 🆕 **NEW!** Programmatic MCP server management
 
 ### **CLI Examples**
 

@@ -1,5 +1,11 @@
 # 💰 Business Value Guide: Analytics & Evaluation Features
 
+<!-- TOC -->
+
+- [✅ Performance Monitoring Achieved:](#[object Object])
+- [🎯 Next Steps](#-next-steps)
+<!-- /TOC -->
+
 NeuroLink's analytics and evaluation features deliver measurable business value through cost optimization, quality improvement, and performance monitoring. This guide shows real-world examples of business impact and ROI.
 
 ## 📊 Cost Optimization
@@ -25,18 +31,18 @@ NeuroLink's analytics and evaluation features deliver measurable business value 
 ```javascript
 // Before: Using GPT-4 for all product descriptions
 const expensiveResult = await provider.generateText({
-  prompt: "Write product description for basic t-shirt",
-  model: "gpt-4-turbo", // $30/1M tokens
-  enableAnalytics: true,
+	prompt: "Write product description for basic t-shirt",
+	model: "gpt-4-turbo", // $30/1M tokens
+	enableAnalytics: true,
 });
 // Cost per description: $0.12
 // Monthly cost (10,000 descriptions): $1,200
 
 // After: Using analytics-driven model selection
 const optimizedResult = await provider.generateText({
-  prompt: "Write product description for basic t-shirt",
-  model: "gpt-3.5-turbo", // $3/1M tokens
-  enableAnalytics: true,
+	prompt: "Write product description for basic t-shirt",
+	model: "gpt-3.5-turbo", // $3/1M tokens
+	enableAnalytics: true,
 });
 // Cost per description: $0.015
 // Monthly cost (10,000 descriptions): $150
@@ -48,15 +54,15 @@ const optimizedResult = await provider.generateText({
 ```javascript
 // Track costs by department
 const marketingResult = await provider.generateText({
-  prompt: "Create social media post",
-  enableAnalytics: true,
-  context: { department: "marketing", campaign: "Q1-launch" },
+	prompt: "Create social media post",
+	enableAnalytics: true,
+	context: { department: "marketing", campaign: "Q1-launch" },
 });
 
 const supportResult = await provider.generateText({
-  prompt: "Generate customer response",
-  enableAnalytics: true,
-  context: { department: "support", priority: "high" },
+	prompt: "Generate customer response",
+	enableAnalytics: true,
+	context: { department: "support", priority: "high" },
 });
 
 // Analytics dashboard shows:
@@ -89,26 +95,26 @@ const supportResult = await provider.generateText({
 ```javascript
 // Automated quality control
 const supportResponse = await provider.generateText({
-  prompt: "Customer complaining about delayed shipment",
-  enableEvaluation: true,
-  enableAnalytics: true,
-  context: {
-    customerTier: "premium",
-    issueType: "shipping",
-    urgency: "high",
-  },
+	prompt: "Customer complaining about delayed shipment",
+	enableEvaluation: true,
+	enableAnalytics: true,
+	context: {
+		customerTier: "premium",
+		issueType: "shipping",
+		urgency: "high",
+	},
 });
 
 // Quality gates
 if (supportResponse.evaluation.overall < 8) {
-  // Trigger human review for low-quality responses
-  await humanReview(supportResponse);
+	// Trigger human review for low-quality responses
+	await humanReview(supportResponse);
 } else if (supportResponse.evaluation.accuracy < 7) {
-  // Escalate accuracy issues
-  await managerReview(supportResponse);
+	// Escalate accuracy issues
+	await managerReview(supportResponse);
 } else {
-  // Auto-approve high-quality responses
-  await sendToCustomer(supportResponse.content);
+	// Auto-approve high-quality responses
+	await sendToCustomer(supportResponse.content);
 }
 
 // Business Impact:
@@ -123,20 +129,20 @@ if (supportResponse.evaluation.overall < 8) {
 ```javascript
 // Medical content with strict accuracy requirements
 const medicalContent = await provider.generateText({
-  prompt: "Explain diabetes management for patients",
-  enableEvaluation: true,
-  context: {
-    content_type: "medical",
-    audience: "patients",
-    accuracy_required: 95,
-  },
+	prompt: "Explain diabetes management for patients",
+	enableEvaluation: true,
+	context: {
+		content_type: "medical",
+		audience: "patients",
+		accuracy_required: 95,
+	},
 });
 
 // Strict quality standards
 if (medicalContent.evaluation.accuracy >= 9) {
-  await publishContent(medicalContent);
+	await publishContent(medicalContent);
 } else {
-  await medicalProfessionalReview(medicalContent);
+	await medicalProfessionalReview(medicalContent);
 }
 
 // Results:
@@ -166,9 +172,9 @@ npx @juspay/neurolink generate "Daily report summary" \
 ```javascript
 // Track performance trends
 const performanceData = {
-  dailyStats: await analytics.getDailyUsage(),
-  qualityTrends: await evaluation.getQualityTrends(),
-  costOptimization: await analytics.getCostOptimization(),
+	dailyStats: await analytics.getDailyUsage(),
+	qualityTrends: await evaluation.getQualityTrends(),
+	costOptimization: await analytics.getCostOptimization(),
 };
 
 // Key Performance Indicators:
@@ -223,29 +229,29 @@ const performanceData = {
 ```javascript
 // Monthly cost analysis
 const monthlyROI = {
-  // Before NeuroLink
-  aiProviderCosts: 5000, // Unoptimized spending
-  humanReviewHours: 80, // Manual quality review
-  humanHourlyRate: 50, // $50/hour for reviewers
-  qualityIssues: 12, // Monthly quality problems
-  issueResolutionCost: 200, // $200 per quality issue
+	// Before NeuroLink
+	aiProviderCosts: 5000, // Unoptimized spending
+	humanReviewHours: 80, // Manual quality review
+	humanHourlyRate: 50, // $50/hour for reviewers
+	qualityIssues: 12, // Monthly quality problems
+	issueResolutionCost: 200, // $200 per quality issue
 
-  // After NeuroLink
-  optimizedAICosts: 3200, // 36% cost reduction
-  reducedReviewHours: 20, // 75% review time reduction
-  qualityIssuesPrevented: 10, // Quality gates prevent issues
+	// After NeuroLink
+	optimizedAICosts: 3200, // 36% cost reduction
+	reducedReviewHours: 20, // 75% review time reduction
+	qualityIssuesPrevented: 10, // Quality gates prevent issues
 
-  // Calculate savings
-  totalMonthlySavings() {
-    const aiSavings = this.aiProviderCosts - this.optimizedAICosts;
-    const laborSavings =
-      (this.humanReviewHours - this.reducedReviewHours) * this.humanHourlyRate;
-    const qualitySavings =
-      this.qualityIssuesPrevented * this.issueResolutionCost;
+	// Calculate savings
+	totalMonthlySavings() {
+		const aiSavings = this.aiProviderCosts - this.optimizedAICosts;
+		const laborSavings =
+			(this.humanReviewHours - this.reducedReviewHours) * this.humanHourlyRate;
+		const qualitySavings =
+			this.qualityIssuesPrevented * this.issueResolutionCost;
 
-    return aiSavings + laborSavings + qualitySavings;
-    // Result: $1,800 + $3,000 + $2,000 = $6,800/month savings
-  },
+		return aiSavings + laborSavings + qualitySavings;
+		// Result: $1,800 + $3,000 + $2,000 = $6,800/month savings
+	},
 };
 
 // Annual ROI: $81,600 savings
@@ -257,19 +263,19 @@ const monthlyROI = {
 
 ```javascript
 const qualityMetrics = {
-  beforeNeuroLink: {
-    averageQualityScore: 6.5, // Out of 10
-    customerSatisfaction: 72, // Percentage
-    manualReviewRequired: 100, // Percentage
-    complianceViolations: 3, // Per month
-  },
+	beforeNeuroLink: {
+		averageQualityScore: 6.5, // Out of 10
+		customerSatisfaction: 72, // Percentage
+		manualReviewRequired: 100, // Percentage
+		complianceViolations: 3, // Per month
+	},
 
-  afterNeuroLink: {
-    averageQualityScore: 8.7, // +34% improvement
-    customerSatisfaction: 89, // +24% improvement
-    manualReviewRequired: 25, // -75% reduction
-    complianceViolations: 0, // Zero violations
-  },
+	afterNeuroLink: {
+		averageQualityScore: 8.7, // +34% improvement
+		customerSatisfaction: 89, // +24% improvement
+		manualReviewRequired: 25, // -75% reduction
+		complianceViolations: 0, // Zero violations
+	},
 };
 ```
 

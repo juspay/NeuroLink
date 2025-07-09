@@ -25,23 +25,23 @@ NeuroLink provides enterprise-grade real-time services with WebSocket infrastruc
 import { NeuroLinkWebSocketServer } from "@juspay/neurolink";
 
 const wsServer = new NeuroLinkWebSocketServer({
-  port: 8080,
-  maxConnections: 1000,
-  enableCompression: true,
-  heartbeatInterval: 30000, // 30 seconds
+	port: 8080,
+	maxConnections: 1000,
+	enableCompression: true,
+	heartbeatInterval: 30000, // 30 seconds
 });
 
 // Handle connections
 wsServer.on("connection", ({ connectionId, userAgent, remoteAddress }) => {
-  console.log(`New connection: ${connectionId} from ${remoteAddress}`);
+	console.log(`New connection: ${connectionId} from ${remoteAddress}`);
 
-  // Join default room
-  wsServer.joinRoom(connectionId, "general");
+	// Join default room
+	wsServer.joinRoom(connectionId, "general");
 });
 
 // Handle disconnections
 wsServer.on("disconnect", ({ connectionId, reason }) => {
-  console.log(`Connection ${connectionId} disconnected: ${reason}`);
+	console.log(`Connection ${connectionId} disconnected: ${reason}`);
 });
 
 // Start server
@@ -54,33 +54,33 @@ console.log("WebSocket server running on port 8080");
 ```typescript
 // Advanced connection handling
 wsServer.on("connection", ({ connectionId, userAgent, headers }) => {
-  // Authenticate connection
-  const token = headers["authorization"];
-  if (!validateToken(token)) {
-    wsServer.closeConnection(connectionId, "Authentication failed");
-    return;
-  }
+	// Authenticate connection
+	const token = headers["authorization"];
+	if (!validateToken(token)) {
+		wsServer.closeConnection(connectionId, "Authentication failed");
+		return;
+	}
 
-  // Store connection metadata
-  wsServer.setConnectionData(connectionId, {
-    userId: extractUserId(token),
-    joinedAt: new Date(),
-    permissions: getUserPermissions(token),
-  });
+	// Store connection metadata
+	wsServer.setConnectionData(connectionId, {
+		userId: extractUserId(token),
+		joinedAt: new Date(),
+		permissions: getUserPermissions(token),
+	});
 
-  // Send welcome message
-  wsServer.sendMessage(connectionId, {
-    type: "welcome",
-    data: { message: "Connected to NeuroLink AI" },
-  });
+	// Send welcome message
+	wsServer.sendMessage(connectionId, {
+		type: "welcome",
+		data: { message: "Connected to NeuroLink AI" },
+	});
 });
 
 // Monitor connection health
 wsServer.on("heartbeat", ({ connectionId, latency }) => {
-  if (latency > 5000) {
-    // 5 seconds
-    console.warn(`High latency detected: ${connectionId} (${latency}ms)`);
-  }
+	if (latency > 5000) {
+		// 5 seconds
+		console.warn(`High latency detected: ${connectionId} (${latency}ms)`);
+	}
 });
 ```
 
@@ -112,24 +112,24 @@ console.log("User is in rooms:", userRooms);
 ```typescript
 // Broadcast AI responses to room
 wsServer.broadcastToRoom("ai-support-room", {
-  type: "ai-response",
-  data: {
-    text: "How can I help you today?",
-    timestamp: new Date().toISOString(),
-    provider: "openai",
-  },
+	type: "ai-response",
+	data: {
+		text: "How can I help you today?",
+		timestamp: new Date().toISOString(),
+		provider: "openai",
+	},
 });
 
 // Broadcast to multiple rooms
 wsServer.broadcastToRooms(["room1", "room2"], {
-  type: "announcement",
-  data: { message: "System maintenance in 10 minutes" },
+	type: "announcement",
+	data: { message: "System maintenance in 10 minutes" },
 });
 
 // Broadcast to all connections
 wsServer.broadcast({
-  type: "global-message",
-  data: { message: "Welcome to NeuroLink AI" },
+	type: "global-message",
+	data: { message: "Welcome to NeuroLink AI" },
 });
 ```
 
@@ -145,22 +145,22 @@ const channel = wsServer.createStreamingChannel(connectionId, "ai-stream");
 
 // Configure channel options
 channel.setOptions({
-  bufferSize: 4096,
-  compressionEnabled: true,
-  maxChunkSize: 1024,
+	bufferSize: 4096,
+	compressionEnabled: true,
+	maxChunkSize: 1024,
 });
 
 // Handle streaming data
 channel.onData = (chunk) => {
-  console.log("Received chunk:", chunk);
+	console.log("Received chunk:", chunk);
 };
 
 channel.onComplete = () => {
-  console.log("Streaming complete");
+	console.log("Streaming complete");
 };
 
 channel.onError = (error) => {
-  console.error("Streaming error:", error);
+	console.error("Streaming error:", error);
 };
 ```
 
@@ -171,42 +171,42 @@ import { createBestAIProvider } from "@juspay/neurolink";
 
 // Handle chat messages with streaming
 wsServer.on("chat-message", async ({ connectionId, message }) => {
-  const channel = wsServer.createStreamingChannel(
-    connectionId,
-    `chat-${Date.now()}`,
-  );
-  const provider = await createBestAIProvider();
+	const channel = wsServer.createStreamingChannel(
+		connectionId,
+		`chat-${Date.now()}`,
+	);
+	const provider = await createBestAIProvider();
 
-  try {
-    // Start streaming AI response
-    const result = await provider.streamText({
-      prompt: message.data.prompt,
-      temperature: 0.7,
-    });
+	try {
+		// Start streaming AI response
+		const result = await provider.streamText({
+			prompt: message.data.prompt,
+			temperature: 0.7,
+		});
 
-    // Stream chunks to client
-    for await (const chunk of result.textStream) {
-      channel.send({
-        type: "text-chunk",
-        data: { chunk, provider: result.provider },
-      });
-    }
+		// Stream chunks to client
+		for await (const chunk of result.textStream) {
+			channel.send({
+				type: "text-chunk",
+				data: { chunk, provider: result.provider },
+			});
+		}
 
-    // Signal completion
-    channel.complete({
-      type: "stream-complete",
-      data: {
-        provider: result.provider,
-        model: result.model,
-        totalChunks: channel.getChunkCount(),
-      },
-    });
-  } catch (error) {
-    channel.error({
-      type: "stream-error",
-      data: { error: error.message },
-    });
-  }
+		// Signal completion
+		channel.complete({
+			type: "stream-complete",
+			data: {
+				provider: result.provider,
+				model: result.model,
+				totalChunks: channel.getChunkCount(),
+			},
+		});
+	} catch (error) {
+		channel.error({
+			type: "stream-error",
+			data: { error: error.message },
+		});
+	}
 });
 ```
 
@@ -218,47 +218,47 @@ wsServer.on("chat-message", async ({ connectionId, message }) => {
 
 ```typescript
 import {
-  createEnhancedChatService,
-  createBestAIProvider,
+	createEnhancedChatService,
+	createBestAIProvider,
 } from "@juspay/neurolink";
 
 const provider = await createBestAIProvider();
 const chatService = createEnhancedChatService({
-  provider,
-  enableSSE: true, // Server-Sent Events for simple streaming
-  enableWebSocket: true, // WebSocket for real-time bidirectional
-  streamingConfig: {
-    bufferSize: 8192,
-    compressionEnabled: true,
-    latencyTarget: 100, // Target 100ms latency
-  },
+	provider,
+	enableSSE: true, // Server-Sent Events for simple streaming
+	enableWebSocket: true, // WebSocket for real-time bidirectional
+	streamingConfig: {
+		bufferSize: 8192,
+		compressionEnabled: true,
+		latencyTarget: 100, // Target 100ms latency
+	},
 });
 
 // Handle streaming responses
 await chatService.streamChat({
-  prompt: "Generate a story about AI and humanity",
-  onChunk: (chunk) => {
-    console.log("Chunk:", chunk);
-    // Send to WebSocket clients
-    wsServer.broadcast({
-      type: "story-chunk",
-      data: { chunk },
-    });
-  },
-  onComplete: (result) => {
-    console.log("Story complete:", result.text);
-    wsServer.broadcast({
-      type: "story-complete",
-      data: result,
-    });
-  },
-  onError: (error) => {
-    console.error("Story generation error:", error);
-    wsServer.broadcast({
-      type: "story-error",
-      data: { error: error.message },
-    });
-  },
+	prompt: "Generate a story about AI and humanity",
+	onChunk: (chunk) => {
+		console.log("Chunk:", chunk);
+		// Send to WebSocket clients
+		wsServer.broadcast({
+			type: "story-chunk",
+			data: { chunk },
+		});
+	},
+	onComplete: (result) => {
+		console.log("Story complete:", result.text);
+		wsServer.broadcast({
+			type: "story-complete",
+			data: result,
+		});
+	},
+	onError: (error) => {
+		console.error("Story generation error:", error);
+		wsServer.broadcast({
+			type: "story-error",
+			data: { error: error.message },
+		});
+	},
 });
 ```
 
@@ -268,22 +268,22 @@ await chatService.streamChat({
 // Create persistent chat sessions
 const sessionId = "user-123-session";
 const chatSession = chatService.createSession(sessionId, {
-  maxHistory: 50, // Keep last 50 messages
-  persistToDisk: true,
-  sessionTimeout: 3600000, // 1 hour timeout
+	maxHistory: 50, // Keep last 50 messages
+	persistToDisk: true,
+	sessionTimeout: 3600000, // 1 hour timeout
 });
 
 // Add message to session history
 chatSession.addMessage({
-  role: "user",
-  content: "Hello, AI!",
-  timestamp: new Date(),
+	role: "user",
+	content: "Hello, AI!",
+	timestamp: new Date(),
 });
 
 // Generate response with session context
 const response = await chatSession.generateResponse({
-  temperature: 0.7,
-  maxTokens: 500,
+	temperature: 0.7,
+	maxTokens: 500,
 });
 
 // Session automatically maintains conversation history
@@ -299,24 +299,24 @@ console.log("Token usage:", chatSession.getTokenUsage());
 
 ```typescript
 const wsServer = new NeuroLinkWebSocketServer({
-  port: 8080,
-  maxConnections: 5000,
+	port: 8080,
+	maxConnections: 5000,
 
-  // Connection pooling
-  connectionPool: {
-    enabled: true,
-    maxIdleTime: 300000, // 5 minutes
-    cleanupInterval: 60000, // 1 minute
-  },
+	// Connection pooling
+	connectionPool: {
+		enabled: true,
+		maxIdleTime: 300000, // 5 minutes
+		cleanupInterval: 60000, // 1 minute
+	},
 
-  // Performance tuning
-  performance: {
-    enableCompression: true,
-    compressionLevel: 6, // 1-9, 6 is balanced
-    maxPayloadSize: 16777216, // 16MB
-    pingInterval: 30000, // 30 seconds
-    pongTimeout: 5000, // 5 seconds
-  },
+	// Performance tuning
+	performance: {
+		enableCompression: true,
+		compressionLevel: 6, // 1-9, 6 is balanced
+		maxPayloadSize: 16777216, // 16MB
+		pingInterval: 30000, // 30 seconds
+		pongTimeout: 5000, // 5 seconds
+	},
 });
 ```
 
@@ -328,17 +328,17 @@ const servers = [];
 const ports = [8080, 8081, 8082];
 
 for (const port of ports) {
-  const server = new NeuroLinkWebSocketServer({ port });
+	const server = new NeuroLinkWebSocketServer({ port });
 
-  // Shared Redis for cross-server communication
-  server.setMessageBroker({
-    type: "redis",
-    url: "redis://localhost:6379",
-    prefix: "neurolink:ws",
-  });
+	// Shared Redis for cross-server communication
+	server.setMessageBroker({
+		type: "redis",
+		url: "redis://localhost:6379",
+		prefix: "neurolink:ws",
+	});
 
-  servers.push(server);
-  await server.start();
+	servers.push(server);
+	await server.start();
 }
 
 console.log(`Started ${servers.length} WebSocket servers`);
@@ -349,33 +349,33 @@ console.log(`Started ${servers.length} WebSocket servers`);
 ```typescript
 // Configure optimal streaming for different use cases
 const streamingConfigs = {
-  // Low latency for chat
-  chat: {
-    bufferSize: 1024,
-    compressionEnabled: false, // Disable for speed
-    latencyTarget: 50,
-  },
+	// Low latency for chat
+	chat: {
+		bufferSize: 1024,
+		compressionEnabled: false, // Disable for speed
+		latencyTarget: 50,
+	},
 
-  // High throughput for content generation
-  content: {
-    bufferSize: 16384,
-    compressionEnabled: true,
-    latencyTarget: 200,
-  },
+	// High throughput for content generation
+	content: {
+		bufferSize: 16384,
+		compressionEnabled: true,
+		latencyTarget: 200,
+	},
 
-  // Balanced for general use
-  general: {
-    bufferSize: 4096,
-    compressionEnabled: true,
-    latencyTarget: 100,
-  },
+	// Balanced for general use
+	general: {
+		bufferSize: 4096,
+		compressionEnabled: true,
+		latencyTarget: 100,
+	},
 };
 
 // Apply configuration based on use case
 const chatService = createEnhancedChatService({
-  provider: await createBestAIProvider(),
-  enableWebSocket: true,
-  streamingConfig: streamingConfigs.chat, // Use chat optimization
+	provider: await createBestAIProvider(),
+	enableWebSocket: true,
+	streamingConfig: streamingConfigs.chat, // Use chat optimization
 });
 ```
 
@@ -527,11 +527,11 @@ spec:
 ```typescript
 // Enable metrics collection
 wsServer.enableMetrics({
-  collectConnectionStats: true,
-  collectMessageStats: true,
-  collectPerformanceStats: true,
-  exportPrometheus: true,
-  metricsEndpoint: "/metrics",
+	collectConnectionStats: true,
+	collectMessageStats: true,
+	collectPerformanceStats: true,
+	exportPrometheus: true,
+	metricsEndpoint: "/metrics",
 });
 
 // Get real-time statistics
@@ -547,22 +547,22 @@ console.log("Memory usage:", stats.memoryUsage);
 ```typescript
 // Health check implementation
 wsServer.addHealthCheck("ai-providers", async () => {
-  try {
-    const provider = await createBestAIProvider();
-    await provider.generateText({ prompt: "test", maxTokens: 1 });
-    return { status: "healthy", message: "AI providers operational" };
-  } catch (error) {
-    return { status: "unhealthy", message: error.message };
-  }
+	try {
+		const provider = await createBestAIProvider();
+		await provider.generateText({ prompt: "test", maxTokens: 1 });
+		return { status: "healthy", message: "AI providers operational" };
+	} catch (error) {
+		return { status: "unhealthy", message: error.message };
+	}
 });
 
 wsServer.addHealthCheck("redis", async () => {
-  try {
-    await redis.ping();
-    return { status: "healthy", message: "Redis connection active" };
-  } catch (error) {
-    return { status: "unhealthy", message: "Redis connection failed" };
-  }
+	try {
+		await redis.ping();
+		return { status: "healthy", message: "Redis connection active" };
+	} catch (error) {
+		return { status: "unhealthy", message: "Redis connection failed" };
+	}
 });
 
 // Health endpoint available at /health
@@ -591,44 +591,44 @@ docker run -d -p 6379:6379 redis:alpine
 ```typescript
 // server.js
 import {
-  NeuroLinkWebSocketServer,
-  createEnhancedChatService,
-  createBestAIProvider,
+	NeuroLinkWebSocketServer,
+	createEnhancedChatService,
+	createBestAIProvider,
 } from "@juspay/neurolink";
 
 async function startServer() {
-  // Initialize WebSocket server
-  const wsServer = new NeuroLinkWebSocketServer({ port: 8080 });
+	// Initialize WebSocket server
+	const wsServer = new NeuroLinkWebSocketServer({ port: 8080 });
 
-  // Initialize enhanced chat
-  const provider = await createBestAIProvider();
-  const chatService = createEnhancedChatService({
-    provider,
-    enableWebSocket: true,
-  });
+	// Initialize enhanced chat
+	const provider = await createBestAIProvider();
+	const chatService = createEnhancedChatService({
+		provider,
+		enableWebSocket: true,
+	});
 
-  // Handle chat messages
-  wsServer.on("chat-message", async ({ connectionId, message }) => {
-    await chatService.streamChat({
-      prompt: message.data.prompt,
-      onChunk: (chunk) => {
-        wsServer.sendMessage(connectionId, {
-          type: "ai-chunk",
-          data: { chunk },
-        });
-      },
-      onComplete: (result) => {
-        wsServer.sendMessage(connectionId, {
-          type: "ai-complete",
-          data: result,
-        });
-      },
-    });
-  });
+	// Handle chat messages
+	wsServer.on("chat-message", async ({ connectionId, message }) => {
+		await chatService.streamChat({
+			prompt: message.data.prompt,
+			onChunk: (chunk) => {
+				wsServer.sendMessage(connectionId, {
+					type: "ai-chunk",
+					data: { chunk },
+				});
+			},
+			onComplete: (result) => {
+				wsServer.sendMessage(connectionId, {
+					type: "ai-complete",
+					data: result,
+				});
+			},
+		});
+	});
 
-  // Start server
-  await wsServer.start();
-  console.log("🚀 NeuroLink WebSocket server running on port 8080");
+	// Start server
+	await wsServer.start();
+	console.log("🚀 NeuroLink WebSocket server running on port 8080");
 }
 
 startServer().catch(console.error);
@@ -645,60 +645,60 @@ node server.js
 <!-- client.html -->
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>NeuroLink Real-time Chat</title>
-  </head>
-  <body>
-    <div id="chat"></div>
-    <input id="message" type="text" placeholder="Type your message..." />
-    <button onclick="sendMessage()">Send</button>
+	<head>
+		<title>NeuroLink Real-time Chat</title>
+	</head>
+	<body>
+		<div id="chat"></div>
+		<input id="message" type="text" placeholder="Type your message..." />
+		<button onclick="sendMessage()">Send</button>
 
-    <script>
-      const ws = new WebSocket("ws://localhost:8080");
-      const chat = document.getElementById("chat");
-      const messageInput = document.getElementById("message");
+		<script>
+			const ws = new WebSocket("ws://localhost:8080");
+			const chat = document.getElementById("chat");
+			const messageInput = document.getElementById("message");
 
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+			ws.onmessage = (event) => {
+				const data = JSON.parse(event.data);
 
-        if (data.type === "ai-chunk") {
-          appendToChat(data.data.chunk, false);
-        } else if (data.type === "ai-complete") {
-          appendToChat("\n\n", false);
-        }
-      };
+				if (data.type === "ai-chunk") {
+					appendToChat(data.data.chunk, false);
+				} else if (data.type === "ai-complete") {
+					appendToChat("\n\n", false);
+				}
+			};
 
-      function sendMessage() {
-        const message = messageInput.value;
-        if (message) {
-          appendToChat(`You: ${message}\n`, true);
+			function sendMessage() {
+				const message = messageInput.value;
+				if (message) {
+					appendToChat(`You: ${message}\n`, true);
 
-          ws.send(
-            JSON.stringify({
-              type: "chat-message",
-              data: { prompt: message },
-            }),
-          );
+					ws.send(
+						JSON.stringify({
+							type: "chat-message",
+							data: { prompt: message },
+						}),
+					);
 
-          messageInput.value = "";
-          appendToChat("AI: ", true);
-        }
-      }
+					messageInput.value = "";
+					appendToChat("AI: ", true);
+				}
+			}
 
-      function appendToChat(text, isNewLine) {
-        if (isNewLine) {
-          chat.innerHTML += text;
-        } else {
-          chat.innerHTML += text;
-        }
-        chat.scrollTop = chat.scrollHeight;
-      }
+			function appendToChat(text, isNewLine) {
+				if (isNewLine) {
+					chat.innerHTML += text;
+				} else {
+					chat.innerHTML += text;
+				}
+				chat.scrollTop = chat.scrollHeight;
+			}
 
-      messageInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") sendMessage();
-      });
-    </script>
-  </body>
+			messageInput.addEventListener("keypress", (e) => {
+				if (e.key === "Enter") sendMessage();
+			});
+		</script>
+	</body>
 </html>
 ```
 

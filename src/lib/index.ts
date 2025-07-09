@@ -11,46 +11,46 @@
 import { AIProviderFactory } from "./core/factory.js";
 export { AIProviderFactory };
 export type {
-  AIProvider,
-  AIProviderName,
-  ProviderConfig,
-  StreamingOptions,
-  ProviderAttempt,
-  SupportedModelName,
+	AIProvider,
+	AIProviderName,
+	ProviderConfig,
+	StreamingOptions,
+	ProviderAttempt,
+	SupportedModelName,
 } from "./core/types.js";
 
 // Model enums
 export {
-  BedrockModels,
-  OpenAIModels,
-  VertexModels,
-  DEFAULT_PROVIDER_CONFIGS,
+	BedrockModels,
+	OpenAIModels,
+	VertexModels,
+	DEFAULT_PROVIDER_CONFIGS,
 } from "./core/types.js";
 
 // Provider exports
 export {
-  GoogleVertexAI,
-  AmazonBedrock,
-  OpenAI,
-  AnthropicProvider,
-  AzureOpenAIProvider,
+	GoogleVertexAI,
+	AmazonBedrock,
+	OpenAI,
+	AnthropicProvider,
+	AzureOpenAIProvider,
 } from "./providers/index.js";
 export type { ProviderName } from "./providers/index.js";
 export { PROVIDERS, AVAILABLE_PROVIDERS } from "./providers/index.js";
 
 // Utility exports
 export {
-  getBestProviderSync as getBestProvider,
-  getAvailableProviders,
-  isValidProvider,
+	getBestProviderSync as getBestProvider,
+	getAvailableProviders,
+	isValidProvider,
 } from "./utils/providerUtils.js";
 
 // Main NeuroLink wrapper class
 export { NeuroLink } from "./neurolink.js";
 export type {
-  TextGenerationOptions,
-  StreamTextOptions,
-  TextGenerationResult,
+	TextGenerationOptions,
+	StreamTextOptions,
+	TextGenerationResult,
 } from "./neurolink.js";
 
 // Version
@@ -68,13 +68,13 @@ export const VERSION = "1.0.0";
  * ```
  */
 export async function createAIProvider(
-  providerName?: string,
-  modelName?: string,
+	providerName?: string,
+	modelName?: string,
 ) {
-  return await AIProviderFactory.createProvider(
-    providerName || "bedrock",
-    modelName,
-  );
+	return await AIProviderFactory.createProvider(
+		providerName || "bedrock",
+		modelName,
+	);
 }
 
 /**
@@ -88,15 +88,15 @@ export async function createAIProvider(
  * ```
  */
 export async function createAIProviderWithFallback(
-  primaryProvider?: string,
-  fallbackProvider?: string,
-  modelName?: string,
+	primaryProvider?: string,
+	fallbackProvider?: string,
+	modelName?: string,
 ) {
-  return await AIProviderFactory.createProviderWithFallback(
-    primaryProvider || "bedrock",
-    fallbackProvider || "vertex",
-    modelName,
-  );
+	return await AIProviderFactory.createProviderWithFallback(
+		primaryProvider || "bedrock",
+		fallbackProvider || "vertex",
+		modelName,
+	);
 }
 
 /**
@@ -110,13 +110,13 @@ export async function createAIProviderWithFallback(
  * ```
  */
 export async function createBestAIProvider(
-  requestedProvider?: string,
-  modelName?: string,
+	requestedProvider?: string,
+	modelName?: string,
 ) {
-  return await AIProviderFactory.createBestProvider(
-    requestedProvider,
-    modelName,
-  );
+	return await AIProviderFactory.createBestProvider(
+		requestedProvider,
+		modelName,
+	);
 }
 
 // ============================================================================
@@ -145,40 +145,40 @@ export async function createBestAIProvider(
  * ```
  */
 export {
-  // Core MCP ecosystem
-  MCPEcosystem,
-  mcpEcosystem,
-  initializeMCPEcosystem,
+	// Core MCP ecosystem
+	MCPEcosystem,
+	mcpEcosystem,
+	initializeMCPEcosystem,
 
-  // Plugin management
-  PluginManager,
-  pluginManager,
-  listMCPs,
-  executeMCP,
-  getMCPStats,
+	// Plugin management
+	PluginManager,
+	pluginManager,
+	listMCPs,
+	executeMCP,
+	getMCPStats,
 
-  // Quick filesystem operations
-  readFile,
-  writeFile,
-  listFiles,
-  createDirectory,
+	// Quick filesystem operations
+	readFile,
+	writeFile,
+	listFiles,
+	createDirectory,
 
-  // Core contracts and types
-  MCP,
-  SecurityManager,
-  mcpLogger,
+	// Core contracts and types
+	MCP,
+	SecurityManager,
+	mcpLogger,
 
-  // Core plugins
-  FileSystemMCP,
+	// Core plugins
+	FileSystemMCP,
 } from "./mcp/index.js";
 
 export type {
-  MCPMetadata,
-  ExecutionContext,
-  MCPConstructor,
-  MCPInstance,
-  DiscoveredMCP,
-  LogLevel,
+	MCPMetadata,
+	ExecutionContext,
+	MCPConstructor,
+	MCPInstance,
+	DiscoveredMCP,
+	LogLevel,
 } from "./mcp/index.js";
 
 // ============================================================================
@@ -191,20 +191,20 @@ export type {
 
 // Optional Telemetry (Phase 2) - Conditional export based on feature flag
 export async function initializeTelemetry(): Promise<boolean> {
-  if (process.env.NEUROLINK_TELEMETRY_ENABLED === "true") {
-    const { initializeTelemetry: init } = await import("./telemetry/index.js");
-    const result = await init();
-    return !!result; // Convert TelemetryService to boolean
-  }
-  return Promise.resolve(false);
+	if (process.env.NEUROLINK_TELEMETRY_ENABLED === "true") {
+		const { initializeTelemetry: init } = await import("./telemetry/index.js");
+		const result = await init();
+		return !!result; // Convert TelemetryService to boolean
+	}
+	return Promise.resolve(false);
 }
 
 export function getTelemetryStatus(): {
-  enabled: boolean;
-  initialized: boolean;
+	enabled: boolean;
+	initialized: boolean;
 } {
-  if (process.env.NEUROLINK_TELEMETRY_ENABLED === "true") {
-    return { enabled: true, initialized: false };
-  }
-  return { enabled: false, initialized: false };
+	if (process.env.NEUROLINK_TELEMETRY_ENABLED === "true") {
+		return { enabled: true, initialized: false };
+	}
+	return { enabled: false, initialized: false };
 }

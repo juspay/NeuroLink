@@ -113,13 +113,13 @@ const value = String(unknownValue || "default");
 // SOLUTION: Cast to expected type
 const result = response as ToolResult;
 if (result.success) {
-  /* ... */
+	/* ... */
 }
 
 // ERROR: Interface compatibility issues
 // SOLUTION: Use optional methods
 if (registry.executeTool) {
-  const result = await registry.executeTool("tool", args, context);
+	const result = await registry.executeTool("tool", args, context);
 }
 ```
 
@@ -151,9 +151,9 @@ const result = (await registry.executeTool("tool", args)) as ToolResult;
 
 // Handle both legacy and new interfaces
 if ("registerServer" in registry) {
-  await registry.registerServer("server", config, context);
+	await registry.registerServer("server", config, context);
 } else {
-  registry.register_server("server", config);
+	registry.register_server("server", config);
 }
 ```
 
@@ -191,26 +191,26 @@ NEUROLINK_DEFAULT_TIMEOUT=10000
 ```typescript
 // Use parallel execution where possible
 const results = await Promise.all([
-  registry.executeTool("tool1", args1, context),
-  registry.executeTool("tool2", args2, context),
+	registry.executeTool("tool1", args1, context),
+	registry.executeTool("tool2", args2, context),
 ]);
 
 // Enable caching for repeated operations
 const context: ExecutionContext = {
-  cacheOptions: {
-    enabled: true,
-    ttl: 300,
-    key: "operation-cache",
-  },
+	cacheOptions: {
+		enabled: true,
+		ttl: 300,
+		key: "operation-cache",
+	},
 };
 
 // Use fallback options for reliability
 const context: ExecutionContext = {
-  fallbackOptions: {
-    enabled: true,
-    maxRetries: 2,
-    providers: ["openai", "anthropic"],
-  },
+	fallbackOptions: {
+		enabled: true,
+		maxRetries: 2,
+		providers: ["openai", "anthropic"],
+	},
 };
 ```
 
@@ -227,16 +227,16 @@ const context: ExecutionContext = {
 ```typescript
 // OLD (snake_case) - causes errors
 const context = {
-  session_id: "session123",
-  user_id: "user456",
-  ai_provider: "google",
+	session_id: "session123",
+	user_id: "user456",
+	ai_provider: "google",
 };
 
 // NEW (camelCase) - correct
 const context: ExecutionContext = {
-  sessionId: "session123",
-  userId: "user456",
-  aiProvider: "google",
+	sessionId: "session123",
+	userId: "user456",
+	aiProvider: "google",
 };
 ```
 
@@ -255,7 +255,7 @@ registry.executeTool?.("tool", args, context);
 
 // ALTERNATIVE: Check method exists
 if (registry.executeTool) {
-  const result = await registry.executeTool("tool", args, context);
+	const result = await registry.executeTool("tool", args, context);
 }
 ```
 
@@ -300,12 +300,12 @@ npx @juspay/neurolink config restore --backup latest
 ```typescript
 // Configure automatic fallback
 const context: ExecutionContext = {
-  fallbackOptions: {
-    enabled: true,
-    providers: ["google-ai", "openai", "anthropic"],
-    maxRetries: 3,
-    retryDelay: 1000,
-  },
+	fallbackOptions: {
+		enabled: true,
+		providers: ["google-ai", "openai", "anthropic"],
+		maxRetries: 3,
+		retryDelay: 1000,
+	},
 };
 ```
 

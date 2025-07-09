@@ -54,10 +54,10 @@ import { AIProviderFactory } from "@juspay/neurolink";
 
 const openai = AIProviderFactory.createProvider("openai", "gpt-4o");
 const result = await openai.generateText({
-  prompt: "Explain machine learning",
-  temperature: 0.7,
-  maxTokens: 500,
-  timeout: "30s", // Optional: Override default 30s timeout
+	prompt: "Explain machine learning",
+	temperature: 0.7,
+	maxTokens: 500,
+	timeout: "30s", // Optional: Override default 30s timeout
 });
 ```
 
@@ -146,10 +146,10 @@ import { AIProviderFactory } from "@juspay/neurolink";
 
 const bedrock = AIProviderFactory.createProvider("bedrock");
 const result = await bedrock.generateText({
-  prompt: "Write a haiku about AI",
-  temperature: 0.8,
-  maxTokens: 100,
-  timeout: "45s", // Optional: Override default 45s timeout
+	prompt: "Write a haiku about AI",
+	temperature: 0.8,
+	maxTokens: 100,
+	timeout: "45s", // Optional: Override default 45s timeout
 });
 ```
 
@@ -172,17 +172,17 @@ To use AWS Bedrock, ensure your AWS account has:
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel",
-        "bedrock:InvokeModelWithResponseStream"
-      ],
-      "Resource": ["arn:aws:bedrock:*:*:inference-profile/us.anthropic.*"]
-    }
-  ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"bedrock:InvokeModel",
+				"bedrock:InvokeModelWithResponseStream"
+			],
+			"Resource": ["arn:aws:bedrock:*:*:inference-profile/us.anthropic.*"]
+		}
+	]
 }
 ```
 
@@ -277,10 +277,10 @@ import { AIProviderFactory } from "@juspay/neurolink";
 
 const vertex = AIProviderFactory.createProvider("vertex", "gemini-2.5-flash");
 const result = await vertex.generateText({
-  prompt: "Explain quantum computing",
-  temperature: 0.6,
-  maxTokens: 800,
-  timeout: "1m", // Optional: Override default 60s timeout
+	prompt: "Explain quantum computing",
+	temperature: 0.6,
+	maxTokens: 800,
+	timeout: "1m", // Optional: Override default 60s timeout
 });
 ```
 
@@ -338,14 +338,14 @@ export GOOGLE_AI_MODEL="gemini-2.5-pro"  # Default model to use
 import { AIProviderFactory } from "@juspay/neurolink";
 
 const googleAI = AIProviderFactory.createProvider(
-  "google-ai",
-  "gemini-2.5-flash",
+	"google-ai",
+	"gemini-2.5-flash",
 );
 const result = await googleAI.generateText({
-  prompt: "Explain the future of AI",
-  temperature: 0.7,
-  maxTokens: 1000,
-  timeout: "30s", // Optional: Override default 30s timeout
+	prompt: "Explain the future of AI",
+	temperature: 0.7,
+	maxTokens: 1000,
+	timeout: "30s", // Optional: Override default 30s timeout
 });
 ```
 
@@ -402,23 +402,23 @@ Google AI Studio includes generous free tier limits:
 import { AIProviderFactory } from "@juspay/neurolink";
 
 try {
-  const provider = AIProviderFactory.createProvider("google-ai");
-  const result = await provider.generateText({
-    prompt: "Generate a creative story",
-    temperature: 0.8,
-    maxTokens: 500,
-  });
-  console.log(result.text);
+	const provider = AIProviderFactory.createProvider("google-ai");
+	const result = await provider.generateText({
+		prompt: "Generate a creative story",
+		temperature: 0.8,
+		maxTokens: 500,
+	});
+	console.log(result.text);
 } catch (error) {
-  if (error.message.includes("API_KEY_INVALID")) {
-    console.error(
-      "Invalid Google AI API key. Check your GOOGLE_AI_API_KEY environment variable.",
-    );
-  } else if (error.message.includes("QUOTA_EXCEEDED")) {
-    console.error("Rate limit exceeded. Wait before making more requests.");
-  } else {
-    console.error("Google AI Studio error:", error.message);
-  }
+	if (error.message.includes("API_KEY_INVALID")) {
+		console.error(
+			"Invalid Google AI API key. Check your GOOGLE_AI_API_KEY environment variable.",
+		);
+	} else if (error.message.includes("QUOTA_EXCEEDED")) {
+		console.error("Rate limit exceeded. Wait before making more requests.");
+	} else {
+		console.error("Google AI Studio error:", error.message);
+	}
 }
 ```
 
@@ -464,10 +464,10 @@ import { AIProviderFactory } from "@juspay/neurolink";
 
 const huggingface = AIProviderFactory.createProvider("huggingface", "gpt2");
 const result = await huggingface.generateText({
-  prompt: "Explain machine learning",
-  temperature: 0.8,
-  maxTokens: 200,
-  timeout: "45s", // Optional: Override default 30s timeout
+	prompt: "Explain machine learning",
+	temperature: 0.8,
+	maxTokens: 200,
+	timeout: "45s", // Optional: Override default 30s timeout
 });
 ```
 
@@ -542,10 +542,10 @@ ollama rm llama2
 ```typescript
 const ollama = AIProviderFactory.createProvider("ollama", "llama2");
 const result = await ollama.generateText({
-  prompt: "Write a poem about privacy",
-  temperature: 0.7,
-  maxTokens: 300,
-  timeout: "10m", // Optional: Override default 5m timeout
+	prompt: "Write a poem about privacy",
+	temperature: 0.7,
+	maxTokens: 300,
+	timeout: "10m", // Optional: Override default 5m timeout
 });
 ```
 
@@ -619,10 +619,10 @@ Mistral offers competitive pricing:
 ```typescript
 const mistral = AIProviderFactory.createProvider("mistral", "mistral-small");
 const result = await mistral.generateText({
-  prompt: "Translate to French: Hello world",
-  temperature: 0.3,
-  maxTokens: 100,
-  timeout: "30s", // Optional: Override default 30s timeout
+	prompt: "Translate to French: Hello world",
+	temperature: 0.3,
+	maxTokens: 100,
+	timeout: "30s", // Optional: Override default 30s timeout
 });
 ```
 
@@ -759,15 +759,15 @@ import { AIProviderFactory } from "@juspay/neurolink";
 
 // Custom provider with fallback
 const { primary, fallback } = AIProviderFactory.createProviderWithFallback(
-  "bedrock", // Prefer Bedrock
-  "openai", // Fall back to OpenAI
+	"bedrock", // Prefer Bedrock
+	"openai", // Fall back to OpenAI
 );
 
 try {
-  const result = await primary.generateText({ prompt: "Hello" });
+	const result = await primary.generateText({ prompt: "Hello" });
 } catch (error) {
-  console.log("Primary failed, trying fallback...");
-  const result = await fallback.generateText({ prompt: "Hello" });
+	console.log("Primary failed, trying fallback...");
+	const result = await fallback.generateText({ prompt: "Hello" });
 }
 ```
 
@@ -776,9 +776,9 @@ try {
 ```typescript
 // Different providers for different environments
 const provider =
-  process.env.NODE_ENV === "production"
-    ? AIProviderFactory.createProvider("bedrock") // Production: Bedrock
-    : AIProviderFactory.createProvider("openai", "gpt-4o-mini"); // Dev: Cheaper model
+	process.env.NODE_ENV === "production"
+		? AIProviderFactory.createProvider("bedrock") // Production: Bedrock
+		: AIProviderFactory.createProvider("openai", "gpt-4o-mini"); // Dev: Cheaper model
 ```
 
 ## Testing Provider Configuration
@@ -802,33 +802,33 @@ npx @juspay/neurolink status --verbose
 import { AIProviderFactory } from "@juspay/neurolink";
 
 async function testProviders() {
-  const providers = [
-    "openai",
-    "bedrock",
-    "vertex",
-    "anthropic",
-    "azure",
-    "google-ai",
-    "huggingface",
-    "ollama",
-    "mistral",
-  ];
+	const providers = [
+		"openai",
+		"bedrock",
+		"vertex",
+		"anthropic",
+		"azure",
+		"google-ai",
+		"huggingface",
+		"ollama",
+		"mistral",
+	];
 
-  for (const providerName of providers) {
-    try {
-      const provider = AIProviderFactory.createProvider(providerName);
-      const start = Date.now();
+	for (const providerName of providers) {
+		try {
+			const provider = AIProviderFactory.createProvider(providerName);
+			const start = Date.now();
 
-      const result = await provider.generateText({
-        prompt: "Test",
-        maxTokens: 10,
-      });
+			const result = await provider.generateText({
+				prompt: "Test",
+				maxTokens: 10,
+			});
 
-      console.log(`✅ ${providerName}: Working (${Date.now() - start}ms)`);
-    } catch (error) {
-      console.log(`❌ ${providerName}: ${error.message}`);
-    }
-  }
+			console.log(`✅ ${providerName}: Working (${Date.now() - start}ms)`);
+		} catch (error) {
+			console.log(`❌ ${providerName}: ${error.message}`);
+		}
+	}
 }
 
 testProviders();

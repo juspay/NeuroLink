@@ -885,23 +885,23 @@ MCP servers are automatically configured in `.mcp-config.json`:
 
 ```json
 {
-  "mcpServers": {
-    "filesystem": {
-      "name": "filesystem",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
-      "transport": "stdio"
-    },
-    "github": {
-      "name": "github",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "transport": "stdio",
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
-      }
-    }
-  }
+	"mcpServers": {
+		"filesystem": {
+			"name": "filesystem",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+			"transport": "stdio"
+		},
+		"github": {
+			"name": "github",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-github"],
+			"transport": "stdio",
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
+			}
+		}
+	}
 }
 ```
 

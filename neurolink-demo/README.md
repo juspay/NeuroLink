@@ -1,5 +1,11 @@
 # NeuroLink AI Toolkit - Interactive Demo
 
+<!-- TOC -->
+
+- [🚀 Next Steps](#[object Object])
+- [📞 Support](#-support)
+<!-- /TOC -->
+
 🧠 **Complete working demo showcasing the NeuroLink SDK with 9 major AI providers**
 
 ## 🚀 Quick Start
@@ -461,25 +467,25 @@ http://localhost:9876
 
 ```json
 {
-  "timestamp": "2025-06-04T10:17:00Z",
-  "providers": {
-    "openai": {
-      "available": true,
-      "model": "gpt-4o",
-      "configured": true
-    },
-    "bedrock": {
-      "available": true,
-      "model": "anthropic.claude-3-sonnet-20240229-v1:0",
-      "configured": true
-    },
-    "vertex": {
-      "available": true,
-      "model": "gemini-2.5-pro",
-      "configured": true
-    }
-  },
-  "bestProvider": "bedrock"
+	"timestamp": "2025-06-04T10:17:00Z",
+	"providers": {
+		"openai": {
+			"available": true,
+			"model": "gpt-4o",
+			"configured": true
+		},
+		"bedrock": {
+			"available": true,
+			"model": "anthropic.claude-3-sonnet-20240229-v1:0",
+			"configured": true
+		},
+		"vertex": {
+			"available": true,
+			"model": "gemini-2.5-pro",
+			"configured": true
+		}
+	},
+	"bestProvider": "bedrock"
 }
 ```
 
@@ -490,10 +496,10 @@ http://localhost:9876
 
 ```json
 {
-  "provider": "openai|bedrock|vertex|auto",
-  "prompt": "Your prompt here",
-  "maxTokens": 500,
-  "temperature": 0.7
+	"provider": "openai|bedrock|vertex|auto",
+	"prompt": "Your prompt here",
+	"maxTokens": 500,
+	"temperature": 0.7
 }
 ```
 
@@ -501,16 +507,16 @@ http://localhost:9876
 
 ```json
 {
-  "success": true,
-  "content": "Generated text response",
-  "provider": "openai",
-  "model": "gpt-4o",
-  "responseTime": 1250,
-  "usage": {
-    "promptTokens": 15,
-    "completionTokens": 42,
-    "totalTokens": 57
-  }
+	"success": true,
+	"content": "Generated text response",
+	"provider": "openai",
+	"model": "gpt-4o",
+	"responseTime": 1250,
+	"usage": {
+		"promptTokens": 15,
+		"completionTokens": 42,
+		"totalTokens": 57
+	}
 }
 ```
 
@@ -527,7 +533,7 @@ http://localhost:9876
 
 ```json
 {
-  "prompt": "Test prompt for fallback"
+	"prompt": "Test prompt for fallback"
 }
 ```
 
@@ -535,20 +541,20 @@ http://localhost:9876
 
 ```json
 {
-  "timestamp": "2025-06-04T10:17:00Z",
-  "attempts": [
-    {
-      "provider": "openai",
-      "status": "failed",
-      "error": "Rate limit exceeded"
-    },
-    { "provider": "bedrock", "status": "success", "responseTime": 890 }
-  ],
-  "success": true,
-  "finalResult": {
-    "provider": "bedrock",
-    "content": "Generated content"
-  }
+	"timestamp": "2025-06-04T10:17:00Z",
+	"attempts": [
+		{
+			"provider": "openai",
+			"status": "failed",
+			"error": "Rate limit exceeded"
+		},
+		{ "provider": "bedrock", "status": "success", "responseTime": 890 }
+	],
+	"success": true,
+	"finalResult": {
+		"provider": "bedrock",
+		"content": "Generated content"
+	}
 }
 ```
 
@@ -559,25 +565,25 @@ http://localhost:9876
 
 ```json
 {
-  "timestamp": "2025-06-04T10:17:00Z",
-  "results": {
-    "openai": {
-      "success": true,
-      "responseTime": 1200,
-      "model": "gpt-4o",
-      "contentLength": 156
-    },
-    "bedrock": {
-      "success": true,
-      "responseTime": 890,
-      "model": "anthropic.claude-3-sonnet-20240229-v1:0",
-      "contentLength": 142
-    },
-    "vertex": {
-      "success": false,
-      "error": "Authentication failed"
-    }
-  }
+	"timestamp": "2025-06-04T10:17:00Z",
+	"results": {
+		"openai": {
+			"success": true,
+			"responseTime": 1200,
+			"model": "gpt-4o",
+			"contentLength": 156
+		},
+		"bedrock": {
+			"success": true,
+			"responseTime": 890,
+			"model": "anthropic.claude-3-sonnet-20240229-v1:0",
+			"contentLength": 142
+		},
+		"vertex": {
+			"success": false,
+			"error": "Authentication failed"
+		}
+	}
 }
 ```
 
@@ -588,14 +594,14 @@ http://localhost:9876
 
 ```json
 {
-  "success": true,
-  "structuredData": {
-    "name": "Alice Johnson",
-    "age": 28,
-    "occupation": "Software Engineer",
-    "hobbies": ["reading", "hiking", "photography"]
-  },
-  "provider": "auto-selected"
+	"success": true,
+	"structuredData": {
+		"name": "Alice Johnson",
+		"age": 28,
+		"occupation": "Software Engineer",
+		"hobbies": ["reading", "hiking", "photography"]
+	},
+	"provider": "auto-selected"
 }
 ```
 

@@ -12,18 +12,18 @@
  */
 
 import type {
-  AIProvider,
-  TextGenerationOptions,
-  StreamTextOptions,
-  EnhancedGenerateTextResult,
+	AIProvider,
+	TextGenerationOptions,
+	StreamTextOptions,
+	EnhancedGenerateTextResult,
 } from "../core/types.js";
 import type {
-  GenerateTextResult,
-  StreamTextResult,
-  ToolSet,
-  LanguageModelV1,
-  LanguageModelV1CallOptions,
-  LanguageModelV1StreamPart,
+	GenerateTextResult,
+	StreamTextResult,
+	ToolSet,
+	LanguageModelV1,
+	LanguageModelV1CallOptions,
+	LanguageModelV1StreamPart,
 } from "ai";
 import { streamText, generateText, Output } from "ai";
 import type { ZodType, ZodTypeDef } from "zod";
@@ -35,786 +35,786 @@ import { evaluateResponse } from "../core/evaluation.js";
 
 // Default system context
 const DEFAULT_SYSTEM_CONTEXT = {
-  systemPrompt: "You are a helpful AI assistant.",
+	systemPrompt: "You are a helpful AI assistant.",
 };
 
 // Declare process for TypeScript
 declare const process: {
-  env: {
-    OLLAMA_BASE_URL?: string;
-    OLLAMA_MODEL?: string;
-    OLLAMA_TIMEOUT?: string;
-  };
+	env: {
+		OLLAMA_BASE_URL?: string;
+		OLLAMA_MODEL?: string;
+		OLLAMA_TIMEOUT?: string;
+	};
 };
 
 /**
  * Ollama API Response Interfaces
  */
 interface OllamaModel {
-  name: string;
-  modified_at: string;
-  size: number;
-  digest: string;
+	name: string;
+	modified_at: string;
+	size: number;
+	digest: string;
 }
 
 interface OllamaListResponse {
-  models: OllamaModel[];
+	models: OllamaModel[];
 }
 
 interface OllamaGenerateResponse {
-  model: string;
-  created_at: string;
-  response: string;
-  done: boolean;
-  context?: number[];
-  total_duration?: number;
-  load_duration?: number;
-  prompt_eval_count?: number;
-  prompt_eval_duration?: number;
-  eval_count?: number;
-  eval_duration?: number;
+	model: string;
+	created_at: string;
+	response: string;
+	done: boolean;
+	context?: number[];
+	total_duration?: number;
+	load_duration?: number;
+	prompt_eval_count?: number;
+	prompt_eval_duration?: number;
+	eval_count?: number;
+	eval_duration?: number;
 }
 
 interface OllamaGenerateRequest {
-  model: string;
-  prompt: string;
-  stream?: boolean;
-  system?: string;
-  temperature?: number;
-  max_tokens?: number;
-  options?: {
-    temperature?: number;
-    num_predict?: number;
-    top_k?: number;
-    top_p?: number;
-  };
+	model: string;
+	prompt: string;
+	stream?: boolean;
+	system?: string;
+	temperature?: number;
+	max_tokens?: number;
+	options?: {
+		temperature?: number;
+		num_predict?: number;
+		top_k?: number;
+		top_p?: number;
+	};
 }
 
 // Custom LanguageModelV1 implementation for Ollama
 class OllamaLanguageModel implements LanguageModelV1 {
-  readonly specificationVersion = "v1";
-  readonly provider = "ollama";
-  readonly modelId: string;
-  readonly maxTokens?: number;
-  readonly supportsStreaming = true;
-  readonly defaultObjectGenerationMode = "json" as const;
+	readonly specificationVersion = "v1";
+	readonly provider = "ollama";
+	readonly modelId: string;
+	readonly maxTokens?: number;
+	readonly supportsStreaming = true;
+	readonly defaultObjectGenerationMode = "json" as const;
 
-  private baseUrl: string;
-  private timeout: number;
+	private baseUrl: string;
+	private timeout: number;
 
-  constructor(modelId: string, baseUrl: string, timeout: number) {
-    this.modelId = modelId;
-    this.baseUrl = baseUrl;
-    this.timeout = timeout;
-  }
+	constructor(modelId: string, baseUrl: string, timeout: number) {
+		this.modelId = modelId;
+		this.baseUrl = baseUrl;
+		this.timeout = timeout;
+	}
 
-  private estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4); // Rough estimation: 4 characters per token
-  }
+	private estimateTokens(text: string): number {
+		return Math.ceil(text.length / 4); // Rough estimation: 4 characters per token
+	}
 
-  private convertMessagesToPrompt(messages: any[]): string {
-    return messages
-      .map((msg) => {
-        if (typeof msg.content === "string") {
-          return `${msg.role}: ${msg.content}`;
-        } else if (Array.isArray(msg.content)) {
-          // Handle multi-part content (text, images, etc.)
-          return `${msg.role}: ${msg.content
-            .filter((part: any) => part.type === "text")
-            .map((part: any) => part.text)
-            .join(" ")}`;
-        }
-        return "";
-      })
-      .join("\n");
-  }
+	private convertMessagesToPrompt(messages: any[]): string {
+		return messages
+			.map((msg) => {
+				if (typeof msg.content === "string") {
+					return `${msg.role}: ${msg.content}`;
+				} else if (Array.isArray(msg.content)) {
+					// Handle multi-part content (text, images, etc.)
+					return `${msg.role}: ${msg.content
+						.filter((part: any) => part.type === "text")
+						.map((part: any) => part.text)
+						.join(" ")}`;
+				}
+				return "";
+			})
+			.join("\n");
+	}
 
-  private async checkHealth(): Promise<boolean> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+	private async checkHealth(): Promise<boolean> {
+		try {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${this.baseUrl}/api/tags`, {
-        method: "GET",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json" },
-      });
+			const response = await fetch(`${this.baseUrl}/api/tags`, {
+				method: "GET",
+				signal: controller.signal,
+				headers: { "Content-Type": "application/json" },
+			});
 
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }
+			clearTimeout(timeoutId);
+			return response.ok;
+		} catch {
+			return false;
+		}
+	}
 
-  private async ensureModelAvailable(): Promise<void> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/tags`);
-      if (!response.ok) {
-        throw new Error("Cannot access Ollama");
-      }
+	private async ensureModelAvailable(): Promise<void> {
+		try {
+			const response = await fetch(`${this.baseUrl}/api/tags`);
+			if (!response.ok) {
+				throw new Error("Cannot access Ollama");
+			}
 
-      const data = (await response.json()) as OllamaListResponse;
-      const models = data.models?.map((m) => m.name) || [];
+			const data = (await response.json()) as OllamaListResponse;
+			const models = data.models?.map((m) => m.name) || [];
 
-      if (!models.includes(this.modelId)) {
-        // Try to pull the model
-        const pullResponse = await fetch(`${this.baseUrl}/api/pull`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: this.modelId }),
-        });
+			if (!models.includes(this.modelId)) {
+				// Try to pull the model
+				const pullResponse = await fetch(`${this.baseUrl}/api/pull`, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ name: this.modelId }),
+				});
 
-        if (!pullResponse.ok) {
-          throw new Error(
-            `Model '${this.modelId}' not available and cannot be pulled`,
-          );
-        }
-      }
-    } catch (error) {
-      throw new Error(
-        `Failed to ensure model availability: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
+				if (!pullResponse.ok) {
+					throw new Error(
+						`Model '${this.modelId}' not available and cannot be pulled`,
+					);
+				}
+			}
+		} catch (error) {
+			throw new Error(
+				`Failed to ensure model availability: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
 
-  async doGenerate(options: LanguageModelV1CallOptions) {
-    // Health check and model availability
-    const isHealthy = await this.checkHealth();
-    if (!isHealthy) {
-      throw new Error(
-        "Ollama service is not running or accessible. Please ensure Ollama is installed and running.",
-      );
-    }
+	async doGenerate(options: LanguageModelV1CallOptions) {
+		// Health check and model availability
+		const isHealthy = await this.checkHealth();
+		if (!isHealthy) {
+			throw new Error(
+				"Ollama service is not running or accessible. Please ensure Ollama is installed and running.",
+			);
+		}
 
-    await this.ensureModelAvailable();
+		await this.ensureModelAvailable();
 
-    const prompt = this.convertMessagesToPrompt(options.prompt);
+		const prompt = this.convertMessagesToPrompt(options.prompt);
 
-    const requestPayload: OllamaGenerateRequest = {
-      model: this.modelId,
-      prompt,
-      stream: false,
-      options: {
-        temperature: options.temperature || 0.7,
-        num_predict: options.maxTokens ?? DEFAULT_MAX_TOKENS,
-      },
-    };
+		const requestPayload: OllamaGenerateRequest = {
+			model: this.modelId,
+			prompt,
+			stream: false,
+			options: {
+				temperature: options.temperature || 0.7,
+				num_predict: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+			},
+		};
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-    try {
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestPayload),
-        signal: controller.signal,
-      });
+		try {
+			const response = await fetch(`${this.baseUrl}/api/generate`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(requestPayload),
+				signal: controller.signal,
+			});
 
-      clearTimeout(timeoutId);
+			clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          const errorData = await response.json();
-          if (errorData.error && errorData.error.includes("not found")) {
-            throw new Error(
-              `Model '${this.modelId}' not found. Please run 'ollama pull ${this.modelId}'`,
-            );
-          }
-        }
-        throw new Error(
-          `Ollama API error: ${response.status} ${response.statusText}`,
-        );
-      }
+			if (!response.ok) {
+				if (response.status === 404) {
+					const errorData = await response.json();
+					if (errorData.error && errorData.error.includes("not found")) {
+						throw new Error(
+							`Model '${this.modelId}' not found. Please run 'ollama pull ${this.modelId}'`,
+						);
+					}
+				}
+				throw new Error(
+					`Ollama API error: ${response.status} ${response.statusText}`,
+				);
+			}
 
-      const data = (await response.json()) as OllamaGenerateResponse;
+			const data = (await response.json()) as OllamaGenerateResponse;
 
-      if (!data.response) {
-        throw new Error("No response received from Ollama");
-      }
+			if (!data.response) {
+				throw new Error("No response received from Ollama");
+			}
 
-      const promptTokens = this.estimateTokens(prompt);
-      const completionTokens = this.estimateTokens(data.response);
+			const promptTokens = this.estimateTokens(prompt);
+			const completionTokens = this.estimateTokens(data.response);
 
-      return {
-        text: data.response,
-        usage: {
-          promptTokens,
-          completionTokens,
-          totalTokens: promptTokens + completionTokens,
-        },
-        finishReason: "stop" as const,
-        logprobs: undefined,
-        rawCall: { rawPrompt: prompt, rawSettings: options },
-        rawResponse: { headers: {} },
-      };
-    } catch (error) {
-      clearTimeout(timeoutId);
+			return {
+				text: data.response,
+				usage: {
+					promptTokens,
+					completionTokens,
+					totalTokens: promptTokens + completionTokens,
+				},
+				finishReason: "stop" as const,
+				logprobs: undefined,
+				rawCall: { rawPrompt: prompt, rawSettings: options },
+				rawResponse: { headers: {} },
+			};
+		} catch (error) {
+			clearTimeout(timeoutId);
 
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 
-      if (
-        errorMessage.includes("AbortError") ||
-        errorMessage.includes("timeout")
-      ) {
-        throw new Error(
-          `Ollama request timeout (${this.timeout}ms). The model may be large or the system is under load.`,
-        );
-      }
+			if (
+				errorMessage.includes("AbortError") ||
+				errorMessage.includes("timeout")
+			) {
+				throw new Error(
+					`Ollama request timeout (${this.timeout}ms). The model may be large or the system is under load.`,
+				);
+			}
 
-      if (
-        errorMessage.includes("ECONNREFUSED") ||
-        errorMessage.includes("fetch failed")
-      ) {
-        throw new Error(
-          "Cannot connect to Ollama service. Please ensure Ollama is installed and running on " +
-            this.baseUrl,
-        );
-      }
+			if (
+				errorMessage.includes("ECONNREFUSED") ||
+				errorMessage.includes("fetch failed")
+			) {
+				throw new Error(
+					"Cannot connect to Ollama service. Please ensure Ollama is installed and running on " +
+						this.baseUrl,
+				);
+			}
 
-      throw error;
-    }
-  }
+			throw error;
+		}
+	}
 
-  async doStream(options: LanguageModelV1CallOptions) {
-    // Health check and model availability
-    const isHealthy = await this.checkHealth();
-    if (!isHealthy) {
-      throw new Error(
-        "Ollama service is not running or accessible. Please ensure Ollama is installed and running.",
-      );
-    }
+	async doStream(options: LanguageModelV1CallOptions) {
+		// Health check and model availability
+		const isHealthy = await this.checkHealth();
+		if (!isHealthy) {
+			throw new Error(
+				"Ollama service is not running or accessible. Please ensure Ollama is installed and running.",
+			);
+		}
 
-    await this.ensureModelAvailable();
+		await this.ensureModelAvailable();
 
-    const prompt = this.convertMessagesToPrompt(options.prompt);
+		const prompt = this.convertMessagesToPrompt(options.prompt);
 
-    const requestPayload: OllamaGenerateRequest = {
-      model: this.modelId,
-      prompt,
-      stream: true,
-      options: {
-        temperature: options.temperature || 0.7,
-        num_predict: options.maxTokens ?? DEFAULT_MAX_TOKENS,
-      },
-    };
+		const requestPayload: OllamaGenerateRequest = {
+			model: this.modelId,
+			prompt,
+			stream: true,
+			options: {
+				temperature: options.temperature || 0.7,
+				num_predict: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+			},
+		};
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-    try {
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestPayload),
-        signal: controller.signal,
-      });
+		try {
+			const response = await fetch(`${this.baseUrl}/api/generate`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(requestPayload),
+				signal: controller.signal,
+			});
 
-      clearTimeout(timeoutId);
+			clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          const errorData = await response.json();
-          if (errorData.error && errorData.error.includes("not found")) {
-            throw new Error(
-              `Model '${this.modelId}' not found. Please run 'ollama pull ${this.modelId}'`,
-            );
-          }
-        }
-        throw new Error(
-          `Ollama API error: ${response.status} ${response.statusText}`,
-        );
-      }
+			if (!response.ok) {
+				if (response.status === 404) {
+					const errorData = await response.json();
+					if (errorData.error && errorData.error.includes("not found")) {
+						throw new Error(
+							`Model '${this.modelId}' not found. Please run 'ollama pull ${this.modelId}'`,
+						);
+					}
+				}
+				throw new Error(
+					`Ollama API error: ${response.status} ${response.statusText}`,
+				);
+			}
 
-      if (!response.body) {
-        throw new Error("No response body received from Ollama streaming API");
-      }
+			if (!response.body) {
+				throw new Error("No response body received from Ollama streaming API");
+			}
 
-      // Create a ReadableStream that parses Ollama's streaming format
-      const stream = new ReadableStream<LanguageModelV1StreamPart>({
-        async start(controller) {
-          const reader = response.body!.getReader();
-          const decoder = new TextDecoder();
-          let totalTokens = 0;
+			// Create a ReadableStream that parses Ollama's streaming format
+			const stream = new ReadableStream<LanguageModelV1StreamPart>({
+				async start(controller) {
+					const reader = response.body!.getReader();
+					const decoder = new TextDecoder();
+					let totalTokens = 0;
 
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
+					try {
+						while (true) {
+							const { done, value } = await reader.read();
 
-              if (done) {
-                break;
-              }
+							if (done) {
+								break;
+							}
 
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split("\n").filter((line) => line.trim());
+							const chunk = decoder.decode(value, { stream: true });
+							const lines = chunk.split("\n").filter((line) => line.trim());
 
-              for (const line of lines) {
-                try {
-                  const data = JSON.parse(line) as OllamaGenerateResponse;
+							for (const line of lines) {
+								try {
+									const data = JSON.parse(line) as OllamaGenerateResponse;
 
-                  if (data.response) {
-                    controller.enqueue({
-                      type: "text-delta",
-                      textDelta: data.response,
-                    });
-                    totalTokens += Math.ceil(data.response.length / 4);
-                  }
+									if (data.response) {
+										controller.enqueue({
+											type: "text-delta",
+											textDelta: data.response,
+										});
+										totalTokens += Math.ceil(data.response.length / 4);
+									}
 
-                  if (data.done) {
-                    controller.enqueue({
-                      type: "finish",
-                      finishReason: "stop",
-                      usage: {
-                        promptTokens:
-                          data.prompt_eval_count ||
-                          Math.ceil(prompt.length / 4),
-                        completionTokens: data.eval_count || totalTokens,
-                      },
-                      logprobs: undefined,
-                    });
-                    controller.close();
-                    return;
-                  }
-                } catch (parseError) {
-                  // Skip invalid JSON lines
-                }
-              }
-            }
-          } finally {
-            reader.releaseLock();
-          }
-        },
-      });
+									if (data.done) {
+										controller.enqueue({
+											type: "finish",
+											finishReason: "stop",
+											usage: {
+												promptTokens:
+													data.prompt_eval_count ||
+													Math.ceil(prompt.length / 4),
+												completionTokens: data.eval_count || totalTokens,
+											},
+											logprobs: undefined,
+										});
+										controller.close();
+										return;
+									}
+								} catch (parseError) {
+									// Skip invalid JSON lines
+								}
+							}
+						}
+					} finally {
+						reader.releaseLock();
+					}
+				},
+			});
 
-      return {
-        stream,
-        rawCall: { rawPrompt: prompt, rawSettings: options },
-        rawResponse: { headers: {} },
-      };
-    } catch (error) {
-      clearTimeout(timeoutId);
+			return {
+				stream,
+				rawCall: { rawPrompt: prompt, rawSettings: options },
+				rawResponse: { headers: {} },
+			};
+		} catch (error) {
+			clearTimeout(timeoutId);
 
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 
-      if (
-        errorMessage.includes("AbortError") ||
-        errorMessage.includes("timeout")
-      ) {
-        throw new Error(
-          `Ollama streaming timeout (${this.timeout}ms). The model may be large or the system is under load.`,
-        );
-      }
+			if (
+				errorMessage.includes("AbortError") ||
+				errorMessage.includes("timeout")
+			) {
+				throw new Error(
+					`Ollama streaming timeout (${this.timeout}ms). The model may be large or the system is under load.`,
+				);
+			}
 
-      if (
-        errorMessage.includes("ECONNREFUSED") ||
-        errorMessage.includes("fetch failed")
-      ) {
-        throw new Error(
-          "Cannot connect to Ollama service. Please ensure Ollama is installed and running on " +
-            this.baseUrl,
-        );
-      }
+			if (
+				errorMessage.includes("ECONNREFUSED") ||
+				errorMessage.includes("fetch failed")
+			) {
+				throw new Error(
+					"Cannot connect to Ollama service. Please ensure Ollama is installed and running on " +
+						this.baseUrl,
+				);
+			}
 
-      throw error;
-    }
-  }
+			throw error;
+		}
+	}
 }
 
 export class Ollama implements AIProvider {
-  private baseUrl: string;
-  private modelName: string;
-  private defaultTimeout: number;
+	private baseUrl: string;
+	private modelName: string;
+	private defaultTimeout: number;
 
-  constructor(modelName?: string) {
-    this.baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-    this.modelName = modelName || process.env.OLLAMA_MODEL || "llama2";
-    // Use environment variable for backward compatibility, but convert to format used by other providers
-    const envTimeout = process.env.OLLAMA_TIMEOUT
-      ? parseInt(process.env.OLLAMA_TIMEOUT)
-      : undefined;
-    this.defaultTimeout =
-      envTimeout ||
-      parseInt(getDefaultTimeout("ollama", "generate").replace(/[^\d]/g, ""));
+	constructor(modelName?: string) {
+		this.baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+		this.modelName = modelName || process.env.OLLAMA_MODEL || "llama2";
+		// Use environment variable for backward compatibility, but convert to format used by other providers
+		const envTimeout = process.env.OLLAMA_TIMEOUT
+			? parseInt(process.env.OLLAMA_TIMEOUT)
+			: undefined;
+		this.defaultTimeout =
+			envTimeout ||
+			parseInt(getDefaultTimeout("ollama", "generate").replace(/[^\d]/g, ""));
 
-    logger.debug("[Ollama] Initialized", {
-      baseUrl: this.baseUrl,
-      modelName: this.modelName,
-      defaultTimeout: this.defaultTimeout,
-    });
-  }
+		logger.debug("[Ollama] Initialized", {
+			baseUrl: this.baseUrl,
+			modelName: this.modelName,
+			defaultTimeout: this.defaultTimeout,
+		});
+	}
 
-  /**
-   * Gets the appropriate model instance
-   * @private
-   */
-  private getModel(timeout?: number): LanguageModelV1 {
-    logger.debug("Ollama.getModel - Ollama model selected", {
-      modelName: this.modelName,
-      timeout: timeout || this.defaultTimeout,
-    });
+	/**
+	 * Gets the appropriate model instance
+	 * @private
+	 */
+	private getModel(timeout?: number): LanguageModelV1 {
+		logger.debug("Ollama.getModel - Ollama model selected", {
+			modelName: this.modelName,
+			timeout: timeout || this.defaultTimeout,
+		});
 
-    return new OllamaLanguageModel(
-      this.modelName,
-      this.baseUrl,
-      timeout || this.defaultTimeout,
-    );
-  }
+		return new OllamaLanguageModel(
+			this.modelName,
+			this.baseUrl,
+			timeout || this.defaultTimeout,
+		);
+	}
 
-  /**
-   * Health check - verify Ollama service is running and accessible
-   */
-  async checkHealth(): Promise<boolean> {
-    const model = new OllamaLanguageModel(
-      this.modelName,
-      this.baseUrl,
-      this.defaultTimeout,
-    );
-    return await model["checkHealth"]();
-  }
+	/**
+	 * Health check - verify Ollama service is running and accessible
+	 */
+	async checkHealth(): Promise<boolean> {
+		const model = new OllamaLanguageModel(
+			this.modelName,
+			this.baseUrl,
+			this.defaultTimeout,
+		);
+		return await model["checkHealth"]();
+	}
 
-  /**
-   * List available models on the Ollama instance
-   */
-  async listModels(): Promise<string[]> {
-    const functionTag = "Ollama.listModels";
+	/**
+	 * List available models on the Ollama instance
+	 */
+	async listModels(): Promise<string[]> {
+		const functionTag = "Ollama.listModels";
 
-    try {
-      logger.debug(`[${functionTag}] Listing available models`);
+		try {
+			logger.debug(`[${functionTag}] Listing available models`);
 
-      const response = await fetch(`${this.baseUrl}/api/tags`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+			const response = await fetch(`${this.baseUrl}/api/tags`, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+			});
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to list models: ${response.status} ${response.statusText}`,
-        );
-      }
+			if (!response.ok) {
+				throw new Error(
+					`Failed to list models: ${response.status} ${response.statusText}`,
+				);
+			}
 
-      const data = (await response.json()) as OllamaListResponse;
-      const modelNames = data.models?.map((model) => model.name) || [];
+			const data = (await response.json()) as OllamaListResponse;
+			const modelNames = data.models?.map((model) => model.name) || [];
 
-      logger.debug(`[${functionTag}] Found models`, {
-        count: modelNames.length,
-        models: modelNames,
-      });
+			logger.debug(`[${functionTag}] Found models`, {
+				count: modelNames.length,
+				models: modelNames,
+			});
 
-      return modelNames;
-    } catch (error) {
-      logger.debug(`[${functionTag}] Error listing models`, {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new Error(
-        `Failed to list Ollama models: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
+			return modelNames;
+		} catch (error) {
+			logger.debug(`[${functionTag}] Error listing models`, {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			throw new Error(
+				`Failed to list Ollama models: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
 
-  /**
-   * Check if a specific model is available
-   */
-  async isModelAvailable(modelName: string): Promise<boolean> {
-    try {
-      const models = await this.listModels();
-      return models.includes(modelName);
-    } catch (error) {
-      return false;
-    }
-  }
+	/**
+	 * Check if a specific model is available
+	 */
+	async isModelAvailable(modelName: string): Promise<boolean> {
+		try {
+			const models = await this.listModels();
+			return models.includes(modelName);
+		} catch (error) {
+			return false;
+		}
+	}
 
-  /**
-   * Pull/download a model to the local Ollama instance
-   */
-  async pullModel(modelName: string): Promise<void> {
-    const functionTag = "Ollama.pullModel";
+	/**
+	 * Pull/download a model to the local Ollama instance
+	 */
+	async pullModel(modelName: string): Promise<void> {
+		const functionTag = "Ollama.pullModel";
 
-    try {
-      logger.debug(`[${functionTag}] Pulling model`, { modelName });
+		try {
+			logger.debug(`[${functionTag}] Pulling model`, { modelName });
 
-      const response = await fetch(`${this.baseUrl}/api/pull`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: modelName,
-        }),
-      });
+			const response = await fetch(`${this.baseUrl}/api/pull`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					name: modelName,
+				}),
+			});
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to pull model: ${response.status} ${response.statusText}`,
-        );
-      }
+			if (!response.ok) {
+				throw new Error(
+					`Failed to pull model: ${response.status} ${response.statusText}`,
+				);
+			}
 
-      // Note: Ollama pull API returns streaming responses
-      // For simplicity, we're not handling the streaming progress here
-      logger.debug(`[${functionTag}] Model pull completed`, { modelName });
-    } catch (error) {
-      logger.debug(`[${functionTag}] Error pulling model`, {
-        modelName,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new Error(
-        `Failed to pull model '${modelName}': ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
+			// Note: Ollama pull API returns streaming responses
+			// For simplicity, we're not handling the streaming progress here
+			logger.debug(`[${functionTag}] Model pull completed`, { modelName });
+		} catch (error) {
+			logger.debug(`[${functionTag}] Error pulling model`, {
+				modelName,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			throw new Error(
+				`Failed to pull model '${modelName}': ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
 
-  /**
-   * Generate text using Ollama local models
-   */
-  async generateText(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<GenerateTextResult<ToolSet, unknown> | null> {
-    const functionTag = "Ollama.generateText";
-    const provider = "ollama";
-    const startTime = Date.now();
+	/**
+	 * Generate text using Ollama local models
+	 */
+	async generateText(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<GenerateTextResult<ToolSet, unknown> | null> {
+		const functionTag = "Ollama.generateText";
+		const provider = "ollama";
+		const startTime = Date.now();
 
-    try {
-      // Parse parameters - support both string and options object
-      const options =
-        typeof optionsOrPrompt === "string"
-          ? { prompt: optionsOrPrompt }
-          : optionsOrPrompt;
+		try {
+			// Parse parameters - support both string and options object
+			const options =
+				typeof optionsOrPrompt === "string"
+					? { prompt: optionsOrPrompt }
+					: optionsOrPrompt;
 
-      const {
-        prompt,
-        temperature = 0.7,
-        maxTokens = DEFAULT_MAX_TOKENS,
-        systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
-        schema,
-        timeout,
-      } = options;
+			const {
+				prompt,
+				temperature = 0.7,
+				maxTokens = DEFAULT_MAX_TOKENS,
+				systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+				schema,
+				timeout,
+			} = options;
 
-      // Use schema from options or fallback parameter
-      const finalSchema = schema || analysisSchema;
+			// Use schema from options or fallback parameter
+			const finalSchema = schema || analysisSchema;
 
-      // Convert timeout to milliseconds if provided as string
-      const timeoutMs = timeout
-        ? typeof timeout === "string"
-          ? parseInt(
-              getDefaultTimeout("ollama", "generate").replace(/[^\d]/g, ""),
-            )
-          : timeout
-        : this.defaultTimeout;
+			// Convert timeout to milliseconds if provided as string
+			const timeoutMs = timeout
+				? typeof timeout === "string"
+					? parseInt(
+							getDefaultTimeout("ollama", "generate").replace(/[^\d]/g, ""),
+						)
+					: timeout
+				: this.defaultTimeout;
 
-      logger.debug(`[${functionTag}] Generate request started`, {
-        provider,
-        modelName: this.modelName,
-        promptLength: prompt.length,
-        temperature,
-        maxTokens,
-        timeout: timeoutMs,
-      });
+			logger.debug(`[${functionTag}] Generate request started`, {
+				provider,
+				modelName: this.modelName,
+				promptLength: prompt.length,
+				temperature,
+				maxTokens,
+				timeout: timeoutMs,
+			});
 
-      const model = this.getModel(timeoutMs);
+			const model = this.getModel(timeoutMs);
 
-      const generateOptions = {
-        model: model,
-        prompt: prompt,
-        system: systemPrompt,
-        temperature,
-        maxTokens,
-      } as Parameters<typeof generateText>[0];
+			const generateOptions = {
+				model: model,
+				prompt: prompt,
+				system: systemPrompt,
+				temperature,
+				maxTokens,
+			} as Parameters<typeof generateText>[0];
 
-      if (finalSchema) {
-        generateOptions.experimental_output = Output.object({
-          schema: finalSchema,
-        });
-      }
+			if (finalSchema) {
+				generateOptions.experimental_output = Output.object({
+					schema: finalSchema,
+				});
+			}
 
-      const result = await generateText(generateOptions);
+			const result = await generateText(generateOptions);
 
-      if (result.text.includes("model not found")) {
-        throw new Error(
-          `Model '${this.modelName}' not found. Please run 'ollama pull ${this.modelName}'`,
-        );
-      }
+			if (result.text.includes("model not found")) {
+				throw new Error(
+					`Model '${this.modelName}' not found. Please run 'ollama pull ${this.modelName}'`,
+				);
+			}
 
-      logger.debug(`[${functionTag}] Generate text completed`, {
-        provider,
-        modelName: this.modelName,
-        usage: result.usage,
-        finishReason: result.finishReason,
-        responseLength: result.text?.length || 0,
-      });
+			logger.debug(`[${functionTag}] Generate text completed`, {
+				provider,
+				modelName: this.modelName,
+				usage: result.usage,
+				finishReason: result.finishReason,
+				responseLength: result.text?.length || 0,
+			});
 
-      // Add analytics if enabled
-      if (options.enableAnalytics) {
-        (result as any).analytics = {
-          provider,
-          model: this.modelName,
-          tokens: result.usage,
-          responseTime: Date.now() - startTime,
-          context: options.context,
-        };
-      }
+			// Add analytics if enabled
+			if (options.enableAnalytics) {
+				(result as any).analytics = {
+					provider,
+					model: this.modelName,
+					tokens: result.usage,
+					responseTime: Date.now() - startTime,
+					context: options.context,
+				};
+			}
 
-      // Add evaluation if enabled
-      if (options.enableEvaluation) {
-        (result as any).evaluation = await evaluateResponse(
-          prompt,
-          result.text,
-          options.context,
-        );
-      }
+			// Add evaluation if enabled
+			if (options.enableEvaluation) {
+				(result as any).evaluation = await evaluateResponse(
+					prompt,
+					result.text,
+					options.context,
+				);
+			}
 
-      return result;
-    } catch (err) {
-      logger.debug(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in generating text",
-        err: String(err),
-      });
-      throw err; // Re-throw error to trigger fallback
-    }
-  }
+			return result;
+		} catch (err) {
+			logger.debug(`[${functionTag}] Exception`, {
+				provider,
+				modelName: this.modelName,
+				message: "Error in generating text",
+				err: String(err),
+			});
+			throw err; // Re-throw error to trigger fallback
+		}
+	}
 
-  /**
-   * Generate streaming text using Ollama local models
-   */
-  async streamText(
-    optionsOrPrompt: StreamTextOptions | string,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<StreamTextResult<ToolSet, unknown> | null> {
-    const functionTag = "Ollama.streamText";
-    const provider = "ollama";
-    let chunkCount = 0;
+	/**
+	 * Generate streaming text using Ollama local models
+	 */
+	async streamText(
+		optionsOrPrompt: StreamTextOptions | string,
+		analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+	): Promise<StreamTextResult<ToolSet, unknown> | null> {
+		const functionTag = "Ollama.streamText";
+		const provider = "ollama";
+		let chunkCount = 0;
 
-    try {
-      // Parse parameters - support both string and options object
-      const options =
-        typeof optionsOrPrompt === "string"
-          ? { prompt: optionsOrPrompt }
-          : optionsOrPrompt;
+		try {
+			// Parse parameters - support both string and options object
+			const options =
+				typeof optionsOrPrompt === "string"
+					? { prompt: optionsOrPrompt }
+					: optionsOrPrompt;
 
-      const {
-        prompt,
-        temperature = 0.7,
-        maxTokens = DEFAULT_MAX_TOKENS,
-        systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
-        schema,
-        timeout,
-      } = options;
+			const {
+				prompt,
+				temperature = 0.7,
+				maxTokens = DEFAULT_MAX_TOKENS,
+				systemPrompt = DEFAULT_SYSTEM_CONTEXT.systemPrompt,
+				schema,
+				timeout,
+			} = options;
 
-      // Use schema from options or fallback parameter
-      const finalSchema = schema || analysisSchema;
+			// Use schema from options or fallback parameter
+			const finalSchema = schema || analysisSchema;
 
-      // Convert timeout to milliseconds if provided as string
-      const timeoutMs = timeout
-        ? typeof timeout === "string"
-          ? parseInt(
-              getDefaultTimeout("ollama", "stream").replace(/[^\d]/g, ""),
-            )
-          : timeout
-        : this.defaultTimeout;
+			// Convert timeout to milliseconds if provided as string
+			const timeoutMs = timeout
+				? typeof timeout === "string"
+					? parseInt(
+							getDefaultTimeout("ollama", "stream").replace(/[^\d]/g, ""),
+						)
+					: timeout
+				: this.defaultTimeout;
 
-      logger.debug(`[${functionTag}] Stream request started`, {
-        provider,
-        modelName: this.modelName,
-        promptLength: prompt.length,
-        temperature,
-        maxTokens,
-        hasSchema: !!finalSchema,
-        timeout: timeoutMs,
-      });
+			logger.debug(`[${functionTag}] Stream request started`, {
+				provider,
+				modelName: this.modelName,
+				promptLength: prompt.length,
+				temperature,
+				maxTokens,
+				hasSchema: !!finalSchema,
+				timeout: timeoutMs,
+			});
 
-      const model = this.getModel(timeoutMs);
+			const model = this.getModel(timeoutMs);
 
-      const streamOptions = {
-        model: model,
-        prompt: prompt,
-        system: systemPrompt,
-        temperature,
-        maxTokens,
+			const streamOptions = {
+				model: model,
+				prompt: prompt,
+				system: systemPrompt,
+				temperature,
+				maxTokens,
 
-        onError: (event: { error: unknown }) => {
-          const error = event.error;
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          const errorStack = error instanceof Error ? error.stack : undefined;
+				onError: (event: { error: unknown }) => {
+					const error = event.error;
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					const errorStack = error instanceof Error ? error.stack : undefined;
 
-          logger.debug(`[${functionTag}] Stream text error`, {
-            provider,
-            modelName: this.modelName,
-            error: errorMessage,
-            stack: errorStack,
-            promptLength: prompt.length,
-            chunkCount,
-          });
-        },
+					logger.debug(`[${functionTag}] Stream text error`, {
+						provider,
+						modelName: this.modelName,
+						error: errorMessage,
+						stack: errorStack,
+						promptLength: prompt.length,
+						chunkCount,
+					});
+				},
 
-        onFinish: (event: {
-          finishReason: string;
-          usage: Record<string, unknown>;
-          text?: string;
-        }) => {
-          logger.debug(`[${functionTag}] Stream text finished`, {
-            provider,
-            modelName: this.modelName,
-            finishReason: event.finishReason,
-            usage: event.usage,
-            totalChunks: chunkCount,
-            promptLength: prompt.length,
-            responseLength: event.text?.length || 0,
-          });
-        },
+				onFinish: (event: {
+					finishReason: string;
+					usage: Record<string, unknown>;
+					text?: string;
+				}) => {
+					logger.debug(`[${functionTag}] Stream text finished`, {
+						provider,
+						modelName: this.modelName,
+						finishReason: event.finishReason,
+						usage: event.usage,
+						totalChunks: chunkCount,
+						promptLength: prompt.length,
+						responseLength: event.text?.length || 0,
+					});
+				},
 
-        onChunk: (event: { chunk: { type: string; text?: string } }) => {
-          chunkCount++;
-          logger.debug(`[${functionTag}] Stream text chunk`, {
-            provider,
-            modelName: this.modelName,
-            chunkNumber: chunkCount,
-            chunkLength: event.chunk.text?.length || 0,
-            chunkType: event.chunk.type,
-          });
-        },
-      } as Parameters<typeof streamText>[0];
+				onChunk: (event: { chunk: { type: string; text?: string } }) => {
+					chunkCount++;
+					logger.debug(`[${functionTag}] Stream text chunk`, {
+						provider,
+						modelName: this.modelName,
+						chunkNumber: chunkCount,
+						chunkLength: event.chunk.text?.length || 0,
+						chunkType: event.chunk.type,
+					});
+				},
+			} as Parameters<typeof streamText>[0];
 
-      if (finalSchema) {
-        streamOptions.experimental_output = Output.object({
-          schema: finalSchema,
-        });
-      }
+			if (finalSchema) {
+				streamOptions.experimental_output = Output.object({
+					schema: finalSchema,
+				});
+			}
 
-      const result = streamText(streamOptions);
-      return result;
-    } catch (err) {
-      logger.debug(`[${functionTag}] Exception`, {
-        provider,
-        modelName: this.modelName,
-        message: "Error in streaming text",
-        err: String(err),
-        promptLength:
-          typeof optionsOrPrompt === "string"
-            ? optionsOrPrompt.length
-            : optionsOrPrompt.prompt.length,
-      });
-      throw err; // Re-throw error to trigger fallback
-    }
-  }
+			const result = streamText(streamOptions);
+			return result;
+		} catch (err) {
+			logger.debug(`[${functionTag}] Exception`, {
+				provider,
+				modelName: this.modelName,
+				message: "Error in streaming text",
+				err: String(err),
+				promptLength:
+					typeof optionsOrPrompt === "string"
+						? optionsOrPrompt.length
+						: optionsOrPrompt.prompt.length,
+			});
+			throw err; // Re-throw error to trigger fallback
+		}
+	}
 
-  async generate(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: any,
-  ): Promise<EnhancedGenerateTextResult | null> {
-    return this.generateText(optionsOrPrompt, analysisSchema);
-  }
+	async generate(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: any,
+	): Promise<EnhancedGenerateTextResult | null> {
+		return this.generateText(optionsOrPrompt, analysisSchema);
+	}
 
-  async gen(
-    optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: any,
-  ): Promise<EnhancedGenerateTextResult | null> {
-    return this.generateText(optionsOrPrompt, analysisSchema);
-  }
+	async gen(
+		optionsOrPrompt: TextGenerationOptions | string,
+		analysisSchema?: any,
+	): Promise<EnhancedGenerateTextResult | null> {
+		return this.generateText(optionsOrPrompt, analysisSchema);
+	}
 }

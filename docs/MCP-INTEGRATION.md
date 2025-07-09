@@ -45,7 +45,37 @@ npx neurolink mcp test filesystem
 npx neurolink mcp list --status
 ```
 
-### **3. Execute Tools (Coming Soon)**
+### **3. 🆕 Programmatic Server Management**
+
+**NEW!** Add MCP servers dynamically at runtime:
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+// Add external servers dynamically
+await neurolink.addMCPServer("bitbucket", {
+	command: "npx",
+	args: ["-y", "@nexus2520/bitbucket-mcp-server"],
+	env: {
+		BITBUCKET_USERNAME: "your-username",
+		BITBUCKET_APP_PASSWORD: "your-token",
+	},
+});
+
+// Add database integration
+await neurolink.addMCPServer("database", {
+	command: "node",
+	args: ["./custom-db-server.js"],
+	env: { DB_CONNECTION: "postgresql://..." },
+});
+
+// Verify registration
+const status = await neurolink.getMCPStatus();
+console.log("Active servers:", status.totalServers);
+```
+
+### **4. Execute Tools (Coming Soon)**
 
 ```bash
 # Execute tools from connected servers
@@ -172,30 +202,30 @@ MCP servers are configured in `.mcp-config.json`:
 
 ```json
 {
-  "mcpServers": {
-    "filesystem": {
-      "name": "filesystem",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
-      "transport": "stdio"
-    },
-    "github": {
-      "name": "github",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "transport": "stdio",
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
-      }
-    },
-    "custom": {
-      "name": "custom",
-      "command": "python",
-      "args": ["/path/to/server.py"],
-      "transport": "stdio",
-      "cwd": "/project/directory"
-    }
-  }
+	"mcpServers": {
+		"filesystem": {
+			"name": "filesystem",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+			"transport": "stdio"
+		},
+		"github": {
+			"name": "github",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-github"],
+			"transport": "stdio",
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..."
+			}
+		},
+		"custom": {
+			"name": "custom",
+			"command": "python",
+			"args": ["/path/to/server.py"],
+			"transport": "stdio",
+			"cwd": "/project/directory"
+		}
+	}
 }
 ```
 

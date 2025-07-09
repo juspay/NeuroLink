@@ -11,28 +11,28 @@ import { createBestAIProvider } from "@juspay/neurolink";
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ request }) => {
-  try {
-    const { message } = await request.json();
+	try {
+		const { message } = await request.json();
 
-    const provider = createBestAIProvider();
-    const result = await provider.streamText({
-      prompt: message,
-      temperature: 0.7,
-      maxTokens: 1000,
-    });
+		const provider = createBestAIProvider();
+		const result = await provider.streamText({
+			prompt: message,
+			temperature: 0.7,
+			maxTokens: 1000,
+		});
 
-    return new Response(result.toReadableStream(), {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-      },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+		return new Response(result.toReadableStream(), {
+			headers: {
+				"Content-Type": "text/plain; charset=utf-8",
+				"Cache-Control": "no-cache",
+			},
+		});
+	} catch (error) {
+		return new Response(JSON.stringify({ error: error.message }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
 };
 ```
 
@@ -145,38 +145,38 @@ import { AIProviderFactory } from "@juspay/neurolink";
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ request }) => {
-  try {
-    const { message, useCase, optimizeFor } = await request.json();
+	try {
+		const { message, useCase, optimizeFor } = await request.json();
 
-    const factory = new AIProviderFactory();
+		const factory = new AIProviderFactory();
 
-    // Use dynamic model selection based on use case
-    const provider = await factory.createProvider({
-      provider: "auto",
-      capability: useCase === "vision" ? "vision" : "general",
-      optimizeFor: optimizeFor || "quality", // 'cost', 'speed', or 'quality'
-    });
+		// Use dynamic model selection based on use case
+		const provider = await factory.createProvider({
+			provider: "auto",
+			capability: useCase === "vision" ? "vision" : "general",
+			optimizeFor: optimizeFor || "quality", // 'cost', 'speed', or 'quality'
+		});
 
-    const result = await provider.streamText({
-      prompt: message,
-      temperature: 0.7,
-      maxTokens: 1000,
-    });
+		const result = await provider.streamText({
+			prompt: message,
+			temperature: 0.7,
+			maxTokens: 1000,
+		});
 
-    return new Response(result.toReadableStream(), {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "X-Model-Used": result.model,
-        "X-Provider-Used": result.provider,
-      },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+		return new Response(result.toReadableStream(), {
+			headers: {
+				"Content-Type": "text/plain; charset=utf-8",
+				"Cache-Control": "no-cache",
+				"X-Model-Used": result.model,
+				"X-Provider-Used": result.provider,
+			},
+		});
+	} catch (error) {
+		return new Response(JSON.stringify({ error: error.message }), {
+			status: 500,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
 };
 ```
 
@@ -315,44 +315,44 @@ import { createBestAIProvider } from "@juspay/neurolink";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  try {
-    const { prompt, ...options } = await request.json();
+	try {
+		const { prompt, ...options } = await request.json();
 
-    const provider = createBestAIProvider();
-    const result = await provider.generateText({
-      prompt,
-      temperature: 0.7,
-      maxTokens: 1000,
-      ...options,
-    });
+		const provider = createBestAIProvider();
+		const result = await provider.generateText({
+			prompt,
+			temperature: 0.7,
+			maxTokens: 1000,
+			...options,
+		});
 
-    return NextResponse.json({
-      text: result.text,
-      provider: result.provider,
-      usage: result.usage,
-    });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+		return NextResponse.json({
+			text: result.text,
+			provider: result.provider,
+			usage: result.usage,
+		});
+	} catch (error) {
+		return NextResponse.json({ error: error.message }, { status: 500 });
+	}
 }
 
 // Streaming endpoint
 export async function PUT(request: NextRequest) {
-  try {
-    const { prompt } = await request.json();
+	try {
+		const { prompt } = await request.json();
 
-    const provider = createBestAIProvider();
-    const result = await provider.streamText({ prompt });
+		const provider = createBestAIProvider();
+		const result = await provider.streamText({ prompt });
 
-    return new Response(result.toReadableStream(), {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-      },
-    });
-  } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+		return new Response(result.toReadableStream(), {
+			headers: {
+				"Content-Type": "text/plain; charset=utf-8",
+				"Cache-Control": "no-cache",
+			},
+		});
+	} catch (error) {
+		return NextResponse.json({ error: error.message }, { status: 500 });
+	}
 }
 ```
 
@@ -549,81 +549,81 @@ app.use(express.json());
 
 // Simple generation endpoint
 app.post("/api/generate", async (req, res) => {
-  try {
-    const { prompt, options = {} } = req.body;
+	try {
+		const { prompt, options = {} } = req.body;
 
-    const provider = createBestAIProvider();
-    const result = await provider.generateText({
-      prompt,
-      ...options,
-    });
+		const provider = createBestAIProvider();
+		const result = await provider.generateText({
+			prompt,
+			...options,
+		});
 
-    res.json({
-      success: true,
-      text: result.text,
-      provider: result.provider,
-      usage: result.usage,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
+		res.json({
+			success: true,
+			text: result.text,
+			provider: result.provider,
+			usage: result.usage,
+		});
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			error: error.message,
+		});
+	}
 });
 
 // Streaming endpoint
 app.post("/api/stream", async (req, res) => {
-  try {
-    const { prompt } = req.body;
+	try {
+		const { prompt } = req.body;
 
-    const provider = createBestAIProvider();
-    const result = await provider.streamText({ prompt });
+		const provider = createBestAIProvider();
+		const result = await provider.streamText({ prompt });
 
-    res.setHeader("Content-Type", "text/plain");
-    res.setHeader("Cache-Control", "no-cache");
+		res.setHeader("Content-Type", "text/plain");
+		res.setHeader("Cache-Control", "no-cache");
 
-    for await (const chunk of result.textStream) {
-      res.write(chunk);
-    }
-    res.end();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+		for await (const chunk of result.textStream) {
+			res.write(chunk);
+		}
+		res.end();
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
 });
 
 // Provider status endpoint
 app.get("/api/status", async (req, res) => {
-  const providers = ["openai", "bedrock", "vertex"];
-  const status = {};
+	const providers = ["openai", "bedrock", "vertex"];
+	const status = {};
 
-  for (const providerName of providers) {
-    try {
-      const provider = AIProviderFactory.createProvider(providerName);
-      const start = Date.now();
+	for (const providerName of providers) {
+		try {
+			const provider = AIProviderFactory.createProvider(providerName);
+			const start = Date.now();
 
-      await provider.generateText({
-        prompt: "test",
-        maxTokens: 1,
-      });
+			await provider.generateText({
+				prompt: "test",
+				maxTokens: 1,
+			});
 
-      status[providerName] = {
-        available: true,
-        responseTime: Date.now() - start,
-      };
-    } catch (error) {
-      status[providerName] = {
-        available: false,
-        error: error.message,
-      };
-    }
-  }
+			status[providerName] = {
+				available: true,
+				responseTime: Date.now() - start,
+			};
+		} catch (error) {
+			status[providerName] = {
+				available: false,
+				error: error.message,
+			};
+		}
+	}
 
-  res.json(status);
+	res.json(status);
 });
 
 app.listen(9876, () => {
-  console.log("Server running on http://localhost:9876");
+	console.log("Server running on http://localhost:9876");
 });
 ```
 
@@ -638,60 +638,60 @@ app.use(express.json());
 
 // Middleware for AI provider
 app.use("/api/ai", (req, res, next) => {
-  req.aiProvider = createBestAIProvider();
-  next();
+	req.aiProvider = createBestAIProvider();
+	next();
 });
 
 // Rate limiting middleware
 const rateLimitMap = new Map();
 app.use("/api/ai", (req, res, next) => {
-  const ip = req.ip;
-  const now = Date.now();
-  const requests = rateLimitMap.get(ip) || [];
+	const ip = req.ip;
+	const now = Date.now();
+	const requests = rateLimitMap.get(ip) || [];
 
-  // Allow 10 requests per minute
-  const recentRequests = requests.filter((time) => now - time < 60000);
+	// Allow 10 requests per minute
+	const recentRequests = requests.filter((time) => now - time < 60000);
 
-  if (recentRequests.length >= 10) {
-    return res.status(429).json({ error: "Rate limit exceeded" });
-  }
+	if (recentRequests.length >= 10) {
+		return res.status(429).json({ error: "Rate limit exceeded" });
+	}
 
-  recentRequests.push(now);
-  rateLimitMap.set(ip, recentRequests);
-  next();
+	recentRequests.push(now);
+	rateLimitMap.set(ip, recentRequests);
+	next();
 });
 
 // Batch processing endpoint
 app.post("/api/ai/batch", async (req, res) => {
-  try {
-    const { prompts, options = {} } = req.body;
+	try {
+		const { prompts, options = {} } = req.body;
 
-    if (!Array.isArray(prompts) || prompts.length === 0) {
-      return res.status(400).json({ error: "Prompts array required" });
-    }
+		if (!Array.isArray(prompts) || prompts.length === 0) {
+			return res.status(400).json({ error: "Prompts array required" });
+		}
 
-    const results = [];
-    for (const prompt of prompts) {
-      try {
-        const result = await req.aiProvider.generateText({
-          prompt,
-          ...options,
-        });
-        results.push({ success: true, ...result });
-      } catch (error) {
-        results.push({ success: false, error: error.message });
-      }
+		const results = [];
+		for (const prompt of prompts) {
+			try {
+				const result = await req.aiProvider.generateText({
+					prompt,
+					...options,
+				});
+				results.push({ success: true, ...result });
+			} catch (error) {
+				results.push({ success: false, error: error.message });
+			}
 
-      // Add delay to prevent rate limiting
-      if (results.length < prompts.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    }
+			// Add delay to prevent rate limiting
+			if (results.length < prompts.length) {
+				await new Promise((resolve) => setTimeout(resolve, 1000));
+			}
+		}
 
-    res.json({ results });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+		res.json({ results });
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
 });
 ```
 
@@ -820,60 +820,60 @@ function MyComponent() {
 import { useState, useCallback } from "react";
 
 export function useAIStream(apiEndpoint = "/api/ai/stream") {
-  const [streaming, setStreaming] = useState(false);
-  const [content, setContent] = useState("");
-  const [error, setError] = useState<string | null>(null);
+	const [streaming, setStreaming] = useState(false);
+	const [content, setContent] = useState("");
+	const [error, setError] = useState<string | null>(null);
 
-  const stream = useCallback(
-    async (prompt: string) => {
-      if (!prompt.trim()) return;
+	const stream = useCallback(
+		async (prompt: string) => {
+			if (!prompt.trim()) return;
 
-      setStreaming(true);
-      setContent("");
-      setError(null);
+			setStreaming(true);
+			setContent("");
+			setError(null);
 
-      try {
-        const response = await fetch(apiEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
-        });
+			try {
+				const response = await fetch(apiEndpoint, {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ prompt }),
+				});
 
-        if (!response.body) {
-          throw new Error("No response stream");
-        }
+				if (!response.body) {
+					throw new Error("No response stream");
+				}
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
+				const reader = response.body.getReader();
+				const decoder = new TextDecoder();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          setContent((prev) => prev + chunk);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Stream error");
-      } finally {
-        setStreaming(false);
-      }
-    },
-    [apiEndpoint],
-  );
+					const chunk = decoder.decode(value, { stream: true });
+					setContent((prev) => prev + chunk);
+				}
+			} catch (err) {
+				setError(err instanceof Error ? err.message : "Stream error");
+			} finally {
+				setStreaming(false);
+			}
+		},
+		[apiEndpoint],
+	);
 
-  const clear = useCallback(() => {
-    setContent("");
-    setError(null);
-  }, []);
+	const clear = useCallback(() => {
+		setContent("");
+		setError(null);
+	}, []);
 
-  return {
-    stream,
-    streaming,
-    content,
-    error,
-    clear,
-  };
+	return {
+		stream,
+		streaming,
+		content,
+		error,
+		clear,
+	};
 }
 ```
 
@@ -886,50 +886,50 @@ export function useAIStream(apiEndpoint = "/api/ai/stream") {
 import { ref, computed } from "vue";
 
 export function useAI() {
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const result = ref<string>("");
+	const loading = ref(false);
+	const error = ref<string | null>(null);
+	const result = ref<string>("");
 
-  const generate = async (prompt: string, options = {}) => {
-    if (!prompt.trim()) return;
+	const generate = async (prompt: string, options = {}) => {
+		if (!prompt.trim()) return;
 
-    loading.value = true;
-    error.value = null;
-    result.value = "";
+		loading.value = true;
+		error.value = null;
+		result.value = "";
 
-    try {
-      const response = await fetch("/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, ...options }),
-      });
+		try {
+			const response = await fetch("/api/ai", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ prompt, ...options }),
+			});
 
-      const data = await response.json();
+			const data = await response.json();
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+			if (data.error) {
+				throw new Error(data.error);
+			}
 
-      result.value = data.text;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Unknown error";
-    } finally {
-      loading.value = false;
-    }
-  };
+			result.value = data.text;
+		} catch (err) {
+			error.value = err instanceof Error ? err.message : "Unknown error";
+		} finally {
+			loading.value = false;
+		}
+	};
 
-  const clear = () => {
-    result.value = "";
-    error.value = null;
-  };
+	const clear = () => {
+		result.value = "";
+		error.value = null;
+	};
 
-  return {
-    loading: computed(() => loading.value),
-    error: computed(() => error.value),
-    result: computed(() => result.value),
-    generate,
-    clear,
-  };
+	return {
+		loading: computed(() => loading.value),
+		error: computed(() => error.value),
+		result: computed(() => result.value),
+		generate,
+		clear,
+	};
 }
 ```
 
@@ -937,28 +937,28 @@ export function useAI() {
 
 ```vue
 <template>
-  <div class="ai-chat">
-    <h1>AI Chat with NeuroLink</h1>
+	<div class="ai-chat">
+		<h1>AI Chat with NeuroLink</h1>
 
-    <div class="input-group">
-      <textarea
-        v-model="prompt"
-        placeholder="Enter your prompt..."
-        @keydown.enter.prevent="handleGenerate"
-        :disabled="loading"
-      />
-      <button @click="handleGenerate" :disabled="loading || !prompt.trim()">
-        {{ loading ? "Generating..." : "Generate" }}
-      </button>
-    </div>
+		<div class="input-group">
+			<textarea
+				v-model="prompt"
+				placeholder="Enter your prompt..."
+				@keydown.enter.prevent="handleGenerate"
+				:disabled="loading"
+			/>
+			<button @click="handleGenerate" :disabled="loading || !prompt.trim()">
+				{{ loading ? "Generating..." : "Generate" }}
+			</button>
+		</div>
 
-    <div v-if="error" class="error">Error: {{ error }}</div>
+		<div v-if="error" class="error">Error: {{ error }}</div>
 
-    <div v-if="result" class="result">
-      <h3>Response:</h3>
-      <p>{{ result }}</p>
-    </div>
-  </div>
+		<div v-if="result" class="result">
+			<h3>Response:</h3>
+			<p>{{ result }}</p>
+		</div>
+	</div>
 </template>
 
 <script setup lang="ts">
@@ -969,65 +969,65 @@ const prompt = ref("");
 const { loading, error, result, generate } = useAI();
 
 const handleGenerate = async () => {
-  if (!prompt.value.trim()) return;
+	if (!prompt.value.trim()) return;
 
-  await generate(prompt.value, {
-    temperature: 0.7,
-    maxTokens: 500,
-  });
+	await generate(prompt.value, {
+		temperature: 0.7,
+		maxTokens: 500,
+	});
 
-  prompt.value = "";
+	prompt.value = "";
 };
 </script>
 
 <style scoped>
 .ai-chat {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 2rem;
+	max-width: 600px;
+	margin: 0 auto;
+	padding: 2rem;
 }
 
 .input-group {
-  display: flex;
-  gap: 1rem;
-  margin: 1rem 0;
+	display: flex;
+	gap: 1rem;
+	margin: 1rem 0;
 }
 
 textarea {
-  flex: 1;
-  min-height: 100px;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+	flex: 1;
+	min-height: 100px;
+	padding: 0.5rem;
+	border: 1px solid #ccc;
+	border-radius: 4px;
 }
 
 button {
-  padding: 0.5rem 1rem;
-  background: #42b883;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+	padding: 0.5rem 1rem;
+	background: #42b883;
+	color: white;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
 }
 
 button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .error {
-  padding: 1rem;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 4px;
-  color: #c00;
+	padding: 1rem;
+	background: #fee;
+	border: 1px solid #fcc;
+	border-radius: 4px;
+	color: #c00;
 }
 
 .result {
-  padding: 1rem;
-  background: #f9f9f9;
-  border-radius: 4px;
-  margin-top: 1rem;
+	padding: 1rem;
+	background: #f9f9f9;
+	border-radius: 4px;
+	margin-top: 1rem;
 }
 </style>
 ```
@@ -1056,13 +1056,13 @@ ENABLE_FALLBACK="true"
 ```javascript
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    // Don't expose AWS keys to client
-  },
-  experimental: {
-    serverComponentsExternalPackages: ["@juspay/neurolink"],
-  },
+	env: {
+		OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+		// Don't expose AWS keys to client
+	},
+	experimental: {
+		serverComponentsExternalPackages: ["@juspay/neurolink"],
+	},
 };
 
 module.exports = nextConfig;
@@ -1075,11 +1075,11 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [sveltekit()],
-  define: {
-    // Only expose public env vars to client
-    "process.env.PUBLIC_APP_NAME": JSON.stringify(process.env.PUBLIC_APP_NAME),
-  },
+	plugins: [sveltekit()],
+	define: {
+		// Only expose public env vars to client
+		"process.env.PUBLIC_APP_NAME": JSON.stringify(process.env.PUBLIC_APP_NAME),
+	},
 });
 ```
 

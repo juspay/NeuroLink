@@ -19,9 +19,9 @@ Analyze AI usage patterns, token consumption, and cost optimization across all p
 
 ```typescript
 const analysis = await provider.analyzeAIUsage({
-  timeframe: "last-24-hours",
-  providers: ["openai", "bedrock", "vertex", "google-ai"],
-  includeOptimizations: true,
+	timeframe: "last-24-hours",
+	providers: ["openai", "bedrock", "vertex", "google-ai"],
+	includeOptimizations: true,
 });
 
 console.log(analysis.tokenUsage); // Token consumption patterns
@@ -42,9 +42,9 @@ Advanced benchmarking with latency, quality, and cost metrics across all AI prov
 
 ```typescript
 const benchmark = await provider.benchmarkProviders({
-  iterations: 3,
-  testPrompts: ["balanced", "creative", "technical"],
-  includeQualityMetrics: true,
+	iterations: 3,
+	testPrompts: ["balanced", "creative", "technical"],
+	includeQualityMetrics: true,
 });
 
 console.log(benchmark.latencyResults); // Response time comparisons
@@ -65,10 +65,10 @@ Optimize prompt parameters (temperature, max tokens, style) for better output qu
 
 ```typescript
 const optimization = await provider.optimizePrompt({
-  prompt: "Write a professional email explaining AI benefits",
-  style: "balanced",
-  optimizeFor: "quality",
-  includeAlternatives: true,
+	prompt: "Write a professional email explaining AI benefits",
+	style: "balanced",
+	optimizeFor: "quality",
+	includeAlternatives: true,
 });
 
 console.log(optimization.optimizedParameters); // Temperature, max tokens, etc.
@@ -183,9 +183,9 @@ AI Analysis Tools are implemented as MCP (Model Context Protocol) tools that wor
 ```typescript
 // Internal MCP tool execution (transparent to users)
 const mcpTools = [
-  "analyze-ai-usage",
-  "benchmark-provider-performance",
-  "optimize-prompt-parameters",
+	"analyze-ai-usage",
+	"benchmark-provider-performance",
+	"optimize-prompt-parameters",
 ];
 ```
 

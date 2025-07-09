@@ -5,9 +5,9 @@
 
 import type { NeuroLinkMCPClient } from "./client.js";
 import type {
-  NeuroLinkMCPServer,
-  NeuroLinkMCPTool,
-  NeuroLinkExecutionContext,
+	NeuroLinkMCPServer,
+	NeuroLinkMCPTool,
+	NeuroLinkExecutionContext,
 } from "./factory.js";
 import { mcpConfig } from "./config.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -19,17 +19,17 @@ import { logger } from "../utils/logger.js";
  * Following Lighthouse's pattern of ensuring valid tool names
  */
 const sanitizeToolName = (name: string): string => {
-  return name.replace(/[^a-zA-Z0-9_-]/g, "_");
+	return name.replace(/[^a-zA-Z0-9_-]/g, "_");
 };
 
 /**
  * Check if a schema is a Zod schema
  */
 const isZodSchema = (schema: unknown): schema is z.ZodTypeAny => {
-  if (typeof schema !== "object" || schema === null) {
-    return false;
-  }
-  return "_def" in schema || "parse" in schema;
+	if (typeof schema !== "object" || schema === null) {
+		return false;
+	}
+	return "_def" in schema || "parse" in schema;
 };
 
 /**
@@ -37,164 +37,164 @@ const isZodSchema = (schema: unknown): schema is z.ZodTypeAny => {
  * Following Lighthouse's pattern for tool registration
  */
 export const initializeMCPTools = async (
-  sessionId: string,
-  client: NeuroLinkMCPClient,
-  context: NeuroLinkExecutionContext,
+	sessionId: string,
+	client: NeuroLinkMCPClient,
+	context: NeuroLinkExecutionContext,
 ): Promise<void> => {
-  try {
-    logger.info(`[MCP Tools] Initializing tools for session: ${sessionId}`);
+	try {
+		logger.info(`[MCP Tools] Initializing tools for session: ${sessionId}`);
 
-    // Get all registered servers
-    const servers: NeuroLinkMCPServer[] = await mcpConfig.getServers();
+		// Get all registered servers
+		const servers: NeuroLinkMCPServer[] = await mcpConfig.getServers();
 
-    if (!servers || servers.length === 0) {
-      logger.warn("[MCP Tools] No MCP servers found to register tools from");
-      return;
-    }
+		if (!servers || servers.length === 0) {
+			logger.warn("[MCP Tools] No MCP servers found to register tools from");
+			return;
+		}
 
-    let totalToolsRegistered = 0;
+		let totalToolsRegistered = 0;
 
-    // Process each server
-    servers.forEach((server: NeuroLinkMCPServer) => {
-      if (!server || !server.id || !server.tools) {
-        logger.warn(
-          `[MCP Tools] Skipping invalid server configuration: ${JSON.stringify(server)}`,
-        );
-        return;
-      }
+		// Process each server
+		servers.forEach((server: NeuroLinkMCPServer) => {
+			if (!server || !server.id || !server.tools) {
+				logger.warn(
+					`[MCP Tools] Skipping invalid server configuration: ${JSON.stringify(server)}`,
+				);
+				return;
+			}
 
-      const serverId = server.id;
-      logger.info(`[MCP Tools] Registering tools from server: ${serverId}`);
+			const serverId = server.id;
+			logger.info(`[MCP Tools] Registering tools from server: ${serverId}`);
 
-      // Process each tool in the server
-      Object.entries(server.tools).forEach(([originalToolName, tool]) => {
-        if (!tool || typeof tool.execute !== "function") {
-          logger.warn(
-            `[MCP Tools] Skipping invalid tool definition for ${originalToolName} in server ${serverId}`,
-          );
-          return;
-        }
+			// Process each tool in the server
+			Object.entries(server.tools).forEach(([originalToolName, tool]) => {
+				if (!tool || typeof tool.execute !== "function") {
+					logger.warn(
+						`[MCP Tools] Skipping invalid tool definition for ${originalToolName} in server ${serverId}`,
+					);
+					return;
+				}
 
-        // Create namespaced tool name (serverId_toolName)
-        let finalToolName = originalToolName;
-        const prefix = `${serverId}_`;
-        const maxToolNameLength = 64 - prefix.length;
+				// Create namespaced tool name (serverId_toolName)
+				let finalToolName = originalToolName;
+				const prefix = `${serverId}_`;
+				const maxToolNameLength = 64 - prefix.length;
 
-        // Truncate if necessary
-        if (finalToolName.length > maxToolNameLength) {
-          finalToolName = finalToolName.substring(0, maxToolNameLength);
-          logger.info(
-            `[MCP Tools] Truncated tool name: ${originalToolName} -> ${finalToolName}`,
-          );
-        }
+				// Truncate if necessary
+				if (finalToolName.length > maxToolNameLength) {
+					finalToolName = finalToolName.substring(0, maxToolNameLength);
+					logger.info(
+						`[MCP Tools] Truncated tool name: ${originalToolName} -> ${finalToolName}`,
+					);
+				}
 
-        // Sanitize and combine
-        const namespacedToolName = sanitizeToolName(
-          `${prefix}${finalToolName}`,
-        );
+				// Sanitize and combine
+				const namespacedToolName = sanitizeToolName(
+					`${prefix}${finalToolName}`,
+				);
 
-        // Validate final length
-        if (namespacedToolName.length > 64) {
-          logger.warn(
-            `[MCP Tools] Tool name too long after sanitization: ${namespacedToolName}. Skipping.`,
-          );
-          return;
-        }
+				// Validate final length
+				if (namespacedToolName.length > 64) {
+					logger.warn(
+						`[MCP Tools] Tool name too long after sanitization: ${namespacedToolName}. Skipping.`,
+					);
+					return;
+				}
 
-        // Prepare description
-        const description =
-          tool.description ||
-          `Tool ${originalToolName} from server ${serverId}`;
+				// Prepare description
+				const description =
+					tool.description ||
+					`Tool ${originalToolName} from server ${serverId}`;
 
-        // Convert schema if needed
-        let schemaForClient: Record<string, unknown> | undefined = undefined;
+				// Convert schema if needed
+				let schemaForClient: Record<string, unknown> | undefined = undefined;
 
-        if (tool.inputSchema) {
-          if (isZodSchema(tool.inputSchema)) {
-            try {
-              const jsonSchemaOutput = zodToJsonSchema(tool.inputSchema);
+				if (tool.inputSchema) {
+					if (isZodSchema(tool.inputSchema)) {
+						try {
+							const jsonSchemaOutput = zodToJsonSchema(tool.inputSchema);
 
-              if (
-                typeof jsonSchemaOutput === "object" &&
-                jsonSchemaOutput !== null &&
-                "type" in jsonSchemaOutput &&
-                jsonSchemaOutput.type === "object"
-              ) {
-                schemaForClient = jsonSchemaOutput as Record<string, unknown>;
-              } else {
-                logger.warn(
-                  `[MCP Tools] Converted schema for ${originalToolName} is not a root object type`,
-                );
-              }
-            } catch (schemaError) {
-              logger.error(
-                `[MCP Tools] Error converting Zod schema for tool ${originalToolName}: ${schemaError}`,
-              );
-            }
-          } else if (
-            typeof tool.inputSchema === "object" &&
-            tool.inputSchema !== null
-          ) {
-            if (
-              (tool.inputSchema as Record<string, unknown>).type === "object"
-            ) {
-              schemaForClient = tool.inputSchema as Record<string, unknown>;
-            } else {
-              logger.warn(
-                `[MCP Tools] Input schema for ${originalToolName} is not type 'object'`,
-              );
-            }
-          }
-        }
+							if (
+								typeof jsonSchemaOutput === "object" &&
+								jsonSchemaOutput !== null &&
+								"type" in jsonSchemaOutput &&
+								jsonSchemaOutput.type === "object"
+							) {
+								schemaForClient = jsonSchemaOutput as Record<string, unknown>;
+							} else {
+								logger.warn(
+									`[MCP Tools] Converted schema for ${originalToolName} is not a root object type`,
+								);
+							}
+						} catch (schemaError) {
+							logger.error(
+								`[MCP Tools] Error converting Zod schema for tool ${originalToolName}: ${schemaError}`,
+							);
+						}
+					} else if (
+						typeof tool.inputSchema === "object" &&
+						tool.inputSchema !== null
+					) {
+						if (
+							(tool.inputSchema as Record<string, unknown>).type === "object"
+						) {
+							schemaForClient = tool.inputSchema as Record<string, unknown>;
+						} else {
+							logger.warn(
+								`[MCP Tools] Input schema for ${originalToolName} is not type 'object'`,
+							);
+						}
+					}
+				}
 
-        try {
-          // Register tool with client
-          client.registerTool(
-            namespacedToolName,
-            async (_name: string, input: Record<string, unknown>) => {
-              // Execute the tool with full context
-              const result = await tool.execute(input, context);
+				try {
+					// Register tool with client
+					client.registerTool(
+						namespacedToolName,
+						async (_name: string, input: Record<string, unknown>) => {
+							// Execute the tool with full context
+							const result = await tool.execute(input, context);
 
-              // Convert to Lighthouse-style response
-              if (result.success) {
-                return {
-                  content: [{ text: JSON.stringify(result.data ?? {}) }],
-                };
-              } else {
-                return {
-                  content: [
-                    { text: `Error: ${result.error || "Unknown error"}` },
-                  ],
-                  isError: true,
-                };
-              }
-            },
-            description,
-            schemaForClient,
-          );
+							// Convert to Lighthouse-style response
+							if (result.success) {
+								return {
+									content: [{ text: JSON.stringify(result.data ?? {}) }],
+								};
+							} else {
+								return {
+									content: [
+										{ text: `Error: ${result.error || "Unknown error"}` },
+									],
+									isError: true,
+								};
+							}
+						},
+						description,
+						schemaForClient,
+					);
 
-          logger.debug(`[MCP Tools] Registered tool: ${namespacedToolName}`, {
-            serverId,
-            originalToolName,
-          });
+					logger.debug(`[MCP Tools] Registered tool: ${namespacedToolName}`, {
+						serverId,
+						originalToolName,
+					});
 
-          totalToolsRegistered++;
-        } catch (registrationError) {
-          logger.error(
-            `[MCP Tools] Failed to register tool ${originalToolName} from server ${serverId}: ${registrationError}`,
-          );
-        }
-      });
-    });
+					totalToolsRegistered++;
+				} catch (registrationError) {
+					logger.error(
+						`[MCP Tools] Failed to register tool ${originalToolName} from server ${serverId}: ${registrationError}`,
+					);
+				}
+			});
+		});
 
-    logger.info(
-      `[MCP Tools] Successfully registered ${totalToolsRegistered} tools for session: ${sessionId}`,
-    );
-  } catch (error) {
-    logger.error(
-      `[MCP Tools] Error during tool initialization for session ${sessionId}: ${error}`,
-    );
-  }
+		logger.info(
+			`[MCP Tools] Successfully registered ${totalToolsRegistered} tools for session: ${sessionId}`,
+		);
+	} catch (error) {
+		logger.error(
+			`[MCP Tools] Error during tool initialization for session ${sessionId}: ${error}`,
+		);
+	}
 };
 
 /**
@@ -202,47 +202,47 @@ export const initializeMCPTools = async (
  * Useful for documentation and discovery
  */
 export async function getAllAvailableTools(): Promise<
-  Array<{
-    serverId: string;
-    serverTitle: string;
-    toolName: string;
-    namespacedName: string;
-    description: string;
-    isImplemented: boolean;
-  }>
+	Array<{
+		serverId: string;
+		serverTitle: string;
+		toolName: string;
+		namespacedName: string;
+		description: string;
+		isImplemented: boolean;
+	}>
 > {
-  const tools: Array<{
-    serverId: string;
-    serverTitle: string;
-    toolName: string;
-    namespacedName: string;
-    description: string;
-    isImplemented: boolean;
-  }> = [];
+	const tools: Array<{
+		serverId: string;
+		serverTitle: string;
+		toolName: string;
+		namespacedName: string;
+		description: string;
+		isImplemented: boolean;
+	}> = [];
 
-  const servers = await mcpConfig.getServers();
+	const servers = await mcpConfig.getServers();
 
-  servers.forEach((server) => {
-    Object.entries(server.tools).forEach(([toolName, tool]) => {
-      const prefix = `${server.id}_`;
-      const finalToolName =
-        toolName.length > 64 - prefix.length
-          ? toolName.substring(0, 64 - prefix.length)
-          : toolName;
-      const namespacedName = sanitizeToolName(`${prefix}${finalToolName}`);
+	servers.forEach((server) => {
+		Object.entries(server.tools).forEach(([toolName, tool]) => {
+			const prefix = `${server.id}_`;
+			const finalToolName =
+				toolName.length > 64 - prefix.length
+					? toolName.substring(0, 64 - prefix.length)
+					: toolName;
+			const namespacedName = sanitizeToolName(`${prefix}${finalToolName}`);
 
-      tools.push({
-        serverId: server.id,
-        serverTitle: server.title,
-        toolName,
-        namespacedName,
-        description: tool.description || "",
-        isImplemented: tool.isImplemented !== false,
-      });
-    });
-  });
+			tools.push({
+				serverId: server.id,
+				serverTitle: server.title,
+				toolName,
+				namespacedName,
+				description: tool.description || "",
+				isImplemented: tool.isImplemented !== false,
+			});
+		});
+	});
 
-  return tools;
+	return tools;
 }
 
 /**
@@ -250,63 +250,63 @@ export async function getAllAvailableTools(): Promise<
  * Useful for selective tool registration
  */
 export async function initializeServerTools(
-  serverId: string,
-  client: NeuroLinkMCPClient,
-  context: NeuroLinkExecutionContext,
+	serverId: string,
+	client: NeuroLinkMCPClient,
+	context: NeuroLinkExecutionContext,
 ): Promise<number> {
-  const servers = await mcpConfig.getServers();
-  const server = servers.find((s) => s.id === serverId);
+	const servers = await mcpConfig.getServers();
+	const server = servers.find((s) => s.id === serverId);
 
-  if (!server) {
-    logger.warn(`[MCP Tools] Server not found: ${serverId}`);
-    return 0;
-  }
+	if (!server) {
+		logger.warn(`[MCP Tools] Server not found: ${serverId}`);
+		return 0;
+	}
 
-  let toolsRegistered = 0;
+	let toolsRegistered = 0;
 
-  Object.entries(server.tools).forEach(([toolName, tool]) => {
-    if (!tool || typeof tool.execute !== "function") {
-      return;
-    }
+	Object.entries(server.tools).forEach(([toolName, tool]) => {
+		if (!tool || typeof tool.execute !== "function") {
+			return;
+		}
 
-    const prefix = `${serverId}_`;
-    const finalToolName =
-      toolName.length > 64 - prefix.length
-        ? toolName.substring(0, 64 - prefix.length)
-        : toolName;
-    const namespacedToolName = sanitizeToolName(`${prefix}${finalToolName}`);
+		const prefix = `${serverId}_`;
+		const finalToolName =
+			toolName.length > 64 - prefix.length
+				? toolName.substring(0, 64 - prefix.length)
+				: toolName;
+		const namespacedToolName = sanitizeToolName(`${prefix}${finalToolName}`);
 
-    if (namespacedToolName.length > 64) {
-      return;
-    }
+		if (namespacedToolName.length > 64) {
+			return;
+		}
 
-    try {
-      client.registerTool(
-        namespacedToolName,
-        async (_name: string, input: Record<string, unknown>) => {
-          const result = await tool.execute(input, context);
+		try {
+			client.registerTool(
+				namespacedToolName,
+				async (_name: string, input: Record<string, unknown>) => {
+					const result = await tool.execute(input, context);
 
-          if (result.success) {
-            return { content: [{ text: JSON.stringify(result.data ?? {}) }] };
-          } else {
-            return {
-              content: [{ text: `Error: ${result.error || "Unknown error"}` }],
-              isError: true,
-            };
-          }
-        },
-        tool.description || `Tool ${toolName} from server ${serverId}`,
-        tool.inputSchema,
-      );
+					if (result.success) {
+						return { content: [{ text: JSON.stringify(result.data ?? {}) }] };
+					} else {
+						return {
+							content: [{ text: `Error: ${result.error || "Unknown error"}` }],
+							isError: true,
+						};
+					}
+				},
+				tool.description || `Tool ${toolName} from server ${serverId}`,
+				tool.inputSchema,
+			);
 
-      toolsRegistered++;
-    } catch (error) {
-      logger.error(`[MCP Tools] Failed to register tool ${toolName}: ${error}`);
-    }
-  });
+			toolsRegistered++;
+		} catch (error) {
+			logger.error(`[MCP Tools] Failed to register tool ${toolName}: ${error}`);
+		}
+	});
 
-  logger.info(
-    `[MCP Tools] Registered ${toolsRegistered} tools from server ${serverId}`,
-  );
-  return toolsRegistered;
+	logger.info(
+		`[MCP Tools] Registered ${toolsRegistered} tools from server ${serverId}`,
+	);
+	return toolsRegistered;
 }

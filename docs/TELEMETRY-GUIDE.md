@@ -48,21 +48,21 @@ import { initializeTelemetry, getTelemetryStatus } from "@juspay/neurolink";
 
 // Initialize telemetry with configuration
 const telemetry = initializeTelemetry({
-  serviceName: "my-ai-application",
-  endpoint: "http://localhost:4318",
-  enableTracing: true,
-  enableMetrics: true,
-  enableLogs: true,
-  samplingRate: 0.1, // Sample 10% of traces for performance
+	serviceName: "my-ai-application",
+	endpoint: "http://localhost:4318",
+	enableTracing: true,
+	enableMetrics: true,
+	enableLogs: true,
+	samplingRate: 0.1, // Sample 10% of traces for performance
 });
 
 if (telemetry.success) {
-  console.log("✅ Telemetry initialized successfully");
-  console.log("📊 Tracing enabled:", telemetry.tracingEnabled);
-  console.log("📈 Metrics enabled:", telemetry.metricsEnabled);
-  console.log("📝 Logs enabled:", telemetry.logsEnabled);
+	console.log("✅ Telemetry initialized successfully");
+	console.log("📊 Tracing enabled:", telemetry.tracingEnabled);
+	console.log("📈 Metrics enabled:", telemetry.metricsEnabled);
+	console.log("📝 Logs enabled:", telemetry.logsEnabled);
 } else {
-  console.error("❌ Telemetry initialization failed:", telemetry.error);
+	console.error("❌ Telemetry initialization failed:", telemetry.error);
 }
 
 // Check telemetry status
