@@ -1,24 +1,24 @@
 {
-	"mcpServers": {
-		"filesystem": {
-			"name": "filesystem",
-			"command": "npx",
-			"args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
-			"transport": "stdio"
-		},
-		"github": {
-			"name": "github",
-			"command": "npx",
-			"args": ["-y", "@modelcontextprotocol/server-github"],
-			"transport": "stdio"
-		}
-	},
-	"autoDiscovery": {
-		"enabled": true,
-		"autoRegister": true
-	},
-	"defaultRegistry": {
-		"enabled": true,
-		"includeBuiltInTools": true
-	}
+  "mcpServers": {
+    "filesystem": {
+      "name": "filesystem",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "transport": "stdio"
+    },
+    "github": {
+      "name": "github",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "transport": "stdio"
+    }
+  },
+  "autoDiscovery": {
+    "enabled": true,
+    "autoRegister": true
+  },
+  "defaultRegistry": {
+    "enabled": true,
+    "includeBuiltInTools": true
+  }
 }

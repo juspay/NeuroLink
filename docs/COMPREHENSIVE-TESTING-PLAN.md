@@ -102,8 +102,8 @@ npm list | grep -E "(@opentelemetry)"
 import { NeuroLinkWebSocketServer } from "../src/lib/services/websocket/websocket-server.js";
 
 const wsServer = new NeuroLinkWebSocketServer({
-	port: 8080,
-	maxConnections: 100,
+  port: 8080,
+  maxConnections: 100,
 });
 
 // Test: Connection Management
@@ -164,9 +164,9 @@ import { AIProviderFactory } from "../src/lib/core/factory.js";
 
 const provider = await AIProviderFactory.createProvider("google-ai");
 const chatService = createEnhancedChatService({
-	provider,
-	enableSSE: true,
-	enableWebSocket: true,
+  provider,
+  enableSSE: true,
+  enableWebSocket: true,
 });
 ```
 
@@ -241,9 +241,9 @@ expect((enabledTime - disabledTime) / disabledTime).toBeLessThan(0.05);
 ```typescript
 // Scenario 1: WebSocket Chat Application
 const chatApp = createEnhancedChatService({
-	provider: await createBestAIProvider(),
-	enableWebSocket: true,
-	enableSSE: true,
+  provider: await createBestAIProvider(),
+  enableWebSocket: true,
+  enableSSE: true,
 });
 
 // Scenario 2: Telemetry-Enabled Production
@@ -273,11 +273,11 @@ process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4318";
 ```typescript
 // Test all new exports work
 import {
-	createEnhancedChatService,
-	initializeTelemetry,
-	getTelemetryStatus,
-	NeuroLinkWebSocketServer,
-	StreamingManager,
+  createEnhancedChatService,
+  initializeTelemetry,
+  getTelemetryStatus,
+  NeuroLinkWebSocketServer,
+  StreamingManager,
 } from "@juspay/neurolink";
 
 // Test TypeScript types

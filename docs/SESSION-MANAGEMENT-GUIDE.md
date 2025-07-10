@@ -24,30 +24,30 @@ The NeuroLink MCP platform provides sophisticated session management capabilitie
 
 ```typescript
 export class SessionManager {
-	private sessions: Map<string, OrchestratorSession> = new Map();
-	private persistence: SessionPersistence;
-	private cleanupScheduler: NodeJS.Timeout;
+  private sessions: Map<string, OrchestratorSession> = new Map();
+  private persistence: SessionPersistence;
+  private cleanupScheduler: NodeJS.Timeout;
 
-	async createSession(
-		context: NeuroLinkExecutionContext,
-		options?: SessionOptions,
-	): Promise<OrchestratorSession> {
-		const session: OrchestratorSession = {
-			id: uuidv4(),
-			context,
-			toolHistory: [],
-			state: new Map(),
-			metadata: options?.metadata || {},
-			createdAt: Date.now(),
-			lastActivity: Date.now(),
-			expiresAt: Date.now() + (options?.ttl || 3600000), // 1 hour default
-		};
+  async createSession(
+    context: NeuroLinkExecutionContext,
+    options?: SessionOptions,
+  ): Promise<OrchestratorSession> {
+    const session: OrchestratorSession = {
+      id: uuidv4(),
+      context,
+      toolHistory: [],
+      state: new Map(),
+      metadata: options?.metadata || {},
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      expiresAt: Date.now() + (options?.ttl || 3600000), // 1 hour default
+    };
 
-		this.sessions.set(session.id, session);
-		await this.persistence.saveSession(session);
+    this.sessions.set(session.id, session);
+    await this.persistence.saveSession(session);
 
-		return session;
-	}
+    return session;
+  }
 }
 ```
 
@@ -55,19 +55,19 @@ export class SessionManager {
 
 ```typescript
 export interface OrchestratorSession {
-	id: string; // UUID v4 identifier
-	context: NeuroLinkExecutionContext; // Execution context
-	toolHistory: ToolResult[]; // Complete tool execution history
-	state: Map<string, any>; // Session-specific state
-	metadata: {
-		userAgent?: string; // Client user agent
-		origin?: string; // Request origin
-		tags?: string[]; // Custom tags
-		[key: string]: any; // Custom metadata
-	};
-	createdAt: number; // Creation timestamp
-	lastActivity: number; // Last activity timestamp
-	expiresAt: number; // Expiration timestamp
+  id: string; // UUID v4 identifier
+  context: NeuroLinkExecutionContext; // Execution context
+  toolHistory: ToolResult[]; // Complete tool execution history
+  state: Map<string, any>; // Session-specific state
+  metadata: {
+    userAgent?: string; // Client user agent
+    origin?: string; // Request origin
+    tags?: string[]; // Custom tags
+    [key: string]: any; // Custom metadata
+  };
+  createdAt: number; // Creation timestamp
+  lastActivity: number; // Last activity timestamp
+  expiresAt: number; // Expiration timestamp
 }
 ```
 
@@ -79,30 +79,30 @@ export interface OrchestratorSession {
 
 ```typescript
 export class SessionPersistence {
-	async saveSession(session: OrchestratorSession): Promise<void> {
-		const sessionPath = this.getSessionPath(session.id);
-		const sessionData = this.serializeSession(session);
+  async saveSession(session: OrchestratorSession): Promise<void> {
+    const sessionPath = this.getSessionPath(session.id);
+    const sessionData = this.serializeSession(session);
 
-		// Atomic write with temporary file
-		const tempPath = `${sessionPath}.tmp`;
-		await fs.writeFile(tempPath, JSON.stringify(sessionData, null, 2));
-		await fs.rename(tempPath, sessionPath);
+    // Atomic write with temporary file
+    const tempPath = `${sessionPath}.tmp`;
+    await fs.writeFile(tempPath, JSON.stringify(sessionData, null, 2));
+    await fs.rename(tempPath, sessionPath);
 
-		// Create checksum for integrity verification
-		const checksum = await this.calculateChecksum(sessionData);
-		await fs.writeFile(`${sessionPath}.checksum`, checksum);
-	}
+    // Create checksum for integrity verification
+    const checksum = await this.calculateChecksum(sessionData);
+    await fs.writeFile(`${sessionPath}.checksum`, checksum);
+  }
 
-	async loadSession(sessionId: string): Promise<OrchestratorSession | null> {
-		try {
-			const sessionPath = this.getSessionPath(sessionId);
-			const sessionData = JSON.parse(await fs.readFile(sessionPath, "utf8"));
-			return this.deserializeSession(sessionData);
-		} catch (error) {
-			console.error(`Failed to load session ${sessionId}:`, error);
-			return null;
-		}
-	}
+  async loadSession(sessionId: string): Promise<OrchestratorSession | null> {
+    try {
+      const sessionPath = this.getSessionPath(sessionId);
+      const sessionData = JSON.parse(await fs.readFile(sessionPath, "utf8"));
+      return this.deserializeSession(sessionData);
+    } catch (error) {
+      console.error(`Failed to load session ${sessionId}:`, error);
+      return null;
+    }
+  }
 }
 ```
 
@@ -115,18 +115,18 @@ export class SessionPersistence {
 ```typescript
 // Create session with metadata
 const session = await sessionManager.createSession(
-	{
-		userId: "user123",
-		aiProvider: "google-ai",
-		permissions: ["read-data", "analyze"],
-	},
-	{
-		ttl: 7200000, // 2 hours
-		metadata: {
-			userAgent: "NeuroLink-CLI/1.0",
-			tags: ["analysis", "urgent"],
-		},
-	},
+  {
+    userId: "user123",
+    aiProvider: "google-ai",
+    permissions: ["read-data", "analyze"],
+  },
+  {
+    ttl: 7200000, // 2 hours
+    metadata: {
+      userAgent: "NeuroLink-CLI/1.0",
+      tags: ["analysis", "urgent"],
+    },
+  },
 );
 ```
 
@@ -135,21 +135,21 @@ const session = await sessionManager.createSession(
 ```typescript
 // Execute multi-step workflow with session state
 const executeLongWorkflow = async (sessionId: string) => {
-	const session = await sessionManager.getSession(sessionId);
+  const session = await sessionManager.getSession(sessionId);
 
-	// Step 1: Fetch data (if not already done)
-	if (!session.state.has("dataFetched")) {
-		const userData = await orchestrator.executeTool(
-			"database-query",
-			{},
-			session.context,
-		);
-		session.state.set("userData", userData);
-		session.state.set("dataFetched", true);
-		await sessionManager.updateSession(session);
-	}
+  // Step 1: Fetch data (if not already done)
+  if (!session.state.has("dataFetched")) {
+    const userData = await orchestrator.executeTool(
+      "database-query",
+      {},
+      session.context,
+    );
+    session.state.set("userData", userData);
+    session.state.set("dataFetched", true);
+    await sessionManager.updateSession(session);
+  }
 
-	// Continue workflow...
+  // Continue workflow...
 };
 ```
 
@@ -161,20 +161,20 @@ const executeLongWorkflow = async (sessionId: string) => {
 
 ```typescript
 export class SessionCleanupManager {
-	async performCleanup(): Promise<CleanupResult> {
-		const allSessions = await this.sessionManager.getAllSessions();
-		const now = Date.now();
-		let cleanedSessions = 0;
+  async performCleanup(): Promise<CleanupResult> {
+    const allSessions = await this.sessionManager.getAllSessions();
+    const now = Date.now();
+    let cleanedSessions = 0;
 
-		for (const session of allSessions) {
-			if (session.expiresAt < now) {
-				await this.sessionManager.removeSession(session.id);
-				cleanedSessions++;
-			}
-		}
+    for (const session of allSessions) {
+      if (session.expiresAt < now) {
+        await this.sessionManager.removeSession(session.id);
+        cleanedSessions++;
+      }
+    }
 
-		return { cleanedSessions, duration: Date.now() - now };
-	}
+    return { cleanedSessions, duration: Date.now() - now };
+  }
 }
 ```
 
@@ -186,10 +186,10 @@ export class SessionCleanupManager {
 
 ```typescript
 interface SessionAnalytics {
-	totalSessions: number;
-	activeSessions: number;
-	averageSessionDuration: number;
-	toolUsageStats: Map<string, number>;
+  totalSessions: number;
+  activeSessions: number;
+  averageSessionDuration: number;
+  toolUsageStats: Map<string, number>;
 }
 
 // Collect session metrics
@@ -207,17 +207,17 @@ console.log("Average duration:", analytics.averageSessionDuration);
 ```typescript
 // Test session recovery after restart
 const testPersistence = async () => {
-	// Create session with state
-	const session = await sessionManager.createSession(context);
-	session.state.set("testData", { value: 42 });
-	await sessionManager.updateSession(session);
+  // Create session with state
+  const session = await sessionManager.createSession(context);
+  session.state.set("testData", { value: 42 });
+  await sessionManager.updateSession(session);
 
-	// Simulate restart
-	const newSessionManager = new SessionManager({ persistenceStrategy: "file" });
-	const recovered = await newSessionManager.getSession(session.id);
+  // Simulate restart
+  const newSessionManager = new SessionManager({ persistenceStrategy: "file" });
+  const recovered = await newSessionManager.getSession(session.id);
 
-	console.log("Recovery successful:", !!recovered);
-	console.log("Data intact:", recovered?.state.get("testData")?.value === 42);
+  console.log("Recovery successful:", !!recovered);
+  console.log("Data intact:", recovered?.state.get("testData")?.value === 42);
 };
 ```
 
@@ -229,16 +229,16 @@ const testPersistence = async () => {
 
 ```typescript
 const sessionManager = new SessionManager({
-	persistenceStrategy: "file",
-	persistence: {
-		basePath: "./sessions",
-		encryptionKey: process.env.SESSION_ENCRYPTION_KEY,
-	},
-	defaults: {
-		ttl: 3600000, // 1 hour
-		maxSessions: 1000, // Max concurrent sessions
-		cleanupInterval: 300000, // 5 minutes
-	},
+  persistenceStrategy: "file",
+  persistence: {
+    basePath: "./sessions",
+    encryptionKey: process.env.SESSION_ENCRYPTION_KEY,
+  },
+  defaults: {
+    ttl: 3600000, // 1 hour
+    maxSessions: 1000, // Max concurrent sessions
+    cleanupInterval: 300000, // 5 minutes
+  },
 });
 ```
 
@@ -251,15 +251,15 @@ const sessionManager = new SessionManager({
 ```typescript
 // Always check session validity
 const safeSessionOperation = async (sessionId: string, operation: Function) => {
-	const session = await sessionManager.getSession(sessionId);
-	if (!session) {
-		throw new Error("Session not found or expired");
-	}
+  const session = await sessionManager.getSession(sessionId);
+  if (!session) {
+    throw new Error("Session not found or expired");
+  }
 
-	session.lastActivity = Date.now();
-	const result = await operation(session);
-	await sessionManager.updateSession(session);
-	return result;
+  session.lastActivity = Date.now();
+  const result = await operation(session);
+  await sessionManager.updateSession(session);
+  return result;
 };
 ```
 
@@ -268,11 +268,11 @@ const safeSessionOperation = async (sessionId: string, operation: Function) => {
 ```typescript
 // Implement graceful shutdown
 const gracefulShutdown = async () => {
-	const activeSessions = await sessionManager.getActiveSessions();
-	for (const session of activeSessions) {
-		await sessionManager.updateSession(session);
-	}
-	sessionManager.stopCleanup();
+  const activeSessions = await sessionManager.getActiveSessions();
+  for (const session of activeSessions) {
+    await sessionManager.updateSession(session);
+  }
+  sessionManager.stopCleanup();
 };
 ```
 
