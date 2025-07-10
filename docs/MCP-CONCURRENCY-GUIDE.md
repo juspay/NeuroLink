@@ -23,44 +23,44 @@ The NeuroLink MCP platform includes a sophisticated concurrency control system t
 
 ```typescript
 export class SemaphoreManager {
-	private semaphores: Map<string, Promise<void>> = new Map();
-	private stats: Map<string, SemaphoreStats> = new Map();
+  private semaphores: Map<string, Promise<void>> = new Map();
+  private stats: Map<string, SemaphoreStats> = new Map();
 
-	async acquire<T>(
-		key: string,
-		operation: () => Promise<T>,
-	): Promise<SemaphoreResult<T>> {
-		const startTime = Date.now();
-		const existing = this.semaphores.get(key);
+  async acquire<T>(
+    key: string,
+    operation: () => Promise<T>,
+  ): Promise<SemaphoreResult<T>> {
+    const startTime = Date.now();
+    const existing = this.semaphores.get(key);
 
-		// Wait for existing operation if present
-		if (existing) {
-			await existing;
-		}
+    // Wait for existing operation if present
+    if (existing) {
+      await existing;
+    }
 
-		// Execute operation with automatic cleanup
-		const promise = operation();
-		this.semaphores.set(
-			key,
-			promise.then(
-				() => {},
-				() => {},
-			),
-		);
+    // Execute operation with automatic cleanup
+    const promise = operation();
+    this.semaphores.set(
+      key,
+      promise.then(
+        () => {},
+        () => {},
+      ),
+    );
 
-		try {
-			const result = await promise;
-			return {
-				success: true,
-				result,
-				waitTime: existing ? Date.now() - startTime : 0,
-				executionTime: Date.now() - startTime,
-				queueDepth: this.getQueueDepth(key),
-			};
-		} finally {
-			this.semaphores.delete(key);
-		}
-	}
+    try {
+      const result = await promise;
+      return {
+        success: true,
+        result,
+        waitTime: existing ? Date.now() - startTime : 0,
+        executionTime: Date.now() - startTime,
+        queueDepth: this.getQueueDepth(key),
+      };
+    } finally {
+      this.semaphores.delete(key);
+    }
+  }
 }
 ```
 
@@ -68,20 +68,20 @@ export class SemaphoreManager {
 
 ```typescript
 export class MCPOrchestrator {
-	private semaphoreManager: SemaphoreManager;
+  private semaphoreManager: SemaphoreManager;
 
-	async executeTool<T>(
-		toolName: string,
-		args: unknown,
-		context: NeuroLinkExecutionContext,
-	): Promise<T> {
-		return await this.semaphoreManager.acquire(
-			toolName, // Use tool name as semaphore key
-			async () => {
-				return await this.registry.executeTool(toolName, args, context);
-			},
-		);
-	}
+  async executeTool<T>(
+    toolName: string,
+    args: unknown,
+    context: NeuroLinkExecutionContext,
+  ): Promise<T> {
+    return await this.semaphoreManager.acquire(
+      toolName, // Use tool name as semaphore key
+      async () => {
+        return await this.registry.executeTool(toolName, args, context);
+      },
+    );
+  }
 }
 ```
 
@@ -98,8 +98,8 @@ const semaphoreManager = new SemaphoreManager();
 
 // Execute operation with concurrency control
 const result = await semaphoreManager.acquire("my-operation", async () => {
-	// Your operation here
-	return await performSomeTask();
+  // Your operation here
+  return await performSomeTask();
 });
 
 console.log("Success:", result.success);
@@ -112,9 +112,9 @@ console.log("Execution Time:", result.executionTime);
 ```typescript
 // Same tool executions are serialized
 const fileOperations = [
-	semaphoreManager.acquire("file-read", () => readFile("data1.txt")),
-	semaphoreManager.acquire("file-read", () => readFile("data2.txt")),
-	semaphoreManager.acquire("file-read", () => readFile("data3.txt")),
+  semaphoreManager.acquire("file-read", () => readFile("data1.txt")),
+  semaphoreManager.acquire("file-read", () => readFile("data2.txt")),
+  semaphoreManager.acquire("file-read", () => readFile("data3.txt")),
 ];
 
 // These will execute sequentially to prevent file conflicts
@@ -126,11 +126,11 @@ const results = await Promise.all(fileOperations);
 ```typescript
 // Different tools can run simultaneously
 const mixedOperations = [
-	semaphoreManager.acquire("file-read", () => readFile("data.txt")),
-	semaphoreManager.acquire("http-request", () =>
-		fetchData("https://api.example.com"),
-	),
-	semaphoreManager.acquire("database-query", () => queryDatabase()),
+  semaphoreManager.acquire("file-read", () => readFile("data.txt")),
+  semaphoreManager.acquire("http-request", () =>
+    fetchData("https://api.example.com"),
+  ),
+  semaphoreManager.acquire("database-query", () => queryDatabase()),
 ];
 
 // These will execute concurrently for optimal performance
@@ -145,12 +145,12 @@ const results = await Promise.all(mixedOperations);
 
 ```typescript
 interface SemaphoreStats {
-	activeOperations: number; // Currently running operations
-	queuedOperations: number; // Operations waiting in queue
-	totalOperations: number; // Total operations processed
-	totalWaitTime: number; // Cumulative wait time (ms)
-	averageWaitTime: number; // Average wait time per operation
-	peakQueueDepth: number; // Maximum queue depth reached
+  activeOperations: number; // Currently running operations
+  queuedOperations: number; // Operations waiting in queue
+  totalOperations: number; // Total operations processed
+  totalWaitTime: number; // Cumulative wait time (ms)
+  averageWaitTime: number; // Average wait time per operation
+  peakQueueDepth: number; // Maximum queue depth reached
 }
 
 // Get statistics for monitoring
@@ -164,10 +164,10 @@ console.log(`Peak queue depth: ${stats.peakQueueDepth}`);
 ```typescript
 // Real-world performance characteristics
 const PERFORMANCE_BENCHMARKS = {
-	overhead: "<1ms per operation",
-	memoryUsage: "O(n) where n = concurrent operations",
-	cleanup: "Automatic on operation completion",
-	concurrentLimit: "100+ operations tested successfully",
+  overhead: "<1ms per operation",
+  memoryUsage: "O(n) where n = concurrent operations",
+  cleanup: "Automatic on operation completion",
+  concurrentLimit: "100+ operations tested successfully",
 };
 ```
 
@@ -180,19 +180,19 @@ const PERFORMANCE_BENCHMARKS = {
 ```typescript
 // Test 100 concurrent operations
 const testConcurrency = async () => {
-	const operations = Array.from({ length: 100 }, (_, i) =>
-		semaphoreManager.acquire("test-tool", async () => {
-			await new Promise((resolve) => setTimeout(resolve, 100));
-			return `Operation ${i} complete`;
-		}),
-	);
+  const operations = Array.from({ length: 100 }, (_, i) =>
+    semaphoreManager.acquire("test-tool", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return `Operation ${i} complete`;
+    }),
+  );
 
-	const startTime = Date.now();
-	const results = await Promise.all(operations);
-	const totalTime = Date.now() - startTime;
+  const startTime = Date.now();
+  const results = await Promise.all(operations);
+  const totalTime = Date.now() - startTime;
 
-	console.log(`100 operations completed in ${totalTime}ms`);
-	console.log(`All successful: ${results.every((r) => r.success)}`);
+  console.log(`100 operations completed in ${totalTime}ms`);
+  console.log(`All successful: ${results.every((r) => r.success)}`);
 };
 ```
 
@@ -201,22 +201,22 @@ const testConcurrency = async () => {
 ```typescript
 // Verify serialization of same-tool operations
 const testSerialization = async () => {
-	let counter = 0;
-	const operations = Array.from({ length: 10 }, () =>
-		semaphoreManager.acquire("counter-tool", async () => {
-			const current = counter;
-			await new Promise((resolve) => setTimeout(resolve, 10));
-			counter = current + 1;
-			return counter;
-		}),
-	);
+  let counter = 0;
+  const operations = Array.from({ length: 10 }, () =>
+    semaphoreManager.acquire("counter-tool", async () => {
+      const current = counter;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      counter = current + 1;
+      return counter;
+    }),
+  );
 
-	const results = await Promise.all(operations);
-	const finalValues = results.map((r) => r.result);
+  const results = await Promise.all(operations);
+  const finalValues = results.map((r) => r.result);
 
-	// Should be [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] in some order
-	console.log("Final counter value:", counter); // Should be 10
-	console.log("No race conditions:", new Set(finalValues).size === 10);
+  // Should be [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] in some order
+  console.log("Final counter value:", counter); // Should be 10
+  console.log("No race conditions:", new Set(finalValues).size === 10);
 };
 ```
 
@@ -228,17 +228,17 @@ const testSerialization = async () => {
 
 ```typescript
 interface SemaphoreManagerOptions {
-	maxConcurrentOperations?: number; // Global concurrency limit
-	defaultTimeout?: number; // Operation timeout (ms)
-	cleanupInterval?: number; // Stats cleanup interval (ms)
-	enableStatistics?: boolean; // Enable/disable stats collection
+  maxConcurrentOperations?: number; // Global concurrency limit
+  defaultTimeout?: number; // Operation timeout (ms)
+  cleanupInterval?: number; // Stats cleanup interval (ms)
+  enableStatistics?: boolean; // Enable/disable stats collection
 }
 
 const semaphoreManager = new SemaphoreManager({
-	maxConcurrentOperations: 50,
-	defaultTimeout: 30000,
-	cleanupInterval: 300000,
-	enableStatistics: true,
+  maxConcurrentOperations: 50,
+  defaultTimeout: 30000,
+  cleanupInterval: 300000,
+  enableStatistics: true,
 });
 ```
 
@@ -247,9 +247,9 @@ const semaphoreManager = new SemaphoreManager({
 ```typescript
 // Automatic cleanup configuration
 const cleanupOptions = {
-	maxHistorySize: 1000, // Max entries in statistics history
-	cleanupThreshold: 0.8, // Cleanup when 80% full
-	forceCleanupInterval: 600000, // Force cleanup every 10 minutes
+  maxHistorySize: 1000, // Max entries in statistics history
+  cleanupThreshold: 0.8, // Cleanup when 80% full
+  forceCleanupInterval: 600000, // Force cleanup every 10 minutes
 };
 ```
 
@@ -265,10 +265,10 @@ const cleanupOptions = {
 // Diagnose high wait times
 const diagnostics = await semaphoreManager.getDiagnostics();
 if (diagnostics.averageWaitTime > 1000) {
-	console.warn("High wait times detected:");
-	console.log("- Consider reducing operation complexity");
-	console.log("- Check for blocking I/O operations");
-	console.log("- Monitor queue depth patterns");
+  console.warn("High wait times detected:");
+  console.log("- Consider reducing operation complexity");
+  console.log("- Check for blocking I/O operations");
+  console.log("- Monitor queue depth patterns");
 }
 ```
 
@@ -280,10 +280,10 @@ const memoryUsage = process.memoryUsage();
 const activeOperations = semaphoreManager.getActiveOperationCount();
 
 if (memoryUsage.heapUsed > 200 * 1024 * 1024) {
-	// 200MB
-	console.warn("High memory usage detected");
-	console.log(`Active operations: ${activeOperations}`);
-	console.log("Consider implementing operation timeouts");
+  // 200MB
+  console.warn("High memory usage detected");
+  console.log(`Active operations: ${activeOperations}`);
+  console.log("Consider implementing operation timeouts");
 }
 ```
 
@@ -292,14 +292,14 @@ if (memoryUsage.heapUsed > 200 * 1024 * 1024) {
 ```typescript
 // Monitor for potential deadlocks
 const deadlockCheck = () => {
-	const stats = semaphoreManager.getAllStats();
-	const stalledOperations = Object.entries(stats)
-		.filter(([_, stat]) => stat.averageWaitTime > 30000)
-		.map(([toolName, _]) => toolName);
+  const stats = semaphoreManager.getAllStats();
+  const stalledOperations = Object.entries(stats)
+    .filter(([_, stat]) => stat.averageWaitTime > 30000)
+    .map(([toolName, _]) => toolName);
 
-	if (stalledOperations.length > 0) {
-		console.warn("Potential deadlocks detected in:", stalledOperations);
-	}
+  if (stalledOperations.length > 0) {
+    console.warn("Potential deadlocks detected in:", stalledOperations);
+  }
 };
 ```
 
@@ -318,23 +318,23 @@ const deadlockCheck = () => {
 
 ```typescript
 const robustExecution = async () => {
-	try {
-		const result = await semaphoreManager.acquire(
-			"risky-operation",
-			async () => {
-				// Operation that might fail
-				return await performRiskyTask();
-			},
-		);
+  try {
+    const result = await semaphoreManager.acquire(
+      "risky-operation",
+      async () => {
+        // Operation that might fail
+        return await performRiskyTask();
+      },
+    );
 
-		if (!result.success) {
-			console.error("Operation failed:", result.error);
-			// Handle failure appropriately
-		}
-	} catch (error) {
-		console.error("Semaphore error:", error);
-		// Handle semaphore-level errors
-	}
+    if (!result.success) {
+      console.error("Operation failed:", result.error);
+      // Handle failure appropriately
+    }
+  } catch (error) {
+    console.error("Semaphore error:", error);
+    // Handle semaphore-level errors
+  }
 };
 ```
 
@@ -343,10 +343,10 @@ const robustExecution = async () => {
 ```typescript
 // Batch similar operations when possible
 const batchOperations = async (items: string[]) => {
-	return await semaphoreManager.acquire("batch-operation", async () => {
-		// Process all items in a single semaphore-protected block
-		return await Promise.all(items.map(processItem));
-	});
+  return await semaphoreManager.acquire("batch-operation", async () => {
+    // Process all items in a single semaphore-protected block
+    return await Promise.all(items.map(processItem));
+  });
 };
 ```
 
@@ -359,17 +359,17 @@ const batchOperations = async (items: string[]) => {
 ```typescript
 // Prevent concurrent file modifications
 const fileManager = {
-	async writeFile(filename: string, content: string) {
-		return await semaphoreManager.acquire(`file:${filename}`, async () => {
-			return await fs.writeFile(filename, content);
-		});
-	},
+  async writeFile(filename: string, content: string) {
+    return await semaphoreManager.acquire(`file:${filename}`, async () => {
+      return await fs.writeFile(filename, content);
+    });
+  },
 
-	async readFile(filename: string) {
-		return await semaphoreManager.acquire(`file:${filename}`, async () => {
-			return await fs.readFile(filename, "utf8");
-		});
-	},
+  async readFile(filename: string) {
+    return await semaphoreManager.acquire(`file:${filename}`, async () => {
+      return await fs.readFile(filename, "utf8");
+    });
+  },
 };
 ```
 
@@ -378,15 +378,15 @@ const fileManager = {
 ```typescript
 // Prevent API rate limit violations
 const apiManager = {
-	async makeRequest(endpoint: string, data: any) {
-		return await semaphoreManager.acquire("api-requests", async () => {
-			await new Promise((resolve) => setTimeout(resolve, 100)); // Rate limit
-			return await fetch(endpoint, {
-				method: "POST",
-				body: JSON.stringify(data),
-			});
-		});
-	},
+  async makeRequest(endpoint: string, data: any) {
+    return await semaphoreManager.acquire("api-requests", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Rate limit
+      return await fetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    });
+  },
 };
 ```
 
@@ -395,12 +395,12 @@ const apiManager = {
 ```typescript
 // Serialize database migrations
 const dbManager = {
-	async runMigration(migrationName: string) {
-		return await semaphoreManager.acquire("database-migration", async () => {
-			console.log(`Running migration: ${migrationName}`);
-			return await executeMigration(migrationName);
-		});
-	},
+  async runMigration(migrationName: string) {
+    return await semaphoreManager.acquire("database-migration", async () => {
+      console.log(`Running migration: ${migrationName}`);
+      return await executeMigration(migrationName);
+    });
+  },
 };
 ```
 

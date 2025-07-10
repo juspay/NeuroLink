@@ -1,9 +1,8 @@
 # [4.1.0](https://github.com/juspay/neurolink/compare/v4.0.0...v4.1.0) (2025-07-09)
 
-
 ### Features
 
-* **mcp:** comprehensive MCP system overhaul with GitHub PR fixes ([c0d8114](https://github.com/juspay/neurolink/commit/c0d8114ef1ab2d5dd3162c369f234d0de17397f7))
+- **mcp:** comprehensive MCP system overhaul with GitHub PR fixes ([c0d8114](https://github.com/juspay/neurolink/commit/c0d8114ef1ab2d5dd3162c369f234d0de17397f7))
 
 # [4.0.0](https://github.com/juspay/neurolink/compare/v3.0.1...v4.0.0) (2025-07-06)
 
