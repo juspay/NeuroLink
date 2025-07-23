@@ -43,6 +43,7 @@ export interface ContextRequest {
 export class ContextManager {
   private sessionCounter: number = 0;
   private activeContexts: Map<string, NeuroLinkExecutionContext> = new Map();
+  private static cachedLogger: any = null;
 
   /**
    * Create a new execution context with rich information
@@ -98,6 +99,7 @@ export class ContextManager {
       },
       path: {
         join: (...paths: string[]) => {
+          // Use dynamic require for synchronous path operations
           const path = require("path");
           return path.join(...paths);
         },
@@ -119,15 +121,19 @@ export class ContextManager {
         },
       },
       grantedPermissions: request.permissions || [],
-      log: (
+      log: async (
         level: "debug" | "info" | "warn" | "error",
         message: string,
         data?: any,
       ) => {
-        // Use logger if available, otherwise console
+        // Use cached logger if available, otherwise import and cache
         try {
-          const { logger } = require("../utils/logger.js");
-          logger[level](message, data);
+          if (!ContextManager.cachedLogger) {
+            ContextManager.cachedLogger = await import(
+              "../utils/logger.js"
+            ).then(({ logger }) => logger);
+          }
+          ContextManager.cachedLogger[level](message, data);
         } catch {
           console[level === "debug" ? "log" : level](message, data);
         }

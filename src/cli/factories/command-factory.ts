@@ -3,6 +3,7 @@ import { NeuroLink } from "../../lib/neurolink.js";
 import type { AIProviderName } from "../../lib/index.js";
 import ora from "ora";
 import chalk from "chalk";
+import { logger } from "../../lib/utils/logger.js";
 
 interface GenerateCommandArgs {
   input: string;
@@ -200,14 +201,14 @@ export class CLICommandFactory {
       }
 
       if (argv.debug) {
-        console.log("\n" + chalk.yellow("Debug Information:"));
-        console.log("Provider:", result.provider);
-        console.log("Model:", result.model);
+        logger.debug("\n" + chalk.yellow("Debug Information:"));
+        logger.debug("Provider:", result.provider);
+        logger.debug("Model:", result.model);
         if (result.analytics) {
-          console.log("Analytics:", JSON.stringify(result.analytics, null, 2));
+          logger.debug("Analytics:", JSON.stringify(result.analytics, null, 2));
         }
         if (result.evaluation) {
-          console.log(
+          logger.debug(
             "Evaluation:",
             JSON.stringify(result.evaluation, null, 2),
           );

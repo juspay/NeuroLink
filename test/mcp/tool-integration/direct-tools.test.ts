@@ -11,8 +11,20 @@ import dotenv from "dotenv";
  */
 
 async function execCLI(args: string[], timeout: number = 30000) {
-  const cliPath = require.resolve("../../../src/cli.js");
-  const cmd = `node ${cliPath} ${args.map((a) => `"${a}"`).join(" ")}`;
+  const { resolve, dirname, join } = await import("path");
+  const { fileURLToPath } = await import("url");
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const cliPath =
+    process.env.CLI_PATH || resolve(__dirname, "../../../dist/cli/index.js");
+  if (!process.env.CLI_PATH) {
+    console.warn(
+      "⚠️  Using fallback CLI path. Consider setting the CLI_PATH environment variable.",
+    );
+  }
+  // Use shell-quote for robust argument escaping
+  const { quote: shellQuote } = await import("shell-quote");
+  const quotedArgs = args.length > 0 ? ` ${shellQuote(args)}` : "";
+  const cmd = `node "${cliPath}"${quotedArgs}`;
   return await execAsync(cmd, { timeout });
 }
 

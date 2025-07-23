@@ -22,7 +22,7 @@
  * 13. Backward compatibility
  */
 
-import { NeuroLink } from "../lib/neurolink.js";
+import { NeuroLink } from "../src/lib/neurolink.js";
 import { spawn } from "child_process";
 import path from "path";
 

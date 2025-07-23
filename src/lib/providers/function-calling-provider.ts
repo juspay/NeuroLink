@@ -26,7 +26,7 @@ import {
 import { createExecutionContext } from "../mcp/context-manager.js";
 import type { NeuroLinkExecutionContext } from "../mcp/factory.js";
 import { mcpLogger } from "../mcp/logging.js";
-import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
 
 /**
@@ -37,6 +37,13 @@ export class FunctionCallingProvider implements AIProvider {
   private enableFunctionCalling: boolean;
   private sessionId: string;
   private userId: string;
+  private cachedToolsObject: Record<string, Tool> | null = null;
+  private cachedToolMap: Map<
+    string,
+    { serverId: string; toolName: string }
+  > | null = null;
+  private cacheTimestamp: number | null = null;
+  private readonly cacheExpiryMs: number;
 
   constructor(
     baseProvider: AIProvider,
@@ -44,12 +51,20 @@ export class FunctionCallingProvider implements AIProvider {
       enableFunctionCalling?: boolean;
       sessionId?: string;
       userId?: string;
+      cacheExpiryMs?: number;
     } = {},
   ) {
     this.baseProvider = baseProvider;
     this.enableFunctionCalling = options.enableFunctionCalling ?? true;
     this.sessionId = options.sessionId || `function-calling-${Date.now()}`;
     this.userId = options.userId || "function-calling-user";
+    // Configurable cache expiry: default 5 minutes, with environment override, then constructor option
+    const defaultExpiryMs = 5 * 60 * 1000; // 5 minutes
+    const envExpiryMs = process.env.NEUROLINK_CACHE_EXPIRY_MS
+      ? parseInt(process.env.NEUROLINK_CACHE_EXPIRY_MS, 10)
+      : undefined;
+    this.cacheExpiryMs =
+      options.cacheExpiryMs ?? envExpiryMs ?? defaultExpiryMs;
   }
 
   /**
@@ -150,8 +165,36 @@ export class FunctionCallingProvider implements AIProvider {
         return result;
       }
 
-      // Get available function tools
-      const { tools, toolMap } = await getAvailableFunctionTools();
+      // Get available function tools (with automatic cache invalidation)
+      let toolsObject, toolMap;
+      const now = Date.now();
+      const isCacheExpired =
+        this.cacheTimestamp === null ||
+        now - this.cacheTimestamp > this.cacheExpiryMs;
+
+      if (this.cachedToolsObject && this.cachedToolMap && !isCacheExpired) {
+        toolsObject = this.cachedToolsObject;
+        toolMap = this.cachedToolMap;
+        mcpLogger.debug(
+          `[${functionTag}] Using cached tools (${Math.round((now - this.cacheTimestamp!) / 1000)}s old)`,
+        );
+      } else {
+        if (isCacheExpired && this.cachedToolsObject) {
+          mcpLogger.debug(`[${functionTag}] Cache expired, refreshing tools`);
+        }
+        const result = await getAvailableFunctionTools();
+        toolsObject = result.toolsObject;
+        toolMap = result.toolMap;
+        // Cache the results for future use with timestamp
+        this.cachedToolsObject = toolsObject;
+        this.cachedToolMap = toolMap;
+        this.cacheTimestamp = now;
+        mcpLogger.debug(
+          `[${functionTag}] Cached ${Object.keys(toolsObject).length} tools with expiry in ${this.cacheExpiryMs / 1000}s`,
+        );
+      }
+
+      const tools = Object.values(toolsObject);
       if (tools.length === 0) {
         mcpLogger.debug(
           `[${functionTag}] No tools available, using base provider`,
@@ -182,10 +225,10 @@ export class FunctionCallingProvider implements AIProvider {
       });
 
       // Use the AI SDK's native function calling by calling generate directly
-      // We need to get the underlying model from the base provider
-      const result = await this.generateWithTools(
+      // We can now use the toolsObject directly instead of converting from array
+      const result = await this.generateWithToolsObject(
         options,
-        tools,
+        toolsObject,
         toolMap,
         context,
         analysisSchema,
@@ -233,7 +276,104 @@ export class FunctionCallingProvider implements AIProvider {
   }
 
   /**
-   * Generate text using AI SDK's native function calling
+   * Generate text with tools using the AI SDK's generate function (with tools object)
+   */
+  private async generateWithToolsObject(
+    options: TextGenerationOptions,
+    toolsObject: Record<string, Tool>,
+    toolMap: Map<string, { serverId: string; toolName: string }>,
+    context: NeuroLinkExecutionContext,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<GenerateResult> {
+    const functionTag = "FunctionCallingProvider.generateWithToolsObject";
+    try {
+      // Use the toolsObject directly with proper execution wrapped
+      const toolsWithExecution = this.wrapToolsWithExecution(
+        toolsObject,
+        toolMap,
+        context,
+      );
+
+      mcpLogger.debug(
+        `[${functionTag}] Using tools object with ${Object.keys(toolsWithExecution).length} tools`,
+      );
+
+      // Get the model from base provider
+      const modelInfo = await this.getModelFromProvider();
+
+      if (!modelInfo) {
+        mcpLogger.warn(
+          `[${functionTag}] Could not get model from provider, falling back to base provider`,
+        );
+        const result = await this.baseProvider.generate(
+          options,
+          analysisSchema,
+        );
+        if (!result) {
+          return {
+            content: "No response generated",
+            provider: "function-calling",
+            model: "unknown",
+          };
+        }
+        return result;
+      }
+
+      // Use AI SDK's generate directly with tools
+      const generateOptions: Parameters<typeof aiGenerate>[0] = {
+        model: modelInfo.model,
+        prompt: options.prompt,
+        system: options.systemPrompt || "You are a helpful AI assistant.",
+        temperature: options.temperature || 0.7,
+        maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+        tools: toolsWithExecution,
+        toolChoice: "auto", // Let the AI decide when to use tools
+        maxSteps: options.maxSteps ?? DEFAULT_MAX_STEPS, // Enable multi-turn tool execution
+      };
+
+      // Add experimental_output if schema is provided
+      if (analysisSchema) {
+        generateOptions.experimental_output = Output.object({
+          schema: analysisSchema,
+        });
+      }
+
+      const result = await aiGenerate(generateOptions);
+
+      mcpLogger.debug(`[${functionTag}] AI SDK generate completed`, {
+        toolCalls: result.toolCalls?.length || 0,
+        finishReason: result.finishReason,
+        usage: result.usage,
+      });
+
+      return {
+        content: result.text,
+        provider: "function-calling",
+        model: "unknown",
+        usage: result.usage
+          ? {
+              inputTokens: result.usage.promptTokens,
+              outputTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+            }
+          : undefined,
+        responseTime: 0,
+        toolsUsed: result.toolCalls?.map((tc) => tc.toolName) || [],
+        toolExecutions: [],
+        enhancedWithTools: (result.toolCalls?.length || 0) > 0,
+        availableTools: [],
+      };
+    } catch (error) {
+      mcpLogger.error(
+        `[${functionTag}] Failed to generate text with tools:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Generate text using AI SDK's native function calling (legacy array-based)
    */
   private async generateWithTools(
     options: TextGenerationOptions,
@@ -253,7 +393,7 @@ export class FunctionCallingProvider implements AIProvider {
       );
 
       mcpLogger.debug(
-        `[${functionTag}] Calling AI SDK generate with ${Object.keys(toolsWithExecution).length} tools and maxSteps: 5`,
+        `[${functionTag}] Calling AI SDK generate with ${Object.keys(toolsWithExecution).length} tools and maxSteps: ${options.maxSteps ?? DEFAULT_MAX_STEPS}`,
       );
       mcpLogger.debug(
         `[${functionTag}] Sanitized tool names:`,
@@ -299,7 +439,7 @@ export class FunctionCallingProvider implements AIProvider {
         maxTokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
         tools: toolsWithExecution,
         toolChoice: "auto", // Let the AI decide when to use tools
-        maxSteps: 5, // CRITICAL: Enable multi-turn tool execution
+        maxSteps: options.maxSteps ?? DEFAULT_MAX_STEPS, // Enable multi-turn tool execution
       };
 
       // Add experimental_output if schema is provided
@@ -400,7 +540,66 @@ export class FunctionCallingProvider implements AIProvider {
   }
 
   /**
-   * Convert our tools to AI SDK format with proper execution
+   * Wrap tools with proper execution context (for object-based tools)
+   */
+  private wrapToolsWithExecution(
+    toolsObject: Record<string, Tool>,
+    toolMap: Map<string, { serverId: string; toolName: string }>,
+    context: NeuroLinkExecutionContext,
+  ): Record<string, Tool> {
+    const functionTag = "FunctionCallingProvider.wrapToolsWithExecution";
+    const wrappedTools: Record<string, Tool> = {};
+
+    for (const [toolName, tool] of Object.entries(toolsObject)) {
+      const toolInfo = toolMap.get(toolName);
+      const originalToolName = toolInfo ? toolInfo.toolName : toolName;
+
+      // Create a version with actual MCP execution
+      wrappedTools[toolName] = {
+        description: tool.description,
+        parameters: tool.parameters,
+        execute: async (args: Record<string, unknown>) => {
+          // Debug logging only in debug mode
+          if (process.env.NEUROLINK_DEBUG === "true") {
+            const providerName = this.baseProvider.constructor.name;
+            mcpLogger.debug(`Tool execution - Provider: ${providerName}`);
+            mcpLogger.debug(
+              `Tool: ${toolName} (original: ${originalToolName})`,
+            );
+            mcpLogger.debug(`Args:`, args);
+          }
+
+          try {
+            // Execute the actual MCP tool
+            const result = await executeFunctionCall(toolName, args);
+
+            if (process.env.NEUROLINK_DEBUG === "true") {
+              mcpLogger.debug(`Tool result:`, result);
+            }
+
+            if (result.success) {
+              return result.data || { success: true };
+            } else {
+              return { error: result.error || "Tool execution failed" };
+            }
+          } catch (error) {
+            mcpLogger.error(
+              `[${functionTag}] Tool execution error: ${toolName}`,
+              error,
+            );
+            return {
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        },
+      };
+    }
+
+    return wrappedTools;
+  }
+
+  /**
+   * Convert our tools to AI SDK format with proper execution (legacy array-based)
    */
   private convertToAISDKTools(
     tools: Tool[],
@@ -576,6 +775,58 @@ These functions provide accurate, real-time data. Use them actively to enhance y
    */
 
   /**
+   * Clear cached tools - Cache Invalidation Strategy
+   *
+   * WHEN TO CALL clearToolsCache():
+   *
+   * 1. **MCP Server Changes**: When MCP servers are added, removed, or restarted
+   *    - After calling unifiedRegistry.addServer() or removeServer()
+   *    - When MCP server configurations change
+   *    - After MCP server restart or reconnection
+   *
+   * 2. **Tool Registration Changes**: When custom tools are modified
+   *    - After registering new SDK tools via registerTool()
+   *    - When tool implementations change
+   *    - After unregistering tools
+   *
+   * 3. **Provider Reinitialization**: When the provider context changes
+   *    - Before switching between different AI providers
+   *    - When session context changes significantly
+   *    - After provider authentication refresh
+   *
+   * 4. **Error Recovery**: When tool execution encounters systematic failures
+   *    - After MCP connection errors are resolved
+   *    - When tool discovery needs to be re-run
+   *    - During error recovery workflows
+   *
+   * 5. **Development/Testing**: During development and testing cycles
+   *    - Between test cases that modify tool availability
+   *    - When testing different tool configurations
+   *    - During hot reloading scenarios
+   *
+   * CACHE LIFECYCLE:
+   * - Cache is populated on first generate() call via getAvailableFunctionTools()
+   * - Cache persists across multiple generate() calls for performance
+   * - Cache is invalidated by calling this method
+   * - Next generate() call will rebuild cache from current tool state
+   *
+   * PERFORMANCE IMPACT:
+   * - Clearing cache forces tool discovery on next usage (~100-500ms overhead)
+   * - Recommended to clear cache proactively rather than reactively
+   * - Consider batching tool changes before clearing cache
+   *
+   * THREAD SAFETY:
+   * - This method is not thread-safe
+   * - Avoid calling during active generate() operations
+   * - Safe to call between separate AI generation requests
+   */
+  clearToolsCache(): void {
+    this.cachedToolsObject = null;
+    this.cachedToolMap = null;
+    this.cacheTimestamp = null;
+  }
+
+  /**
    * Short alias for generate() - CLI-SDK consistency
    */
   async gen(
@@ -595,6 +846,7 @@ export function createFunctionCallingProvider(
     enableFunctionCalling?: boolean;
     sessionId?: string;
     userId?: string;
+    cacheExpiryMs?: number;
   },
 ): AIProvider {
   return new FunctionCallingProvider(baseProvider, options);
@@ -612,6 +864,7 @@ export function createMCPAwareProviderV3(
     enableFunctionCalling?: boolean;
     sessionId?: string;
     userId?: string;
+    cacheExpiryMs?: number;
   } = {},
 ): AIProvider {
   const functionTag = "createMCPAwareProviderV3";
@@ -627,6 +880,7 @@ export function createMCPAwareProviderV3(
     enableFunctionCalling: options.enableFunctionCalling,
     sessionId: options.sessionId,
     userId: options.userId,
+    cacheExpiryMs: options.cacheExpiryMs,
   });
 
   mcpLogger.debug(

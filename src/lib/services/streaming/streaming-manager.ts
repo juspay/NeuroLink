@@ -1,5 +1,6 @@
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
+import { logger } from "../../utils/logger.js";
 import type {
   StreamingSession,
   StreamingConfig,
@@ -58,7 +59,7 @@ export class StreamingManager extends EventEmitter {
     this.activeSessions.set(sessionId, session);
     this.updateGlobalMetrics();
 
-    console.log(
+    logger.debug(
       `[Streaming Manager] Created session ${sessionId} for provider ${config.provider}`,
     );
     this.emit("session-created", session);
@@ -76,7 +77,7 @@ export class StreamingManager extends EventEmitter {
     this.activeSessions.delete(sessionId);
     this.updateGlobalMetrics();
 
-    console.log(`[Streaming Manager] Terminated session ${sessionId}`);
+    logger.debug(`[Streaming Manager] Terminated session ${sessionId}`);
     this.emit("session-terminated", session);
   }
 
@@ -88,7 +89,7 @@ export class StreamingManager extends EventEmitter {
 
     if (session.status === "active") {
       session.status = "paused";
-      console.log(`[Streaming Manager] Paused session ${sessionId}`);
+      logger.debug(`[Streaming Manager] Paused session ${sessionId}`);
       this.emit("session-paused", session);
     }
   }
@@ -102,7 +103,7 @@ export class StreamingManager extends EventEmitter {
     if (session.status === "paused") {
       session.status = "active";
       session.lastActivity = Date.now();
-      console.log(`[Streaming Manager] Resumed session ${sessionId}`);
+      logger.debug(`[Streaming Manager] Resumed session ${sessionId}`);
       this.emit("session-resumed", session);
     }
   }
@@ -134,7 +135,7 @@ export class StreamingManager extends EventEmitter {
       session.config.streamingMode = "real-time";
     }
 
-    console.log(
+    logger.debug(
       `[Streaming Manager] Optimized session ${sessionId}: latency=${currentLatency}ms, mode=${session.config.streamingMode}`,
     );
   }
@@ -146,7 +147,7 @@ export class StreamingManager extends EventEmitter {
     }
 
     session.config.compressionEnabled = true;
-    console.log(
+    logger.debug(
       `[Streaming Manager] Enabled compression for session ${sessionId}`,
     );
   }
@@ -166,7 +167,7 @@ export class StreamingManager extends EventEmitter {
       bufferConfig.flushThreshold,
     );
 
-    console.log(
+    logger.debug(
       `[Streaming Manager] Updated buffer config for session ${sessionId}:`,
       bufferConfig,
     );
@@ -186,7 +187,7 @@ export class StreamingManager extends EventEmitter {
     };
 
     this.streamingPools.set(poolId, pool);
-    console.log(
+    logger.debug(
       `[Streaming Manager] Created pool ${poolId} with max ${config.maxConcurrentSessions} sessions`,
     );
   }
@@ -228,7 +229,7 @@ export class StreamingManager extends EventEmitter {
     pool.maxSessions = newMaxSessions;
     pool.config.maxConcurrentSessions = newMaxSessions;
 
-    console.log(
+    logger.debug(
       `[Streaming Manager] Scaled pool ${poolId} to ${newMaxSessions} max sessions (${scale}x)`,
     );
   }
@@ -299,7 +300,7 @@ export class StreamingManager extends EventEmitter {
     this.healthCheckInterval = setInterval(() => {
       const health = this.getStreamingHealthStatus();
       if (health.status !== "healthy") {
-        console.warn("[Streaming Manager] Health check:", health);
+        logger.debug("[Streaming Manager] Health check:", health);
         this.emit("health-warning", health);
       }
     }, 30000); // Check every 30 seconds

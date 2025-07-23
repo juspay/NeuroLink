@@ -184,14 +184,18 @@ export class NeuroLinkMCPClient extends EventEmitter {
   /**
    * Get all registered tools
    */
-  getTools(): Record<string, { description?: string; inputSchema?: unknown }> {
+  getTools(): Record<
+    string,
+    { name: string; description?: string; inputSchema?: unknown }
+  > {
     const tools: Record<
       string,
-      { description?: string; inputSchema?: unknown }
+      { name: string; description?: string; inputSchema?: unknown }
     > = {};
 
     for (const [name, tool] of this.tools) {
       tools[name] = {
+        name: name, // Include the tool name as a property
         description: tool.description,
         inputSchema: tool.inputSchema,
       };

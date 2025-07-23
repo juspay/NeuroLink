@@ -17,6 +17,21 @@ import { directAgentTools } from "../agent/direct-tools.js";
 // Analytics helper will be dynamically imported when needed
 
 /**
+ * Validates if a result contains a valid toolsObject structure
+ * @param result - The result object to validate
+ * @returns true if the result contains a valid toolsObject, false otherwise
+ */
+function isValidToolsObject(result: any): boolean {
+  return (
+    result &&
+    typeof result === "object" &&
+    result.toolsObject &&
+    typeof result.toolsObject === "object" &&
+    Object.keys(result.toolsObject).length > 0
+  );
+}
+
+/**
  * Abstract base class for all AI providers
  * Tools are integrated as first-class citizens - always available by default
  */
@@ -247,25 +262,25 @@ export abstract class BaseProvider implements AIProvider {
       ...this.directTools, // Always include direct tools
     };
 
-    logger.info(
+    logger.debug(
       `[BaseProvider] getAllTools called, SDK available: ${!!this.sdk}, type: ${typeof this.sdk}`,
     );
-    console.log(
+    logger.debug(
       `[BaseProvider] Direct tools: ${Object.keys(this.directTools).join(", ")}`,
     );
 
     // Add custom tools from SDK if available
-    console.log(
+    logger.debug(
       `[BaseProvider] Checking SDK: ${!!this.sdk}, has getInMemoryServers: ${this.sdk && typeof (this.sdk as any).getInMemoryServers}`,
     );
     if (
       this.sdk &&
       typeof (this.sdk as any).getInMemoryServers === "function"
     ) {
-      console.log(`[BaseProvider] SDK check passed, loading custom tools`);
+      logger.debug(`[BaseProvider] SDK check passed, loading custom tools`);
       try {
         const inMemoryServers = (this.sdk as any).getInMemoryServers();
-        console.log(`[BaseProvider] Got servers:`, inMemoryServers.size);
+        logger.debug(`[BaseProvider] Got servers:`, inMemoryServers.size);
         logger.debug(
           `[BaseProvider] Loading custom tools from SDK, found ${inMemoryServers.size} servers`,
         );
@@ -285,7 +300,7 @@ export abstract class BaseProvider implements AIProvider {
                 any,
               ][]) {
                 if (toolInfo && typeof toolInfo.execute === "function") {
-                  console.log(
+                  logger.debug(
                     `[BaseProvider] Converting custom tool: ${toolName}`,
                   );
                   // Convert to AI SDK tool format
@@ -338,12 +353,15 @@ export abstract class BaseProvider implements AIProvider {
           "../mcp/function-calling.js"
         );
         const result = await getAvailableFunctionTools();
-        if (result.tools && result.tools.length > 0) {
-          this.mcpTools = {};
-          for (const tool of result.tools) {
-            const toolName = (tool as any).name || "unknown";
-            this.mcpTools[toolName] = tool;
-          }
+        if (isValidToolsObject(result)) {
+          this.mcpTools = result.toolsObject;
+        } else {
+          logger.debug(
+            `Invalid or empty toolsObject for ${this.providerName}: Expected an object with at least one key, but got ${typeof result.toolsObject} with ${
+              result.toolsObject ? Object.keys(result.toolsObject).length : 0
+            } keys. Full result:`,
+            result,
+          );
         }
       } catch (error) {
         logger.debug(
@@ -359,7 +377,7 @@ export abstract class BaseProvider implements AIProvider {
       Object.assign(tools, this.mcpTools);
     }
 
-    console.log(
+    logger.debug(
       `[BaseProvider] getAllTools returning tools: ${Object.keys(tools).join(", ")}`,
     );
     return tools;

@@ -4,6 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { logger } from "../lib/utils/logger.js";
 import {
   DynamicOrchestrator,
   type ToolDecision,
@@ -87,7 +88,7 @@ describe("DynamicOrchestrator", () => {
         if (params.prompt.includes("Select the next tool")) {
           // Return different decisions based on previous results
           const previousResults = params.systemPrompt || "";
-          console.log(
+          logger.debug(
             "Mock called with systemPrompt:",
             previousResults.slice(0, 200),
           );
@@ -95,7 +96,7 @@ describe("DynamicOrchestrator", () => {
           // Track iteration based on result content
           const iterationCount = (previousResults.match(/Result \d+:/g) || [])
             .length;
-          console.log("Iteration count:", iterationCount);
+          logger.debug("Iteration count:", iterationCount);
 
           if (iterationCount === 0) {
             // First iteration - search for code
@@ -236,9 +237,9 @@ describe("DynamicOrchestrator", () => {
 
         // Debug logging
         if (!result.success) {
-          console.error("Test failed with error:", result.error?.message);
-          console.error("Results:", result.results);
-          console.error("Decisions:", result.decisions);
+          logger.debug("Test failed with error:", result.error?.message);
+          logger.debug("Results:", result.results);
+          logger.debug("Decisions:", result.decisions);
         }
 
         expect(result.success).toBe(true);
@@ -248,7 +249,7 @@ describe("DynamicOrchestrator", () => {
         expect(result.finalOutput).toContain("calculateTotal");
         expect(result.finalOutput).toContain("42");
       } catch (error) {
-        console.error("Test threw error:", error);
+        logger.debug("Test threw error:", error);
         throw error;
       }
 
@@ -355,7 +356,7 @@ describe("DynamicOrchestrator", () => {
         { includeReasoning: true, requireConfidence: 0.4 },
       );
 
-      console.log("Result:", JSON.stringify(result, null, 2));
+      logger.debug("Result:", JSON.stringify(result, null, 2));
 
       // Should fall back to default tool
       expect(result.success).toBe(true);

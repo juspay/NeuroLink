@@ -795,13 +795,747 @@ const result = await neurolink.generate({
 // 3. Call processRefund({ orderId: <most_recent>, amount: 50, reason: "damaged item" })
 ```
 
+## 🌐 MCP Server Integration
+
+Beyond simple tool registration, NeuroLink SDK supports adding complete MCP (Model Context Protocol) servers for more complex tool ecosystems.
+
+### Adding In-Memory MCP Servers
+
+```typescript
+// Add a complete MCP server with multiple related tools
+await neurolink.addInMemoryMCPServer("hr-management", {
+  server: {
+    title: "HR Management Server",
+    description: "Comprehensive HR tools for employee management",
+    tools: {
+      createEmployee: {
+        description: "Create a new employee record with full details",
+        execute: async (params: {
+          name: string;
+          department: string;
+          role: string;
+          salary: number;
+          startDate: string;
+        }) => {
+          return {
+            success: true,
+            data: {
+              employeeId: `EMP-${Date.now()}`,
+              name: params.name,
+              department: params.department,
+              role: params.role,
+              salary: params.salary,
+              startDate: params.startDate,
+              status: "active",
+              createdAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+
+      calculateSalary: {
+        description: "Calculate total salary including bonuses and deductions",
+        execute: async (params: {
+          baseSalary: number;
+          bonuses: number;
+          deductions: number;
+          taxRate: number;
+        }) => {
+          const grossSalary =
+            params.baseSalary + params.bonuses - params.deductions;
+          const netSalary = grossSalary * (1 - params.taxRate);
+
+          return {
+            success: true,
+            data: {
+              baseSalary: params.baseSalary,
+              bonuses: params.bonuses,
+              deductions: params.deductions,
+              grossSalary,
+              taxAmount: grossSalary * params.taxRate,
+              netSalary,
+              calculatedAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+
+      getEmployeeStats: {
+        description: "Get comprehensive employee statistics and analytics",
+        execute: async (params: { department?: string; role?: string }) => {
+          // Simulated analytics data
+          return {
+            success: true,
+            data: {
+              totalEmployees: 150,
+              byDepartment: {
+                engineering: 60,
+                sales: 35,
+                marketing: 25,
+                hr: 15,
+                finance: 15,
+              },
+              averageSalary: 75000,
+              averageTenure: "2.5 years",
+              openPositions: 8,
+              lastUpdated: new Date().toISOString(),
+            },
+          };
+        },
+      },
+    },
+  },
+  category: "hr-management",
+  metadata: {
+    version: "1.0.0",
+    author: "Your Company",
+    description: "Complete HR management solution",
+  },
+});
+```
+
+### Advanced MCP Server Examples
+
+#### 1. Data Analytics Server
+
+```typescript
+await neurolink.addInMemoryMCPServer("analytics-server", {
+  server: {
+    title: "Data Analytics Server",
+    description: "Advanced data processing and analytics tools",
+    tools: {
+      analyzeDataset: {
+        description: "Perform statistical analysis on datasets",
+        execute: async (params: {
+          data: number[];
+          analysisType: "descriptive" | "correlation" | "regression";
+        }) => {
+          const { data, analysisType } = params;
+
+          switch (analysisType) {
+            case "descriptive":
+              const sum = data.reduce((a, b) => a + b, 0);
+              const mean = sum / data.length;
+              const sortedData = [...data].sort((a, b) => a - b);
+              const median = sortedData[Math.floor(data.length / 2)];
+              const variance =
+                data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) /
+                data.length;
+              const stdDev = Math.sqrt(variance);
+
+              return {
+                success: true,
+                data: {
+                  count: data.length,
+                  sum,
+                  mean,
+                  median,
+                  min: Math.min(...data),
+                  max: Math.max(...data),
+                  variance,
+                  standardDeviation: stdDev,
+                  range: Math.max(...data) - Math.min(...data),
+                },
+              };
+
+            case "correlation":
+              // Simplified correlation analysis
+              return {
+                success: true,
+                data: {
+                  correlationMatrix: "Generated correlation matrix",
+                  strongCorrelations: [],
+                  analysisNote: "Correlation analysis completed",
+                },
+              };
+
+            default:
+              return { success: false, error: "Unknown analysis type" };
+          }
+        },
+      },
+
+      generateReport: {
+        description: "Generate comprehensive data reports with visualizations",
+        execute: async (params: {
+          title: string;
+          data: any[];
+          reportType: "summary" | "detailed" | "executive";
+        }) => {
+          return {
+            success: true,
+            data: {
+              reportId: `RPT-${Date.now()}`,
+              title: params.title,
+              type: params.reportType,
+              dataPoints: params.data.length,
+              sections: [
+                "Executive Summary",
+                "Key Metrics",
+                "Detailed Analysis",
+                "Recommendations",
+              ],
+              generatedAt: new Date().toISOString(),
+              status: "completed",
+            },
+          };
+        },
+      },
+    },
+  },
+});
+```
+
+#### 2. Workflow Automation Server
+
+```typescript
+await neurolink.addInMemoryMCPServer("workflow-server", {
+  server: {
+    title: "Workflow Automation Server",
+    description: "Tools for creating and managing automated workflows",
+    tools: {
+      createWorkflow: {
+        description: "Create a new automated workflow with multiple steps",
+        execute: async (params: {
+          name: string;
+          steps: Array<{
+            name: string;
+            type: string;
+            config: any;
+          }>;
+          triggers: string[];
+        }) => {
+          return {
+            success: true,
+            data: {
+              workflowId: `WF-${Date.now()}`,
+              name: params.name,
+              steps: params.steps,
+              triggers: params.triggers,
+              status: "created",
+              nextExecution: null,
+              createdAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+
+      executeWorkflow: {
+        description: "Execute a workflow with specific input data",
+        execute: async (params: {
+          workflowId: string;
+          inputData: any;
+          executionMode: "test" | "production";
+        }) => {
+          return {
+            success: true,
+            data: {
+              executionId: `EXE-${Date.now()}`,
+              workflowId: params.workflowId,
+              mode: params.executionMode,
+              status: "running",
+              progress: 0,
+              startedAt: new Date().toISOString(),
+              estimatedCompletion: new Date(Date.now() + 300000).toISOString(), // 5 minutes
+            },
+          };
+        },
+      },
+
+      getWorkflowStatus: {
+        description: "Get current status and progress of workflow execution",
+        execute: async (params: { workflowId: string }) => {
+          return {
+            success: true,
+            data: {
+              workflowId: params.workflowId,
+              status: "in-progress",
+              currentStep: "Data Processing",
+              stepsCompleted: 3,
+              totalSteps: 8,
+              progress: 37.5,
+              timeElapsed: "2m 15s",
+              estimatedTimeRemaining: "3m 45s",
+              lastUpdated: new Date().toISOString(),
+            },
+          };
+        },
+      },
+    },
+  },
+});
+```
+
+#### 3. Content Generation Server
+
+```typescript
+await neurolink.addInMemoryMCPServer("content-server", {
+  server: {
+    title: "Content Generation Server",
+    description: "Advanced content creation and management tools",
+    tools: {
+      generateSampleText: {
+        description: "Generate sample text content for testing and development",
+        execute: async (params: {
+          topic: string;
+          length: "short" | "medium" | "long";
+          style: "formal" | "casual" | "technical";
+        }) => {
+          const samples = {
+            short: `A brief overview of ${params.topic}. This content covers essential information in a ${params.style} style.`,
+            medium: `This is a comprehensive introduction to ${params.topic}. Written in a ${params.style} style, it covers fundamental concepts, practical applications, and key considerations for understanding ${params.topic} in various contexts.`,
+            long: `This extensive exploration of ${params.topic} provides detailed analysis written in a ${params.style} style. The content examines multiple perspectives, methodologies, and real-world applications related to ${params.topic}. By thoroughly investigating various aspects and implications, readers gain comprehensive understanding of ${params.topic} and its significance across different fields and industries.`,
+          };
+
+          return {
+            success: true,
+            data: {
+              text: samples[params.length],
+              topic: params.topic,
+              length: params.length,
+              style: params.style,
+              wordCount: samples[params.length].split(" ").length,
+              characterCount: samples[params.length].length,
+              generatedAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+
+      analyzeContent: {
+        description: "Analyze text content for various metrics and insights",
+        execute: async (params: {
+          text: string;
+          analysisTypes: Array<
+            "sentiment" | "readability" | "keywords" | "topics"
+          >;
+        }) => {
+          const results: any = {};
+
+          params.analysisTypes.forEach((type) => {
+            switch (type) {
+              case "sentiment":
+                const positiveWords = ["good", "great", "excellent", "amazing"];
+                const negativeWords = ["bad", "terrible", "awful", "poor"];
+                const words = params.text.toLowerCase().split(" ");
+                const positive = words.filter((w) =>
+                  positiveWords.includes(w),
+                ).length;
+                const negative = words.filter((w) =>
+                  negativeWords.includes(w),
+                ).length;
+
+                results.sentiment = {
+                  score: positive - negative,
+                  sentiment:
+                    positive > negative
+                      ? "positive"
+                      : negative > positive
+                        ? "negative"
+                        : "neutral",
+                  confidence: Math.min(
+                    (Math.abs(positive - negative) / words.length) * 10,
+                    1,
+                  ),
+                };
+                break;
+
+              case "readability":
+                const sentences = params.text.split(/[.!?]+/).length;
+                const wordCount = params.text.split(" ").length;
+                const avgWordsPerSentence = wordCount / sentences;
+
+                results.readability = {
+                  wordCount,
+                  sentenceCount: sentences,
+                  avgWordsPerSentence,
+                  readabilityLevel:
+                    avgWordsPerSentence < 15
+                      ? "easy"
+                      : avgWordsPerSentence < 25
+                        ? "moderate"
+                        : "difficult",
+                };
+                break;
+
+              case "keywords":
+                const wordFreq: Record<string, number> = {};
+                const meaningfulWords = params.text
+                  .toLowerCase()
+                  .replace(/[^\w\s]/g, "")
+                  .split(" ")
+                  .filter((w) => w.length > 3);
+
+                meaningfulWords.forEach((word) => {
+                  wordFreq[word] = (wordFreq[word] || 0) + 1;
+                });
+
+                results.keywords = Object.entries(wordFreq)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 10)
+                  .map(([word, freq]) => ({ word, frequency: freq }));
+                break;
+            }
+          });
+
+          return {
+            success: true,
+            data: {
+              textLength: params.text.length,
+              analysisTypes: params.analysisTypes,
+              results,
+              analyzedAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+    },
+  },
+});
+```
+
+### Mixed Tool Ecosystem Example
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+import { createTool } from "@juspay/neurolink";
+import { z } from "zod";
+
+const neurolink = new NeuroLink();
+
+// 1. Register simple custom tools (extending existing functionality)
+neurolink.registerTool(
+  "enhancedCalculator",
+  createTool({
+    description: "Enhanced calculator with scientific and financial functions",
+    execute: (params: {
+      expression: string;
+      mode: "basic" | "scientific" | "financial";
+    }) => {
+      if (params.mode === "scientific" && params.expression.includes("sqrt")) {
+        const num = parseFloat(
+          params.expression.replace("sqrt(", "").replace(")", ""),
+        );
+        return { result: Math.sqrt(num), enhanced: true, mode: params.mode };
+      }
+
+      if (
+        params.mode === "financial" &&
+        params.expression.includes("compound")
+      ) {
+        // Parse: compound(principal, rate, time)
+        const match = params.expression.match(
+          /compound\((\d+),\s*([\d.]+),\s*(\d+)\)/,
+        );
+        if (match) {
+          const [, principal, rate, time] = match.map(Number);
+          const result = principal * Math.pow(1 + rate / 100, time);
+          return {
+            result,
+            enhanced: true,
+            mode: params.mode,
+            calculation: "compound_interest",
+          };
+        }
+      }
+
+      // Use a safe, restricted math expression evaluator for security
+      const {
+        create,
+        addDependencies,
+        subtractDependencies,
+        multiplyDependencies,
+        divideDependencies,
+        powDependencies,
+        sqrtDependencies,
+        absDependencies,
+      } from "mathjs";
+
+      // Create restricted math environment with only specific functions for security
+      const dependencies = {
+        addDependencies,
+        subtractDependencies,
+        multiplyDependencies,
+        divideDependencies,
+        powDependencies,
+        sqrtDependencies,
+        absDependencies,
+      };
+
+      const math = create(dependencies, {
+        matrix: "Array",
+        number: "number",
+        precision: 64,
+      });
+
+      // Additional sanitization for basic mathematical expressions
+      const sanitizedExpression = params.expression.replace(
+        /[^0-9+\-*/().\s]/g,
+        "",
+      );
+      if (sanitizedExpression !== params.expression) {
+        return {
+          error: "Expression contains invalid characters",
+          enhanced: false,
+          mode: params.mode,
+        };
+      }
+
+      try {
+        const result = math.evaluate(sanitizedExpression);
+        return { result, enhanced: false, mode: params.mode };
+      } catch (error) {
+        return {
+          error: `Mathematical expression failed: ${error.message || "Invalid expression"}`,
+          enhanced: false,
+          mode: params.mode,
+        };
+      }
+    },
+  }),
+);
+
+// 2. Add complete MCP servers (new functionality domains)
+await neurolink.addInMemoryMCPServer("business-intelligence", {
+  server: {
+    title: "Business Intelligence Server",
+    tools: {
+      generateKPIReport: {
+        description: "Generate comprehensive KPI reports for business metrics",
+        execute: async (params: {
+          metrics: string[];
+          timeRange: string;
+          department?: string;
+        }) => {
+          return {
+            success: true,
+            data: {
+              reportId: `KPI-${Date.now()}`,
+              metrics: params.metrics,
+              timeRange: params.timeRange,
+              department: params.department || "All",
+              kpis: {
+                revenue: "$1.2M",
+                growth: "+15%",
+                customerSatisfaction: "94%",
+                efficiency: "87%",
+              },
+              trends: ["Revenue increasing", "Customer satisfaction stable"],
+              recommendations: [
+                "Focus on efficiency improvements",
+                "Expand successful programs",
+              ],
+              generatedAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+
+      predictTrends: {
+        description: "Predict business trends using historical data",
+        execute: async (params: {
+          dataPoints: number[];
+          predictionPeriod: number;
+          algorithm: "linear" | "exponential" | "seasonal";
+        }) => {
+          // Simplified prediction logic
+          const trend =
+            params.dataPoints[params.dataPoints.length - 1] >
+            params.dataPoints[0]
+              ? "upward"
+              : "downward";
+          const avgGrowth =
+            (params.dataPoints[params.dataPoints.length - 1] -
+              params.dataPoints[0]) /
+            params.dataPoints.length;
+
+          return {
+            success: true,
+            data: {
+              algorithm: params.algorithm,
+              trend,
+              predictedGrowth: avgGrowth,
+              confidence: 0.85,
+              predictions: Array.from(
+                { length: params.predictionPeriod },
+                (_, i) =>
+                  params.dataPoints[params.dataPoints.length - 1] +
+                  avgGrowth * (i + 1),
+              ),
+              generatedAt: new Date().toISOString(),
+            },
+          };
+        },
+      },
+    },
+  },
+});
+
+// 3. Use the mixed ecosystem
+const comprehensiveResult = await neurolink.generate({
+  input: {
+    text: `Calculate compound interest for $10000 at 5% for 3 years, then generate a KPI report
+           for revenue metrics over the last quarter, and predict trends for the next 6 months
+           using the data points [100, 120, 115, 130, 125, 140]`,
+  },
+  provider: "google-ai",
+  maxTokens: 2000,
+});
+
+// The AI will automatically:
+// 1. Use enhancedCalculator for compound interest: compound(10000, 5, 3)
+// 2. Use generateKPIReport for business metrics
+// 3. Use predictTrends for forecasting
+// 4. Synthesize all results into a comprehensive response
+
+console.log("AI Response:", comprehensiveResult.content);
+console.log("Tools Used:", comprehensiveResult.toolsUsed);
+```
+
+### Tool Discovery and Management
+
+```typescript
+// Get comprehensive view of all available tools
+const allTools = await neurolink.getAllAvailableTools();
+
+// Group tools by source
+const toolsBySource = allTools.reduce(
+  (acc, tool) => {
+    const source = tool.serverId || "unknown";
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  },
+  {} as Record<string, number>,
+);
+
+console.log("Tool ecosystem summary:");
+console.log("• Total tools available:", allTools.length);
+console.log("• Tools by source:", toolsBySource);
+
+// Get custom tools registered via registerTool()
+const customTools = neurolink.getCustomTools();
+console.log("• Custom tools registered:", customTools.size);
+
+// Get in-memory MCP servers added via addInMemoryMCPServer()
+const mcpServers = neurolink.getInMemoryServers();
+console.log("• In-memory MCP servers:", mcpServers.size);
+
+// Execute tools from any source using unified API
+const timeResult = await neurolink.executeTool("getCurrentTime");
+const calculationResult = await neurolink.executeTool("enhancedCalculator", {
+  expression: "compound(5000, 4.5, 2)",
+  mode: "financial",
+});
+const reportResult = await neurolink.executeTool("generateKPIReport", {
+  metrics: ["revenue", "growth"],
+  timeRange: "Q1-2024",
+});
+
+console.log("Tool execution results:");
+console.log("• Built-in tool:", timeResult.data.time);
+console.log("• Custom tool:", calculationResult.result);
+console.log("• MCP server tool:", reportResult.data.reportId);
+```
+
+### Best Practices for MCP Integration
+
+#### 1. Organize Tools by Domain
+
+```typescript
+// Group related tools into themed MCP servers
+await neurolink.addInMemoryMCPServer("user-management", {
+  server: {
+    title: "User Management Server",
+    tools: {
+      createUser: {
+        /* ... */
+      },
+      updateUser: {
+        /* ... */
+      },
+      deleteUser: {
+        /* ... */
+      },
+      getUserProfile: {
+        /* ... */
+      },
+    },
+  },
+});
+
+await neurolink.addInMemoryMCPServer("order-processing", {
+  server: {
+    title: "Order Processing Server",
+    tools: {
+      createOrder: {
+        /* ... */
+      },
+      updateOrderStatus: {
+        /* ... */
+      },
+      calculateShipping: {
+        /* ... */
+      },
+      processPayment: {
+        /* ... */
+      },
+    },
+  },
+});
+```
+
+#### 2. Consistent Error Handling
+
+```typescript
+execute: async (params) => {
+  try {
+    const result = await performOperation(params);
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      code: error.code || "OPERATION_FAILED",
+      timestamp: new Date().toISOString(),
+    };
+  }
+};
+```
+
+#### 3. Comprehensive Metadata
+
+```typescript
+await neurolink.addInMemoryMCPServer("server-id", {
+  server: {
+    title: "Human-Readable Server Name",
+    description: "Detailed description of server purpose",
+    tools: {
+      /* ... */
+    },
+  },
+  category: "business-logic", // Group similar servers
+  metadata: {
+    version: "2.1.0",
+    author: "Your Team",
+    lastUpdated: "2024-01-15",
+    documentation: "https://docs.yourcompany.com/mcp-servers",
+    supportContact: "support@yourcompany.com",
+  },
+});
+```
+
 ## 📚 Additional Resources
 
 - [API Reference - NeuroLink Class](./API-REFERENCE.md#neurolink-class-api)
 - [MCP Integration Guide](./MCP-INTEGRATION.md)
 - [Provider Tool Support](../README.md#provider-tool-support-status)
 - [Test Examples](../test/mcp/tool-integration/)
+- [MCP SDK Integration Proof Tests](../test/mcp-sdk-integration-proof.test.ts)
+- [Real AI-MCP Integration Demo](../test/mcp-ai-integration-demo.test.ts)
 
 ---
 
-**Start building powerful AI applications with custom tools today! 🚀**
+**Start building powerful AI applications with custom tools and MCP servers today! 🚀**

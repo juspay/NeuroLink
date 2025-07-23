@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
+import { promises as fs } from "fs";
+import * as path from "path";
 // Standard test timeouts (in milliseconds)
 const TEST_TIMEOUTS = {
   STANDARD: 30000, // 30 seconds per test
@@ -92,9 +94,15 @@ describe("SDK Comprehensive Tests", () => {
         });
       `;
 
-        const { stdout } = await execAsync(
-          `cd ${process.cwd()} && GOOGLE_AI_API_KEY=${process.env.GOOGLE_AI_API_KEY} node -e "${testCode}"`,
-        );
+        const tmpFile = path.join(process.cwd(), "tmp-sdk-test.js");
+        await fs.writeFile(tmpFile, testCode);
+        const { stdout } = await execAsync(`node ${tmpFile}`, {
+          env: {
+            ...process.env,
+            GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY,
+          },
+        });
+        await fs.unlink(tmpFile);
         expect(stdout).toContain("SDK_SUCCESS: true");
       },
       timeout,
@@ -108,10 +116,36 @@ describe("SDK Comprehensive Tests", () => {
         console.log("🔍 INPUT: SDK streaming test");
 
         try {
-          // FIXED: Use standalone script to avoid shell escaping issues
-          const { stdout } = await execAsync(
-            `cd ${process.cwd()} && GOOGLE_AI_API_KEY=${process.env.GOOGLE_AI_API_KEY} node test-sdk-comprehensive-streaming.mjs`,
-          );
+          const testCode = `
+          import('./dist/lib/neurolink.js').then(({NeuroLink}) => {
+            const sdk = new NeuroLink();
+            return sdk.stream({
+              input: {text: 'Count to 3'},
+              provider: 'google-ai',
+              maxTokens: 2000
+            });
+          }).then(async (streamResult) => {
+            let content = '';
+            for await (const chunk of streamResult.stream) {
+              content += chunk.content;
+            }
+            console.log('SDK_STREAM_SUCCESS:', content.length > 0);
+          }).catch(e => {
+            console.log('SDK_STREAM_ERROR:', e.message);
+          });
+        `;
+
+          const tmpFile = path.join(process.cwd(), "tmp-sdk-streaming-test.js");
+          await fs.writeFile(tmpFile, testCode);
+
+          const { stdout } = await execAsync(`node ${tmpFile}`, {
+            env: {
+              ...process.env,
+              GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY,
+            },
+          });
+
+          await fs.unlink(tmpFile);
           console.log("📤 OUTPUT:", stdout.substring(0, 300) + "...");
           console.log("✅ SUCCESS: Command completed");
 
@@ -146,9 +180,17 @@ describe("SDK Comprehensive Tests", () => {
         });
       `;
 
-        const { stdout } = await execAsync(
-          `cd ${process.cwd()} && GOOGLE_AI_API_KEY=${process.env.GOOGLE_AI_API_KEY} node -e "${testCode}"`,
-        );
+        const tmpFile = path.join(process.cwd(), "tmp-sdk-params-test.js");
+        await fs.writeFile(tmpFile, testCode);
+
+        const { stdout } = await execAsync(`node ${tmpFile}`, {
+          env: {
+            ...process.env,
+            GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY,
+          },
+        });
+
+        await fs.unlink(tmpFile);
         expect(stdout).toContain("SDK_PARAMS_SUCCESS: true");
       },
       timeout,
@@ -172,9 +214,17 @@ describe("SDK Comprehensive Tests", () => {
         });
       `;
 
-        const { stdout } = await execAsync(
-          `cd ${process.cwd()} && GOOGLE_AI_API_KEY=${process.env.GOOGLE_AI_API_KEY} node -e "${testCode}"`,
-        );
+        const tmpFile = path.join(process.cwd(), "tmp-sdk-error-test.js");
+        await fs.writeFile(tmpFile, testCode);
+
+        const { stdout } = await execAsync(`node ${tmpFile}`, {
+          env: {
+            ...process.env,
+            GOOGLE_AI_API_KEY: process.env.GOOGLE_AI_API_KEY,
+          },
+        });
+
+        await fs.unlink(tmpFile);
         expect(stdout).toContain("SDK_ERROR_HANDLED: true");
       },
       timeout,

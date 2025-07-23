@@ -86,7 +86,7 @@ describe("SDK Tool Registration - Phase 1", () => {
           description: "",
           execute: () => {},
         }),
-      ).toThrow("must have a description");
+      ).toThrow("must have a non-empty description");
 
       // Tool without execute function should fail
       expect(() =>

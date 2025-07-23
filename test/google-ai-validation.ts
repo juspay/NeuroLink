@@ -7,7 +7,7 @@
  * This test MUST pass 100% before any refactoring can begin.
  */
 
-import { UniversalProviderTest } from "./universal-provider-test.js";
+import { UniversalProviderTest } from "./universal-provider.js";
 
 describe("Google AI Provider Validation", () => {
   const hasApiKey = !!(

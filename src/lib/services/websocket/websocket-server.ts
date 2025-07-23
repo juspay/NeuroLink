@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
+import { logger } from "../../utils/logger.js";
 import type {
   WebSocketOptions,
   ConnectionInfo,
@@ -45,7 +46,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
     });
 
     this.wss.on("error", (error) => {
-      console.error("[WebSocket Server] Error:", error);
+      logger.error("[WebSocket Server] Error:", error);
       this.emit("error", error);
     });
   }
@@ -83,7 +84,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
     });
 
     ws.on("error", (error) => {
-      console.error(`[WebSocket] Connection ${connectionId} error:`, error);
+      logger.error(`[WebSocket] Connection ${connectionId} error:`, error);
       this.handleDisconnection(connectionId);
     });
 
@@ -103,7 +104,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
       },
     });
 
-    console.log(
+    logger.debug(
       `[WebSocket] New connection: ${connectionId} (${this.connections.size}/${this.options.maxConnections})`,
     );
     this.emit("connection", { connectionId, userAgent, ipAddress });
@@ -125,7 +126,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
           this.emit("message", { connectionId, message });
       }
     } catch (error) {
-      console.error(`[WebSocket] Invalid message from ${connectionId}:`, error);
+      logger.error(`[WebSocket] Invalid message from ${connectionId}:`, error);
       this.sendError(connectionId, "Invalid message format");
     }
   }
@@ -153,7 +154,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
     this.connections.delete(connectionId);
     this.connectionInfo.delete(connectionId);
 
-    console.log(
+    logger.debug(
       `[WebSocket] Disconnected: ${connectionId} (${this.connections.size}/${this.options.maxConnections})`,
     );
     this.emit("disconnection", { connectionId });
@@ -186,7 +187,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
       },
     });
 
-    console.log(`[WebSocket] ${connectionId} joined room ${roomId}`);
+    logger.debug(`[WebSocket] ${connectionId} joined room ${roomId}`);
     return true;
   }
 
@@ -221,7 +222,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
       },
     });
 
-    console.log(`[WebSocket] ${connectionId} left room ${roomId}`);
+    logger.debug(`[WebSocket] ${connectionId} left room ${roomId}`);
     return true;
   }
 
@@ -285,7 +286,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
       ws.send(JSON.stringify(message));
       return true;
     } catch (error) {
-      console.error(
+      logger.error(
         `[WebSocket] Failed to send message to ${connectionId}:`,
         error,
       );
@@ -336,7 +337,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
             connection &&
             Date.now() - connection.lastActivity > this.options.timeoutMs
           ) {
-            console.log(`[WebSocket] Timeout for connection ${connectionId}`);
+            logger.debug(`[WebSocket] Timeout for connection ${connectionId}`);
             ws.terminate();
           }
         }
@@ -369,10 +370,10 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
   }
 
   private handleChannelError(channelId: string, error: Error): void {
-    console.error(`[Streaming Channel] ${channelId} error:`, error);
+    logger.error(`[Streaming Channel] ${channelId} error:`, error);
   }
 
   private handleChannelClose(channelId: string): void {
-    console.log(`[Streaming Channel] ${channelId} closed`);
+    logger.debug(`[Streaming Channel] ${channelId} closed`);
   }
 }

@@ -9,6 +9,7 @@ import {
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { logger } from "../utils/logger.js";
 
 export interface HealthMetrics {
   timestamp: number;
@@ -42,7 +43,7 @@ export class TelemetryService {
     if (this.enabled) {
       this.initializeTelemetry();
     } else {
-      console.log(
+      logger.debug(
         "[Telemetry] Disabled - set NEUROLINK_TELEMETRY_ENABLED=true or configure OTEL_EXPORTER_OTLP_ENDPOINT to enable",
       );
     }
@@ -85,12 +86,12 @@ export class TelemetryService {
 
       this.initializeMetrics();
 
-      console.log(
+      logger.debug(
         "[Telemetry] Initialized with endpoint:",
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
       );
     } catch (error) {
-      console.error("[Telemetry] Failed to initialize:", error);
+      logger.error("[Telemetry] Failed to initialize:", error);
       this.enabled = false;
     }
   }
@@ -145,9 +146,9 @@ export class TelemetryService {
 
     try {
       await this.sdk?.start();
-      console.log("[Telemetry] SDK started successfully");
+      logger.debug("[Telemetry] SDK started successfully");
     } catch (error) {
-      console.error("[Telemetry] Failed to start SDK:", error);
+      logger.error("[Telemetry] Failed to start SDK:", error);
       this.enabled = false;
     }
   }
@@ -348,9 +349,9 @@ export class TelemetryService {
     if (this.enabled && this.sdk) {
       try {
         await this.sdk.shutdown();
-        console.log("[Telemetry] SDK shutdown completed");
+        logger.debug("[Telemetry] SDK shutdown completed");
       } catch (error) {
-        console.error("[Telemetry] Error during shutdown:", error);
+        logger.error("[Telemetry] Error during shutdown:", error);
       }
     }
   }

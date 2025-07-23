@@ -4,6 +4,7 @@
  */
 
 import { config } from "dotenv";
+import { logger } from "../lib/utils/logger.js";
 
 // Load environment variables from .env file
 config();
@@ -47,8 +48,8 @@ if (!process.env.AWS_REGION) {
 // NO async imports - they can hang in teardown
 
 if (!process.env.CI) {
-  console.log("✅ Minimal test environment configured");
-  console.log("🔑 Environment variables loaded:", {
+  logger.debug("✅ Minimal test environment configured");
+  logger.debug("🔑 Environment variables loaded:", {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "***" : "missing",
     GOOGLE_VERTEX_PROJECT: process.env.GOOGLE_VERTEX_PROJECT || "not set",
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "***" : "missing",

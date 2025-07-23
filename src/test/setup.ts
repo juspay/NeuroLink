@@ -5,6 +5,7 @@
 
 import { config } from "dotenv";
 import { vi, afterEach, afterAll } from "vitest";
+import { logger } from "../lib/utils/logger.js";
 
 // Load environment variables from .env file
 config();
@@ -64,9 +65,9 @@ afterAll(async () => {
 // Individual test files should mock services as needed using vi.mock() within their own scope.
 
 if (!process.env.CI) {
-  console.log("✅ Enhanced test environment configured with proper cleanup");
+  logger.debug("✅ Enhanced test environment configured with proper cleanup");
   // Optionally log environment variables only in local development, not in CI
-  console.log("🔑 Environment variables loaded:", {
+  logger.debug("🔑 Environment variables loaded:", {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ? "***" : "missing",
     GOOGLE_VERTEX_PROJECT: process.env.GOOGLE_VERTEX_PROJECT || "not set",
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "***" : "missing",

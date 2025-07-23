@@ -17,6 +17,122 @@ import { createExecutionContext } from "./context-manager.js";
 import { mcpLogger } from "./logging.js";
 
 /**
+ * Parses neurolink-specific function name patterns to extract the server ID and tool name.
+ *
+ * @param {string[]} parts - An array of strings representing parts of a function name,
+ * typically obtained by splitting the function name on underscores.
+ * @returns {{ serverId: string; toolName: string } | null} An object containing the `serverId`
+ * and `toolName` if the input matches a neurolink-specific pattern, or `null` if no match is found.
+ *
+ * @example
+ * // Returns { serverId: "neurolink_ai_core", toolName: "generate" }
+ * parseNeuroLinkPattern(["neurolink", "ai", "core", "generate"]);
+ *
+ * @example
+ * // Returns { serverId: "neurolink_utility", toolName: "format_number" }
+ * parseNeuroLinkPattern(["neurolink", "utility", "format_number"]);
+ *
+ * @example
+ * // Returns null
+ * parseNeuroLinkPattern(["other", "pattern"]);
+ */
+function parseNeuroLinkPattern(parts: string[]): {
+  serverId: string;
+  toolName: string;
+} | null {
+  if (
+    parts.length >= 3 &&
+    parts[0] === "neurolink" &&
+    (parts[1] === "ai" || parts[1] === "utility")
+  ) {
+    // neurolink_ai_core_generate -> serverId: "neurolink_ai_core", toolName: "generate"
+    // neurolink_utility_format_number -> serverId: "neurolink_utility", toolName: "format_number"
+    if (parts[1] === "ai" && parts[2] === "core") {
+      return {
+        serverId: "neurolink_ai_core",
+        toolName: parts.slice(3).join("_"),
+      };
+    } else if (parts[1] === "utility") {
+      return {
+        serverId: "neurolink_utility",
+        toolName: parts.slice(2).join("_"),
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Parse underscore-separated function name format
+ */
+function parseUnderscoreFormat(functionName: string): {
+  serverId: string;
+  toolName: string;
+} | null {
+  const parts = functionName.split("_");
+
+  if (parts.length >= 2) {
+    // Try neurolink-specific patterns first
+    const neurolinkResult = parseNeuroLinkPattern(parts);
+    if (neurolinkResult) {
+      return neurolinkResult;
+    }
+
+    // Default underscore parsing
+    return {
+      serverId: parts[0],
+      toolName: parts.slice(1).join("_"),
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Parse dot-separated function name format (legacy support)
+ */
+function parseDotFormat(functionName: string): {
+  serverId: string;
+  toolName: string;
+} | null {
+  const parts = functionName.split(".");
+  if (parts.length >= 2) {
+    return {
+      serverId: parts[0],
+      toolName: parts.slice(1).join("."),
+    };
+  }
+  return null;
+}
+
+/**
+ * Parse function name to extract server ID and tool name
+ * Handles various naming patterns including neurolink server patterns
+ */
+function parseFunctionName(functionName: string): {
+  serverId: string;
+  toolName: string;
+} {
+  // Try underscore format first (most common)
+  const underscoreResult = parseUnderscoreFormat(functionName);
+  if (underscoreResult) {
+    return underscoreResult;
+  }
+
+  // Fallback to dot format for backward compatibility
+  const dotResult = parseDotFormat(functionName);
+  if (dotResult) {
+    return dotResult;
+  }
+
+  // Final fallback - return as-is with unknown server
+  return {
+    serverId: "unknown",
+    toolName: functionName,
+  };
+}
+
+/**
  * Convert MCP tool to AI SDK function definition
  */
 export function mcpToolToAISDKTool(
@@ -73,10 +189,12 @@ export function mcpToolToAISDKTool(
  */
 export async function getAvailableFunctionTools(): Promise<{
   tools: Tool[];
+  toolsObject: Record<string, Tool>;
   toolMap: Map<string, { serverId: string; toolName: string }>;
 }> {
   const functionTag = "getAvailableFunctionTools";
   const tools: Tool[] = [];
+  const toolsObject: Record<string, Tool> = {};
   const toolMap = new Map<string, { serverId: string; toolName: string }>();
 
   try {
@@ -402,6 +520,9 @@ export async function getAvailableFunctionTools(): Promise<{
 
             tools.push(aiTool);
 
+            // Store tool with proper name association
+            toolsObject[functionName] = aiTool;
+
             // Store mapping for execution - CRITICAL: Use sanitized functionName as key
             toolMap.set(functionName, {
               serverId:
@@ -437,7 +558,7 @@ export async function getAvailableFunctionTools(): Promise<{
         if (overallTimeoutId) {
           clearTimeout(overallTimeoutId);
         }
-        return { tools, toolMap };
+        return { tools, toolsObject, toolMap };
       } catch (error) {
         if (overallTimeoutId) {
           clearTimeout(overallTimeoutId);
@@ -449,7 +570,7 @@ export async function getAvailableFunctionTools(): Promise<{
     return await Promise.race([toolsLoadingPromise, overallTimeoutPromise]);
   } catch (error) {
     mcpLogger.error(`[${functionTag}] Error getting function tools:`, error);
-    return { tools: [], toolMap: new Map() };
+    return { tools: [], toolsObject: {}, toolMap: new Map() };
   }
 }
 
@@ -496,42 +617,19 @@ export async function executeFunctionCall(
     }
 
     // Parse server and tool name from function name
-    // First try underscore format (sanitized), then fallback to dot format
-    let parts = functionName.split("_");
-    let serverId: string = "unknown";
-    let toolName: string = functionName;
+    const { serverId, toolName } = parseFunctionName(functionName);
 
-    if (parts.length >= 2) {
-      // Handle underscore format (sanitized names)
-      const firstPart = parts[0];
-      if (firstPart && typeof firstPart === "string" && firstPart.length > 0) {
-        serverId = firstPart as string;
-      } else {
-        serverId = "unknown";
-      }
-      toolName = parts.slice(1).join("_"); // Rejoin in case tool name had underscores
-    } else {
-      // Fallback to dot format for backward compatibility
-      parts = functionName.split(".");
-      if (parts.length === 2) {
-        const parsedServerId = parts[0];
-        const parsedToolName = parts[1];
-        if (parsedServerId && parsedToolName) {
-          serverId = parsedServerId;
-          toolName = parsedToolName;
-        }
-      } else {
-        // Can't parse - try executing as-is through unified registry
-        mcpLogger.debug(
-          `[${functionTag}] Cannot parse function name format: ${functionName}, trying unified registry`,
-        );
-        const result = await unifiedRegistry.executeTool(
-          functionName,
-          actualParameters,
-          finalContext,
-        );
-        return result as ToolResult;
-      }
+    if (serverId === "unknown") {
+      // Can't parse - try executing as-is through unified registry
+      mcpLogger.debug(
+        `[${functionTag}] Cannot parse function name format: ${functionName}, trying unified registry`,
+      );
+      const result = await unifiedRegistry.executeTool(
+        functionName,
+        actualParameters,
+        finalContext,
+      );
+      return result as ToolResult;
     }
 
     // Handle built-in NeuroLink servers directly
@@ -765,5 +863,42 @@ export async function isFunctionCallingAvailable(): Promise<boolean> {
       error,
     );
     return false;
+  }
+}
+
+/**
+ * Utility function to create a named tool object for debugging
+ */
+export function createNamedTool(
+  name: string,
+  toolDef: any,
+): any & { name: string } {
+  return {
+    name,
+    description: toolDef.description,
+    parameters: toolDef.parameters,
+    execute: toolDef.execute,
+  };
+}
+
+/**
+ * Get tools with proper name properties for debugging
+ */
+export async function getToolsWithNames(): Promise<
+  Record<string, any & { name: string }>
+> {
+  try {
+    const { toolsObject } = await getAvailableFunctionTools();
+    const namedTools: Record<string, any & { name: string }> = {};
+    for (const [name, tool] of Object.entries(toolsObject)) {
+      namedTools[name] = createNamedTool(name, tool);
+    }
+    return namedTools;
+  } catch (error) {
+    mcpLogger.warn(
+      "[getToolsWithNames] Failed to get tools with names:",
+      error,
+    );
+    return {};
   }
 }

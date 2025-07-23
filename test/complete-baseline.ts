@@ -158,10 +158,11 @@ describe("NeuroLink Complete Baseline Test", () => {
         const { stdout } = await execAsync(
           `${cliPrefix} generate "Validate analytics structure" --provider google-ai --max-tokens 2000 --output-format json --enable-analytics`,
         );
-        const response = JSON.parse(
-          stdout.split("\n").find((line) => line.trim().startsWith("{")) ||
-            "{}",
-        );
+        // Extract JSON from CLI output (find the JSON block)
+        const jsonStart = stdout.indexOf("{");
+        const jsonEnd = stdout.lastIndexOf("}") + 1;
+        const jsonStr = stdout.substring(jsonStart, jsonEnd);
+        const response = JSON.parse(jsonStr);
 
         expect(response.usage).toBeDefined();
         expect(response.usage.totalTokens).toBeGreaterThan(0);
@@ -234,10 +235,11 @@ describe("NeuroLink Complete Baseline Test", () => {
         const { stdout } = await execAsync(
           `${cliPrefix} generate "Validate evaluation scores" --provider google-ai --max-tokens 2000 --output-format json --enable-evaluation`,
         );
-        const response = JSON.parse(
-          stdout.split("\n").find((line) => line.trim().startsWith("{")) ||
-            "{}",
-        );
+        // Extract JSON from CLI output (find the JSON block)
+        const jsonStart = stdout.indexOf("{");
+        const jsonEnd = stdout.lastIndexOf("}") + 1;
+        const jsonStr = stdout.substring(jsonStart, jsonEnd);
+        const response = JSON.parse(jsonStr);
 
         expect(response.evaluation).toBeDefined();
         expect(response.evaluation.relevance).toBeGreaterThanOrEqual(1);
@@ -275,10 +277,10 @@ describe("NeuroLink Complete Baseline Test", () => {
             provider: 'google-ai',
             maxTokens: 2000
           });
-        }).then(async (stream) => {
+        }).then(async (streamResult) => {
           let content = '';
-          for await (const chunk of stream) {
-            content += chunk;
+          for await (const chunk of streamResult.stream) {
+            content += chunk.content;
           }
           console.log('SDK_STREAM_SUCCESS:', content.length > 0);
         }).catch(e => {
@@ -359,16 +361,7 @@ describe("NeuroLink Complete Baseline Test", () => {
       timeout,
     );
 
-    it(
-      "should handle context parameter",
-      async () => {
-        const { stdout } = await execAsync(
-          `${cliPrefix} generate "Test context" --provider google-ai --context '{"project":"test"}' --max-tokens 2000 --output-format text`,
-        );
-        expect(stdout).toContain("Generated Content:");
-      },
-      timeout,
-    );
+    // Context parameter is not supported in CLI - removing this test
   });
 
   describe("Error Handling Comprehensive", () => {
@@ -506,10 +499,10 @@ describe("NeuroLink Complete Baseline Test", () => {
             provider: 'google-ai',
             maxTokens: 2000
           });
-        }).then(async (stream) => {
+        }).then(async (streamResult) => {
           let content = '';
-          for await (const chunk of stream) {
-            content += chunk;
+          for await (const chunk of streamResult.stream) {
+            content += chunk.content;
           }
           console.log('SDK_STREAM_SUCCESS:', content.length > 0);
         }).catch(e => {

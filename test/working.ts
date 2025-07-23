@@ -17,7 +17,7 @@ describe("Working Tests - Core Functionality", () => {
   });
 
   it("should import NeuroLink SDK successfully", async () => {
-    const { NeuroLink } = await import("../lib/neurolink.js");
+    const { NeuroLink } = await import("../src/lib/neurolink.js");
     expect(NeuroLink).toBeDefined();
 
     const sdk = new NeuroLink();
@@ -27,7 +27,7 @@ describe("Working Tests - Core Functionality", () => {
   });
 
   it("should generate text with SDK", async () => {
-    const { NeuroLink } = await import("../lib/neurolink.js");
+    const { NeuroLink } = await import("../src/lib/neurolink.js");
     const sdk = new NeuroLink();
 
     const result = await sdk.generate({
@@ -43,7 +43,7 @@ describe("Working Tests - Core Functionality", () => {
   }, 15000);
 
   it("should generate text with analytics", async () => {
-    const { NeuroLink } = await import("../lib/neurolink.js");
+    const { NeuroLink } = await import("../src/lib/neurolink.js");
     const sdk = new NeuroLink();
 
     const result = await sdk.generate({

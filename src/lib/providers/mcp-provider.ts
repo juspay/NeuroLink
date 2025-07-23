@@ -91,13 +91,26 @@ export class MCPAwareProvider implements AIProvider {
           exists: async () => false,
         },
         path: {
-          join: (...paths: string[]) => require("path").join(...paths),
-          resolve: (...paths: string[]) => require("path").resolve(...paths),
-          relative: (from: string, to: string) =>
-            require("path").relative(from, to),
-          dirname: (path: string) => require("path").dirname(path),
-          basename: (path: string, ext?: string) =>
-            require("path").basename(path, ext),
+          join: (...paths: string[]) => {
+            const pathModule = require("path");
+            return pathModule.join(...paths);
+          },
+          resolve: (...paths: string[]) => {
+            const pathModule = require("path");
+            return pathModule.resolve(...paths);
+          },
+          relative: (from: string, to: string) => {
+            const pathModule = require("path");
+            return pathModule.relative(from, to);
+          },
+          dirname: (pathArg: string) => {
+            const pathModule = require("path");
+            return pathModule.dirname(pathArg);
+          },
+          basename: (pathArg: string, ext?: string) => {
+            const pathModule = require("path");
+            return pathModule.basename(pathArg, ext);
+          },
         },
         grantedPermissions: [],
         log: console.log,

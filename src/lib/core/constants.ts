@@ -7,6 +7,7 @@
 export const DEFAULT_MAX_TOKENS = 8192; // Changed from 10000 to fix Anthropic error
 export const DEFAULT_TEMPERATURE = 0.7;
 export const DEFAULT_TIMEOUT = 30000;
+export const DEFAULT_MAX_STEPS = 5; // Default multi-turn tool execution steps
 
 // Specialized Use Case Defaults
 export const DEFAULT_EVALUATION_MAX_TOKENS = 500; // Keep evaluation fast
