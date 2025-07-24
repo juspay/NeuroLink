@@ -5,18 +5,18 @@
 
 import { logger } from "../utils/logger.js";
 
-export interface ServiceFactory<T = any> {
+export interface ServiceFactory<T = unknown> {
   (): T | Promise<T>;
 }
 
-export interface ServiceRegistration {
-  factory: ServiceFactory;
+export interface ServiceRegistration<T = unknown> {
+  factory: ServiceFactory<T>;
   singleton: boolean;
-  instance?: any;
+  instance?: T;
 }
 
 export class ServiceRegistry {
-  private static services = new Map<string, ServiceRegistration>();
+  private static services = new Map<string, ServiceRegistration<unknown>>();
   private static initializing = new Set<string>();
 
   /**
@@ -63,7 +63,7 @@ export class ServiceRegistry {
 
     // Return existing singleton instance if available
     if (registration.singleton && registration.instance !== undefined) {
-      return registration.instance;
+      return registration.instance as T;
     }
 
     try {
@@ -101,7 +101,7 @@ export class ServiceRegistry {
     }
 
     if (registration.singleton && registration.instance !== undefined) {
-      return registration.instance;
+      return registration.instance as T;
     }
 
     // Try synchronous initialization

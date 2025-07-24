@@ -11,6 +11,7 @@ import type {
   SupportedModelName,
   TextGenerationOptions,
 } from "./types.js";
+import type { UnknownRecord } from "../types/common.js";
 
 const componentIdentifier = "aiProviderFactory";
 
@@ -42,7 +43,7 @@ export class AIProviderFactory {
     providerName: string,
     modelName?: string | null,
     enableMCP: boolean = true,
-    sdk?: any,
+    sdk?: UnknownRecord,
   ): Promise<AIProvider> {
     const functionTag = "AIawait ProviderFactory.createProvider";
 
@@ -236,7 +237,7 @@ export class AIProviderFactory {
     requestedProvider?: string,
     modelName?: string | null,
     enableMCP: boolean = true,
-    sdk?: any,
+    sdk?: UnknownRecord,
   ): Promise<AIProvider> {
     const functionTag = "AIProviderFactory.createBestProvider";
 

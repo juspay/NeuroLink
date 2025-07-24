@@ -1,4 +1,5 @@
 import type { AIProvider, AIProviderName } from "../core/types.js";
+import type { UnknownRecord } from "../types/common.js";
 import { logger } from "../utils/logger.js";
 
 // ✅ NO HARDCODED IMPORTS - Pure factory pattern
@@ -8,11 +9,17 @@ import { logger } from "../utils/logger.js";
  * Provider constructor interface - supports both sync constructors and async factory functions
  */
 type ProviderConstructor =
-  | { new (modelName?: string, providerName?: any, sdk?: any): AIProvider }
+  | {
+      new (
+        modelName?: string,
+        providerName?: string,
+        sdk?: UnknownRecord,
+      ): AIProvider;
+    }
   | ((
       modelName?: string,
-      providerName?: any,
-      sdk?: any,
+      providerName?: string,
+      sdk?: UnknownRecord,
     ) => Promise<AIProvider>);
 
 /**
@@ -66,7 +73,7 @@ export class ProviderFactory {
   static async createProvider(
     providerName: AIProviderName | string,
     modelName?: string,
-    sdk?: any,
+    sdk?: UnknownRecord,
   ): Promise<AIProvider> {
     // Note: Providers are registered explicitly by ProviderRegistry to avoid circular dependencies
 
@@ -82,39 +89,37 @@ export class ProviderFactory {
     const model = modelName || registration.defaultModel;
 
     try {
-      // Check if constructor is an async factory function or a class constructor
-      if (typeof registration.constructor === "function") {
-        // Check if it has a prototype (class constructor) or not (factory function)
-        if (
-          registration.constructor.prototype &&
-          registration.constructor.prototype.constructor ===
-            registration.constructor
-        ) {
-          // It's a class constructor
-          return new (registration.constructor as any)(
-            model,
-            providerName,
-            sdk,
-          );
-        } else {
-          // It's a factory function - call it and await if it returns a promise
-          const result = (registration.constructor as any)(
-            model,
-            providerName,
-            sdk,
-          );
-          if (result && typeof result.then === "function") {
-            // It's a Promise (async factory)
-            return await result;
-          } else {
-            // It's a sync result, return it
-            return result as AIProvider;
-          }
-        }
-      } else {
-        // Fallback - use as class constructor
-        return new (registration.constructor as any)(model, sdk);
+      // Try calling as factory function first, then fallback to constructor
+      let result: AIProvider | Promise<AIProvider>;
+
+      try {
+        // Try as factory function
+        result = (
+          registration.constructor as (
+            modelName?: string,
+            providerName?: string,
+            sdk?: UnknownRecord,
+          ) => Promise<AIProvider> | AIProvider
+        )(model, providerName, sdk);
+      } catch (factoryError) {
+        // Fallback to constructor
+        result = new (registration.constructor as new (
+          modelName?: string,
+          providerName?: string,
+          sdk?: UnknownRecord,
+        ) => AIProvider)(model, providerName, sdk);
       }
+
+      // Only await if result is actually a Promise
+      if (
+        result &&
+        typeof result === "object" &&
+        typeof (result as Promise<AIProvider>).then === "function"
+      ) {
+        return await result;
+      }
+
+      return result as AIProvider;
     } catch (error) {
       logger.error(`Failed to create provider ${providerName}:`, error);
       throw new Error(`Failed to create provider ${providerName}: ${error}`);
@@ -203,7 +208,7 @@ export class ProviderFactory {
     providerName: AIProviderName | string,
     modelName?: string,
     enableMCP?: boolean,
-    sdk?: any,
+    sdk?: UnknownRecord,
   ): Promise<AIProvider> {
     return await this.createProvider(providerName, modelName, sdk);
   }

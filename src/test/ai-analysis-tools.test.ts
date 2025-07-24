@@ -11,6 +11,7 @@ import {
   createExecutionContext,
 } from "../lib/mcp/context-manager.js";
 import { aiCoreServer } from "../lib/mcp/servers/ai-providers/ai-core-server.js";
+import type { UnknownRecord } from "../lib/types/common.js";
 
 describe("AI Analysis Tools Tests", () => {
   let registry: MCPToolRegistry;
@@ -389,7 +390,7 @@ describe("AI Analysis Tools Tests", () => {
       expect(result.usage?.executionTime).toBeGreaterThanOrEqual(0);
 
       // Check that all iterations have performance metrics
-      result.data.results.forEach((iteration: any) => {
+      result.data.results.forEach((iteration: UnknownRecord) => {
         expect(iteration.metrics.qualityScore).toBeGreaterThanOrEqual(0.7);
         expect(iteration.metrics.relevanceScore).toBeGreaterThanOrEqual(0.8);
         expect(iteration.metrics.coherenceScore).toBeGreaterThanOrEqual(0.75);

@@ -74,7 +74,7 @@ export async function* withStreamingTimeout<T>(
   } finally {
     // Ensure generator is properly closed
     if (generator.return) {
-      await generator.return(undefined as any);
+      await generator.return(undefined);
     }
   }
 }

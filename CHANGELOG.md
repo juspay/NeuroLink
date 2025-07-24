@@ -1,9 +1,8 @@
 # [5.3.0](https://github.com/juspay/neurolink/compare/v5.2.0...v5.3.0) (2025-07-23)
 
-
 ### Features
 
-* **mcp:** enhance MCP integration with comprehensive testing infrastructure and tool ecosystem improvements ([a38d845](https://github.com/juspay/neurolink/commit/a38d845032133eee098de10b966cbdd3a329fdfd))
+- **mcp:** enhance MCP integration with comprehensive testing infrastructure and tool ecosystem improvements ([a38d845](https://github.com/juspay/neurolink/commit/a38d845032133eee098de10b966cbdd3a329fdfd))
 
 # [5.2.0](https://github.com/juspay/neurolink/compare/v5.1.0...v5.2.0) (2025-07-22)
 

@@ -6,6 +6,7 @@
 import { NeuroLinkMCPClient, createMCPClient } from "./client.js";
 import { logger } from "../utils/logger.js";
 import type { MCPClientConfig } from "./client.js";
+import type { UnknownRecord } from "../types/common.js";
 
 /**
  * Maximum number of concurrent MCP instances
@@ -171,7 +172,7 @@ export class NeuroLinkMCPManager {
    * Get statistics for all instances
    */
   public static getAllStats() {
-    const stats: Record<string, any> = {};
+    const stats: Record<string, UnknownRecord> = {};
 
     for (const [sessionId, instance] of this.instances.entries()) {
       stats[sessionId] = instance.getStats();

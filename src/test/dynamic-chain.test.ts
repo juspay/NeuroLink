@@ -5,6 +5,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createMockExecutionContext } from "./helpers/test-utilities.js";
+import type { ToolArgs, ToolDefinition } from "../../lib/types/tools.js";
+import type { UnknownRecord, Unknown } from "../../lib/types/common.js";
 import {
   DynamicChainExecutor,
   HeuristicChainPlanner,
@@ -17,7 +19,7 @@ import { ErrorManager } from "../lib/mcp/error-manager.js";
 /**
  * Helper to enrich tool objects with default description and inputSchema.
  */
-function enrichTools(tools: any[]) {
+function enrichTools(tools: Unknown[]) {
   return tools.map((tool) => ({
     ...tool,
     description: tool.description || "No description",
@@ -59,7 +61,7 @@ describe("Dynamic AI Tool Chains", () => {
             type: "object",
             properties: { url: { type: "string" } },
           },
-          execute: async (params: any) => ({
+          execute: async (params: ToolArgs) => ({
             data: "fetched-data",
             source: params.url,
           }),
@@ -71,7 +73,7 @@ describe("Dynamic AI Tool Chains", () => {
             type: "object",
             properties: { data: { type: "string" } },
           },
-          execute: async (params: any) => ({
+          execute: async (params: ToolArgs) => ({
             processed: true,
             analysis: "processed-" + params.data,
           }),
@@ -81,9 +83,12 @@ describe("Dynamic AI Tool Chains", () => {
           description: "Save final result",
           inputSchema: {
             type: "object",
-            properties: { result: { type: "any" } },
+            properties: { result: { type: "object" } },
           },
-          execute: async (params: any) => ({ saved: true, id: "result-123" }),
+          execute: async (params: ToolArgs) => ({
+            saved: true,
+            id: "result-123",
+          }),
         },
       },
     });
@@ -221,7 +226,7 @@ describe("Dynamic AI Tool Chains", () => {
       const aiPlanner = new AIModelChainPlanner("gpt-4");
 
       // Mock AI call to fail
-      vi.spyOn(aiPlanner as any, "callAIModel").mockRejectedValue(
+      vi.spyOn(aiPlanner as UnknownRecord, "callAIModel").mockRejectedValue(
         new Error("AI unavailable"),
       );
 
@@ -249,7 +254,9 @@ describe("Dynamic AI Tool Chains", () => {
         expectedOutcome: "Analyze the data",
       });
 
-      vi.spyOn(aiPlanner as any, "callAIModel").mockResolvedValue(mockResponse);
+      vi.spyOn(aiPlanner as UnknownRecord, "callAIModel").mockResolvedValue(
+        mockResponse,
+      );
 
       const availableTools = await registry.listTools();
       const step = await aiPlanner.planNextStep(

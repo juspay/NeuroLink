@@ -5,6 +5,7 @@
  */
 
 import type { NeuroLinkExecutionContext } from "./factory.js";
+import type { Unknown } from "../types/common.js";
 import {
   ErrorRecovery,
   defaultErrorRecovery,
@@ -47,7 +48,7 @@ export interface ErrorEntry {
   context: {
     sessionId?: string;
     toolName?: string;
-    parameters?: any;
+    parameters?: unknown;
     executionContext?: NeuroLinkExecutionContext;
   };
   stackTrace?: string;
@@ -138,7 +139,7 @@ export class ErrorManager {
       severity?: ErrorSeverity;
       sessionId?: string;
       toolName?: string;
-      parameters?: any;
+      parameters?: unknown;
       executionContext?: NeuroLinkExecutionContext;
     } = {},
   ): Promise<ErrorEntry> {
@@ -149,7 +150,9 @@ export class ErrorManager {
       errorObj = error;
     } else if (error && typeof error === "object" && "message" in error) {
       // Handle objects with message property
-      errorObj = new Error(String((error as any).message));
+      errorObj = new Error(
+        String((error as Unknown as { message: unknown }).message),
+      );
     } else if (error === null || error === undefined) {
       errorObj = new Error("Unknown error");
     } else {

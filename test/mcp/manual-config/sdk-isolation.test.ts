@@ -3,6 +3,7 @@ import { NeuroLink } from "../../../src/lib/neurolink.js";
 import { writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 import dotenv from "dotenv";
+import type { UnknownRecord } from "../../../src/lib/types/common.js";
 
 // Load environment variables
 dotenv.config();
@@ -82,7 +83,7 @@ describe("SDK Manual MCP Isolation Tests", () => {
       try {
         const result = await sdk.generate({
           input: { text: "What is 2+2?" },
-          provider: getTestProvider() as any,
+          provider: getTestProvider() as UnknownRecord,
           maxTokens: 50,
           disableTools: false, // Tools enabled, but should only have direct tools
         });
@@ -124,7 +125,7 @@ describe("SDK Manual MCP Isolation Tests", () => {
       try {
         const result = await sdk.generate({
           input: { text: "What time is it?" },
-          provider: getTestProvider() as any,
+          provider: getTestProvider() as UnknownRecord,
           maxTokens: 100,
         });
 
@@ -170,7 +171,7 @@ describe("SDK Manual MCP Isolation Tests", () => {
       try {
         const streamResult = await sdk.stream({
           input: { text: "Count to 3" },
-          provider: getTestProvider() as any,
+          provider: getTestProvider() as UnknownRecord,
           maxTokens: 50,
         });
 

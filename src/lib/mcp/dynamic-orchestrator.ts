@@ -9,8 +9,13 @@ import type { NeuroLinkExecutionContext, ToolResult } from "./factory.js";
 import type { PipelineResult } from "./orchestrator.js";
 import type { OrchestratorSession } from "./session-manager.js";
 import type { ContextRequest } from "./context-manager.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
 import { createExecutionContext } from "./context-manager.js";
-import { ErrorCategory, ErrorSeverity } from "./error-manager.js";
+import { ErrorCategory, ErrorSeverity, ErrorManager } from "./error-manager.js";
+import type { MCPToolRegistry } from "./tool-registry.js";
+import type { ContextManager } from "./context-manager.js";
+import type { SemaphoreManager } from "./semaphore-manager.js";
+import type { SessionManager } from "./session-manager.js";
 import { aiCoreServer } from "./servers/ai-providers/ai-core-server.js";
 
 /**
@@ -18,7 +23,7 @@ import { aiCoreServer } from "./servers/ai-providers/ai-core-server.js";
  */
 export interface ToolDecision {
   toolName: string;
-  args: Record<string, any>;
+  args: UnknownRecord;
   reasoning: string;
   confidence: number;
   shouldContinue: boolean;
@@ -83,11 +88,11 @@ Example response:
  */
 export class DynamicOrchestrator extends MCPOrchestrator {
   constructor(
-    registry?: any,
-    contextManager?: any,
-    semaphoreManager?: any,
-    sessionManager?: any,
-    errorManager?: any,
+    registry?: MCPToolRegistry,
+    contextManager?: ContextManager,
+    semaphoreManager?: SemaphoreManager,
+    sessionManager?: SessionManager,
+    errorManager?: ErrorManager,
   ) {
     super(
       registry,
@@ -124,7 +129,7 @@ export class DynamicOrchestrator extends MCPOrchestrator {
     const decisions: ToolDecision[] = [];
     let error: Error | undefined;
     let iterations = 0;
-    let session: any;
+    let session: OrchestratorSession | undefined;
 
     try {
       // Create or get session
@@ -328,7 +333,7 @@ export class DynamicOrchestrator extends MCPOrchestrator {
       if (!aiResponse.success) {
         throw new Error(String(aiResponse.error || "AI generation failed"));
       }
-      const responseText = aiResponse.data?.text || "";
+      const responseText = (aiResponse.data as { text?: string })?.text || "";
 
       // Extract JSON from response (handle markdown code blocks)
       const jsonMatch =
@@ -429,7 +434,7 @@ Provide a clear, concise answer that addresses the user's request based on the t
       if (!aiResponse.success) {
         throw new Error(String(aiResponse.error || "AI generation failed"));
       }
-      return aiResponse.data?.text || "";
+      return (aiResponse.data as { text?: string })?.text || "";
     } catch (error) {
       // Fallback to simple summary
       return `Executed ${results.length} tools to address your request. ${
@@ -496,11 +501,11 @@ Provide a clear, concise answer that addresses the user's request based on the t
  * @returns Dynamic orchestrator instance
  */
 export function createDynamicOrchestrator(
-  registry: any,
-  contextManager: any,
-  semaphoreManager?: any,
-  sessionManager?: any,
-  errorManager?: any,
+  registry: MCPToolRegistry,
+  contextManager: ContextManager,
+  semaphoreManager?: SemaphoreManager,
+  sessionManager?: SessionManager,
+  errorManager?: ErrorManager,
 ): DynamicOrchestrator {
   return new DynamicOrchestrator(
     registry,

@@ -9,6 +9,7 @@ import type {
   ToolResult,
   NeuroLinkExecutionContext,
 } from "./factory.js";
+import type { Unknown } from "../types/common.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -65,7 +66,10 @@ export class NeuroLinkMCPClient extends EventEmitter {
    */
   registerTool(
     toolName: string,
-    execute: (name: string, params: Record<string, unknown>) => Promise<any>,
+    execute: (
+      name: string,
+      params: Record<string, unknown>,
+    ) => Promise<Unknown>,
     description?: string,
     inputSchema?: unknown,
   ): void {
@@ -79,7 +83,10 @@ export class NeuroLinkMCPClient extends EventEmitter {
       name: toolName,
       originalName,
       serverId,
-      execute: async (params: unknown, context: NeuroLinkExecutionContext) => {
+      execute: async (
+        params: unknown,
+        context: NeuroLinkExecutionContext,
+      ): Promise<ToolResult> => {
         try {
           // Call the execute function with Lighthouse-style parameters
           const result = await execute(
@@ -94,19 +101,24 @@ export class NeuroLinkMCPClient extends EventEmitter {
               "success" in result &&
               ("data" in result || "error" in result)
             ) {
-              return result;
+              return result as ToolResult;
             }
 
             // If it's in Lighthouse format with content array
+            const lightouseResult = result as {
+              text?: Array<{ text: string }>;
+              isError?: boolean;
+            };
+
             if (
-              result.text &&
-              Array.isArray(result.text) &&
-              result.text[0]?.text
+              lightouseResult.text &&
+              Array.isArray(lightouseResult.text) &&
+              lightouseResult.text[0]?.text
             ) {
               try {
-                const data = JSON.parse(result.text[0].text);
+                const data = JSON.parse(lightouseResult.text[0].text);
                 return {
-                  success: !result.isError,
+                  success: !lightouseResult.isError,
                   data,
                   metadata: {
                     toolName,
@@ -114,41 +126,42 @@ export class NeuroLinkMCPClient extends EventEmitter {
                     sessionId: context.sessionId,
                     timestamp: Date.now(),
                   },
-                };
+                } as ToolResult;
               } catch (parseError) {
                 // If JSON parsing fails, return the text as-is
                 return {
-                  success: !result.isError,
-                  data: { text: result.text[0].text },
+                  success: !lightouseResult.isError,
+                  data: { text: lightouseResult.text[0].text },
                   metadata: {
                     toolName,
                     serverId,
                     sessionId: context.sessionId,
                     timestamp: Date.now(),
                   },
-                };
+                } as ToolResult;
               }
             }
 
             // If it has a direct text property
-            if (result.text) {
+            const textResult = result as { text?: string };
+            if (textResult.text) {
               return {
                 success: true,
-                data: { text: result.text },
+                data: { text: textResult.text },
                 metadata: {
                   toolName,
                   serverId,
                   sessionId: context.sessionId,
                   timestamp: Date.now(),
                 },
-              };
+              } as ToolResult;
             }
           }
 
           return {
             success: false,
             error: "Invalid tool response format",
-          };
+          } as ToolResult;
         } catch (error) {
           logger.error(
             `[MCP Client] Tool execution failed: ${toolName}`,
@@ -157,7 +170,7 @@ export class NeuroLinkMCPClient extends EventEmitter {
           return {
             success: false,
             error: error instanceof Error ? error.message : String(error),
-          };
+          } as ToolResult;
         }
       },
       description,
@@ -193,7 +206,7 @@ export class NeuroLinkMCPClient extends EventEmitter {
       { name: string; description?: string; inputSchema?: unknown }
     > = {};
 
-    for (const [name, tool] of this.tools) {
+    for (const [name, tool] of Array.from(this.tools.entries())) {
       tools[name] = {
         name: name, // Include the tool name as a property
         description: tool.description,

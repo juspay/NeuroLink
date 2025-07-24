@@ -25,6 +25,7 @@
 import { NeuroLink } from "../src/lib/neurolink.js";
 import { spawn } from "child_process";
 import path from "path";
+import type { UnknownRecord, Unknown } from "../src/lib/types/common.js";
 
 interface ProviderTestConfig {
   name: string;
@@ -38,7 +39,7 @@ interface TestResult {
   success: boolean;
   duration: number;
   error?: string;
-  details?: any;
+  details?: Unknown;
 }
 
 interface TestSuiteResult {
@@ -173,7 +174,7 @@ export class UniversalProviderTest {
 
       const result = await sdk.generate({
         input: { text: 'Say "Hello from SDK" and nothing else.' },
-        provider: providerName as any,
+        provider: providerName as UnknownRecord,
         maxTokens: 2000,
         temperature: 0,
       });
@@ -235,7 +236,7 @@ export class UniversalProviderTest {
 
       const streamResult = await sdk.stream({
         input: { text: "Count from 1 to 3, one number per line." },
-        provider: providerName as any,
+        provider: providerName as UnknownRecord,
         maxTokens: 2000,
         temperature: 0,
       });
@@ -318,7 +319,7 @@ export class UniversalProviderTest {
       for (const params of paramTests) {
         const result = await sdk.generate({
           input: { text: 'Say "test" and describe the weather.' },
-          provider: providerName as any,
+          provider: providerName as UnknownRecord,
           ...params,
         });
 
@@ -374,7 +375,7 @@ export class UniversalProviderTest {
         input: {
           text: "What time is it right now? Please use tools to get the current time.",
         },
-        provider: providerName as any,
+        provider: providerName as UnknownRecord,
         maxTokens: 2000,
         // Tools should be enabled by default
       });
@@ -387,7 +388,8 @@ export class UniversalProviderTest {
         result.content?.match(/\d{1,2}:\d{2}/) !== null;
 
       const hasToolInfo =
-        !!(result as any).toolCalls || !!(result as any).toolResults;
+        !!(result as UnknownRecord).toolCalls ||
+        !!(result as UnknownRecord).toolResults;
 
       console.log(
         `   ✅ Success (${duration}ms) - Tool integration available, mentions time: ${mentionsTime}`,
@@ -429,13 +431,13 @@ export class UniversalProviderTest {
 
       const result = await sdk.generate({
         input: { text: 'Say "analytics test"' },
-        provider: providerName as any,
+        provider: providerName as UnknownRecord,
         maxTokens: 2000,
         enableAnalytics: true,
       });
 
       const duration = Date.now() - startTime;
-      const hasAnalytics = !!(result as any).analytics;
+      const hasAnalytics = !!(result as UnknownRecord).analytics;
 
       console.log(
         `   ✅ Success (${duration}ms) - Analytics enabled: ${hasAnalytics}`,
@@ -448,7 +450,7 @@ export class UniversalProviderTest {
         details: {
           hasAnalytics,
           analyticsKeys: hasAnalytics
-            ? Object.keys((result as any).analytics)
+            ? Object.keys((result as UnknownRecord).analytics)
             : [],
         },
       };
@@ -480,13 +482,13 @@ export class UniversalProviderTest {
         input: {
           text: "Explain what artificial intelligence is in one sentence.",
         },
-        provider: providerName as any,
+        provider: providerName as UnknownRecord,
         maxTokens: 2000,
         enableEvaluation: false,
       });
 
       const duration = Date.now() - startTime;
-      const hasEvaluation = !!(result as any).evaluation;
+      const hasEvaluation = !!(result as UnknownRecord).evaluation;
 
       console.log(
         `   ✅ Success (${duration}ms) - Evaluation enabled: ${hasEvaluation}`,
@@ -499,7 +501,7 @@ export class UniversalProviderTest {
         details: {
           hasEvaluation,
           evaluationKeys: hasEvaluation
-            ? Object.keys((result as any).evaluation)
+            ? Object.keys((result as UnknownRecord).evaluation)
             : [],
         },
       };
@@ -532,7 +534,7 @@ export class UniversalProviderTest {
       try {
         await sdk.generate({
           input: { text: "test" },
-          provider: providerName as any,
+          provider: providerName as UnknownRecord,
           maxTokens: -1, // Invalid value
         });
       } catch (error) {

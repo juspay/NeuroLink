@@ -1,4 +1,5 @@
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
+import type { AmazonBedrockProvider as BedrockProviderType } from "@ai-sdk/amazon-bedrock";
 import type { ZodType, ZodTypeDef } from "zod";
 import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
 import type {
@@ -70,7 +71,7 @@ const getAppEnvironment = (): string => {
  * - Enhanced error handling with setup guidance
  */
 export class AmazonBedrockProvider extends BaseProvider {
-  private bedrock: any;
+  private bedrock: BedrockProviderType;
   private model: LanguageModelV1;
 
   constructor(modelName?: string) {
@@ -156,34 +157,36 @@ export class AmazonBedrockProvider extends BaseProvider {
     }
   }
 
-  protected handleProviderError(error: any): Error {
-    if (error.name === "TimeoutError") {
+  protected handleProviderError(error: unknown): Error {
+    if (error instanceof Error && error.name === "TimeoutError") {
       return new TimeoutError(
         `Amazon Bedrock request timed out. Consider increasing timeout or using a lighter model.`,
         this.defaultTimeout,
       );
     }
 
-    if (error.message?.includes("InvalidRequestException")) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("InvalidRequestException")) {
       return new Error(
-        `❌ Amazon Bedrock Request Error\n\nThe request was invalid: ${error.message}\n\n🔧 Common Solutions:\n1. Check your model ID format\n2. Verify your request parameters\n3. Ensure your AWS account has Bedrock access`,
+        `❌ Amazon Bedrock Request Error\n\nThe request was invalid: ${errorMessage}\n\n🔧 Common Solutions:\n1. Check your model ID format\n2. Verify your request parameters\n3. Ensure your AWS account has Bedrock access`,
       );
     }
 
-    if (error.message?.includes("AccessDeniedException")) {
+    if (errorMessage.includes("AccessDeniedException")) {
       return new Error(
         `❌ Amazon Bedrock Access Denied\n\nYour AWS credentials don't have permission to access Bedrock.\n\n🔧 Required Steps:\n1. Ensure your IAM user has bedrock:InvokeModel permission\n2. Check if Bedrock is available in your region\n3. Verify model access is enabled in Bedrock console`,
       );
     }
 
-    if (error.message?.includes("ValidationException")) {
+    if (errorMessage.includes("ValidationException")) {
       return new Error(
-        `❌ Amazon Bedrock Validation Error\n\n${error.message}\n\n🔧 Check:\n1. Model ID format (should be ARN or model identifier)\n2. Request parameters are within limits\n3. Region configuration is correct`,
+        `❌ Amazon Bedrock Validation Error\n\n${errorMessage}\n\n🔧 Check:\n1. Model ID format (should be ARN or model identifier)\n2. Request parameters are within limits\n3. Region configuration is correct`,
       );
     }
 
     return new Error(
-      `❌ Amazon Bedrock Provider Error\n\n${error.message || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check AWS credentials and permissions\n2. Verify model availability\n3. Check network connectivity`,
+      `❌ Amazon Bedrock Provider Error\n\n${errorMessage || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check AWS credentials and permissions\n2. Verify model availability\n3. Check network connectivity`,
     );
   }
 

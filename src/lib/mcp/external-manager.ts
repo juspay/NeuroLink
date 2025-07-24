@@ -17,6 +17,7 @@ import type {
   NeuroLinkExecutionContext,
   ToolResult,
 } from "./factory.js";
+import type { Unknown } from "../types/common.js";
 import { MCPToolRegistry } from "./tool-registry.js";
 import { mcpLogger as logger } from "./logging.js";
 
@@ -49,8 +50,8 @@ interface MCPConfig {
  */
 interface ExternalServerInfo {
   name: string;
-  client: ExternalMCPClient;
-  server: NeuroLinkMCPServer;
+  client: ExternalMCPClient | null;
+  server: NeuroLinkMCPServer | null;
   status: "connecting" | "connected" | "disconnected" | "error";
   lastError?: string;
   toolCount: number;
@@ -140,7 +141,7 @@ export class ExternalMCPManager {
         autoDiscovery: this.config?.autoDiscovery?.enabled,
       });
     } catch (error) {
-      if ((error as any).code === "ENOENT") {
+      if ((error as Unknown as { code?: string })?.code === "ENOENT") {
         logger.warn(
           `[External MCP Manager] Config file not found: ${this.configPath}`,
         );
@@ -232,8 +233,8 @@ export class ExternalMCPManager {
 
       const serverInfo: ExternalServerInfo = {
         name: serverName,
-        client: null as any,
-        server: null as any,
+        client: null,
+        server: null,
         status: "error",
         lastError: error instanceof Error ? error.message : String(error),
         toolCount: 0,
@@ -252,6 +253,14 @@ export class ExternalMCPManager {
     serverInfo: ExternalServerInfo,
   ): Promise<void> {
     try {
+      if (!serverInfo.client) {
+        throw new Error("Client is not available");
+      }
+
+      if (!serverInfo.server) {
+        throw new Error("Server is not available");
+      }
+
       const tools = serverInfo.client.getNeuroLinkTools();
 
       // Register each tool with the server
@@ -300,8 +309,8 @@ export class ExternalMCPManager {
       statuses[name] = {
         ...info,
         // Don't include the actual client/server objects in status
-        client: undefined as any,
-        server: undefined as any,
+        client: null,
+        server: null,
       };
     }
     return statuses;
@@ -312,7 +321,7 @@ export class ExternalMCPManager {
    */
   async executeTool(
     toolName: string,
-    params: any,
+    params: unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> {
     // Use the registry to execute the tool

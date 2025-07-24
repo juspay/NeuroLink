@@ -45,36 +45,40 @@ export class AnthropicProviderV2 extends BaseProvider {
   /**
    * Returns the Vercel AI SDK model instance for Anthropic
    */
-  protected getAISDKModel(): any {
+  protected getAISDKModel(): LanguageModelV1 {
     const apiKey = this.getApiKey();
     const anthropic = createAnthropic({ apiKey });
     return anthropic(this.modelName);
   }
 
-  protected handleProviderError(error: any): Error {
+  protected handleProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`Anthropic request timed out: ${error.message}`);
     }
 
-    if (error?.status === 401) {
+    const errorWithStatus = error as { status?: number; message?: string };
+
+    if (errorWithStatus?.status === 401) {
       return new Error(
         "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable.",
       );
     }
 
-    if (error?.status === 429) {
+    if (errorWithStatus?.status === 429) {
       return new Error(
         "Anthropic rate limit exceeded. Please try again later.",
       );
     }
 
-    if (error?.status === 400) {
+    if (errorWithStatus?.status === 400) {
       return new Error(
-        `Anthropic bad request: ${error?.message || "Invalid request parameters"}`,
+        `Anthropic bad request: ${errorWithStatus?.message || "Invalid request parameters"}`,
       );
     }
 
-    return new Error(`Anthropic error: ${error?.message || "Unknown error"}`);
+    return new Error(
+      `Anthropic error: ${errorWithStatus?.message || String(error) || "Unknown error"}`,
+    );
   }
 
   private getApiKey(): string {

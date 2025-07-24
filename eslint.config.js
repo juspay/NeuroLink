@@ -82,7 +82,7 @@ export default [
 
       // TypeScript-specific rules (less strict to avoid blocking build)
       "@typescript-eslint/no-unused-vars": "off", // Too many legacy unused vars
-      "@typescript-eslint/no-explicit-any": "off", // Legacy codebase has many any types
+      "@typescript-eslint/no-explicit-any": "error", // Enforce strict typing - no any types allowed
       "@typescript-eslint/prefer-as-const": "warn",
 
       // Basic rules
@@ -153,7 +153,7 @@ export default [
 
       // TypeScript-specific rules (less strict for test files)
       "@typescript-eslint/no-unused-vars": "off", // Test files often have unused vars
-      "@typescript-eslint/no-explicit-any": "off", // Test mocks use any types
+      "@typescript-eslint/no-explicit-any": "error", // Enforce strict typing - no any types allowed even in tests
       "@typescript-eslint/prefer-as-const": "warn",
 
       // Basic rules

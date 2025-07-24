@@ -1,6 +1,7 @@
 import { AIProviderFactory } from "../core/factory.js";
 import { logger } from "./logger.js";
 import { hasProviderEnvVars } from "./providerUtils.js";
+import type { UnknownRecord } from "../types/common.js";
 
 /**
  * Asynchronously get the best available provider based on real-time checks.
@@ -93,7 +94,7 @@ async function isProviderAvailable(providerName: string): Promise<boolean> {
       if (response.ok) {
         const { models } = await response.json();
         const defaultOllamaModel = "llama3.2:latest";
-        return models.some((m: any) => m.name === defaultOllamaModel);
+        return models.some((m: UnknownRecord) => m.name === defaultOllamaModel);
       }
       return false;
     } catch (error) {

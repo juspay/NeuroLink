@@ -2,6 +2,7 @@ import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema, Tool } from "ai";
 import type { GenerateResult } from "../types/generate-types.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { JsonValue } from "../types/common.js";
 
 export interface TextGenerationResult {
   content: string;
@@ -27,9 +28,15 @@ export interface TextGenerationResult {
     server: string;
     category?: string;
   }>;
-  // 🔧 FIX: Add analytics and evaluation fields
-  analytics?: any;
-  evaluation?: any;
+  // Analytics and evaluation data
+  analytics?: AnalyticsData;
+  evaluation?: {
+    relevance: number;
+    accuracy: number;
+    completeness: number;
+    overall: number;
+    reasoning?: string;
+  };
 }
 
 /**
@@ -132,7 +139,7 @@ export interface TextGenerationOptions {
   // NEW: Analytics and Evaluation Support
   enableEvaluation?: boolean; // Default: false - AI quality scoring
   enableAnalytics?: boolean; // Default: false - Usage tracking
-  context?: Record<string, any>; // Default: undefined - Custom context
+  context?: Record<string, JsonValue>; // Default: undefined - Custom context
 
   // NEW: Lighthouse-Compatible Domain-Aware Evaluation
   evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
@@ -154,7 +161,7 @@ export interface AnalyticsData {
   cost?: number; // Optional cost calculation
   responseTime: number; // Milliseconds
   timestamp: string; // ISO timestamp
-  context?: Record<string, any>; // User context
+  context?: Record<string, JsonValue>; // User context
 }
 
 /**

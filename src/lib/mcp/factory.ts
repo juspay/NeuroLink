@@ -74,10 +74,10 @@ export interface NeuroLinkExecutionContext extends ExecutionContext {
   securityLevel?: "public" | "private" | "organization";
 
   // Extensible metadata
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   // Extension points for custom context
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -85,7 +85,7 @@ export interface NeuroLinkExecutionContext extends ExecutionContext {
  */
 export interface ToolResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string | Error;
   usage?: {
     tokens?: number;
@@ -102,7 +102,7 @@ export interface ToolResult {
     timestamp?: number;
     executionTime?: number;
     executionId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -123,7 +123,7 @@ export interface NeuroLinkMCPTool {
   permissions?: string[];
   version?: string;
   // Extension point for tool metadata
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -145,7 +145,7 @@ export interface NeuroLinkMCPServer {
   registerTool(tool: NeuroLinkMCPTool): NeuroLinkMCPServer;
 
   // Extension points
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   dependencies?: string[];
   capabilities?: string[];
 }
@@ -160,7 +160,7 @@ export interface MCPServerConfig {
   version?: string;
   category?: MCPServerCategory;
   visibility?: "public" | "private" | "organization";
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   dependencies?: string[];
   capabilities?: string[];
 }

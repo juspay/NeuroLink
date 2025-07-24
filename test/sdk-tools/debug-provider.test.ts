@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { NeuroLink } from "../../src/lib/neurolink.js";
 import { createTool } from "../../src/lib/sdk/tool-registration.js";
 import { AIProviderFactory } from "../../src/lib/core/factory.js";
+import type { UnknownRecord } from "../../src/lib/types/common.js";
 
 describe("Debug Provider Tool Loading", () => {
   it("should check if SDK is passed to provider correctly", async () => {
@@ -32,7 +33,7 @@ describe("Debug Provider Tool Loading", () => {
       "Provider has SDK:",
       Object.prototype.hasOwnProperty.call(provider, "sdk"),
     );
-    console.log("Provider SDK type:", typeof (provider as any).sdk);
+    console.log("Provider SDK type:", typeof (provider as UnknownRecord).sdk);
 
     // Get tools from provider
     const tools = await provider.getTools();

@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import type { Unknown, UnknownRecord } from "../../../types/common.js";
 import type {
   NeuroLinkMCPTool,
   NeuroLinkExecutionContext,
@@ -154,7 +155,7 @@ interface DebugResult {
 /**
  * Generate test cases for code functions
  */
-export const generateTestCasesTool: NeuroLinkMCPTool = {
+const generateTestCasesTool: NeuroLinkMCPTool = {
   name: "generate-test-cases",
   description:
     "Generate comprehensive test cases for code functions with various test types and frameworks",
@@ -164,7 +165,7 @@ export const generateTestCasesTool: NeuroLinkMCPTool = {
   permissions: ["write"],
   version: "2.0.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
@@ -238,7 +239,8 @@ Generate 3-5 comprehensive test cases covering the requested types.`;
         coverageEstimate: Math.min(coverageTarget, 80 + Math.random() * 15),
         totalTests: testCases.length,
         totalAssertions: testCases.reduce(
-          (sum: number, tc: any) => sum + (tc.assertions || 1),
+          (sum: number, tc: UnknownRecord) =>
+            sum + ((tc.assertions as number) || 1),
           0,
         ),
         generatedAt: new Date().toISOString(),
@@ -284,7 +286,7 @@ Generate 3-5 comprehensive test cases covering the requested types.`;
 /**
  * Refactor code for improved quality
  */
-export const refactorCodeTool: NeuroLinkMCPTool = {
+const refactorCodeTool: NeuroLinkMCPTool = {
   name: "refactor-code",
   description:
     "AI-powered code refactoring for improved readability, performance, and maintainability",
@@ -294,7 +296,7 @@ export const refactorCodeTool: NeuroLinkMCPTool = {
   permissions: ["write"],
   version: "2.0.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
@@ -414,7 +416,7 @@ Focus on real, actionable improvements based on the specified objectives.`;
 /**
  * Generate documentation from code
  */
-export const generateDocumentationTool: NeuroLinkMCPTool = {
+const generateDocumentationTool: NeuroLinkMCPTool = {
   name: "generate-documentation",
   description: "Automatically generate comprehensive documentation from code",
   category: "ai-workflow",
@@ -423,7 +425,7 @@ export const generateDocumentationTool: NeuroLinkMCPTool = {
   permissions: ["read"],
   version: "2.0.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
@@ -549,7 +551,7 @@ Focus on creating accurate, useful documentation that explains the code's purpos
 /**
  * Debug AI-generated output
  */
-export const debugAIOutputTool: NeuroLinkMCPTool = {
+const debugAIOutputTool: NeuroLinkMCPTool = {
   name: "debug-ai-output",
   description:
     "Analyze and debug AI-generated output to identify issues and suggest improvements",
@@ -559,7 +561,7 @@ export const debugAIOutputTool: NeuroLinkMCPTool = {
   permissions: ["read", "analytics"],
   version: "2.0.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
@@ -718,18 +720,18 @@ function simulateRefactoring(
   return refactored;
 }
 
-// Export all tools
-export const aiWorkflowTools = [
-  generateTestCasesTool,
-  refactorCodeTool,
-  generateDocumentationTool,
-  debugAIOutputTool,
-];
+// REMOVED: Tool exports disabled to prevent provider conflicts
+// const aiWorkflowTools = [
+//   generateTestCasesTool,
+//   refactorCodeTool,
+//   generateDocumentationTool,
+//   debugAIOutputTool,
+// ];
 
-// Export schemas for external validation
-export const workflowToolSchemas = {
-  "generate-test-cases": generateTestCasesSchema,
-  "refactor-code": refactorCodeSchema,
-  "generate-documentation": generateDocumentationSchema,
-  "debug-ai-output": debugAIOutputSchema,
-};
+// REMOVED: Schema exports disabled
+// const workflowToolSchemas = {
+//   "generate-test-cases": generateTestCasesSchema,
+//   "refactor-code": refactorCodeSchema,
+//   "generate-documentation": generateDocumentationSchema,
+//   "debug-ai-output": debugAIOutputSchema,
+// };

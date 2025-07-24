@@ -28,7 +28,7 @@ export interface GenerateOptions {
   // Analytics and Evaluation
   enableEvaluation?: boolean;
   enableAnalytics?: boolean;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 
   // Domain-aware evaluation
   evaluationDomain?: string;
@@ -60,21 +60,21 @@ export interface GenerateResult {
   toolCalls?: Array<{
     toolCallId: string;
     toolName: string;
-    args: Record<string, any>;
+    args: Record<string, unknown>;
   }>;
-  toolResults?: any[]; // Results from tool execution (Vercel AI SDK)
+  toolResults?: unknown[]; // Results from tool execution (Vercel AI SDK)
   toolsUsed?: string[];
   toolExecutions?: Array<{
     name: string;
-    input: Record<string, any>;
-    output: any;
+    input: Record<string, unknown>;
+    output: unknown;
     duration: number;
   }>;
   enhancedWithTools?: boolean;
   availableTools?: Array<{
     name: string;
     description: string;
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
   }>;
 
   // Analytics and evaluation

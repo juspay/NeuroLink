@@ -1,14 +1,17 @@
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema } from "ai";
-import type { Tool } from "ai";
+import type { Tool, LanguageModel } from "ai";
 import type {
   AIProvider,
   TextGenerationOptions,
   EnhancedGenerateResult,
   AnalyticsData,
   AIProviderName,
+  EvaluationData,
 } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
+import type { ToolCall, ToolResult } from "../types/tools.js";
 import { logger } from "../utils/logger.js";
 import { directAgentTools } from "../agent/direct-tools.js";
 // Dynamic imports to break circular dependency
@@ -17,17 +20,52 @@ import { directAgentTools } from "../agent/direct-tools.js";
 // Analytics helper will be dynamically imported when needed
 
 /**
+ * Interface for SDK with in-memory MCP servers
+ */
+export interface NeuroLinkSDK {
+  getInMemoryServers?: () => Map<
+    string,
+    {
+      server: {
+        title?: string;
+        description?: string;
+        tools?: Map<string, ToolInfo> | Record<string, ToolInfo>;
+      };
+      category?: string;
+      metadata?: UnknownRecord;
+    }
+  >;
+}
+
+/**
+ * Interface for tool information in MCP servers
+ */
+interface ToolInfo {
+  description?: string;
+  inputSchema?: ZodType<JsonValue>;
+  parameters?: ZodType<JsonValue>;
+  execute: (
+    args: JsonValue,
+  ) => Promise<JsonValue | ToolResult> | JsonValue | ToolResult;
+  isImplemented?: boolean;
+  metadata?: UnknownRecord;
+}
+
+/**
  * Validates if a result contains a valid toolsObject structure
  * @param result - The result object to validate
  * @returns true if the result contains a valid toolsObject, false otherwise
  */
-function isValidToolsObject(result: any): boolean {
+function isValidToolsObject(
+  result: UnknownRecord,
+): result is UnknownRecord & { toolsObject: Record<string, unknown> } {
   return (
-    result &&
+    result !== null &&
     typeof result === "object" &&
-    result.toolsObject &&
+    "toolsObject" in result &&
+    result.toolsObject !== null &&
     typeof result.toolsObject === "object" &&
-    Object.keys(result.toolsObject).length > 0
+    Object.keys(result.toolsObject as Record<string, unknown>).length > 0
   );
 }
 
@@ -45,9 +83,13 @@ export abstract class BaseProvider implements AIProvider {
   protected mcpTools?: Record<string, Tool>; // MCP tools loaded dynamically when available
   protected sessionId?: string;
   protected userId?: string;
-  protected sdk?: any; // Reference to NeuroLink SDK instance for custom tools
+  protected sdk?: NeuroLinkSDK; // Reference to NeuroLink SDK instance for custom tools
 
-  constructor(modelName?: string, providerName?: AIProviderName, sdk?: any) {
+  constructor(
+    modelName?: string,
+    providerName?: AIProviderName,
+    sdk?: NeuroLinkSDK,
+  ) {
     this.modelName = modelName || this.getDefaultModel();
     this.providerName = providerName || this.getProviderName();
     this.sdk = sdk;
@@ -135,7 +177,17 @@ export abstract class BaseProvider implements AIProvider {
             parameters: call.args,
             id: call.toolCallId,
           })),
-          toolResults: result?.toolResults,
+          toolResults: result?.toolResults
+            ? result.toolResults.map((tr) => ({
+                toolName:
+                  ((tr as UnknownRecord).toolName as string) || "unknown",
+                status: (((tr as UnknownRecord).status as string) === "error"
+                  ? "failure"
+                  : "success") as "success" | "failure",
+                result: (tr as UnknownRecord).result,
+                error: (tr as UnknownRecord).error as string | undefined,
+              }))
+            : undefined,
         };
       } catch (error) {
         logger.error(
@@ -200,8 +252,23 @@ export abstract class BaseProvider implements AIProvider {
         },
         provider: this.providerName,
         model: this.modelName,
-        toolCalls: result.toolCalls as any,
-        toolResults: result.toolResults as any,
+        toolCalls: result.toolCalls
+          ? result.toolCalls.map((tc) => ({
+              toolCallId:
+                ((tc as UnknownRecord).toolCallId as string) ||
+                ((tc as UnknownRecord).id as string) ||
+                "unknown",
+              toolName:
+                ((tc as UnknownRecord).toolName as string) ||
+                ((tc as UnknownRecord).name as string) ||
+                "unknown",
+              args:
+                ((tc as UnknownRecord).args as Record<string, unknown>) ||
+                ((tc as UnknownRecord).parameters as Record<string, unknown>) ||
+                {},
+            }))
+          : [],
+        toolResults: result.toolResults as ToolResult[],
       };
 
       // Enhanced result with analytics and evaluation
@@ -247,7 +314,7 @@ export abstract class BaseProvider implements AIProvider {
    * REQUIRED: Every provider MUST implement this method
    * Returns the Vercel AI SDK model instance for this provider
    */
-  protected abstract getAISDKModel(): any | Promise<any>;
+  protected abstract getAISDKModel(): LanguageModel | Promise<LanguageModel>;
 
   // ===================
   // TOOL MANAGEMENT
@@ -271,15 +338,12 @@ export abstract class BaseProvider implements AIProvider {
 
     // Add custom tools from SDK if available
     logger.debug(
-      `[BaseProvider] Checking SDK: ${!!this.sdk}, has getInMemoryServers: ${this.sdk && typeof (this.sdk as any).getInMemoryServers}`,
+      `[BaseProvider] Checking SDK: ${!!this.sdk}, has getInMemoryServers: ${this.sdk && typeof this.sdk.getInMemoryServers}`,
     );
-    if (
-      this.sdk &&
-      typeof (this.sdk as any).getInMemoryServers === "function"
-    ) {
+    if (this.sdk && typeof this.sdk.getInMemoryServers === "function") {
       logger.debug(`[BaseProvider] SDK check passed, loading custom tools`);
       try {
-        const inMemoryServers = (this.sdk as any).getInMemoryServers();
+        const inMemoryServers = this.sdk.getInMemoryServers!();
         logger.debug(`[BaseProvider] Got servers:`, inMemoryServers.size);
         logger.debug(
           `[BaseProvider] Loading custom tools from SDK, found ${inMemoryServers.size} servers`,
@@ -297,7 +361,7 @@ export abstract class BaseProvider implements AIProvider {
 
               for (const [toolName, toolInfo] of toolEntries as [
                 string,
-                any,
+                ToolInfo,
               ][]) {
                 if (toolInfo && typeof toolInfo.execute === "function") {
                   logger.debug(
@@ -324,9 +388,11 @@ export abstract class BaseProvider implements AIProvider {
                         if (result.success) {
                           return result.data;
                         } else {
-                          throw new Error(
-                            result.error || "Tool execution failed",
-                          );
+                          const errorMsg =
+                            typeof result.error === "string"
+                              ? result.error
+                              : "Tool execution failed";
+                          throw new Error(errorMsg);
                         }
                       }
                       return result;
@@ -354,11 +420,18 @@ export abstract class BaseProvider implements AIProvider {
         );
         const result = await getAvailableFunctionTools();
         if (isValidToolsObject(result)) {
-          this.mcpTools = result.toolsObject;
+          this.mcpTools = result.toolsObject as Record<string, Tool>;
         } else {
           logger.debug(
-            `Invalid or empty toolsObject for ${this.providerName}: Expected an object with at least one key, but got ${typeof result.toolsObject} with ${
-              result.toolsObject ? Object.keys(result.toolsObject).length : 0
+            `Invalid or empty toolsObject for ${this.providerName}: Expected an object with at least one key, but got ${typeof (result as UnknownRecord)?.toolsObject} with ${
+              (result as UnknownRecord)?.toolsObject
+                ? Object.keys(
+                    (result as UnknownRecord).toolsObject as Record<
+                      string,
+                      unknown
+                    >,
+                  ).length
+                : 0
             } keys. Full result:`,
             result,
           );
@@ -394,7 +467,7 @@ export abstract class BaseProvider implements AIProvider {
   /**
    * Provider-specific error handling
    */
-  protected abstract handleProviderError(error: any): Error;
+  protected abstract handleProviderError(error: unknown): Error;
   // ===================
   // TEMPLATE METHODS - COMMON FUNCTIONALITY
   // ===================
@@ -500,9 +573,10 @@ export abstract class BaseProvider implements AIProvider {
   protected async createEvaluation(
     result: EnhancedGenerateResult,
     options: TextGenerationOptions,
-  ) {
+  ): Promise<EvaluationData> {
     const { evaluateResponse } = await import("../core/evaluation.js");
-    return evaluateResponse(result.content, options.prompt);
+    const evaluation = await evaluateResponse(result.content, options.prompt);
+    return evaluation as EvaluationData;
   }
 
   protected validateOptions(options: TextGenerationOptions): void {

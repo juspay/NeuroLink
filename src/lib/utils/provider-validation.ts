@@ -8,6 +8,8 @@
  * - Rate-limit friendly validation
  */
 
+import type { UnknownRecord } from "../types/common.js";
+
 import { hasProviderEnvVars } from "./providerUtils.js";
 import { defaultTimeoutManager } from "./timeout-manager.js";
 
@@ -19,7 +21,7 @@ export interface ProviderValidationResult {
   error?: string;
   errorType?: "config" | "format" | "auth" | "network" | "quota" | "unknown";
   responseTime?: number;
-  details?: Record<string, any>;
+  details?: UnknownRecord;
 }
 
 /**
@@ -506,9 +508,14 @@ async function validateOllamaAvailability(): Promise<ProviderValidationResult> {
         const data = await response.json();
         const models = data.models || [];
 
+        interface OllamaModel {
+          name: string;
+          [key: string]: unknown;
+        }
+
         return {
           available: true,
-          models: models.map((m: any) => m.name),
+          models: models.map((m: OllamaModel) => m.name),
           hasModels: models.length > 0,
         };
       },

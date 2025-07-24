@@ -4,6 +4,7 @@
  */
 
 import { spawn } from "child_process";
+import type { UnknownRecord, Unknown } from "../../lib/types/common.js";
 
 export interface TestResult {
   stdout: string;
@@ -13,11 +14,11 @@ export interface TestResult {
 }
 
 const CLI_TIMEOUT = 15000; // 15 seconds max
-const spawnedProcesses = new Set<any>();
+const spawnedProcesses = new Set<Unknown>();
 
 export async function execCLI(
   args: string[],
-  options: any = {},
+  options: UnknownRecord = {},
 ): Promise<TestResult> {
   return new Promise((resolve) => {
     const child = spawn("node", ["./dist/cli/index.js", ...args], {

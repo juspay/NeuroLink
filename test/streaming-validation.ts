@@ -115,8 +115,9 @@ const validateRealCredentials = async (provider: string): Promise<boolean> => {
     }
 
     return hasContent && !hasError;
-  } catch (error: any) {
-    console.log(`❌ ${provider} credential validation failed:`, error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`❌ ${provider} credential validation failed:`, errorMessage);
     return false;
   }
 };
@@ -310,16 +311,18 @@ describe(`Streaming Validation Tests (${getTestProvider().toUpperCase()})`, () =
           // If it completes within timeout, check for real content
           expect(stdout).toContain("Generated content:");
           expect(stdout.length).toBeGreaterThan(50);
-        } catch (error: any) {
+        } catch (error: unknown) {
           // DEBUG: Log actual error message for analysis
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.log("🔍 DEBUG - Streaming timeout error:", {
-            message: error.message,
-            type: typeof error.message,
+            message: errorMessage,
+            type: typeof errorMessage,
             fullError: error,
           });
 
           // Should either work or timeout gracefully
-          expect(error.message).toMatch(
+          expect(errorMessage).toMatch(
             /timed.out|timeout|error|failed|exit code/i,
           );
         }

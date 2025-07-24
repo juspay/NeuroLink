@@ -11,6 +11,7 @@ import {
   getDefaultTimeout,
 } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import type { UnknownRecord } from "../types/common.js";
 
 // Configuration helpers
 const getOpenAIApiKey = (): string => {
@@ -68,25 +69,31 @@ export class OpenAIProvider extends BaseProvider {
     return this.model;
   }
 
-  protected handleProviderError(error: any): Error {
+  protected handleProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`OpenAI request timed out: ${error.message}`);
     }
 
+    const errorObj = error as UnknownRecord;
+    const message =
+      errorObj?.message && typeof errorObj.message === "string"
+        ? errorObj.message
+        : "Unknown error";
+
     if (
-      error?.message?.includes("API_KEY_INVALID") ||
-      error?.message?.includes("Invalid API key")
+      message.includes("API_KEY_INVALID") ||
+      message.includes("Invalid API key")
     ) {
       return new Error(
         "Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable.",
       );
     }
 
-    if (error?.message?.includes("rate limit")) {
+    if (message.includes("rate limit")) {
       return new Error("OpenAI rate limit exceeded. Please try again later.");
     }
 
-    return new Error(`OpenAI error: ${error?.message || "Unknown error"}`);
+    return new Error(`OpenAI error: ${message}`);
   }
 
   /**

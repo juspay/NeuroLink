@@ -8,12 +8,13 @@ import {
   DEFAULT_TEMPERATURE,
   ENV_DEFAULTS,
 } from "./constants.js";
+import type { UnknownRecord } from "../types/common.js";
 
 /**
  * Apply default values to options object
  * User-provided values take precedence over defaults
  */
-export function applyDefaults(options: any): any {
+export function applyDefaults(options: UnknownRecord): UnknownRecord {
   return {
     maxTokens: ENV_DEFAULTS.maxTokens,
     temperature: ENV_DEFAULTS.temperature,

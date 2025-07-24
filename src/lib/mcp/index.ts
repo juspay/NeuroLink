@@ -55,10 +55,10 @@ export async function listMCPs(): Promise<MCPMetadata[]> {
 /**
  * Execute an MCP operation
  */
-export async function executeMCP<T = any>(
+export async function executeMCP<T = unknown>(
   name: string,
-  config: any,
-  args: any,
+  config: unknown,
+  args: unknown,
   context?: {
     sessionId?: string;
     userId?: string;
@@ -70,44 +70,50 @@ export async function executeMCP<T = any>(
 /**
  * Quick filesystem operations
  */
-export async function readFile(path: string, basePath?: string): Promise<any> {
+export async function readFile(
+  path: string,
+  basePath?: string,
+): Promise<string | Buffer> {
   return mcpEcosystem.filesystem({
     action: "readFile",
     path,
     basePath,
-  });
+  }) as Promise<string | Buffer>;
 }
 
 export async function writeFile(
   path: string,
   content: string,
   basePath?: string,
-): Promise<any> {
+): Promise<void> {
   return mcpEcosystem.filesystem({
     action: "writeFile",
     path,
     content,
     basePath,
-  });
+  }) as Promise<void>;
 }
 
-export async function listFiles(path: string, basePath?: string): Promise<any> {
+export async function listFiles(
+  path: string,
+  basePath?: string,
+): Promise<string[]> {
   return mcpEcosystem.filesystem({
     action: "listFiles",
     path,
     basePath,
-  });
+  }) as Promise<string[]>;
 }
 
 export async function createDirectory(
   path: string,
   basePath?: string,
-): Promise<any> {
+): Promise<void> {
   return mcpEcosystem.filesystem({
     action: "createDir",
     path,
     basePath,
-  });
+  }) as Promise<void>;
 }
 
 /**

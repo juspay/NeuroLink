@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import dotenv from "dotenv";
 import { execWithTimeout } from "./shared/exec-with-timeout.js";
+import type { UnknownRecord } from "../src/lib/types/common.js";
 
 // Load environment variables
 dotenv.config();
@@ -32,20 +33,24 @@ describe("Error Handling Tests", () => {
           await execWithTimeout(
             `cd ${process.cwd()} && GOOGLE_AI_API_KEY=invalid-key pnpm cli generate "Test" --provider google-ai --max-tokens 2000`,
           );
-        } catch (error: any) {
+        } catch (error: unknown) {
           // DEBUG: Log actual error structure for analysis
           console.log("🔍 DEBUG - Error handling structure:", {
-            hasStderr: "stderr" in error,
-            hasStdout: "stdout" in error,
-            stderr: error.stderr,
-            stdout: error.stdout,
-            message: error.message,
-            errorKeys: Object.keys(error),
+            hasStderr: "stderr" in (error as UnknownRecord),
+            hasStdout: "stdout" in (error as UnknownRecord),
+            stderr: (error as UnknownRecord).stderr,
+            stdout: (error as UnknownRecord).stdout,
+            message: error instanceof Error ? error.message : String(error),
+            errorKeys: Object.keys(error as UnknownRecord),
             fullError: error,
           });
 
           // Check error message first (more reliable), then stderr/stdout if available
-          const errorText = error.message || error.stderr || error.stdout || "";
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          const errorText = errorMessage || errorStderr || errorStdout || "";
           expect(errorText).toMatch(
             /api.key|authentication|invalid|error|timeout/i,
           );
@@ -67,8 +72,12 @@ describe("Error Handling Tests", () => {
 
           // Should either work or show clear error
           expect(stdout).toBeDefined();
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(/token|limit|maximum/i);
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(/token|limit|maximum/i);
         }
       },
       timeout,
@@ -81,20 +90,24 @@ describe("Error Handling Tests", () => {
           await execWithTimeout(
             `${cliPrefix} generate "Test" --provider google-ai --model invalid-model-name`,
           );
-        } catch (error: any) {
+        } catch (error: unknown) {
           // DEBUG: Log actual error structure for invalid model analysis
           console.log("🔍 DEBUG - Invalid model error structure:", {
-            hasStderr: "stderr" in error,
-            hasStdout: "stdout" in error,
-            stderr: error.stderr,
-            stdout: error.stdout,
-            message: error.message,
-            errorKeys: Object.keys(error),
+            hasStderr: "stderr" in (error as UnknownRecord),
+            hasStdout: "stdout" in (error as UnknownRecord),
+            stderr: (error as UnknownRecord).stderr,
+            stdout: (error as UnknownRecord).stdout,
+            message: error instanceof Error ? error.message : String(error),
+            errorKeys: Object.keys(error as UnknownRecord),
             fullError: error,
           });
 
           // Check error message first (more reliable), then stderr/stdout if available
-          const errorText = error.message || error.stderr || error.stdout || "";
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          const errorText = errorMessage || errorStderr || errorStdout || "";
           expect(errorText).toMatch(/model|invalid|not.found|timeout/i);
         }
       },
@@ -108,8 +121,12 @@ describe("Error Handling Tests", () => {
           await execWithTimeout(
             `${cliPrefix} generate "Test" --provider google-ai --context '{invalid-json'`,
           );
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(
             /json|context|invalid|parse/i,
           );
         }
@@ -143,10 +160,12 @@ describe("Error Handling Tests", () => {
           await execWithTimeout(
             `${cliPrefix} generate "Test" --provider invalid-provider`,
           );
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(
-            /provider|error|invalid/i,
-          );
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(/provider|error|invalid/i);
         }
       },
       timeout,

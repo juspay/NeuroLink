@@ -5,6 +5,7 @@ import {
   createTypedTool,
 } from "../../src/lib/sdk/tool-registration.js";
 import { z } from "zod";
+import type { ToolArgs, Unknown } from "../../src/lib/types/index.js";
 
 describe("SDK Tool Registration - Phase 1", () => {
   let sdk: NeuroLink;
@@ -92,7 +93,7 @@ describe("SDK Tool Registration - Phase 1", () => {
       expect(() =>
         sdk.registerTool("invalidTool", {
           description: "Test",
-          execute: null as any,
+          execute: null as Unknown,
         }),
       ).toThrow("must have an execute function");
     });
@@ -123,7 +124,7 @@ describe("SDK Tool Registration - Phase 1", () => {
           tools: {
             customTool: {
               description: "Custom MCP tool",
-              execute: async (params: any) => ({
+              execute: async (params: ToolArgs) => ({
                 success: true,
                 data: { message: "Hello from MCP" },
               }),

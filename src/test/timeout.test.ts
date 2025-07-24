@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { UnknownRecord } from "../../lib/types/common.js";
 import {
   parseTimeout,
   TimeoutError,
@@ -88,7 +89,9 @@ describe("Timeout Utilities", () => {
     });
 
     it("should fallback to global default for unknown providers", () => {
-      expect(getDefaultTimeout("unknown" as any, "generate")).toBe("30s");
+      expect(getDefaultTimeout("unknown" as UnknownRecord, "generate")).toBe(
+        "30s",
+      );
     });
   });
 
@@ -233,7 +236,7 @@ describe("Provider Timeout Integration", () => {
   beforeEach(() => {
     vi.mock("../lib/providers/openAI.js", () => ({
       OpenAI: class {
-        async generate(options: any) {
+        async generate(options: UnknownRecord) {
           // Simulate API delay
           await new Promise((resolve) => setTimeout(resolve, 100));
           const timeoutMs = options.timeout

@@ -1,5 +1,12 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
-import { metrics, trace } from "@opentelemetry/api";
+import {
+  metrics,
+  trace,
+  type Meter,
+  type Tracer,
+  type Counter,
+  type Histogram,
+} from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
@@ -24,17 +31,17 @@ export class TelemetryService {
   private static instance: TelemetryService;
   private sdk?: NodeSDK;
   private enabled: boolean = false;
-  private meter?: any;
-  private tracer?: any;
+  private meter?: Meter;
+  private tracer?: Tracer;
 
   // Optional Metrics (only created when enabled)
-  private aiRequestCounter?: any;
-  private aiRequestDuration?: any;
-  private aiTokensUsed?: any;
-  private aiProviderErrors?: any;
-  private mcpToolCalls?: any;
-  private connectionCounter?: any;
-  private responseTimeHistogram?: any;
+  private aiRequestCounter?: Counter;
+  private aiRequestDuration?: Histogram;
+  private aiTokensUsed?: Counter;
+  private aiProviderErrors?: Counter;
+  private mcpToolCalls?: Counter;
+  private connectionCounter?: Counter;
+  private responseTimeHistogram?: Histogram;
 
   private constructor() {
     // Check if telemetry is enabled

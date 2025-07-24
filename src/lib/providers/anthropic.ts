@@ -7,7 +7,8 @@ import type {
   EnhancedGenerateResult,
 } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
-import { BaseProvider } from "../core/base-provider.js";
+import type { Unknown, UnknownRecord } from "../types/common.js";
+import { BaseProvider, type NeuroLinkSDK } from "../core/base-provider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,
@@ -38,8 +39,12 @@ const getDefaultAnthropicModel = (): string => {
 export class AnthropicProvider extends BaseProvider {
   private model: LanguageModelV1;
 
-  constructor(modelName?: string, sdk?: any) {
-    super(modelName, "anthropic" as AIProviderName, sdk);
+  constructor(modelName?: string, sdk?: unknown) {
+    super(
+      modelName,
+      "anthropic" as AIProviderName,
+      sdk as NeuroLinkSDK | undefined,
+    );
 
     // Initialize Anthropic model with API key validation
     const apiKey = getAnthropicApiKey();
@@ -66,27 +71,37 @@ export class AnthropicProvider extends BaseProvider {
     return this.model;
   }
 
-  protected handleProviderError(error: any): Error {
+  protected handleProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`Anthropic request timed out: ${error.message}`);
     }
 
+    const errorRecord = error as UnknownRecord;
     if (
-      error?.message?.includes("API_KEY_INVALID") ||
-      error?.message?.includes("Invalid API key")
+      (typeof errorRecord?.message === "string" &&
+        errorRecord.message.includes("API_KEY_INVALID")) ||
+      (typeof errorRecord?.message === "string" &&
+        errorRecord.message.includes("Invalid API key"))
     ) {
       return new Error(
         "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable.",
       );
     }
 
-    if (error?.message?.includes("rate limit")) {
+    if (
+      typeof errorRecord?.message === "string" &&
+      errorRecord.message.includes("rate limit")
+    ) {
       return new Error(
         "Anthropic rate limit exceeded. Please try again later.",
       );
     }
 
-    return new Error(`Anthropic error: ${error?.message || "Unknown error"}`);
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error";
+    return new Error(`Anthropic error: ${message}`);
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { NeuroLink } from "../../src/lib/neurolink.js";
 import { createTypedTool } from "../../src/lib/sdk/tool-registration.js";
 import { z } from "zod";
+import type { UnknownRecord } from "../../src/lib/types/common.js";
 
 describe("Real-World SDK Tool Examples", () => {
   it("should create a task management assistant", async () => {
@@ -160,7 +161,7 @@ describe("Real-World SDK Tool Examples", () => {
             }
           };
 
-          const result: any = {
+          const result: UnknownRecord = {
             period: "Jan-Jun",
             calculation,
           };

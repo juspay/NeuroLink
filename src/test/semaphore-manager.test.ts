@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createMockExecutionContext } from "./helpers/test-utilities.js";
 import { SemaphoreManager } from "../lib/mcp/semaphore-manager.js";
 import type { NeuroLinkExecutionContext } from "../lib/mcp/factory.js";
+import type { Unknown } from "../../lib/types/common.js";
 
 describe("SemaphoreManager", () => {
   let semaphoreManager: SemaphoreManager;
@@ -279,7 +280,7 @@ describe("SemaphoreManager", () => {
   describe("Race Condition Prevention", () => {
     it("should prevent race conditions in counter increment", async () => {
       let counter = 0;
-      const incrementOperations: Promise<any>[] = [];
+      const incrementOperations: Promise<Unknown>[] = [];
 
       // Create 100 concurrent increment operations
       for (let i = 0; i < 100; i++) {

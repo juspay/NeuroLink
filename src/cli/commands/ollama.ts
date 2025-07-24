@@ -65,15 +65,16 @@ async function listModelsHandler() {
         ),
       );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     spinner.fail("Failed to list models. Is Ollama installed?");
-    console.error(chalk.red("Error:", error.message));
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red("Error:", errorMessage));
     console.log(chalk.blue("\nTip: Install Ollama from https://ollama.ai"));
     process.exit(1);
   }
 }
 
-async function pullModelHandler(argv: any) {
+async function pullModelHandler(argv: { model: string }) {
   const { model } = argv;
   console.log(chalk.blue(`Downloading model: ${model}`));
   console.log(chalk.gray("This may take several minutes..."));
@@ -86,14 +87,15 @@ async function pullModelHandler(argv: any) {
         `\nTest it with: npx @juspay/neurolink generate "Hello!" --provider ollama --model ${model}`,
       ),
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(chalk.red(`\n❌ Failed to download ${model}`));
-    console.error(chalk.red("Error:", error.message));
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red("Error:", errorMessage));
     process.exit(1);
   }
 }
 
-async function removeModelHandler(argv: any) {
+async function removeModelHandler(argv: { model: string }) {
   const { model } = argv;
 
   // Confirm removal
@@ -115,9 +117,10 @@ async function removeModelHandler(argv: any) {
   try {
     execSync(`ollama rm ${model}`, { encoding: "utf8" });
     spinner.succeed(`Successfully removed ${model}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     spinner.fail(`Failed to remove ${model}`);
-    console.error(chalk.red("Error:", error.message));
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red("Error:", errorMessage));
     process.exit(1);
   }
 }
@@ -198,9 +201,10 @@ async function startHandler() {
     console.log(
       chalk.blue("\nWait a few seconds for the service to initialize..."),
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(chalk.red("Failed to start Ollama service"));
-    console.error(chalk.red("Error:", error.message));
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red("Error:", errorMessage));
     console.log(
       chalk.blue("\nTry starting Ollama manually or check installation"),
     );
@@ -232,7 +236,7 @@ async function stopHandler() {
     }
 
     spinner.succeed("Ollama service stopped");
-  } catch (error: any) {
+  } catch (error: unknown) {
     spinner.fail("Failed to stop Ollama service");
     console.error(chalk.red("It may not be running or requires manual stop"));
   }

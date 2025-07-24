@@ -5,6 +5,7 @@
  */
 
 import { EventEmitter } from "events";
+import type { UnknownRecord } from "../types/common.js";
 import type { AIProvider, TextGenerationOptions } from "../core/types.js";
 import type {
   NeuroLinkMCPTool,
@@ -441,7 +442,7 @@ Response (JSON array only):`;
       .map((tr) => {
         if (tr.result.success && tr.result.data) {
           // Check if tool result has a displayString or other human-readable format
-          const data = tr.result.data as any;
+          const data = tr.result.data as UnknownRecord;
 
           // For time tool, use the displayString
           if (data.displayString) {
@@ -487,8 +488,8 @@ Response (JSON array only):`;
     if (toolResults.length === 1) {
       const toolResult = toolResults[0];
       if (toolResult.result.success && toolResult.result.data) {
-        const data = toolResult.result.data as any;
-        if (data.displayString) {
+        const data = toolResult.result.data as UnknownRecord;
+        if (typeof data.displayString === "string") {
           return data.displayString;
         }
       }

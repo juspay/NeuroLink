@@ -5,6 +5,8 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
+import type { Stats } from "fs";
+import type { UnknownRecord } from "../types/common.js";
 import { mcpLogger } from "./logging.js";
 import type { ExecutionContext } from "./contracts/mcp-contract.js";
 
@@ -244,7 +246,7 @@ export class SecurityManager {
         );
 
         try {
-          return await fs.readFile(resolvedPath, encoding as any);
+          return await fs.readFile(resolvedPath, encoding as BufferEncoding);
         } catch (error) {
           mcpLogger.error(
             `[SecurityManager] Failed to read file ${filePath}:`,
@@ -299,7 +301,7 @@ export class SecurityManager {
         }
       },
 
-      async stat(filePath: string): Promise<any> {
+      async stat(filePath: string): Promise<Stats> {
         const resolvedPath = resolveSecurePath(filePath);
         self.checkFileSystemPermission(
           "read",
@@ -319,7 +321,7 @@ export class SecurityManager {
         }
       },
 
-      async mkdir(dirPath: string, options?: any): Promise<void> {
+      async mkdir(dirPath: string, options?: UnknownRecord): Promise<void> {
         const resolvedPath = resolveSecurePath(dirPath);
         self.checkFileSystemPermission(
           "write",

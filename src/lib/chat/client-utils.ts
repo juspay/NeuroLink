@@ -4,6 +4,7 @@
  */
 
 import type { ChatMessage, SSEEvent } from "./types.js";
+import type { JsonValue, JsonObject } from "../types/common.js";
 
 export interface ChatClientOptions {
   endpoint: string;
@@ -186,13 +187,19 @@ export class ChatClient {
   private handleSSEEvent(event: SSEEvent): void {
     switch (event.type) {
       case "data":
-        this.handleDataEvent(event.data);
+        if (this.isDataEventData(event.data)) {
+          this.handleDataEvent(event.data);
+        }
         break;
       case "error":
-        this.handleErrorEvent(event.data);
+        if (this.isErrorEventData(event.data)) {
+          this.handleErrorEvent(event.data);
+        }
         break;
       case "complete":
-        this.handleCompleteEvent(event.data);
+        if (this.isCompleteEventData(event.data)) {
+          this.handleCompleteEvent(event.data);
+        }
         break;
       case "heartbeat":
         // Heartbeat received, connection is alive
@@ -200,7 +207,34 @@ export class ChatClient {
     }
   }
 
-  private handleDataEvent(data: any): void {
+  private isDataEventData(
+    data: JsonValue,
+  ): data is JsonObject & { type: string; content?: string } {
+    return (
+      typeof data === "object" &&
+      data !== null &&
+      typeof (data as JsonObject).type === "string"
+    );
+  }
+
+  private isErrorEventData(
+    data: JsonValue,
+  ): data is JsonObject & { message?: string } {
+    return typeof data === "object" && data !== null;
+  }
+
+  private isCompleteEventData(
+    data: JsonValue,
+  ): data is JsonObject & { totalTokens?: number } {
+    return typeof data === "object" && data !== null;
+  }
+
+  private handleDataEvent(
+    data: JsonObject & {
+      type: string;
+      content?: string;
+    },
+  ): void {
     if (data.type === "chunk") {
       // Handle streaming response chunk
       const lastMessage = this.messages[this.messages.length - 1];
@@ -214,7 +248,7 @@ export class ChatClient {
         const message: ChatMessage = {
           id: `msg_${Date.now()}_assistant`,
           role: "assistant",
-          content: data.content,
+          content: data.content || "",
           timestamp: Date.now(),
         };
 
@@ -224,7 +258,7 @@ export class ChatClient {
     } else if (data.type === "start") {
       // New conversation started
       const userMessage: ChatMessage = {
-        id: data.messageId,
+        id: String(data.messageId || `msg_${Date.now()}_user`),
         role: "user",
         content: data.content || "", // Use data content if available
         timestamp: Date.now(),
@@ -234,11 +268,15 @@ export class ChatClient {
     }
   }
 
-  private handleErrorEvent(data: any): void {
+  private handleErrorEvent(data: JsonObject & { message?: string }): void {
     this.options.onError(new Error(data.message || "Chat error"));
   }
 
-  private handleCompleteEvent(data: any): void {
+  private handleCompleteEvent(
+    data: JsonObject & {
+      totalTokens?: number;
+    },
+  ): void {
     // Message completion - final processing
     if (data.totalTokens) {
       const lastMessage = this.messages[this.messages.length - 1];

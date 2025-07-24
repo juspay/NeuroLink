@@ -28,12 +28,24 @@ describe("Session Persistence", () => {
     vi.clearAllMocks();
 
     // Mock directory operations
-    (fs.mkdir as any).mockResolvedValue(undefined);
-    (fs.readdir as any).mockResolvedValue([]);
-    (fs.readFile as any).mockRejectedValue({ code: "ENOENT" });
-    (fs.writeFile as any).mockResolvedValue(undefined);
-    (fs.rename as any).mockResolvedValue(undefined);
-    (fs.unlink as any).mockResolvedValue(undefined);
+    (fs.mkdir as jest.MockedFunction<typeof fs.mkdir>).mockResolvedValue(
+      undefined,
+    );
+    (fs.readdir as jest.MockedFunction<typeof fs.readdir>).mockResolvedValue(
+      [],
+    );
+    (fs.readFile as jest.MockedFunction<typeof fs.readFile>).mockRejectedValue({
+      code: "ENOENT",
+    });
+    (
+      fs.writeFile as jest.MockedFunction<typeof fs.writeFile>
+    ).mockResolvedValue(undefined);
+    (fs.rename as jest.MockedFunction<typeof fs.rename>).mockResolvedValue(
+      undefined,
+    );
+    (fs.unlink as jest.MockedFunction<typeof fs.unlink>).mockResolvedValue(
+      undefined,
+    );
 
     // Create session manager with persistence
     sessionManager = new SessionManager(
@@ -76,17 +88,22 @@ describe("Session Persistence", () => {
       expect(fs.rename).toHaveBeenCalled();
 
       // Check file path
-      const writeCall = (fs.writeFile as any).mock.calls[0];
+      const writeCall = (
+        fs.writeFile as jest.MockedFunction<typeof fs.writeFile>
+      ).mock.calls[0];
       expect(writeCall[0]).toContain(".tmp");
 
-      const renameCall = (fs.rename as any).mock.calls[0];
+      const renameCall = (fs.rename as jest.MockedFunction<typeof fs.rename>)
+        .mock.calls[0];
       expect(renameCall[1]).toBe(path.join(testDir, "test-session-1.json"));
     });
 
     it("should serialize session with checksum", async () => {
       await sessionManager.createSession(testContext);
 
-      const writeCall = (fs.writeFile as any).mock.calls[0];
+      const writeCall = (
+        fs.writeFile as jest.MockedFunction<typeof fs.writeFile>
+      ).mock.calls[0];
       const fileContent = JSON.parse(writeCall[1]);
 
       expect(fileContent.session).toBeDefined();
@@ -114,7 +131,9 @@ describe("Session Persistence", () => {
         lastSaved: Date.now(),
       };
 
-      (fs.readFile as any).mockResolvedValueOnce(JSON.stringify(savedSession));
+      (
+        fs.readFile as jest.MockedFunction<typeof fs.readFile>
+      ).mockResolvedValueOnce(JSON.stringify(savedSession));
 
       const session = await sessionManager.getSession("persisted-session");
 
@@ -134,7 +153,9 @@ describe("Session Persistence", () => {
         "not-json.txt", // Should be ignored
       ];
 
-      (fs.readdir as any).mockResolvedValueOnce(sessions);
+      (
+        fs.readdir as jest.MockedFunction<typeof fs.readdir>
+      ).mockResolvedValueOnce(sessions);
 
       // Mock reading each session file
       sessions.forEach((file, index) => {
@@ -154,9 +175,9 @@ describe("Session Persistence", () => {
             version: "1.0",
             lastSaved: Date.now(),
           };
-          (fs.readFile as any).mockResolvedValueOnce(
-            JSON.stringify(sessionData),
-          );
+          (
+            fs.readFile as jest.MockedFunction<typeof fs.readFile>
+          ).mockResolvedValueOnce(JSON.stringify(sessionData));
         }
       });
 
@@ -202,7 +223,7 @@ describe("Session Persistence", () => {
       expect(fs.writeFile).toHaveBeenCalled();
 
       // Check serialized state
-      const writeCall = (fs.writeFile as any).mock.calls[0];
+      const writeCall = (fs.writeFile as unknown).mock.calls[0];
       const fileContent = JSON.parse(writeCall[1]);
       expect(fileContent.session.state).toContainEqual(["counter", 42]);
     });
@@ -244,7 +265,7 @@ describe("Session Persistence", () => {
   describe("Error Handling", () => {
     it("should handle write failures with retries", async () => {
       // Mock write failures then success
-      (fs.writeFile as any)
+      (fs.writeFile as unknown)
         .mockRejectedValueOnce(new Error("Write failed"))
         .mockRejectedValueOnce(new Error("Write failed"))
         .mockResolvedValueOnce(undefined);
@@ -258,7 +279,9 @@ describe("Session Persistence", () => {
 
     it("should handle corrupted session files", async () => {
       // Mock corrupted file
-      (fs.readFile as any).mockResolvedValueOnce("{ invalid json");
+      (
+        fs.readFile as jest.MockedFunction<typeof fs.readFile>
+      ).mockResolvedValueOnce("{ invalid json");
 
       const session = await sessionManager.getSession("corrupted-session");
 
@@ -283,7 +306,9 @@ describe("Session Persistence", () => {
         lastSaved: Date.now(),
       };
 
-      (fs.readFile as any).mockResolvedValueOnce(JSON.stringify(sessionData));
+      (
+        fs.readFile as jest.MockedFunction<typeof fs.readFile>
+      ).mockResolvedValueOnce(JSON.stringify(sessionData));
 
       const session = await sessionManager.getSession("tampered-session");
 
@@ -346,8 +371,8 @@ describe("SessionPersistence Class", () => {
       expiresAt: Date.now() + 3600000,
     };
 
-    (fs.writeFile as any).mockResolvedValue(undefined);
-    (fs.rename as any).mockResolvedValue(undefined);
+    (fs.writeFile as unknown).mockResolvedValue(undefined);
+    (fs.rename as unknown).mockResolvedValue(undefined);
 
     const result = await persistence.saveSession("atomic-test", session);
 
@@ -364,10 +389,13 @@ describe("SessionPersistence Class", () => {
     const oldFile = "old-session.json";
     const newFile = "new-session.json";
 
-    (fs.readdir as any).mockResolvedValue([oldFile, newFile]);
+    (fs.readdir as jest.MockedFunction<typeof fs.readdir>).mockResolvedValue([
+      oldFile,
+      newFile,
+    ]);
 
     // Mock old file stats
-    (fs.stat as any).mockImplementation((filepath: string) => {
+    (fs.stat as unknown).mockImplementation((filepath: string) => {
       if (filepath.includes(oldFile)) {
         return Promise.resolve({
           mtimeMs: Date.now() - 25 * 60 * 60 * 1000, // 25 hours old

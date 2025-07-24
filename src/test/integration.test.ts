@@ -10,6 +10,7 @@ import {
   AIProviderFactory,
   type AIProvider,
 } from "../lib/index.js";
+import type { UnknownRecord } from "../../lib/types/common.js";
 
 // Integration test configuration
 const INTEGRATION_TIMEOUT = 30000; // 30 seconds for real API calls
@@ -65,12 +66,12 @@ describe("NeuroLink Integration Tests", () => {
     it.skipIf(!INTEGRATION_ENABLED)(
       "should generate text with all available providers",
       async () => {
-        const results: Record<string, any> = {};
+        const results: Record<string, UnknownRecord> = {};
 
         for (const [name, provider] of Object.entries(providers)) {
           const startTime = Date.now();
           try {
-            const result = await (provider as any).generate({
+            const result = await (provider as unknown).generate({
               input: { text: TEST_PROMPTS.simple },
               maxTokens: 100,
               temperature: 0.7,
@@ -123,7 +124,7 @@ describe("NeuroLink Integration Tests", () => {
         const startTime = Date.now();
 
         try {
-          const result = await (provider as any).stream({
+          const result = await (provider as unknown).stream({
             input: { text: TEST_PROMPTS.creative },
             maxTokens: 200,
             temperature: 0.8,
@@ -167,7 +168,7 @@ describe("NeuroLink Integration Tests", () => {
         for (let i = 0; i < concurrentRequests; i++) {
           const provider = createBestAIProvider();
           promises.push(
-            (provider as any).generate({
+            (provider as unknown).generate({
               input: { text: `${TEST_PROMPTS.technical} (Request ${i + 1})` },
               maxTokens: 150,
               temperature: 0.5,
@@ -224,7 +225,7 @@ describe("NeuroLink Integration Tests", () => {
         for (const testCase of testCases) {
           const startTime = Date.now();
           try {
-            const result = await (provider as any).generate({
+            const result = await (provider as unknown).generate({
               input: { text: testCase.prompt },
               maxTokens: 300,
               temperature: 0.7,
@@ -260,7 +261,7 @@ describe("NeuroLink Integration Tests", () => {
 
         for (let i = 0; i < rapidRequests; i++) {
           try {
-            const result = await (provider as any).generate({
+            const result = await (provider as unknown).generate({
               input: { text: `Quick test ${i + 1}` },
               maxTokens: 50,
               temperature: 0.3,
@@ -305,7 +306,7 @@ describe("NeuroLink Integration Tests", () => {
 
         while (retryCount < maxRetries) {
           try {
-            const result = await (provider as any).generate({
+            const result = await (provider as unknown).generate({
               input: { text: "Network resilience test" },
               maxTokens: 100,
               temperature: 0.5,
@@ -344,7 +345,7 @@ describe("NeuroLink Integration Tests", () => {
       async () => {
         const benchmarkPrompt =
           "Explain artificial intelligence in 2-3 sentences";
-        const benchmarks: Record<string, any> = {};
+        const benchmarks: Record<string, UnknownRecord> = {};
 
         for (const [name, provider] of Object.entries(providers)) {
           const runs = 3;
@@ -354,7 +355,7 @@ describe("NeuroLink Integration Tests", () => {
           for (let i = 0; i < runs; i++) {
             try {
               const startTime = Date.now();
-              const result = await (provider as any).generate({
+              const result = await (provider as unknown).generate({
                 input: { text: benchmarkPrompt },
                 maxTokens: 100,
                 temperature: 0.7,

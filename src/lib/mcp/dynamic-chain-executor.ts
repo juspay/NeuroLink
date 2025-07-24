@@ -6,7 +6,63 @@
 import type { MCPOrchestrator } from "./orchestrator.js";
 import type { MCPRegistry } from "./registry.js";
 import type { NeuroLinkExecutionContext } from "./factory.js";
+import type { JsonValue, UnknownRecord, JsonObject } from "../types/common.js";
 import { ErrorManager, ErrorCategory, ErrorSeverity } from "./error-manager.js";
+
+/**
+ * Tool input schema structure
+ */
+export interface ToolInputSchema {
+  type?: string;
+  properties?: Record<string, unknown>;
+  required?: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Tool execution parameters
+ */
+export interface ToolExecutionParameters extends Record<string, JsonValue> {}
+
+/**
+ * Context evolution entry tracking data changes
+ */
+export interface ContextEvolutionEntry {
+  step: string;
+  timestamp: number;
+  dataKeys: string[];
+  [key: string]: JsonValue;
+}
+
+/**
+ * AI model planning response structure
+ */
+export interface AIPlanningResponse {
+  toolName: string | null;
+  parameters?: ToolExecutionParameters;
+  reasoning?: string;
+  confidence?: number;
+  expectedOutcome?: string;
+}
+
+/**
+ * AI model evaluation response structure
+ */
+export interface AIEvaluationResponse {
+  goalAchieved: boolean;
+  confidence: number;
+  nextAction: "continue" | "retry" | "abort" | "complete";
+  reasoning: string;
+}
+
+/**
+ * Available tool descriptor
+ */
+export interface AvailableToolDescriptor {
+  name: string;
+  description: string;
+  inputSchema: ToolInputSchema;
+}
 
 /**
  * Tool execution result with metadata
@@ -14,11 +70,11 @@ import { ErrorManager, ErrorCategory, ErrorSeverity } from "./error-manager.js";
 export interface ToolExecutionResult {
   toolName: string;
   success: boolean;
-  result?: any;
+  result?: JsonValue;
   error?: Error;
   timestamp: number;
   executionTime: number;
-  context?: Record<string, any>;
+  context?: UnknownRecord;
 }
 
 /**
@@ -27,7 +83,7 @@ export interface ToolExecutionResult {
 export interface ChainStep {
   stepId: string;
   toolName: string;
-  parameters: any;
+  parameters: ToolExecutionParameters;
   reasoning: string;
   confidence: number; // 0-1 scale
   expectedOutcome: string;
@@ -41,7 +97,7 @@ export interface ChainExecutionContext {
   currentStep: number;
   totalSteps?: number;
   executionHistory: ToolExecutionResult[];
-  accumulatedContext: Record<string, any>;
+  accumulatedContext: UnknownRecord;
   userContext?: NeuroLinkExecutionContext;
   maxSteps: number;
   aiModel?: string;
@@ -56,13 +112,13 @@ export interface ChainExecutionResult {
   totalSteps: number;
   executionTime: number;
   results: ToolExecutionResult[];
-  finalResult?: any;
+  finalResult?: JsonValue;
   reasoning: string;
   error?: Error;
   metadata: {
     toolsUsed: string[];
     averageConfidence: number;
-    contextEvolution: Record<string, any>[];
+    contextEvolution: ContextEvolutionEntry[];
   };
 }
 
@@ -73,25 +129,16 @@ export interface AIChainPlanner {
   name: string;
   planNextStep(
     goal: string,
-    availableTools: Array<{
-      name: string;
-      description: string;
-      inputSchema: any;
-    }>,
+    availableTools: AvailableToolDescriptor[],
     executionHistory: ToolExecutionResult[],
-    accumulatedContext: Record<string, any>,
+    accumulatedContext: UnknownRecord,
   ): Promise<ChainStep | null>;
 
   evaluateResult(
     step: ChainStep,
     result: ToolExecutionResult,
     goal: string,
-  ): Promise<{
-    goalAchieved: boolean;
-    confidence: number;
-    nextAction: "continue" | "retry" | "abort" | "complete";
-    reasoning: string;
-  }>;
+  ): Promise<AIEvaluationResponse>;
 }
 
 /**
@@ -102,13 +149,9 @@ export class HeuristicChainPlanner implements AIChainPlanner {
 
   async planNextStep(
     goal: string,
-    availableTools: Array<{
-      name: string;
-      description: string;
-      inputSchema: any;
-    }>,
+    availableTools: AvailableToolDescriptor[],
     executionHistory: ToolExecutionResult[],
-    accumulatedContext: Record<string, any>,
+    accumulatedContext: UnknownRecord,
   ): Promise<ChainStep | null> {
     // Simple heuristic-based planning
     const usedTools = new Set(executionHistory.map((h) => h.toolName));
@@ -171,12 +214,7 @@ export class HeuristicChainPlanner implements AIChainPlanner {
     step: ChainStep,
     result: ToolExecutionResult,
     goal: string,
-  ): Promise<{
-    goalAchieved: boolean;
-    confidence: number;
-    nextAction: "continue" | "retry" | "abort" | "complete";
-    reasoning: string;
-  }> {
+  ): Promise<AIEvaluationResponse> {
     if (!result.success) {
       return {
         goalAchieved: false,
@@ -208,18 +246,18 @@ export class HeuristicChainPlanner implements AIChainPlanner {
   }
 
   private generateParameters(
-    tool: { name: string; description: string; inputSchema: any },
-    context: Record<string, any>,
+    tool: AvailableToolDescriptor,
+    context: UnknownRecord,
     history: ToolExecutionResult[],
-  ): any {
-    const params: any = {};
+  ): ToolExecutionParameters {
+    const params: ToolExecutionParameters = {};
 
     // Extract useful data from previous results
     const lastResult = history[history.length - 1];
     if (lastResult?.result) {
       // Pass relevant data from previous step
-      if (typeof lastResult.result === "object") {
-        Object.assign(params, lastResult.result);
+      if (typeof lastResult.result === "object" && lastResult.result !== null) {
+        Object.assign(params, lastResult.result as JsonObject);
       } else if (typeof lastResult.result === "string") {
         params.input = lastResult.result;
       }
@@ -245,13 +283,9 @@ export class AIModelChainPlanner implements AIChainPlanner {
 
   async planNextStep(
     goal: string,
-    availableTools: Array<{
-      name: string;
-      description: string;
-      inputSchema: any;
-    }>,
+    availableTools: AvailableToolDescriptor[],
     executionHistory: ToolExecutionResult[],
-    accumulatedContext: Record<string, any>,
+    accumulatedContext: UnknownRecord,
   ): Promise<ChainStep | null> {
     const prompt = this.buildPlanningPrompt(
       goal,
@@ -282,12 +316,7 @@ export class AIModelChainPlanner implements AIChainPlanner {
     step: ChainStep,
     result: ToolExecutionResult,
     goal: string,
-  ): Promise<{
-    goalAchieved: boolean;
-    confidence: number;
-    nextAction: "continue" | "retry" | "abort" | "complete";
-    reasoning: string;
-  }> {
+  ): Promise<AIEvaluationResponse> {
     const prompt = this.buildEvaluationPrompt(step, result, goal);
 
     try {
@@ -302,13 +331,9 @@ export class AIModelChainPlanner implements AIChainPlanner {
 
   private buildPlanningPrompt(
     goal: string,
-    availableTools: Array<{
-      name: string;
-      description: string;
-      inputSchema: any;
-    }>,
+    availableTools: AvailableToolDescriptor[],
     executionHistory: ToolExecutionResult[],
-    accumulatedContext: Record<string, any>,
+    accumulatedContext: UnknownRecord,
   ): string {
     return `
 You are an AI tool chain planner. Your job is to select the next tool to execute towards achieving a goal.
@@ -413,12 +438,7 @@ Respond in JSON format:
     }
   }
 
-  private parseEvaluationResponse(response: string): {
-    goalAchieved: boolean;
-    confidence: number;
-    nextAction: "continue" | "retry" | "abort" | "complete";
-    reasoning: string;
-  } {
+  private parseEvaluationResponse(response: string): AIEvaluationResponse {
     try {
       const parsed = JSON.parse(response);
       return {
@@ -470,7 +490,7 @@ export class DynamicChainExecutor {
    */
   async executeChain(
     goal: string,
-    initialContext: Record<string, any> = {},
+    initialContext: UnknownRecord = {},
     userContext?: NeuroLinkExecutionContext,
     options: {
       maxSteps?: number;
@@ -629,7 +649,7 @@ export class DynamicChainExecutor {
       return {
         toolName: step.toolName,
         success: true,
-        result,
+        result: result as unknown as JsonValue,
         timestamp: Date.now(),
         executionTime: Date.now() - startTime,
         context: {
@@ -660,11 +680,11 @@ export class DynamicChainExecutor {
    * @private
    */
   private updateAccumulatedContext(
-    context: Record<string, any>,
-    result: any,
+    context: UnknownRecord,
+    result: JsonValue,
   ): void {
     if (typeof result === "object" && result !== null) {
-      Object.assign(context, result);
+      Object.assign(context, result as JsonObject);
     } else {
       context.lastResult = result;
     }
@@ -698,8 +718,8 @@ export class DynamicChainExecutor {
    */
   private trackContextEvolution(
     history: ToolExecutionResult[],
-  ): Record<string, any>[] {
-    const evolution: Record<string, any>[] = [];
+  ): ContextEvolutionEntry[] {
+    const evolution: ContextEvolutionEntry[] = [];
 
     history.forEach((result) => {
       if (result.success && result.result) {
@@ -707,8 +727,8 @@ export class DynamicChainExecutor {
           step: result.toolName,
           timestamp: result.timestamp,
           dataKeys:
-            typeof result.result === "object"
-              ? Object.keys(result.result)
+            typeof result.result === "object" && result.result !== null
+              ? Object.keys(result.result as JsonObject)
               : ["primitive"],
         });
       }

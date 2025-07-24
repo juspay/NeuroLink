@@ -3,6 +3,7 @@ import { NeuroLink } from "../../../src/lib/neurolink.js";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import dotenv from "dotenv";
+import type { UnknownRecord } from "../../../src/lib/types/common.js";
 
 // Load environment variables
 dotenv.config();
@@ -102,7 +103,7 @@ describe("Provider MCP Tool Support Tests", () => {
             try {
               const result = await sdk.generate({
                 input: { text: "What is 25 + 25?" },
-                provider: provider as any,
+                provider: provider as UnknownRecord,
                 maxTokens: 50,
                 disableTools: false,
               });
@@ -128,7 +129,7 @@ describe("Provider MCP Tool Support Tests", () => {
             try {
               const result = await sdk.generate({
                 input: { text: "What is 30 + 30?" },
-                provider: provider as any,
+                provider: provider as UnknownRecord,
                 maxTokens: 50,
                 disableTools: true,
               });
@@ -214,7 +215,7 @@ describe("Provider MCP Tool Support Tests", () => {
           try {
             const result = await sdk.generate({
               input: { text: `Calculate: ${testExpression}` },
-              provider: provider as any,
+              provider: provider as UnknownRecord,
               maxTokens: 50,
             });
 
@@ -251,7 +252,7 @@ describe("Provider MCP Tool Support Tests", () => {
           // Try to read a non-existent file
           const result = await sdk.generate({
             input: { text: "Read the file at /non/existent/path/file.txt" },
-            provider: provider as any,
+            provider: provider as UnknownRecord,
             maxTokens: 100,
           });
 

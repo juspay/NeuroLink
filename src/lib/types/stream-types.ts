@@ -5,13 +5,14 @@ import type {
   AnalyticsData,
   EvaluationData,
 } from "../core/types.js";
+import type { UnknownRecord, Unknown } from "./common.js";
 
 /**
  * Interface for tool execution calls
  */
 export interface ToolCall {
   toolName: string; // Name of the tool being called
-  parameters: Record<string, any>; // Parameters passed to the tool
+  parameters: UnknownRecord; // Parameters passed to the tool
   id?: string; // Optional unique identifier for the call
 }
 
@@ -21,7 +22,7 @@ export interface ToolCall {
 export interface ToolResult {
   toolName: string; // Name of the tool that was executed
   status: "success" | "failure"; // Execution status
-  output?: any; // Output from the tool (can be refined further based on specific tools)
+  output?: Unknown; // Output from the tool (can be refined further based on specific tools)
   error?: string; // Error message if the tool failed
   id?: string; // Optional unique identifier matching the call
   executionTime?: number; // Time taken to execute the tool in milliseconds
@@ -57,7 +58,7 @@ export interface StreamOptions {
   // Analytics and Evaluation
   enableEvaluation?: boolean;
   enableAnalytics?: boolean;
-  context?: Record<string, any>;
+  context?: UnknownRecord;
 
   // Domain-aware evaluation
   evaluationDomain?: string;

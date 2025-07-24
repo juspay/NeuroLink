@@ -15,9 +15,11 @@ import {
   Output,
   type Schema,
   type Tool,
+  type LanguageModelV1,
 } from "ai";
 import type { GenerateResult } from "../types/generate-types.js";
 import type { ZodType, ZodTypeDef } from "zod";
+import type { UnknownRecord } from "../types/common.js";
 import {
   getAvailableFunctionTools,
   executeFunctionCall,
@@ -73,7 +75,7 @@ export class FunctionCallingProvider implements AIProvider {
    */
   async stream(
     optionsOrPrompt: StreamOptions | string,
-    analysisSchema?: any,
+    analysisSchema?: Schema,
   ): Promise<StreamResult> {
     const functionTag = "FunctionCallingProvider.stream";
     const startTime = Date.now();
@@ -487,24 +489,26 @@ export class FunctionCallingProvider implements AIProvider {
    * Get the model from the base provider
    * This is a temporary solution - ideally we'd have a getModel() method on AIProvider
    */
-  private async getModelFromProvider(): Promise<{ model: any } | null> {
+  private async getModelFromProvider(): Promise<{
+    model: LanguageModelV1;
+  } | null> {
     const functionTag = "FunctionCallingProvider.getModelFromProvider";
 
     try {
       // Try to access the model property if it exists
-      const provider = this.baseProvider as any;
+      const provider = this.baseProvider as unknown as UnknownRecord;
 
       // Check if provider has a model property
       if (provider.model) {
         mcpLogger.debug(`[${functionTag}] Found model property on provider`);
-        return { model: provider.model };
+        return { model: provider.model as LanguageModelV1 };
       }
 
       // Check if provider has a getModel method
       if (typeof provider.getModel === "function") {
         mcpLogger.debug(`[${functionTag}] Found getModel method on provider`);
         const model = await provider.getModel();
-        return { model };
+        return { model: model as LanguageModelV1 };
       }
 
       mcpLogger.warn(`[${functionTag}] Could not find model on provider`);
@@ -831,7 +835,7 @@ These functions provide accurate, real-time data. Use them actively to enhance y
    */
   async gen(
     optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: any,
+    analysisSchema?: Schema,
   ): Promise<EnhancedGenerateResult | null> {
     return this.generate(optionsOrPrompt, analysisSchema);
   }

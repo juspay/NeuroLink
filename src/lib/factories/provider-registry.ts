@@ -4,6 +4,8 @@ import { ProviderFactory } from "./provider-factory.js";
 // This breaks the circular dependency chain completely
 import { AIProviderName, GoogleAIModels, OpenAIModels } from "../core/types.js";
 import { logger } from "../utils/logger.js";
+import type { UnknownRecord } from "../types/common.js";
+import type { MistralProvider as MistralProviderType } from "@ai-sdk/mistral";
 
 /**
  * Configuration options for the provider registry
@@ -41,7 +43,11 @@ export class ProviderRegistry {
       // Register Google AI Studio Provider (our validated baseline)
       ProviderFactory.registerProvider(
         AIProviderName.GOOGLE_AI,
-        async (modelName?: string, providerName?: string, sdk?: any) => {
+        async (
+          modelName?: string,
+          providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
           const { GoogleAIStudioProvider } = await import(
             "../providers/google-ai-studio.js"
           );
@@ -54,7 +60,11 @@ export class ProviderRegistry {
       // Register OpenAI provider
       ProviderFactory.registerProvider(
         AIProviderName.OPENAI,
-        async (modelName?: string, providerName?: string, sdk?: any) => {
+        async (
+          modelName?: string,
+          providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
           const { OpenAIProvider } = await import("../providers/openAI.js");
           return new OpenAIProvider(modelName);
         },
@@ -65,7 +75,11 @@ export class ProviderRegistry {
       // Register Anthropic provider
       ProviderFactory.registerProvider(
         AIProviderName.ANTHROPIC,
-        async (modelName?: string, providerName?: string, sdk?: any) => {
+        async (
+          modelName?: string,
+          providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
           const { AnthropicProvider } = await import(
             "../providers/anthropic.js"
           );
@@ -130,9 +144,16 @@ export class ProviderRegistry {
       // Register Mistral AI provider
       ProviderFactory.registerProvider(
         AIProviderName.MISTRAL,
-        async (modelName?: string, providerName?: string, sdk?: any) => {
+        async (
+          modelName?: string,
+          providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
           const { MistralProvider } = await import("../providers/mistral.js");
-          return new MistralProvider(modelName, sdk);
+          return new MistralProvider(
+            modelName,
+            sdk as MistralProviderType | undefined,
+          );
         },
         "mistral-large-latest",
         ["mistral"],

@@ -17,6 +17,7 @@ import {
   ErrorCategory,
   ErrorSeverity,
 } from "../lib/mcp/error-manager.js";
+import type { UnknownRecord } from "../lib/types/common.js";
 
 describe.skip("Health Monitoring System", () => {
   let healthMonitor: HealthMonitor;
@@ -308,10 +309,9 @@ describe.skip("Health Monitoring System", () => {
       };
 
       // Access private method for testing
-      const recommendations = (healthMonitor as any).generateRecommendations(
-        summary,
-        mockServers,
-      );
+      const recommendations = (
+        healthMonitor as UnknownRecord
+      ).generateRecommendations(summary, mockServers);
 
       expect(recommendations).toContain(
         expect.stringMatching(/Critical.*below 50%/),

@@ -14,6 +14,7 @@ import {
   type HealthCheckResult,
   type ServerHealth,
 } from "../lib/mcp/health-monitor.js";
+import type { UnknownRecord } from "../lib/types/common.js";
 import { MCPRegistry } from "../lib/mcp/registry.js";
 import { ErrorManager } from "../lib/mcp/error-manager.js";
 
@@ -78,12 +79,12 @@ describe("HealthMonitor", () => {
 
     it("should not start monitoring twice", () => {
       healthMonitor.startMonitoring();
-      const firstCallCount = (mockRegistry.listServers as any).mock.calls
-        .length;
+      const firstCallCount = (mockRegistry.listServers as UnknownRecord).mock
+        .calls.length;
 
       healthMonitor.startMonitoring();
-      const secondCallCount = (mockRegistry.listServers as any).mock.calls
-        .length;
+      const secondCallCount = (mockRegistry.listServers as UnknownRecord).mock
+        .calls.length;
 
       expect(secondCallCount).toBe(firstCallCount);
     });
@@ -105,9 +106,12 @@ describe("HealthMonitor", () => {
       healthMonitor.stopMonitoring();
 
       // Advance time and verify no more checks
-      const callCount = (mockRegistry.listTools as any).mock.calls.length;
+      const callCount = (mockRegistry.listTools as UnknownRecord).mock.calls
+        .length;
       timers.advanceTimersByTime(10000);
-      expect((mockRegistry.listTools as any).mock.calls.length).toBe(callCount);
+      expect((mockRegistry.listTools as UnknownRecord).mock.calls.length).toBe(
+        callCount,
+      );
     });
   });
 

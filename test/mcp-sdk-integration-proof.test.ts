@@ -92,9 +92,11 @@ describe("MCP SDK Integration - Comprehensive Proof", () => {
             const parsedExpression = math.parse(expression);
             const result = parsedExpression.evaluate();
             return { result, enhanced: false, mode };
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
             return {
-              error: `Mathematical evaluation failed: ${error.message || "Invalid expression"}`,
+              error: `Mathematical evaluation failed: ${errorMessage || "Invalid expression"}`,
               enhanced: false,
               mode,
             };

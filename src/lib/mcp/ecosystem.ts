@@ -69,10 +69,10 @@ export class MCPEcosystem {
   /**
    * Create and execute an MCP instance
    */
-  async execute<T = any>(
+  async execute<T = unknown>(
     name: string,
-    config: any,
-    args: any,
+    config: unknown,
+    args: unknown,
     context?: {
       sessionId?: string;
       userId?: string;
@@ -94,7 +94,7 @@ export class MCPEcosystem {
         context?.sessionId || `mcp-${Date.now()}`,
         context?.userId || "mcp-user",
         metadata.permissions,
-        config?.basePath,
+        (config as { basePath?: string })?.basePath,
       );
 
       // Create MCP instance
@@ -109,7 +109,7 @@ export class MCPEcosystem {
         resultType: typeof result,
       });
 
-      return result;
+      return result as T;
     } catch (error) {
       mcpLogger.error(`[${functionTag}] ${name} execution failed:`, error);
       throw error;
@@ -124,7 +124,7 @@ export class MCPEcosystem {
     path: string;
     content?: string;
     basePath?: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     return this.execute(
       "@neurolink-mcp/filesystem",
       { basePath: operation.basePath || process.cwd() },
@@ -158,7 +158,10 @@ export class MCPEcosystem {
   /**
    * Create an MCP instance for direct use
    */
-  async createInstance<T extends MCP>(name: string, config: any): Promise<T> {
+  async createInstance<T extends MCP>(
+    name: string,
+    config: unknown,
+  ): Promise<T> {
     await this.ensureInitialized();
 
     const metadata = await this.getMetadata(name);
@@ -198,10 +201,10 @@ export class MCPEcosystem {
   /**
    * Get all tools formatted for AI providers
    */
-  async getToolsForAI(): Promise<any> {
+  async getToolsForAI(): Promise<Record<string, unknown>> {
     await this.ensureInitialized();
     const plugins = await this.list();
-    const tools: any = {};
+    const tools: Record<string, unknown> = {};
 
     for (const plugin of plugins) {
       // This is a simplified representation. A real implementation

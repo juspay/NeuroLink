@@ -5,6 +5,7 @@ import { promisify } from "util";
 import { writeFileSync, unlinkSync, mkdirSync, rmdirSync } from "fs";
 import { join } from "path";
 import dotenv from "dotenv";
+import type { UnknownRecord } from "../../../src/lib/types/common.js";
 /**
  * Minimal execCLI implementation for test usage.
  * Runs the CLI command with arguments and returns { stdout, stderr }.
@@ -111,7 +112,7 @@ describe("Direct Tools Integration Tests", () => {
         try {
           const result = await sdk.generate({
             input: { text: "What is the current time?" },
-            provider: getTestProvider() as any,
+            provider: getTestProvider() as UnknownRecord,
             maxTokens: 100,
           });
 
@@ -243,7 +244,7 @@ describe("Direct Tools Integration Tests", () => {
         try {
           const streamResult = await sdk.stream({
             input: { text: "Tell me the current time and calculate 50 + 50" },
-            provider: getTestProvider() as any,
+            provider: getTestProvider() as UnknownRecord,
             maxTokens: 200,
           });
 
@@ -442,7 +443,7 @@ describe("Direct Tools Integration Tests", () => {
         try {
           const result = await sdk.generate({
             input: { text: `List the contents of ${testDir}` },
-            provider: getTestProvider() as any,
+            provider: getTestProvider() as UnknownRecord,
             maxTokens: 200,
           });
 
@@ -498,7 +499,7 @@ describe("Direct Tools Integration Tests", () => {
         try {
           const result = await sdk.generate({
             input: { text: `Search for .txt files in ${testDir}` },
-            provider: getTestProvider() as any,
+            provider: getTestProvider() as UnknownRecord,
             maxTokens: 200,
           });
 

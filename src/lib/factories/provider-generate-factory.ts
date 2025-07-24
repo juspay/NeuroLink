@@ -3,7 +3,11 @@ import type {
   GenerateResult,
   EnhancedProvider,
 } from "../types/generate-types.js";
-import type { AIProvider, TextGenerationOptions } from "../core/types.js";
+import type {
+  AIProvider,
+  TextGenerationOptions,
+  EnhancedGenerateResult,
+} from "../core/types.js";
 import { CompatibilityConversionFactory } from "./compatibility-factory.js";
 
 /**
@@ -50,41 +54,54 @@ export class ProviderGenerateFactory {
 
       try {
         // Use existing generate method for identical performance
-        const textResult = await provider.generate(textOptions);
+        const textResult: EnhancedGenerateResult | null =
+          await provider.generate(textOptions);
+
+        if (!textResult) {
+          throw new Error("Generate method returned null result");
+        }
 
         // Convert back to GenerateResult format with type safety
         const generateResult: GenerateResult = {
-          content: (textResult as any)?.content || "",
-          outputs: { text: (textResult as any)?.content || "" },
-          provider: (textResult as any)?.provider,
-          model: (textResult as any)?.model,
-          usage: (textResult as any)?.usage
+          content: textResult.content || "",
+          outputs: { text: textResult.content || "" },
+          provider: textResult.provider,
+          model: textResult.model,
+          usage: textResult.usage
             ? {
-                inputTokens: (textResult as any).usage?.promptTokens || 0,
-                outputTokens: (textResult as any).usage?.completionTokens || 0,
-                totalTokens: (textResult as any).usage?.totalTokens || 0,
+                inputTokens: textResult.usage.inputTokens || 0,
+                outputTokens: textResult.usage.outputTokens || 0,
+                totalTokens: textResult.usage.totalTokens || 0,
               }
             : undefined,
-          responseTime: (textResult as any)?.responseTime,
-          toolsUsed: (textResult as any)?.toolsUsed,
-          toolExecutions: (textResult as any)?.toolExecutions?.map(
-            (te: any) => ({
-              name: te.toolName || te.name || "",
-              input: te.input || {},
-              output: te.output || te.result,
-              duration: te.executionTime || te.duration || 0,
-            }),
-          ),
-          enhancedWithTools: (textResult as any)?.enhancedWithTools,
-          availableTools: (textResult as any)?.availableTools?.map(
-            (at: any) => ({
-              name: at.name || "",
-              description: at.description || "",
-              parameters: at.parameters || {},
-            }),
-          ),
-          analytics: (textResult as any)?.analytics,
-          evaluation: (textResult as any)?.evaluation,
+          responseTime: textResult.responseTime,
+          toolsUsed: textResult.toolsUsed,
+          toolExecutions: textResult.toolExecutions?.map((te) => {
+            const toolExecution = te as unknown as {
+              toolName?: string;
+              name?: string;
+              input?: Record<string, unknown>;
+              output?: unknown;
+              result?: unknown;
+              executionTime?: number;
+              duration?: number;
+            };
+            return {
+              name: toolExecution.toolName || toolExecution.name || "",
+              input: toolExecution.input || {},
+              output: toolExecution.output || toolExecution.result,
+              duration:
+                toolExecution.executionTime || toolExecution.duration || 0,
+            };
+          }),
+          enhancedWithTools: textResult.enhancedWithTools,
+          availableTools: textResult.availableTools?.map((at) => ({
+            name: at.name || "",
+            description: at.description || "",
+            parameters: at.parameters || {},
+          })),
+          analytics: textResult.analytics,
+          evaluation: textResult.evaluation,
         };
 
         return generateResult;

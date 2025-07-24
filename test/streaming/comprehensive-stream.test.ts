@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NeuroLink } from "../../src/lib/neurolink.js";
+import type { UnknownRecord } from "../../src/lib/types/common.js";
 import {
   createTool,
   createTypedTool,
@@ -265,7 +266,7 @@ describe("Comprehensive Streaming Tests", () => {
       try {
         const result = await sdk.stream({
           input: { text: "Hello" },
-          provider: "invalid-provider" as any,
+          provider: "invalid-provider" as UnknownRecord,
           disableTools: true,
         });
 

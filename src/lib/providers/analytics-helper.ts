@@ -4,18 +4,21 @@
  * Integrates with Universal Evaluation System
  */
 
-export interface AnalyticsData {
-  provider: string;
-  model: string;
-  tokens: {
-    input: number;
-    output: number;
-    total: number;
-  };
-  cost?: number;
-  responseTime: number;
-  timestamp: string;
-  context?: Record<string, any>;
+import type { UnknownRecord, JsonValue } from "../types/common.js";
+import type { AnalyticsData as CoreAnalyticsData } from "../core/types.js";
+
+// Type guard for checking if an unknown value is a number
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && !isNaN(value);
+}
+
+// Type guard for checking if an unknown value is an object
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Extended analytics data with additional provider helper features
+export interface AnalyticsData extends CoreAnalyticsData {
   // Enhanced evaluation integration
   evaluation?: {
     relevanceScore: number;
@@ -27,13 +30,7 @@ export interface AnalyticsData {
     evaluationAttempt?: number;
   };
   // Enhanced cost tracking
-  costDetails?: {
-    inputCost: number;
-    outputCost: number;
-    evaluationCost?: number;
-    totalCost: number;
-    currency: string;
-  };
+  costDetails?: UnknownRecord;
 }
 
 /**
@@ -42,27 +39,39 @@ export interface AnalyticsData {
 export function createAnalytics(
   provider: string,
   model: string,
-  result: any,
+  result: unknown,
   responseTime: number,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
 ): AnalyticsData {
   // Handle different token usage formats across providers
-  const tokenUsage = result.usage || {};
+  const tokenUsage = ((result as UnknownRecord)?.usage as UnknownRecord) || {};
 
   // Standardize token field names across providers
   const inputTokens =
-    tokenUsage.promptTokens ||
-    tokenUsage.input_tokens ||
-    tokenUsage.inputTokens ||
+    (typeof tokenUsage.promptTokens === "number"
+      ? tokenUsage.promptTokens
+      : 0) ||
+    (typeof tokenUsage.input_tokens === "number"
+      ? tokenUsage.input_tokens
+      : 0) ||
+    (typeof tokenUsage.inputTokens === "number" ? tokenUsage.inputTokens : 0) ||
     0;
   const outputTokens =
-    tokenUsage.completionTokens ||
-    tokenUsage.output_tokens ||
-    tokenUsage.outputTokens ||
+    (typeof tokenUsage.completionTokens === "number"
+      ? tokenUsage.completionTokens
+      : 0) ||
+    (typeof tokenUsage.output_tokens === "number"
+      ? tokenUsage.output_tokens
+      : 0) ||
+    (typeof tokenUsage.outputTokens === "number"
+      ? tokenUsage.outputTokens
+      : 0) ||
     0;
   const totalTokens =
-    tokenUsage.totalTokens ||
-    tokenUsage.total_tokens ||
+    (typeof tokenUsage.totalTokens === "number" ? tokenUsage.totalTokens : 0) ||
+    (typeof tokenUsage.total_tokens === "number"
+      ? tokenUsage.total_tokens
+      : 0) ||
     inputTokens + outputTokens ||
     0;
 
@@ -80,7 +89,7 @@ export function createAnalytics(
     cost: estimatedCost,
     responseTime,
     timestamp: new Date().toISOString(),
-    context,
+    context: context as Record<string, JsonValue> | undefined,
   };
 }
 
@@ -90,27 +99,39 @@ export function createAnalytics(
 export async function createEnhancedAnalytics(
   provider: string,
   model: string,
-  result: any,
+  result: unknown,
   responseTime: number,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
 ): Promise<AnalyticsData> {
   // Handle different token usage formats across providers
-  const tokenUsage = result.usage || {};
+  const tokenUsage = ((result as UnknownRecord)?.usage as UnknownRecord) || {};
 
   // Standardize token field names across providers
   const inputTokens =
-    tokenUsage.promptTokens ||
-    tokenUsage.input_tokens ||
-    tokenUsage.inputTokens ||
+    (typeof tokenUsage.promptTokens === "number"
+      ? tokenUsage.promptTokens
+      : 0) ||
+    (typeof tokenUsage.input_tokens === "number"
+      ? tokenUsage.input_tokens
+      : 0) ||
+    (typeof tokenUsage.inputTokens === "number" ? tokenUsage.inputTokens : 0) ||
     0;
   const outputTokens =
-    tokenUsage.completionTokens ||
-    tokenUsage.output_tokens ||
-    tokenUsage.outputTokens ||
+    (typeof tokenUsage.completionTokens === "number"
+      ? tokenUsage.completionTokens
+      : 0) ||
+    (typeof tokenUsage.output_tokens === "number"
+      ? tokenUsage.output_tokens
+      : 0) ||
+    (typeof tokenUsage.outputTokens === "number"
+      ? tokenUsage.outputTokens
+      : 0) ||
     0;
   const totalTokens =
-    tokenUsage.totalTokens ||
-    tokenUsage.total_tokens ||
+    (typeof tokenUsage.totalTokens === "number" ? tokenUsage.totalTokens : 0) ||
+    (typeof tokenUsage.total_tokens === "number"
+      ? tokenUsage.total_tokens
+      : 0) ||
     inputTokens + outputTokens ||
     0;
 
@@ -132,7 +153,7 @@ export async function createEnhancedAnalytics(
     cost: estimatedCost,
     responseTime,
     timestamp: new Date().toISOString(),
-    context,
+    context: context as Record<string, JsonValue> | undefined,
     costDetails,
   };
 }
@@ -144,7 +165,7 @@ export async function calculateEnhancedCost(
   provider: string,
   inputTokens: number,
   outputTokens: number,
-): Promise<{ costDetails: any; estimatedCost: number }> {
+): Promise<{ costDetails: UnknownRecord; estimatedCost: number }> {
   try {
     // Import provider configuration dynamically
     const { getProviderConfig } = await import(
@@ -200,33 +221,79 @@ export async function calculateEnhancedCost(
  */
 export function enhanceAnalyticsWithEvaluation(
   analytics: AnalyticsData,
-  evaluationResult: any,
+  evaluationResult: UnknownRecord,
 ): AnalyticsData {
+  // Helper function to safely extract number values with fallback
+  const getNumberValue = (obj: UnknownRecord, ...keys: string[]): number => {
+    for (const key of keys) {
+      const value = obj[key];
+      if (isNumber(value)) {
+        return value;
+      }
+    }
+    return 1; // Default minimum score
+  };
+
+  // Helper function to safely extract evaluation config cost
+  const getEvaluationCost = (obj: UnknownRecord): number => {
+    const evaluationConfig = obj.evaluationConfig;
+    if (isRecord(evaluationConfig)) {
+      const costEstimate = evaluationConfig.costEstimate;
+      return isNumber(costEstimate) ? costEstimate : 0;
+    }
+    return 0;
+  };
+
+  // Helper function to safely get existing total cost
+  const getExistingTotalCost = (
+    costDetails: UnknownRecord | undefined,
+  ): number => {
+    if (!costDetails) {
+      return 0;
+    }
+    const totalCost = costDetails.totalCost;
+    return isNumber(totalCost) ? totalCost : 0;
+  };
+
+  const evaluationCost = getEvaluationCost(evaluationResult);
+
   return {
     ...analytics,
     evaluation: {
-      // FIX: Use correct field names and ensure minimum score of 1
-      relevanceScore:
-        evaluationResult.relevance || evaluationResult.relevanceScore || 1,
-      accuracyScore:
-        evaluationResult.accuracy || evaluationResult.accuracyScore || 1,
-      completenessScore:
-        evaluationResult.completeness ||
-        evaluationResult.completenessScore ||
-        1,
-      overall: evaluationResult.overall || 1,
-      evaluationProvider: evaluationResult.evaluationProvider,
-      evaluationTime: evaluationResult.evaluationTime,
-      evaluationAttempt: evaluationResult.evaluationAttempt,
+      relevanceScore: getNumberValue(
+        evaluationResult,
+        "relevance",
+        "relevanceScore",
+      ),
+      accuracyScore: getNumberValue(
+        evaluationResult,
+        "accuracy",
+        "accuracyScore",
+      ),
+      completenessScore: getNumberValue(
+        evaluationResult,
+        "completeness",
+        "completenessScore",
+      ),
+      overall: getNumberValue(evaluationResult, "overall"),
+      evaluationProvider:
+        typeof evaluationResult.evaluationProvider === "string"
+          ? evaluationResult.evaluationProvider
+          : undefined,
+      evaluationTime: isNumber(evaluationResult.evaluationTime)
+        ? evaluationResult.evaluationTime
+        : undefined,
+      evaluationAttempt: isNumber(evaluationResult.evaluationAttempt)
+        ? evaluationResult.evaluationAttempt
+        : undefined,
     },
     // Add evaluation cost if available
     costDetails: analytics.costDetails
       ? {
           ...analytics.costDetails,
-          evaluationCost: evaluationResult.evaluationConfig?.costEstimate || 0,
+          evaluationCost,
           totalCost:
-            (analytics.costDetails.totalCost || 0) +
-            (evaluationResult.evaluationConfig?.costEstimate || 0),
+            getExistingTotalCost(analytics.costDetails) + evaluationCost,
         }
       : undefined,
   };

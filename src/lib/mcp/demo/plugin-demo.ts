@@ -2,6 +2,7 @@
  * Plugin Demo - Example MCP Plugin Usage
  */
 
+import type { UnknownRecord } from "../../types/common.js";
 import { mcpEcosystem } from "../ecosystem.js";
 import { FileSystemMCP } from "../plugins/core/filesystem-mcp.js";
 import type { ExecutionContext } from "../contracts/mcp-contract.js";
@@ -54,8 +55,11 @@ export class PluginDemo {
       const fsPlugin = new FileSystemMCP();
       await fsPlugin.initialize({ basePath: process.cwd() });
 
+      // Cast FileSystemMCP to UnknownRecord for executePlugin compatibility
+      const pluginAsRecord = fsPlugin as unknown as UnknownRecord;
+
       const result = await executePlugin(
-        fsPlugin,
+        pluginAsRecord,
         createMockContext(),
         "listFiles",
         ".",
@@ -112,7 +116,7 @@ function createMockContext(): ExecutionContext {
           isFile: () => true,
         };
       },
-      async mkdir(path: string, options?: any) {
+      async mkdir(path: string, options?: UnknownRecord) {
         mcpLogger.info(`Mock mkdir: ${path}`);
       },
       async exists(path: string) {

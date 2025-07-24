@@ -6,6 +6,7 @@
  */
 
 import type { Argv } from "yargs";
+import type { JsonValue, UnknownRecord } from "../../lib/types/common.js";
 import ora from "ora";
 import chalk from "chalk";
 import fs from "fs";
@@ -30,6 +31,25 @@ interface MCPServerConfig {
   cwd?: string;
   transport: "stdio" | "sse";
   url?: string; // for SSE transport
+}
+
+interface MCPCapabilities {
+  tools?: JsonValue[];
+  resources?: JsonValue[];
+  prompts?: JsonValue[];
+  logging?: JsonValue;
+  [key: string]: JsonValue | undefined;
+}
+
+interface MCPServer {
+  id?: string;
+  name: string;
+  description?: string;
+  command?: string;
+  args?: string[];
+  transport?: string;
+  capabilities?: JsonValue;
+  [key: string]: JsonValue | undefined;
 }
 
 interface MCPConfigFile {
@@ -124,7 +144,7 @@ async function checkMCPServerStatus(
 // Connect to MCP server and get capabilities
 async function getMCPServerCapabilities(
   serverConfig: MCPServerConfig,
-): Promise<any> {
+): Promise<MCPCapabilities> {
   if (serverConfig.transport === "stdio") {
     // Use timeout manager for proper cleanup and longer timeout
     const result = await defaultTimeoutManager.wrapMCPOperation(
@@ -135,7 +155,7 @@ async function getMCPServerCapabilities(
           cwd: serverConfig.cwd,
         });
 
-        return new Promise<any>((resolve, reject) => {
+        return new Promise<JsonValue>((resolve, reject) => {
           let responseData = "";
 
           child.stdout?.on("data", (data) => {
@@ -188,7 +208,7 @@ async function getMCPServerCapabilities(
     );
 
     if (result.success) {
-      return result.data;
+      return result.data as MCPCapabilities;
     } else {
       throw result.error || new Error("Failed to get MCP server capabilities");
     }
@@ -200,7 +220,7 @@ async function getMCPServerCapabilities(
 // List available tools from MCP server
 async function listMCPServerTools(
   serverConfig: MCPServerConfig,
-): Promise<any[]> {
+): Promise<JsonValue[]> {
   if (serverConfig.transport === "stdio") {
     // Use timeout manager for proper cleanup and longer timeout
     const result = await defaultTimeoutManager.wrapMCPOperation(
@@ -211,7 +231,7 @@ async function listMCPServerTools(
           cwd: serverConfig.cwd,
         });
 
-        return new Promise<any[]>((resolve, reject) => {
+        return new Promise<JsonValue[]>((resolve, reject) => {
           let responseData = "";
           // let initialized = false; // Commented out as unused
 
@@ -288,8 +308,8 @@ async function listMCPServerTools(
 export async function executeMCPTool(
   serverConfig: MCPServerConfig,
   toolName: string,
-  toolParams: any,
-): Promise<any> {
+  toolParams: JsonValue,
+): Promise<JsonValue> {
   if (serverConfig.transport === "stdio") {
     // Use timeout manager for proper cleanup and configurable timeout
     const result = await defaultTimeoutManager.wrapMCPOperation(
@@ -300,7 +320,7 @@ export async function executeMCPTool(
           cwd: serverConfig.cwd,
         });
 
-        return new Promise<any>((resolve, reject) => {
+        return new Promise<JsonValue>((resolve, reject) => {
           let responseData = "";
           // let initialized = false; // Commented out as unused
 
@@ -392,7 +412,7 @@ export async function executeMCPTool(
     );
 
     if (result.success) {
-      return result.data;
+      return result.data || null;
     } else {
       throw result.error || new Error("Failed to execute MCP tool");
     }
@@ -404,18 +424,23 @@ export async function executeMCPTool(
 /**
  * Display discovery results in table format
  */
-function _displayTable(discoveryResult: any) {
+function _displayTable(discoveryResult: {
+  discovered: UnknownRecord[];
+  stats: UnknownRecord;
+  sources: UnknownRecord[];
+}) {
   console.log(
     chalk.green(`\n📋 Found ${discoveryResult.discovered.length} MCP servers:`),
   );
   console.log(chalk.gray("─".repeat(80)));
 
-  discoveryResult.discovered.forEach((server: any, index: number) => {
-    const sourceIcon = getSourceIcon(server.source.tool);
+  discoveryResult.discovered.forEach((server: UnknownRecord, index: number) => {
+    const source = server.source as UnknownRecord;
+    const sourceIcon = getSourceIcon(source?.tool as string);
     const typeColor =
-      server.source.type === "global"
+      source?.type === "global"
         ? chalk.blue
-        : server.source.type === "workspace"
+        : source?.type === "workspace"
           ? chalk.green
           : chalk.gray;
 
@@ -424,10 +449,10 @@ function _displayTable(discoveryResult: any) {
     );
     console.log(`   ${chalk.gray("Title:")} ${server.title}`);
     console.log(
-      `   ${chalk.gray("Source:")} ${server.source.tool} ${typeColor(`(${server.source.type})`)}`,
+      `   ${chalk.gray("Source:")} ${source?.tool} ${typeColor(`(${source?.type})`)}`,
     );
     console.log(
-      `   ${chalk.gray("Command:")} ${server.command} ${server.args?.join(" ") || ""}`,
+      `   ${chalk.gray("Command:")} ${server.command} ${(server.args as string[])?.join(" ") || ""}`,
     );
     console.log(`   ${chalk.gray("Config:")} ${server.configPath}`);
 
@@ -459,8 +484,9 @@ function _displayTable(discoveryResult: any) {
   if (discoveryResult.sources.length > 0) {
     console.log(chalk.blue("\n🎯 Search Sources:"));
     const sourcesByTool = discoveryResult.sources.reduce(
-      (acc: any, source: any) => {
-        acc[source.tool] = (acc[source.tool] || 0) + 1;
+      (acc: UnknownRecord, source: UnknownRecord) => {
+        const tool = String(source.tool || "unknown");
+        acc[tool] = (Number(acc[tool]) || 0) + 1;
         return acc;
       },
       {},
@@ -476,7 +502,10 @@ function _displayTable(discoveryResult: any) {
 /**
  * Display discovery results in summary format
  */
-function _displaySummary(discoveryResult: any) {
+function _displaySummary(discoveryResult: {
+  discovered: UnknownRecord[];
+  stats: UnknownRecord;
+}) {
   console.log(chalk.green(`\n📊 Discovery Summary`));
   console.log(chalk.gray("==================="));
 
@@ -495,9 +524,9 @@ function _displaySummary(discoveryResult: any) {
 
   // Group by source tool
   const serversByTool = discoveryResult.discovered.reduce(
-    (acc: any, server: any) => {
-      const tool = server.source.tool;
-      acc[tool] = (acc[tool] || 0) + 1;
+    (acc: UnknownRecord, server: UnknownRecord) => {
+      const tool = String((server.source as UnknownRecord)?.tool || "unknown");
+      acc[tool] = (Number(acc[tool]) || 0) + 1;
       return acc;
     },
     {},
@@ -513,9 +542,9 @@ function _displaySummary(discoveryResult: any) {
 
   // Group by type
   const serversByType = discoveryResult.discovered.reduce(
-    (acc: any, server: any) => {
-      const type = server.source.type;
-      acc[type] = (acc[type] || 0) + 1;
+    (acc: UnknownRecord, server: UnknownRecord) => {
+      const type = String((server.source as UnknownRecord)?.type || "unknown");
+      acc[type] = (Number(acc[type]) || 0) + 1;
       return acc;
     },
     {},
@@ -584,8 +613,8 @@ function _getStatusIcon(status: string): string {
 export async function mcpExecuteTool(
   serverName: string,
   toolName: string,
-  toolParams: any,
-): Promise<any> {
+  toolParams: JsonValue,
+): Promise<JsonValue> {
   // First try unified registry (includes built-in NeuroLink servers)
   try {
     await unifiedRegistry.initialize();
@@ -608,7 +637,7 @@ export async function mcpExecuteTool(
     );
 
     if (result.success) {
-      return result.data;
+      return result.data as JsonValue;
     }
   } catch (error) {
     mcpLogger.debug(
@@ -639,12 +668,16 @@ export async function mcpExecuteTool(
   });
 
   // Extract the text content from MCP result format
-  if (result.content && Array.isArray(result.content)) {
-    const textContent = result.content.find(
-      (item: any) => item.type === "text",
-    );
+  if (
+    result &&
+    (result as UnknownRecord).content &&
+    Array.isArray((result as UnknownRecord).content)
+  ) {
+    const textContent = (
+      (result as UnknownRecord).content as UnknownRecord[]
+    ).find((item: UnknownRecord) => item.type === "text");
     if (textContent) {
-      return JSON.parse(textContent.text);
+      return JSON.parse(textContent.text as string);
     }
   }
 
@@ -879,10 +912,10 @@ export function addMCPCommands(yargs: Argv): Argv {
               console.log(
                 `   Protocol Version: ${capabilities.protocolVersion || "Unknown"}`,
               );
-              if (capabilities.capabilities.tools) {
+              if (capabilities.tools) {
                 console.log(`   Tools: ✅ Supported`);
               }
-              if (capabilities.capabilities.resources) {
+              if (capabilities.resources) {
                 console.log(`   Resources: ✅ Supported`);
               }
 
@@ -890,9 +923,10 @@ export function addMCPCommands(yargs: Argv): Argv {
               if (tools.length === 0) {
                 console.log("   No tools available");
               } else {
-                tools.forEach((tool: any) => {
+                tools.forEach((tool: JsonValue) => {
+                  const toolObj = tool as UnknownRecord;
                   console.log(
-                    `   • ${tool.name}: ${tool.description || "No description"}`,
+                    `   • ${String(toolObj.name)}: ${String(toolObj.description) || "No description"}`,
                   );
                 });
               }
@@ -1044,18 +1078,21 @@ export function addMCPCommands(yargs: Argv): Argv {
               spinner.succeed(chalk.green("✅ Tool executed successfully!"));
 
               console.log(chalk.blue("\n📋 Result:"));
-              if (result.content) {
+              const resultObj = result as UnknownRecord;
+              if (resultObj.content) {
                 // Handle different content types
-                if (Array.isArray(result.content)) {
-                  result.content.forEach((item: any) => {
-                    if (item.type === "text") {
-                      console.log(item.text);
-                    } else {
-                      console.log(JSON.stringify(item, null, 2));
-                    }
-                  });
+                if (Array.isArray(resultObj.content)) {
+                  (resultObj.content as UnknownRecord[]).forEach(
+                    (item: UnknownRecord) => {
+                      if (item.type === "text") {
+                        console.log(String(item.text));
+                      } else {
+                        console.log(JSON.stringify(item, null, 2));
+                      }
+                    },
+                  );
                 } else {
-                  console.log(JSON.stringify(result.content, null, 2));
+                  console.log(JSON.stringify(resultObj.content, null, 2));
                 }
               } else {
                 console.log(JSON.stringify(result, null, 2));
@@ -1667,12 +1704,12 @@ export function addMCPCommands(yargs: Argv): Argv {
               if (builtInTools.length === 0) {
                 console.log(chalk.red("  ❌ No built-in tools found"));
               } else {
-                builtInTools.forEach((tool: any) => {
+                builtInTools.forEach((tool: UnknownRecord) => {
                   console.log(
-                    `  ✅ ${tool.name} (${tool.serverId || "unknown server"})`,
+                    `  ✅ ${String(tool.name)} (${String(tool.serverId) || "unknown server"})`,
                   );
                   if (argv.verbose && tool.description) {
-                    console.log(`     └─ ${tool.description}`);
+                    console.log(`     └─ ${String(tool.description)}`);
                   }
                 });
               }
@@ -1680,29 +1717,34 @@ export function addMCPCommands(yargs: Argv): Argv {
               // Check external servers
               console.log(chalk.green("\n🌐 External Servers:"));
               const allTools = await registry.listAllTools();
-              const externalTools = allTools.filter((t: any) => t.isExternal);
+              const externalTools = allTools.filter((t: UnknownRecord) =>
+                Boolean(t.isExternal),
+              );
 
               if (externalTools.length === 0) {
                 console.log(chalk.yellow("  ⚠️ No external servers connected"));
               } else {
                 const serverGroups = externalTools.reduce(
-                  (acc: Record<string, any[]>, tool: any) => {
-                    const server = tool.serverId || "unknown";
+                  (
+                    acc: Record<string, UnknownRecord[]>,
+                    tool: UnknownRecord,
+                  ) => {
+                    const server = String(tool.serverId) || "unknown";
                     if (!acc[server]) {
                       acc[server] = [];
                     }
                     acc[server].push(tool);
                     return acc;
                   },
-                  {} as Record<string, any[]>,
+                  {} as Record<string, UnknownRecord[]>,
                 );
 
                 Object.entries(serverGroups).forEach(
-                  ([server, tools]: [string, any[]]) => {
+                  ([server, tools]: [string, UnknownRecord[]]) => {
                     console.log(`  🔧 ${server} (${tools.length} tools)`);
                     if (argv.verbose) {
-                      tools.forEach((tool: any) => {
-                        console.log(`     └─ ${tool.name}`);
+                      tools.forEach((tool: UnknownRecord) => {
+                        console.log(`     └─ ${String(tool.name)}`);
                       });
                     }
                   },
@@ -1719,14 +1761,20 @@ export function addMCPCommands(yargs: Argv): Argv {
                 } else {
                   console.log(`  └─ Tool executed successfully`);
                 }
-              } catch (error: any) {
+              } catch (error: unknown) {
+                const errorMessage =
+                  error instanceof Error ? error.message : String(error);
                 console.log(chalk.red("  ❌ Failed:"));
-                console.log(`  └─ ${error.message}`);
+                console.log(`  └─ ${errorMessage}`);
 
                 if (argv.verbose) {
                   console.log(chalk.gray("\n📋 Debug Details:"));
-                  console.log(`     Error Type: ${error.constructor.name}`);
-                  console.log(`     Stack: ${error.stack}`);
+                  console.log(
+                    `     Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`,
+                  );
+                  console.log(
+                    `     Stack: ${error instanceof Error && error.stack ? error.stack : "No stack trace available"}`,
+                  );
                 }
               }
 
@@ -1735,11 +1783,17 @@ export function addMCPCommands(yargs: Argv): Argv {
               console.log(`  Built-in tools: ${builtInTools.length}`);
               console.log(`  External tools: ${externalTools.length}`);
               console.log(`  Total tools: ${allTools.length}`);
-            } catch (error: any) {
+            } catch (error: unknown) {
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
               console.error(chalk.red("❌ Debug failed:"));
-              console.error(`   ${error.message}`);
+              console.error(`   ${errorMessage}`);
               if (argv.verbose) {
-                console.error(error.stack);
+                console.error(
+                  error instanceof Error && error.stack
+                    ? error.stack
+                    : "No stack trace available",
+                );
               }
               process.exit(1);
             }

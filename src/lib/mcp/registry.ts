@@ -8,6 +8,7 @@ import type {
   ExecutionContext,
   ToolInfo,
 } from "./contracts/mcpContract.js";
+import type { UnknownRecord } from "../types/common.js";
 import { registryLogger } from "./logging.js";
 
 /**
@@ -96,12 +97,13 @@ export class MCPRegistry implements McpRegistry {
         name: serverId,
         description:
           typeof serverConfig === "object" && serverConfig
-            ? (serverConfig as any).description || "No description"
+            ? ((serverConfig as UnknownRecord).description as string) ||
+              "No description"
             : "No description",
       },
       tools:
         typeof serverConfig === "object" && serverConfig
-          ? (serverConfig as any).tools
+          ? ((serverConfig as UnknownRecord).tools as UnknownRecord)
           : {},
       configuration:
         typeof serverConfig === "object" && serverConfig
@@ -149,7 +151,7 @@ export class MCPRegistry implements McpRegistry {
   /**
    * Execute a tool (legacy sync version)
    */
-  executeToolSync(toolName: string, args?: unknown): any {
+  executeToolSync(toolName: string, args?: unknown): UnknownRecord {
     registryLogger.info(`Executing tool (sync): ${toolName}`);
     return { result: `Mock execution of ${toolName}`, args };
   }

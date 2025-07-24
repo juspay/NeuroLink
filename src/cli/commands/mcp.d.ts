@@ -4,6 +4,7 @@
  * Real MCP server connectivity and management
  */
 import type { Argv } from "yargs";
+import type { JsonValue } from "../../lib/types/common.js";
 interface MCPServerConfig {
     name: string;
     command: string;
@@ -13,7 +14,7 @@ interface MCPServerConfig {
     transport: "stdio" | "sse";
     url?: string;
 }
-export declare function executeMCPTool(serverConfig: MCPServerConfig, toolName: string, toolParams: any): Promise<any>;
-export declare function mcpExecuteTool(serverName: string, toolName: string, toolParams: any): Promise<any>;
+export declare function executeMCPTool(serverConfig: MCPServerConfig, toolName: string, toolParams: JsonValue): Promise<JsonValue>;
+export declare function mcpExecuteTool(serverName: string, toolName: string, toolParams: JsonValue): Promise<JsonValue>;
 export declare function addMCPCommands(yargs: Argv): Argv;
 export {};

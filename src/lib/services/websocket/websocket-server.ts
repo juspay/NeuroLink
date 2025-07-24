@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { EventEmitter } from "events";
 import { randomUUID } from "crypto";
+import { IncomingMessage } from "http";
 import { logger } from "../../utils/logger.js";
 import type {
   WebSocketOptions,
@@ -8,6 +9,7 @@ import type {
   WebSocketMessage,
   StreamingChannel,
 } from "../types.js";
+import type { UnknownRecord } from "../../types/common.js";
 
 export class NeuroLinkWebSocketServer extends EventEmitter {
   private wss: WebSocketServer;
@@ -51,7 +53,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
     });
   }
 
-  private handleConnection(ws: WebSocket, request: any): void {
+  private handleConnection(ws: WebSocket, request: IncomingMessage): void {
     if (this.connections.size >= this.options.maxConnections) {
       ws.close(1013, "Server at capacity");
       return;
@@ -59,7 +61,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
 
     const connectionId = randomUUID();
     const userAgent = request.headers["user-agent"];
-    const ipAddress = request.socket.remoteAddress;
+    const ipAddress = request.socket?.remoteAddress;
 
     // Store connection
     this.connections.set(connectionId, ws);
@@ -110,7 +112,10 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
     this.emit("connection", { connectionId, userAgent, ipAddress });
   }
 
-  private handleMessage(connectionId: string, data: any): void {
+  private handleMessage(
+    connectionId: string,
+    data: Buffer | ArrayBuffer | Buffer[],
+  ): void {
     try {
       const message = JSON.parse(data.toString()) as WebSocketMessage;
       this.updateLastActivity(connectionId);
@@ -273,10 +278,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
   }
 
   // Helper methods
-  private sendMessage(
-    connectionId: string,
-    message: WebSocketMessage,
-  ): boolean {
+  public sendMessage(connectionId: string, message: WebSocketMessage): boolean {
     const ws = this.connections.get(connectionId);
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       return false;
@@ -365,7 +367,7 @@ export class NeuroLinkWebSocketServer extends EventEmitter {
     this.wss.close();
   }
 
-  private handleChannelData(channelId: string, data: any): void {
+  private handleChannelData(channelId: string, data: unknown): void {
     // Implementation for channel data handling
   }
 

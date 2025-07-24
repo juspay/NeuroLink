@@ -6,6 +6,7 @@
  */
 
 import { logger } from "../utils/logger.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
 
 export interface AnalyticsData {
   provider: string;
@@ -17,7 +18,7 @@ export interface AnalyticsData {
   };
   cost?: number;
   responseTime: number;
-  context?: Record<string, any>;
+  context?: Record<string, JsonValue>;
   timestamp: string;
 }
 
@@ -27,9 +28,9 @@ export interface AnalyticsData {
 export function createAnalytics(
   provider: string,
   model: string,
-  result: any,
+  result: UnknownRecord,
   responseTime: number,
-  context?: Record<string, any>,
+  context?: Record<string, JsonValue>,
 ): AnalyticsData {
   const functionTag = "createAnalytics";
 
@@ -77,33 +78,46 @@ export function createAnalytics(
 /**
  * Extract token usage from various AI result formats
  */
-function extractTokenUsage(result: any): {
+function extractTokenUsage(result: UnknownRecord): {
   input: number;
   output: number;
   total: number;
 } {
   // Handle different response formats
-  if (result.usage) {
-    const usage = result.usage;
+  if (
+    result.usage &&
+    typeof result.usage === "object" &&
+    result.usage !== null
+  ) {
+    const usage = result.usage as Record<string, unknown>;
 
     // Standard format
     if (
-      usage.promptTokens !== undefined &&
-      usage.completionTokens !== undefined
+      typeof usage.promptTokens === "number" &&
+      typeof usage.completionTokens === "number"
     ) {
       return {
         input: usage.promptTokens || 0,
         output: usage.completionTokens || 0,
-        total: usage.totalTokens || usage.promptTokens + usage.completionTokens,
+        total:
+          typeof usage.totalTokens === "number"
+            ? usage.totalTokens
+            : usage.promptTokens + usage.completionTokens,
       };
     }
 
     // Alternative formats
-    if (usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
+    if (
+      typeof usage.input_tokens === "number" &&
+      typeof usage.output_tokens === "number"
+    ) {
       return {
         input: usage.input_tokens || 0,
         output: usage.output_tokens || 0,
-        total: usage.total_tokens || usage.input_tokens + usage.output_tokens,
+        total:
+          typeof usage.total_tokens === "number"
+            ? usage.total_tokens
+            : usage.input_tokens + usage.output_tokens,
       };
     }
 
@@ -118,7 +132,10 @@ function extractTokenUsage(result: any): {
   }
 
   // Fallback: estimate from text length
-  const textLength = result.text?.length || result.content?.length || 0;
+  const textLength =
+    (typeof result.text === "string" ? result.text.length : 0) ||
+    (typeof result.content === "string" ? result.content.length : 0) ||
+    0;
   const estimatedTokens = Math.ceil(textLength / 4); // ~4 chars per token
 
   return {

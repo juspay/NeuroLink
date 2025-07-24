@@ -5,6 +5,7 @@
 import { logger } from "../utils/logger.js";
 import { AIProviderFactory } from "./factory.js";
 import type { EvaluationData } from "./types.js";
+import type { UnknownRecord } from "../types/common.js";
 import { z } from "zod";
 import { ProviderRegistry } from "../factories/provider-registry.js";
 
@@ -33,7 +34,7 @@ export interface UnifiedEvaluationResult extends EvaluationData {
 export interface UnifiedEvaluationContext {
   userQuery: string;
   aiResponse: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   primaryDomain?: string;
   assistantRole?: string;
   conversationHistory?: Array<{
@@ -43,8 +44,8 @@ export interface UnifiedEvaluationContext {
   }>;
   toolUsage?: Array<{
     toolName: string;
-    input: any;
-    output: any;
+    input: unknown;
+    output: unknown;
     executionTime: number;
   }>;
   expectedOutcome?: string;
@@ -151,7 +152,16 @@ function parseUnifiedEvaluationResult(
       if (match) {
         const value = parseFloat(match[1]);
         if (value >= 1 && value <= 10) {
-          (result as any)[key] = Math.round(value);
+          const roundedValue = Math.round(value);
+          if (key === "relevance") {
+            result.relevance = roundedValue;
+          } else if (key === "accuracy") {
+            result.accuracy = roundedValue;
+          } else if (key === "completeness") {
+            result.completeness = roundedValue;
+          } else if (key === "overall") {
+            result.overall = roundedValue;
+          }
         }
       }
     }
@@ -255,9 +265,7 @@ Overall: [score]
 
     // Extract text from result
     const response =
-      typeof result === "string"
-        ? result
-        : (result as any).text || String(result);
+      typeof result === "string" ? result : result?.content || String(result);
 
     // Parse evaluation result
     const parsed = parseUnifiedEvaluationResult(response, context);
@@ -300,16 +308,16 @@ Overall: [score]
 
 // Legacy compatibility function with flexible arguments
 export async function evaluateResponse(
-  responseOrContext: any,
-  contextOrUserQuery?: any,
-  userQuery?: any,
-  providedContexts?: any,
-  options?: any,
-  additionalArgs?: any,
-): Promise<any> {
+  responseOrContext: unknown,
+  contextOrUserQuery?: unknown,
+  userQuery?: unknown,
+  providedContexts?: unknown,
+  options?: unknown,
+  additionalArgs?: unknown,
+): Promise<unknown> {
   // Handle different call patterns for backward compatibility
   let aiResponse: string;
-  let context: any;
+  let context: unknown;
 
   if (typeof responseOrContext === "string") {
     // Normal call: evaluateResponse(response, context, ...)
@@ -317,21 +325,21 @@ export async function evaluateResponse(
     context = contextOrUserQuery;
   } else {
     // Provider call pattern: evaluateResponse(contextObject, userQuery, ...)
-    context = responseOrContext;
+    context = responseOrContext as UnknownRecord;
     aiResponse =
-      context?.aiResponse ||
-      context?.response ||
+      ((context as UnknownRecord)?.aiResponse as string) ||
+      ((context as UnknownRecord)?.response as string) ||
       String(contextOrUserQuery || "");
   }
 
   const evalContext: UnifiedEvaluationContext = {
     userQuery:
-      userQuery ||
-      context?.userQuery ||
-      contextOrUserQuery ||
+      (typeof userQuery === "string" ? userQuery : "") ||
+      ((context as UnknownRecord)?.userQuery as string) ||
+      (typeof contextOrUserQuery === "string" ? contextOrUserQuery : "") ||
       "Generated response",
     aiResponse,
-    context,
+    context: context as UnknownRecord | undefined,
   };
   return generateUnifiedEvaluation(evalContext);
 }

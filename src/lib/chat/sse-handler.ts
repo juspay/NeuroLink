@@ -67,32 +67,25 @@ export class SSEChatHandler {
         });
 
         if (aiResponse?.stream) {
-          // Convert async iterable to readable stream
-          const reader = aiResponse.stream as any;
+          // Iterate over the async iterable stream
+          const reader = aiResponse.stream as AsyncIterable<{
+            content: string;
+          }>;
           let fullResponse = "";
 
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
+          for await (const chunk of reader) {
+            const content = chunk.content;
+            fullResponse += content;
 
-              if (done) {
-                break;
-              }
-
-              fullResponse += value;
-
-              // Send chunk to client
-              await this.sendEvent(writer, {
-                type: "data",
-                data: {
-                  type: "chunk",
-                  content: value,
-                  sessionId,
-                },
-              });
-            }
-          } finally {
-            reader.releaseLock();
+            // Send chunk to client
+            await this.sendEvent(writer, {
+              type: "data",
+              data: {
+                type: "chunk",
+                content: content,
+                sessionId,
+              },
+            });
           }
 
           // Add AI response to session

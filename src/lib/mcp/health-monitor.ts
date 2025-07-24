@@ -6,6 +6,7 @@
 
 import type { MCPRegistry } from "./registry.js";
 import type { NeuroLinkExecutionContext } from "./factory.js";
+import type { Unknown, UnknownRecord } from "../types/common.js";
 import { ErrorManager, ErrorCategory, ErrorSeverity } from "./error-manager.js";
 
 /**
@@ -748,7 +749,7 @@ export class HealthMonitor {
       | "recovery-started"
       | "recovery-failed"
       | "critical-error",
-    callback: (data: any) => void,
+    callback: (data: Unknown) => void,
   ): void {
     // Implementation would use EventEmitter
     // For now, just a placeholder
@@ -803,18 +804,31 @@ export class HealthMonitor {
    *
    * @private
    */
-  private generateRecommendations(summary: any, servers: any[]): string[] {
+  private generateRecommendations(
+    summary: UnknownRecord,
+    servers: UnknownRecord[],
+  ): string[] {
     const recommendations: string[] = [];
 
+    // Type-safe access to summary properties
+    const overallHealth =
+      typeof summary.overallHealth === "number" ? summary.overallHealth : 0;
+    const unhealthyServers =
+      typeof summary.unhealthyServers === "number"
+        ? summary.unhealthyServers
+        : 0;
+    const totalServers =
+      typeof summary.totalServers === "number" ? summary.totalServers : 1;
+
     // Check overall health
-    if (summary.overallHealth < 50) {
+    if (overallHealth < 50) {
       recommendations.push(
         "Critical: System health is below 50%. Immediate attention required.",
       );
     }
 
     // Check unhealthy servers
-    if (summary.unhealthyServers > summary.totalServers * 0.3) {
+    if (unhealthyServers > totalServers * 0.3) {
       recommendations.push(
         "Multiple servers are failing. Check network connectivity and server availability.",
       );
@@ -822,24 +836,30 @@ export class HealthMonitor {
 
     // Check recovery attempts
     const highRecoveryServers = servers.filter(
-      (s) => s.metrics.recoveryAttempts > 2,
+      (s) =>
+        typeof s.metrics === "object" &&
+        s.metrics &&
+        typeof (s.metrics as UnknownRecord).recoveryAttempts === "number" &&
+        ((s.metrics as UnknownRecord).recoveryAttempts as number) > 2,
     );
     if (highRecoveryServers.length > 0) {
       recommendations.push(
-        `Servers with repeated recovery attempts: ${highRecoveryServers.map((s) => s.serverId).join(", ")}. Consider manual intervention.`,
+        `Servers with repeated recovery attempts: ${highRecoveryServers.map((s) => (typeof s.serverId === "string" ? s.serverId : "unknown")).join(", ")}. Consider manual intervention.`,
       );
     }
 
     // Check latency
-    const highLatencyServers = servers.filter((s) => s.avgLatency > 1000);
+    const highLatencyServers = servers.filter(
+      (s) => typeof s.avgLatency === "number" && s.avgLatency > 1000,
+    );
     if (highLatencyServers.length > 0) {
       recommendations.push(
-        `High latency detected on servers: ${highLatencyServers.map((s) => s.serverId).join(", ")}. Check server load and network conditions.`,
+        `High latency detected on servers: ${highLatencyServers.map((s) => (typeof s.serverId === "string" ? s.serverId : "unknown")).join(", ")}. Check server load and network conditions.`,
       );
     }
 
     // Positive feedback
-    if (summary.overallHealth >= 90) {
+    if (overallHealth >= 90) {
       recommendations.push(
         "System health is excellent. All servers are operating normally.",
       );

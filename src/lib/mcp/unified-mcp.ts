@@ -40,7 +40,7 @@ export interface UnifiedMCPStatus {
     tools: number;
   };
   totalTools: number;
-  registryStats: any;
+  registryStats: unknown;
 }
 
 /**
@@ -174,7 +174,7 @@ export class UnifiedMCPSystem {
    */
   async executeTool(
     toolName: string,
-    params: any,
+    params: unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> {
     if (!this.isInitialized) {
@@ -189,7 +189,7 @@ export class UnifiedMCPSystem {
   /**
    * List all available tools
    */
-  listTools(criteria?: any) {
+  listTools(criteria?: unknown) {
     return this.registry.listTools();
   }
 
@@ -335,7 +335,7 @@ export function getMCPSystem(): UnifiedMCPSystem {
  */
 export async function executeMCPTool(
   toolName: string,
-  params: any,
+  params: unknown,
   context: NeuroLinkExecutionContext,
 ): Promise<ToolResult> {
   return defaultUnifiedMCP.executeTool(toolName, params, context);
@@ -344,7 +344,7 @@ export async function executeMCPTool(
 /**
  * List all available MCP tools
  */
-export function listMCPTools(criteria?: any) {
+export function listMCPTools(criteria?: unknown) {
   return defaultUnifiedMCP.listTools(criteria);
 }
 

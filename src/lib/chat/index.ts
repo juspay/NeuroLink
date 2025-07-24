@@ -3,6 +3,12 @@
  * Main chat module exports
  */
 import { SSEChatHandler } from "./sse-handler.js";
+import type { AIProvider } from "../core/types.js";
+import type { JsonValue } from "../types/common.js";
+
+interface SessionOptions {
+  [key: string]: JsonValue;
+}
 export { SSEChatHandler } from "./sse-handler.js";
 export { ChatSession } from "./session.js";
 export {
@@ -28,17 +34,17 @@ export type {
 /**
  * Quick setup helper for SSE chat
  */
-export async function createSSEChat(provider: any, options?: any) {
+export async function createSSEChat(provider: unknown, options?: unknown) {
   const { SSEChatHandler } = await import("./sse-handler.js");
-  return new SSEChatHandler(provider, options);
+  return new SSEChatHandler(provider as AIProvider, options as SessionOptions);
 }
 
 /**
  * Quick setup helper for chat session
  */
-export async function createChatSession(sessionId: string, options?: any) {
+export async function createChatSession(sessionId: string, options?: unknown) {
   const { ChatSession } = await import("./session.js");
-  return new ChatSession(sessionId, options);
+  return new ChatSession(sessionId, options as SessionOptions);
 }
 
 // Real-time Services (Phase 4) - Temporarily disabled for testing
@@ -50,21 +56,25 @@ export async function createChatSession(sessionId: string, options?: any) {
 /**
  * Enhanced factory function for real-time chat
  */
+interface WebSocketOptions {
+  [key: string]: JsonValue;
+}
+
 export async function createEnhancedChatService(options: {
-  provider: any;
+  provider: unknown;
   enableSSE?: boolean;
   enableWebSocket?: boolean;
-  streamingConfig?: any;
+  streamingConfig?: unknown;
 }) {
   if (options.enableWebSocket) {
     const { WebSocketChatHandler } = await import(
       "./websocket-chat-handler.js"
     );
-    return new WebSocketChatHandler(options.provider, {
+    return new WebSocketChatHandler(options.provider as AIProvider, {
       sseOptions: options.enableSSE ? {} : undefined,
-      wsOptions: options.streamingConfig,
+      wsOptions: options.streamingConfig as WebSocketOptions | undefined,
     });
   }
 
-  return new SSEChatHandler(options.provider);
+  return new SSEChatHandler(options.provider as AIProvider);
 }

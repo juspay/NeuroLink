@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { logger } from "../lib/utils/logger.js";
+import type { Unknown, UnknownRecord } from "../../lib/types/common.js";
 import {
   DynamicOrchestrator,
   type ToolDecision,
@@ -28,7 +29,7 @@ describe("DynamicOrchestrator", () => {
   let mockSemaphoreManager: SemaphoreManager;
   let mockSessionManager: SessionManager;
   let mockErrorManager: ErrorManager;
-  let originalTools: any;
+  let originalTools: Unknown;
 
   beforeEach(() => {
     mockRegistry = new MCPToolRegistry();
@@ -81,7 +82,7 @@ describe("DynamicOrchestrator", () => {
       name: "generate",
       description: "Generate text using AI",
       category: "text-generation",
-      inputSchema: {} as any,
+      inputSchema: {} as UnknownRecord,
       isImplemented: true,
       execute: vi.fn().mockImplementation(async (params) => {
         // Simulate AI decisions based on prompt
@@ -172,13 +173,13 @@ describe("DynamicOrchestrator", () => {
       sessionId: "test-session-123",
       userId: "test-user",
       aiProvider: "test-provider",
-    } as any);
+    } as UnknownRecord);
 
     vi.spyOn(mockContextManager, "getContext").mockReturnValue({
       sessionId: "test-session-123",
       userId: "test-user",
       aiProvider: "test-provider",
-    } as any);
+    } as UnknownRecord);
 
     // Mock session manager methods
     vi.spyOn(mockSessionManager, "createSession").mockResolvedValue({
@@ -192,13 +193,13 @@ describe("DynamicOrchestrator", () => {
       state: new Map(),
       createdAt: Date.now(),
       lastActivity: Date.now(),
-    } as any);
+    } as UnknownRecord);
 
     // Store original tools to restore later
     originalTools = aiCoreServer.tools;
     // Mock the AI core server tools
     aiCoreServer.tools = {
-      generate: mockGenerate as any,
+      generate: mockGenerate as UnknownRecord,
     };
 
     // Mock error manager methods
@@ -206,8 +207,8 @@ describe("DynamicOrchestrator", () => {
       id: "test-error",
       timestamp: Date.now(),
       error: new Error("test error"),
-      category: "TOOL_ERROR" as any,
-      severity: "HIGH" as any,
+      category: "TOOL_ERROR" as ErrorCategory,
+      severity: "HIGH" as ErrorSeverity,
       context: {},
     }));
 
@@ -424,7 +425,7 @@ describe("DynamicOrchestrator", () => {
         "You are a specialized code analyzer. Always select analyze-code first.";
 
       // Mock to verify custom prompt is used
-      const mockGenerate = aiCoreServer.tools["generate"] as any;
+      const mockGenerate = aiCoreServer.tools["generate"] as UnknownRecord;
       const executeSpy = vi.mocked(mockGenerate.execute);
 
       await dynamicOrchestrator.executeDynamicToolChain(

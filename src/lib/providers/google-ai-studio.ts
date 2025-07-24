@@ -8,7 +8,8 @@ import type {
 } from "../core/types.js";
 import { GoogleAIModels } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
-import { BaseProvider } from "../core/base-provider.js";
+import type { Unknown, UnknownRecord } from "../types/common.js";
+import { BaseProvider, type NeuroLinkSDK } from "../core/base-provider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,
@@ -31,8 +32,12 @@ if (
  * Migrated from original GoogleAIStudio class to new factory pattern
  */
 export class GoogleAIStudioProvider extends BaseProvider {
-  constructor(modelName?: string, sdk?: any) {
-    super(modelName, "google-ai" as AIProviderName, sdk);
+  constructor(modelName?: string, sdk?: unknown) {
+    super(
+      modelName,
+      "google-ai" as AIProviderName,
+      sdk as NeuroLinkSDK | undefined,
+    );
     logger.debug("GoogleAIStudioProvider initialized", {
       model: this.modelName,
       provider: this.providerName,
@@ -60,24 +65,35 @@ export class GoogleAIStudioProvider extends BaseProvider {
     return google(this.modelName);
   }
 
-  protected handleProviderError(error: any): Error {
+  protected handleProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`Google AI request timed out: ${error.message}`);
     }
 
-    if (error?.message?.includes("API_KEY_INVALID")) {
+    const errorRecord = error as UnknownRecord;
+    if (
+      typeof errorRecord?.message === "string" &&
+      errorRecord.message.includes("API_KEY_INVALID")
+    ) {
       return new Error(
         "Invalid Google AI API key. Please check your GOOGLE_AI_API_KEY environment variable.",
       );
     }
 
-    if (error?.message?.includes("RATE_LIMIT_EXCEEDED")) {
+    if (
+      typeof errorRecord?.message === "string" &&
+      errorRecord.message.includes("RATE_LIMIT_EXCEEDED")
+    ) {
       return new Error(
         "Google AI rate limit exceeded. Please try again later.",
       );
     }
 
-    return new Error(`Google AI error: ${error?.message || "Unknown error"}`);
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error";
+    return new Error(`Google AI error: ${message}`);
   }
   // executeGenerate removed - BaseProvider handles all generation with tools
   protected async executeStream(

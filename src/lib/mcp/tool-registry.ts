@@ -9,9 +9,32 @@ import type {
   ToolInfo,
 } from "./contracts/mcpContract.js";
 import type { ToolResult } from "./factory.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
 import { MCPRegistry } from "./registry.js";
 import { registryLogger } from "./logging.js";
 import { randomUUID } from "crypto";
+
+interface ToolImplementation {
+  execute: (
+    params: unknown,
+    context?: ExecutionContext,
+  ) => Promise<unknown> | unknown;
+  description?: string;
+  inputSchema?: unknown;
+  outputSchema?: unknown;
+  category?: string;
+  permissions?: string[];
+}
+
+interface ServerRegistration {
+  id?: string;
+  serverId?: string;
+  description?: string;
+  title?: string;
+  category?: string;
+  tools?: Record<string, ToolImplementation>;
+  configuration?: Record<string, unknown>;
+}
 
 // Use the compatible ToolResult from factory.ts
 export type ToolExecutionResult = ToolResult;
@@ -31,7 +54,7 @@ export interface ToolExecutionOptions {
 
 export class MCPToolRegistry extends MCPRegistry {
   private tools: Map<string, ToolInfo> = new Map();
-  private toolImpls: Map<string, any> = new Map(); // Store actual tool implementations
+  private toolImpls: Map<string, ToolImplementation> = new Map(); // Store actual tool implementations
   private toolExecutionStats: Map<
     string,
     { count: number; totalTime: number }
@@ -41,7 +64,7 @@ export class MCPToolRegistry extends MCPRegistry {
    * Register a server with its tools (updated signature)
    */
   async registerServer(
-    serverOrId: string | any,
+    serverOrId: string | ServerRegistration,
     serverConfig?: unknown,
     context?: ExecutionContext,
   ): Promise<void> {
@@ -58,12 +81,13 @@ export class MCPToolRegistry extends MCPRegistry {
           name: serverId,
           description:
             typeof serverConfig === "object" && serverConfig
-              ? (serverConfig as any).description || "No description"
+              ? (serverConfig as ServerRegistration).description ||
+                "No description"
               : "No description",
         },
         tools:
           typeof serverConfig === "object" && serverConfig
-            ? (serverConfig as any).tools
+            ? (serverConfig as ServerRegistration).tools
             : {},
         configuration:
           typeof serverConfig === "object" && serverConfig
@@ -73,17 +97,21 @@ export class MCPToolRegistry extends MCPRegistry {
     } else {
       // New behavior: register server object
       const server = serverOrId;
-      serverId = server.id || server.serverId || "unknown-server";
+      serverId = String(server.id || server.serverId || "unknown-server");
       registryLogger.info(`Registering server object: ${serverId}`);
 
       plugin = {
         metadata: {
           name: serverId,
-          description: server.description || server.title || "No description",
-          category: server.category,
+          description: String(
+            server.description || server.title || "No description",
+          ),
+          category: String(server.category || ""),
         },
         tools: server.tools || {},
-        configuration: server.configuration || {},
+        configuration:
+          (server.configuration as Record<string, string | number | boolean>) ||
+          {},
       };
     }
 
@@ -101,23 +129,27 @@ export class MCPToolRegistry extends MCPRegistry {
       const toolId = `${serverId}.${toolName}`;
       const toolInfo = {
         name: toolName,
-        description: (toolDef as any)?.description,
-        inputSchema: (toolDef as any)?.inputSchema,
-        outputSchema: (toolDef as any)?.outputSchema,
+        description: (toolDef as ToolImplementation)?.description,
+        inputSchema: (toolDef as ToolImplementation)?.inputSchema as
+          | Record<string, unknown>
+          | undefined,
+        outputSchema: (toolDef as ToolImplementation)?.outputSchema as
+          | Record<string, unknown>
+          | undefined,
         serverId,
-        category: (toolDef as any)?.category || "general",
-        permissions: (toolDef as any)?.permissions || [],
+        category: (toolDef as ToolImplementation)?.category || "general",
+        permissions: (toolDef as ToolImplementation)?.permissions || [],
       };
 
       // Register only with fully-qualified toolId to avoid collisions
       this.tools.set(toolId, toolInfo);
 
       // Store the actual tool implementation for execution using toolId as key
-      this.toolImpls.set(toolId, toolDef);
+      this.toolImpls.set(toolId, toolDef as ToolImplementation);
 
       registryLogger.debug(
         `Registered tool '${toolName}' with execute function:`,
-        typeof (toolDef as any)?.execute,
+        typeof (toolDef as ToolImplementation)?.execute,
       );
     }
   }
@@ -182,14 +214,15 @@ export class MCPToolRegistry extends MCPRegistry {
       const toolResult = await toolImpl.execute(args, execContext);
 
       // Add metadata to the tool result (don't double-wrap)
+      const toolResultObj = toolResult as unknown as ToolResult;
       const result = {
-        ...toolResult,
+        ...toolResultObj,
         usage: {
-          ...toolResult.usage,
+          ...(toolResultObj.usage || {}),
           executionTime: Date.now() - startTime,
         },
         metadata: {
-          ...toolResult.metadata,
+          ...(toolResultObj.metadata || {}),
           toolName,
           serverId: tool.serverId,
           sessionId: execContext.sessionId,
@@ -280,7 +313,7 @@ export class MCPToolRegistry extends MCPRegistry {
         filter = undefined;
       } else {
         // It's a filter object
-        filter = filterOrContext as any;
+        filter = filterOrContext as UnknownRecord;
       }
     }
 
@@ -303,7 +336,8 @@ export class MCPToolRegistry extends MCPRegistry {
 
       if (filter.permissions && filter.permissions.length > 0) {
         result = result.filter((tool) => {
-          const toolPermissions = (tool as any).permissions || [];
+          const toolPermissions =
+            (tool as ToolInfo & { permissions?: string[] }).permissions || [];
           return filter.permissions!.some((perm) =>
             toolPermissions.includes(perm),
           );

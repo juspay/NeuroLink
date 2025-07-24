@@ -6,6 +6,7 @@
  */
 
 import type { NeuroLinkExecutionContext, ToolResult } from "./factory.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
 import {
   MCPToolRegistry,
   defaultToolRegistry,
@@ -62,7 +63,7 @@ export interface PipelineOptions {
  */
 export interface PipelineStep {
   toolName: string;
-  params: any;
+  params: JsonValue;
   options?: ToolExecutionOptions;
   dependsOn?: string[]; // Step dependencies for parallel execution
   stepId?: string; // Unique identifier for the step
@@ -163,7 +164,7 @@ export class MCPOrchestrator {
    */
   async executeTool(
     toolName: string,
-    params: any,
+    params: JsonValue,
     contextRequest: ContextRequest = {},
     options: ToolExecutionOptions & { sessionOptions?: SessionOptions } = {},
   ): Promise<ToolResult> {
@@ -503,10 +504,10 @@ export class MCPOrchestrator {
           toolName: "select-provider",
           params: {
             requirements: {
-              maxTokens: options.maxTokens,
+              maxTokens: options.maxTokens || 1000,
               costEfficient: true,
             },
-          },
+          } as JsonValue,
         });
       }
 
@@ -516,11 +517,11 @@ export class MCPOrchestrator {
         toolName: "generate",
         params: {
           prompt,
-          provider: options.provider,
-          model: options.model,
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          systemPrompt: options.systemPrompt,
+          provider: options.provider || "auto",
+          model: options.model || "default",
+          temperature: options.temperature || 0.7,
+          maxTokens: options.maxTokens || 1000,
+          systemPrompt: options.systemPrompt || "",
         },
         dependsOn: options.provider ? [] : ["select-provider"],
       });
@@ -564,9 +565,11 @@ export class MCPOrchestrator {
 
       return {
         success: true,
-        text: textResult.data?.text,
-        provider: textResult.data?.provider || providerResult?.data?.provider,
-        model: textResult.data?.model,
+        text: (textResult.data as { text?: string })?.text,
+        provider:
+          (textResult.data as { provider?: string })?.provider ||
+          (providerResult?.data as { provider?: string })?.provider,
+        model: (textResult.data as { model?: string })?.model,
         executionTime,
         usage: textResult.usage,
         metadata: {
@@ -600,16 +603,16 @@ export class MCPOrchestrator {
    * @returns Comprehensive orchestrator statistics
    */
   getStats(): {
-    registry: any;
-    context: any;
-    session: any;
-    error: any;
-    health?: any;
+    registry: UnknownRecord;
+    context: UnknownRecord;
+    session: UnknownRecord;
+    error: UnknownRecord;
+    health?: UnknownRecord;
     orchestrator: {
       pipelinesExecuted: number;
     };
   } {
-    const stats: any = {
+    const stats: UnknownRecord = {
       registry: this.registry.getStats(),
       context: this.contextManager.getStats(),
       session: this.sessionManager.getStats(),
@@ -632,7 +635,16 @@ export class MCPOrchestrator {
       };
     }
 
-    return stats;
+    return stats as {
+      registry: UnknownRecord;
+      context: UnknownRecord;
+      session: UnknownRecord;
+      error: UnknownRecord;
+      health?: UnknownRecord;
+      orchestrator: {
+        pipelinesExecuted: number;
+      };
+    };
   }
 
   /**
@@ -675,7 +687,7 @@ export class MCPOrchestrator {
   async setSessionState(
     sessionId: string,
     key: string,
-    value: any,
+    value: JsonValue,
   ): Promise<boolean> {
     return this.sessionManager.setSessionState(sessionId, key, value) !== null;
   }
@@ -687,8 +699,12 @@ export class MCPOrchestrator {
    * @param key State key
    * @returns State value or undefined
    */
-  async getSessionState(sessionId: string, key: string): Promise<any> {
-    return this.sessionManager.getSessionState(sessionId, key);
+  async getSessionState(
+    sessionId: string,
+    key: string,
+  ): Promise<JsonValue | undefined> {
+    const result = this.sessionManager.getSessionState(sessionId, key);
+    return result as JsonValue | undefined;
   }
 
   /**
@@ -813,7 +829,7 @@ export class MCPOrchestrator {
    * @param config Transport configuration
    * @returns Connected MCP client
    */
-  async connectTransport(config: TransportConfig): Promise<any> {
+  async connectTransport(config: TransportConfig): Promise<unknown> {
     if (!this.transportManager) {
       this.initializeTransportManager();
     }
@@ -984,7 +1000,7 @@ export const defaultOrchestrator = new MCPOrchestrator();
  */
 export async function executeTool(
   toolName: string,
-  params: any,
+  params: JsonValue,
   contextRequest?: ContextRequest,
   options?: ToolExecutionOptions,
 ): Promise<ToolResult> {
@@ -1007,7 +1023,7 @@ export async function executeTool(
 export async function executeTextPipeline(
   prompt: string,
   contextRequest?: ContextRequest,
-  options?: any,
+  options?: UnknownRecord,
 ): Promise<TextPipelineResult> {
   return defaultOrchestrator.executeTextPipeline(
     prompt,

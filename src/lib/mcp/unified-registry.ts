@@ -6,12 +6,23 @@ import type {
   DiscoveredMCP,
   ExecutionContext,
 } from "./contracts/mcp-contract.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
 import { MCPRegistry } from "./registry.js";
 import {
   discoverMCPServers,
   autoRegisterMCPServers,
 } from "./auto-discovery.js";
 import type { DiscoveryOptions } from "./auto-discovery.js";
+
+interface MCPServerConfig {
+  name: string;
+  id?: string;
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  transport?: string;
+  [key: string]: JsonValue | undefined;
+}
 import { unifiedRegistryLogger } from "./logging.js";
 import {
   MCPToolRegistry,
@@ -34,7 +45,7 @@ import * as path from "path";
 export class UnifiedMCPRegistry extends MCPToolRegistry {
   private autoDiscoveryEnabled = true;
   private autoDiscoveredServers: DiscoveredMCP[] = [];
-  private manualServers: Map<string, any> = new Map();
+  private manualServers: Map<string, MCPServerConfig> = new Map();
   private availableServers: Set<string> = new Set();
   private transportManager: TransportManager;
   private activeConnections: Map<string, Client> = new Map();
@@ -77,7 +88,7 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
 
       // Register discovered plugins
       for (const plugin of result.plugins) {
-        this.register(plugin as any);
+        this.register(plugin as DiscoveredMCP);
         this.autoDiscoveredServers.push(plugin);
         this.availableServers.add(plugin.metadata.name);
       }
@@ -124,14 +135,14 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
               description: `MCP server: ${serverId}`,
               permissions: ["filesystem", "network"],
             },
-            entryPath: (serverConfig as any).command || "npx",
+            entryPath: (serverConfig as MCPServerConfig).command || "npx",
             source: "project" as const,
             constructor: undefined,
           };
 
           // Register the server
-          this.register(discoveredMcp as any);
-          this.manualServers.set(serverId, serverConfig);
+          this.register(discoveredMcp);
+          this.manualServers.set(serverId, serverConfig as MCPServerConfig);
           this.availableServers.add(serverId);
 
           unifiedRegistryLogger.debug(`Registered manual server: ${serverId}`);
@@ -165,9 +176,11 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
         // Use addExternalServer method which properly establishes connections
         await this.addExternalServer(serverId, {
           type: "stdio" as const,
-          command: (serverConfig as any).command || "npx",
-          args: (serverConfig as any).args || [],
-          env: (serverConfig as any).env,
+          command: (serverConfig as MCPServerConfig).command || "npx",
+          args: (serverConfig as MCPServerConfig).args || [],
+          env: (serverConfig as MCPServerConfig).env as
+            | Record<string, string>
+            | undefined,
         });
 
         unifiedRegistryLogger.info(
@@ -228,7 +241,7 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
   /**
    * Get manual servers
    */
-  getManualServers(): Map<string, any> {
+  getManualServers(): Map<string, MCPServerConfig> {
     return this.manualServers;
   }
 
@@ -328,9 +341,9 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
         `Tool ${toolName} executed successfully via defaultToolRegistry`,
       );
       return result;
-    } catch (builtInError: any) {
+    } catch (builtInError: unknown) {
       unifiedRegistryLogger.debug(
-        `Built-in tool execution failed: ${builtInError.message}`,
+        `Built-in tool execution failed: ${(builtInError as Error).message}`,
       );
     }
 
@@ -345,9 +358,9 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
         `Tool ${toolName} executed successfully via external MCP server`,
       );
       return result;
-    } catch (externalError: any) {
+    } catch (externalError: unknown) {
       unifiedRegistryLogger.debug(
-        `External MCP execution failed: ${externalError.message}`,
+        `External MCP execution failed: ${(externalError as Error).message}`,
       );
     }
 
@@ -406,10 +419,30 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
 
         // Import the executeMCPTool function
         const { executeMCPTool } = await import("../../cli/commands/mcp.js");
+        const typedServerConfig = serverConfig as UnknownRecord;
+        const mcpServerConfig = {
+          name: serverId,
+          command: (typeof typedServerConfig.command === "string"
+            ? typedServerConfig.command
+            : "npx") as string,
+          args: (Array.isArray(typedServerConfig.args)
+            ? typedServerConfig.args
+            : []) as string[],
+          env: (typeof typedServerConfig.env === "object" &&
+          typedServerConfig.env
+            ? typedServerConfig.env
+            : {}) as Record<string, string>,
+          cwd:
+            typeof typedServerConfig.cwd === "string"
+              ? typedServerConfig.cwd
+              : undefined,
+          transport:
+            (typedServerConfig.transport as "stdio" | "sse") || "stdio",
+        };
         const result = await executeMCPTool(
-          serverConfig as any,
+          mcpServerConfig,
           toolName,
-          args || {},
+          this.toJsonValue(args || {}),
         );
 
         // Convert to ToolResult format
@@ -472,7 +505,7 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
   /**
    * Register a manual server
    */
-  registerManualServer(id: string, server: any): void {
+  registerManualServer(id: string, server: MCPServerConfig): void {
     this.manualServers.set(id, server);
     this.availableServers.add(id);
   }
@@ -510,7 +543,9 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
     const byType: Record<string, number> = {};
 
     for (const plugin of plugins) {
-      const source = (plugin as any).source || "unknown";
+      const source =
+        (plugin as unknown as DiscoveredMCP & { source?: string }).source ||
+        "unknown";
       bySource[source] = (bySource[source] || 0) + 1;
 
       // Extract type from name or metadata
@@ -568,8 +603,12 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
     };
 
     // Register in internal registry
-    this.register(serverMeta as any);
-    this.manualServers.set(serverId, config);
+    this.register(serverMeta);
+    this.manualServers.set(serverId, {
+      ...config,
+      name: serverId,
+      command: config.command || "npx",
+    } as MCPServerConfig);
     this.availableServers.add(serverId);
 
     // Establish actual connection to make server immediately reachable
@@ -693,6 +732,39 @@ export class UnifiedMCPRegistry extends MCPToolRegistry {
 
     // Clear registries without attempting to close connections again
     this.clearRegistriesOnly();
+  }
+
+  /**
+   * Convert unknown arguments to JsonValue for CLI compatibility
+   * Attempts to serialize complex types to JSON-safe format
+   */
+  private toJsonValue(args: unknown): JsonValue {
+    try {
+      // First try to use it directly if it's already a JsonValue
+      if (
+        args === null ||
+        typeof args === "string" ||
+        typeof args === "number" ||
+        typeof args === "boolean"
+      ) {
+        return args;
+      }
+
+      // For objects and arrays, try JSON round-trip to ensure serialization
+      if (typeof args === "object") {
+        return JSON.parse(JSON.stringify(args)) as JsonValue;
+      }
+
+      // For other types, convert to string
+      return String(args);
+    } catch (error) {
+      // If serialization fails, return empty object as fallback
+      unifiedRegistryLogger.warn(
+        "Failed to convert args to JsonValue, using empty object:",
+        error,
+      );
+      return {};
+    }
   }
 }
 

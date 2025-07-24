@@ -8,6 +8,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import type { UnknownRecord } from "../types/common.js";
 
 // ES Module compatibility
 const __filename = fileURLToPath(import.meta.url);
@@ -233,14 +234,16 @@ export class PluginManager {
       return false;
     }
 
-    const obj = manifest as any;
-    return (
+    const obj = manifest as UnknownRecord;
+    return Boolean(
       typeof obj.name === "string" &&
-      typeof obj.version === "string" &&
-      typeof obj.main === "string" &&
-      obj.engine?.neurolink &&
-      typeof obj.description === "string" &&
-      Array.isArray(obj.permissions)
+        typeof obj.version === "string" &&
+        typeof obj.main === "string" &&
+        typeof obj.engine === "object" &&
+        obj.engine &&
+        "neurolink" in obj.engine &&
+        typeof obj.description === "string" &&
+        Array.isArray(obj.permissions),
     );
   }
 

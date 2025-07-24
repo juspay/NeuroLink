@@ -16,6 +16,7 @@ import {
   getDefaultTimeout,
 } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import type { UnknownRecord } from "../types/common.js";
 
 // Environment variables
 declare const process: {
@@ -161,27 +162,33 @@ export class HuggingFaceProvider extends BaseProvider {
     return this.model;
   }
 
-  protected handleProviderError(error: any): Error {
+  protected handleProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`HuggingFace request timed out: ${error.message}`);
     }
 
+    const errorObj = error as UnknownRecord;
+    const message =
+      errorObj?.message && typeof errorObj.message === "string"
+        ? errorObj.message
+        : "Unknown error";
+
     if (
-      error?.message?.includes("API_TOKEN_INVALID") ||
-      error?.message?.includes("Invalid token")
+      message.includes("API_TOKEN_INVALID") ||
+      message.includes("Invalid token")
     ) {
       return new Error(
         "Invalid HuggingFace API token. Please check your HUGGING_FACE_API_KEY environment variable.",
       );
     }
 
-    if (error?.message?.includes("rate limit")) {
+    if (message.includes("rate limit")) {
       return new Error(
         "HuggingFace rate limit exceeded. Please try again later.",
       );
     }
 
-    return new Error(`HuggingFace error: ${error?.message || "Unknown error"}`);
+    return new Error(`HuggingFace error: ${message}`);
   }
 
   // ===================

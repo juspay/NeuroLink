@@ -1,5 +1,7 @@
 // Real-time Services Types
 
+import type { UnknownRecord, Unknown } from "../types/common.js";
+
 export interface StreamingSession {
   id: string;
   connectionId: string;
@@ -69,13 +71,13 @@ export interface StreamingChannel {
   type: "ai-response" | "mcp-tool" | "chat" | "notification";
   status: "open" | "closed" | "error";
   buffer: StreamingBuffer;
-  onData: (data: any) => void;
+  onData: (data: Unknown) => void;
   onError: (error: Error) => void;
   onClose: () => void;
 }
 
 export interface StreamingBuffer {
-  data: any[];
+  data: Unknown[];
   maxSize: number;
   currentSize: number;
   flushThreshold: number;
@@ -114,7 +116,7 @@ export interface WebSocketMessage {
   connectionId: string;
   roomId?: string;
   timestamp: number;
-  data: any;
+  data: Unknown;
   metadata?: {
     provider?: string;
     model?: string;
@@ -176,5 +178,5 @@ export interface ConnectionInfo {
   lastActivity: number;
   rooms: Set<string>;
   subscriptions: Set<string>;
-  metadata: Record<string, any>;
+  metadata: UnknownRecord;
 }

@@ -17,6 +17,7 @@ import type { NeuroLinkExecutionContext } from "../mcp/factory.js";
 import { logger } from "../utils/logger.js";
 import { v4 as uuidv4 } from "uuid";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { UnknownRecord } from "../types/common.js";
 
 /**
  * MCP-Aware Provider Configuration
@@ -142,7 +143,7 @@ export class MCPAwareProvider implements AIProvider {
    */
   async stream(
     optionsOrPrompt: StreamOptions | string,
-    analysisSchema?: any,
+    analysisSchema?: unknown,
   ): Promise<StreamResult> {
     const functionTag = "MCPAwareProvider.stream";
     const startTime = Date.now();
@@ -353,8 +354,8 @@ Please provide a response based on this information.`;
    */
   async gen(
     optionsOrPrompt: TextGenerationOptions | string,
-    analysisSchema?: any,
-  ): Promise<EnhancedGenerateResult | null> {
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<GenerateResult> {
     return this.generate(optionsOrPrompt, analysisSchema);
   }
 }

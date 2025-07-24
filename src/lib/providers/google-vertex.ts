@@ -10,7 +10,8 @@ import type {
   EnhancedGenerateResult,
 } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
-import { BaseProvider } from "../core/base-provider.js";
+import type { Unknown, UnknownRecord } from "../types/common.js";
+import { BaseProvider, type NeuroLinkSDK } from "../core/base-provider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,
@@ -20,7 +21,7 @@ import {
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 
 // Cache for anthropic module to avoid repeated imports
-let _createVertexAnthropic: any = null;
+let _createVertexAnthropic: unknown = null;
 let _anthropicImportAttempted = false;
 
 // Function to dynamically import anthropic support
@@ -33,7 +34,10 @@ async function getCreateVertexAnthropic() {
 
   try {
     // Try to import the anthropic module - available in @ai-sdk/google-vertex ^2.2.0+
-    const anthropicModule = await import("@ai-sdk/google-vertex/anthropic");
+    // Use proper dynamic import without eval() for security
+    const anthropicModule = (await import(
+      "@ai-sdk/google-vertex/anthropic"
+    )) as UnknownRecord;
     _createVertexAnthropic = anthropicModule.createVertexAnthropic;
     logger.debug("[GoogleVertexAI] Anthropic module successfully loaded");
     return _createVertexAnthropic;
@@ -95,14 +99,18 @@ const hasGoogleCredentials = (): boolean => {
  * - Enhanced error handling with setup guidance
  */
 export class GoogleVertexProvider extends BaseProvider {
-  private vertex: any;
+  private vertex: ReturnType<typeof createVertex>;
   private model: LanguageModelV1;
   private projectId: string;
   private location: string;
   private cachedAnthropicModel: LanguageModelV1 | null = null;
 
-  constructor(modelName?: string) {
-    super(modelName, "vertex" as AIProviderName);
+  constructor(modelName?: string, sdk?: unknown) {
+    super(
+      modelName,
+      "vertex" as AIProviderName,
+      sdk as NeuroLinkSDK | undefined,
+    );
 
     // Validate Google Cloud credentials
     if (!hasGoogleCredentials()) {
@@ -124,7 +132,9 @@ export class GoogleVertexProvider extends BaseProvider {
     this.vertex = createVertex(vertexConfig);
 
     // Pre-initialize model for efficiency
-    this.model = this.vertex(this.modelName || getDefaultVertexModel());
+    this.model = this.vertex(
+      this.modelName || getDefaultVertexModel(),
+    ) as LanguageModelV1;
 
     logger.debug("Google Vertex AI BaseProvider v2 initialized", {
       modelName: this.modelName,
@@ -200,40 +210,49 @@ export class GoogleVertexProvider extends BaseProvider {
     }
   }
 
-  protected handleProviderError(error: any): Error {
-    if (error.name === "TimeoutError") {
+  protected handleProviderError(error: unknown): Error {
+    const errorRecord = error as UnknownRecord;
+    if (
+      typeof errorRecord?.name === "string" &&
+      errorRecord.name === "TimeoutError"
+    ) {
       return new TimeoutError(
         `Google Vertex AI request timed out. Consider increasing timeout or using a lighter model.`,
         this.defaultTimeout,
       );
     }
 
-    if (error.message?.includes("PERMISSION_DENIED")) {
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error occurred";
+
+    if (message.includes("PERMISSION_DENIED")) {
       return new Error(
         `❌ Google Vertex AI Permission Denied\n\nYour Google Cloud credentials don't have permission to access Vertex AI.\n\n🔧 Required Steps:\n1. Ensure your service account has Vertex AI User role\n2. Check if Vertex AI API is enabled in your project\n3. Verify your project ID is correct\n4. Confirm your location/region has Vertex AI available`,
       );
     }
 
-    if (error.message?.includes("NOT_FOUND")) {
+    if (message.includes("NOT_FOUND")) {
       return new Error(
-        `❌ Google Vertex AI Model Not Found\n\n${error.message}\n\n🔧 Check:\n1. Model name is correct (e.g., 'gemini-1.5-pro')\n2. Model is available in your region (${this.location})\n3. Your project has access to the model\n4. Model supports your request parameters`,
+        `❌ Google Vertex AI Model Not Found\n\n${message}\n\n🔧 Check:\n1. Model name is correct (e.g., 'gemini-1.5-pro')\n2. Model is available in your region (${this.location})\n3. Your project has access to the model\n4. Model supports your request parameters`,
       );
     }
 
-    if (error.message?.includes("QUOTA_EXCEEDED")) {
+    if (message.includes("QUOTA_EXCEEDED")) {
       return new Error(
-        `❌ Google Vertex AI Quota Exceeded\n\n${error.message}\n\n🔧 Solutions:\n1. Check your Vertex AI quotas in Google Cloud Console\n2. Request quota increase if needed\n3. Try a different model or reduce request frequency\n4. Consider using a different region`,
+        `❌ Google Vertex AI Quota Exceeded\n\n${message}\n\n🔧 Solutions:\n1. Check your Vertex AI quotas in Google Cloud Console\n2. Request quota increase if needed\n3. Try a different model or reduce request frequency\n4. Consider using a different region`,
       );
     }
 
-    if (error.message?.includes("INVALID_ARGUMENT")) {
+    if (message.includes("INVALID_ARGUMENT")) {
       return new Error(
-        `❌ Google Vertex AI Invalid Request\n\n${error.message}\n\n🔧 Check:\n1. Request parameters are within model limits\n2. Input text is properly formatted\n3. Temperature and other settings are valid\n4. Model supports your request type`,
+        `❌ Google Vertex AI Invalid Request\n\n${message}\n\n🔧 Check:\n1. Request parameters are within model limits\n2. Input text is properly formatted\n3. Temperature and other settings are valid\n4. Model supports your request type`,
       );
     }
 
     return new Error(
-      `❌ Google Vertex AI Provider Error\n\n${error.message || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check Google Cloud credentials and permissions\n2. Verify project ID and location settings\n3. Ensure Vertex AI API is enabled\n4. Check network connectivity`,
+      `❌ Google Vertex AI Provider Error\n\n${message}\n\n🔧 Troubleshooting:\n1. Check Google Cloud credentials and permissions\n2. Verify project ID and location settings\n3. Ensure Vertex AI API is enabled\n4. Check network connectivity`,
     );
   }
 
@@ -281,12 +300,16 @@ export class GoogleVertexProvider extends BaseProvider {
       return null;
     }
 
-    const vertexAnthropic = createVertexAnthropic({
+    const vertexAnthropic = (
+      createVertexAnthropic as (config: UnknownRecord) => Unknown
+    )({
       project: this.projectId,
       location: this.location,
     });
 
-    return vertexAnthropic(modelName);
+    return (vertexAnthropic as (modelName: string) => LanguageModelV1)(
+      modelName,
+    );
   }
 }
 

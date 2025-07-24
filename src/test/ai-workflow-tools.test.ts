@@ -12,13 +12,15 @@ import {
   beforeEach,
   vi,
 } from "vitest";
+import type { UnknownRecord, Unknown } from "../../lib/types/common.js";
+import type { ToolArgs } from "../../lib/types/tools.js";
 
 // Mock AI provider calls to avoid requiring real credentials
 vi.mock("../lib/core/factory.js", async () => {
   const actual = await vi.importActual("../lib/core/factory.js");
 
   // Create mock responses based on the tool being called and input context
-  const createMockResponse = (prompt: string, options: any = {}) => {
+  const createMockResponse = (prompt: string, options: UnknownRecord = {}) => {
     if (
       prompt.includes("generate-test-cases") ||
       prompt.includes("test cases")
@@ -190,11 +192,11 @@ vi.mock("../lib/core/factory.js", async () => {
     ...actual,
     AIProviderFactory: {
       createProvider: vi.fn().mockResolvedValue({
-        generate: vi.fn().mockImplementation(async (options: any) => {
+        generate: vi.fn().mockImplementation(async (options: UnknownRecord) => {
           const prompt = options.input?.text || options.prompt || "";
 
           // Extract parameters from the prompt for context-aware responses
-          const extractedOptions: any = {};
+          const extractedOptions: UnknownRecord = {};
 
           // Parse common parameters from the structured prompts
           if (prompt.includes("test cases")) {
@@ -295,7 +297,10 @@ describe("AI Development Workflow Tools - Phase 1.2", () => {
     contextManager = new ContextManager();
     const { MCPRegistry } = await import("../lib/mcp/registry.js");
     registry = new MCPRegistry();
-    orchestrator = new MCPOrchestrator(registry as any, contextManager);
+    orchestrator = new MCPOrchestrator(
+      registry as UnknownRecord,
+      contextManager,
+    );
 
     // Register AI Core Server once (check if not already registered)
     try {
@@ -364,7 +369,7 @@ describe("AI Development Workflow Tools - Phase 1.2", () => {
       expect(result.success).toBe(true);
       expect(result.data.testCases).toBeInstanceOf(Array);
       const edgeCaseTest = result.data.testCases.find(
-        (tc: any) => tc.type === "edge-case",
+        (tc: UnknownRecord) => tc.type === "edge-case",
       );
       expect(edgeCaseTest).toBeDefined();
       expect(edgeCaseTest.code).toContain("null");
@@ -386,7 +391,7 @@ describe("AI Development Workflow Tools - Phase 1.2", () => {
       expect(result.success).toBe(true);
       expect(result.data.testCases).toBeInstanceOf(Array);
       const asyncTest = result.data.testCases.find(
-        (tc: any) => tc.type === "integration",
+        (tc: UnknownRecord) => tc.type === "integration",
       );
       expect(asyncTest).toBeDefined();
       expect(asyncTest.code).toContain("async");
@@ -633,7 +638,7 @@ describe("AI Development Workflow Tools - Phase 1.2", () => {
 
       expect(result.success).toBe(true);
       const incompleteIssue = result.data.issues.find(
-        (issue: any) => issue.type === "incomplete-implementation",
+        (issue: UnknownRecord) => issue.type === "incomplete-implementation",
       );
       expect(incompleteIssue).toBeDefined();
       expect(incompleteIssue.severity).toBe("high");

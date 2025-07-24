@@ -33,7 +33,7 @@ export interface ContextRequest {
   securityLevel?: "public" | "private" | "organization";
 
   // Custom context extensions
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -43,7 +43,7 @@ export interface ContextRequest {
 export class ContextManager {
   private sessionCounter: number = 0;
   private activeContexts: Map<string, NeuroLinkExecutionContext> = new Map();
-  private static cachedLogger: any = null;
+  private static cachedLogger: unknown = null;
 
   /**
    * Create a new execution context with rich information
@@ -83,9 +83,12 @@ export class ContextManager {
           const fs = await import("fs/promises");
           return fs.stat(path);
         },
-        mkdir: async (path: string, options?: any) => {
+        mkdir: async (path: string, options?: unknown) => {
           const fs = await import("fs/promises");
-          await fs.mkdir(path, options);
+          await fs.mkdir(
+            path,
+            options as { recursive?: boolean; mode?: number } | undefined,
+          );
         },
         exists: async (path: string) => {
           const fs = await import("fs/promises");
@@ -124,7 +127,7 @@ export class ContextManager {
       log: async (
         level: "debug" | "info" | "warn" | "error",
         message: string,
-        data?: any,
+        data?: unknown,
       ) => {
         // Use cached logger if available, otherwise import and cache
         try {
@@ -133,7 +136,11 @@ export class ContextManager {
               "../utils/logger.js"
             ).then(({ logger }) => logger);
           }
-          ContextManager.cachedLogger[level](message, data);
+          (
+            ContextManager.cachedLogger as {
+              [key: string]: (message: string, data?: unknown) => void;
+            }
+          )[level](message, data);
         } catch {
           console[level === "debug" ? "log" : level](message, data);
         }
@@ -348,7 +355,9 @@ export class ContextManager {
    * @param request Context creation request
    * @returns Custom fields object
    */
-  private extractCustomFields(request: ContextRequest): Record<string, any> {
+  private extractCustomFields(
+    request: ContextRequest,
+  ): Record<string, unknown> {
     const knownFields = new Set([
       "sessionId",
       "userId",
@@ -364,7 +373,7 @@ export class ContextManager {
       "securityLevel",
     ]);
 
-    const customFields: Record<string, any> = {};
+    const customFields: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(request)) {
       if (!knownFields.has(key)) {

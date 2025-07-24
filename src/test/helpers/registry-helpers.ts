@@ -4,12 +4,13 @@
  */
 
 import type { MCPToolRegistry } from "../../lib/mcp/tool-registry.js";
+import type { UnknownRecord } from "../../lib/types/common.js";
 
 // Helper to register individual tools for testing
 export const registerTestTool = async (
   registry: MCPToolRegistry,
   toolName: string,
-  toolDef: any,
+  toolDef: UnknownRecord,
 ): Promise<void> => {
   const serverId = `test-server-${toolName}`;
 
@@ -29,7 +30,7 @@ export const registerTestTool = async (
 // Helper to register multiple tools at once
 export const registerTestTools = async (
   registry: MCPToolRegistry,
-  tools: Record<string, any>,
+  tools: Record<string, UnknownRecord>,
 ): Promise<void> => {
   await registry.registerServer("test-server-batch", {
     tools: Object.fromEntries(

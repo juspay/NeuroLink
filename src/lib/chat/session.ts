@@ -9,6 +9,7 @@ import type {
   ChatSessionState,
   SessionStorage,
 } from "./types.js";
+import type { JsonValue } from "../types/common.js";
 import { MemorySessionStorage } from "./session-storage.js";
 
 export class ChatSession {
@@ -18,7 +19,7 @@ export class ChatSession {
   private storage: SessionStorage;
   private createdAt: number;
   private lastActivity: number;
-  private metadata: Record<string, any> = {};
+  private metadata: Record<string, JsonValue> = {};
 
   constructor(sessionId: string, options: SessionOptions = {}) {
     this.sessionId = sessionId;
@@ -46,14 +47,21 @@ export class ChatSession {
   addMessage(
     role: "user" | "assistant" | "system",
     content: string,
-    metadata?: any,
+    metadata?: unknown,
   ): ChatMessage {
     const message: ChatMessage = {
       id: `${this.sessionId}_${Date.now()}_${role}`,
       role,
       content,
       timestamp: Date.now(),
-      metadata,
+      metadata: metadata as
+        | {
+            provider?: string;
+            model?: string;
+            tokens?: number;
+            duration?: number;
+          }
+        | undefined,
     };
 
     this.messages.push(message);
@@ -92,14 +100,14 @@ export class ChatSession {
   /**
    * Get session metadata
    */
-  getMetadata(): Record<string, any> {
+  getMetadata(): Record<string, JsonValue> {
     return { ...this.metadata };
   }
 
   /**
    * Set session metadata
    */
-  setMetadata(key: string, value: any): void {
+  setMetadata(key: string, value: JsonValue): void {
     this.metadata[key] = value;
     this.lastActivity = Date.now();
   }

@@ -4,6 +4,7 @@
  * Based on patterns from Cline's session management implementation
  */
 
+import type { Unknown } from "../types/common.js";
 import type { NeuroLinkExecutionContext, ToolResult } from "./factory.js";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -19,7 +20,7 @@ export interface OrchestratorSession {
   id: string;
   context: NeuroLinkExecutionContext;
   toolHistory: ToolResult[];
-  state: Map<string, any>;
+  state: Map<string, Unknown>;
   metadata: {
     userAgent?: string;
     origin?: string;
@@ -251,7 +252,7 @@ export class SessionManager {
   setSessionState(
     sessionId: string,
     key: string,
-    value: any,
+    value: Unknown,
   ): OrchestratorSession | null {
     const session = this.getSession(sessionId);
 
@@ -277,7 +278,7 @@ export class SessionManager {
    * @param key State key
    * @returns State value or undefined
    */
-  getSessionState(sessionId: string, key: string): any {
+  getSessionState(sessionId: string, key: string): Unknown {
     const session = this.getSession(sessionId, false);
     return session?.state.get(key);
   }

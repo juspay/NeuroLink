@@ -8,6 +8,8 @@ import { MCPOrchestrator } from "../lib/mcp/orchestrator.js";
 import { MCPToolRegistry } from "../lib/mcp/tool-registry.js";
 import { SemaphoreManager } from "../lib/mcp/semaphore-manager.js";
 import type { ToolResult } from "../lib/mcp/factory.js";
+import type { ToolArgs, ToolDefinition } from "../../lib/types/tools.js";
+import type { UnknownRecord } from "../../lib/types/common.js";
 
 describe("Semaphore Integration", () => {
   let orchestrator: MCPOrchestrator;
@@ -28,7 +30,7 @@ describe("Semaphore Integration", () => {
           name: "slow-tool",
           description: "A tool that takes time to execute",
           inputSchema: { type: "object", properties: {} },
-          execute: async (args: any) => {
+          execute: async (args: ToolArgs) => {
             const id = args.id || "default";
             executionOrder.push(`start-${id}`);
 
@@ -68,7 +70,7 @@ describe("Semaphore Integration", () => {
 
   it("should allow parallel execution of different tools", async () => {
     // Register multiple different tools
-    const tools: any = {};
+    const tools: Record<string, ToolDefinition> = {};
     ["tool-a", "tool-b", "tool-c"].forEach((toolName) => {
       tools[toolName] = {
         name: toolName,

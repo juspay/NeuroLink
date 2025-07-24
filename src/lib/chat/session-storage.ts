@@ -6,6 +6,10 @@
 import type { SessionStorage, ChatSessionState } from "./types.js";
 import { promises as fs } from "fs";
 
+interface NodeError extends Error {
+  code?: string;
+}
+
 /**
  * In-memory session storage (default)
  */
@@ -101,7 +105,7 @@ export class FileSessionStorage implements SessionStorage {
       const data = await fs.readFile(filePath, "utf-8");
       return JSON.parse(data);
     } catch (error) {
-      if ((error as any)?.code === "ENOENT") {
+      if ((error as NodeError)?.code === "ENOENT") {
         return null; // File doesn't exist
       }
       throw error;
@@ -127,7 +131,7 @@ export class FileSessionStorage implements SessionStorage {
       const filePath = this.getFilePath(sessionId);
       await fs.unlink(filePath);
     } catch (error) {
-      if ((error as any)?.code !== "ENOENT") {
+      if ((error as NodeError)?.code !== "ENOENT") {
         throw error;
       }
     }
@@ -168,7 +172,7 @@ export class FileSessionStorage implements SessionStorage {
     try {
       await fs.mkdir(this.basePath, { recursive: true });
     } catch (error) {
-      if ((error as any)?.code !== "EEXIST") {
+      if ((error as NodeError)?.code !== "EEXIST") {
         throw error; // Rethrow unexpected errors
       }
       // Directory already exists, which is fine
@@ -182,10 +186,10 @@ export class FileSessionStorage implements SessionStorage {
 // Generic Redis client interface for better typing
 interface RedisClient {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string, options?: any): Promise<any>;
+  set(key: string, value: string, options?: unknown): Promise<unknown>;
   del(key: string): Promise<number>;
   exists(key: string): Promise<number>;
-  expire?(key: string, ttl: number): Promise<any>;
+  expire?(key: string, ttl: number): Promise<unknown>;
   keys?(pattern: string): Promise<string[]>;
 }
 

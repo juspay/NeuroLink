@@ -3,6 +3,7 @@
  * Connects MCP tools to NeuroLink AI providers following Lighthouse patterns
  */
 
+import type { Unknown, UnknownRecord } from "../types/common.js";
 import { mcpConfig } from "./config.js";
 import type {
   NeuroLinkExecutionContext,
@@ -66,8 +67,10 @@ export class MCPToolIntegration {
 
     for (const server of servers) {
       await this.registry.registerServer(
-        server.id || (server as any).name || "unknown",
-        server,
+        server.id ||
+          ((server as unknown as UnknownRecord).name as string) ||
+          "unknown",
+        server as unknown as UnknownRecord,
       );
     }
 
@@ -137,7 +140,7 @@ export class MCPToolIntegration {
    */
   async executeTool(
     toolName: string,
-    params: any,
+    params: Unknown,
     serverId?: string,
   ): Promise<ToolResult> {
     try {
@@ -171,7 +174,7 @@ export class MCPToolIntegration {
   async createToolAwarePrompt(userPrompt: string): Promise<string> {
     const tools = await this.getAvailableTools();
     const toolDescriptions = tools
-      .map((t: any) => `- ${t.name}: ${t.description}`)
+      .map((t: UnknownRecord) => `- ${t.name}: ${t.description}`)
       .join("\n");
 
     return `${userPrompt}
@@ -187,7 +190,7 @@ You can use these tools to provide more accurate and real-time information.`;
    */
   analyzeForToolUsage(aiResponse: string): Array<{
     toolName: string;
-    params: any;
+    params: Unknown;
     confidence: number;
   }> {
     const toolRequests = [];

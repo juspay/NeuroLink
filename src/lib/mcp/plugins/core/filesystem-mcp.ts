@@ -8,6 +8,7 @@ import type {
   MCPMetadata,
   ExecutionContext,
 } from "../../contracts/mcp-contract.js";
+import type { UnknownRecord } from "../../../types/common.js";
 import * as path from "path";
 
 interface FileSystemConfig {
@@ -19,12 +20,12 @@ interface FileSystemArgs {
   operation: "readFile" | "writeFile" | "listFiles" | "createDir";
   path: string;
   content?: string;
-  options?: any;
+  options?: UnknownRecord;
 }
 
 interface FileSystemResult {
   success: boolean;
-  data?: any;
+  data?: UnknownRecord;
   error?: string;
 }
 
@@ -118,7 +119,11 @@ export class FileSystemMCP extends MCP<
       data: {
         content,
         size: stats.size,
-        lastModified: stats.mtime,
+        lastModified:
+          (stats as { mtime?: Date; mtimeMs?: number }).mtime ||
+          new Date(
+            (stats as { mtime?: Date; mtimeMs?: number }).mtimeMs || Date.now(),
+          ),
         path: filePath,
       },
     };
@@ -156,7 +161,12 @@ export class FileSystemMCP extends MCP<
           name: item,
           type: stats.isDirectory() ? "directory" : "file",
           size: stats.isFile() ? stats.size : undefined,
-          lastModified: stats.mtime,
+          lastModified:
+            (stats as { mtime?: Date; mtimeMs?: number }).mtime ||
+            new Date(
+              (stats as { mtime?: Date; mtimeMs?: number }).mtimeMs ||
+                Date.now(),
+            ),
         });
       } catch {
         // Skip inaccessible items

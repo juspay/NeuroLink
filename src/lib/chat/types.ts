@@ -3,6 +3,8 @@
  * Type definitions for chat infrastructure
  */
 
+import type { JsonValue } from "../types/common.js";
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -46,7 +48,7 @@ export interface SessionOptions {
 
 export interface SSEEvent {
   type: "data" | "error" | "progress" | "complete" | "heartbeat";
-  data: any;
+  data: JsonValue;
   id?: string;
   retry?: number;
 }
@@ -56,7 +58,7 @@ export interface ChatSessionState {
   messages: ChatMessage[];
   createdAt: number;
   lastActivity: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, JsonValue>;
 }
 
 export interface StreamingChatResponse {

@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import type { Unknown } from "../../../types/common.js";
 import { createMCPServer } from "../../factory.js";
 import type { NeuroLinkExecutionContext, ToolResult } from "../../factory.js";
 import { logger } from "../../../utils/logger.js";
@@ -46,7 +47,7 @@ utilityServer.registerTool({
   inputSchema: GetCurrentTimeSchema,
   isImplemented: true,
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
@@ -161,7 +162,7 @@ utilityServer.registerTool({
   inputSchema: CalculateDateDifferenceSchema,
   isImplemented: true,
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
@@ -311,7 +312,7 @@ utilityServer.registerTool({
   inputSchema: FormatNumberSchema,
   isImplemented: true,
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();

@@ -17,6 +17,8 @@ if (!process.argv.includes("--debug")) {
 
 import { NeuroLink } from "../lib/neurolink.js";
 import type { AIProviderName } from "../lib/index.js";
+import type { AnalyticsData } from "../lib/types/providers.js";
+import type { JsonValue, UnknownRecord } from "../lib/types/common.js";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import ora from "ora";
@@ -33,7 +35,40 @@ import { logger } from "../lib/utils/logger.js";
  * Addresses DRY principle - extracted shared parts into reusable functions
  */
 
-function displayDebugInfo(title: string, data: any, debug: boolean) {
+interface EvaluationResult {
+  relevance: number;
+  accuracy: number;
+  completeness: number;
+  overall: number;
+  reasoning?: string;
+  // Additional properties that the CLI code expects
+  relevanceScore?: number;
+  accuracyScore?: number;
+  completenessScore?: number;
+  alertSeverity?: string;
+  suggestedImprovements?: string[];
+  evaluationModel?: string;
+  evaluationTime?: number;
+}
+
+interface CommandResult {
+  content?: string;
+  provider?: string;
+  model?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  };
+  responseTime?: number;
+  toolCalls?: JsonValue[];
+  toolResults?: JsonValue[];
+  analytics?: JsonValue;
+  evaluation?: JsonValue;
+  [key: string]: JsonValue | undefined;
+}
+
+function displayDebugInfo(title: string, data: JsonValue, debug: boolean) {
   if (debug) {
     console.log(chalk.blue(title));
     console.log(JSON.stringify(data, null, 2));
@@ -47,26 +82,26 @@ function displayMissingDataWarning(type: string) {
   console.log();
 }
 
-function formatAnalytics(analytics: any) {
+function formatAnalytics(analytics: AnalyticsData) {
   console.log();
   console.log(chalk.blue("📊 Analytics:"));
   console.log(`   🚀 Provider: ${analytics.provider}`);
   console.log(`   🤖 Model: ${analytics.model}`);
   if (analytics.tokens) {
+    const tokens = analytics.tokens as UnknownRecord;
     console.log(
-      `   💬 Tokens: ${analytics.tokens.totalTokens || analytics.tokens.total || "unknown"}`,
+      `   💬 Tokens: ${tokens.totalTokens || tokens.total || "unknown"}`,
     );
   }
   console.log(`   ⏱️  Response Time: ${analytics.responseTime}ms`);
   if (analytics.context) {
-    console.log(
-      `   📋 Context: ${Object.keys(analytics.context).length} fields`,
-    );
+    const context = analytics.context as UnknownRecord;
+    console.log(`   📋 Context: ${Object.keys(context).length} fields`);
   }
   console.log();
 }
 
-function formatEvaluation(evaluation: any) {
+function formatEvaluation(evaluation: EvaluationResult) {
   console.log();
   console.log(chalk.blue("⭐ Response Quality Evaluation:"));
   console.log(
@@ -75,7 +110,7 @@ function formatEvaluation(evaluation: any) {
   console.log(`   🎯 Overall Quality: ${evaluation.overall}/10`);
 
   const severity = evaluation.alertSeverity || "none";
-  const severityColors: { [key: string]: any } = {
+  const severityColors: { [key: string]: (text: string) => string } = {
     high: chalk.red,
     medium: chalk.yellow,
     low: chalk.blue,
@@ -99,20 +134,27 @@ function formatEvaluation(evaluation: any) {
   console.log();
 }
 
-function displayAnalyticsAndEvaluation(result: any, argv: any) {
+function displayAnalyticsAndEvaluation(
+  result: CommandResult,
+  argv: UnknownRecord,
+) {
   if (result && result.analytics) {
-    displayDebugInfo("📊 Analytics:", result.analytics, argv.debug);
+    displayDebugInfo("📊 Analytics:", result.analytics, argv.debug as boolean);
     if (!argv.debug) {
-      formatAnalytics(result.analytics);
+      formatAnalytics(result.analytics as AnalyticsData);
     }
   } else if (argv.enableAnalytics) {
     displayMissingDataWarning("Analytics");
   }
 
   if (result && result.evaluation) {
-    displayDebugInfo("⭐ Response Evaluation:", result.evaluation, argv.debug);
+    displayDebugInfo(
+      "⭐ Response Evaluation:",
+      result.evaluation,
+      argv.debug as boolean,
+    );
     if (!argv.debug) {
-      formatEvaluation(result.evaluation);
+      formatEvaluation(result.evaluation as unknown as EvaluationResult);
     }
   } else if (argv.enableEvaluation) {
     displayMissingDataWarning("Evaluation");
@@ -572,7 +614,7 @@ const cli = yargs(args)
 
       // Command is now the primary generate method
 
-      let originalConsole: any = {};
+      let originalConsole: Partial<Console> = {};
       if (
         (argv.format === "json" || argv.outputFormat === "json") &&
         !argv.quiet
@@ -582,7 +624,7 @@ const cli = yargs(args)
         (Object.keys(originalConsole) as Array<keyof Console>).forEach(
           (key) => {
             if (typeof console[key] === "function") {
-              (console[key] as any) = () => {};
+              (console[key] as unknown) = () => {};
             }
           },
         );
@@ -607,7 +649,7 @@ const cli = yargs(args)
         });
 
         // Parse context if provided
-        let contextObj: Record<string, any> | undefined;
+        let contextObj: UnknownRecord | undefined;
         if (argv.context) {
           try {
             contextObj = JSON.parse(argv.context);
@@ -659,10 +701,10 @@ const cli = yargs(args)
           };
           provider?: string;
           responseTime?: number;
-          toolCalls?: any[];
-          toolResults?: any[];
-          analytics?: any;
-          evaluation?: any;
+          toolCalls?: UnknownRecord[];
+          toolResults?: UnknownRecord[];
+          analytics?: AnalyticsData;
+          evaluation?: EvaluationResult;
         }
 
         const typedResult = result as AIResponse | undefined;
@@ -676,7 +718,7 @@ const cli = yargs(args)
         if (argv.format === "json" || argv.outputFormat === "json") {
           // CLI debug removed - analytics and evaluation now working correctly
 
-          const jsonOutput: any = {
+          const jsonOutput: UnknownRecord = {
             content: responseText,
             provider: typedResult?.provider || argv.provider,
             usage: responseUsage,
@@ -703,30 +745,33 @@ const cli = yargs(args)
           }
 
           // Show tool calls if any
+          const typedResultForTools = result as CommandResult;
           if (
-            result &&
-            (result as any).toolCalls &&
-            (result as any).toolCalls.length > 0
+            typedResultForTools &&
+            typedResultForTools.toolCalls &&
+            typedResultForTools.toolCalls.length > 0
           ) {
             console.log(chalk.blue("🔧 Tools Called:"));
-            for (const toolCall of (result as any).toolCalls) {
-              console.log(`- ${toolCall.toolName}`);
-              console.log(`  Args: ${JSON.stringify(toolCall.args)}`);
+            for (const toolCall of typedResultForTools.toolCalls) {
+              const toolCallObj = toolCall as UnknownRecord;
+              console.log(`- ${toolCallObj.toolName}`);
+              console.log(`  Args: ${JSON.stringify(toolCallObj.args)}`);
             }
             console.log();
           }
 
           // Show tool results if any
           if (
-            result &&
-            (result as any).toolResults &&
-            (result as any).toolResults.length > 0
+            typedResultForTools &&
+            typedResultForTools.toolResults &&
+            typedResultForTools.toolResults.length > 0
           ) {
             console.log(chalk.blue("📋 Tool Results:"));
-            for (const toolResult of (result as any).toolResults) {
-              console.log(`- ${toolResult.toolCallId}`);
+            for (const toolResult of typedResultForTools.toolResults) {
+              const toolResultObj = toolResult as UnknownRecord;
+              console.log(`- ${toolResultObj.toolCallId}`);
               console.log(
-                `  Result: ${JSON.stringify(toolResult.result).substring(0, 200)}...`,
+                `  Result: ${JSON.stringify(toolResultObj.result).substring(0, 200)}...`,
               );
             }
             console.log();
@@ -738,8 +783,8 @@ const cli = yargs(args)
               keys: Object.keys(result || {}),
             });
             logger.debug("Enhancement status:", {
-              hasAnalytics: !!(result && (result as any).analytics),
-              hasEvaluation: !!(result && (result as any).evaluation),
+              hasAnalytics: !!(result && (result as CommandResult).analytics),
+              hasEvaluation: !!(result && (result as CommandResult).evaluation),
               enableAnalytics: argv.enableAnalytics,
               enableEvaluation: argv.enableEvaluation,
               hasContext: !!contextObj,
@@ -747,16 +792,18 @@ const cli = yargs(args)
           }
 
           // Show analytics and evaluation if enabled
-          displayAnalyticsAndEvaluation(result, argv);
+          displayAnalyticsAndEvaluation(result as CommandResult, argv);
 
           console.log(
             JSON.stringify(
               {
                 provider: result
-                  ? (result as any).provider || argv.provider
+                  ? (result as CommandResult).provider || argv.provider
                   : argv.provider,
                 usage: responseUsage,
-                responseTime: result ? (result as any).responseTime || 0 : 0,
+                responseTime: result
+                  ? (result as CommandResult).responseTime || 0
+                  : 0,
               },
               null,
               2,
@@ -774,7 +821,7 @@ const cli = yargs(args)
           }
 
           // Show analytics and evaluation if enabled
-          displayAnalyticsAndEvaluation(result, argv);
+          displayAnalyticsAndEvaluation(result as CommandResult, argv);
         }
 
         // Explicitly exit to prevent hanging, especially with Google AI Studio
@@ -934,7 +981,7 @@ const cli = yargs(args)
 
       try {
         // Parse context if provided
-        let contextObj: Record<string, any> | undefined;
+        let contextObj: UnknownRecord | undefined;
         if (argv.context) {
           try {
             contextObj = JSON.parse(argv.context);
@@ -1249,7 +1296,7 @@ const cli = yargs(args)
                   const { models } = await serviceResponse.json();
                   const defaultOllamaModel = "llama3.2:latest";
                   const modelIsAvailable = models.some(
-                    (m: any) => m.name === defaultOllamaModel,
+                    (m: { name: string }) => m.name === defaultOllamaModel,
                   );
 
                   if (modelIsAvailable) {
@@ -1304,7 +1351,7 @@ const cli = yargs(args)
                 // Add timeout to prevent hanging
                 const testPromise = sdk.generate({
                   input: { text: "test" },
-                  provider: p as any,
+                  provider: p,
                   maxTokens: 1,
                   disableTools: true, // Disable tools for faster status check
                 });

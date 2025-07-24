@@ -6,6 +6,7 @@
 
 import { spawn, ChildProcess } from "child_process";
 import { EventEmitter } from "events";
+import type { ZodType } from "zod";
 import type {
   NeuroLinkMCPTool,
   NeuroLinkExecutionContext,
@@ -33,12 +34,12 @@ interface MCPMessage {
   jsonrpc: "2.0";
   id?: string | number;
   method?: string;
-  params?: any;
-  result?: any;
+  params?: unknown;
+  result?: unknown;
   error?: {
     code: number;
     message: string;
-    data?: any;
+    data?: unknown;
   };
 }
 
@@ -48,7 +49,7 @@ interface MCPMessage {
 interface MCPToolInfo {
   name: string;
   description?: string;
-  inputSchema?: any;
+  inputSchema?: unknown;
 }
 
 /**
@@ -62,7 +63,7 @@ export class ExternalMCPClient extends EventEmitter {
   private pendingRequests = new Map<
     string | number,
     {
-      resolve: (value: any) => void;
+      resolve: (value: unknown) => void;
       reject: (error: Error) => void;
       timeout: NodeJS.Timeout;
     }
@@ -187,14 +188,20 @@ export class ExternalMCPClient extends EventEmitter {
     try {
       const response = await this.sendRequest("tools/list", {});
 
-      if (response.tools && Array.isArray(response.tools)) {
+      const responseObj = response as { tools?: unknown[] };
+      if (responseObj.tools && Array.isArray(responseObj.tools)) {
         this.tools.clear();
 
-        for (const tool of response.tools) {
-          this.tools.set(tool.name, {
-            name: tool.name,
-            description: tool.description,
-            inputSchema: tool.inputSchema,
+        for (const tool of responseObj.tools) {
+          const toolObj = tool as {
+            name?: string;
+            description?: string;
+            inputSchema?: unknown;
+          };
+          this.tools.set(toolObj.name || "unknown", {
+            name: toolObj.name || "unknown",
+            description: toolObj.description || "",
+            inputSchema: toolObj.inputSchema,
           });
         }
 
@@ -215,7 +222,7 @@ export class ExternalMCPClient extends EventEmitter {
    */
   async executeTool(
     toolName: string,
-    params: any,
+    params: unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> {
     if (!this.isConnected) {
@@ -237,9 +244,14 @@ export class ExternalMCPClient extends EventEmitter {
       const executionTime = Date.now() - startTime;
 
       // Transform MCP response to NeuroLink format
+      const responseObj = response as {
+        isError?: boolean;
+        text?: unknown;
+        result?: unknown;
+      };
       const result: ToolResult = {
-        success: !response.isError,
-        data: response.text || response.result || response,
+        success: !responseObj.isError,
+        data: responseObj.text || responseObj.result || response,
         metadata: {
           toolName,
           serverId: this.config.name,
@@ -250,8 +262,11 @@ export class ExternalMCPClient extends EventEmitter {
         },
       };
 
-      if (response.isError) {
-        result.error = response.text?.[0]?.text || "Tool execution failed";
+      if (responseObj.isError) {
+        const textArray = responseObj.text as
+          | Array<{ text?: string }>
+          | undefined;
+        result.error = textArray?.[0]?.text || "Tool execution failed";
       }
 
       logger.debug(
@@ -299,7 +314,7 @@ export class ExternalMCPClient extends EventEmitter {
         ) => {
           return this.executeTool(name, params, context);
         },
-        inputSchema: toolInfo.inputSchema,
+        inputSchema: toolInfo.inputSchema as ZodType<unknown> | undefined,
         metadata: {
           serverId: this.config.name,
           serverTitle: this.config.name,
@@ -315,7 +330,7 @@ export class ExternalMCPClient extends EventEmitter {
   /**
    * Send a request to the MCP server
    */
-  private async sendRequest(method: string, params: any): Promise<any> {
+  private async sendRequest(method: string, params: unknown): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.process?.stdin) {
         reject(new Error("Process not available"));

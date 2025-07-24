@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { exec } from "child_process";
 import { promisify } from "util";
+import type { UnknownRecord } from "../src/lib/types/common.js";
 
 const execAsync = promisify(exec);
 
@@ -315,9 +316,13 @@ describe("NeuroLink Complete Baseline Test", () => {
             `${cliPrefix} stream "Long task" --provider google-ai --max-tokens 2000 --disable-tools --timeout 1s`,
           );
           expect(stdout).toContain("Streaming..."); // Should start streaming
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Should either work or timeout gracefully
-          expect(error.stderr || error.stdout).toMatch(/timeout|error/i);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(/timeout|error/i);
         }
       },
       timeout,
@@ -372,8 +377,12 @@ describe("NeuroLink Complete Baseline Test", () => {
           await execAsync(
             `cd ${process.cwd()} && GOOGLE_AI_API_KEY=invalid-key pnpm cli generate "Test" --provider google-ai --max-tokens 2000`,
           );
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(
             /api.key|authentication|invalid|error/i,
           );
         }
@@ -390,8 +399,12 @@ describe("NeuroLink Complete Baseline Test", () => {
           );
           // Should either work or show clear error
           expect(stdout).toBeDefined();
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(/token|limit|maximum/i);
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(/token|limit|maximum/i);
         }
       },
       timeout,
@@ -404,8 +417,12 @@ describe("NeuroLink Complete Baseline Test", () => {
           await execAsync(
             `${cliPrefix} generate "Test" --provider google-ai --model invalid-model-name`,
           );
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(
             /model|invalid|not.found/i,
           );
         }
@@ -420,8 +437,12 @@ describe("NeuroLink Complete Baseline Test", () => {
           await execAsync(
             `${cliPrefix} generate "Test" --provider google-ai --context '{invalid-json'`,
           );
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(
             /json|context|invalid|parse/i,
           );
         }
@@ -449,10 +470,12 @@ describe("NeuroLink Complete Baseline Test", () => {
           await execAsync(
             `${cliPrefix} generate "Test" --provider invalid-provider`,
           );
-        } catch (error: any) {
-          expect(error.stderr || error.stdout).toMatch(
-            /provider|error|invalid/i,
-          );
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          const errorStderr = (error as UnknownRecord)?.stderr || "";
+          const errorStdout = (error as UnknownRecord)?.stdout || "";
+          expect(errorStderr || errorStdout).toMatch(/provider|error|invalid/i);
         }
       },
       timeout,

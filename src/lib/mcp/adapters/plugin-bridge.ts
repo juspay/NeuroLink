@@ -4,6 +4,7 @@
  */
 
 import type { ExecutionContext } from "../contracts/mcp-contract.js";
+import type { JsonValue, UnknownRecord, Unknown } from "../../types/common.js";
 import * as path from "path";
 
 /**
@@ -65,17 +66,24 @@ export function enhanceExecutionContext(
 export async function adaptLegacyMCPCall(
   context: ExecutionContext,
   operation: string,
-  ...args: any[]
-): Promise<any> {
+  ...args: JsonValue[]
+): Promise<Unknown> {
   const bridge = createLegacyBridge(context);
 
   switch (operation) {
-    case "writeFile":
-      return bridge.writeFile(args[0], args[1]);
-    case "readFile":
-      return bridge.readFile(args[0]);
-    case "listFiles":
-      return bridge.listFiles(args[0]);
+    case "writeFile": {
+      const filePath = typeof args[0] === "string" ? args[0] : String(args[0]);
+      const content = typeof args[1] === "string" ? args[1] : String(args[1]);
+      return bridge.writeFile(filePath, content);
+    }
+    case "readFile": {
+      const readPath = typeof args[0] === "string" ? args[0] : String(args[0]);
+      return bridge.readFile(readPath);
+    }
+    case "listFiles": {
+      const listPath = typeof args[0] === "string" ? args[0] : String(args[0]);
+      return bridge.listFiles(listPath);
+    }
     default:
       throw new Error(`Unsupported legacy operation: ${operation}`);
   }
@@ -85,7 +93,7 @@ export async function adaptLegacyMCPCall(
  * Quick plugin factory for simple plugin creation
  */
 export class QuickPluginFactory {
-  static async create(name: string, config: any) {
+  static async create(name: string, config: UnknownRecord) {
     // Simple factory implementation
     return {
       name,
@@ -99,11 +107,11 @@ export class QuickPluginFactory {
  * Execute plugin with enhanced context
  */
 export async function executePlugin(
-  plugin: any,
+  plugin: UnknownRecord,
   context: ExecutionContext,
   operation: string,
-  ...args: any[]
-): Promise<any> {
+  ...args: JsonValue[]
+): Promise<Unknown> {
   const enhancedContext = enhanceExecutionContext(context);
 
   if (typeof plugin.execute === "function") {

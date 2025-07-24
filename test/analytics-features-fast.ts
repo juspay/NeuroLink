@@ -1,6 +1,7 @@
 import { exec } from "child_process";
 import dotenv from "dotenv";
 import { execWithTimeout } from "./shared/exec-with-timeout.js";
+import type { Unknown } from "../src/lib/types/common.js";
 
 // Load environment variables
 dotenv.config();
@@ -38,7 +39,7 @@ interface CommandOptions {
   enableAnalytics?: boolean;
   disableTools?: boolean;
   outputFormat?: string;
-  [key: string]: any;
+  [key: string]: Unknown;
 }
 
 function buildCommand(

@@ -151,9 +151,11 @@ describe("SDK Comprehensive Tests", () => {
 
           // Accept either success or error (streaming might have issues)
           expect(stdout).toContain("SDK_STREAM_SUCCESS: true");
-        } catch (error: any) {
+        } catch (error: unknown) {
           // FIXED: No longer accept timeouts as passing tests
-          throw new Error(`Test failed: ${error.message}`);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          throw new Error(`Test failed: ${errorMessage}`);
         }
       },
       timeout,

@@ -9,6 +9,7 @@ import type {
   NeuroLinkMCPTool,
   NeuroLinkExecutionContext,
 } from "./factory.js";
+import type { UnknownRecord } from "../types/common.js";
 import { mcpConfig } from "./config.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
@@ -202,7 +203,7 @@ export const initializeMCPTools = async (
  * Useful for documentation and discovery
  */
 export async function getAllAvailableTools(
-  inMemoryServers?: Map<string, any>,
+  inMemoryServers?: Map<string, UnknownRecord>,
 ): Promise<
   Array<{
     serverId: string;
@@ -226,14 +227,22 @@ export async function getAllAvailableTools(
   if (inMemoryServers) {
     for (const [serverId, serverConfig] of inMemoryServers) {
       const server = serverConfig.server;
-      if (server && server.tools) {
+      if (
+        server &&
+        typeof server === "object" &&
+        "tools" in server &&
+        server.tools
+      ) {
         // Handle both Map and object formats
         const toolEntries =
           server.tools instanceof Map
             ? Array.from(server.tools.entries())
             : Object.entries(server.tools || {});
 
-        for (const [toolName, toolInfo] of toolEntries as [string, any][]) {
+        for (const [toolName, toolInfo] of toolEntries as [
+          string,
+          UnknownRecord,
+        ][]) {
           const prefix = `${serverId}_`;
           const finalToolName =
             toolName.length > 64 - prefix.length
@@ -262,7 +271,13 @@ export async function getAllAvailableTools(
 
           tools.push({
             serverId,
-            serverTitle: server.title || serverId,
+            serverTitle:
+              typeof server === "object" &&
+              server &&
+              "title" in server &&
+              typeof server.title === "string"
+                ? server.title
+                : serverId,
             toolName,
             namespacedName,
             description,

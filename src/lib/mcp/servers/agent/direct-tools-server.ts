@@ -3,6 +3,8 @@
  * Wraps the agent direct tools as an MCP server for proper registration
  */
 
+import type { Unknown, UnknownRecord } from "../../../types/common.js";
+import { z } from "zod";
 import { createMCPServer } from "../../factory.js";
 import type { NeuroLinkExecutionContext, ToolResult } from "../../factory.js";
 import { directAgentTools } from "../../../agent/direct-tools.js";
@@ -25,19 +27,31 @@ export const directToolsServer = createMCPServer({
 Object.entries(directAgentTools).forEach(([toolName, toolDef]) => {
   // The toolDef is a Vercel AI SDK Tool object
   // Extract properties from the Tool object
-  const toolSpec = (toolDef as any)._spec || toolDef;
-  const description = toolSpec.description || `Direct tool: ${toolName}`;
-  const inputSchema = toolSpec.parameters;
-  const execute = toolSpec.execute;
+  const toolSpec = (toolDef as UnknownRecord)._spec || toolDef;
+  const description =
+    typeof toolSpec === "object" &&
+    toolSpec &&
+    "description" in toolSpec &&
+    typeof toolSpec.description === "string"
+      ? toolSpec.description
+      : `Direct tool: ${toolName}`;
+  const inputSchema =
+    typeof toolSpec === "object" && toolSpec && "parameters" in toolSpec
+      ? toolSpec.parameters
+      : undefined;
+  const execute =
+    typeof toolSpec === "object" && toolSpec && "execute" in toolSpec
+      ? toolSpec.execute
+      : undefined;
 
   directToolsServer.registerTool({
     name: toolName,
     description: description,
     category: getToolCategory(toolName),
-    inputSchema: inputSchema,
+    inputSchema: inputSchema as z.ZodSchema | undefined,
     isImplemented: true,
     execute: async (
-      params: any,
+      params: Unknown,
       context: NeuroLinkExecutionContext,
     ): Promise<ToolResult> => {
       const startTime = Date.now();
@@ -49,13 +63,18 @@ Object.entries(directAgentTools).forEach(([toolName, toolDef]) => {
         );
 
         // Execute the direct tool
-        const result = await execute(params);
+        if (!execute || typeof execute !== "function") {
+          throw new Error(`Tool ${toolName} has no execute function`);
+        }
+        const result = await (execute as (params: Unknown) => Promise<Unknown>)(
+          params,
+        );
 
         // Convert direct tool result to ToolResult format
-        if (result.success) {
+        if ((result as UnknownRecord)?.success) {
           return {
             success: true,
-            data: result,
+            data: (result as UnknownRecord).data || result,
             usage: {
               executionTime: Date.now() - startTime,
             },
@@ -69,7 +88,7 @@ Object.entries(directAgentTools).forEach(([toolName, toolDef]) => {
           return {
             success: false,
             data: null,
-            error: result.error || "Unknown error",
+            error: String((result as UnknownRecord)?.error) || "Unknown error",
             usage: {
               executionTime: Date.now() - startTime,
             },

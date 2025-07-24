@@ -53,21 +53,23 @@ export function createProxyFetch(): typeof fetch {
 
         // Use undici fetch with dispatcher
         const response = await undici.fetch(
-          input as any,
+          input as string,
           {
             ...init,
             dispatcher: dispatcher,
-          } as any,
+          } as unknown as import("undici").RequestInit,
         );
 
         logger.debug(
           `[Proxy Fetch] ✅ Request proxied successfully to ${url.hostname}`,
         );
-        return response as any; // Type assertion to avoid complex type issues
+        return response as unknown as Response; // undici.fetch returns compatible Response type
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.warn(
-        `[Proxy Fetch] Proxy failed (${error.message}), falling back to direct connection`,
+        `[Proxy Fetch] Proxy failed (${errorMessage}), falling back to direct connection`,
       );
     }
 

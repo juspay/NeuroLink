@@ -39,7 +39,7 @@ export interface InMemoryMCPServerConfig {
     provider?: string;
     version?: string;
     author?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -55,12 +55,14 @@ export interface InMemoryToolInfo {
   /**
    * Tool execution function
    */
-  execute: (params: any) => Promise<InMemoryToolResult> | InMemoryToolResult;
+  execute: (
+    params: unknown,
+  ) => Promise<InMemoryToolResult> | InMemoryToolResult;
 
   /**
    * Input parameter schema (Zod or JSON Schema)
    */
-  inputSchema?: any;
+  inputSchema?: unknown;
 
   /**
    * Whether the tool is implemented (default: true)
@@ -70,7 +72,7 @@ export interface InMemoryToolInfo {
   /**
    * Optional metadata
    */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -85,7 +87,7 @@ export interface InMemoryToolResult {
   /**
    * Result data if successful
    */
-  data?: any;
+  data?: unknown;
 
   /**
    * Error message if failed
@@ -99,7 +101,7 @@ export interface InMemoryToolResult {
     executionTime?: number;
     toolName?: string;
     serverId?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -130,7 +132,11 @@ export interface UnifiedMCPRegistry {
   /**
    * Execute a tool
    */
-  executeTool(toolName: string, params: any, context: any): Promise<any>;
+  executeTool(
+    toolName: string,
+    params: unknown,
+    context: unknown,
+  ): Promise<unknown>;
 
   /**
    * Check if connected to a server

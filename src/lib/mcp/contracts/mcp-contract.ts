@@ -41,8 +41,12 @@ export interface ExecutionContext {
     readFile: (path: string, encoding?: string) => Promise<string | Buffer>;
     writeFile: (path: string, content: string | Buffer) => Promise<void>;
     readdir: (path: string) => Promise<string[]>;
-    stat: (path: string) => Promise<any>;
-    mkdir: (path: string, options?: any) => Promise<void>;
+    stat: (path: string) => Promise<{
+      size: number;
+      isFile: () => boolean;
+      isDirectory: () => boolean;
+    }>;
+    mkdir: (path: string, options?: { recursive?: boolean }) => Promise<void>;
     exists: (path: string) => Promise<boolean>;
   };
   /** Sandboxed path operations */
@@ -55,7 +59,7 @@ export interface ExecutionContext {
   };
   /** Sandboxed network operations (future) */
   secureNet?: {
-    fetch: (url: string, options?: any) => Promise<Response>;
+    fetch: (url: string, options?: RequestInit) => Promise<Response>;
   };
   /** Plugin-specific permissions granted */
   grantedPermissions: string[];
@@ -63,17 +67,21 @@ export interface ExecutionContext {
   log: (
     level: "debug" | "info" | "warn" | "error",
     message: string,
-    data?: any,
+    data?: unknown,
   ) => void;
   /** Plugin instance reference (for plugin bridge compatibility) */
-  plugin?: any;
+  plugin?: unknown;
 }
 
 /**
  * MCP Abstract Class - The Core Contract for All Plugins
  * Uses TypeScript generics for type-safe configuration
  */
-export abstract class MCP<TConfig = any, TArgs = any, TResult = any> {
+export abstract class MCP<
+  TConfig = unknown,
+  TArgs = unknown,
+  TResult = unknown,
+> {
   /** Static metadata loaded from manifest */
   abstract readonly metadata: MCPMetadata;
 
@@ -141,7 +149,7 @@ export abstract class MCP<TConfig = any, TArgs = any, TResult = any> {
     context: ExecutionContext,
     level: "debug" | "info" | "warn" | "error",
     message: string,
-    data?: any,
+    data?: unknown,
   ): void {
     context.log(level, `[${this.metadata.name}] ${message}`, data);
   }
@@ -161,6 +169,7 @@ export interface DiscoveredMCP {
   entryPath: string;
   source: "core" | "project" | "installed";
   constructor?: MCPConstructor;
+  [key: string]: unknown;
 }
 
 /**
@@ -185,7 +194,7 @@ export interface PluginDiscoveryResult {
 /**
  * Plugin execution result
  */
-export interface PluginExecutionResult<T = any> {
+export interface PluginExecutionResult<T = unknown> {
   success: boolean;
   result?: T;
   error?: string;

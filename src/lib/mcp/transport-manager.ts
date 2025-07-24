@@ -5,7 +5,9 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
+import type { UnknownRecord } from "../types/common.js";
 import { ErrorManager } from "./error-manager.js";
 import { ErrorCategory, ErrorSeverity } from "./error-manager.js";
 
@@ -146,7 +148,7 @@ export class TransportManager {
   /**
    * Create transport based on configuration
    */
-  async createTransport(config: TransportConfig): Promise<any> {
+  async createTransport(config: TransportConfig): Promise<Transport> {
     switch (config.type) {
       case "stdio":
         return this.createStdioTransport(config);
@@ -155,7 +157,9 @@ export class TransportManager {
       case "http":
         return this.createHTTPTransport(config);
       default:
-        throw new Error(`Unsupported transport type: ${(config as any).type}`);
+        throw new Error(
+          `Unsupported transport type: ${(config as UnknownRecord).type}`,
+        );
     }
   }
 
@@ -204,7 +208,7 @@ export class TransportManager {
         eventSource: ReconnectingEventSource,
         max_retry_time: config.maxRetryTime,
         withCredentials: config.withCredentials,
-      } as any,
+      } as UnknownRecord,
     });
   }
 
@@ -219,9 +223,16 @@ export class TransportManager {
       "@modelcontextprotocol/sdk/client/streamableHttp.js"
     );
     const HTTPClientTransport =
-      (httpModule as any).default || (httpModule as any).HTTPClientTransport;
+      (httpModule as UnknownRecord).default ||
+      (httpModule as UnknownRecord).HTTPClientTransport;
 
-    return new HTTPClientTransport(new URL(config.url), {
+    if (!HTTPClientTransport || typeof HTTPClientTransport !== "function") {
+      throw new Error("HTTPClientTransport constructor not found");
+    }
+    return new (HTTPClientTransport as new (
+      url: URL,
+      options: UnknownRecord,
+    ) => Transport)(new URL(config.url), {
       requestInit: {
         headers: config.headers,
         timeout: config.timeout * 1000, // Convert seconds to milliseconds

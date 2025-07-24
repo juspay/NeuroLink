@@ -41,6 +41,8 @@ import {
   createMCPServerFromTools,
 } from "./sdk/tool-registration.js";
 import type { InMemoryMCPServerConfig } from "./types/mcp-types.js";
+import type { JsonValue, UnknownRecord } from "./types/common.js";
+import type { ToolArgs } from "./types/tools.js";
 
 // Provider and MCP diagnostic types
 export interface ProviderStatus {
@@ -71,7 +73,7 @@ export interface MCPServerInfo {
   source: string;
   status: "connected" | "discovered" | "failed";
   hasServer: boolean;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 // Core types imported from core/types.js
@@ -161,7 +163,7 @@ export class NeuroLink {
       // 🔧 FIX: Include analytics and evaluation options!
       enableAnalytics: options.enableAnalytics,
       enableEvaluation: options.enableEvaluation,
-      context: options.context,
+      context: options.context as Record<string, JsonValue> | undefined,
       evaluationDomain: options.evaluationDomain,
       toolUsageContext: options.toolUsageContext,
     };
@@ -183,20 +185,57 @@ export class NeuroLink {
         : undefined,
       responseTime: textResult.responseTime,
       toolsUsed: textResult.toolsUsed,
-      toolExecutions: textResult.toolExecutions?.map((te: any) => ({
-        name: te.toolName || te.name || "",
-        input: te.input || {},
-        output: te.output || te.result,
-        duration: te.executionTime || te.duration || 0,
-      })),
+      toolExecutions: textResult.toolExecutions?.map((te) => {
+        const teRecord = te as UnknownRecord;
+        return {
+          name: te.toolName || (teRecord.name as string) || "",
+          input:
+            (teRecord.input as Record<string, unknown>) ||
+            (teRecord.args as Record<string, unknown>) ||
+            {},
+          output:
+            (teRecord.output as string) ||
+            (teRecord.result as string) ||
+            (te.success ? "success" : "failed"),
+          duration: te.executionTime || (teRecord.duration as number) || 0,
+        };
+      }),
       enhancedWithTools: textResult.enhancedWithTools,
-      availableTools: textResult.availableTools?.map((tool: any) => ({
-        name: tool.name || "",
-        description: tool.description || "",
-        parameters: tool.parameters || {},
-      })),
-      analytics: (textResult as any).analytics,
-      evaluation: (textResult as any).evaluation,
+      availableTools: textResult.availableTools?.map((tool) => {
+        const toolRecord = tool as UnknownRecord;
+        return {
+          name: tool.name || "",
+          description: tool.description || "",
+          parameters:
+            (toolRecord.parameters as Record<string, unknown>) ||
+            (toolRecord.schema as Record<string, unknown>) ||
+            {},
+        };
+      }),
+      analytics: textResult.analytics,
+      evaluation: textResult.evaluation
+        ? {
+            ...textResult.evaluation,
+            isOffTopic:
+              ((textResult.evaluation as UnknownRecord)
+                .isOffTopic as boolean) ?? false,
+            alertSeverity:
+              ((textResult.evaluation as UnknownRecord).alertSeverity as
+                | "low"
+                | "medium"
+                | "high"
+                | "none") ?? ("none" as const),
+            reasoning:
+              ((textResult.evaluation as UnknownRecord).reasoning as string) ??
+              "No evaluation provided",
+            evaluationModel:
+              ((textResult.evaluation as UnknownRecord)
+                .evaluationModel as string) ?? "unknown",
+            evaluationTime:
+              ((textResult.evaluation as UnknownRecord)
+                .evaluationTime as number) ?? Date.now(),
+          }
+        : undefined,
     };
 
     return generateResult;
@@ -311,11 +350,12 @@ export class NeuroLink {
 
       try {
         const allTools = await toolRegistry.listTools();
-        availableTools = allTools.map((tool: any) => ({
-          name: tool.name,
-          description: tool.description || "No description available",
-          server: tool.server,
-          category: tool.category,
+        availableTools = allTools.map((tool: UnknownRecord) => ({
+          name: (tool.name as string) || "Unknown",
+          description:
+            (tool.description as string) || "No description available",
+          server: (tool.server as string) || "Unknown",
+          category: tool.category as string | undefined,
         }));
       } catch (error) {
         mcpLogger.warn(`[${functionTag}] Failed to get tools`, { error });
@@ -332,7 +372,7 @@ export class NeuroLink {
         providerName as AIProviderName,
         options.model,
         !options.disableTools, // Pass disableTools as inverse of enableMCP
-        this, // Pass SDK instance
+        this as unknown as UnknownRecord, // Pass SDK instance
       );
 
       const result = await provider.generate({
@@ -356,9 +396,9 @@ export class NeuroLink {
         toolsUsed: [],
         enhancedWithTools: true,
         availableTools: availableTools.length > 0 ? availableTools : undefined,
-        // 🔧 FIX: Include analytics and evaluation from BaseProvider
-        analytics: (result as any).analytics,
-        evaluation: (result as any).evaluation,
+        // Include analytics and evaluation from BaseProvider
+        analytics: result.analytics,
+        evaluation: result.evaluation,
       };
     } catch (error) {
       mcpLogger.warn(`[${functionTag}] MCP generation failed`, {
@@ -414,7 +454,7 @@ export class NeuroLink {
           providerName as AIProviderName,
           options.model,
           !options.disableTools, // Pass disableTools as inverse of enableMCP
-          this, // Pass SDK instance
+          this as unknown as UnknownRecord, // Pass SDK instance
         );
 
         const result = await provider.generate(options);
@@ -437,8 +477,8 @@ export class NeuroLink {
           responseTime,
           toolsUsed: [],
           enhancedWithTools: false,
-          analytics: (result as any).analytics,
-          evaluation: (result as any).evaluation,
+          analytics: result.analytics,
+          evaluation: result.evaluation,
         };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -563,7 +603,7 @@ export class NeuroLink {
         providerName,
         options.model,
         true,
-        this, // Pass SDK instance
+        this as unknown as UnknownRecord, // Pass SDK instance
       );
 
       // Call the provider's stream method directly
@@ -603,7 +643,7 @@ export class NeuroLink {
         providerName,
         options.model,
         false, // Disable MCP for fallback
-        this, // Pass SDK instance
+        this as unknown as UnknownRecord, // Pass SDK instance
       );
 
       const streamResult = await provider.stream(options);
@@ -750,9 +790,9 @@ export class NeuroLink {
    * @param options - Execution options
    * @returns Tool execution result
    */
-  async executeTool<T = any>(
+  async executeTool<T = unknown>(
     toolName: string,
-    params: any = {},
+    params: unknown = {},
     options?: { timeout?: number },
   ): Promise<T> {
     const functionTag = "NeuroLink.executeTool";
@@ -773,7 +813,7 @@ export class NeuroLink {
         };
 
         const startTime = Date.now();
-        const result = await tool.execute(params, context);
+        const result = await tool.execute(params as ToolArgs, context);
         const executionTime = Date.now() - startTime;
 
         mcpLogger.debug(`[${functionTag}] Custom tool executed successfully`, {
@@ -887,7 +927,9 @@ export class NeuroLink {
    */
   async getAllAvailableTools() {
     const { getAllAvailableTools } = await import("./mcp/initialize-tools.js");
-    return getAllAvailableTools(this.inMemoryServers);
+    return getAllAvailableTools(
+      this.inMemoryServers as unknown as Map<string, UnknownRecord>,
+    );
   }
 
   // ============================================================================
@@ -950,7 +992,7 @@ export class NeuroLink {
           const { models } = await response.json();
           const defaultOllamaModel = "llama3.2:latest";
           const modelIsAvailable = models.some(
-            (m: any) => m.name === defaultOllamaModel,
+            (m: UnknownRecord) => m.name === defaultOllamaModel,
           );
 
           if (modelIsAvailable) {
@@ -1046,7 +1088,7 @@ export class NeuroLink {
     const { AIProviderFactory } = await import("./core/factory.js");
 
     const provider = await AIProviderFactory.createProvider(
-      providerName as any,
+      providerName as AIProviderName,
       null,
       false, // Disable MCP for testing
     );

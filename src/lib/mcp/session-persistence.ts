@@ -7,13 +7,21 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { existsSync } from "fs";
+import type { Unknown } from "../types/common.js";
 import type { OrchestratorSession } from "./session-manager.js";
+
+/**
+ * Serialized session data for JSON storage
+ */
+interface SerializedSession extends Omit<OrchestratorSession, "state"> {
+  state: Array<[string, unknown]>;
+}
 
 /**
  * Session file metadata
  */
 interface SessionFile {
-  session: OrchestratorSession;
+  session: SerializedSession;
   checksum: string;
   version: string;
   lastSaved: number;
@@ -94,13 +102,13 @@ export class SessionPersistence {
    */
   private serializeSession(session: OrchestratorSession): string {
     // Convert Map to array for JSON serialization
-    const sessionData = {
+    const sessionData: SerializedSession = {
       ...session,
       state: Array.from(session.state.entries()),
     };
 
     const fileData: SessionFile = {
-      session: sessionData as any,
+      session: sessionData as SerializedSession,
       checksum: "",
       version: "1.0",
       lastSaved: Date.now(),
@@ -140,8 +148,11 @@ export class SessionPersistence {
       }
 
       // Convert state array back to Map
-      const session = fileData.session;
-      session.state = new Map(session.state as any);
+      const serializedSession = fileData.session;
+      const session: OrchestratorSession = {
+        ...serializedSession,
+        state: new Map(serializedSession.state),
+      };
 
       return session;
     } catch (error) {
@@ -218,7 +229,7 @@ export class SessionPersistence {
       const data = await fs.readFile(filepath, "utf8");
       return this.deserializeSession(data);
     } catch (error) {
-      if ((error as any).code !== "ENOENT") {
+      if ((error as { code?: string }).code !== "ENOENT") {
         console.error(
           `[SessionPersistence] Failed to load session ${sessionId}:`,
           error,
@@ -304,7 +315,7 @@ export class SessionPersistence {
       // Keep memory and disk state in sync
       this.sessionMap.delete(sessionId);
     } catch (error) {
-      if ((error as any).code !== "ENOENT") {
+      if ((error as { code?: string }).code !== "ENOENT") {
         console.error(
           `[SessionPersistence] Failed to delete session ${sessionId}:`,
           error,

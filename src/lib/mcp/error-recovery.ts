@@ -10,6 +10,7 @@ import type {
   ErrorSeverity,
 } from "./error-manager.js";
 import type { NeuroLinkExecutionContext } from "./factory.js";
+import type { UnknownRecord } from "../types/common.js";
 
 /**
  * Circuit breaker states
@@ -23,7 +24,7 @@ export enum CircuitState {
 /**
  * Retry strategy configuration
  */
-export interface RetryConfig {
+export interface RetryConfig extends UnknownRecord {
   maxAttempts: number;
   initialDelay: number;
   maxDelay: number;
@@ -34,7 +35,7 @@ export interface RetryConfig {
 /**
  * Circuit breaker configuration
  */
-export interface CircuitBreakerConfig {
+export interface CircuitBreakerConfig extends UnknownRecord {
   failureThreshold: number; // Number of failures to open circuit
   resetTimeout: number; // Time to wait before half-open
   successThreshold: number; // Successes needed to close from half-open
@@ -58,7 +59,7 @@ export interface ErrorPattern {
  */
 export interface RecoveryStrategy {
   type: "retry" | "circuit-breaker" | "fallback" | "manual";
-  config?: any;
+  config?: UnknownRecord;
   action?: (context: RecoveryContext) => Promise<RecoveryResult>;
 }
 
@@ -369,14 +370,14 @@ export class ErrorRecovery {
         case "retry":
           result = await this.executeRetryStrategy(
             recoveryContext,
-            strategy.config,
+            strategy.config as RetryConfig | undefined,
           );
           break;
 
         case "circuit-breaker":
           result = await this.executeCircuitBreakerStrategy(
             recoveryContext,
-            strategy.config,
+            strategy.config as CircuitBreakerConfig | undefined,
           );
           break;
 
@@ -482,7 +483,7 @@ export class ErrorRecovery {
    */
   private async executeFallbackStrategy(
     context: RecoveryContext,
-    config?: any,
+    config?: UnknownRecord,
   ): Promise<RecoveryResult> {
     // In a real implementation, this would execute fallback logic
     // For now, just indicate fallback should be used
@@ -502,7 +503,7 @@ export class ErrorRecovery {
       case "TIMEOUT_ERROR":
         return {
           type: "retry",
-          config: this.defaultRetryConfig,
+          config: this.defaultRetryConfig as UnknownRecord,
         };
 
       case "CONFIGURATION_ERROR":

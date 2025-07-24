@@ -12,6 +12,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { spawn } from "child_process";
 import { EventEmitter } from "events";
+import type { UnknownRecord } from "../../lib/types/common.js";
 
 // Mock modules
 vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
@@ -39,8 +40,8 @@ vi.mock("reconnecting-eventsource", () => ({
 describe("TransportManager", () => {
   let transportManager: TransportManager;
   let mockErrorManager: ErrorManager;
-  let mockClient: any;
-  let mockChildProcess: any;
+  let mockClient: UnknownRecord;
+  let mockChildProcess: UnknownRecord;
 
   beforeEach(() => {
     // Reset all mocks
@@ -57,7 +58,7 @@ describe("TransportManager", () => {
         errorsBySeverity: {},
         errorRate: 0,
       }),
-    } as any;
+    } as UnknownRecord;
 
     // Create mock client
     mockClient = {
@@ -72,7 +73,7 @@ describe("TransportManager", () => {
     // Create mock child process
     mockChildProcess = new EventEmitter();
     mockChildProcess.kill = vi.fn();
-    vi.mocked(spawn).mockReturnValue(mockChildProcess as any);
+    vi.mocked(spawn).mockReturnValue(mockChildProcess as UnknownRecord);
 
     // Create transport manager
     transportManager = new TransportManager(mockErrorManager, {

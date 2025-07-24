@@ -69,9 +69,11 @@ class OllamaLanguageModel implements LanguageModelV1 {
     return Math.ceil(text.length / 4);
   }
 
-  private convertMessagesToPrompt(messages: any[]): string {
+  private convertMessagesToPrompt(
+    messages: Array<{ role: string; content: unknown }>,
+  ): string {
     return messages
-      .map((msg: any) => {
+      .map((msg: { role: string; content: unknown }) => {
         if (typeof msg.content === "string") {
           return `${msg.role}: ${msg.content}`;
         }
@@ -80,8 +82,45 @@ class OllamaLanguageModel implements LanguageModelV1 {
       .join("\n");
   }
 
-  async doGenerate(options: LanguageModelV1CallOptions): Promise<any> {
-    const messages = (options as any).messages || [];
+  async doGenerate(options: LanguageModelV1CallOptions): Promise<{
+    text?: string;
+    reasoning?:
+      | string
+      | Array<
+          | { type: "text"; text: string; signature?: string }
+          | { type: "redacted"; data: string }
+        >;
+    files?: Array<{ data: string | Uint8Array; mimeType: string }>;
+    logprobs?: Array<{
+      token: string;
+      logprob: number;
+      topLogprobs: Array<{ token: string; logprob: number }>;
+    }>;
+    usage: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens?: number;
+    };
+    finishReason:
+      | "stop"
+      | "length"
+      | "content-filter"
+      | "tool-calls"
+      | "error"
+      | "unknown";
+    response?: {
+      id?: string;
+      timestamp?: Date;
+      modelId?: string;
+    };
+    warnings?: Array<{ type: "other"; message: string }>;
+    rawCall: { rawPrompt: unknown; rawSettings: Record<string, unknown> };
+    rawResponse?: { headers?: Record<string, string> };
+    request?: { body?: string };
+  }> {
+    const messages =
+      (options as { messages?: Array<{ role: string; content: unknown }> })
+        .messages || [];
     const prompt = this.convertMessagesToPrompt(messages);
 
     const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -91,7 +130,9 @@ class OllamaLanguageModel implements LanguageModelV1 {
         model: this.modelId,
         prompt,
         stream: false,
-        system: messages.find((m: any) => m.role === "system")?.content,
+        system: messages.find(
+          (m: { role: string; content: unknown }) => m.role === "system",
+        )?.content,
         options: {
           temperature: options.temperature,
           num_predict: options.maxTokens,
@@ -113,12 +154,34 @@ class OllamaLanguageModel implements LanguageModelV1 {
       usage: {
         promptTokens: this.estimateTokens(prompt),
         completionTokens: this.estimateTokens(data.response),
+        totalTokens:
+          this.estimateTokens(prompt) + this.estimateTokens(data.response),
+      },
+      finishReason: "stop",
+      rawCall: {
+        rawPrompt: prompt,
+        rawSettings: {
+          model: this.modelId,
+          temperature: options.temperature,
+          num_predict: options.maxTokens,
+        },
+      },
+      rawResponse: {
+        headers: {},
       },
     };
   }
 
-  async doStream(options: LanguageModelV1CallOptions): Promise<any> {
-    const messages = (options as any).messages || [];
+  async doStream(options: LanguageModelV1CallOptions): Promise<{
+    stream: ReadableStream<LanguageModelV1StreamPart>;
+    rawCall: { rawPrompt: unknown; rawSettings: Record<string, unknown> };
+    rawResponse?: { headers?: Record<string, string> };
+    request?: { body?: string };
+    warnings?: Array<{ type: "other"; message: string }>;
+  }> {
+    const messages =
+      (options as { messages?: Array<{ role: string; content: unknown }> })
+        .messages || [];
     const prompt = this.convertMessagesToPrompt(messages);
 
     const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -128,7 +191,9 @@ class OllamaLanguageModel implements LanguageModelV1 {
         model: this.modelId,
         prompt,
         stream: true,
-        system: messages.find((m: any) => m.role === "system")?.content,
+        system: messages.find(
+          (m: { role: string; content: unknown }) => m.role === "system",
+        )?.content,
         options: {
           temperature: options.temperature,
           num_predict: options.maxTokens,
@@ -143,8 +208,31 @@ class OllamaLanguageModel implements LanguageModelV1 {
       );
     }
 
+    const self = this;
     return {
-      stream: this.parseStreamResponse(response),
+      stream: new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of self.parseStreamResponse(response)) {
+              controller.enqueue(chunk);
+            }
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+      }),
+      rawCall: {
+        rawPrompt: prompt,
+        rawSettings: {
+          model: this.modelId,
+          temperature: options.temperature,
+          num_predict: options.maxTokens,
+        },
+      },
+      rawResponse: {
+        headers: {},
+      },
     };
   }
 
@@ -250,6 +338,7 @@ export class OllamaProvider extends BaseProvider {
 
   /**
    * Returns the Vercel AI SDK model instance for Ollama
+   * The OllamaLanguageModel implements LanguageModelV1 interface properly
    */
   protected getAISDKModel(): LanguageModelV1 {
     return this.ollamaModel;
@@ -380,8 +469,8 @@ export class OllamaProvider extends BaseProvider {
     }
   }
 
-  protected handleProviderError(error: any): Error {
-    if (error.name === "TimeoutError") {
+  protected handleProviderError(error: unknown): Error {
+    if ((error as Error).name === "TimeoutError") {
       return new TimeoutError(
         `Ollama request timed out. The model might be loading or the request is too complex.`,
         this.defaultTimeout,
@@ -389,8 +478,8 @@ export class OllamaProvider extends BaseProvider {
     }
 
     if (
-      error.message?.includes("ECONNREFUSED") ||
-      error.message?.includes("fetch failed")
+      (error as Error).message?.includes("ECONNREFUSED") ||
+      (error as Error).message?.includes("fetch failed")
     ) {
       return new Error(
         `❌ Ollama Service Not Running\n\nCannot connect to Ollama at ${this.baseUrl}\n\n🔧 Steps to Fix:\n1. Install Ollama: https://ollama.ai/\n2. Start Ollama service: 'ollama serve'\n3. Verify it's running: 'curl ${this.baseUrl}/api/version'\n4. Try again`,
@@ -398,22 +487,22 @@ export class OllamaProvider extends BaseProvider {
     }
 
     if (
-      error.message?.includes("model") &&
-      error.message?.includes("not found")
+      (error as Error).message?.includes("model") &&
+      (error as Error).message?.includes("not found")
     ) {
       return new Error(
         `❌ Ollama Model Not Found\n\nModel '${this.modelName}' is not available locally.\n\n🔧 Install Model:\n1. Run: ollama pull ${this.modelName}\n2. Or try a different model:\n   - ollama pull ${FALLBACK_OLLAMA_MODEL}\n   - ollama pull mistral:latest\n   - ollama pull codellama:latest\n\n🔧 List Available Models:\nollama list`,
       );
     }
 
-    if (error.message?.includes("404")) {
+    if ((error as Error).message?.includes("404")) {
       return new Error(
         `❌ Ollama API Endpoint Not Found\n\nThe API endpoint might have changed or Ollama version is incompatible.\n\n🔧 Check:\n1. Ollama version: 'ollama --version'\n2. Update Ollama to latest version\n3. Verify API is available: 'curl ${this.baseUrl}/api/version'`,
       );
     }
 
     return new Error(
-      `❌ Ollama Provider Error\n\n${error.message || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check if Ollama service is running\n2. Verify model is installed: 'ollama list'\n3. Check network connectivity to ${this.baseUrl}\n4. Review Ollama logs for details`,
+      `❌ Ollama Provider Error\n\n${(error as Error).message || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check if Ollama service is running\n2. Verify model is installed: 'ollama list'\n3. Check network connectivity to ${this.baseUrl}\n4. Review Ollama logs for details`,
     );
   }
 
@@ -474,7 +563,7 @@ export class OllamaProvider extends BaseProvider {
       }
 
       const data = await response.json();
-      return data.models?.map((model: any) => model.name) || [];
+      return data.models?.map((model: { name: string }) => model.name) || [];
     } catch (error) {
       logger.warn("Failed to fetch Ollama models:", error);
       return [];

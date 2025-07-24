@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import type { Unknown } from "../../../types/common.js";
 import { createMCPServer } from "../../factory.js";
 import type { NeuroLinkExecutionContext, ToolResult } from "../../factory.js";
 import { ServiceRegistry } from "../../../core/service-registry.js";
@@ -13,65 +14,24 @@ import {
   getAvailableProviders,
 } from "../../../utils/providerUtils.js";
 import { logger } from "../../../utils/logger.js";
-import {
-  analyzeAIUsageTool,
-  benchmarkProviderPerformanceTool,
-  optimizePromptParametersTool,
-} from "./ai-analysis-tools.js";
-import {
-  generateTestCasesTool,
-  refactorCodeTool,
-  generateDocumentationTool,
-  debugAIOutputTool,
-} from "./ai-workflow-tools.js";
 
 /**
- * AI Core Server - Central hub for AI provider tools
- * Provides text generation, provider selection, AI analysis, and development workflow tools
+ * AI Core Server - Central hub for AI provider management
+ * Provides provider selection and status checking functionality
  */
 export const aiCoreServer = createMCPServer({
   id: "neurolink-ai-core",
   title: "NeuroLink AI Core",
   description:
-    "Core AI provider tools with automatic fallback, analysis capabilities, and development workflow enhancement",
+    "Core AI provider management with automatic fallback and status monitoring",
   category: "ai-providers",
   version: "1.2.0",
   capabilities: [
-    "text-generation",
     "provider-selection",
     "automatic-fallback",
-    "usage-tracking",
     "multi-provider-support",
-    "ai-analysis",
-    "test-generation",
-    "code-refactoring",
-    "documentation-generation",
-    "ai-debugging",
+    "provider-status-monitoring",
   ],
-});
-
-/**
- * Text Generation Input Schema
- */
-const TextGenerationSchema = z.object({
-  prompt: z.string().min(1, "Prompt is required"),
-  provider: z
-    .enum([
-      "openai",
-      "bedrock",
-      "vertex",
-      "anthropic",
-      "google-ai",
-      "azure",
-      "huggingface",
-      "ollama",
-      "mistral",
-    ])
-    .optional(),
-  model: z.string().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().positive().optional(),
-  systemPrompt: z.string().optional(),
 });
 
 /**
@@ -90,101 +50,6 @@ const ProviderSelectionSchema = z.object({
 });
 
 /**
- * Register Text Generation Tool
- * Core tool that leverages existing AIProviderFactory for text generation
- */
-aiCoreServer.registerTool({
-  name: "generate",
-  description:
-    "Generate text using AI providers with automatic fallback and provider selection",
-  category: "text-generation",
-  inputSchema: TextGenerationSchema,
-  isImplemented: true,
-  execute: async (
-    params: any,
-    context: NeuroLinkExecutionContext,
-  ): Promise<ToolResult> => {
-    const startTime = Date.now();
-
-    try {
-      logger.debug(
-        `[AI-Core] Starting text generation: "${params.prompt.substring(0, 50)}..."`,
-      );
-
-      // Use existing AIProviderFactory with best provider selection
-      const selectedProvider =
-        params.provider || (await getBestProvider(params.provider));
-
-      // Get AIProviderFactory from ServiceRegistry to avoid circular dependency
-      const AIProviderFactory =
-        await ServiceRegistry.get<any>("AIProviderFactory");
-      const provider =
-        await AIProviderFactory.createBestProvider(selectedProvider);
-
-      // Generate text using existing NeuroLink patterns
-      const result = await provider.generate({
-        prompt: params.prompt,
-        model: params.model,
-        temperature: params.temperature,
-        maxTokens: params.maxTokens,
-        systemPrompt: params.systemPrompt,
-      });
-
-      if (!result) {
-        throw new Error("AI provider returned null result");
-      }
-
-      const executionTime = Date.now() - startTime;
-
-      logger.debug(
-        `[AI-Core] Text generation successful in ${executionTime}ms using ${selectedProvider}`,
-      );
-
-      return {
-        success: true,
-        data: {
-          text: result.content,
-          model: params.model || "default",
-          provider: selectedProvider,
-          generatedAt: new Date().toISOString(),
-        },
-        usage: {
-          tokens: result.usage?.totalTokens,
-          provider: selectedProvider,
-          model: params.model || "default",
-          executionTime,
-        },
-        metadata: {
-          toolName: "generate",
-          serverId: "neurolink-ai-core",
-          sessionId: context.sessionId,
-          timestamp: Date.now(),
-          executionTime,
-        },
-      };
-    } catch (error) {
-      const executionTime = Date.now() - startTime;
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-
-      logger.debug(`[AI-Core] Text generation failed: ${errorMessage}`);
-
-      return {
-        success: false,
-        error: errorMessage,
-        metadata: {
-          toolName: "generate",
-          serverId: "neurolink-ai-core",
-          sessionId: context.sessionId,
-          timestamp: Date.now(),
-          executionTime,
-        },
-      };
-    }
-  },
-});
-
-/**
  * Register Provider Selection Tool
  * Intelligent provider selection based on requirements and availability
  */
@@ -196,20 +61,24 @@ aiCoreServer.registerTool({
   inputSchema: ProviderSelectionSchema,
   isImplemented: true,
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
 
     try {
+      const typedParams = params as {
+        requirements?: Unknown;
+        preferred?: string;
+      };
       logger.debug(
         `[AI-Core] Selecting provider with requirements:`,
-        params.requirements,
+        typedParams.requirements,
       );
 
       // Use existing provider selection logic
       const availableProviders = getAvailableProviders();
-      const selectedProvider = await getBestProvider(params.preferred);
+      const selectedProvider = await getBestProvider(typedParams.preferred);
 
       // Get provider capabilities
       const getProviderCapabilities = (provider: string) => ({
@@ -251,8 +120,8 @@ aiCoreServer.registerTool({
           provider: selectedProvider,
           available: availableProviders,
           capabilities,
-          reason: params.preferred
-            ? `Preferred provider ${params.preferred} selected`
+          reason: typedParams.preferred
+            ? `Preferred provider ${typedParams.preferred} selected`
             : "Best available provider selected",
           selectedAt: new Date().toISOString(),
         },
@@ -303,21 +172,25 @@ aiCoreServer.registerTool({
   }),
   isImplemented: true,
   execute: async (
-    params: any,
+    params: Unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
     const startTime = Date.now();
 
     try {
+      const typedParams = params as {
+        provider?: string;
+        includeCapabilities?: boolean;
+      };
       logger.debug(
-        `[AI-Core] Checking provider status for: ${params.provider || "all providers"}`,
+        `[AI-Core] Checking provider status for: ${typedParams.provider || "all providers"}`,
       );
 
       const availableProviders = getAvailableProviders();
       const providerStatuses = [];
 
-      const providersToCheck = params.provider
-        ? [params.provider]
+      const providersToCheck = typedParams.provider
+        ? [typedParams.provider]
         : availableProviders;
 
       for (const provider of providersToCheck) {
@@ -328,7 +201,7 @@ aiCoreServer.registerTool({
           providerStatuses.push({
             provider,
             status: isAvailable ? "available" : "unavailable",
-            capabilities: params.includeCapabilities
+            capabilities: typedParams.includeCapabilities
               ? {
                   textGeneration: true,
                   multimodal:
@@ -417,25 +290,8 @@ aiCoreServer.registerTool({
   },
 });
 
-/**
- * Register AI Analysis Tools
- * Usage analysis, performance benchmarking, and parameter optimization
- */
-aiCoreServer.registerTool(analyzeAIUsageTool);
-aiCoreServer.registerTool(benchmarkProviderPerformanceTool);
-aiCoreServer.registerTool(optimizePromptParametersTool);
-
-/**
- * Register AI Development Workflow Tools
- * Test generation, code refactoring, documentation generation, and AI debugging
- */
-aiCoreServer.registerTool(generateTestCasesTool);
-aiCoreServer.registerTool(refactorCodeTool);
-aiCoreServer.registerTool(generateDocumentationTool);
-aiCoreServer.registerTool(debugAIOutputTool);
-
 // Log successful server creation
 logger.debug(
-  "[AI-Core] NeuroLink AI Core Server v1.2.0 created with 10 tools:",
+  "[AI-Core] NeuroLink AI Core Server v1.2.0 created with provider management tools:",
   Object.keys(aiCoreServer.tools),
 );

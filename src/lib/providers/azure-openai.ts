@@ -1,22 +1,27 @@
 import { createAzure } from "@ai-sdk/azure";
-import { streamText } from "ai";
-import { BaseProvider } from "../core/base-provider.js";
+import { streamText, type LanguageModelV1 } from "ai";
+import { BaseProvider, type NeuroLinkSDK } from "../core/base-provider.js";
 import type {
   AIProviderName,
   TextGenerationOptions,
   EnhancedGenerateResult,
 } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { Unknown, UnknownRecord } from "../types/common.js";
 
 export class AzureOpenAIProvider extends BaseProvider {
   private apiKey: string;
   private resourceName: string;
   private deployment: string;
   private apiVersion: string;
-  private azureProvider: any;
+  private azureProvider: ReturnType<typeof createAzure>;
 
-  constructor(modelName?: string) {
-    super(modelName, "azure" as AIProviderName);
+  constructor(modelName?: string, sdk?: unknown) {
+    super(
+      modelName,
+      "azure" as AIProviderName,
+      sdk as NeuroLinkSDK | undefined,
+    );
 
     this.apiKey = process.env.AZURE_OPENAI_API_KEY || "";
     const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "";
@@ -63,24 +68,31 @@ export class AzureOpenAIProvider extends BaseProvider {
   /**
    * Returns the Vercel AI SDK model instance for Azure OpenAI
    */
-  protected getAISDKModel(): any {
+  protected getAISDKModel(): LanguageModelV1 {
     return this.azureProvider(this.deployment);
   }
 
-  protected handleProviderError(error: any): Error {
-    if (error?.message?.includes("401")) {
+  protected handleProviderError(error: unknown): Error {
+    const errorObj = error as UnknownRecord;
+    if (
+      errorObj?.message &&
+      typeof errorObj.message === "string" &&
+      errorObj.message.includes("401")
+    ) {
       return new Error("Invalid Azure OpenAI API key or endpoint.");
     }
-    return new Error(
-      `Azure OpenAI error: ${error?.message || "Unknown error"}`,
-    );
+    const message =
+      errorObj?.message && typeof errorObj.message === "string"
+        ? errorObj.message
+        : "Unknown error";
+    return new Error(`Azure OpenAI error: ${message}`);
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools
 
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: any,
+    analysisSchema?: unknown,
   ): Promise<StreamResult> {
     try {
       const stream = await streamText({
@@ -104,7 +116,7 @@ export class AzureOpenAIProvider extends BaseProvider {
           startTime: Date.now(),
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw this.handleProviderError(error);
     }
   }

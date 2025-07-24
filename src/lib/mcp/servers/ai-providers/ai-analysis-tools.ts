@@ -40,6 +40,10 @@ const AnalyzeUsageSchema = z.object({
   includeCostEstimation: z.boolean().default(true),
 });
 
+type AnalyzeUsageParams = z.infer<typeof AnalyzeUsageSchema>;
+type BenchmarkParams = z.infer<typeof BenchmarkSchema>;
+type OptimizeParametersParams = z.infer<typeof OptimizeParametersSchema>;
+
 const BenchmarkSchema = z.object({
   providers: z
     .array(
@@ -93,7 +97,7 @@ const OptimizeParametersSchema = z.object({
  * AI Usage Analysis Tool
  * Analyzes AI usage patterns, token consumption, and cost optimization opportunities
  */
-export const analyzeAIUsageTool: NeuroLinkMCPTool = {
+const analyzeAIUsageTool: NeuroLinkMCPTool = {
   name: "analyze-ai-usage",
   description:
     "Analyze AI usage patterns, token consumption, and cost optimization opportunities",
@@ -103,13 +107,14 @@ export const analyzeAIUsageTool: NeuroLinkMCPTool = {
   permissions: ["read", "analytics"],
   version: "1.2.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
+    const typedParams = params as AnalyzeUsageParams;
     const startTime = Date.now();
     try {
       console.log(
-        `[AI-Analysis] Starting real AI-powered usage analysis for timeRange: ${params.timeRange}`,
+        `[AI-Analysis] Starting real AI-powered usage analysis for timeRange: ${typedParams.timeRange}`,
       );
 
       const providerName = await getBestProvider();
@@ -122,8 +127,8 @@ export const analyzeAIUsageTool: NeuroLinkMCPTool = {
 
       const analysisPrompt = `
         Analyze hypothetical AI usage data for a project based on the following parameters.
-        Time Range: ${params.timeRange}
-        Provider Focus: ${params.provider || "all"}
+        Time Range: ${typedParams.timeRange}
+        Provider Focus: ${typedParams.provider || "all"}
 
         Generate a realistic analysis including:
         1. A summary of usage statistics (totalRequests, totalTokens).
@@ -192,7 +197,7 @@ export const analyzeAIUsageTool: NeuroLinkMCPTool = {
  * Provider Performance Benchmarking Tool
  * Benchmarks AI provider performance across latency, quality, and cost metrics
  */
-export const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
+const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
   name: "benchmark-provider-performance",
   description:
     "Benchmark AI provider performance across latency, quality, and cost metrics",
@@ -202,13 +207,14 @@ export const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
   permissions: ["read", "benchmark"],
   version: "1.1.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
+    const typedParams = params as BenchmarkParams;
     const startTime = Date.now();
     try {
-      const providersToTest = params.providers || getAvailableProviders();
-      const testPrompts = params.testPrompts || [
+      const providersToTest = typedParams.providers || getAvailableProviders();
+      const testPrompts = typedParams.testPrompts || [
         "Explain quantum computing in simple terms",
       ];
       const benchmarkResults = [];
@@ -228,11 +234,11 @@ export const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
           totalTokens = 0,
           successfulTests = 0;
         for (const prompt of testPrompts) {
-          for (let i = 0; i < params.iterations; i++) {
+          for (let i = 0; i < typedParams.iterations; i++) {
             const testStartTime = Date.now();
             const result = await provider.generate({
               prompt: prompt,
-              maxTokens: params.maxTokens,
+              maxTokens: typedParams.maxTokens,
             });
             if (result && result.usage) {
               totalLatency += Date.now() - testStartTime;
@@ -251,7 +257,8 @@ export const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
                 : 0,
             totalTokens: totalTokens,
             successRate:
-              (successfulTests / (testPrompts.length * params.iterations)) *
+              (successfulTests /
+                (testPrompts.length * typedParams.iterations)) *
               100,
           },
         });
@@ -300,7 +307,7 @@ export const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
  * Prompt Parameter Optimization Tool
  * Optimizes prompt parameters (temperature, max tokens) for better AI output quality and efficiency
  */
-export const optimizePromptParametersTool: NeuroLinkMCPTool = {
+const optimizePromptParametersTool: NeuroLinkMCPTool = {
   name: "optimize-prompt-parameters",
   description:
     "Optimize prompt parameters (temperature, max tokens) for better AI output quality and efficiency",
@@ -310,12 +317,13 @@ export const optimizePromptParametersTool: NeuroLinkMCPTool = {
   permissions: ["read", "optimize"],
   version: "1.1.0", // Updated version with real AI
   execute: async (
-    params: any,
+    params: unknown,
     context: NeuroLinkExecutionContext,
   ): Promise<ToolResult> => {
+    const typedParams = params as OptimizeParametersParams;
     const startTime = Date.now();
     try {
-      const providerName = params.provider || (await getBestProvider());
+      const providerName = typedParams.provider || (await getBestProvider());
       const provider: AIProvider | null =
         await AIProviderFactory.createProvider(providerName);
       if (!provider) {
@@ -327,9 +335,9 @@ export const optimizePromptParametersTool: NeuroLinkMCPTool = {
 
       for (const temp of temperatures) {
         const result = await provider.generate({
-          prompt: params.prompt,
+          prompt: typedParams.prompt,
           temperature: temp,
-          maxTokens: params.targetLength || 250,
+          maxTokens: typedParams.targetLength || 250,
         });
         if (result) {
           optimizationResults.push({
@@ -347,7 +355,7 @@ export const optimizePromptParametersTool: NeuroLinkMCPTool = {
       }
 
       const analysisPrompt = `
-        Analyze the following AI-generated responses for the prompt "${params.prompt}" based on the optimization goal of "${params.optimizeFor}".
+        Analyze the following AI-generated responses for the prompt "${typedParams.prompt}" based on the optimization goal of "${typedParams.optimizeFor}".
 
         Responses:
         ${optimizationResults.map((r, i) => `Response ${i + 1} (Temp: ${r.parameters.temperature}):\n${r.output}`).join("\n\n")}
@@ -371,8 +379,8 @@ export const optimizePromptParametersTool: NeuroLinkMCPTool = {
         success: true,
         data: {
           optimization: {
-            originalPrompt: params.prompt,
-            optimizeFor: params.optimizeFor,
+            originalPrompt: typedParams.prompt,
+            optimizeFor: typedParams.optimizeFor,
             provider: providerName,
           },
           results: optimizationResults,

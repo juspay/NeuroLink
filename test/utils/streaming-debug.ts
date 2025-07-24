@@ -4,6 +4,7 @@
  */
 
 import { ReadableStream } from "stream/web";
+import type { UnknownRecord } from "../../src/lib/types/common.js";
 
 export interface StreamChunk {
   content: string;
@@ -193,11 +194,11 @@ export function validateStreamStructure<T extends { content?: string }>(
   }
 
   // Check first chunk for property structure
-  const firstChunk = chunks[0] as any;
+  const firstChunk = chunks[0] as UnknownRecord;
   const allKeys = new Set<string>();
 
   chunks.forEach((chunk) => {
-    Object.keys(chunk as any).forEach((key) => allKeys.add(key));
+    Object.keys(chunk as UnknownRecord).forEach((key) => allKeys.add(key));
   });
 
   // Check for standard properties

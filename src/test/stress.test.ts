@@ -9,6 +9,7 @@ import {
   AIProviderFactory,
   type AIProvider,
 } from "../lib/index.js";
+import type { Unknown, UnknownRecord } from "../../lib/types/common.js";
 
 // Stress test configuration
 const STRESS_TIMEOUT = 120000; // 2 minutes for stress tests
@@ -41,7 +42,7 @@ describe("NeuroLink Stress Tests", () => {
       "should handle rapid sequential requests",
       async () => {
         const requestCount = 10;
-        const results: any[] = [];
+        const results: Unknown[] = [];
 
         for (let i = 0; i < requestCount; i++) {
           const startTime = Date.now();
@@ -100,7 +101,7 @@ describe("NeuroLink Stress Tests", () => {
       "should handle concurrent requests",
       async () => {
         const concurrentCount = 5;
-        const promises: Promise<any>[] = [];
+        const promises: Promise<Unknown>[] = [];
 
         for (let i = 0; i < concurrentCount; i++) {
           promises.push(
@@ -366,13 +367,13 @@ describe("NeuroLink Stress Tests", () => {
       "should handle provider switching under stress",
       async () => {
         const providers = ["openai", "bedrock", "vertex"];
-        const results: any[] = [];
+        const results: Unknown[] = [];
 
         for (const providerName of providers) {
           try {
             const testProvider = AIProviderFactory.createProvider(providerName);
 
-            const result = await (testProvider as any).generate({
+            const result = await (testProvider as UnknownRecord).generate({
               prompt: `Provider test: ${providerName}`,
               maxTokens: 50,
               temperature: 0.5,

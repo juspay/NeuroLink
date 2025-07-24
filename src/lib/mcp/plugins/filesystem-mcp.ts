@@ -11,6 +11,7 @@ import {
   type ExecutionContext,
   MCPCategory,
 } from "../contracts/mcp-contract.js";
+import type { Unknown } from "../../types/common.js";
 
 /**
  * FileSystem MCP Configuration
@@ -57,7 +58,10 @@ export class FileSystemMCP extends MCP<FileSystemConfig> {
     };
   }
 
-  async execute(context: ExecutionContext, args: FileSystemArgs): Promise<any> {
+  async execute(
+    context: ExecutionContext,
+    args: FileSystemArgs,
+  ): Promise<Unknown> {
     const resolvedPath = this.resolvePath(args.path);
 
     switch (args.operation) {

@@ -1,6 +1,7 @@
 import type { CommandModule } from "yargs";
 import { NeuroLink } from "../../lib/neurolink.js";
 import type { AIProviderName } from "../../lib/index.js";
+import type { UnknownRecord } from "../../lib/types/common.js";
 import ora from "ora";
 import chalk from "chalk";
 import { logger } from "../../lib/utils/logger.js";
@@ -112,7 +113,7 @@ export class CLICommandFactory {
   /**
    * Execute provider status command
    */
-  async executeProviderStatus(argv: any) {
+  async executeProviderStatus(argv: UnknownRecord) {
     if (argv.verbose && !argv.quiet) {
       console.log(
         chalk.yellow("ℹ️ Verbose mode enabled. Displaying detailed status.\n"),

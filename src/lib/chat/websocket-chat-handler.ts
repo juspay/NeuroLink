@@ -4,17 +4,17 @@ import { StreamingManager } from "../services/streaming/streaming-manager.js";
 import type { AIProvider } from "../core/types.js";
 import type {
   WebSocketOptions,
-  ChatRequest,
   GroupChatRequest,
   StreamingChatRequest,
   MultiModalContent,
   WebSocketMessage,
 } from "../services/types.js";
-import type { SSEOptions } from "./types.js";
+import type { SSEOptions, ChatRequest } from "./types.js";
+import type { UnknownRecord } from "../types/common.js";
 import { randomUUID } from "crypto";
 
 export interface WebSocketChatOptions {
-  sseOptions?: any;
+  sseOptions?: UnknownRecord;
   wsOptions?: WebSocketOptions;
   enableTypingIndicators?: boolean;
   enablePresenceTracking?: boolean;
@@ -100,7 +100,7 @@ export class WebSocketChatHandler extends SSEChatHandler {
 
       // Generate AI response
       const result = await this.provider.generate({
-        prompt: request.prompt,
+        prompt: request.message,
         temperature: request.options?.temperature,
         maxTokens: request.options?.maxTokens,
       });
@@ -250,12 +250,8 @@ export class WebSocketChatHandler extends SSEChatHandler {
     connectionId: string,
     message: WebSocketMessage,
   ): void {
-    // Use the WebSocket server's send method
-    const ws = (this.wsServer as any).connections?.get(connectionId);
-    if (ws && ws.readyState === 1) {
-      // WebSocket.OPEN
-      ws.send(JSON.stringify(message));
-    }
+    // Use the WebSocket server's public send method
+    this.wsServer.sendMessage(connectionId, message);
   }
 
   private sendError(connectionId: string, errorMessage: string): void {
@@ -312,18 +308,29 @@ export class WebSocketChatHandler extends SSEChatHandler {
     connectionId: string,
     message: WebSocketMessage,
   ): void {
-    switch (message.data?.event) {
+    const data = message.data as Record<string, unknown>;
+    if (!data || typeof data !== "object") {
+      return;
+    }
+
+    switch (data.event) {
       case "chat_request":
-        this.handleWebSocketChatRequest(connectionId, message.data.request);
+        this.handleWebSocketChatRequest(
+          connectionId,
+          data.request as ChatRequest,
+        );
         break;
       case "join_room":
-        this.wsServer.joinRoom(connectionId, message.data.roomId);
+        this.wsServer.joinRoom(connectionId, data.roomId as string);
         break;
       case "leave_room":
-        this.wsServer.leaveRoom(connectionId, message.data.roomId);
+        this.wsServer.leaveRoom(connectionId, data.roomId as string);
         break;
       case "typing_start":
-        this.showTypingIndicator(connectionId, message.data.sender || "user");
+        this.showTypingIndicator(
+          connectionId,
+          (data.sender as string) || "user",
+        );
         break;
       case "typing_stop":
         this.clearTypingIndicator(connectionId);

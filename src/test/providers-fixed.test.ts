@@ -80,8 +80,8 @@ function setAnthropicImportShouldFail(shouldFail: boolean) {
 
 describe("NeuroLink AI Providers (Fixed)", () => {
   // Access mocked functions via dynamic import
-  let mockGenerate: any;
-  let mockStream: any;
+  let mockGenerate: unknown;
+  let mockStream: unknown;
 
   beforeAll(async () => {
     const aiModule = await import("ai");
@@ -92,14 +92,14 @@ describe("NeuroLink AI Providers (Fixed)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset default mock behavior for AI SDK generate (used internally by providers)
-    (mockGenerate as any).mockResolvedValue({
+    (mockGenerate as unknown).mockResolvedValue({
       text: "test response",
       usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
       finishReason: "stop",
     });
 
     // Reset default mock behavior for streamText
-    (mockStream as any).mockReturnValue({
+    (mockStream as unknown).mockReturnValue({
       textStream: (async function* () {
         yield "test";
         yield " stream";
@@ -120,8 +120,8 @@ describe("NeuroLink AI Providers (Fixed)", () => {
       const provider = new OpenAI("gpt-4");
 
       expect(provider).toBeDefined();
-      expect(typeof (provider as any).generate).toBe("function");
-      expect(typeof (provider as any).stream).toBe("function");
+      expect(typeof (provider as unknown).generate).toBe("function");
+      expect(typeof (provider as unknown).stream).toBe("function");
     });
 
     it("should handle generate successfully", async () => {
@@ -160,8 +160,8 @@ describe("NeuroLink AI Providers (Fixed)", () => {
       );
 
       expect(provider).toBeDefined();
-      expect(typeof (provider as any).generate).toBe("function");
-      expect(typeof (provider as any).stream).toBe("function");
+      expect(typeof (provider as unknown).generate).toBe("function");
+      expect(typeof (provider as unknown).stream).toBe("function");
     });
 
     it("should handle generate successfully", async () => {
@@ -190,8 +190,8 @@ describe("NeuroLink AI Providers (Fixed)", () => {
       const provider = new GoogleVertexAI("gemini-pro");
 
       expect(provider).toBeDefined();
-      expect(typeof (provider as any).generate).toBe("function");
-      expect(typeof (provider as any).stream).toBe("function");
+      expect(typeof (provider as unknown).generate).toBe("function");
+      expect(typeof (provider as unknown).stream).toBe("function");
     });
 
     it("should handle Google models without anthropic import", async () => {
@@ -260,7 +260,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
       // ✅ Add await
       const provider = await AIProviderFactory.createBestProvider();
       expect(provider).toBeDefined();
-      expect(typeof (provider as any).generate).toBe("function");
+      expect(typeof (provider as unknown).generate).toBe("function");
     });
 
     it("should create provider with fallback", async () => {
@@ -370,7 +370,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         const provider = new OpenAI("gpt-4");
 
         // Mock rejection for this specific test
-        (mockGenerate as any).mockImplementationOnce(() => {
+        (mockGenerate as unknown).mockImplementationOnce(() => {
           throw new Error("API rate limit exceeded");
         });
 
@@ -384,7 +384,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         const provider = new OpenAI("gpt-4");
 
         // Mock rejection for this specific test
-        (mockStream as any).mockImplementationOnce(() => {
+        (mockStream as unknown).mockImplementationOnce(() => {
           throw new Error("Network connection failed");
         });
 
@@ -400,7 +400,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         );
 
         // Create a spy on the actual generate method to intercept and control its behavior
-        const generateSpy = vi.spyOn(provider as any, "generate");
+        const generateSpy = vi.spyOn(provider as unknown, "generate");
         generateSpy.mockImplementation(async () => {
           // Simulate the provider's internal error handling logic
           try {
@@ -451,7 +451,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         const provider = new GoogleVertexAI("claude-3-sonnet@20240229");
 
         // Mock successful execution since the anthropic module is available
-        (mockGenerate as any).mockResolvedValue({
+        (mockGenerate as unknown).mockResolvedValue({
           text: "anthropic response",
           usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
           finishReason: "stop",
@@ -728,7 +728,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         const mockSchema = {
           type: "object",
           properties: { test: { type: "string" } },
-        } as any;
+        } as unknown;
 
         const result = await provider.generate({
           prompt: "test prompt",
@@ -873,7 +873,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         const mockSchema = {
           type: "object",
           properties: { test: { type: "string" } },
-        } as any;
+        } as unknown;
 
         const provider = new OpenAI("gpt-4");
         const result = await provider.generate({
@@ -896,7 +896,7 @@ describe("NeuroLink AI Providers (Fixed)", () => {
         const mockSchema = {
           type: "object",
           properties: { test: { type: "string" } },
-        } as any;
+        } as unknown;
 
         const provider = new OpenAI("gpt-4");
         const result = await provider.stream({

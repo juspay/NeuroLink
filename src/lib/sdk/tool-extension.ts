@@ -21,12 +21,12 @@ export interface CustomTool {
   /**
    * Parameters schema using Zod or JSON Schema
    */
-  parameters?: z.ZodSchema | Record<string, any>;
+  parameters?: z.ZodSchema | Record<string, unknown>;
 
   /**
    * Tool execution function
    */
-  execute: (args: any, context?: ToolContext) => Promise<any> | any;
+  execute: (args: unknown, context?: ToolContext) => Promise<unknown> | unknown;
 
   /**
    * Optional metadata
@@ -55,7 +55,7 @@ export interface ToolContext {
   /**
    * Call another tool
    */
-  callTool: (name: string, args: any) => Promise<any>;
+  callTool: (name: string, args: unknown) => Promise<unknown>;
 
   /**
    * Current session information
@@ -78,10 +78,10 @@ export interface ToolContext {
  */
 export type ToolMiddleware = (
   toolName: string,
-  args: any,
-  next: () => Promise<any>,
+  args: unknown,
+  next: () => Promise<unknown>,
   context: ToolContext,
-) => Promise<any>;
+) => Promise<unknown>;
 
 /**
  * Tool permission configuration
@@ -90,7 +90,10 @@ export interface ToolPermissions {
   allowlist?: string[];
   denylist?: string[];
   requireApproval?: string[];
-  customValidator?: (toolName: string, args: any) => boolean | Promise<boolean>;
+  customValidator?: (
+    toolName: string,
+    args: unknown,
+  ) => boolean | Promise<boolean>;
 }
 
 /**
@@ -98,7 +101,7 @@ export interface ToolPermissions {
  */
 export function convertToAISDKTool(name: string, customTool: CustomTool): Tool {
   // Convert parameters to JSON schema if needed
-  let parametersSchema: any = {};
+  let parametersSchema: Record<string, unknown> = {};
   let zodSchema: z.ZodSchema;
 
   if (customTool.parameters) {
@@ -280,7 +283,11 @@ export class ToolRegistry {
   /**
    * Execute a tool with middleware
    */
-  async execute(name: string, args: any, context: ToolContext): Promise<any> {
+  async execute(
+    name: string,
+    args: unknown,
+    context: ToolContext,
+  ): Promise<unknown> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool ${name} not found`);
@@ -306,7 +313,7 @@ export class ToolRegistry {
 
     // Build middleware chain
     let index = 0;
-    const next = async (): Promise<any> => {
+    const next = async (): Promise<unknown> => {
       if (index < this.middleware.length) {
         const middleware = this.middleware[index++];
         return middleware(name, args, next, context);
@@ -332,7 +339,7 @@ export function createTool(config: CustomTool): CustomTool {
  */
 export function createAsyncTool(
   config: Omit<CustomTool, "execute"> & {
-    execute: (args: any, context?: ToolContext) => Promise<any>;
+    execute: (args: unknown, context?: ToolContext) => Promise<unknown>;
   },
 ): CustomTool {
   return config as CustomTool;
@@ -350,7 +357,8 @@ export function createBatchTool<T, R>(
 ): CustomTool {
   return {
     ...config,
-    execute: async ({ items }, context) => {
+    execute: async (args, context) => {
+      const { items } = args as { items: T[] };
       const batchSize = config.batchSize || 10;
       const results: R[] = [];
 
@@ -396,7 +404,7 @@ export const TestUtils = {
    */
   async testTool(
     tool: CustomTool,
-    testCases: Array<{ input: any; expected?: any }>,
+    testCases: Array<{ input: unknown; expected?: unknown }>,
   ) {
     const context = TestUtils.mockContext();
     const results = [];

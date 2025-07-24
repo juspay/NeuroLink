@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NeuroLink } from "../src/lib/neurolink.js";
 import { createTool } from "../src/lib/sdk/tool-registration.js";
+import type { Unknown, UnknownArray } from "../src/lib/types/common.js";
 import {
   create,
   addDependencies,
@@ -93,17 +94,21 @@ describe("Real AI-MCP Integration Demo", () => {
               result: result,
               calculated_at: new Date().toISOString(),
             };
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
             return {
-              error: `Mathematical evaluation failed: ${error.message || "Invalid expression"}`,
+              error: `Mathematical evaluation failed: ${errorMessage || "Invalid expression"}`,
               expression: params.expression,
               calculated_at: new Date().toISOString(),
             };
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Outer catch for any unexpected errors
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           return {
-            error: `Calculation failed: ${error.message || "Unknown error"}`,
+            error: `Calculation failed: ${errorMessage || "Unknown error"}`,
           };
         }
       },
@@ -120,7 +125,7 @@ describe("Real AI-MCP Integration Demo", () => {
         tools: {
           formatData: {
             description: "Format data into readable table or summary",
-            execute: async (params: { data: any; format: string }) => {
+            execute: async (params: { data: Unknown; format: string }) => {
               console.log(`   📊 Formatting data as: ${params.format}`);
 
               if (params.format === "table") {
@@ -148,7 +153,7 @@ describe("Real AI-MCP Integration Demo", () => {
           },
           generateReport: {
             description: "Generate a summary report from provided data",
-            execute: async (params: { title: string; data: any[] }) => {
+            execute: async (params: { title: string; data: UnknownArray }) => {
               console.log(`   📋 Generating report: ${params.title}`);
 
               return {

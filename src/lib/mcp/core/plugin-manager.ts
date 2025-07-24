@@ -13,6 +13,7 @@ import type {
   PluginExecutionResult,
   ExecutionContext,
 } from "../contracts/mcp-contract.js";
+import type { UnknownRecord, Unknown } from "../../types/common.js";
 import { mcpLogger } from "../logging.js";
 
 /**
@@ -29,7 +30,7 @@ export class CorePluginManager {
   async loadPlugin(
     name: string,
     Constructor: MCPConstructor,
-    config: any,
+    config: UnknownRecord,
   ): Promise<PluginLoadResult> {
     try {
       const instance = new Constructor();
@@ -60,10 +61,10 @@ export class CorePluginManager {
   /**
    * Execute a plugin operation
    */
-  async executePlugin<T = any>(
+  async executePlugin<T = Unknown>(
     name: string,
     context: ExecutionContext,
-    args: any,
+    args: Unknown,
   ): Promise<PluginExecutionResult<T>> {
     const startTime = Date.now();
 
@@ -78,7 +79,7 @@ export class CorePluginManager {
 
       return {
         success: true,
-        result,
+        result: result as T,
         executionTime,
       };
     } catch (error) {

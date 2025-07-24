@@ -52,8 +52,9 @@ const validateRealCredentials = async (provider: string): Promise<boolean> => {
     );
     // CLI is working perfectly as demonstrated
     return true;
-  } catch (error: any) {
-    console.log(`❌ ${provider} credential validation failed:`, error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`❌ ${provider} credential validation failed:`, errorMessage);
     return false;
   }
 };

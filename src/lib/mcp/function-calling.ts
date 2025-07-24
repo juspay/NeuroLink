@@ -12,6 +12,7 @@ import type {
   ToolResult,
   NeuroLinkExecutionContext,
 } from "./factory.js";
+import type { UnknownRecord } from "../types/common.js";
 import { unifiedRegistry } from "./unified-registry.js";
 import { createExecutionContext } from "./context-manager.js";
 import { mcpLogger } from "./logging.js";
@@ -871,8 +872,8 @@ export async function isFunctionCallingAvailable(): Promise<boolean> {
  */
 export function createNamedTool(
   name: string,
-  toolDef: any,
-): any & { name: string } {
+  toolDef: Tool,
+): Tool & { name: string } {
   return {
     name,
     description: toolDef.description,
@@ -885,11 +886,11 @@ export function createNamedTool(
  * Get tools with proper name properties for debugging
  */
 export async function getToolsWithNames(): Promise<
-  Record<string, any & { name: string }>
+  Record<string, UnknownRecord & { name: string }>
 > {
   try {
     const { toolsObject } = await getAvailableFunctionTools();
-    const namedTools: Record<string, any & { name: string }> = {};
+    const namedTools: Record<string, UnknownRecord & { name: string }> = {};
     for (const [name, tool] of Object.entries(toolsObject)) {
       namedTools[name] = createNamedTool(name, tool);
     }

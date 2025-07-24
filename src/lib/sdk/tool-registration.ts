@@ -12,6 +12,13 @@ import type {
   InMemoryMCPServerConfig,
   InMemoryToolInfo,
 } from "../types/mcp-types.js";
+import type {
+  ToolArgs,
+  ToolContext as CoreToolContext,
+  ToolResult,
+  SimpleTool as CoreSimpleTool,
+} from "../types/tools.js";
+import type { JsonValue } from "../types/common.js";
 
 /**
  * Configuration constants for tool validation
@@ -25,17 +32,13 @@ const DEFAULT_DESCRIPTION_MAX_LENGTH =
 
 /**
  * Context provided to tools during execution
+ * Extends the core ToolContext with SDK-specific features
  */
-export interface ToolContext {
+export interface ToolContext extends CoreToolContext {
   /**
    * Current session ID
    */
   sessionId: string;
-
-  /**
-   * User ID if available
-   */
-  userId?: string;
 
   /**
    * AI provider being used
@@ -50,7 +53,7 @@ export interface ToolContext {
   /**
    * Call another tool
    */
-  callTool?: (name: string, args: any) => Promise<any>;
+  callTool?: (name: string, args: ToolArgs) => Promise<ToolResult>;
 
   /**
    * Logger instance
@@ -60,8 +63,10 @@ export interface ToolContext {
 
 /**
  * Simple tool interface for SDK users
+ * Extends the core SimpleTool with specific types
  */
-export interface SimpleTool {
+export interface SimpleTool<TArgs = ToolArgs, TResult = JsonValue>
+  extends Omit<CoreSimpleTool<TArgs, TResult>, "execute"> {
   /**
    * Tool description that helps AI understand when to use it
    */
@@ -75,7 +80,7 @@ export interface SimpleTool {
   /**
    * Tool execution function
    */
-  execute: (args: any, context?: ToolContext) => Promise<any> | any;
+  execute: (args: TArgs, context?: ToolContext) => Promise<TResult> | TResult;
 
   /**
    * Optional metadata
@@ -84,7 +89,9 @@ export interface SimpleTool {
     category?: string;
     version?: string;
     author?: string;
-    [key: string]: any;
+    tags?: string[];
+    documentation?: string;
+    [key: string]: JsonValue | undefined;
   };
 }
 
@@ -119,9 +126,10 @@ export function convertToAISDKTool(name: string, simpleTool: SimpleTool): Tool {
 export function convertToMCPTool(simpleTool: SimpleTool): InMemoryToolInfo {
   return {
     description: simpleTool.description,
-    execute: async (params: any) => {
+    execute: async (params: unknown) => {
+      const typedParams = params as ToolArgs;
       try {
-        const result = await simpleTool.execute(params);
+        const result = await simpleTool.execute(typedParams);
         return {
           success: true,
           data: result,
@@ -152,7 +160,9 @@ export function createMCPServerFromTools(
     title?: string;
     description?: string;
     category?: string;
-    [key: string]: any;
+    version?: string;
+    author?: string;
+    [key: string]: JsonValue | undefined;
   },
 ): InMemoryMCPServerConfig {
   const mcpTools: Record<string, InMemoryToolInfo> = {};
@@ -175,7 +185,7 @@ export function createMCPServerFromTools(
 /**
  * Helper to create a tool with type safety
  */
-export function createTool<TParams = any>(config: SimpleTool): SimpleTool {
+export function createTool<TParams = ToolArgs>(config: SimpleTool): SimpleTool {
   return config;
 }
 
@@ -188,7 +198,7 @@ export function createTypedTool<TParams extends z.ZodSchema>(
     execute: (
       args: z.infer<TParams>,
       context?: ToolContext,
-    ) => Promise<any> | any;
+    ) => Promise<JsonValue> | JsonValue;
   },
 ): SimpleTool {
   return config as SimpleTool;
@@ -256,7 +266,7 @@ export function validateTool(name: string, tool: SimpleTool): void {
   if (typeof tool.execute !== "function") {
     throw new Error(
       `Tool '${name}' must have an execute function. ` +
-        `Expected signature: async (params?: any) => Promise<any>. ` +
+        `Expected signature: async (params?: ToolArgs) => Promise<unknown>. ` +
         `Received: ${typeof tool.execute}. ` +
         `Example: { execute: async (params) => { return { success: true, data: result }; } }`,
     );
@@ -272,7 +282,7 @@ export function validateTool(name: string, tool: SimpleTool): void {
     }
 
     // Check for common schema validation methods (Zod uses 'parse', others might use 'validate')
-    const params = tool.parameters as any;
+    const params = tool.parameters as unknown as Record<string, unknown>;
     const hasValidationMethod =
       typeof params.parse === "function" ||
       typeof params.validate === "function" ||

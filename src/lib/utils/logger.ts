@@ -5,22 +5,22 @@
  */
 
 export const logger = {
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (process.env.NEUROLINK_DEBUG === "true") {
       console.log(...args);
     }
   },
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     // Completely disabled for clean CLI demo output
   },
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     // Completely disabled for clean CLI demo output
   },
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     // Always show errors regardless of debug mode
     console.error(...args);
   },
-  always: (...args: any[]) => {
+  always: (...args: unknown[]) => {
     console.log(...args);
   },
 };

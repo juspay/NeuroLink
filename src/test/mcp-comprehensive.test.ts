@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { ToolArgs } from "../../lib/types/tools.js";
+import type { UnknownRecord } from "../../lib/types/common.js";
 import {
   createMCPServer,
   validateTool,
@@ -35,7 +37,10 @@ describe("MCP Foundation Tests", () => {
     const { MCPToolRegistry } = await import("../lib/mcp/tool-registry.js");
     registry = new MCPToolRegistry();
     contextManager = new ContextManager();
-    orchestrator = new MCPOrchestrator(registry as any, contextManager);
+    orchestrator = new MCPOrchestrator(
+      registry as UnknownRecord,
+      contextManager,
+    );
   });
 
   afterEach(() => {
@@ -72,7 +77,7 @@ describe("MCP Foundation Tests", () => {
         name: "test-tool",
         description: "Test tool for validation",
         execute: async (
-          params: any,
+          params: ToolArgs,
           context: NeuroLinkExecutionContext,
         ): Promise<ToolResult> => {
           return { success: true, data: { result: "success" } };
@@ -228,7 +233,7 @@ describe("MCP Foundation Tests", () => {
         name: "registry-tool",
         description: "Tool for registry testing",
         execute: async (
-          params: any,
+          params: ToolArgs,
           context: NeuroLinkExecutionContext,
         ): Promise<ToolResult> => {
           return {
@@ -262,7 +267,7 @@ describe("MCP Foundation Tests", () => {
         name: "execution-tool",
         description: "Tool for execution testing",
         execute: async (
-          params: any,
+          params: ToolArgs,
           context: NeuroLinkExecutionContext,
         ): Promise<ToolResult> => {
           return {
@@ -410,7 +415,7 @@ describe("MCP Foundation Tests", () => {
       testServer.registerTool({
         name: "step-1",
         description: "First step in pipeline",
-        execute: async (params: any): Promise<ToolResult> => {
+        execute: async (params: ToolArgs): Promise<ToolResult> => {
           await new Promise((resolve) => setTimeout(resolve, 10)); // Simulate work
           return {
             success: true,
@@ -422,7 +427,7 @@ describe("MCP Foundation Tests", () => {
       testServer.registerTool({
         name: "step-2",
         description: "Second step in pipeline",
-        execute: async (params: any): Promise<ToolResult> => {
+        execute: async (params: ToolArgs): Promise<ToolResult> => {
           await new Promise((resolve) => setTimeout(resolve, 10)); // Simulate work
           return {
             success: true,
@@ -646,7 +651,7 @@ describe("MCP Foundation Tests", () => {
         name: "format-data",
         description: "Format data for display",
         execute: async (
-          params: any,
+          params: ToolArgs,
           context: NeuroLinkExecutionContext,
         ): Promise<ToolResult> => {
           return {

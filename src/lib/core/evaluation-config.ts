@@ -13,7 +13,11 @@ export function parseEvaluationConfig(): EvaluationConfig {
   return {
     provider: process.env.NEUROLINK_EVALUATION_PROVIDER || "google-ai",
     model: process.env.NEUROLINK_EVALUATION_MODEL || "gemini-2.5-flash",
-    mode: (process.env.NEUROLINK_EVALUATION_MODE as any) || "fast",
+    mode:
+      (process.env.NEUROLINK_EVALUATION_MODE as
+        | "fast"
+        | "balanced"
+        | "quality") || "fast",
     fallbackEnabled:
       process.env.NEUROLINK_EVALUATION_FALLBACK_ENABLED !== "false",
     fallbackProviders: (

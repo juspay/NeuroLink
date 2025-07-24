@@ -12,6 +12,7 @@ import type {
   StreamingProgressData,
   ProgressCallback,
 } from "../lib/core/types.js";
+import type { UnknownRecord } from "../../lib/types/common.js";
 
 describe("Phase 2: Enhanced Streaming Infrastructure", () => {
   beforeEach(() => {
@@ -213,14 +214,14 @@ describe("Phase 2: Enhanced Streaming Infrastructure", () => {
 
   describe("UI Integration", () => {
     it("should create progress callback for UI", () => {
-      const uiUpdates: any[] = [];
+      const uiUpdates: UnknownRecord[] = [];
       const uiErrors: Error[] = [];
-      const uiCompletions: any[] = [];
+      const uiCompletions: UnknownRecord[] = [];
 
       const uiHandler = {
         onProgress: (progress: StreamingProgressData) =>
           uiUpdates.push(progress),
-        onComplete: (metadata: any) => uiCompletions.push(metadata),
+        onComplete: (metadata: UnknownRecord) => uiCompletions.push(metadata),
         onError: (error: Error) => uiErrors.push(error),
       };
 

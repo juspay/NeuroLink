@@ -16,7 +16,7 @@ const TEST_FILE_PATH = "./test-prompts-cli.txt";
 // Helper function to execute CLI commands with proper error handling
 function execCLI(
   command: string,
-  options: any = {},
+  options: Record<string, unknown> = {},
 ): { stdout: string; stderr: string; exitCode: number } {
   try {
     const output = execSync(command, {
@@ -25,11 +25,16 @@ function execCLI(
       ...options,
     });
     return { stdout: output, stderr: "", exitCode: 0 };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // execSync throws on non-zero exit codes, but we still get the output
-    const stdout = error.stdout || "";
-    const stderr = error.stderr || "";
-    const exitCode = error.status || 1;
+    const errorObj = error as {
+      stdout?: string;
+      stderr?: string;
+      status?: number;
+    };
+    const stdout = errorObj.stdout || "";
+    const stderr = errorObj.stderr || "";
+    const exitCode = errorObj.status || 1;
     return { stdout, stderr, exitCode };
   }
 }
