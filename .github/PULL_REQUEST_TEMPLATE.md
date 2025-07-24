@@ -1,43 +1,89 @@
+# Pull Request
+
 ## Description
+<!-- Provide a clear and concise description of the changes -->
 
-<!--- Describe your changes in detail -->
+## Type of Change
+<!-- Check all that apply -->
+- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
+- [ ] ✨ New feature (non-breaking change which adds functionality)
+- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] 📚 Documentation update
+- [ ] 🧹 Code refactoring (no functional changes)
+- [ ] ⚡ Performance improvement
+- [ ] 🧪 Test coverage improvement
+- [ ] 🔧 Build/CI configuration change
 
-## Related Issue
+## Related Issues
+<!-- Link to related issues using keywords like "Fixes #123" or "Closes #456" -->
+- Fixes #
+- Related to #
 
-<!--- Please link to the issue here -->
-<!--- For example: Closes #123 -->
+## Changes Made
+<!-- Provide a detailed list of changes -->
+- 
+- 
+- 
 
-## Motivation and Context
+## AI Provider Impact
+<!-- If applicable, indicate which AI providers are affected -->
+- [ ] OpenAI
+- [ ] Anthropic
+- [ ] Google AI/Vertex
+- [ ] AWS Bedrock
+- [ ] Azure OpenAI
+- [ ] Hugging Face
+- [ ] Ollama
+- [ ] Mistral
+- [ ] All providers
+- [ ] No provider-specific changes
 
-<!--- Why is this change required? What problem does it solve? -->
+## Component Impact
+<!-- Check all components that are affected -->
+- [ ] CLI
+- [ ] SDK
+- [ ] MCP Integration
+- [ ] Streaming
+- [ ] Tool Calling
+- [ ] Configuration
+- [ ] Documentation
+- [ ] Tests
 
-## How Has This Been Tested?
+## Testing
+<!-- Describe the tests you've added or run -->
+- [ ] Unit tests added/updated
+- [ ] Integration tests added/updated
+- [ ] E2E tests added/updated
+- [ ] Manual testing performed
+- [ ] All existing tests pass
 
-<!--- Please describe how you tested your changes. -->
-<!--- Include details of your testing environment, tests ran to see how -->
-<!--- your change affects other areas of the code, etc. -->
+### Test Environment
+- OS: 
+- Node.js version: 
+- Package manager: 
 
-## Types of changes
-
-<!--- What types of changes does your code introduce? Put an `x` in all the boxes that apply: -->
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
+## Performance Impact
+<!-- If applicable, describe any performance implications -->
+- [ ] No performance impact
 - [ ] Performance improvement
-- [ ] Code refactoring (no functional changes)
+- [ ] Minor performance impact (acceptable)
+- [ ] Significant performance impact (needs discussion)
 
-## Checklist:
+## Breaking Changes
+<!-- If this is a breaking change, describe the impact and migration path -->
 
-<!--- Go over all the following points, and put an `x` in all the boxes that apply. -->
-<!--- If you're unsure about any of these, don't hesitate to ask. We're here to help! -->
+## Screenshots/Demo
+<!-- If applicable, add screenshots or demo links -->
 
-- [ ] My code follows the code style of this project.
-- [ ] I have updated the documentation accordingly.
-- [ ] I have added tests to cover my changes.
-- [ ] All new and existing tests passed.
-- [ ] My changes generate no new warnings.
-- [ ] I have checked that my changes don't break any existing features.
+## Checklist
+- [ ] My code follows the project's style guidelines
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I have made corresponding changes to the documentation
+- [ ] My changes generate no new warnings
+- [ ] I have added tests that prove my fix is effective or that my feature works
+- [ ] New and existing unit tests pass locally with my changes
+- [ ] Any dependent changes have been merged and published
 
-## Screenshots (if appropriate):
+## Additional Notes
+<!-- Any additional information that would be helpful for reviewers -->
