@@ -7,7 +7,7 @@ import { AIProviderFactory } from "./factory.js";
 import type { EvaluationData } from "./types.js";
 import type { UnknownRecord } from "../types/common.js";
 import { z } from "zod";
-import { ProviderRegistry } from "../factories/provider-registry.js";
+import { ProviderRegistry } from "../factories/providerRegistry.js";
 
 // Enhanced evaluation result interface
 export interface UnifiedEvaluationResult extends EvaluationData {

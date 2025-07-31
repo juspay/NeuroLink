@@ -460,7 +460,7 @@ GOOGLE_AI_MODEL="gemini-2.5-pro-"     # Default model
 #### Required Variables
 
 ```bash
-AZURE_OPENAI_API_KEY="your-azure-openai-key"
+AZURE_OPENAI_API_KEY="your-azureOpenai-key"
 AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 AZURE_OPENAI_DEPLOYMENT_ID="your-deployment-name"
 ```

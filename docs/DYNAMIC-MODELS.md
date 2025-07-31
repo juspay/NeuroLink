@@ -22,7 +22,7 @@ The dynamic model system enables:
    - Provides search and filtering capabilities
    - Can be hosted anywhere (GitHub, CDN, internal server)
 
-2. **Dynamic Model Provider** (`src/lib/core/dynamic-models.ts`)
+2. **Dynamic Model Provider** (`src/lib/core/dynamicModels.ts`)
 
    - Loads configurations from multiple sources with fallback
    - Caches configurations to reduce network requests
@@ -56,16 +56,16 @@ Server runs on `http://localhost:3001` by default.
 
 ```bash
 # Run comprehensive tests
-npm run test:dynamic-models
+npm run test:dynamicModels
 
 # Or manually
-node test-dynamic-models.js
+node test-dynamicModels.js
 ```
 
 ### 3. Use in Code
 
 ```typescript
-import { dynamicModelProvider } from "./src/lib/core/dynamic-models.js";
+import { dynamicModelProvider } from "./src/lib/core/dynamicModels.js";
 
 // Initialize the provider
 await dynamicModelProvider.initialize();
@@ -98,8 +98,8 @@ curl http://localhost:3001/api/v1/models
 # Get OpenAI models
 curl http://localhost:3001/api/v1/models/openai
 
-# Search for function-calling models under $0.001
-curl "http://localhost:3001/api/v1/search?capability=function-calling&maxPrice=0.001"
+# Search for functionCalling models under $0.001
+curl "http://localhost:3001/api/v1/search?capability=functionCalling&maxPrice=0.001"
 ```
 
 ## 🔧 Configuration Schema
@@ -115,7 +115,7 @@ curl "http://localhost:3001/api/v1/search?capability=function-calling&maxPrice=0
       "claude-3-opus": {
         "id": "claude-3-opus-20240229",
         "displayName": "Claude 3 Opus",
-        "capabilities": ["function-calling", "vision", "analysis"],
+        "capabilities": ["functionCalling", "vision", "analysis"],
         "deprecated": false,
         "pricing": { "input": 0.015, "output": 0.075 },
         "contextWindow": 200000,
@@ -137,7 +137,7 @@ curl "http://localhost:3001/api/v1/search?capability=function-calling&maxPrice=0
 
 - **`id`**: Provider-specific model identifier
 - **`displayName`**: Human-readable model name
-- **`capabilities`**: Array of model capabilities (function-calling, vision, etc.)
+- **`capabilities`**: Array of model capabilities (functionCalling, vision, etc.)
 - **`deprecated`**: Whether the model is deprecated
 - **`pricing`**: Input/output token costs per 1K tokens
 - **`contextWindow`**: Maximum context window size
@@ -173,7 +173,7 @@ resolveModel("anthropic", "opus"); // Matches 'claude-3-opus'
 ### Capability Search Options
 
 ```typescript
-searchByCapability("function-calling", {
+searchByCapability("functionCalling", {
   provider: "openai", // Filter by provider
   maxPrice: 0.001, // Maximum input price per 1K tokens
   excludeDeprecated: true, // Exclude deprecated models
@@ -248,7 +248,7 @@ The test suite verifies:
 Run tests with:
 
 ```bash
-npm run test:dynamic-models
+npm run test:dynamicModels
 ```
 
 ## 🚀 Benefits

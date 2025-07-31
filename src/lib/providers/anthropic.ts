@@ -6,9 +6,9 @@ import type {
   TextGenerationOptions,
   EnhancedGenerateResult,
 } from "../core/types.js";
-import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { Unknown, UnknownRecord } from "../types/common.js";
-import { BaseProvider, type NeuroLinkSDK } from "../core/base-provider.js";
+import { BaseProvider, type NeuroLinkSDK } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,

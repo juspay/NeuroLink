@@ -120,7 +120,7 @@ export function createMCPServer(config: {
   description?: string; // OPTIONAL
   version?: string; // OPTIONAL
   category?:
-    | "ai-providers"
+    | "aiProviders"
     | "frameworks"
     | "development"
     | "analytics"
@@ -594,7 +594,7 @@ src/lib/mcp/
 ├── security.ts                         # Permission and security system
 ├── config.ts                           # Configuration management
 ├── servers/
-│   ├── ai-providers/                   # AI provider tools
+│   ├── aiProviders/                   # AI provider tools
 │   │   ├── openai-tools-server.ts     # OpenAI specific tools
 │   │   ├── bedrock-tools-server.ts    # Bedrock specific tools
 │   │   ├── vertex-tools-server.ts     # Vertex specific tools

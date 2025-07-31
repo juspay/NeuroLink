@@ -1071,7 +1071,7 @@ await neurolink.addMCPServer('bitbucket', {
 - ✅ **src/lib/providers/openAI.ts**: Standardized to throw errors instead of returning null
 - ✅ **src/lib/providers/googleVertexAI.ts**: Consistent error handling implementation
 - ✅ **src/lib/neurolink.ts**: Enhanced with automatic fallback logic and comprehensive logging
-- ✅ **src/lib/mcp/servers/ai-providers/ai-workflow-tools.ts**: Real AI integration with NeuroLink
+- ✅ **src/lib/mcp/servers/aiProviders/aiWorkflowTools.ts**: Real AI integration with NeuroLink
 
 ### **Production Validation**
 
@@ -1116,8 +1116,8 @@ src/lib/mcp/
 ├── context-manager.ts          # Context management system
 ├── registry.ts                 # Tool registry and discovery
 ├── orchestrator.ts             # Tool orchestration engine
-└── servers/ai-providers/       # AI provider tools implementation
-    └── ai-core-server.ts       # AI Core Server with 3 tools
+└── servers/aiProviders/       # AI provider tools implementation
+    └── aiCoreServer.ts       # AI Core Server with 3 tools
 ```
 
 ### **Performance Metrics**
@@ -1549,7 +1549,7 @@ neurolink/
 1. **Google Vertex AI Anthropic Import**:
 
    - Status: ✅ **RESOLVED** (2025-06-04)
-   - Issue: The `@ai-sdk/google-vertex/anthropic` module was imported but not exported
+   - Issue: The `@ai-sdk/googleVertex/anthropic` module was imported but not exported
    - Solution: Implemented ESM-compatible authentication with three flexible methods
    - Fixed in: Current build with enhanced authentication
 

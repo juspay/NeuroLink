@@ -24,22 +24,22 @@ export type {
   GenerateOptions,
   GenerateResult,
   EnhancedProvider,
-} from "./types/generate-types.js";
+} from "./types/generateTypes.js";
 
 // Tool Registration exports
-export type { SimpleTool, ToolContext } from "./sdk/tool-registration.js";
+export type { SimpleTool, ToolContext } from "./sdk/toolRegistration.js";
 export {
   createTool,
   createTypedTool,
   validateTool,
-} from "./sdk/tool-registration.js";
+} from "./sdk/toolRegistration.js";
 
 // MCP Types for extensions
 export type {
   InMemoryMCPServerConfig,
   InMemoryToolInfo,
   InMemoryToolResult,
-} from "./types/mcp-types.js";
+} from "./types/mcpTypes.js";
 
 // Model enums
 export {

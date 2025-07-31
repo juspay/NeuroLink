@@ -6,7 +6,7 @@
  */
 
 import { MCPOrchestrator } from "../../dist/lib/mcp/orchestrator.js";
-import { MCPToolRegistry } from "../../dist/lib/mcp/tool-registry.js";
+import { MCPToolRegistry } from "../../dist/lib/mcp/toolRegistry.js";
 import { SessionManager } from "../../dist/lib/mcp/session-manager.js";
 import fs from "fs/promises";
 import path from "path";

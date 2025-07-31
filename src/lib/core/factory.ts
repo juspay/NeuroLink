@@ -1,10 +1,10 @@
 // ✅ CIRCULAR DEPENDENCY FIX: Remove barrel export import
 // Providers are now managed via ProviderFactory instead of direct imports
-import { ProviderFactory } from "../factories/provider-factory.js";
-import { ProviderRegistry } from "../factories/provider-registry.js";
+import { ProviderFactory } from "../factories/providerFactory.js";
+import { ProviderRegistry } from "../factories/providerRegistry.js";
 import { getBestProvider } from "../utils/providerUtils.js";
 import { logger } from "../utils/logger.js";
-import { dynamicModelProvider } from "./dynamic-models.js";
+import { dynamicModelProvider } from "./dynamicModels.js";
 import type {
   AIProvider,
   AIProviderName,
@@ -138,9 +138,9 @@ export class AIProviderFactory {
       if (enableMCP) {
         try {
           logger.debug(
-            `[${functionTag}] MCP wrapping disabled - function-calling removed`,
+            `[${functionTag}] MCP wrapping disabled - functionCalling removed`,
           );
-          // MCP wrapping simplified - removed function-calling dependency
+          // MCP wrapping simplified - removed functionCalling dependency
         } catch (mcpError) {
           logger.warn(
             `[${functionTag}] Failed to wrap with MCP, using base provider`,

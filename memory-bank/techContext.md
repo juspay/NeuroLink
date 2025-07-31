@@ -76,7 +76,7 @@ src/lib/mcp/
 
 // Supporting Infrastructure
 ├── contracts/mcpContract.ts       # Industry standard interfaces
-├── tool-registry.ts               # Enhanced tool registry
+├── toolRegistry.ts               # Enhanced tool registry
 └── external-manager.ts            # External server management
 ```
 
@@ -553,7 +553,7 @@ src/lib/config/
 src/lib/mcp/
 ├── contracts/mcpContract.ts    # Industry standard interfaces
 ├── registry.ts               # Enhanced base registry (162 lines)
-└── tool-registry.ts          # Updated tool registry (205 lines)
+└── toolRegistry.ts          # Updated tool registry (205 lines)
 ```
 
 ### **TypeScript Compilation Status**
@@ -696,7 +696,7 @@ src/lib/mcp/
 ## Testing Infrastructure
 
 - **Test Strategy**: `./development/testing-strategy.md`
-- **AI Workflow Tools Testing**: `./development/ai-workflow-tools-testing-guide.md`
+- **AI Workflow Tools Testing**: `./development/aiWorkflowTools-testing-guide.md`
 - **Test Files**: `src/test/` directory
 - **Test Reports**: `./reports/build-summary.md`, `./reports/test-summary.md`
 
@@ -710,9 +710,9 @@ src/lib/mcp/
 ### AI SDK Integration Pattern
 - **Core Integration**: `src/lib/providers/googleAIStudio.ts` with `maxSteps: 5`
 - **Tool Registration**: `src/lib/mcp/unified-registry.ts` for tool discovery
-- **Function Calling Provider**: `src/lib/providers/function-calling-provider.ts`
+- **Function Calling Provider**: `src/lib/providers/functionCalling-provider.ts`
 - **Auto-Discovery**: `src/lib/mcp/auto-discovery.ts` for system-wide tool finding
-- **Debug Tools**: `debug-multi-turn.js`, `debug-ai-sdk-tools.js`
+- **Debug Tools**: `debug-multi-turn.js`, `debug-ai-sdkTools.js`
 
 ### Multi-turn Conversation Flow
 - **Step 1**: AI analyzes prompt and identifies tool needs
@@ -727,8 +727,8 @@ src/lib/mcp/
 ```typescript
 // MCPEnhancedProvider: Auto-injects discovered tools
 src/lib/core/factory.ts              # Factory with MCP integration
-src/lib/providers/function-calling-provider.ts  # Function calling wrapper
-src/lib/mcp/function-calling.ts      # Core function calling logic
+src/lib/providers/functionCalling-provider.ts  # Function calling wrapper
+src/lib/mcp/functionCalling.ts      # Core function calling logic
 ```
 
 #### MCP Tool Integration
@@ -780,8 +780,8 @@ generate({
 - **AI Provider SDKs** (as peer dependencies):
   - `ai`: Core AI utilities from Vercel
   - `@ai-sdk/openai`: OpenAI integration
-  - `@ai-sdk/amazon-bedrock`: Amazon Bedrock integration
-  - `@ai-sdk/google-vertex`: Google Vertex AI integration
+  - `@ai-sdk/amazonBedrock`: Amazon Bedrock integration
+  - `@ai-sdk/googleVertex`: Google Vertex AI integration
   - `zod`: Schema validation
 
 ## Development Environment
@@ -939,7 +939,7 @@ pnpm test
 
 ## Known Technical Debt
 
-1. **Google Vertex AI Anthropic Import**: The Google Vertex AI provider imports `@ai-sdk/google-vertex/anthropic` which is not exported by the Google Vertex package. This needs to be fixed in a future release.
+1. **Google Vertex AI Anthropic Import**: The Google Vertex AI provider imports `@ai-sdk/googleVertex/anthropic` which is not exported by the Google Vertex package. This needs to be fixed in a future release.
 
 2. **Error Handling Consistency**: Error handling could be more consistent across providers, especially for network errors and rate limiting.
 

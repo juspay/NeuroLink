@@ -153,7 +153,7 @@ describe("MCP Server Factory", () => {
       title: "Test Server",
       description: "Test description",
       version: "1.0.0",
-      category: "ai-providers",
+      category: "aiProviders",
       visibility: "organization",
     });
 
@@ -440,7 +440,7 @@ describe("Tool Registry", () => {
 1. **Day 1-2: AI Core Server Creation**
 
    ```typescript
-   // src/lib/mcp/servers/ai-providers/ai-core-server.ts
+   // src/lib/mcp/servers/aiProviders/aiCoreServer.ts
    import { createMCPServer } from "../../factory.js";
    import { AIProviderFactory } from "../../../core/factory.js";
 
@@ -448,7 +448,7 @@ describe("Tool Registry", () => {
      id: "neurolink-ai-core",
      title: "NeuroLink AI Core",
      description: "Core AI provider tools with automatic fallback",
-     category: "ai-providers",
+     category: "aiProviders",
    });
    ```
 
@@ -532,7 +532,7 @@ describe("Tool Registry", () => {
 **Test Cases**:
 
 ```typescript
-// tests/mcp/servers/ai-core-server.test.ts
+// tests/mcp/servers/aiCoreServer.test.ts
 describe("AI Core Server", () => {
   beforeEach(() => {
     // Mock AI providers for testing
@@ -793,7 +793,7 @@ describe("Tool Orchestrator", () => {
    import { ToolOrchestrator } from "./mcp/orchestrator.js";
    import { MCPToolRegistry } from "./mcp/registry.js";
    import { ContextManager } from "./mcp/context-manager.js";
-   import { aiCoreServer } from "./mcp/servers/ai-providers/ai-core-server.js";
+   import { aiCoreServer } from "./mcp/servers/aiProviders/aiCoreServer.js";
 
    export class NeuroLink {
      private toolOrchestrator: ToolOrchestrator;
@@ -1303,7 +1303,7 @@ describe("CLI Tools Commands", () => {
 describe("React Tools Server", () => {
   beforeEach(() => {
     // Mock AI core server
-    jest.mock("../ai-providers/ai-core-server.js");
+    jest.mock("../aiProviders/aiCoreServer.js");
   });
 
   test("generates functional component", async () => {

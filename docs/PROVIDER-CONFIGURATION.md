@@ -695,7 +695,7 @@ GOOGLE_VERTEX_LOCATION=us-east5
 VERTEX_MODEL_ID=claude-sonnet-4@20250514
 
 # Google AI Studio
-GOOGLE_AI_API_KEY=AIza-your-google-ai-studio-key
+GOOGLE_AI_API_KEY=AIza-your-googleAiStudio-key
 GOOGLE_AI_MODEL=gemini-2.5-pro
 
 # Anthropic

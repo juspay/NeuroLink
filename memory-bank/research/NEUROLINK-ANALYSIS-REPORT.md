@@ -8,7 +8,7 @@ NeuroLink is a Universal AI Development Platform that integrates multiple AI pro
 
 ### 1. Function-Calling Module Issues (FIXED)
 
-**Problem**: The `src/lib/mcp/function-calling.ts` file had:
+**Problem**: The `src/lib/mcp/functionCalling.ts` file had:
 - Orphaned code outside of any function starting at line 119
 - Duplicate code that was causing TypeScript errors
 - Incorrect implementation of the `getAvailableFunctionTools` function
@@ -80,7 +80,7 @@ The project has TypeScript configuration issues that need addressing:
    - Consider upgrading to ES2020 or higher target
 
 2. **Test Function Calling Integration**:
-   - Create test cases for the fixed function-calling module
+   - Create test cases for the fixed functionCalling module
    - Verify tool execution works correctly
 
 3. **Simplify Dynamic Model Loading**:
@@ -118,7 +118,7 @@ The project has TypeScript configuration issues that need addressing:
 
 ## Conclusion
 
-NeuroLink is an ambitious and well-architected project that successfully integrates multiple AI providers with advanced MCP capabilities. The main issues are configuration-related rather than architectural. With the function-calling fix and TypeScript configuration updates, the project should be fully functional.
+NeuroLink is an ambitious and well-architected project that successfully integrates multiple AI providers with advanced MCP capabilities. The main issues are configuration-related rather than architectural. With the functionCalling fix and TypeScript configuration updates, the project should be fully functional.
 
 ## Next Steps
 

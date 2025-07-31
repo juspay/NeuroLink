@@ -141,7 +141,7 @@ export function hasProviderEnvVars(provider: string): boolean {
       return !!process.env.ANTHROPIC_API_KEY;
 
     case "azure":
-    case "azure-openai":
+    case "azureOpenai":
       return !!process.env.AZURE_OPENAI_API_KEY;
 
     case "google-ai":

@@ -72,7 +72,7 @@ node ../examples/interface-usage/execution-context-example.js
 ### **🆕 Interface Usage** (examples/interface-usage/)
 - `execution-context-example.js` - Rich context demonstration
 - `registry-interface-demo.js` - Registry patterns
-- `tool-integration-example.js` - Tool integration
+- `toolIntegration-example.js` - Tool integration
 - `migration-examples.js` - Legacy to v3.0 migration
 
 ---

@@ -6,7 +6,7 @@
  */
 
 import { MCPOrchestrator } from "../../dist/lib/mcp/orchestrator.js";
-import { MCPToolRegistry } from "../../dist/lib/mcp/tool-registry.js";
+import { MCPToolRegistry } from "../../dist/lib/mcp/toolRegistry.js";
 import { SemaphoreManager } from "../../dist/lib/mcp/semaphore-manager.js";
 
 // Color utilities for better visualization

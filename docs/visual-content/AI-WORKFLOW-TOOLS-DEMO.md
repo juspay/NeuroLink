@@ -8,11 +8,11 @@ This document provides complete visual evidence of AI Development Workflow Tools
 
 ## 📱 **Demo Application Videos**
 
-### **Location**: `neurolink-demo/videos/ai-workflow-tools-demo/`
+### **Location**: `neurolink-demo/videos/aiWorkflowTools-demo/`
 
 ✅ **Professional Demo Video** (MP4 Format)
 
-- **File**: `ai-workflow-tools-demo.mp4` (315 KB, 3 seconds)
+- **File**: `aiWorkflowTools-demo.mp4` (315 KB, 3 seconds)
 - **File**: `ai-workflow-full-demo.mp4` (1.32 MB, 19 seconds)
 - **Resolution**: 1920x1080 (Full HD)
 - **Content**: Complete demonstration of all 4 AI workflow tools in web interface
@@ -36,11 +36,11 @@ This document provides complete visual evidence of AI Development Workflow Tools
 
 ## 💻 **CLI Demo Videos**
 
-### **Location**: `docs/visual-content/cli-videos/ai-workflow-tools-demo/`
+### **Location**: `docs/visual-content/cli-videos/aiWorkflowTools-demo/`
 
 ✅ **Professional CLI Demo Video** (MP4 Format)
 
-- **File**: `ai-workflow-tools-cli-demo.mp4` (218 KB, 5 seconds)
+- **File**: `aiWorkflowTools-cli-demo.mp4` (218 KB, 5 seconds)
 - **Resolution**: 1280x800 (Professional terminal standard)
 - **Content**: Terminal-style demonstration of CLI commands
 - **CLI Commands Demonstrated**:
@@ -66,7 +66,7 @@ This document provides complete visual evidence of AI Development Workflow Tools
 ### **Demo Application Screenshots** (`neurolink-demo/screenshots/`)
 
 - `08-ai-workflow-overview.png` - Overview of AI workflow tools section
-- `09-ai-workflow-tools.png` - All 4 tools visible in green theme
+- `09-aiWorkflowTools.png` - All 4 tools visible in green theme
 - `10-test-cases-result.png` - Test case generation result
 - `11-refactor-code-result.png` - Code refactoring result
 - `12-documentation-result.png` - Documentation generation result
@@ -74,7 +74,7 @@ This document provides complete visual evidence of AI Development Workflow Tools
 
 ### **CLI Screenshot** (`docs/visual-content/screenshots/`)
 
-- `ai-workflow-tools-cli-demo.png` - Professional terminal demonstration
+- `aiWorkflowTools-cli-demo.png` - Professional terminal demonstration
 
 **Screenshot Quality**: All images captured at 1920x1080 resolution, professional documentation quality.
 
@@ -115,20 +115,20 @@ This document provides complete visual evidence of AI Development Workflow Tools
 
 ```
 📦 AI Workflow Tools Visual Proof Assets
-├── neurolink-demo/videos/ai-workflow-tools-demo/
-│   ├── ai-workflow-tools-demo.mp4           # Short demo (3s)
+├── neurolink-demo/videos/aiWorkflowTools-demo/
+│   ├── aiWorkflowTools-demo.mp4           # Short demo (3s)
 │   └── ai-workflow-full-demo.mp4            # Complete demo (19s)
-├── docs/visual-content/cli-videos/ai-workflow-tools-demo/
-│   └── ai-workflow-tools-cli-demo.mp4       # CLI demonstration (5s)
+├── docs/visual-content/cli-videos/aiWorkflowTools-demo/
+│   └── aiWorkflowTools-cli-demo.mp4       # CLI demonstration (5s)
 ├── neurolink-demo/screenshots/
 │   ├── 08-ai-workflow-overview.png
-│   ├── 09-ai-workflow-tools.png
+│   ├── 09-aiWorkflowTools.png
 │   ├── 10-test-cases-result.png
 │   ├── 11-refactor-code-result.png
 │   ├── 12-documentation-result.png
 │   └── 13-debug-output-result.png
 └── docs/visual-content/screenshots/
-    └── ai-workflow-tools-cli-demo.png
+    └── aiWorkflowTools-cli-demo.png
 ```
 
 ---

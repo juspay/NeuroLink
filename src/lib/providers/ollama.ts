@@ -9,10 +9,10 @@ import type {
   LanguageModelV1StreamPart,
 } from "ai";
 import { streamText, Output } from "ai";
-import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema } from "ai";
-import { BaseProvider } from "../core/base-provider.js";
+import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
 import { getDefaultTimeout, TimeoutError } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";

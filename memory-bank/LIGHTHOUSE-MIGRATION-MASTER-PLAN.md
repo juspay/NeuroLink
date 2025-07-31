@@ -81,7 +81,7 @@ Build core AI-focused MCP tools using proven Lighthouse patterns, focusing on de
 
 - **1.2.1**: ❌ `generate-test-prompts` - Create test datasets for AI applications
 - **1.2.2**: ❌ `validate-ai-responses` - Quality checking and validation
-- **1.2.3**: ❌ `compare-ai-providers` - Side-by-side provider comparison
+- **1.2.3**: ❌ `compare-aiProviders` - Side-by-side provider comparison
 - **1.2.4**: ❌ `ai-cost-calculator` - Cost estimation and budgeting
 
 **ACTUALLY IMPLEMENTED TOOLS:**

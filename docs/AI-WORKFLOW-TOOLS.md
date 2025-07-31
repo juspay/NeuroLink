@@ -248,7 +248,7 @@ Content-Type: application/json
 
 All workflow tools are demonstrated in our comprehensive demo videos:
 
-- **[AI Workflow Tools Demo](../neurolink-demo/videos/ai-workflow-tools-demo/ai-workflow-tools-demo.mp4)** - Complete workflow demonstration
+- **[AI Workflow Tools Demo](../neurolink-demo/videos/aiWorkflowTools-demo/aiWorkflowTools-demo.mp4)** - Complete workflow demonstration
 - **[Developer Tools Demo](../neurolink-demo/videos/developer-tools.webm)** - Technical applications and code generation
 
 ## 🔧 Technical Implementation

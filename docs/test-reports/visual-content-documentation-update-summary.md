@@ -50,7 +50,7 @@
   - cli-04-auto-selection.mp4
   - cli-05-streaming.mp4
   - cli-06-advanced-features.mp4
-  - ai-workflow-tools-demo.mp4 (in subdirectory)
+  - aiWorkflowTools-demo.mp4 (in subdirectory)
   - mcp-help.mp4 (in cli-advanced-features/)
   - mcp-list.mp4 (in cli-advanced-features/)
 
@@ -76,8 +76,8 @@
 
 ### Phase 1.2 Videos Available:
 
-- `ai-workflow-tools-demo/ai-workflow-tools-cli-demo.mp4` - Complete CLI demo
-- `ai-workflow-tools-demo/ai-workflow-tools-cli-demo.webm` - WebM version
+- `aiWorkflowTools-demo/aiWorkflowTools-cli-demo.mp4` - Complete CLI demo
+- `aiWorkflowTools-demo/aiWorkflowTools-cli-demo.webm` - WebM version
 
 ## 📝 Recommended Additional Updates
 

@@ -94,11 +94,11 @@ vi.mock("ai", () => ({
 
 // Mock provider SDKs
 vi.mock("@ai-sdk/openai", () => ({ openai: vi.fn() }));
-vi.mock("@ai-sdk/amazon-bedrock", () => ({
+vi.mock("@ai-sdk/amazonBedrock", () => ({
   amazonBedrock: vi.fn(),
   createAmazonBedrock: vi.fn(),
 }));
-vi.mock("@ai-sdk/google-vertex", () => ({
+vi.mock("@ai-sdk/googleVertex", () => ({
   createVertex: vi.fn(),
 }));
 ```

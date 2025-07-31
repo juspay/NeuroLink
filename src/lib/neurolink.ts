@@ -23,23 +23,20 @@ import type {
 import { AIProviderFactory } from "./core/factory.js";
 
 import { mcpLogger } from "./utils/logger.js";
-import { toolRegistry } from "./mcp/tool-registry.js";
+import { toolRegistry } from "./mcp/toolRegistry.js";
 import { logger } from "./utils/logger.js";
 import { getBestProvider } from "./utils/providerUtils.js";
-import { ProviderRegistry } from "./factories/provider-registry.js";
+import { ProviderRegistry } from "./factories/providerRegistry.js";
 // NEW: Generate function imports
-import type {
-  GenerateOptions,
-  GenerateResult,
-} from "./types/generate-types.js";
-import type { StreamOptions, StreamResult } from "./types/stream-types.js";
+import type { GenerateOptions, GenerateResult } from "./types/generateTypes.js";
+import type { StreamOptions, StreamResult } from "./types/streamTypes.js";
 // Tool registration imports
-import type { SimpleTool } from "./sdk/tool-registration.js";
+import type { SimpleTool } from "./sdk/toolRegistration.js";
 import {
   validateTool,
   createMCPServerFromTools,
-} from "./sdk/tool-registration.js";
-import type { InMemoryMCPServerConfig } from "./types/mcp-types.js";
+} from "./sdk/toolRegistration.js";
+import type { InMemoryMCPServerConfig } from "./types/mcpTypes.js";
 import type { JsonValue, UnknownRecord } from "./types/common.js";
 import type { ToolArgs } from "./types/tools.js";
 
@@ -927,7 +924,7 @@ export class NeuroLink {
       "openai",
       "bedrock",
       "vertex",
-      "google-vertex",
+      "googleVertex",
       "anthropic",
       "azure",
       "google-ai",

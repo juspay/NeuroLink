@@ -351,7 +351,7 @@ NeuroLink now features a revolutionary dynamic model configuration system that e
 
 - **🔄 Self-Updating**: New models automatically available without code updates
 - **💰 Cost-Optimized**: Automatic selection of cheapest models for tasks
-- **🔍 Smart Search**: Find models by capabilities (function-calling, vision, etc.)
+- **🔍 Smart Search**: Find models by capabilities (functionCalling, vision, etc.)
 - **🏷️ Alias Support**: Use friendly names like "claude-latest" or "best-coding"
 - **📊 Real-Time Pricing**: Always current model costs and performance data
 
@@ -369,14 +369,14 @@ npx @juspay/neurolink gen "Write code" --model best-coding
 
 # Test dynamic model server
 npm run model-server  # Starts config server on localhost:3001
-npm run test:dynamic-models  # Comprehensive test suite
+npm run test:dynamicModels  # Comprehensive test suite
 ```
 
 ### 📊 Current Model Inventory (Auto-Updated)
 
 - **10 active models** across 4 providers
 - **Cheapest**: Gemini 2.0 Flash ($0.000075/1K tokens)
-- **Most capable**: Claude 3 Opus (function-calling + vision + analysis)
+- **Most capable**: Claude 3 Opus (functionCalling + vision + analysis)
 - **Best for coding**: Claude 3 Opus, Gemini 2.0 Flash
 - **1 deprecated model** automatically excluded
 

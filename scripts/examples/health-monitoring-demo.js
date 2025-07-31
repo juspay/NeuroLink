@@ -5,8 +5,8 @@
  * Demonstrates health checks, auto-recovery, and reporting
  */
 
-import { HealthMonitor, ConnectionStatus, PingHealthCheck, ToolListValidationCheck, PerformanceCheck } from "../../dist/lib/mcp/health-monitor.js";
-import { MCPToolRegistry } from "../../dist/lib/mcp/tool-registry.js";
+import { HealthMonitor, ConnectionStatus, PingHealthCheck, ToolListValidationCheck, PerformanceCheck } from "../../dist/lib/mcp/healthMonitor.js";
+import { MCPToolRegistry } from "../../dist/lib/mcp/toolRegistry.js";
 import { ErrorManager } from "../../dist/lib/mcp/error-manager.js";
 import ora from "ora";
 import chalk from "chalk";
@@ -22,7 +22,7 @@ class MockMCPRegistry extends MCPToolRegistry {
   }
   
   listServers() {
-    return ["api-server", "database-server", "ai-model-server", "slow-server"];
+    return ["api-server", "database-server", "ai-modelServer", "slow-server"];
   }
   
   async listTools() {
@@ -63,7 +63,7 @@ async function demoHealthChecks(healthMonitor) {
   console.log(chalk.cyan("\n🔍 Demo 1: Health Check Strategies"));
   console.log(chalk.gray("─".repeat(60)));
 
-  const servers = ["api-server", "database-server", "ai-model-server"];
+  const servers = ["api-server", "database-server", "ai-modelServer"];
   const strategies = ["ping", "tool-validation", "performance"];
   
   for (const server of servers) {
@@ -271,7 +271,7 @@ async function demoCustomHealthChecks(healthMonitor) {
   
   console.log("\n" + chalk.yellow("Testing custom 'business-logic' health check:"));
   
-  const servers = ["api-server", "database-server", "ai-model-server"];
+  const servers = ["api-server", "database-server", "ai-modelServer"];
   
   for (const serverId of servers) {
     const spinner = ora(`Checking ${serverId}...`).start();

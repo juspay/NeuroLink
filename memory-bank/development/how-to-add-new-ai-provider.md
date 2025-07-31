@@ -217,19 +217,19 @@ function isProviderConfigured(provider) {
 
 #### **4.1 AI Core Server**
 
-- **File**: `src/lib/mcp/servers/ai-providers/ai-core-server.ts`
+- **File**: `src/lib/mcp/servers/aiProviders/aiCoreServer.ts`
 - **Tool Schemas**: Add provider to all tool parameter schemas
 - **Provider Support**: Ensure all 3 core tools support new provider
 
 #### **4.2 AI Analysis Tools**
 
-- **File**: `src/lib/mcp/servers/ai-providers/ai-analysis-tools.ts`
+- **File**: `src/lib/mcp/servers/aiProviders/aiAnalysisTools.ts`
 - **Tool Schemas**: Add provider to analysis tool schemas
 - **Provider Support**: All analysis tools must support new provider
 
 #### **4.3 AI Workflow Tools**
 
-- **File**: `src/lib/mcp/servers/ai-providers/ai-workflow-tools.ts`
+- **File**: `src/lib/mcp/servers/aiProviders/aiWorkflowTools.ts`
 - **Tool Schemas**: Add provider to workflow tool schemas
 - **Provider Support**: All workflow tools must support new provider
 

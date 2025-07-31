@@ -20,9 +20,7 @@ async function testDirectProxy() {
 
   try {
     // Import the proxy fetch function
-    const { createProxyFetch } = await import(
-      "../../dist/proxy/proxy-fetch.js"
-    );
+    const { createProxyFetch } = await import("../../dist/proxy/proxyFetch.js");
     const proxyFetch = createProxyFetch();
 
     console.log("[Direct Test] 🚀 Making direct HTTP request through proxy...");

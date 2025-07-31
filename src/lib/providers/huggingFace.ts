@@ -7,8 +7,8 @@ import type {
   TextGenerationOptions,
   EnhancedGenerateResult,
 } from "../core/types.js";
-import type { StreamOptions, StreamResult } from "../types/stream-types.js";
-import { BaseProvider } from "../core/base-provider.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,

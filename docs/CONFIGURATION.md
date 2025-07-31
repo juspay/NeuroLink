@@ -159,7 +159,7 @@ Create or modify `config/models.json` to define available models:
       "name": "Claude 3.5 Sonnet",
       "provider": "anthropic",
       "pricing": { "input": 0.003, "output": 0.015 },
-      "capabilities": ["function-calling", "vision", "code"],
+      "capabilities": ["functionCalling", "vision", "code"],
       "contextWindow": 200000,
       "deprecated": false,
       "aliases": ["claude-latest", "best-coding"]
@@ -185,7 +185,7 @@ npx neurolink generate "Write code" --model best-coding
 npx neurolink generate "Describe image" --capability vision --optimize-cost
 
 # Search and discover models
-npx neurolink models search --capability function-calling --max-price 0.001
+npx neurolink models search --capability functionCalling --max-price 0.001
 npx neurolink models list
 npx neurolink models best --use-case coding
 ```

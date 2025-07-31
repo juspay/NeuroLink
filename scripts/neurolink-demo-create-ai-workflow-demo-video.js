@@ -20,7 +20,7 @@ async function createAIWorkflowDemoVideo() {
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
     recordVideo: {
-      dir: path.join(VIDEOS_DIR, "ai-workflow-tools-demo"),
+      dir: path.join(VIDEOS_DIR, "aiWorkflowTools-demo"),
       size: { width: 1920, height: 1080 },
     },
   });
@@ -57,7 +57,7 @@ async function createAIWorkflowDemoVideo() {
 
     // Screenshot of AI workflow tools
     await page.screenshot({
-      path: path.join(__dirname, "screenshots", "09-ai-workflow-tools.png"),
+      path: path.join(__dirname, "screenshots", "09-aiWorkflowTools.png"),
       fullPage: false,
     });
 

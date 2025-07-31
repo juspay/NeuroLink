@@ -77,7 +77,7 @@ console.log("Available tools:", Object.keys(testServer.tools));
 
 ```typescript
 // test-ai-core.ts
-import { aiCoreServer } from "@juspay/neurolink/mcp/servers/ai-providers/ai-core-server";
+import { aiCoreServer } from "@juspay/neurolink/mcp/servers/aiProviders/aiCoreServer";
 import { ContextManager } from "@juspay/neurolink/mcp";
 
 async function testAICoreServer() {
@@ -152,7 +152,7 @@ testAICoreServer();
 import { MCPRegistry } from "@juspay/neurolink/mcp";
 import { ToolOrchestrator } from "@juspay/neurolink/mcp";
 import { ContextManager } from "@juspay/neurolink/mcp";
-import { aiCoreServer } from "@juspay/neurolink/mcp/servers/ai-providers/ai-core-server";
+import { aiCoreServer } from "@juspay/neurolink/mcp/servers/aiProviders/aiCoreServer";
 
 async function testOrchestration() {
   // Initialize registry and orchestrator

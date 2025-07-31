@@ -62,7 +62,7 @@ pnpm vitest src/test/cli-comprehensive.test.ts --run
 
 # Feature Tests
 pnpm vitest src/test/streaming-enhancements.test.ts --run
-pnpm vitest src/test/error-handling.test.ts --run
+pnpm vitest src/test/errorHandling.test.ts --run
 pnpm vitest src/test/timeout.test.ts --run
 
 # Advanced Features
@@ -75,23 +75,23 @@ pnpm vitest src/test/health-monitor.test.ts --run
 
 ```bash
 # Integration Test Batches
-pnpm vitest test/analytics-features.ts --run
-pnpm vitest test/evaluation-features.ts --run
-pnpm vitest test/streaming-validation.ts --run
-pnpm vitest test/error-handling.ts --run
-pnpm vitest test/sdk-comprehensive.ts --run
-pnpm vitest test/parameter-validation.ts --run
+pnpm vitest test/analyticsFeatures.ts --run
+pnpm vitest test/evaluationFeatures.ts --run
+pnpm vitest test/streamingValidation.ts --run
+pnpm vitest test/errorHandling.ts --run
+pnpm vitest test/sdkComprehensive.ts --run
+pnpm vitest test/parameterValidation.ts --run
 
 # MCP Integration Tests
-pnpm vitest test/mcp/manual-config --run
-pnpm vitest test/mcp/tool-integration --run
+pnpm vitest test/mcp/manualConfig --run
+pnpm vitest test/mcp/toolIntegration --run
 pnpm vitest test/mcp/providers --run
 
 # Performance Tests
-pnpm vitest test/streaming/performance-benchmark.test.ts --run
+pnpm vitest test/streaming/performanceBenchmark.test.ts --run
 
 # Direct Tools Tests (ALL 6 TOOLS)
-pnpm vitest test/mcp/tool-integration/direct-tools.test.ts --run
+pnpm vitest test/mcp/toolIntegration/directTools.test.ts --run
 ```
 
 ---
@@ -104,34 +104,34 @@ The MCP test suite validates the Model Context Protocol implementation, includin
 
 ### **MCP Test Categories**
 
-#### **1. Manual Configuration Tests** (`test/mcp/manual-config/`)
+#### **1. Manual Configuration Tests** (`test/mcp/manualConfig/`)
 
 ```bash
 # Test CLI manual MCP config loading
-pnpm vitest test/mcp/manual-config/cli-manual-mcp.test.ts --run
+pnpm vitest test/mcp/manualConfig/cliManualMcp.test.ts --run
 
 # Test SDK isolation from manual config
-pnpm vitest test/mcp/manual-config/sdk-isolation.test.ts --run
+pnpm vitest test/mcp/manualConfig/sdkIsolation.test.ts --run
 
 # Run all manual config tests
-pnpm vitest test/mcp/manual-config --run
+pnpm vitest test/mcp/manualConfig --run
 ```
 
-#### **2. Tool Integration Tests** (`test/mcp/tool-integration/`)
+#### **2. Tool Integration Tests** (`test/mcp/toolIntegration/`)
 
 ```bash
 # Test direct (built-in) tools
-pnpm vitest test/mcp/tool-integration/direct-tools.test.ts --run
+pnpm vitest test/mcp/toolIntegration/directTools.test.ts --run
 
 # Run all tool integration tests
-pnpm vitest test/mcp/tool-integration --run
+pnpm vitest test/mcp/toolIntegration --run
 ```
 
 #### **3. Provider Support Tests** (`test/mcp/providers/`)
 
 ```bash
 # Test MCP tool support across providers
-pnpm vitest test/mcp/providers/provider-tools.test.ts --run
+pnpm vitest test/mcp/providers/providerTools.test.ts --run
 
 # Run all provider MCP tests
 pnpm vitest test/mcp/providers --run
@@ -277,7 +277,7 @@ import('./dist/lib/neurolink.js').then(({NeuroLink}) => {
 vitest
 
 # Watch specific batch
-vitest test/basic-functionality.ts
+vitest test/basicFunctionality.ts
 ```
 
 ### **CI/CD Mode (Non-interactive)**
@@ -297,10 +297,10 @@ pnpm vitest test --run --reporter=json
 
 ```bash
 # Run with verbose output
-pnpm vitest test/basic-functionality.ts --run --reporter=verbose
+pnpm vitest test/basicFunctionality.ts --run --reporter=verbose
 
 # Run single test file with debug info
-DEBUG=* pnpm vitest test/basic-functionality.ts --run
+DEBUG=* pnpm vitest test/basicFunctionality.ts --run
 ```
 
 ---
@@ -344,7 +344,7 @@ pnpm cli --version
 
 ## 🛠️ Test Utilities (NEW)
 
-### **Streaming Debug Utilities** (`test/utils/streaming-debug.ts`)
+### **Streaming Debug Utilities** (`test/utils/streamingDebug.ts`)
 
 - Analyze stream behavior and performance
 - Detect progressive vs synthetic streaming
@@ -355,7 +355,7 @@ pnpm cli --version
 import {
   analyzeStream,
   createDebugStream,
-} from "./test/utils/streaming-debug.js";
+} from "./test/utils/streamingDebug.js";
 
 // Analyze a stream
 const analysis = await analyzeStream(stream);
@@ -370,7 +370,7 @@ const debugStream = createDebugStream(originalStream, {
 });
 ```
 
-### **Visual Test Runner** (`test/utils/visual-runner.ts`)
+### **Visual Test Runner** (`test/utils/visualRunner.ts`)
 
 - Color-coded test output
 - Progress tracking
@@ -378,7 +378,7 @@ const debugStream = createDebugStream(originalStream, {
 - Markdown report generation
 
 ```typescript
-import { VisualTestRunner } from "./test/utils/visual-runner.js";
+import { VisualTestRunner } from "./test/utils/visualRunner.js";
 
 const runner = new VisualTestRunner();
 runner.startSuite("My Test Suite");
@@ -431,7 +431,7 @@ pnpm vitest test --run --reporter=basic
 
 ```bash
 # Run individual batches
-pnpm vitest test/basic-functionality.ts --run
+pnpm vitest test/basicFunctionality.ts --run
 
 # Or use simple integration test
 node test-integration-simple.cjs

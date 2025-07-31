@@ -6,10 +6,10 @@
  * Demonstrates the integration of all automation tools.
  */
 
-import { ScriptAnalyzer } from "./automation/script-analyzer.js";
-import { EnvironmentManager } from "./automation/environment-manager.js";
-import { ProjectOrganizer } from "./automation/project-organizer.js";
-import { VideoCleanup } from "./content/video-cleanup.js";
+import { ScriptAnalyzer } from "./automation/scriptAnalyzer.js";
+import { EnvironmentManager } from "./automation/environmentManager.js";
+import { ProjectOrganizer } from "./automation/projectOrganizer.js";
+import { VideoCleanup } from "./content/videoCleanup.js";
 
 class NeuroLinkSetup {
   constructor() {
@@ -194,10 +194,10 @@ class NeuroLinkSetup {
     ];
 
     const requiredFiles = [
-      "tools/automation/script-analyzer.js",
-      "tools/automation/environment-manager.js",
-      "tools/automation/project-organizer.js",
-      "tools/content/video-cleanup.js",
+      "tools/automation/scriptAnalyzer.js",
+      "tools/automation/environmentManager.js",
+      "tools/automation/projectOrganizer.js",
+      "tools/content/videoCleanup.js",
     ];
 
     const validation = {
@@ -406,9 +406,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } catch (error) {
     console.error("❌ Setup failed:", error.message);
     console.log("\n💡 Try running individual tools:");
-    console.log("  node tools/automation/environment-manager.js");
-    console.log("  node tools/automation/script-analyzer.js");
-    console.log("  node tools/automation/project-organizer.js");
+    console.log("  node tools/automation/environmentManager.js");
+    console.log("  node tools/automation/scriptAnalyzer.js");
+    console.log("  node tools/automation/projectOrganizer.js");
     process.exit(1);
   }
 }

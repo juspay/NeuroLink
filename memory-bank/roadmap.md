@@ -85,7 +85,7 @@ This roadmap outlines the planned development trajectory for the NeuroLink AI to
   - ✅ src/lib/providers/openAI.ts: Standardized error handling
   - ✅ src/lib/providers/googleVertexAI.ts: Consistent error throwing
   - ✅ src/lib/neurolink.ts: Enhanced with automatic fallback logic
-  - ✅ src/lib/mcp/servers/ai-providers/ai-workflow-tools.ts: Real AI integration
+  - ✅ src/lib/mcp/servers/aiProviders/aiWorkflowTools.ts: Real AI integration
 - ✅ **Impact Achieved**: Enterprise-grade reliability with transparent Google Vertex AI issue handling
 
 ### **🏭 Phase 1: MCP Foundation Complete** (January 2025) ✅

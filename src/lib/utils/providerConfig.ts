@@ -28,7 +28,7 @@ const API_KEY_FORMATS: Record<string, RegExp> = {
   mistral: /^[A-Za-z0-9]{32}$/,
   azure: /^[A-Za-z0-9]{32,}$/,
   aws: /^[A-Z0-9]{20}$/, // Access Key ID format
-  "google-vertex": /^[A-Za-z0-9\-_]{1,}$/, // Project ID format
+  googleVertex: /^[A-Za-z0-9\-_]{1,}$/, // Project ID format
 };
 
 /**

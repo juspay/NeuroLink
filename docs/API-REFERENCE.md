@@ -947,7 +947,7 @@ const result = await visionProvider.generate({
 ```typescript
 // Select model optimized for function calling
 const functionProvider = await factory.createProvider({
-  capability: "function-calling",
+  capability: "functionCalling",
   optimizeFor: "speed", // Fast function execution
 });
 
@@ -1163,7 +1163,7 @@ interface ModelConfig {
     input: number; // Cost per 1K input tokens
     output: number; // Cost per 1K output tokens
   };
-  capabilities: string[]; // ['function-calling', 'vision', 'code']
+  capabilities: string[]; // ['functionCalling', 'vision', 'code']
   contextWindow: number; // Maximum context length
   deprecated: boolean; // Whether model is deprecated
   aliases: string[]; // Alternative names
@@ -1198,7 +1198,7 @@ await registry.findBestModel({
 });
 
 // Get models by capability
-await registry.getModelsByCapability("function-calling");
+await registry.getModelsByCapability("functionCalling");
 
 // Cost-optimized model selection
 await registry.getCheapestModel("general"); // Cheapest general-purpose model
@@ -1261,7 +1261,7 @@ The `config/models.json` file defines all available models:
       "name": "Claude 3.5 Sonnet",
       "provider": "anthropic",
       "pricing": { "input": 0.003, "output": 0.015 },
-      "capabilities": ["function-calling", "vision", "code"],
+      "capabilities": ["functionCalling", "vision", "code"],
       "contextWindow": 200000,
       "deprecated": false,
       "aliases": ["claude-latest", "best-coding", "claude-sonnet"],
@@ -1292,7 +1292,7 @@ The CLI provides comprehensive dynamic model management:
 neurolink models list
 
 # Search models by capability
-neurolink models search --capability function-calling
+neurolink models search --capability functionCalling
 neurolink models search --capability vision --max-price 0.001
 
 # Get best model for use case
@@ -1316,7 +1316,7 @@ interface DynamicModelOptions {
   model?: string;
 
   // OR specify requirements for automatic selection
-  capability?: "function-calling" | "vision" | "code" | "general";
+  capability?: "functionCalling" | "vision" | "code" | "general";
   maxPrice?: number; // Maximum cost per 1K tokens
   optimizeFor?: "cost" | "speed" | "quality";
   provider?: string; // Preferred provider
@@ -1515,7 +1515,7 @@ interface ModelConfig {
     input: number; // Cost per 1K input tokens
     output: number; // Cost per 1K output tokens
   };
-  capabilities: string[]; // ['function-calling', 'vision', 'code']
+  capabilities: string[]; // ['functionCalling', 'vision', 'code']
   contextWindow: number; // Maximum context length
   deprecated: boolean; // Whether model is deprecated
   aliases: string[]; // Alternative names
@@ -1532,7 +1532,7 @@ interface DynamicModelOptions {
   model?: string;
 
   // OR specify requirements for automatic selection
-  capability?: "function-calling" | "vision" | "code" | "general";
+  capability?: "functionCalling" | "vision" | "code" | "general";
   maxPrice?: number; // Maximum cost per 1K tokens
   optimizeFor?: "cost" | "speed" | "quality";
   provider?: string; // Preferred provider

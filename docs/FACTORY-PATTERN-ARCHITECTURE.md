@@ -21,7 +21,7 @@ NeuroLink uses a **Factory Pattern** architecture with **BaseProvider inheritanc
 The `BaseProvider` class is the foundation of all AI providers:
 
 ```typescript
-// src/lib/core/base-provider.ts
+// src/lib/core/baseProvider.ts
 export abstract class BaseProvider implements LanguageModelV1 {
   // Core properties
   readonly specVersion = "v1";
@@ -84,7 +84,7 @@ export class OpenAIProvider extends BaseProvider {
 The factory creates providers with consistent configuration:
 
 ```typescript
-// src/lib/factories/provider-registry.ts
+// src/lib/factories/providerRegistry.ts
 export class ProviderRegistry {
   private static instance: ProviderRegistry;
   private providers = new Map<string, ProviderFactory>();

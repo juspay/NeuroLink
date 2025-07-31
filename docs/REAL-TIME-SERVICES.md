@@ -546,7 +546,7 @@ console.log("Memory usage:", stats.memoryUsage);
 
 ```typescript
 // Health check implementation
-wsServer.addHealthCheck("ai-providers", async () => {
+wsServer.addHealthCheck("aiProviders", async () => {
   try {
     const provider = await createBestAIProvider();
     await provider.generate({ input: { text: "test" }, maxTokens: 1 });

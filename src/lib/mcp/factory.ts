@@ -11,7 +11,7 @@ import type { ExecutionContext } from "./contracts/mcpContract.js";
  * MCP Server Categories for organization and discovery
  */
 export type MCPServerCategory =
-  | "ai-providers"
+  | "aiProviders"
   | "frameworks"
   | "development"
   | "business"
@@ -175,7 +175,7 @@ const ServerConfigSchema = z.object({
   version: z.string().optional(),
   category: z
     .enum([
-      "ai-providers",
+      "aiProviders",
       "frameworks",
       "development",
       "business",
@@ -208,7 +208,7 @@ const ServerConfigSchema = z.object({
  *   id: 'neurolink-ai-core',
  *   title: 'NeuroLink AI Core',
  *   description: 'Core AI provider tools',
- *   category: 'ai-providers'
+ *   category: 'aiProviders'
  * });
  *
  * aiCoreServer.registerTool({

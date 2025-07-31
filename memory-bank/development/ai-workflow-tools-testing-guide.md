@@ -24,13 +24,13 @@ pnpm run build
 
 ```bash
 # Phase 1.2 AI Workflow Tools tests (36 tests)
-pnpm test src/test/ai-workflow-tools.test.ts
+pnpm test src/test/aiWorkflowTools.test.ts
 
 # All MCP foundation tests (27 tests)
 pnpm test src/test/mcp-comprehensive.test.ts
 
 # Phase 1.1 AI Analysis Tools tests (20 tests)
-pnpm test src/test/ai-analysis-tools.test.ts
+pnpm test src/test/aiAnalysisTools.test.ts
 
 # Complete suite validation
 pnpm test --run
@@ -42,7 +42,7 @@ pnpm test --run
 
 ```bash
 node -e "
-import { generateTestCasesTool } from './dist/mcp/servers/ai-providers/ai-workflow-tools.js';
+import { generateTestCasesTool } from './dist/mcp/servers/aiProviders/aiWorkflowTools.js';
 const result = await generateTestCasesTool.execute({
   codeSnippet: 'function add(a, b) { return a + b; }',
   language: 'javascript',
@@ -62,7 +62,7 @@ console.log('Test Cases:', result.data?.testSuite?.testCases?.length || 0);
 
 ```bash
 node -e "
-import { refactorCodeTool } from './dist/mcp/servers/ai-providers/ai-workflow-tools.js';
+import { refactorCodeTool } from './dist/mcp/servers/aiProviders/aiWorkflowTools.js';
 const result = await refactorCodeTool.execute({
   codeSnippet: 'function calc(x,y){var z=x*y;return z+10;}',
   language: 'javascript',
@@ -82,7 +82,7 @@ console.log('Improvements:', Object.keys(result.data?.improvements || {}));
 
 ```bash
 node -e "
-import { generateDocumentationTool } from './dist/mcp/servers/ai-providers/ai-workflow-tools.js';
+import { generateDocumentationTool } from './dist/mcp/servers/aiProviders/aiWorkflowTools.js';
 const result = await generateDocumentationTool.execute({
   codeSnippet: 'class UserService { getUser(id) { return {}; } }',
   language: 'javascript',
@@ -102,7 +102,7 @@ console.log('Sections:', result.data?.documentation?.sections?.length || 0);
 
 ```bash
 node -e "
-import { debugAIOutputTool } from './dist/mcp/servers/ai-providers/ai-workflow-tools.js';
+import { debugAIOutputTool } from './dist/mcp/servers/aiProviders/aiWorkflowTools.js';
 const result = await debugAIOutputTool.execute({
   aiOutput: 'This is a test AI response that could be improved.',
   originalPrompt: 'Generate a comprehensive guide'

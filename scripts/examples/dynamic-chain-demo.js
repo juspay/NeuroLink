@@ -7,7 +7,7 @@
 
 import { DynamicChainExecutor, HeuristicChainPlanner, AIModelChainPlanner } from "../../dist/lib/mcp/dynamic-chain-executor.js";
 import { MCPOrchestrator } from "../../dist/lib/mcp/orchestrator.js";
-import { MCPToolRegistry } from "../../dist/lib/mcp/tool-registry.js";
+import { MCPToolRegistry } from "../../dist/lib/mcp/toolRegistry.js";
 import { ErrorManager } from "../../dist/lib/mcp/error-manager.js";
 import ora from "ora";
 import chalk from "chalk";

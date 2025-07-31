@@ -156,7 +156,7 @@ function process(data: any) {
 
 ### Naming Conventions
 
-- **Files**: `kebab-case.ts` (e.g., `base-provider.ts`)
+- **Files**: `kebab-case.ts` (e.g., `baseProvider.ts`)
 - **Classes**: `PascalCase` (e.g., `OpenAIProvider`)
 - **Interfaces**: `PascalCase` (e.g., `GenerateOptions`)
 - **Functions**: `camelCase` (e.g., `createProvider`)

@@ -2,8 +2,8 @@ import { openai } from "@ai-sdk/openai";
 import type { ZodType, ZodTypeDef } from "zod";
 import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
 import { AIProviderName } from "../core/types.js";
-import type { StreamOptions, StreamResult } from "../types/stream-types.js";
-import { BaseProvider } from "../core/base-provider.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,

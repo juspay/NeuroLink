@@ -6,13 +6,13 @@ Run from project root directory:
 
 ```bash
 # Run comprehensive parallel tests (322 test cases)
-node scripts/testing/execute-all-tests-parallel.js
+node scripts/testing/executeAllTestsParallel.js
 
 # Run fast subset
 bash scripts/testing/fast-parallel-test-runner.sh
 
 # Run sequential (safer for debugging)  
-bash scripts/testing/sequential-comprehensive-test.sh
+bash scripts/testing/sequential-comprehensiveTest.sh
 
 # Run exhaustive parallel tests
 bash scripts/testing/exhaustive-parallel-test-executor.sh
@@ -21,16 +21,16 @@ bash scripts/testing/exhaustive-parallel-test-executor.sh
 ## Test Files
 
 - **`test-definitions.txt`** - Main test definitions (322 test cases)
-- **`execute-all-tests-parallel.js`** - Main parallel test executor
-- **`comprehensive-test-suite.sh`** - Full test suite runner
+- **`executeAllTestsParallel.js`** - Main parallel test executor
+- **`comprehensiveTest-suite.sh`** - Full test suite runner
 - **`fast-parallel-test-runner.sh`** - Quick subset tests
-- **`sequential-comprehensive-test.sh`** - Sequential execution
+- **`sequential-comprehensiveTest.sh`** - Sequential execution
 - **`core-fixes-verification.sh`** - Core functionality verification
 
 ## Output
 
 - **Results saved to**: `test-executions/comprehensive-parallel/`
-- **Logs**: `comprehensive-test-execution-full.log`
+- **Logs**: `comprehensiveTest-execution-full.log`
 - **Tracker**: `TEST-EXECUTION-TRACKER.md`
 
 ## Test Definition Format

@@ -74,16 +74,16 @@
 neurolink/
 ├── src/lib/
 │   ├── core/
-│   │   ├── base-provider.ts ✅ BaseProvider abstract class (353 lines)
+│   │   ├── baseProvider.ts ✅ BaseProvider abstract class (353 lines)
 │   │   ├── factory.ts      ✅ Provider factory with MCP integration
 │   │   └── types.ts        ✅ TypeScript definitions
 │   ├── providers/
-│   │   ├── amazon-bedrock.ts ✅ Bedrock provider (extends BaseProvider)
-│   │   ├── google-vertex.ts ✅ Vertex AI provider (extends BaseProvider)
-│   │   ├── google-ai-studio.ts ✅ Google AI Studio (extends BaseProvider)
+│   │   ├── amazonBedrock.ts ✅ Bedrock provider (extends BaseProvider)
+│   │   ├── googleVertex.ts ✅ Vertex AI provider (extends BaseProvider)
+│   │   ├── googleAiStudio.ts ✅ Google AI Studio (extends BaseProvider)
 │   │   ├── openai.ts       ✅ OpenAI provider (extends BaseProvider)
 │   │   ├── anthropic.ts    ✅ Anthropic Claude provider (extends BaseProvider)
-│   │   ├── azure-openai.ts ✅ Azure OpenAI provider (extends BaseProvider)
+│   │   ├── azureOpenai.ts ✅ Azure OpenAI provider (extends BaseProvider)
 │   │   ├── huggingface.ts  ✅ Hugging Face provider (custom Vercel AI SDK)
 │   │   ├── ollama.ts       ✅ Ollama provider (custom LanguageModelV1)
 │   │   ├── mistral.ts      ✅ Mistral AI provider (extends BaseProvider)
@@ -91,7 +91,7 @@ neurolink/
 │   ├── mcp/
 │   │   ├── unified-registry.ts ✅ MCP tool registry
 │   │   ├── auto-discovery.ts ✅ Auto-discovery system
-│   │   ├── function-calling.ts ✅ Function calling integration
+│   │   ├── functionCalling.ts ✅ Function calling integration
 │   │   └── factory.ts      ✅ MCP server factory
 │   ├── utils/
 │   │   └── providerUtils.ts ✅ Utility functions

@@ -32,7 +32,7 @@ vi.useFakeTimers();
 let killAllSpawnedProcesses: (() => void) | undefined;
 (async () => {
   try {
-    const cliHelper = await import("./helpers/cli-test-helper.js");
+    const cliHelper = await import("./helpers/cliTestHelper.js");
     killAllSpawnedProcesses = cliHelper.killAllSpawnedProcesses;
   } catch (error) {
     // CLI helper not available, continue without it

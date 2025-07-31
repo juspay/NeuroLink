@@ -44,7 +44,7 @@ const result = await provider.generate({
 ```typescript
 // Factory creates MCP servers with Lighthouse compatibility
 const server = createMCPServer({
-  name: "ai-providers-server",
+  name: "aiProviders-server",
   version: "1.0.0",
   tools: ["generate", "select-provider", "check-provider-status"],
 });
@@ -124,7 +124,7 @@ const registry = {
     schema: {
       /* JSON Schema */
     },
-    provider: "ai-core-server",
+    provider: "aiCoreServer",
     executionCount: 1247,
     averageLatency: 850,
   },
@@ -308,8 +308,8 @@ src/lib/mcp/
 ├── context-manager.ts          # Rich context (15+ fields) + tool chain tracking
 ├── registry.ts                 # Tool discovery, registration, execution + statistics
 ├── orchestrator.ts             # Single tools + sequential pipelines + error handling
-└── servers/ai-providers/       # AI Core Server with 3 tools integrated
-    └── ai-core-server.ts       # generate, select-provider, check-provider-status
+└── servers/aiProviders/       # AI Core Server with 3 tools integrated
+    └── aiCoreServer.ts       # generate, select-provider, check-provider-status
 ```
 
 ### Context Flow

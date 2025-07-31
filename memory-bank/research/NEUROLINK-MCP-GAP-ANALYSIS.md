@@ -81,10 +81,10 @@
 ### 1. Circular Dependency Resolution
 ```typescript
 // Before: Direct imports causing circular dependency
-import { aiCoreServer } from './servers/ai-providers/ai-core-server.js';
+import { aiCoreServer } from './servers/aiProviders/aiCoreServer.js';
 
 // After: Dynamic imports preventing circular dependencies
-const { utilityServer } = await import('./servers/utilities/utility-server.js');
+const { utilityServer } = await import('./servers/utilities/utilityServer.js');
 ```
 
 ### 2. Proper Initialization Chain
@@ -246,7 +246,7 @@ export class NeuroLinkMCPClient {
 
 **Solution**:
 ```typescript
-// src/lib/mcp/tool-integration.ts - Enhanced Implementation
+// src/lib/mcp/toolIntegration.ts - Enhanced Implementation
 export class MCPToolIntegration {
   private externalTools: Map<string, ExternalTool> = new Map();
 

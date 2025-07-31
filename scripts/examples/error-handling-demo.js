@@ -6,7 +6,7 @@
  */
 
 import { MCPOrchestrator } from "../../dist/lib/mcp/orchestrator.js";
-import { MCPToolRegistry } from "../../dist/lib/mcp/tool-registry.js";
+import { MCPToolRegistry } from "../../dist/lib/mcp/toolRegistry.js";
 import { ErrorManager, ErrorCategory, ErrorSeverity } from "../../dist/lib/mcp/error-manager.js";
 import ora from "ora";
 import chalk from "chalk";

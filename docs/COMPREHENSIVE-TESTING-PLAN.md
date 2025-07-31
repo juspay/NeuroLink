@@ -129,7 +129,7 @@ const wsServer = new NeuroLinkWebSocketServer({
 
 ```typescript
 // Test: Telemetry Service (Disabled by Default)
-import { TelemetryService } from "../src/lib/telemetry/telemetry-service.js";
+import { TelemetryService } from "../src/lib/telemetry/telemetryService.js";
 
 const telemetry = TelemetryService.getInstance();
 
@@ -143,7 +143,7 @@ process.env.NEUROLINK_TELEMETRY_ENABLED = "true";
 
 **Tests to Create:**
 
-- `src/test/telemetry-service.test.ts`
+- `src/test/telemetryService.test.ts`
 - `src/test/ai-instrumentation.test.ts`
 - `src/test/mcp-instrumentation.test.ts`
 

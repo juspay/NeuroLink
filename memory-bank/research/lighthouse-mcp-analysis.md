@@ -53,7 +53,7 @@ export function createMCPServer(config: {
 
 ```
 /mcp-servers/
-├── ai-providers/     # OpenAI, Bedrock, Vertex specific tools
+├── aiProviders/     # OpenAI, Bedrock, Vertex specific tools
 ├── frameworks/       # React, Vue, SvelteKit integration tools
 ├── development/      # Code generation, testing tools
 ├── analytics/        # Usage tracking, performance tools
@@ -291,7 +291,7 @@ src/lib/mcp/
 ├── config.ts               # Server registration
 ├── index.ts                # Main exports
 └── servers/
-    ├── ai-providers/       # Provider-specific tools
+    ├── aiProviders/       # Provider-specific tools
     ├── frameworks/         # Framework integration
     ├── development/        # Dev workflow tools
     └── analytics/          # Usage and performance

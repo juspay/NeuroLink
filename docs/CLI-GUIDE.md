@@ -221,7 +221,7 @@ The dynamic model system provides intelligent model selection and cost optimizat
 neurolink models list
 
 # Search models by capability
-neurolink models search --capability function-calling
+neurolink models search --capability functionCalling
 neurolink models search --capability vision --max-price 0.001
 
 # Get best model for specific use case
@@ -243,7 +243,7 @@ node dist/cli/index.js generate "Analyze this complex problem" --provider google
 
 **Available Options:**
 
-- `--capability <feature>` - Filter by capability (function-calling, vision, code-execution)
+- `--capability <feature>` - Filter by capability (functionCalling, vision, code-execution)
 - `--max-price <amount>` - Maximum price per 1K input tokens
 - `--provider <name>` - Filter by specific provider
 - `--exclude-deprecated` - Exclude deprecated models
@@ -259,17 +259,17 @@ node dist/cli/index.js generate "Analyze this complex problem" --provider google
 ┌─────────────┬──────────────────────┬────────────┬─────────────────────────────────┬──────────────┐
 │ Provider    │ Model                │ Input Cost │ Capabilities                    │ Status       │
 ├─────────────┼──────────────────────┼────────────┼─────────────────────────────────┼──────────────┤
-│ google      │ gemini-2.0-flash     │ $0.000075  │ function-calling, vision, code  │ ✅ Active    │
-│ openai      │ gpt-4o-mini          │ $0.000150  │ function-calling, json-mode     │ ✅ Active    │
-│ anthropic   │ claude-3-haiku       │ $0.000250  │ function-calling                │ ✅ Active    │
-│ anthropic   │ claude-3-sonnet      │ $0.003000  │ function-calling, vision        │ ✅ Active    │
-│ openai      │ gpt-4o               │ $0.005000  │ function-calling, vision        │ ✅ Active    │
-│ anthropic   │ claude-3-opus        │ $0.015000  │ function-calling, vision, analysis │ ✅ Active │
-│ openai      │ gpt-4-turbo          │ $0.010000  │ function-calling, vision        │ ❌ Deprecated │
+│ google      │ gemini-2.0-flash     │ $0.000075  │ functionCalling, vision, code  │ ✅ Active    │
+│ openai      │ gpt-4o-mini          │ $0.000150  │ functionCalling, json-mode     │ ✅ Active    │
+│ anthropic   │ claude-3-haiku       │ $0.000250  │ functionCalling                │ ✅ Active    │
+│ anthropic   │ claude-3-sonnet      │ $0.003000  │ functionCalling, vision        │ ✅ Active    │
+│ openai      │ gpt-4o               │ $0.005000  │ functionCalling, vision        │ ✅ Active    │
+│ anthropic   │ claude-3-opus        │ $0.015000  │ functionCalling, vision, analysis │ ✅ Active │
+│ openai      │ gpt-4-turbo          │ $0.010000  │ functionCalling, vision        │ ❌ Deprecated │
 └─────────────┴──────────────────────┴────────────┴─────────────────────────────────┴──────────────┘
 
 💰 Cost Range: $0.000075 - $0.015000 per 1K tokens (200x difference)
-🔍 Capabilities: 9 function-calling, 7 vision, 1 code-execution
+🔍 Capabilities: 9 functionCalling, 7 vision, 1 code-execution
 ⚡ Cheapest: google/gemini-2.0-flash
 🏆 Most Capable: anthropic/claude-3-opus
 ```
@@ -1083,7 +1083,7 @@ npx @juspay/neurolink status
 
 ### **AI Workflow Tools Demo**
 
-- **[AI Workflow Tools](./visual-content/cli-videos/ai-workflow-tools-demo/ai-workflow-tools-cli-demo.mp4)** - Complete demonstration of AI workflow tools via CLI
+- **[AI Workflow Tools](./visual-content/cli-videos/aiWorkflowTools-demo/aiWorkflowTools-cli-demo.mp4)** - Complete demonstration of AI workflow tools via CLI
 
 **All videos feature:**
 

@@ -31,7 +31,7 @@ class NeuroLink {
 src/lib/factories/
 ├── provider-generate-factory.ts   # Core provider enhancement
 ├── compatibility-factory.ts        # Format conversion
-└── command-factory.ts             # CLI command creation
+└── commandFactory.ts             # CLI command creation
 ```
 
 ---

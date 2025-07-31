@@ -1,7 +1,7 @@
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema, Tool } from "ai";
-import type { GenerateResult } from "../types/generate-types.js";
-import type { StreamOptions, StreamResult } from "../types/stream-types.js";
+import type { GenerateResult } from "../types/generateTypes.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue } from "../types/common.js";
 
 export interface TextGenerationResult {

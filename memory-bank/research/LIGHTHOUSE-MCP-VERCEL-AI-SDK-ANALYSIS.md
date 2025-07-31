@@ -39,8 +39,8 @@ This analysis focuses on how Model Context Protocol (MCP) can be integrated with
 
 ```typescript
 import { createOpenAI } from '@ai-sdk/openai';
-import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
-import { createGoogleGenerativeAI } from '@ai-sdk/google-vertex';
+import { createAmazonBedrock } from '@ai-sdk/amazonBedrock';
+import { createGoogleGenerativeAI } from '@ai-sdk/googleVertex';
 import { generate, streamText } from 'ai';
 
 // Vercel AI SDK providers

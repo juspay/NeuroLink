@@ -305,7 +305,7 @@ function handleError(error: Error, context: string): void {
 async function initializeCLI() {
   // Import and configure for CLI mode
   const { ProviderRegistry } = await import(
-    "../lib/factories/provider-registry.js"
+    "../lib/factories/providerRegistry.js"
   );
   // Enable manual MCP only for CLI
   ProviderRegistry.setOptions({
@@ -444,7 +444,7 @@ const cli = yargs(args)
             "openai",
             "bedrock",
             "vertex",
-            "google-vertex",
+            "googleVertex",
             "anthropic",
             "azure",
             "google-ai",
@@ -860,7 +860,7 @@ const cli = yargs(args)
             "openai",
             "bedrock",
             "vertex",
-            "google-vertex",
+            "googleVertex",
             "anthropic",
             "azure",
             "google-ai",
@@ -1046,7 +1046,7 @@ const cli = yargs(args)
             "openai",
             "bedrock",
             "vertex",
-            "google-vertex",
+            "googleVertex",
             "anthropic",
             "azure",
             "google-ai",
@@ -1219,7 +1219,7 @@ const cli = yargs(args)
               "openai",
               "bedrock",
               "vertex",
-              "google-vertex",
+              "googleVertex",
               "anthropic",
               "azure",
               "google-ai",
@@ -1450,7 +1450,7 @@ const cli = yargs(args)
     async (argv) => {
       // Direct implementation instead of redirect to avoid recursion
       const { CLICommandFactory } = await import(
-        "./factories/command-factory.js"
+        "./factories/commandFactory.js"
       );
       const commandFactory = new CLICommandFactory();
       await commandFactory.executeProviderStatus(argv);

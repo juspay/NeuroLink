@@ -1,9 +1,8 @@
 ## [6.2.1](https://github.com/juspay/neurolink/compare/v6.2.0...v6.2.1) (2025-07-31)
 
-
 ### Bug Fixes
 
-* **logging:** consolidate MCP logging and add debug flag control ([ea0132d](https://github.com/juspay/neurolink/commit/ea0132dd954966cb42238dc3736f6cee9cc7b18d))
+- **logging:** consolidate MCP logging and add debug flag control ([ea0132d](https://github.com/juspay/neurolink/commit/ea0132dd954966cb42238dc3736f6cee9cc7b18d))
 
 # [6.2.0](https://github.com/juspay/neurolink/compare/v6.1.0...v6.2.0) (2025-07-30)
 
@@ -36,22 +35,22 @@ NeuroLink codebase, affecting 140+ files with systematic type safety improvement
 - NEW: src/lib/types/cli.ts - CLI command types and interfaces
 - NEW: src/lib/types/index.ts - Centralized type exports
 
-- Export NeuroLinkSDK interface from base-provider for proper typing
-- Fix all provider constructors: anthropic, azure-openai, google-ai-studio, google-vertex, mistral
-- Update function-calling-provider with proper type casting
+- Export NeuroLinkSDK interface from baseProvider for proper typing
+- Fix all provider constructors: anthropic, azureOpenai, googleAiStudio, googleVertex, mistral
+- Update functionCalling-provider with proper type casting
 - Enhanced analytics-helper with comprehensive type guards
 - Fix timeout-wrapper and all provider error handling
 
-- Fix direct-tools-server: inputSchema and execution result types
-- Fix ai-core-server: provider factory and result access types
+- Fix directToolsServer: inputSchema and execution result types
+- Fix aiCoreServer: provider factory and result access types
 - Fix transport-manager: HTTP client transport constructor types
 - Fix unified-registry: server configuration type compatibility
 - Update all MCP adapters, clients, managers, and orchestrators
 - Fix tool integration, registry, and session management
 - Enhanced error handling and recovery systems
 
-- Update base-provider with proper abstract method signatures
-- Fix service-registry with type-safe service management
+- Update baseProvider with proper abstract method signatures
+- Fix serviceRegistry with type-safe service management
 - Enhanced factory pattern with proper generic constraints
 - Update evaluation system with strict typing
 - Fix analytics core with proper data flow types
@@ -365,7 +364,7 @@ Co-authored-by: sachin.sharma <sachin.sharma@juspay.in>
 - **💰 Cost Intelligence**: Built-in cost optimization and model selection algorithms
 
   - **Current Leader**: Gemini 2.0 Flash at $0.000075/1K input tokens
-  - **Capability Mapping**: Find models by features (function-calling, vision, code-execution)
+  - **Capability Mapping**: Find models by features (functionCalling, vision, code-execution)
   - **Real-Time Pricing**: Always current model costs and performance data
   - **Budget Controls**: Maximum price filtering and cost-aware selection
 
@@ -384,16 +383,16 @@ Co-authored-by: sachin.sharma <sachin.sharma@juspay.in>
 
 ### Technical Implementation
 
-- **New Module**: `src/lib/core/dynamic-models.ts` - Core dynamic model provider
+- **New Module**: `src/lib/core/dynamicModels.ts` - Core dynamic model provider
 - **Configuration**: `config/models.json` - Structured model definitions with metadata
 - **Integration**: Updated `AIProviderFactory` to use dynamic models by default
-- **Testing**: Comprehensive test suite (`test-dynamic-models.js`, `test-complete-integration.js`)
+- **Testing**: Comprehensive test suite (`test-dynamicModels.js`, `test-complete-integration.js`)
 - **Server**: Fake hosted server for testing and development (`scripts/model-server.js`)
 
 ### API Enhancements
 
 - **Environment Variables**: Added `GOOGLE_AI_API_KEY` for better compatibility
-- **New Scripts**: `npm run model-server`, `npm run test:dynamic-models`
+- **New Scripts**: `npm run model-server`, `npm run test:dynamicModels`
 - **Model Search API**: RESTful endpoints for model discovery and filtering
 - **Performance**: Sub-millisecond provider creation with intelligent caching
 
@@ -584,7 +583,7 @@ neurolink generate-text "test" --debug
   - **Impact**: **100% provider coverage** with comprehensive fallback for maximum reliability
 
 - **🧹 Console Statement Cleanup**: Systematic cleanup of debug output across entire codebase
-  - **Files Updated**: `src/lib/neurolink.ts`, `src/lib/core/factory.ts`, `src/lib/providers/openAI.ts`, `src/lib/mcp/servers/ai-providers/ai-core-server.ts`
+  - **Files Updated**: `src/lib/neurolink.ts`, `src/lib/core/factory.ts`, `src/lib/providers/openAI.ts`, `src/lib/mcp/servers/aiProviders/aiCoreServer.ts`
   - **Pattern**: Replaced 200+ `console.log()` statements with `logger.debug()` calls
   - **Result**: Professional CLI behavior suitable for production deployment and demos
 
@@ -808,8 +807,8 @@ src/lib/mcp/
 ├── context-manager.ts          # Rich context (15+ fields) + tool chain tracking
 ├── registry.ts                 # Tool discovery, registration, execution + statistics
 ├── orchestrator.ts             # Single tools + sequential pipelines + error handling
-└── servers/ai-providers/       # AI Core Server with 3 tools integrated
-    └── ai-core-server.ts       # generate-text, select-provider, check-provider-status
+└── servers/aiProviders/       # AI Core Server with 3 tools integrated
+    └── aiCoreServer.ts       # generate-text, select-provider, check-provider-status
 ```
 
 ### Breaking Changes
