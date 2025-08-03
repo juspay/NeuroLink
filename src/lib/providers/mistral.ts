@@ -15,6 +15,7 @@ import {
   createMistralConfig,
   getProviderModel,
 } from "../utils/providerConfig.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 
 // Configuration helpers - now using consolidated utility
 const getMistralApiKey = (): string => {
@@ -125,23 +126,42 @@ export class MistralProvider extends BaseProvider {
     const startTime = Date.now();
 
     try {
-      const stream = await streamText({
+      const result = await streamText({
         model: this.model,
-        prompt: (options as { prompt?: string }).prompt || "",
+        prompt: options.input.text,
         temperature: options.temperature,
         maxTokens: options.maxTokens,
+        tools: options.tools,
+        toolChoice: "auto",
       });
 
+      // Transform stream to match StreamResult interface
+      const transformedStream = async function* () {
+        for await (const chunk of result.textStream) {
+          yield { content: chunk };
+        }
+      };
+
+      // Create analytics promise that resolves after stream completion
+      const analyticsPromise = streamAnalyticsCollector.createAnalytics(
+        this.providerName,
+        this.modelName!,
+        result,
+        Date.now() - startTime,
+        {
+          requestId: `mistral-stream-${Date.now()}`,
+          streamingMode: true,
+        },
+      );
+
       return {
-        stream: (async function* () {
-          for await (const chunk of stream.textStream) {
-            yield { content: chunk };
-          }
-        })(),
+        stream: transformedStream(),
         provider: this.providerName,
         model: this.modelName!,
+        analytics: analyticsPromise,
         metadata: {
           startTime,
+          streamId: `mistral-${Date.now()}`,
         },
       };
     } catch (error) {

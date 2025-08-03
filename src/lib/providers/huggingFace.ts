@@ -92,9 +92,21 @@ export class HuggingFaceProvider extends BaseProvider {
    * @returns false to disable tools by default until proper implementation
    */
   supportsTools(): boolean {
-    // TODO: Implement proper HuggingFace tool calling support
-    // Requires: Custom tool schema formatting, response parsing, execution flow
-    // Track models that support function calling: CodeLlama, Llama variants
+    // IMPLEMENTATION STATUS (2025): HuggingFace tool calling remains limited
+    //
+    // Current State:
+    // - Function calling varies significantly across HF models
+    // - Many models treat tool schemas as conversation context
+    // - Requires model-specific implementation per architecture
+    //
+    // To Enable Tools:
+    // 1. Detect model capability via HF model card metadata
+    // 2. Implement model-specific tool schema formatting
+    // 3. Add custom response parsing for function call extraction
+    // 4. Create validation framework for tool parameter handling
+    // 5. Test extensively with supported models (Code Llama, Llama 3.1+)
+    //
+    // Until comprehensive implementation, tools disabled for reliability
     return false;
   }
 

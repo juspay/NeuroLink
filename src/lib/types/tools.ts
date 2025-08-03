@@ -167,6 +167,16 @@ export interface ToolCall {
 }
 
 /**
+ * AI SDK Tool Call format (from Vercel AI SDK)
+ */
+export interface AiSdkToolCall {
+  type: "tool-call";
+  toolCallId: string;
+  toolName: string;
+  args: ToolArgs;
+}
+
+/**
  * Tool call result (for AI SDK integration)
  */
 export interface ToolCallResult {

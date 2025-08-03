@@ -155,6 +155,7 @@
     "mathjs": "^14.5.3",
     "ollama-ai-provider": "^1.2.0",
     "ora": "^7.0.1",
+    "p-limit": "^6.2.0",
     "reconnecting-eventsource": "^1.6.4",
     "undici": "^6.6.2",
     "uuid": "^11.1.0",

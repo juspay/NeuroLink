@@ -10,6 +10,21 @@ import type {
   CommandResult,
   OutputOptions,
 } from "../../lib/types/cli.js";
+import type { TokenUsage, AnalyticsData } from "../../lib/types/providers.js";
+
+// Interface for tokens with simplified property names (as used in analytics)
+interface AnalyticsTokens {
+  input: number;
+  output: number;
+  total: number;
+}
+import {
+  ContextFactory,
+  type BaseContext,
+  type ContextConfig,
+} from "../../lib/types/contextTypes.js";
+import { ModelsCommandFactory } from "../commands/models.js";
+import { MCPCommandFactory } from "../commands/mcp.js";
 import ora from "ora";
 import chalk from "chalk";
 import { logger } from "../../lib/utils/logger.js";
@@ -45,6 +60,8 @@ interface CLICommandArgs extends BaseCommandArgs {
   all?: boolean;
   export?: boolean;
   context?: Record<string, unknown>;
+  noColor?: boolean;
+  configFile?: string;
   [key: string]: unknown;
 }
 
@@ -71,25 +88,30 @@ export class CLICommandFactory {
       ],
       default: "auto",
       description: "AI provider to use (auto-selects best available)",
+      alias: "p",
     },
     model: {
       type: "string" as const,
       description:
         "Specific model to use (e.g. gemini-2.5-pro, gemini-2.5-flash)",
+      alias: "m",
     },
     temperature: {
       type: "number" as const,
       default: 0.7,
       description: "Creativity level (0.0 = focused, 1.0 = creative)",
+      alias: "t",
     },
     maxTokens: {
       type: "number" as const,
       default: 1000,
       description: "Maximum tokens to generate",
+      alias: "max",
     },
     system: {
       type: "string" as const,
       description: "System prompt to guide AI behavior",
+      alias: "s",
     },
 
     // Output control options
@@ -102,6 +124,7 @@ export class CLICommandFactory {
     output: {
       type: "string" as const,
       description: "Save output to file",
+      alias: "o",
     },
 
     // Behavior control options
@@ -164,6 +187,15 @@ export class CLICommandFactory {
       default: false,
       description: "Suppress non-essential output",
     },
+    noColor: {
+      type: "boolean" as const,
+      default: false,
+      description: "Disable colored output (useful for CI/scripts)",
+    },
+    configFile: {
+      type: "string" as const,
+      description: "Path to custom configuration file",
+    },
   };
 
   // Helper method to build options for commands
@@ -176,6 +208,52 @@ export class CLICommandFactory {
 
   // Helper method to process common options
   private static processOptions(argv: CLICommandArgs) {
+    // Handle noColor option by disabling chalk
+    if (argv.noColor) {
+      process.env.FORCE_COLOR = "0";
+    }
+
+    // Process context using ContextFactory for type-safe integration
+    let processedContext: BaseContext | undefined;
+    let contextConfig: Partial<ContextConfig> | undefined;
+
+    if (argv.context) {
+      let rawContext;
+      if (typeof argv.context === "string") {
+        try {
+          rawContext = JSON.parse(argv.context);
+        } catch (err) {
+          const contextStr = argv.context as string;
+          const truncatedJson =
+            contextStr.length > 100
+              ? `${contextStr.slice(0, 100)}...`
+              : contextStr;
+          logger.error(
+            `Invalid JSON in --context parameter: ${(err as Error).message}. Received: ${truncatedJson}`,
+          );
+          process.exit(1);
+        }
+      } else {
+        rawContext = argv.context;
+      }
+
+      const validatedContext = ContextFactory.validateContext(rawContext);
+      if (validatedContext) {
+        processedContext = validatedContext;
+
+        // Configure context integration based on CLI usage
+        contextConfig = {
+          mode: "prompt_prefix", // Add context as prompt prefix for CLI usage
+          includeInPrompt: true,
+          includeInAnalytics: true,
+          includeInEvaluation: true,
+          maxLength: 500, // Reasonable limit for CLI context
+        };
+      } else if (argv.debug) {
+        logger.debug("Invalid context provided, skipping context integration");
+      }
+    }
+
     return {
       provider: argv.provider === "auto" ? undefined : argv.provider,
       model: argv.model,
@@ -189,16 +267,15 @@ export class CLICommandFactory {
       evaluationDomain: argv.evaluationDomain,
       toolUsageContext: argv.toolUsageContext,
       lighthouseStyle: argv.lighthouseStyle,
-      context: argv.context
-        ? typeof argv.context === "string"
-          ? JSON.parse(argv.context)
-          : argv.context
-        : undefined,
+      context: processedContext,
+      contextConfig,
       debug: argv.debug,
       quiet: argv.quiet,
       format: argv.format,
       output: argv.output,
       delay: argv.delay,
+      noColor: argv.noColor,
+      configFile: argv.configFile,
     };
   }
 
@@ -212,13 +289,19 @@ export class CLICommandFactory {
     if (options.format === "json") {
       output = JSON.stringify(result, null, 2);
     } else if (options.format === "table" && Array.isArray(result)) {
-      console.table(result);
+      logger.table(result);
       return;
     } else {
       if (typeof result === "string") {
         output = result;
       } else if (result && typeof result === "object" && "content" in result) {
-        output = (result as GenerateResult).content;
+        const generateResult = result as GenerateResult;
+        output = generateResult.content;
+
+        // Add analytics display for text mode when enabled
+        if (options.enableAnalytics && generateResult.analytics) {
+          output += this.formatAnalyticsForTextMode(generateResult);
+        }
       } else if (result && typeof result === "object" && "text" in result) {
         output = (result as { text: string }).text;
       } else {
@@ -229,11 +312,83 @@ export class CLICommandFactory {
     if (options.output) {
       fs.writeFileSync(options.output, output);
       if (!options.quiet) {
-        console.log(`Output saved to ${options.output}`);
+        logger.always(`Output saved to ${options.output}`);
       }
     } else {
-      console.log(output);
+      logger.always(output);
     }
+  }
+
+  // Helper method to validate token usage data
+  private static isValidTokenUsage(tokens: unknown): tokens is AnalyticsTokens {
+    return !!(
+      tokens &&
+      typeof tokens === "object" &&
+      tokens !== null &&
+      typeof (tokens as AnalyticsTokens).input === "number" &&
+      typeof (tokens as AnalyticsTokens).output === "number" &&
+      typeof (tokens as AnalyticsTokens).total === "number"
+    );
+  }
+
+  // Helper method to format analytics for text mode display
+  private static formatAnalyticsForTextMode(result: GenerateResult): string {
+    if (!result.analytics) {
+      return "";
+    }
+
+    const analytics = result.analytics;
+    let analyticsText = "\n\n📊 Analytics:\n";
+
+    // Provider and model info
+    analyticsText += `   Provider: ${analytics.provider}`;
+    if (result.model) {
+      analyticsText += ` (${result.model})`;
+    }
+    analyticsText += "\n";
+
+    // Token usage
+    if (this.isValidTokenUsage(analytics.tokens)) {
+      const tokens = analytics.tokens as AnalyticsTokens;
+      analyticsText += `   Tokens: ${tokens.input} input + ${tokens.output} output = ${tokens.total} total\n`;
+    }
+
+    // Cost information
+    if (
+      analytics.cost !== undefined &&
+      analytics.cost !== null &&
+      typeof analytics.cost === "number"
+    ) {
+      analyticsText += `   Cost: $${analytics.cost.toFixed(5)}\n`;
+    }
+
+    // Response time
+    if (analytics.responseTime && typeof analytics.responseTime === "number") {
+      const timeInSeconds = (analytics.responseTime / 1000).toFixed(1);
+      analyticsText += `   Time: ${timeInSeconds}s\n`;
+    }
+
+    // Tools used
+    if (result.toolsUsed && result.toolsUsed.length > 0) {
+      analyticsText += `   Tools: ${result.toolsUsed.join(", ")}\n`;
+    }
+
+    // Context information
+    if (
+      analytics.context &&
+      typeof analytics.context === "object" &&
+      analytics.context !== null
+    ) {
+      const contextEntries = Object.entries(analytics.context);
+      if (contextEntries.length > 0) {
+        const contextItems = contextEntries.map(
+          ([key, value]) => `${key}=${value}`,
+        );
+        analyticsText += `   Context: ${contextItems.join(", ")}\n`;
+      }
+    }
+
+    return analyticsText;
   }
 
   /**
@@ -245,10 +400,28 @@ export class CLICommandFactory {
       describe: "Generate content using AI providers",
       builder: (yargs) => {
         return this.buildOptions(
-          yargs.positional("input", {
-            type: "string" as const,
-            description: "Text prompt for AI generation (or read from stdin)",
-          }),
+          yargs
+            .positional("input", {
+              type: "string" as const,
+              description: "Text prompt for AI generation (or read from stdin)",
+            })
+            .example(
+              '$0 generate "Explain quantum computing"',
+              "Basic generation",
+            )
+            .example(
+              '$0 gen "Write a Python function" --provider openai',
+              "Use specific provider",
+            )
+            .example(
+              '$0 generate "Code review" -m gpt-4 -t 0.3',
+              "Use specific model and temperature",
+            )
+            .example('echo "Summarize this" | $0 generate', "Use stdin input")
+            .example(
+              '$0 generate "Analyze data" --enable-analytics',
+              "Enable usage analytics",
+            ),
         );
       },
       handler: async (argv) =>
@@ -265,10 +438,24 @@ export class CLICommandFactory {
       describe: "Stream generation in real-time",
       builder: (yargs) => {
         return this.buildOptions(
-          yargs.positional("input", {
-            type: "string" as const,
-            description: "Text prompt for streaming (or read from stdin)",
-          }),
+          yargs
+            .positional("input", {
+              type: "string" as const,
+              description: "Text prompt for streaming (or read from stdin)",
+            })
+            .example(
+              '$0 stream "Write a story about space"',
+              "Stream a creative story",
+            )
+            .example(
+              '$0 stream "Explain machine learning" -p anthropic',
+              "Stream with specific provider",
+            )
+            .example(
+              '$0 stream "Code walkthrough" --output story.txt',
+              "Stream to file",
+            )
+            .example('echo "Live demo" | $0 stream', "Stream from stdin"),
         );
       },
       handler: async (argv) => await this.executeStream(argv as CLICommandArgs),
@@ -284,11 +471,25 @@ export class CLICommandFactory {
       describe: "Process multiple prompts from a file",
       builder: (yargs) => {
         return this.buildOptions(
-          yargs.positional("file", {
-            type: "string" as const,
-            description: "File with prompts (one per line)",
-            demandOption: true,
-          }),
+          yargs
+            .positional("file", {
+              type: "string" as const,
+              description: "File with prompts (one per line)",
+              demandOption: true,
+            })
+            .example("$0 batch prompts.txt", "Process prompts from file")
+            .example(
+              "$0 batch questions.txt --format json",
+              "Export results as JSON",
+            )
+            .example(
+              "$0 batch tasks.txt -p vertex --delay 2000",
+              "Use Vertex AI with 2s delay",
+            )
+            .example(
+              "$0 batch batch.txt --output results.json",
+              "Save results to file",
+            ),
         );
       },
       handler: async (argv) => await this.executeBatch(argv as CLICommandArgs),
@@ -307,11 +508,18 @@ export class CLICommandFactory {
           .command(
             "status",
             "Check status of all configured AI providers",
-            (y) => this.buildOptions(y),
+            (y) =>
+              this.buildOptions(y)
+                .example("$0 provider status", "Check all provider status")
+                .example(
+                  "$0 provider status --verbose",
+                  "Detailed provider diagnostics",
+                )
+                .example("$0 provider status --quiet", "Minimal status output"),
             (argv) =>
               CLICommandFactory.executeProviderStatus(argv as CLICommandArgs),
           )
-          .demandCommand(1, "");
+          .demandCommand(1, "Please specify a provider subcommand");
       },
       handler: () => {}, // No-op handler as subcommands handle everything
     };
@@ -325,10 +533,35 @@ export class CLICommandFactory {
       command: "status",
       describe:
         "Check AI provider connectivity and performance (alias for provider status)",
-      builder: (yargs) => this.buildOptions(yargs),
+      builder: (yargs) =>
+        this.buildOptions(yargs)
+          .example("$0 status", "Quick provider status check")
+          .example("$0 status --verbose", "Detailed connectivity diagnostics")
+          .example("$0 status --format json", "Export status as JSON"),
       handler: async (argv) =>
         await CLICommandFactory.executeProviderStatus(argv as CLICommandArgs),
     };
+  }
+
+  /**
+   * Create models commands
+   */
+  static createModelsCommands(): CommandModule {
+    return ModelsCommandFactory.createModelsCommands();
+  }
+
+  /**
+   * Create MCP commands
+   */
+  static createMCPCommands(): CommandModule {
+    return MCPCommandFactory.createMCPCommands();
+  }
+
+  /**
+   * Create discover command
+   */
+  static createDiscoverCommand(): CommandModule {
+    return MCPCommandFactory.createDiscoverCommand();
   }
 
   /**
@@ -340,6 +573,49 @@ export class CLICommandFactory {
       describe: "Manage NeuroLink configuration",
       builder: (yargs) => {
         return yargs
+          .command(
+            "init",
+            "Interactive configuration setup wizard",
+            (y) => this.buildOptions(y),
+            async (argv) => {
+              const { configManager } = await import("../commands/config.js");
+              await configManager.initInteractive();
+            },
+          )
+          .command(
+            "show",
+            "Display current configuration",
+            (y) => this.buildOptions(y),
+            async (argv) => {
+              const { configManager } = await import("../commands/config.js");
+              configManager.showConfig();
+            },
+          )
+          .command(
+            "validate",
+            "Validate current configuration",
+            (y) => this.buildOptions(y),
+            async (argv) => {
+              const { configManager } = await import("../commands/config.js");
+              const result = configManager.validateConfig();
+              if (result.valid) {
+                logger.always(chalk.green("✅ Configuration is valid"));
+              } else {
+                logger.always(chalk.red("❌ Configuration has errors:"));
+                result.errors.forEach((error) => logger.always(`  • ${error}`));
+                process.exit(1);
+              }
+            },
+          )
+          .command(
+            "reset",
+            "Reset configuration to defaults",
+            (y) => this.buildOptions(y),
+            async (argv) => {
+              const { configManager } = await import("../commands/config.js");
+              configManager.resetConfig();
+            },
+          )
           .command(
             "export",
             "Export current configuration",
@@ -359,7 +635,11 @@ export class CLICommandFactory {
     return {
       command: "get-best-provider",
       describe: "Show the best available AI provider",
-      builder: (yargs) => this.buildOptions(yargs),
+      builder: (yargs) =>
+        this.buildOptions(yargs)
+          .example("$0 get-best-provider", "Get best available provider")
+          .example("$0 get-best-provider --format json", "Get provider as JSON")
+          .example("$0 get-best-provider --quiet", "Just the provider name"),
       handler: async (argv) =>
         await this.executeGetBestProvider(argv as CLICommandArgs),
     };
@@ -372,7 +652,20 @@ export class CLICommandFactory {
     return {
       command: "completion",
       describe: "Generate shell completion script",
-      builder: (yargs) => this.buildOptions(yargs),
+      builder: (yargs) =>
+        this.buildOptions(yargs)
+          .example("$0 completion", "Generate shell completion")
+          .example(
+            "$0 completion > ~/.neurolink-completion.sh",
+            "Save completion script",
+          )
+          .example(
+            "source ~/.neurolink-completion.sh",
+            "Enable completions (bash)",
+          )
+          .epilogue(
+            "Add the completion script to your shell profile for persistent completions",
+          ),
       handler: async (argv) =>
         await this.executeCompletion(argv as CLICommandArgs),
     };
@@ -383,7 +676,7 @@ export class CLICommandFactory {
    */
   private static async executeProviderStatus(argv: UnknownRecord) {
     if (argv.verbose && !argv.quiet) {
-      console.log(
+      logger.always(
         chalk.yellow("ℹ️ Verbose mode enabled. Displaying detailed status.\n"),
       );
     }
@@ -394,7 +687,7 @@ export class CLICommandFactory {
     try {
       // Use SDK's provider diagnostic method instead of manual testing
       const sdk = new NeuroLink();
-      const results = await sdk.getProviderStatus();
+      const results = await sdk.getProviderStatus({ quiet: !!argv.quiet });
 
       if (spinner) {
         const working = results.filter((r) => r.status === "working").length;
@@ -415,22 +708,22 @@ export class CLICommandFactory {
 
         const time = result.responseTime ? ` (${result.responseTime}ms)` : "";
         const model = result.model ? ` [${result.model}]` : "";
-        console.log(`${result.provider}: ${status}${time}${model}`);
+        logger.always(`${result.provider}: ${status}${time}${model}`);
 
         if (argv.verbose && result.error) {
-          console.log(`  Error: ${chalk.red(result.error)}`);
+          logger.always(`  Error: ${chalk.red(result.error)}`);
         }
       }
 
       if (argv.verbose && !argv.quiet) {
-        console.log(chalk.blue("\n📋 Detailed Results:"));
-        console.log(JSON.stringify(results, null, 2));
+        logger.always(chalk.blue("\n📋 Detailed Results:"));
+        logger.always(JSON.stringify(results, null, 2));
       }
     } catch (error) {
       if (spinner) {
         spinner.fail("Provider status check failed");
       }
-      console.error(chalk.red("Error checking provider status:"), error);
+      logger.error(chalk.red("Error checking provider status:"), error);
       process.exit(1);
     }
   }
@@ -465,9 +758,40 @@ export class CLICommandFactory {
         await new Promise((resolve) => setTimeout(resolve, options.delay));
       }
 
+      // Process context if provided
+      let inputText = argv.input as string;
+      let contextMetadata: UnknownRecord | undefined;
+
+      if (options.context && options.contextConfig) {
+        const processedContextResult = ContextFactory.processContext(
+          options.context,
+          options.contextConfig,
+        );
+
+        // Integrate context into prompt if configured
+        if (processedContextResult.processedContext) {
+          inputText = processedContextResult.processedContext + inputText;
+        }
+
+        // Add context metadata for analytics
+        contextMetadata = {
+          ...ContextFactory.extractAnalyticsContext(options.context),
+          contextMode: processedContextResult.config.mode,
+          contextTruncated: processedContextResult.metadata.truncated,
+        };
+
+        if (options.debug) {
+          logger.debug("Context processed:", {
+            mode: processedContextResult.config.mode,
+            truncated: processedContextResult.metadata.truncated,
+            processingTime: processedContextResult.metadata.processingTime,
+          });
+        }
+      }
+
       const sdk = new NeuroLink();
       const result = await sdk.generate({
-        input: { text: argv.input as string },
+        input: { text: inputText },
         provider: options.provider,
         model: options.model,
         temperature: options.temperature,
@@ -479,7 +803,7 @@ export class CLICommandFactory {
         enableEvaluation: options.enableEvaluation,
         evaluationDomain: options.evaluationDomain as string | undefined,
         toolUsageContext: options.toolUsageContext as string | undefined,
-        context: options.context as UnknownRecord | undefined,
+        context: contextMetadata,
       });
 
       if (spinner) {
@@ -509,11 +833,11 @@ export class CLICommandFactory {
       if (spinner) {
         spinner.fail();
       }
-      console.error(
+      logger.error(
         chalk.red(`❌ Generation failed: ${(error as Error).message}`),
       );
       if (options.debug) {
-        console.error(chalk.gray((error as Error).stack));
+        logger.error(chalk.gray((error as Error).stack));
       }
       process.exit(1);
     }
@@ -543,7 +867,7 @@ export class CLICommandFactory {
     const options = this.processOptions(argv);
 
     if (!options.quiet) {
-      console.log(chalk.blue("🔄 Streaming..."));
+      logger.always(chalk.blue("🔄 Streaming..."));
     }
 
     try {
@@ -552,9 +876,40 @@ export class CLICommandFactory {
         await new Promise((resolve) => setTimeout(resolve, options.delay));
       }
 
+      // Process context if provided (same as generate command)
+      let inputText = argv.input as string;
+      let contextMetadata: UnknownRecord | undefined;
+
+      if (options.context && options.contextConfig) {
+        const processedContextResult = ContextFactory.processContext(
+          options.context,
+          options.contextConfig,
+        );
+
+        // Integrate context into prompt if configured
+        if (processedContextResult.processedContext) {
+          inputText = processedContextResult.processedContext + inputText;
+        }
+
+        // Add context metadata for analytics
+        contextMetadata = {
+          ...ContextFactory.extractAnalyticsContext(options.context),
+          contextMode: processedContextResult.config.mode,
+          contextTruncated: processedContextResult.metadata.truncated,
+        };
+
+        if (options.debug) {
+          logger.debug("Context processed for streaming:", {
+            mode: processedContextResult.config.mode,
+            truncated: processedContextResult.metadata.truncated,
+            processingTime: processedContextResult.metadata.processingTime,
+          });
+        }
+      }
+
       const sdk = new NeuroLink();
       const stream = await sdk.stream({
-        input: { text: argv.input as string },
+        input: { text: inputText },
         provider: options.provider,
         model: options.model,
         temperature: options.temperature,
@@ -564,7 +919,7 @@ export class CLICommandFactory {
         disableTools: options.disableTools,
         enableAnalytics: options.enableAnalytics,
         enableEvaluation: options.enableEvaluation,
-        context: options.context as UnknownRecord | undefined,
+        context: contextMetadata,
       });
 
       let fullContent = "";
@@ -584,21 +939,82 @@ export class CLICommandFactory {
         process.stdout.write("\n");
       }
 
+      // 🔧 NEW: Display analytics and evaluation after streaming (similar to generate command)
+      if (options.enableAnalytics && stream.analytics) {
+        const resolvedAnalytics = await (stream.analytics instanceof Promise
+          ? stream.analytics
+          : Promise.resolve(stream.analytics));
+        const streamAnalytics = {
+          success: true,
+          content: fullContent,
+          analytics: resolvedAnalytics,
+          model: stream.model,
+          toolsUsed: stream.toolCalls?.map((tc) => tc.toolName) || [],
+        };
+        const analyticsDisplay = this.formatAnalyticsForTextMode(
+          streamAnalytics as unknown as GenerateResult,
+        );
+        logger.always(analyticsDisplay);
+      }
+
+      // 🔧 NEW: Display evaluation after streaming
+      if (options.enableEvaluation && stream.evaluation) {
+        const resolvedEvaluation = await (stream.evaluation instanceof Promise
+          ? stream.evaluation
+          : Promise.resolve(stream.evaluation));
+        logger.always(chalk.blue("\n📊 Response Evaluation:"));
+        logger.always(`   Relevance: ${resolvedEvaluation.relevance}/10`);
+        logger.always(`   Accuracy: ${resolvedEvaluation.accuracy}/10`);
+        logger.always(`   Completeness: ${resolvedEvaluation.completeness}/10`);
+        logger.always(`   Overall: ${resolvedEvaluation.overall}/10`);
+        if (resolvedEvaluation.reasoning) {
+          logger.always(`   Reasoning: ${resolvedEvaluation.reasoning}`);
+        }
+      }
+
       // Handle output file if specified
       if (options.output) {
         fs.writeFileSync(options.output, fullContent);
         if (!options.quiet) {
-          console.log(`\nOutput saved to ${options.output}`);
+          logger.always(`\nOutput saved to ${options.output}`);
+        }
+      }
+
+      // 🔧 NEW: Debug output for streaming (similar to generate command)
+      if (options.debug) {
+        logger.debug("\n" + chalk.yellow("Debug Information (Streaming):"));
+        logger.debug("Provider:", stream.provider);
+        logger.debug("Model:", stream.model);
+        if (stream.analytics) {
+          const resolvedAnalytics = await (stream.analytics instanceof Promise
+            ? stream.analytics
+            : Promise.resolve(stream.analytics));
+          logger.debug(
+            "Analytics:",
+            JSON.stringify(resolvedAnalytics, null, 2),
+          );
+        }
+        if (stream.evaluation) {
+          const resolvedEvaluation = await (stream.evaluation instanceof Promise
+            ? stream.evaluation
+            : Promise.resolve(stream.evaluation));
+          logger.debug(
+            "Evaluation:",
+            JSON.stringify(resolvedEvaluation, null, 2),
+          );
+        }
+        if (stream.metadata) {
+          logger.debug("Metadata:", JSON.stringify(stream.metadata, null, 2));
         }
       }
 
       process.exit(0);
     } catch (error) {
-      console.error(
+      logger.error(
         chalk.red(`❌ Streaming failed: ${(error as Error).message}`),
       );
       if (options.debug) {
-        console.error(chalk.gray((error as Error).stack));
+        logger.error(chalk.gray((error as Error).stack));
       }
       process.exit(1);
     }
@@ -634,7 +1050,9 @@ export class CLICommandFactory {
       if (spinner) {
         spinner.text = `📦 Processing ${prompts.length} prompts...`;
       } else if (!options.quiet) {
-        console.log(chalk.blue(`📦 Processing ${prompts.length} prompts...\n`));
+        logger.always(
+          chalk.blue(`📦 Processing ${prompts.length} prompts...\n`),
+        );
       }
 
       const results: Array<{
@@ -651,8 +1069,30 @@ export class CLICommandFactory {
         }
 
         try {
+          // Process context for each batch item
+          let inputText = prompts[i];
+          let contextMetadata: UnknownRecord | undefined;
+
+          if (options.context && options.contextConfig) {
+            const processedContextResult = ContextFactory.processContext(
+              options.context,
+              options.contextConfig,
+            );
+
+            if (processedContextResult.processedContext) {
+              inputText = processedContextResult.processedContext + inputText;
+            }
+
+            contextMetadata = {
+              ...ContextFactory.extractAnalyticsContext(options.context),
+              contextMode: processedContextResult.config.mode,
+              contextTruncated: processedContextResult.metadata.truncated,
+              batchIndex: i,
+            };
+          }
+
           const result = await sdk.generate({
-            input: { text: prompts[i] },
+            input: { text: inputText },
             provider: options.provider,
             model: options.model,
             temperature: options.temperature,
@@ -662,7 +1102,7 @@ export class CLICommandFactory {
             disableTools: options.disableTools,
             enableAnalytics: options.enableAnalytics,
             enableEvaluation: options.enableEvaluation,
-            context: options.context as UnknownRecord | undefined,
+            context: contextMetadata,
           });
 
           results.push({ prompt: prompts[i], response: result.content });
@@ -701,11 +1141,11 @@ export class CLICommandFactory {
       if (spinner) {
         spinner.fail();
       }
-      console.error(
+      logger.error(
         chalk.red(`❌ Batch processing failed: ${(error as Error).message}`),
       );
       if (options.debug) {
-        console.error(chalk.gray((error as Error).stack));
+        logger.error(chalk.gray((error as Error).stack));
       }
       process.exit(1);
     }
@@ -744,7 +1184,7 @@ export class CLICommandFactory {
 
       this.handleOutput(config, options);
     } catch (error) {
-      console.error(
+      logger.error(
         chalk.red(
           `❌ Configuration export failed: ${(error as Error).message}`,
         ),
@@ -769,7 +1209,7 @@ export class CLICommandFactory {
         this.handleOutput({ provider: bestProvider }, options);
       } else {
         if (!options.quiet) {
-          console.log(
+          logger.always(
             chalk.green(`🎯 Best available provider: ${bestProvider}`),
           );
         } else {
@@ -777,7 +1217,7 @@ export class CLICommandFactory {
         }
       }
     } catch (error) {
-      console.error(
+      logger.error(
         chalk.red(`❌ Provider selection failed: ${(error as Error).message}`),
       );
       process.exit(1);
@@ -789,7 +1229,7 @@ export class CLICommandFactory {
    */
   private static async executeCompletion(argv: CLICommandArgs) {
     // This would need to be implemented with the actual CLI instance
-    console.log("# Completion script would be generated here");
-    console.log("# This requires access to the yargs CLI instance");
+    logger.always("# Completion script would be generated here");
+    logger.always("# This requires access to the yargs CLI instance");
   }
 }

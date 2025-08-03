@@ -12,8 +12,29 @@ import type {
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue, UnknownRecord } from "../types/common.js";
 import type { ToolCall, ToolResult } from "../types/tools.js";
+import type { TokenUsage } from "../types/providers.js";
 import { logger } from "../utils/logger.js";
+import { SYSTEM_LIMITS } from "../core/constants.js";
 import { directAgentTools } from "../agent/directTools.js";
+
+// Interface for AI SDK generate result with steps
+interface AISDKGenerateResult {
+  text: string;
+  toolCalls?: Array<{
+    toolName?: string;
+    name?: string;
+    [key: string]: unknown;
+  }>;
+  steps?: Array<{
+    toolCalls?: Array<{
+      toolName?: string;
+      name?: string;
+      [key: string]: unknown;
+    }>;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+}
 // Dynamic imports to break circular dependency
 // import { evaluateResponse } from "../core/evaluation.js";
 // import { getAvailableFunctionTools } from "../mcp/functionCalling.js";
@@ -118,92 +139,117 @@ export abstract class BaseProvider implements AIProvider {
   ): Promise<StreamResult> {
     const options = this.normalizeStreamOptions(optionsOrPrompt);
 
-    // If tools are not disabled AND provider supports tools, use generate() and create synthetic stream
-    if (!options.disableTools && this.supportsTools()) {
-      try {
-        // Convert stream options to text generation options
-        const textOptions: TextGenerationOptions = {
-          prompt: options.input?.text || "",
-          systemPrompt: options.systemPrompt,
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          disableTools: false,
-          maxSteps: options.maxSteps || 5,
-          provider: options.provider as AIProviderName | undefined,
-          model: options.model,
-        };
+    // CRITICAL FIX: Always prefer real streaming over fake streaming
+    // Try real streaming first, use fake streaming only as fallback
+    try {
+      const realStreamResult = await this.executeStream(
+        options,
+        analysisSchema,
+      );
 
-        const result = await this.generate(textOptions, analysisSchema);
+      // If real streaming succeeds, return it (with tools support via Vercel AI SDK)
+      return realStreamResult;
+    } catch (realStreamError) {
+      logger.warn(
+        `Real streaming failed for ${this.providerName}, falling back to fake streaming:`,
+        realStreamError,
+      );
 
-        // Create a synthetic stream from the generate result that simulates progressive delivery
-        return {
-          stream: (async function* () {
-            if (result?.content) {
-              // Split content into words for more natural streaming
-              const words = result.content.split(/(\s+)/); // Keep whitespace
-              let buffer = "";
+      // Fallback to fake streaming only if real streaming fails AND tools are enabled
+      if (!options.disableTools && this.supportsTools()) {
+        try {
+          // Convert stream options to text generation options
+          const textOptions: TextGenerationOptions = {
+            prompt: options.input?.text || "",
+            systemPrompt: options.systemPrompt,
+            temperature: options.temperature,
+            maxTokens: options.maxTokens,
+            disableTools: false,
+            maxSteps: options.maxSteps || 5,
+            provider: options.provider as AIProviderName | undefined,
+            model: options.model,
+            // 🔧 FIX: Include analytics and evaluation options from stream options
+            enableAnalytics: options.enableAnalytics,
+            enableEvaluation: options.enableEvaluation,
+            evaluationDomain: options.evaluationDomain,
+            toolUsageContext: options.toolUsageContext,
+            context: options.context as Record<string, JsonValue> | undefined,
+          };
 
-              for (let i = 0; i < words.length; i++) {
-                buffer += words[i];
+          const result = await this.generate(textOptions, analysisSchema);
 
-                // Yield chunks of roughly 5-10 words or at punctuation
-                const shouldYield =
-                  i === words.length - 1 || // Last word
-                  buffer.length > 50 || // Buffer getting long
-                  /[.!?;,]\s*$/.test(buffer); // End of sentence/clause
+          // Create a synthetic stream from the generate result that simulates progressive delivery
+          return {
+            stream: (async function* () {
+              if (result?.content) {
+                // Split content into words for more natural streaming
+                const words = result.content.split(/(\s+)/); // Keep whitespace
+                let buffer = "";
 
-                if (shouldYield && buffer.trim()) {
+                for (let i = 0; i < words.length; i++) {
+                  buffer += words[i];
+
+                  // Yield chunks of roughly 5-10 words or at punctuation
+                  const shouldYield =
+                    i === words.length - 1 || // Last word
+                    buffer.length > 50 || // Buffer getting long
+                    /[.!?;,]\s*$/.test(buffer); // End of sentence/clause
+
+                  if (shouldYield && buffer.trim()) {
+                    yield { content: buffer };
+                    buffer = "";
+
+                    // Small delay to simulate streaming (1-10ms)
+                    await new Promise((resolve) =>
+                      setTimeout(resolve, Math.random() * 9 + 1),
+                    );
+                  }
+                }
+
+                // Yield any remaining content
+                if (buffer.trim()) {
                   yield { content: buffer };
-                  buffer = "";
-
-                  // Small delay to simulate streaming (1-10ms)
-                  await new Promise((resolve) =>
-                    setTimeout(resolve, Math.random() * 9 + 1),
-                  );
                 }
               }
-
-              // Yield any remaining content
-              if (buffer.trim()) {
-                yield { content: buffer };
-              }
-            }
-          })(),
-          usage: result?.usage,
-          provider: result?.provider,
-          model: result?.model,
-          toolCalls: result?.toolCalls?.map((call) => ({
-            toolName: call.toolName,
-            parameters: call.args,
-            id: call.toolCallId,
-          })),
-          toolResults: result?.toolResults
-            ? result.toolResults.map((tr) => ({
-                toolName:
-                  ((tr as UnknownRecord).toolName as string) || "unknown",
-                status: (((tr as UnknownRecord).status as string) === "error"
-                  ? "failure"
-                  : "success") as "success" | "failure",
-                result: (tr as UnknownRecord).result,
-                error: (tr as UnknownRecord).error as string | undefined,
-              }))
-            : undefined,
-        };
-      } catch (error) {
+            })(),
+            usage: result?.usage,
+            provider: result?.provider,
+            model: result?.model,
+            toolCalls: result?.toolCalls?.map((call) => ({
+              toolName: call.toolName,
+              parameters: call.args,
+              id: call.toolCallId,
+            })),
+            toolResults: result?.toolResults
+              ? result.toolResults.map((tr) => ({
+                  toolName:
+                    ((tr as UnknownRecord).toolName as string) || "unknown",
+                  status: (((tr as UnknownRecord).status as string) === "error"
+                    ? "failure"
+                    : "success") as "success" | "failure",
+                  result: (tr as UnknownRecord).result,
+                  error: (tr as UnknownRecord).error as string | undefined,
+                }))
+              : undefined,
+            // 🔧 FIX: Include analytics and evaluation from generate result
+            analytics: result?.analytics,
+            evaluation: result?.evaluation,
+          };
+        } catch (error) {
+          logger.error(
+            `Fake streaming fallback failed for ${this.providerName}:`,
+            error,
+          );
+          throw this.handleProviderError(error);
+        }
+      } else {
+        // If real streaming failed and no tools are enabled, re-throw the original error
         logger.error(
-          `Stream with tools failed for ${this.providerName}:`,
-          error,
+          `Real streaming failed for ${this.providerName}:`,
+          realStreamError,
         );
-        throw this.handleProviderError(error);
+        throw this.handleProviderError(realStreamError);
       }
-    }
-
-    // Traditional streaming without tools
-    try {
-      return await this.executeStream(options, analysisSchema);
-    } catch (error) {
-      logger.error(`Stream failed for ${this.providerName}:`, error);
-      throw this.handleProviderError(error);
     }
   }
 
@@ -242,6 +288,43 @@ export abstract class BaseProvider implements AIProvider {
         maxTokens: options.maxTokens || 8192,
       });
 
+      // Extract tool names from tool calls for tracking
+      // AI SDK puts tool calls in steps array for multi-step generation
+      const toolsUsed: string[] = [];
+
+      // First check direct tool calls (fallback)
+      if (result.toolCalls && result.toolCalls.length > 0) {
+        toolsUsed.push(
+          ...result.toolCalls.map((tc) => {
+            return (
+              ((tc as UnknownRecord).toolName as string) ||
+              ((tc as UnknownRecord).name as string) ||
+              "unknown"
+            );
+          }),
+        );
+      }
+
+      // Then check steps for tool calls (primary source for multi-step)
+      if (
+        (result as unknown as AISDKGenerateResult).steps &&
+        Array.isArray((result as unknown as AISDKGenerateResult).steps)
+      ) {
+        for (const step of (result as unknown as AISDKGenerateResult).steps ||
+          []) {
+          if (step?.toolCalls && Array.isArray(step.toolCalls)) {
+            toolsUsed.push(
+              ...step.toolCalls.map((tc) => {
+                return tc.toolName || tc.name || "unknown";
+              }),
+            );
+          }
+        }
+      }
+
+      // Remove duplicates
+      const uniqueToolsUsed = [...new Set(toolsUsed)];
+
       // Format the result with tool executions included
       const enhancedResult: EnhancedGenerateResult = {
         content: result.text,
@@ -269,6 +352,7 @@ export abstract class BaseProvider implements AIProvider {
             }))
           : [],
         toolResults: result.toolResults as ToolResult[],
+        toolsUsed: uniqueToolsUsed,
       };
 
       // Enhanced result with analytics and evaluation
@@ -551,8 +635,63 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   protected validateOptions(options: TextGenerationOptions): void {
+    // 🔧 EDGE CASE: Basic prompt validation
     if (!options.prompt || options.prompt.trim().length === 0) {
       throw new Error("Prompt is required and cannot be empty");
+    }
+
+    // 🔧 EDGE CASE: Handle very large prompts (>1M characters)
+    if (options.prompt.length > SYSTEM_LIMITS.MAX_PROMPT_LENGTH) {
+      throw new Error(
+        `Prompt too large: ${options.prompt.length} characters (max: ${SYSTEM_LIMITS.MAX_PROMPT_LENGTH}). Consider breaking into smaller chunks. Use BaseProvider.chunkPrompt(prompt, maxSize, overlap) static method for chunking.`,
+      );
+    }
+
+    // 🔧 EDGE CASE: Validate token limits
+    if (options.maxTokens && options.maxTokens > 200000) {
+      throw new Error(
+        `Max tokens too high: ${options.maxTokens} (recommended max: 200,000). This may cause timeouts or API errors.`,
+      );
+    }
+
+    if (options.maxTokens && options.maxTokens < 1) {
+      throw new Error("Max tokens must be at least 1");
+    }
+
+    // 🔧 EDGE CASE: Validate temperature range
+    if (options.temperature !== undefined) {
+      if (options.temperature < 0 || options.temperature > 2) {
+        throw new Error(
+          `Temperature must be between 0 and 2, got: ${options.temperature}`,
+        );
+      }
+    }
+
+    // 🔧 EDGE CASE: Validate timeout values
+    if (options.timeout !== undefined) {
+      const timeoutMs =
+        typeof options.timeout === "string"
+          ? parseInt(options.timeout, 10)
+          : options.timeout;
+
+      if (isNaN(timeoutMs) || timeoutMs < 1000) {
+        throw new Error(
+          `Timeout must be at least 1000ms (1 second), got: ${options.timeout}`,
+        );
+      }
+
+      if (timeoutMs > SYSTEM_LIMITS.LONG_TIMEOUT_WARNING) {
+        logger.warn(
+          `⚠️ Very long timeout: ${timeoutMs}ms. This may cause the CLI to hang.`,
+        );
+      }
+    }
+
+    // 🔧 EDGE CASE: Validate maxSteps for tool execution
+    if (options.maxSteps !== undefined && options.maxSteps > 20) {
+      throw new Error(
+        `Max steps too high: ${options.maxSteps} (recommended max: 20). This may cause long execution times.`,
+      );
     }
   }
 
@@ -587,5 +726,47 @@ export abstract class BaseProvider implements AIProvider {
     }
 
     return this.defaultTimeout;
+  }
+
+  /**
+   * Utility method to chunk large prompts into smaller pieces
+   * @param prompt The prompt to chunk
+   * @param maxChunkSize Maximum size per chunk (default: 900,000 characters)
+   * @param overlap Overlap between chunks to maintain context (default: 100 characters)
+   * @returns Array of prompt chunks
+   */
+  static chunkPrompt(
+    prompt: string,
+    maxChunkSize: number = 900000,
+    overlap: number = 100,
+  ): string[] {
+    if (prompt.length <= maxChunkSize) {
+      return [prompt];
+    }
+
+    const chunks: string[] = [];
+    let start = 0;
+
+    while (start < prompt.length) {
+      const end = Math.min(start + maxChunkSize, prompt.length);
+      chunks.push(prompt.slice(start, end));
+
+      // Break if we've reached the end
+      if (end >= prompt.length) {
+        break;
+      }
+
+      // Move start forward, accounting for overlap
+      const nextStart = end - overlap;
+
+      // Ensure we make progress (avoid infinite loops)
+      if (nextStart <= start) {
+        start = end;
+      } else {
+        start = Math.max(nextStart, 0);
+      }
+    }
+
+    return chunks;
   }
 }

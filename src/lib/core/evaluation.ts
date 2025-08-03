@@ -145,22 +145,29 @@ function parseUnifiedEvaluationResult(
       accuracy: /accuracy[:\s]*([0-9]+(?:\.[0-9]+)?)/i,
       completeness: /completeness[:\s]*([0-9]+(?:\.[0-9]+)?)/i,
       overall: /overall[:\s]*([0-9]+(?:\.[0-9]+)?)/i,
+      reasoning: /reasoning[:\s]*(.+?)(?=\n\s*\w+:|\n\s*$|$)/is,
     };
 
     for (const [key, pattern] of Object.entries(patterns)) {
       const match = response.match(pattern);
       if (match) {
-        const value = parseFloat(match[1]);
-        if (value >= 1 && value <= 10) {
-          const roundedValue = Math.round(value);
-          if (key === "relevance") {
-            result.relevance = roundedValue;
-          } else if (key === "accuracy") {
-            result.accuracy = roundedValue;
-          } else if (key === "completeness") {
-            result.completeness = roundedValue;
-          } else if (key === "overall") {
-            result.overall = roundedValue;
+        if (key === "reasoning") {
+          // Extract reasoning text
+          result.reasoning = match[1].trim();
+        } else {
+          // Extract numerical scores
+          const value = parseFloat(match[1]);
+          if (value >= 1 && value <= 10) {
+            const roundedValue = Math.round(value);
+            if (key === "relevance") {
+              result.relevance = roundedValue;
+            } else if (key === "accuracy") {
+              result.accuracy = roundedValue;
+            } else if (key === "completeness") {
+              result.completeness = roundedValue;
+            } else if (key === "overall") {
+              result.overall = roundedValue;
+            }
           }
         }
       }
@@ -172,6 +179,7 @@ function parseUnifiedEvaluationResult(
       accuracy: result.accuracy || 1,
       completeness: result.completeness || 1,
       overall: result.overall || 1,
+      reasoning: result.reasoning || "No detailed reasoning provided",
     };
   } catch (error) {
     logger.error(`[${functionTag}] Failed to parse evaluation result`, {
@@ -182,6 +190,7 @@ function parseUnifiedEvaluationResult(
       accuracy: 1,
       completeness: 1,
       overall: 1,
+      reasoning: "Error occurred during evaluation parsing",
     };
   }
 }
@@ -249,6 +258,7 @@ Relevance: [score]
 Accuracy: [score]
 Completeness: [score]
 Overall: [score]
+Reasoning: [Provide a detailed explanation of your evaluation, explaining why you gave these scores. Include specific observations about the response's strengths and any areas for improvement.]
 `;
 
     // Generate evaluation

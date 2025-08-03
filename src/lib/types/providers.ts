@@ -51,6 +51,112 @@ export interface AnalyticsData {
 }
 
 /**
+ * Model Capabilities - Maximally Reusable
+ */
+export type ModelCapability =
+  | "text"
+  | "vision"
+  | "function-calling"
+  | "embedding"
+  | "audio"
+  | "video"
+  | "code"
+  | "reasoning"
+  | "multimodal";
+
+/**
+ * Model Use Cases - High Reusability
+ */
+export type ModelUseCase =
+  | "chat"
+  | "completion"
+  | "analysis"
+  | "coding"
+  | "creative"
+  | "reasoning"
+  | "translation"
+  | "summarization"
+  | "classification";
+
+/**
+ * Model Filter Configuration - High Reusability
+ */
+export interface ModelFilter {
+  provider?: string;
+  capability?: ModelCapability;
+  useCase?: ModelUseCase;
+  requireVision?: boolean;
+  requireFunctionCalling?: boolean;
+  maxTokens?: number;
+  costLimit?: number;
+}
+
+/**
+ * Model Resolution Context - High Reusability
+ */
+export interface ModelResolutionContext {
+  requireCapabilities?: ModelCapability[];
+  preferredProviders?: string[];
+  useCase?: ModelUseCase;
+  budgetConstraints?: {
+    maxCostPerRequest?: number;
+    maxTokens?: number;
+  };
+  performance?: {
+    maxLatency?: number;
+    minQuality?: number;
+  };
+}
+
+/**
+ * Model Statistics Object - High Reusability
+ */
+export interface ModelStats {
+  name: string;
+  provider: string;
+  capabilities: ModelCapability[];
+  useCases: ModelUseCase[];
+  performance: {
+    avgLatency?: number;
+    avgTokensPerSecond?: number;
+    reliability?: number;
+  };
+  pricing?: ModelPricing;
+  metadata: {
+    [key: string]: JsonValue;
+  } & {
+    version?: string;
+    lastUpdated?: Date;
+  };
+}
+
+/**
+ * Model Pricing Information - High Reusability
+ */
+export interface ModelPricing {
+  inputTokens?: {
+    price: number;
+    currency: string;
+    per: number;
+  };
+  outputTokens?: {
+    price: number;
+    currency: string;
+    per: number;
+  };
+  requestPrice?: {
+    price: number;
+    currency: string;
+  };
+  tier?: "free" | "basic" | "premium" | "enterprise";
+  // Additional properties for models command compatibility
+  average?: number;
+  min?: number;
+  max?: number;
+  free?: boolean;
+}
+
+/**
  * Evaluation data structure
  */
 export interface EvaluationData {

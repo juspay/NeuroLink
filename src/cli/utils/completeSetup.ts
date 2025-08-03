@@ -14,6 +14,7 @@ import {
 import { updateEnvFile, displayEnvUpdateSummary } from "./envManager.js";
 import chalk from "chalk";
 
+import { logger } from "../../lib/utils/logger.js";
 /**
  * Run the complete interactive setup process
  */
@@ -23,7 +24,9 @@ export async function runCompleteSetup(
   try {
     // Step 1: Run interactive setup wizard
     if (!quiet) {
-      console.log(chalk.blue("🚀 Starting NeuroLink Configuration Setup...\n"));
+      logger.always(
+        chalk.blue("🚀 Starting NeuroLink Configuration Setup...\n"),
+      );
     }
 
     const setupResult = await runInteractiveSetup(quiet);
@@ -31,7 +34,7 @@ export async function runCompleteSetup(
     // If no providers selected, exit early
     if (setupResult.selectedProviders.length === 0) {
       if (!quiet) {
-        console.log(
+        logger.always(
           chalk.yellow("⚠️  No providers selected. Setup cancelled."),
         );
       }
@@ -41,7 +44,9 @@ export async function runCompleteSetup(
     // Step 2: Update environment file with credentials
     if (Object.keys(setupResult.credentials).length > 0) {
       if (!quiet) {
-        console.log(chalk.blue("\n💾 Updating environment configuration...\n"));
+        logger.always(
+          chalk.blue("\n💾 Updating environment configuration...\n"),
+        );
       }
 
       try {
@@ -58,7 +63,7 @@ export async function runCompleteSetup(
         }
       } catch (error) {
         if (!quiet) {
-          console.error(
+          logger.error(
             chalk.red(
               `❌ Failed to update environment file: ${error instanceof Error ? error.message : String(error)}`,
             ),
@@ -70,7 +75,7 @@ export async function runCompleteSetup(
 
     // Step 3: Test provider connectivity
     if (!quiet) {
-      console.log(chalk.blue("\n🧪 Testing configured providers...\n"));
+      logger.always(chalk.blue("\n🧪 Testing configured providers...\n"));
     }
 
     setupResult.testResults = await testProviderConnectivity(
@@ -84,12 +89,12 @@ export async function runCompleteSetup(
     return setupResult;
   } catch (error) {
     if (!quiet) {
-      console.error(
+      logger.error(
         chalk.red(
           `❌ Setup failed: ${error instanceof Error ? error.message : String(error)}`,
         ),
       );
-      console.log(
+      logger.always(
         chalk.yellow("💡 You can retry setup with: neurolink config setup"),
       );
     }
@@ -109,7 +114,7 @@ export async function configSetup(quiet: boolean = false): Promise<void> {
  */
 export async function configInit(quiet: boolean = false): Promise<void> {
   if (!quiet) {
-    console.log(chalk.gray("📝 config init is an alias for config setup\n"));
+    logger.always(chalk.gray("📝 config init is an alias for config setup\n"));
   }
   await runCompleteSetup(quiet);
 }

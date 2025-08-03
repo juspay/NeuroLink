@@ -18,6 +18,7 @@ import {
 } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 
 // Environment variable setup
 if (
@@ -102,6 +103,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
   ): Promise<StreamResult> {
     this.validateStreamOptions(options);
 
+    const startTime = Date.now();
     const apiKey = this.getApiKey();
     const google = createGoogleGenerativeAI({ apiKey });
     const model = google(this.modelName);
@@ -134,12 +136,30 @@ export class GoogleAIStudioProvider extends BaseProvider {
         }
       };
 
+      // Create analytics promise that resolves after stream completion
+      const analyticsPromise = streamAnalyticsCollector.createAnalytics(
+        this.providerName,
+        this.modelName,
+        result,
+        Date.now() - startTime,
+        {
+          requestId: `google-ai-stream-${Date.now()}`,
+          streamingMode: true,
+        },
+      );
+
       return {
         stream: transformedStream(),
         provider: this.providerName,
         model: this.modelName,
+        analytics: analyticsPromise,
+        metadata: {
+          startTime,
+          streamId: `google-ai-${Date.now()}`,
+        },
       };
     } catch (error) {
+      timeoutController?.cleanup();
       throw this.handleProviderError(error);
     }
   }

@@ -56,24 +56,25 @@ export class AIProviderFactory {
     });
 
     try {
-      // EMERGENCY FIX: Skip dynamic model provider initialization to prevent hanging
-      // TODO: Fix the hanging dynamic model provider.initialize()
-      // Initialize dynamic model provider if not already done
-      // try {
-      //   if (dynamicModelProvider.needsRefresh()) {
-      //     // Add timeout to prevent hanging
-      //     await Promise.race([
-      //       dynamicModelProvider.initialize(),
-      //       new Promise((_, reject) =>
-      //         setTimeout(() => reject(new Error('Dynamic model provider timeout')), 3000)
-      //       )
-      //     ]);
-      //   }
-      // } catch (dynamicError) {
-      //   logger.warn(`[${functionTag}] Dynamic model provider initialization failed, using fallback`, {
-      //     error: dynamicError instanceof Error ? dynamicError.message : String(dynamicError),
-      //   });
-      // }
+      // DYNAMIC MODEL PROVIDER STATUS (2025): Disabled due to reliability issues
+      //
+      // Root Cause: Dynamic model provider initialization can hang when:
+      // - Local model server (localhost:3001) is not running or responding
+      // - GitHub raw URL requests timeout due to network issues
+      // - Local config file doesn't exist
+      //
+      // Current Behavior: Static model resolution works reliably
+      // Impact: No functionality loss - providers use built-in model defaults
+      //
+      // Implementation Requirements (if re-enabling):
+      // 1. Add robust timeout handling (3s max per source)
+      // 2. Implement exponential backoff for network requests
+      // 3. Add graceful degradation when all sources fail
+      // 4. Create health check for localhost:3001 before attempting connection
+      // 5. Add comprehensive error handling and logging
+      //
+      // Until these improvements are implemented, dynamic model provider remains disabled
+      // for system reliability. Static model defaults provide stable functionality.
 
       // COMPREHENSIVE FIX: Disable dynamic model resolution completely until provider is fixed
       // This prevents stale gemini-1.5-pro-latest from overriding correct gemini-2.5-pro defaults

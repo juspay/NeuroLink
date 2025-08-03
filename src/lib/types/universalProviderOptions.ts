@@ -3,6 +3,8 @@
  * Based on TypeScript factory pattern best practices for AI provider abstraction
  */
 
+import { BaseContext, ContextConfig } from "./contextTypes.js";
+
 /**
  * Base configuration interface for all AI providers
  * Uses Parameter Object Pattern for flexible, extensible configuration
@@ -19,8 +21,9 @@ export interface UniversalProviderOptions {
   enableAnalytics?: boolean;
   enableEvaluation?: boolean;
 
-  // Context and metadata
-  context?: Record<string, unknown>;
+  // Context and metadata (type-safe context integration)
+  context?: BaseContext;
+  contextConfig?: Partial<ContextConfig>;
   metadata?: Record<string, unknown>;
 
   // Provider-specific extensions (type-safe extensibility)
@@ -144,8 +147,11 @@ export class ParameterNormalizer {
     return {
       ...defaults,
       ...options,
-      // Merge nested objects
-      context: { ...defaults.context, ...options.context },
+      // Merge nested objects (type-safe context merging)
+      context: { ...defaults.context, ...options.context } as
+        | BaseContext
+        | undefined,
+      contextConfig: { ...defaults.contextConfig, ...options.contextConfig },
       metadata: { ...defaults.metadata, ...options.metadata },
     };
   }

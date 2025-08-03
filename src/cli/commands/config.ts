@@ -14,6 +14,7 @@ import chalk from "chalk";
 import { z } from "zod";
 import { CLI_LIMITS } from "../../lib/core/constants.js";
 
+import { logger } from "../../lib/utils/logger.js";
 // Configuration schema for validation
 const ConfigSchema = z.object({
   defaultProvider: z
@@ -144,7 +145,7 @@ export class ConfigManager {
         return ConfigSchema.parse(configData);
       }
     } catch (error) {
-      console.warn(
+      logger.warn(
         chalk.yellow(
           `⚠️  Invalid config file: ${error instanceof Error ? error.message : "Unknown error"}`,
         ),
@@ -171,9 +172,11 @@ export class ConfigManager {
         this.configFile,
         JSON.stringify(validatedConfig, null, 2),
       );
-      console.log(chalk.green(`✅ Configuration saved to ${this.configFile}`));
+      logger.always(
+        chalk.green(`✅ Configuration saved to ${this.configFile}`),
+      );
     } catch (error) {
-      console.error(
+      logger.error(
         chalk.red(
           `❌ Failed to save config: ${error instanceof Error ? error.message : "Unknown error"}`,
         ),
@@ -186,7 +189,7 @@ export class ConfigManager {
    * Interactive configuration setup
    */
   async initInteractive(): Promise<void> {
-    console.log(chalk.blue("🧠 NeuroLink Configuration Setup\n"));
+    logger.always(chalk.blue("🧠 NeuroLink Configuration Setup\n"));
 
     try {
       // Basic preferences
@@ -251,19 +254,19 @@ export class ConfigManager {
 
       this.saveConfig();
 
-      console.log(chalk.green("\n✅ Configuration setup complete!"));
-      console.log(
+      logger.always(chalk.green("\n✅ Configuration setup complete!"));
+      logger.always(
         chalk.blue(
           "💡 You can modify settings anytime with: neurolink config edit",
         ),
       );
-      console.log(chalk.blue("💡 Test your setup with: neurolink status"));
+      logger.always(chalk.blue("💡 Test your setup with: neurolink status"));
     } catch (error) {
       if (
         error instanceof Error &&
         error.message === "User force closed the prompt with 0 null"
       ) {
-        console.log(chalk.yellow("\n⚠️  Setup cancelled by user"));
+        logger.always(chalk.yellow("\n⚠️  Setup cancelled by user"));
         process.exit(0);
       }
       throw error;
@@ -302,7 +305,7 @@ export class ConfigManager {
    * Setup individual provider
    */
   private async setupProvider(provider: string): Promise<void> {
-    console.log(chalk.blue(`\n🔧 Configuring ${provider.toUpperCase()}`));
+    logger.always(chalk.blue(`\n🔧 Configuring ${provider.toUpperCase()}`));
 
     switch (provider) {
       case "openai":
@@ -707,35 +710,35 @@ export class ConfigManager {
    * Show current configuration
    */
   showConfig(): void {
-    console.log(chalk.blue("📋 Current NeuroLink Configuration\n"));
+    logger.always(chalk.blue("📋 Current NeuroLink Configuration\n"));
 
-    console.log(chalk.cyan("General Settings:"));
-    console.log(
+    logger.always(chalk.cyan("General Settings:"));
+    logger.always(
       `  Default Provider: ${chalk.white(this.config.defaultProvider)}`,
     );
-    console.log(
+    logger.always(
       `  Output Format: ${chalk.white(this.config.preferences.outputFormat)}`,
     );
-    console.log(
+    logger.always(
       `  Temperature: ${chalk.white(this.config.preferences.temperature)}`,
     );
-    console.log(
+    logger.always(
       `  Max Tokens: ${chalk.white(this.config.preferences.maxTokens)}`,
     );
 
-    console.log(chalk.cyan("\nConfigured Providers:"));
+    logger.always(chalk.cyan("\nConfigured Providers:"));
 
     Object.entries(this.config.providers).forEach(([name, config]) => {
       if (config && Object.keys(config).length > 0) {
-        console.log(`  ${chalk.green("✅")} ${name.toUpperCase()}`);
+        logger.always(`  ${chalk.green("✅")} ${name.toUpperCase()}`);
         if ("model" in config) {
-          console.log(`    Model: ${chalk.white(config.model)}`);
+          logger.always(`    Model: ${chalk.white(config.model)}`);
         }
       }
     });
 
-    console.log(chalk.cyan("\nConfiguration File:"));
-    console.log(`  Location: ${chalk.white(this.configFile)}`);
+    logger.always(chalk.cyan("\nConfiguration File:"));
+    logger.always(`  Location: ${chalk.white(this.configFile)}`);
   }
 
   /**
@@ -777,7 +780,7 @@ export class ConfigManager {
   resetConfig(): void {
     this.config = ConfigSchema.parse({});
     this.saveConfig();
-    console.log(chalk.green("✅ Configuration reset to defaults"));
+    logger.always(chalk.green("✅ Configuration reset to defaults"));
   }
 }
 

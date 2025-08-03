@@ -6,6 +6,7 @@
 
 import fs from "fs";
 import chalk from "chalk";
+import { logger } from "../../lib/utils/logger.js";
 
 export interface EnvBackupResult {
   backupPath?: string;
@@ -214,11 +215,11 @@ export function displayEnvUpdateSummary(
   }
 
   if (result.backup.existed && result.backup.backupPath) {
-    console.log(chalk.gray(`💾 Created backup: ${result.backup.backupPath}`));
+    logger.always(chalk.gray(`💾 Created backup: ${result.backup.backupPath}`));
   }
 
   if (result.added.length > 0) {
-    console.log(
+    logger.always(
       chalk.green(
         `➕ Added ${result.added.length} new variables: ${result.added.join(", ")}`,
       ),
@@ -226,7 +227,7 @@ export function displayEnvUpdateSummary(
   }
 
   if (result.updated.length > 0) {
-    console.log(
+    logger.always(
       chalk.yellow(
         `🔄 Updated ${result.updated.length} existing variables: ${result.updated.join(", ")}`,
       ),
@@ -234,7 +235,7 @@ export function displayEnvUpdateSummary(
   }
 
   if (result.unchanged.length > 0) {
-    console.log(
+    logger.always(
       chalk.gray(
         `✓ ${result.unchanged.length} variables unchanged: ${result.unchanged.join(", ")}`,
       ),
@@ -243,11 +244,11 @@ export function displayEnvUpdateSummary(
 
   const totalChanges = result.added.length + result.updated.length;
   if (totalChanges > 0) {
-    console.log(
+    logger.always(
       chalk.blue(`📝 Environment file updated with ${totalChanges} changes`),
     );
   } else {
-    console.log(chalk.gray("📝 No changes needed to environment file"));
+    logger.always(chalk.gray("📝 No changes needed to environment file"));
   }
 }
 

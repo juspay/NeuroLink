@@ -123,6 +123,16 @@ class OllamaLanguageModel implements LanguageModelV1 {
         .messages || [];
     const prompt = this.convertMessagesToPrompt(messages);
 
+    // Debug: Log what's being sent to Ollama
+    logger.debug(
+      "[OllamaLanguageModel] Messages:",
+      JSON.stringify(messages, null, 2),
+    );
+    logger.debug(
+      "[OllamaLanguageModel] Converted Prompt:",
+      JSON.stringify(prompt),
+    );
+
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -149,13 +159,20 @@ class OllamaLanguageModel implements LanguageModelV1 {
 
     const data = await response.json();
 
+    // Debug: Log Ollama API response to understand empty content issue
+    logger.debug(
+      "[OllamaLanguageModel] API Response:",
+      JSON.stringify(data, null, 2),
+    );
+
     return {
       text: data.response,
       usage: {
-        promptTokens: this.estimateTokens(prompt),
-        completionTokens: this.estimateTokens(data.response),
+        promptTokens: data.prompt_eval_count || this.estimateTokens(prompt),
+        completionTokens: data.eval_count || this.estimateTokens(data.response),
         totalTokens:
-          this.estimateTokens(prompt) + this.estimateTokens(data.response),
+          (data.prompt_eval_count || this.estimateTokens(prompt)) +
+          (data.eval_count || this.estimateTokens(data.response)),
       },
       finishReason: "stop",
       rawCall: {
@@ -273,7 +290,9 @@ class OllamaLanguageModel implements LanguageModelV1 {
                   type: "finish",
                   finishReason: "stop",
                   usage: {
-                    promptTokens: this.estimateTokens(data.context || ""),
+                    promptTokens:
+                      data.prompt_eval_count ||
+                      this.estimateTokens(data.context || ""),
                     completionTokens: data.eval_count || 0,
                   },
                 };
@@ -368,9 +387,26 @@ export class OllamaProvider extends BaseProvider {
    * @returns false to disable tools by default
    */
   supportsTools(): boolean {
-    // TODO: Fix the OllamaLanguageModel integration with BaseProvider for tool support.
-    //       Track progress on resolving this issue. See the detailed steps above.
-    //       Issue tracking required for enabling tool support
+    // IMPLEMENTATION STATUS (2025): Ollama function calling actively evolving
+    //
+    // Current State:
+    // - Function calling added in Ollama 2024, improving in 2025
+    // - Requires compatible models (Llama 3.1+, Code Llama variants)
+    // - AI SDK integration needs custom adapter for Ollama's tool format
+    //
+    // Technical Requirements:
+    // 1. Replace AI SDK with direct Ollama API tool calls
+    // 2. Implement Ollama-specific tool schema conversion
+    // 3. Add function response parsing from Ollama's JSON format
+    // 4. Handle streaming tool calls with incremental parsing
+    // 5. Validate model compatibility before enabling tools
+    //
+    // Implementation Path:
+    // - Use Ollama's chat API with 'tools' parameter
+    // - Parse tool_calls from response.message.tool_calls
+    // - Execute functions and return results to conversation
+    //
+    // Until Ollama-specific implementation, tools disabled for compatibility
     return false;
   }
 

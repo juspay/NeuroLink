@@ -47,6 +47,11 @@ export class AnthropicProvider extends BaseProvider {
 
     // Initialize Anthropic model with API key validation
     const apiKey = getAnthropicApiKey();
+
+    // Set Anthropic API key as environment variable (required by @ai-sdk/anthropic)
+    process.env.ANTHROPIC_API_KEY = apiKey;
+
+    // Initialize Anthropic with proper configuration
     this.model = anthropic(this.modelName || getDefaultAnthropicModel());
 
     logger.debug("Anthropic Provider v2 initialized", {

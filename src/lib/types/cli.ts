@@ -72,21 +72,77 @@ export interface StreamCommandArgs extends BaseCommandArgs {
 }
 
 /**
- * MCP command arguments
+ * MCP command arguments - Enhanced with transport and server management
  */
 export interface MCPCommandArgs extends BaseCommandArgs {
   /** MCP server name */
   server?: string;
+  /** MCP server name (alias for server) */
+  serverName?: string;
   /** Tool name to execute */
   tool?: string;
   /** Tool parameters as JSON string */
   params?: string;
   /** List available tools */
   list?: boolean;
+  /** List only specific category */
+  listOnly?: boolean;
   /** Discover MCP servers */
   discover?: boolean;
   /** Show server information */
   info?: boolean;
+  /** Transport type for server connection */
+  transport?: "stdio" | "websocket" | "tcp" | "unix";
+  /** Server description */
+  description?: string;
+  /** Command/executable for stdio transport */
+  command?: string;
+  /** Arguments for server command */
+  args?: string[];
+  /** Environment variables for server (JSON string) */
+  env?: string;
+  /** Server URL for network transports */
+  url?: string;
+  /** Server name for add command */
+  name?: string;
+  /** Show detailed information */
+  detailed?: boolean;
+  /** Force operation without confirmation */
+  force?: boolean;
+  /** Auto install discovered servers */
+  autoInstall?: boolean;
+  /** Discovery source */
+  source?: string;
+  /** Connection timeout */
+  timeout?: number;
+}
+
+/**
+ * Models command arguments - Enhanced for model management
+ */
+export interface ModelsCommandArgs extends BaseCommandArgs {
+  /** AI provider to query */
+  provider?: string;
+  /** Model capability filter */
+  query?: string;
+  /** Model use case filter */
+  useCase?: string;
+  /** Require vision capability */
+  requireVision?: boolean;
+  /** Require function calling capability */
+  requireFunctionCalling?: boolean;
+  /** List all available models */
+  list?: boolean;
+  /** Show model statistics */
+  stats?: boolean;
+  /** Show model pricing */
+  pricing?: boolean;
+  /** Resolve best model for criteria */
+  resolve?: boolean;
+  /** Maximum cost filter */
+  maxCost?: number;
+  /** Maximum tokens filter */
+  maxTokens?: number;
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   createOpenAIConfig,
   getProviderModel,
 } from "../utils/providerConfig.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 
 // Configuration helpers - now using consolidated utility
 const getOpenAIApiKey = (): string => {
@@ -107,6 +108,7 @@ export class OpenAIProvider extends BaseProvider {
   ): Promise<StreamResult> {
     this.validateStreamOptions(options);
 
+    const startTime = Date.now();
     const timeout = this.getTimeout(options);
     const timeoutController = createTimeoutController(
       timeout,
@@ -135,10 +137,27 @@ export class OpenAIProvider extends BaseProvider {
         }
       };
 
+      // Create analytics promise that resolves after stream completion
+      const analyticsPromise = streamAnalyticsCollector.createAnalytics(
+        this.providerName,
+        this.modelName,
+        result,
+        Date.now() - startTime,
+        {
+          requestId: `openai-stream-${Date.now()}`,
+          streamingMode: true,
+        },
+      );
+
       return {
         stream: transformedStream(),
         provider: this.providerName,
         model: this.modelName,
+        analytics: analyticsPromise,
+        metadata: {
+          startTime,
+          streamId: `openai-${Date.now()}`,
+        },
       };
     } catch (error) {
       timeoutController?.cleanup();

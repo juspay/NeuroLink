@@ -100,37 +100,37 @@ function handleError(error: Error, context: string): void {
   }
   // If no specific condition matched, genericMessage remains error.message
 
-  console.error(chalk.red(`❌ ${context} failed: ${genericMessage}`));
+  logger.error(chalk.red(`❌ ${context} failed: ${genericMessage}`));
 
   // Smart hints for common errors (just string matching!)
   if (
     genericMessage.toLowerCase().includes("api key") ||
     genericMessage.toLowerCase().includes("credential")
   ) {
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 Set Google AI Studio API key (RECOMMENDED): export GOOGLE_AI_API_KEY=AIza-...",
       ),
     );
-    console.error(
+    logger.error(
       chalk.yellow("💡 Or set OpenAI API key: export OPENAI_API_KEY=sk-..."),
     );
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 Or set AWS Bedrock credentials: export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_REGION=us-east-1",
       ),
     );
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 Or set Google Vertex AI credentials: export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json",
       ),
     );
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 Or set Anthropic API key: export ANTHROPIC_API_KEY=sk-ant-...",
       ),
     );
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 Or set Azure OpenAI credentials: export AZURE_OPENAI_API_KEY=... AZURE_OPENAI_ENDPOINT=...",
       ),
@@ -138,7 +138,7 @@ function handleError(error: Error, context: string): void {
   }
 
   if (error.message.toLowerCase().includes("rate limit")) {
-    console.error(
+    logger.error(
       chalk.yellow("💡 Try again in a few moments or use --provider vertex"),
     );
   }
@@ -147,12 +147,12 @@ function handleError(error: Error, context: string): void {
     error.message.toLowerCase().includes("not authorized") ||
     error.message.toLowerCase().includes("permission denied")
   ) {
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 Check your account permissions for the selected model/service.",
       ),
     );
-    console.error(
+    logger.error(
       chalk.yellow(
         "💡 For AWS Bedrock, ensure you have permissions for the specific model and consider using inference profile ARNs.",
       ),
@@ -178,7 +178,17 @@ const cli = yargs(args)
   .demandCommand(1, "")
   .epilogue("For more info: https://github.com/juspay/neurolink")
   .showHelpOnFail(true, "Specify --help for available options")
-  .middleware((argv) => {
+  .middleware((argv: { noColor?: boolean; [key: string]: unknown }) => {
+    // Handle no-color option globally
+    if (argv.noColor || process.env.NO_COLOR || !process.stdout.isTTY) {
+      process.env.FORCE_COLOR = "0";
+    }
+
+    // Handle custom config file
+    if (argv.configFile) {
+      process.env.NEUROLINK_CONFIG_FILE = argv.configFile as string;
+    }
+
     // Control SDK logging based on debug flag
     if (argv.debug) {
       process.env.NEUROLINK_DEBUG = "true";
@@ -186,6 +196,7 @@ const cli = yargs(args)
       // Always set to false when debug is not enabled (including when not provided)
       process.env.NEUROLINK_DEBUG = "false";
     }
+
     // Keep existing quiet middleware
     if (
       process.env.NEUROLINK_QUIET === "true" &&
@@ -283,6 +294,15 @@ const cli = yargs(args)
 
   // Status command alias - Using CLICommandFactory
   .command(CLICommandFactory.createStatusCommand())
+
+  // Models Command Group - Using CLICommandFactory
+  .command(CLICommandFactory.createModelsCommands())
+
+  // MCP Command Group - Using CLICommandFactory
+  .command(CLICommandFactory.createMCPCommands())
+
+  // Discover Command - Using CLICommandFactory
+  .command(CLICommandFactory.createDiscoverCommand())
 
   // Configuration Command Group - Using CLICommandFactory
   .command(CLICommandFactory.createConfigCommands())

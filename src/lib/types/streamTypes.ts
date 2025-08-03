@@ -5,27 +5,67 @@ import type {
   AnalyticsData,
   EvaluationData,
 } from "../core/types.js";
-import type { UnknownRecord, Unknown } from "./common.js";
+import type { UnknownRecord, Unknown, JsonValue } from "./common.js";
 
 /**
- * Interface for tool execution calls
+ * Interface for tool execution calls (AI SDK compatible)
  */
 export interface ToolCall {
+  type?: "tool-call";
+  toolCallId?: string;
   toolName: string; // Name of the tool being called
-  parameters: UnknownRecord; // Parameters passed to the tool
+  parameters?: UnknownRecord; // Parameters passed to the tool (NeuroLink format)
+  args?: UnknownRecord; // Arguments passed to the tool (AI SDK format)
   id?: string; // Optional unique identifier for the call
 }
 
 /**
- * Interface for tool execution results
+ * Interface for tool execution results - Enhanced for type safety
  */
 export interface ToolResult {
   toolName: string; // Name of the tool that was executed
   status: "success" | "failure"; // Execution status
-  output?: Unknown; // Output from the tool (can be refined further based on specific tools)
+  output?: JsonValue; // Output from the tool (JSON-serializable)
   error?: string; // Error message if the tool failed
   id?: string; // Optional unique identifier matching the call
   executionTime?: number; // Time taken to execute the tool in milliseconds
+  metadata?: {
+    [key: string]: JsonValue;
+  } & {
+    serverId?: string;
+    toolCategory?: string;
+    isExternal?: boolean;
+  };
+}
+
+/**
+ * Tool Call Results Array - High Reusability
+ */
+export type ToolCallResults = Array<ToolResult>;
+
+/**
+ * Tool Calls Array - High Reusability
+ */
+export type ToolCalls = Array<ToolCall>;
+
+/**
+ * Stream Analytics Data - Enhanced for performance tracking
+ */
+export interface StreamAnalyticsData {
+  /** Tool execution results with timing */
+  toolResults?: Promise<ToolCallResults>;
+  /** Tool calls made during stream */
+  toolCalls?: Promise<ToolCalls>;
+  /** Stream performance metrics */
+  performance?: {
+    startTime: number;
+    endTime?: number;
+    chunkCount: number;
+    avgChunkSize: number;
+    totalBytes: number;
+  };
+  /** Provider analytics */
+  providerAnalytics?: AnalyticsData;
 }
 
 /**
@@ -101,9 +141,9 @@ export interface StreamResult {
     fallback?: boolean;
   };
 
-  // Analytics and evaluation
-  analytics?: AnalyticsData;
-  evaluation?: EvaluationData;
+  // Analytics and evaluation (available after stream completion)
+  analytics?: AnalyticsData | Promise<AnalyticsData>;
+  evaluation?: EvaluationData | Promise<EvaluationData>;
 }
 
 /**

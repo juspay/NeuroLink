@@ -10,6 +10,7 @@ import { NeuroLink } from "../../lib/neurolink.js";
 import chalk from "chalk";
 import ora from "ora";
 
+import { logger } from "../../lib/utils/logger.js";
 // Provider configuration definitions
 export interface ProviderConfig {
   id: AIProviderName;
@@ -178,8 +179,8 @@ export async function runInteractiveSetup(
   };
 
   if (!quiet) {
-    console.log(chalk.blue("\n🎉 Welcome to NeuroLink Interactive Setup!"));
-    console.log(
+    logger.always(chalk.blue("\n🎉 Welcome to NeuroLink Interactive Setup!"));
+    logger.always(
       chalk.gray(
         "This wizard will help you configure AI providers for NeuroLink.\n",
       ),
@@ -212,7 +213,7 @@ export async function runInteractiveSetup(
 
   // Step 2: Credential Collection
   if (!quiet) {
-    console.log(
+    logger.always(
       chalk.blue("\n🔑 Collecting credentials for selected providers...\n"),
     );
   }
@@ -224,7 +225,7 @@ export async function runInteractiveSetup(
     }
 
     if (!quiet) {
-      console.log(chalk.yellow(`\n📋 Configuring ${config.name}:`));
+      logger.always(chalk.yellow(`\n📋 Configuring ${config.name}:`));
     }
 
     for (const envVar of config.envVars) {
@@ -304,7 +305,7 @@ export async function testProviderConnectivity(
   }> = [];
 
   if (!quiet) {
-    console.log(chalk.blue("\n🧪 Testing provider connectivity...\n"));
+    logger.always(chalk.blue("\n🧪 Testing provider connectivity...\n"));
   }
 
   const spinner = quiet ? null : ora().start();
@@ -327,7 +328,7 @@ export async function testProviderConnectivity(
         );
         spinner.start(); // Restart for next provider
       } else if (!quiet) {
-        console.log(
+        logger.always(
           `${provider}: ${chalk.green("✅ Working")} (${duration}ms)`,
         );
       }
@@ -342,7 +343,7 @@ export async function testProviderConnectivity(
         );
         spinner.start(); // Restart for next provider
       } else if (!quiet) {
-        console.error(
+        logger.error(
           `${provider}: ${chalk.red("❌ Failed")} - ${errorMessage.split("\n")[0]}`,
         );
       }
@@ -372,32 +373,32 @@ export function displaySetupSummary(
   ).length;
   const total = result.testResults.length;
 
-  console.log(chalk.blue("\n📊 Setup Summary:"));
-  console.log(chalk.blue("================"));
-  console.log(`Selected providers: ${result.selectedProviders.length}`);
-  console.log(`Working providers: ${working}/${total}`);
+  logger.always(chalk.blue("\n📊 Setup Summary:"));
+  logger.always(chalk.blue("================"));
+  logger.always(`Selected providers: ${result.selectedProviders.length}`);
+  logger.always(`Working providers: ${working}/${total}`);
 
   if (result.envFileBackup) {
-    console.log(chalk.gray(`Environment backup: ${result.envFileBackup}`));
+    logger.always(chalk.gray(`Environment backup: ${result.envFileBackup}`));
   }
 
   if (working > 0) {
-    console.log(chalk.green("\n✅ Setup completed successfully!"));
-    console.log(
+    logger.always(chalk.green("\n✅ Setup completed successfully!"));
+    logger.always(
       chalk.yellow(
         "💡 You can now use NeuroLink with your configured providers.",
       ),
     );
-    console.log(chalk.gray('   Try: neurolink generate "Hello, AI!"'));
+    logger.always(chalk.gray('   Try: neurolink generate "Hello, AI!"'));
   } else {
-    console.log(chalk.red("\n❌ No providers are working."));
-    console.log(
+    logger.always(chalk.red("\n❌ No providers are working."));
+    logger.always(
       chalk.yellow("💡 Please check your credentials and try again."),
     );
-    console.log(chalk.gray("   Run: neurolink config setup"));
+    logger.always(chalk.gray("   Run: neurolink config setup"));
   }
 
-  console.log(
+  logger.always(
     chalk.blue("\n📚 Documentation: https://github.com/juspay/neurolink#setup"),
   );
 }

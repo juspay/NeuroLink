@@ -45,6 +45,28 @@ export const CLI_LIMITS = {
   },
 };
 
+// Performance and System Limits
+export const SYSTEM_LIMITS = {
+  // Prompt size limits (baseProvider.ts magic number fix)
+  MAX_PROMPT_LENGTH: 1000000, // 1M characters - prevents memory issues
+
+  // Memory monitoring thresholds (performance.ts)
+  HIGH_MEMORY_THRESHOLD: 100, // MB - when to warn about memory usage
+
+  // Timeout warnings (baseProvider.ts)
+  LONG_TIMEOUT_WARNING: 300000, // 5 minutes - when to warn about long timeouts
+
+  // Concurrency control (neurolink.ts provider testing)
+  DEFAULT_CONCURRENCY_LIMIT: 3, // Max parallel provider tests
+  MAX_CONCURRENCY_LIMIT: 5, // Upper bound for concurrency
+
+  // Retry system defaults (retryHandler.ts)
+  DEFAULT_RETRY_ATTEMPTS: 3,
+  DEFAULT_INITIAL_DELAY: 1000, // 1 second
+  DEFAULT_MAX_DELAY: 30000, // 30 seconds
+  DEFAULT_BACKOFF_MULTIPLIER: 2,
+};
+
 // Environment Variable Support (for future use)
 export const ENV_DEFAULTS = {
   maxTokens: process.env.NEUROLINK_DEFAULT_MAX_TOKENS

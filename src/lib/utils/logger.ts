@@ -158,6 +158,15 @@ class NeuroLinkLogger {
   always(...args: unknown[]): void {
     console.log(...args);
   }
+
+  /**
+   * Displays tabular data unconditionally using `console.table`.
+   *
+   * @param data - The data to display in table format
+   */
+  table(data: unknown): void {
+    console.table(data);
+  }
 }
 
 // Export singleton instance
@@ -217,6 +226,9 @@ export const logger = {
   },
   always: (...args: unknown[]) => {
     neuroLinkLogger.always(...args);
+  },
+  table: (data: unknown) => {
+    neuroLinkLogger.table(data);
   },
   // Expose structured logging methods
   setLogLevel: (level: LogLevel) => neuroLinkLogger.setLogLevel(level),

@@ -10,6 +10,13 @@ node_modules
 /build
 /dist
 
+# Test Output Files
+/test-outputs/
+verification-results-*.txt
+feature-test-*.txt
+performance-test-*.txt
+test-results.json
+
 # OS
 .DS_Store
 Thumbs.db
@@ -100,3 +107,4 @@ greeting.txt
 poem.txt
 .mcp-config-test.json
 test-direct-tools-temp/
+test-directTools-temp/

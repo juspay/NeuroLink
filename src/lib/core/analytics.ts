@@ -94,7 +94,7 @@ function extractTokenUsage(result: UnknownRecord): {
   output: number;
   total: number;
 } {
-  // Handle different response formats
+  // Use properly typed usage object from BaseProvider or direct AI SDK
   if (
     result.usage &&
     typeof result.usage === "object" &&
@@ -102,58 +102,47 @@ function extractTokenUsage(result: UnknownRecord): {
   ) {
     const usage = result.usage as Record<string, unknown>;
 
-    // Standard format
+    // Try BaseProvider normalized format first (inputTokens/outputTokens)
     if (
-      typeof usage.promptTokens === "number" &&
+      typeof usage.inputTokens === "number" ||
+      typeof usage.outputTokens === "number"
+    ) {
+      const input =
+        typeof usage.inputTokens === "number" ? usage.inputTokens : 0;
+      const output =
+        typeof usage.outputTokens === "number" ? usage.outputTokens : 0;
+      const total =
+        typeof usage.totalTokens === "number"
+          ? usage.totalTokens
+          : input + output;
+      return { input, output, total };
+    }
+
+    // Try OpenAI/Mistral format (promptTokens/completionTokens)
+    if (
+      typeof usage.promptTokens === "number" ||
       typeof usage.completionTokens === "number"
     ) {
-      return {
-        input: usage.promptTokens || 0,
-        output: usage.completionTokens || 0,
-        total:
-          typeof usage.totalTokens === "number"
-            ? usage.totalTokens
-            : usage.promptTokens + usage.completionTokens,
-      };
+      const input =
+        typeof usage.promptTokens === "number" ? usage.promptTokens : 0;
+      const output =
+        typeof usage.completionTokens === "number" ? usage.completionTokens : 0;
+      const total =
+        typeof usage.totalTokens === "number"
+          ? usage.totalTokens
+          : input + output;
+      return { input, output, total };
     }
 
-    // Alternative formats
-    if (
-      typeof usage.input_tokens === "number" &&
-      typeof usage.output_tokens === "number"
-    ) {
-      return {
-        input: usage.input_tokens || 0,
-        output: usage.output_tokens || 0,
-        total:
-          typeof usage.total_tokens === "number"
-            ? usage.total_tokens
-            : usage.input_tokens + usage.output_tokens,
-      };
-    }
-
-    // Generic tokens field
-    if (typeof usage.tokens === "number") {
-      return {
-        input: 0,
-        output: 0,
-        total: usage.tokens,
-      };
+    // Handle total-only case
+    if (typeof usage.totalTokens === "number") {
+      return { input: 0, output: 0, total: usage.totalTokens };
     }
   }
 
-  // Fallback: estimate from text length
-  const textLength =
-    (typeof result.text === "string" ? result.text.length : 0) ||
-    (typeof result.content === "string" ? result.content.length : 0) ||
-    0;
-  const estimatedTokens = Math.ceil(textLength / 4); // ~4 chars per token
-
-  return {
-    input: 0,
-    output: estimatedTokens,
-    total: estimatedTokens,
-  };
+  // Fallback for edge cases
+  logger.debug("Token extraction failed: unknown usage format", { result });
+  return { input: 0, output: 0, total: 0 };
 }
 
 /**

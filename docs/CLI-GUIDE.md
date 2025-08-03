@@ -81,12 +81,17 @@ npx @juspay/neurolink gen "Analyze this problem" --provider google-ai --model ge
 
 - `--provider <name>` - Choose specific provider or 'auto' (default: auto)
 - `--temperature <number>` - Creativity level 0.0-1.0 (default: 0.7)
-- `--max-tokens <number>` - Maximum tokens to generate (default: 1000)
+- `--maxTokens <number>` - Maximum tokens to generate (default: 1000)
 - `--system <text>` - System prompt to guide AI behavior
-- `--format <type>` - Output format: 'text' or 'json' (default: text)
+- `--format <type>` - Output format: 'text', 'json', or 'table' (default: text)
 - `--debug` - Enable debug mode with verbose output and metadata
-- `--timeout <duration>` - Request timeout (default: 30s). Accepts: '30s', '2m', '5000' (ms), '1h'
+- `--timeout <number>` - Request timeout in seconds (default: 120)
 - `--quiet` - Suppress spinners and progress indicators
+- `--enableAnalytics` - Enable usage analytics collection (Phase 3 feature)
+- `--enableEvaluation` - Enable AI response quality evaluation (Phase 3 feature)
+- `--evaluationDomain <text>` - Domain expertise for evaluation context (e.g., "Senior Software Architect")
+- `--context <json>` - JSON context object for custom data (e.g., '{"userId":"123","project":"api-design"}')
+- `--disableTools` - Disable MCP tool integration (tools enabled by default)
 
 **Output Example:**
 
@@ -117,6 +122,45 @@ Quantum computing represents a revolutionary approach to information processing.
 ℹ️  142 tokens used
 ```
 
+### 🆕 Phase 3 Enhanced Features Examples
+
+```bash
+# Analytics Collection (Phase 3.1 Complete)
+npx @juspay/neurolink generate "Explain machine learning" --enableAnalytics --debug
+
+# Response Quality Evaluation (Phase 3.1 Complete)
+npx @juspay/neurolink generate "Write Python code for prime numbers" --enableEvaluation --debug
+
+# Combined Analytics + Evaluation
+npx @juspay/neurolink generate "Design a REST API" --enableAnalytics --enableEvaluation --debug
+
+# Domain-specific Evaluation Context
+npx @juspay/neurolink generate "Debug this code issue" --enableEvaluation --evaluationDomain "Senior Software Engineer" --debug
+
+# Custom Context for Analytics
+npx @juspay/neurolink generate "Help with project" --context '{"userId":"123","project":"AI-platform"}' --enableAnalytics --debug
+```
+
+**Phase 3 Analytics Output Example:**
+
+```
+📊 Analytics:
+   Provider: google-ai
+   Tokens: 434 input + 127 output = 561 total
+   Cost: $0.00042
+   Time: 1.2s
+   Tools: getCurrentTime, writeFile
+
+📊 Response Evaluation:
+   Relevance: 10/10
+   Accuracy: 9/10
+   Completeness: 9/10
+   Overall: 9/10
+   Reasoning: Response directly addresses the request with accurate code implementation.
+             Includes comprehensive examples and error handling. Minor improvement
+             could be adding more edge case documentation.
+```
+
 ### `stream <prompt>` - Real-time Streaming
 
 Stream AI generation in real-time with optional agent support.
@@ -132,7 +176,7 @@ npx @juspay/neurolink stream "Tell me a story" --provider openai
 npx @juspay/neurolink stream "What time is it?" --provider google-ai
 
 # Without tools (traditional text-only mode)
-npx @juspay/neurolink stream "Tell me a story" --disable-tools
+npx @juspay/neurolink stream "Tell me a story" --disableTools
 
 # Debug mode with tool execution logging
 npx @juspay/neurolink stream "What time is it?" --debug
@@ -140,8 +184,11 @@ npx @juspay/neurolink stream "What time is it?" --debug
 # Temperature control for creative streaming
 npx @juspay/neurolink stream "Write a poem" --temperature 0.9
 
+# Real Streaming with Analytics (Phase 3.2B Complete)
+npx @juspay/neurolink stream "Explain quantum computing" --enableAnalytics --enableEvaluation --debug
+
 # With custom timeout for long streaming operations
-npx @juspay/neurolink stream "Write a long story" --timeout 5m
+npx @juspay/neurolink stream "Write a long story" --timeout 120
 
 # Quiet mode with timeout
 npx @juspay/neurolink stream "Hello world" --quiet --timeout 10s
@@ -1057,6 +1104,76 @@ npx @juspay/neurolink status
 - ⚙️ **Complex Logic**: Custom provider fallback, error handling
 - 🎨 **UI Integration**: React components, Svelte stores
 - 📈 **Production Applications**: Full-featured applications
+
+## ⭐ Phase 3 Enhanced Features
+
+### Advanced Analytics and Evaluation
+
+**Multi-Domain Evaluation Strategy:**
+
+```bash
+# Technical Documentation Evaluation
+npx @juspay/neurolink generate "Explain microservices architecture" \
+  --enableEvaluation \
+  --evaluationDomain "Senior Software Architect" \
+  --debug
+
+# Creative Content Evaluation
+npx @juspay/neurolink generate "Write marketing copy for AI product" \
+  --enableEvaluation \
+  --evaluationDomain "Senior Marketing Manager" \
+  --debug
+```
+
+**Context-Aware Analytics:**
+
+```bash
+# User Session Context
+npx @juspay/neurolink generate "Help with API design" \
+  --enableAnalytics \
+  --context '{"userId":"user123","session":"sess456","project":"ecommerce"}' \
+  --debug
+
+# Business Context with Evaluation
+npx @juspay/neurolink generate "Market analysis for AI products" \
+  --enableAnalytics \
+  --enableEvaluation \
+  --evaluationDomain "Business Strategy Consultant" \
+  --context '{"company":"TechCorp","department":"strategy","quarter":"Q4-2025"}' \
+  --debug
+```
+
+### Real Streaming with Analytics
+
+**Enterprise streaming with full monitoring:**
+
+```bash
+# Production streaming with all features
+npx @juspay/neurolink stream "Generate comprehensive project documentation" \
+  --provider google-ai \
+  --model gemini-2.5-pro \
+  --enableAnalytics \
+  --enableEvaluation \
+  --evaluationDomain "Senior Technical Writer" \
+  --context '{"project":"enterprise-api","team":"platform"}' \
+  --temperature 0.7 \
+  --maxTokens 3000 \
+  --timeout 180 \
+  --debug
+```
+
+### Performance Optimization (68% Faster Provider Checks)
+
+```bash
+# Fast provider status (5s instead of 16s)
+time npx @juspay/neurolink provider status
+
+# Best provider selection
+npx @juspay/neurolink get-best-provider
+
+# Auto-selection with performance priority
+npx @juspay/neurolink generate "Performance critical task" --provider auto
+```
 
 ## 🎬 CLI Video Demonstrations
 

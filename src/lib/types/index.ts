@@ -50,7 +50,39 @@ export type {
 export type {
   BaseCommandArgs,
   GenerateCommandArgs,
+  MCPCommandArgs,
+  ModelsCommandArgs,
   CommandResult,
   GenerateResult,
   StreamChunk,
 } from "./cli.js";
+
+// MCP domain types
+export type {
+  MCPTransportType,
+  MCPServerStatus,
+  MCPDiscoveredServer,
+  MCPConnectedServer,
+  MCPServerConfig,
+  MCPToolInfo,
+  MCPServerMetadata,
+  MCPToolMetadata,
+  MCPServerRegistryEntry,
+} from "./mcpTypes.js";
+
+// Model/Provider domain types
+export type {
+  ModelCapability,
+  ModelUseCase,
+  ModelFilter,
+  ModelResolutionContext,
+  ModelStats,
+  ModelPricing,
+} from "./providers.js";
+
+// Stream/Tool domain types
+export type {
+  ToolCallResults,
+  ToolCalls,
+  StreamAnalyticsData,
+} from "./streamTypes.js";

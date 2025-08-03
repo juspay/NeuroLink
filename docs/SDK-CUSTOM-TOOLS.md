@@ -53,42 +53,48 @@ const result = await neurolink.generate({
 ## ⚠️ Common Mistakes
 
 ### ❌ Using `schema` instead of `parameters`
+
 ```typescript
 // WRONG - will throw validation error
 neurolink.registerTool("badTool", {
   description: "This will fail",
-  schema: {  // ❌ Should be 'parameters'
-    type: 'object',
-    properties: { value: { type: 'string' } }
+  schema: {
+    // ❌ Should be 'parameters'
+    type: "object",
+    properties: { value: { type: "string" } },
   },
-  execute: async (args) => args
+  execute: async (args) => args,
 });
 ```
 
 ### ❌ Using plain JSON schema as `parameters`
+
 ```typescript
-// WRONG - will throw validation error  
+// WRONG - will throw validation error
 neurolink.registerTool("badTool", {
   description: "This will also fail",
-  parameters: {  // ❌ Should be Zod schema
-    type: 'object', 
-    properties: { value: { type: 'string' } }
+  parameters: {
+    // ❌ Should be Zod schema
+    type: "object",
+    properties: { value: { type: "string" } },
   },
-  execute: async (args) => args
+  execute: async (args) => args,
 });
 ```
 
 ### ✅ Correct Zod Schema Format
+
 ```typescript
 // CORRECT - works perfectly
-import { z } from 'zod';
+import { z } from "zod";
 
 neurolink.registerTool("goodTool", {
-  description: "This works correctly", 
-  parameters: z.object({  // ✅ Zod schema
-    value: z.string()
+  description: "This works correctly",
+  parameters: z.object({
+    // ✅ Zod schema
+    value: z.string(),
   }),
-  execute: async (args) => args
+  execute: async (args) => args,
 });
 ```
 
