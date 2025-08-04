@@ -21,6 +21,7 @@ import {
   createAnthropicConfig,
   getProviderModel,
 } from "../utils/providerConfig.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Configuration helpers - now using consolidated utility
 const getAnthropicApiKey = (): string => {
@@ -131,10 +132,12 @@ export class AnthropicProvider extends BaseProvider {
     );
 
     try {
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const result = await streamText({
         model: this.model,
-        prompt: options.input.text,
-        system: options.systemPrompt || undefined,
+        messages: messages,  
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         abortSignal: timeoutController?.controller.signal,

@@ -23,6 +23,7 @@ import {
   getProviderModel,
   hasHuggingFaceCredentials,
 } from "../utils/providerConfig.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Environment variables
 declare const process: {
@@ -126,10 +127,12 @@ export class HuggingFaceProvider extends BaseProvider {
     );
 
     try {
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const result = await streamText({
         model: this.model,
-        prompt: options.input.text,
-        system: options.systemPrompt,
+        messages: messages,  
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         tools: options.tools,

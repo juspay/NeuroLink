@@ -1,3 +1,10 @@
+## [7.3.5](https://github.com/juspay/neurolink/compare/v7.3.4...v7.3.5) (2025-08-04)
+
+
+### Bug Fixes
+
+* **docs:** force fresh deployment after GitHub Pages source change to GitHub Actions ([b4b498f](https://github.com/juspay/neurolink/commit/b4b498f436986e6c017b1552af218837ad9b510e))
+
 ## [7.3.4](https://github.com/juspay/neurolink/compare/v7.3.3...v7.3.4) (2025-08-04)
 
 

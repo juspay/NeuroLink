@@ -41,6 +41,13 @@ import {
 import type { InMemoryMCPServerConfig } from "./types/mcpTypes.js";
 import type { JsonValue, UnknownRecord } from "./types/common.js";
 import type { ToolArgs } from "./types/tools.js";
+import type { ConversationMemoryConfig } from "./types/conversationTypes.js";
+import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
+import {
+  applyConversationMemoryDefaults,
+  getConversationMessages,
+  storeConversationTurn,
+} from "./utils/conversationMemoryUtils.js";
 
 // Provider and MCP diagnostic types
 export interface ProviderStatus {
@@ -84,11 +91,28 @@ export class NeuroLink {
   private customTools: Map<string, SimpleTool> = new Map();
   private inMemoryServers: Map<string, InMemoryMCPServerConfig> = new Map();
 
-  constructor() {
+  // Conversation memory support
+  private conversationMemory?: ConversationMemoryManager;
+
+  constructor(config?: {
+    conversationMemory?: Partial<ConversationMemoryConfig>;
+  }) {
     // SDK always disables manual MCP config for security
     ProviderRegistry.setOptions({
       enableManualMCP: false,
     });
+
+    // Initialize conversation memory if enabled
+    if (config?.conversationMemory?.enabled) {
+      const memoryConfig = applyConversationMemoryDefaults(
+        config.conversationMemory,
+      );
+      this.conversationMemory = new ConversationMemoryManager(memoryConfig);
+      logger.info("NeuroLink initialized with conversation memory", {
+        maxSessions: memoryConfig.maxSessions,
+        maxTurnsPerSession: memoryConfig.maxTurnsPerSession
+      });
+    }
   }
 
   /**
@@ -264,9 +288,11 @@ export class NeuroLink {
    * REDESIGNED INTERNAL GENERATION - NO CIRCULAR DEPENDENCIES
    *
    * This method implements a clean fallback chain:
-   * 1. Try MCP-enhanced generation if available
-   * 2. Fall back to direct provider generation
-   * 3. No recursive calls - each method has a specific purpose
+   * 1. Initialize conversation memory if enabled
+   * 2. Inject conversation history into prompt
+   * 3. Try MCP-enhanced generation if available
+   * 4. Fall back to direct provider generation
+   * 5. Store conversation turn for future context
    */
   private async generateTextInternal(
     options: TextGenerationOptions,
@@ -277,15 +303,29 @@ export class NeuroLink {
     logger.debug(`[${functionTag}] Starting generation`, {
       provider: options.provider || "auto",
       promptLength: options.prompt?.length || 0,
+      hasConversationMemory: !!this.conversationMemory,
     });
 
     try {
-      // Try MCP-enhanced generation first (if not explicitly disabled)
+      // Initialize conversation memory if enabled
+      if (this.conversationMemory) {
+        await this.conversationMemory.initialize();
+      }
+
+      // Try MCP-enhanced generation first (if not explicitly disabled)  
       if (!options.disableTools) {
         try {
           const mcpResult = await this.tryMCPGeneration(options);
           if (mcpResult && mcpResult.content) {
             logger.debug(`[${functionTag}] MCP generation successful`);
+
+            // Store conversation turn
+            await storeConversationTurn(
+              this.conversationMemory,
+              options,
+              mcpResult,
+            );
+
             return mcpResult;
           }
         } catch (error) {
@@ -298,6 +338,14 @@ export class NeuroLink {
       // Fall back to direct provider generation
       const directResult = await this.directProviderGeneration(options);
       logger.debug(`[${functionTag}] Direct generation successful`);
+
+      // Store conversation turn
+      await storeConversationTurn(
+        this.conversationMemory,
+        options,
+        directResult,
+      );
+
       return directResult;
     } catch (error) {
       logger.error(`[${functionTag}] All generation methods failed`, {
@@ -359,6 +407,12 @@ export class NeuroLink {
         availableTools,
       );
 
+      // Get conversation messages for context
+      const conversationMessages = await getConversationMessages(
+        this.conversationMemory,
+        options,
+      );
+
       // Create provider and generate
       const provider = await AIProviderFactory.createProvider(
         providerName as AIProviderName,
@@ -370,6 +424,7 @@ export class NeuroLink {
       const result = await provider.generate({
         ...options,
         systemPrompt: enhancedSystemPrompt,
+        conversationMessages, // Inject conversation history
       });
 
       const responseTime = Date.now() - startTime; // 🔧 FIX: Proper timing calculation
@@ -442,6 +497,12 @@ export class NeuroLink {
       try {
         logger.debug(`[${functionTag}] Attempting provider: ${providerName}`);
 
+        // Get conversation messages for context
+        const conversationMessages = await getConversationMessages(
+          this.conversationMemory,
+          options,
+        );
+
         const provider = await AIProviderFactory.createProvider(
           providerName as AIProviderName,
           options.model,
@@ -449,7 +510,10 @@ export class NeuroLink {
           this as unknown as UnknownRecord, // Pass SDK instance
         );
 
-        const result = await provider.generate(options);
+        const result = await provider.generate({
+          ...options,
+          conversationMessages, // Inject conversation history
+        });
         const responseTime = Date.now() - startTime;
 
         if (!result) {
@@ -963,6 +1027,7 @@ export class NeuroLink {
       "huggingface",
       "ollama",
       "mistral",
+      "litellm",
     ] as const;
 
     // 🚀 PERFORMANCE FIX: Test providers with controlled concurrency
@@ -1221,6 +1286,43 @@ export class NeuroLink {
   async testMCPServer(serverId: string): Promise<boolean> {
     // Simplified MCP server testing - unified registry removed
     return false; // No auto-discovery servers available
+  }
+
+  // ============================================================================
+  // CONVERSATION MEMORY PUBLIC API
+  // ============================================================================
+
+  /**
+   * Get conversation memory statistics (public API)
+   */
+  async getConversationStats() {
+    if (!this.conversationMemory) {
+      throw new Error("Conversation memory is not enabled");
+    }
+
+    return await this.conversationMemory.getStats();
+  }
+
+  /**
+   * Clear conversation history for a specific session (public API)
+   */
+  async clearConversationSession(sessionId: string): Promise<boolean> {
+    if (!this.conversationMemory) {
+      throw new Error("Conversation memory is not enabled");
+    }
+
+    return await this.conversationMemory.clearSession(sessionId);
+  }
+
+  /**
+   * Clear all conversation history (public API)
+   */
+  async clearAllConversations(): Promise<void> {
+    if (!this.conversationMemory) {
+      throw new Error("Conversation memory is not enabled");
+    }
+
+    await this.conversationMemory.clearAllSessions();
   }
 }
 
