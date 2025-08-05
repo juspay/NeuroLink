@@ -7,9 +7,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Help & Overview
 
 ![CLI Help Command](../assets/images/cli-help-demo.png)
-*Comprehensive CLI help showing all available commands and options*
+_Comprehensive CLI help showing all available commands and options_
 
 **Key Features Shown:**
+
 - Complete command reference
 - Option descriptions and usage patterns
 - Examples for each command
@@ -18,9 +19,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Provider Status & Connectivity
 
 ![Provider Status](../assets/images/provider-status.png)
-*Real-time provider status showing connectivity and response times*
+_Real-time provider status showing connectivity and response times_
 
 **Features Demonstrated:**
+
 - Multi-provider health monitoring
 - Response time measurements
 - Error detection and reporting
@@ -29,9 +31,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Text Generation Examples
 
 ![Text Generation](../assets/images/text-generation.png)
-*Live text generation with multiple providers and analytics*
+_Live text generation with multiple providers and analytics_
 
 **Capabilities Shown:**
+
 - Real-time AI content generation
 - Provider comparison
 - Analytics tracking
@@ -42,9 +45,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Performance Dashboard
 
 ![Monitoring Analytics](../assets/images/monitoring-analytics.png)
-*Advanced analytics dashboard showing usage patterns and performance metrics*
+_Advanced analytics dashboard showing usage patterns and performance metrics_
 
 **Analytics Features:**
+
 - Usage trends and patterns
 - Cost analysis and optimization
 - Provider performance comparison
@@ -53,9 +57,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### MCP Tools Integration
 
 ![MCP Tools](../assets/images/mcp-tools.png)
-*Model Context Protocol tools discovery and integration*
+_Model Context Protocol tools discovery and integration_
 
 **MCP Capabilities:**
+
 - Automatic server discovery
 - Tool inventory management
 - Integration with popular AI development environments
@@ -66,9 +71,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Business Applications
 
 ![Business Use Cases](../assets/images/business-use-cases.png)
-*Enterprise applications across different business functions*
+_Enterprise applications across different business functions_
 
 **Business Scenarios:**
+
 - Strategic planning assistance
 - Financial analysis and reporting
 - Marketing content generation
@@ -77,9 +83,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Developer Tools
 
 ![Developer Tools](../assets/images/developer-tools.png)
-*Development workflow integration and code assistance*
+_Development workflow integration and code assistance_
 
 **Developer Features:**
+
 - Code generation and review
 - Documentation automation
 - API integration examples
@@ -88,9 +95,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 ### Creative Applications
 
 ![Creative Tools](../assets/images/creative-tools.png)
-*Creative content generation and design assistance*
+_Creative content generation and design assistance_
 
 **Creative Capabilities:**
+
 - Content creation workflows
 - Design brief generation
 - Marketing material development
@@ -105,7 +113,7 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 npx @juspay/neurolink status
 ```
 
-*Shows the step-by-step process of configuring API keys and validating provider connections*
+_Shows the step-by-step process of configuring API keys and validating provider connections_
 
 ### Multi-Provider Setup
 
@@ -115,16 +123,17 @@ npx @juspay/neurolink provider list
 npx @juspay/neurolink provider configure openai
 ```
 
-*Demonstrates configuring multiple AI providers and managing their settings*
+_Demonstrates configuring multiple AI providers and managing their settings_
 
 ## 📱 Web Interface Screenshots
 
 ### Main Dashboard
 
 ![Web Demo Overview](../assets/images/web-demo-overview.png)
-*Web interface showing the main dashboard with navigation and features*
+_Web interface showing the main dashboard with navigation and features_
 
 **Web Interface Features:**
+
 - Intuitive navigation design
 - Real-time provider status
 - Usage analytics visualization
@@ -133,6 +142,7 @@ npx @juspay/neurolink provider configure openai
 ### Interactive Generation
 
 Screenshots showing the web interface for:
+
 - Real-time text generation
 - Provider selection and comparison
 - Analytics visualization
@@ -143,11 +153,13 @@ Screenshots showing the web interface for:
 ### CLI Workflow Examples
 
 1. **Quick Start Workflow**
+
    - Initial setup and configuration
    - First generation command
    - Provider status verification
 
 2. **Batch Processing**
+
    - Multiple prompt processing
    - Performance comparison
    - Results compilation
@@ -160,11 +172,13 @@ Screenshots showing the web interface for:
 ### Integration Screenshots
 
 1. **VS Code Integration**
+
    - Extension interface
    - Code generation in editor
    - MCP server discovery
 
 2. **Terminal Workflows**
+
    - Command completion
    - Real-time streaming
    - Error handling examples
@@ -179,6 +193,7 @@ Screenshots showing the web interface for:
 ### Speed Comparisons
 
 Screenshots showing:
+
 - Response time comparisons across providers
 - Throughput measurements
 - Scalability demonstrations
@@ -187,6 +202,7 @@ Screenshots showing:
 ### Quality Metrics
 
 Visual examples of:
+
 - Evaluation scores across different domains
 - Quality improvement over time
 - A/B testing results
@@ -197,6 +213,7 @@ Visual examples of:
 ### Security & Compliance
 
 Screenshots demonstrating:
+
 - Secure API key management
 - Audit logging capabilities
 - Compliance reporting
@@ -205,6 +222,7 @@ Screenshots demonstrating:
 ### Scalability & Reliability
 
 Visual proof of:
+
 - High-availability setup
 - Load balancing configuration
 - Failover mechanisms
@@ -215,6 +233,7 @@ Visual proof of:
 ### Architecture Diagrams
 
 Visual representations of:
+
 - System architecture
 - Integration patterns
 - Data flow diagrams
@@ -223,6 +242,7 @@ Visual representations of:
 ### API Documentation
 
 Screenshots showing:
+
 - Interactive API explorer
 - Code examples in multiple languages
 - Response format demonstrations
@@ -233,6 +253,7 @@ Screenshots showing:
 ### Before/After Improvements
 
 Side-by-side comparisons showing:
+
 - Performance optimizations
 - User experience enhancements
 - Feature additions
@@ -241,6 +262,7 @@ Side-by-side comparisons showing:
 ### Competitive Analysis
 
 Visual comparisons with:
+
 - Feature completeness
 - Performance benchmarks
 - Ease of use metrics
@@ -251,6 +273,7 @@ Visual comparisons with:
 ### Mobile Interface
 
 Screenshots of:
+
 - Responsive web design
 - Mobile-optimized workflows
 - Touch-friendly interfaces
@@ -259,6 +282,7 @@ Screenshots of:
 ### Cross-Platform Compatibility
 
 Demonstrations across:
+
 - Different operating systems
 - Various browsers
 - Mobile devices
@@ -269,6 +293,7 @@ Demonstrations across:
 ### Design System
 
 Screenshots showcasing:
+
 - Material Design implementation
 - Dark/light mode support
 - Accessibility features
@@ -277,6 +302,7 @@ Screenshots showcasing:
 ### User Experience
 
 Examples of:
+
 - Intuitive navigation flows
 - Error state handling
 - Loading state animations
@@ -287,6 +313,7 @@ Examples of:
 ### Usage Dashboard
 
 Detailed views of:
+
 - Real-time usage metrics
 - Historical trend analysis
 - Cost optimization insights
@@ -295,6 +322,7 @@ Detailed views of:
 ### Reporting Interface
 
 Screenshots of:
+
 - Automated report generation
 - Custom dashboard creation
 - Data export capabilities
@@ -305,6 +333,7 @@ Screenshots of:
 ### Test Results
 
 Visual evidence of:
+
 - Automated testing pipelines
 - Quality gate implementations
 - Performance test results
@@ -313,6 +342,7 @@ Visual evidence of:
 ### Monitoring Dashboard
 
 Screenshots showing:
+
 - Real-time system monitoring
 - Alert management
 - Performance metrics
@@ -320,7 +350,7 @@ Screenshots showing:
 
 ---
 
-*All screenshots are captured from live NeuroLink implementations and demonstrate real functionality. Images are optimized for documentation viewing and include detailed captions explaining the features shown.*
+_All screenshots are captured from live NeuroLink implementations and demonstrate real functionality. Images are optimized for documentation viewing and include detailed captions explaining the features shown._
 
 ## 📚 Related Visual Content
 

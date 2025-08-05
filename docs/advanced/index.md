@@ -16,35 +16,35 @@ NeuroLink goes beyond simple API wrappers to provide a comprehensive AI developm
 
 <div class="grid cards" markdown>
 
--   :material-connection: **[MCP Integration](mcp-integration.md)**
+- :material-connection: **[MCP Integration](mcp-integration.md)**
 
-    ---
+  ***
 
-    Model Context Protocol support with 6 built-in tools and 58+ discoverable external servers.
+  Model Context Protocol support with 6 built-in tools and 58+ discoverable external servers.
 
--   :material-chart-line: **[Analytics & Evaluation](analytics.md)**
+- :material-chart-line: **[Analytics & Evaluation](analytics.md)**
 
-    ---
+  ***
 
-    Built-in usage tracking, cost monitoring, performance metrics, and AI response quality evaluation.
+  Built-in usage tracking, cost monitoring, performance metrics, and AI response quality evaluation.
 
--   :material-factory: **[Factory Patterns](factory-patterns.md)**
+- :material-factory: **[Factory Patterns](factory-patterns.md)**
 
-    ---
+  ***
 
-    Unified provider architecture using the Factory Pattern for consistent interfaces and easy extensibility.
+  Unified provider architecture using the Factory Pattern for consistent interfaces and easy extensibility.
 
--   :material-refresh: **[Dynamic Models](dynamic-models.md)**
+- :material-refresh: **[Dynamic Models](dynamic-models.md)**
 
-    ---
+  ***
 
-    Self-updating model configurations, automatic cost optimization, and smart model resolution.
+  Self-updating model configurations, automatic cost optimization, and smart model resolution.
 
--   :material-wave: **[Streaming](streaming.md)**
+- :material-wave: **[Streaming](streaming.md)**
 
-    ---
+  ***
 
-    Real-time streaming architecture with analytics support and multi-modal readiness.
+  Real-time streaming architecture with analytics support and multi-modal readiness.
 
 </div>
 
@@ -58,7 +58,7 @@ class OpenAIProvider extends BaseProvider {
   protected getProviderName(): AIProviderName {
     return "openai";
   }
-  
+
   protected async getAISDKModel(): Promise<LanguageModel> {
     return openai(this.modelName);
   }
@@ -66,7 +66,9 @@ class OpenAIProvider extends BaseProvider {
 
 // Unified interface across all providers
 const provider = createBestAIProvider();
-const result = await provider.generate({ /* options */ });
+const result = await provider.generate({
+  /* options */
+});
 ```
 
 ### Built-in Tool System
@@ -134,9 +136,9 @@ console.log(result.analytics);
     ```typescript
     // Automated content pipeline with analytics
     const pipeline = new NeuroLink({ enableAnalytics: true });
-    
+
     const articles = await Promise.all(
-      topics.map(topic => 
+      topics.map(topic =>
         pipeline.generate({
           input: { text: `Write article about ${topic}` },
           maxTokens: 2000,
@@ -144,9 +146,9 @@ console.log(result.analytics);
         })
       )
     );
-    
+
     // Analyze costs and performance
-    const totalCost = articles.reduce((sum, article) => 
+    const totalCost = articles.reduce((sum, article) =>
       sum + (article.analytics?.cost || 0), 0
     );
     ```
@@ -156,14 +158,14 @@ console.log(result.analytics);
     ```typescript
     // Future-ready streaming with multi-modal support
     const stream = await neurolink.stream({
-      input: { 
+      input: {
         text: "Analyze this data",
         // Future: image, audio, video inputs
       },
       enableAnalytics: true,
       enableEvaluation: true,
     });
-    
+
     for await (const chunk of stream.stream) {
       // Real-time processing with tool calls
       if (chunk.toolCall) {
@@ -180,18 +182,18 @@ console.log(result.analytics);
     const result = await neurolink.generate({
       input: { text: prompt },
       enableAnalytics: true,
-      context: { 
+      context: {
         userId,
         sessionId,
-        environment: process.env.NODE_ENV 
+        environment: process.env.NODE_ENV
       },
     });
-    
+
     // Custom monitoring integration
     if (result.analytics.responseTime > 5000) {
       logger.warn(`Slow AI response: ${result.analytics.responseTime}ms`);
     }
-    
+
     if (result.analytics.cost > 0.10) {
       logger.warn(`High cost request: $${result.analytics.cost}`);
     }

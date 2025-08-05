@@ -204,6 +204,8 @@ export default [
       "*.tgz",
       "*.d.ts",
       "src/cli/**/*.d.ts",
+      // Exclude built documentation site
+      "site/**",
       // Exclude analysis files with Node.js environment issues
       "comprehensive-gap-analysis.cjs",
       "test-feature-gaps.cjs",

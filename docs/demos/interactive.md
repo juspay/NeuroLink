@@ -16,6 +16,7 @@ Experience NeuroLink's capabilities without any installation:
 - **MCP Integration**: Explore tool capabilities
 
 **Demo Features:**
+
 - ✅ No registration required
 - ✅ Free usage limits
 - ✅ Real provider responses
@@ -28,11 +29,13 @@ Experience NeuroLink's capabilities without any installation:
 Step-by-step interactive tutorial covering:
 
 1. **Basic Text Generation**
+
    - Simple prompt input
    - Provider selection
    - Response analysis
 
 2. **Advanced Features**
+
    - Analytics tracking
    - Quality evaluation
    - Streaming responses
@@ -59,6 +62,7 @@ neurolink gen "Explain quantum computing" --provider google-ai
 ```
 
 **Features:**
+
 - Real command execution
 - Syntax highlighting
 - Auto-completion
@@ -92,13 +96,14 @@ const neurolink = new NeuroLink();
 
 const result = await neurolink.generate({
   input: { text: "Your prompt here" },
-  provider: "google-ai"
+  provider: "google-ai",
 });
 
 console.log(result.content);
 ```
 
 **Playground Features:**
+
 - Live code execution
 - Multiple language support
 - Real API responses
@@ -112,11 +117,13 @@ console.log(result.content);
 Interactive business use cases:
 
 1. **Executive Dashboard**
+
    - Strategic analysis
    - Performance reporting
    - Decision support
 
 2. **Marketing Workflows**
+
    - Content creation
    - Campaign analysis
    - SEO optimization
@@ -190,6 +197,7 @@ Interactive development workflow:
 - Testing assistance
 
 Try these scenarios:
+
 - Generate a REST API endpoint
 - Create unit tests
 - Write technical documentation
@@ -207,6 +215,7 @@ Content creation workflow:
 - SEO optimization
 
 Interactive features:
+
 - Brand voice customization
 - Target audience selection
 - Content performance prediction
@@ -224,6 +233,7 @@ Business analysis capabilities:
 - Decision support
 
 Sample datasets:
+
 - Sales performance data
 - Customer behavior metrics
 - Market research findings
@@ -243,6 +253,7 @@ Compare providers in real-time:
 - Cost analysis
 
 **Test Scenarios:**
+
 - Creative writing tasks
 - Technical documentation
 - Code generation
@@ -268,11 +279,13 @@ Interactive feature comparison:
 Progressive learning experience:
 
 1. **Beginner Level**
+
    - Basic concepts
    - Simple examples
    - Guided exercises
 
 2. **Intermediate Level**
+
    - Advanced features
    - Integration patterns
    - Best practices
@@ -318,9 +331,9 @@ const neurolink = new NeuroLink();
 
 // Try different configurations
 const config = {
-  provider: 'google-ai',
+  provider: "google-ai",
   temperature: 0.7,
-  maxTokens: 1000
+  maxTokens: 1000,
 };
 
 // Execute and see results immediately
@@ -451,11 +464,13 @@ Collaborative development:
 ### Getting Started
 
 1. **Choose Your Path**
+
    - Quick demo (5 minutes)
    - Full tutorial (30 minutes)
    - Specific use case
 
 2. **No Setup Required**
+
    - Browser-based execution
    - Pre-configured examples
    - Sample data provided
@@ -490,7 +505,7 @@ Collaborative development:
 
 ---
 
-*All interactive demos run in your browser without installation. No personal data is collected, and usage is limited to prevent abuse while providing full functionality.*
+_All interactive demos run in your browser without installation. No personal data is collected, and usage is limited to prevent abuse while providing full functionality._
 
 ## 📚 Related Resources
 

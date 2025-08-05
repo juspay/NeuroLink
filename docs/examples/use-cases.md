@@ -13,53 +13,58 @@ import { NeuroLink } from "@juspay/neurolink";
 
 class DeveloperAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
-  async generateCode(requirement: string, language: string, framework?: string) {
+
+  async generateCode(
+    requirement: string,
+    language: string,
+    framework?: string,
+  ) {
     const prompt = `Generate ${language} code for: ${requirement}
-                   ${framework ? `Using ${framework} framework` : ''}
+                   ${framework ? `Using ${framework} framework` : ""}
                    Include error handling, comments, and tests.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic", // Claude excels at code generation
-      temperature: 0.3
+      temperature: 0.3,
     });
   }
-  
+
   async reviewCode(code: string, focusAreas: string[] = []) {
-    const areas = focusAreas.length > 0 
-      ? focusAreas.join(", ") 
-      : "security, performance, maintainability, best practices";
-    
+    const areas =
+      focusAreas.length > 0
+        ? focusAreas.join(", ")
+        : "security, performance, maintainability, best practices";
+
     const prompt = `Review this code focusing on: ${areas}
                    
                    Code:
                    ${code}
                    
                    Provide specific feedback and suggestions.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
-      temperature: 0.4
+      temperature: 0.4,
     });
   }
-  
+
   async explainCode(code: string, audience: string = "developer") {
     const prompt = `Explain this code for a ${audience}:
                    
                    ${code}
                    
                    Make it clear and educational.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
-      temperature: 0.6
+      temperature: 0.6,
     });
   }
 }
@@ -71,14 +76,20 @@ const assistant = new DeveloperAssistant();
 const apiCode = await assistant.generateCode(
   "REST API endpoint for user authentication with JWT tokens",
   "TypeScript",
-  "Express.js"
+  "Express.js",
 );
 
 // Review existing code
-const review = await assistant.reviewCode(legacyCode, ["security", "performance"]);
+const review = await assistant.reviewCode(legacyCode, [
+  "security",
+  "performance",
+]);
 
 // Explain complex algorithm
-const explanation = await assistant.explainCode(complexAlgorithm, "junior developer");
+const explanation = await assistant.explainCode(
+  complexAlgorithm,
+  "junior developer",
+);
 ```
 
 ### Documentation Generation
@@ -115,11 +126,11 @@ Include: service boundaries, data flow, deployment strategy, monitoring.
 ```typescript
 class ContentCreator {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async createBlogPost(topic: string, audience: string, seoKeywords: string[]) {
     const prompt = `Write a comprehensive blog post about "${topic}" for ${audience}.
                    
@@ -129,55 +140,57 @@ class ContentCreator {
                    - 800-1200 words
                    - Actionable insights
                    - Call-to-action at the end`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
       temperature: 0.8,
-      maxTokens: 1500
+      maxTokens: 1500,
     });
   }
-  
+
   async createSocialMediaContent(topic: string, platforms: string[]) {
     const content = {};
-    
+
     for (const platform of platforms) {
       const prompt = `Create engaging ${platform} content about "${topic}".
                      ${this.getPlatformGuidelines(platform)}`;
-      
+
       const result = await this.neurolink.generate({
         input: { text: prompt },
         provider: "openai",
-        temperature: 0.9
+        temperature: 0.9,
       });
-      
+
       content[platform] = result.content;
     }
-    
+
     return content;
   }
-  
+
   private getPlatformGuidelines(platform: string): string {
     const guidelines = {
       twitter: "Max 280 characters, include relevant hashtags, engaging hook",
       linkedin: "Professional tone, 1-3 paragraphs, call for engagement",
       instagram: "Visual-focused caption, emojis, relevant hashtags",
-      facebook: "Conversational tone, encourage comments and shares"
+      facebook: "Conversational tone, encourage comments and shares",
     };
-    
-    return guidelines[platform.toLowerCase()] || "Follow platform best practices";
+
+    return (
+      guidelines[platform.toLowerCase()] || "Follow platform best practices"
+    );
   }
-  
+
   async improveContent(content: string, improvements: string[]) {
     const prompt = `Improve this content by: ${improvements.join(", ")}
                    
                    Original content:
                    ${content}`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
-      temperature: 0.5
+      temperature: 0.5,
     });
   }
 }
@@ -189,20 +202,21 @@ const creator = new ContentCreator();
 const blogPost = await creator.createBlogPost(
   "AI automation in small businesses",
   "small business owners",
-  ["AI automation", "business efficiency", "digital transformation"]
+  ["AI automation", "business efficiency", "digital transformation"],
 );
 
 // Create social media campaign
 const socialContent = await creator.createSocialMediaContent(
   "New product launch",
-  ["twitter", "linkedin", "instagram"]
+  ["twitter", "linkedin", "instagram"],
 );
 
 // Improve existing content
-const improved = await creator.improveContent(
-  existingArticle,
-  ["improve readability", "add more examples", "stronger conclusion"]
-);
+const improved = await creator.improveContent(existingArticle, [
+  "improve readability",
+  "add more examples",
+  "stronger conclusion",
+]);
 ```
 
 ### Email Marketing
@@ -213,7 +227,7 @@ npx @juspay/neurolink gen "
 Create a welcome email series (3 emails) for new SaaS customers.
 
 Email 1: Welcome and getting started
-Email 2: Key features and benefits  
+Email 2: Key features and benefits
 Email 3: Success stories and support resources
 
 Each email should be 150-200 words, professional yet friendly tone.
@@ -229,11 +243,11 @@ Each email should be 150-200 words, professional yet friendly tone.
 ```typescript
 class BusinessAnalyzer {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async analyzeData(data: any[], question: string, context: any = {}) {
     const dataPreview = JSON.stringify(data.slice(0, 5), null, 2);
     const prompt = `Analyze this business data and answer: ${question}
@@ -243,15 +257,15 @@ class BusinessAnalyzer {
                    ${dataPreview}
                    
                    Provide insights, trends, and actionable recommendations.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
       temperature: 0.4,
-      maxTokens: 800
+      maxTokens: 800,
     });
   }
-  
+
   async createExecutiveSummary(metrics: any, timeframe: string) {
     const prompt = `Create an executive summary for ${timeframe} business performance.
                    
@@ -260,15 +274,15 @@ class BusinessAnalyzer {
                    
                    Include: key achievements, challenges, trends, recommendations.
                    Target audience: C-level executives.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
       temperature: 0.5,
-      maxTokens: 600
+      maxTokens: 600,
     });
   }
-  
+
   async generatePredictions(historicalData: any[], forecastPeriod: string) {
     const prompt = `Based on this historical data, provide business predictions for ${forecastPeriod}.
                    
@@ -276,11 +290,11 @@ class BusinessAnalyzer {
                    ${JSON.stringify(historicalData, null, 2)}
                    
                    Include confidence levels and risk factors.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
-      temperature: 0.6
+      temperature: 0.6,
     });
   }
 }
@@ -292,21 +306,24 @@ const analyzer = new BusinessAnalyzer();
 const salesAnalysis = await analyzer.analyzeData(
   salesData,
   "What are the key trends in our sales performance?",
-  { department: "sales", region: "north_america" }
+  { department: "sales", region: "north_america" },
 );
 
 // Create quarterly summary
-const summary = await analyzer.createExecutiveSummary({
-  revenue: "$2.5M",
-  growth: "15%",
-  customers: 1250,
-  churn: "3.2%"
-}, "Q3 2024");
+const summary = await analyzer.createExecutiveSummary(
+  {
+    revenue: "$2.5M",
+    growth: "15%",
+    customers: 1250,
+    churn: "3.2%",
+  },
+  "Q3 2024",
+);
 
 // Generate predictions
 const forecast = await analyzer.generatePredictions(
   monthlyMetrics,
-  "next quarter"
+  "next quarter",
 );
 ```
 
@@ -342,65 +359,79 @@ Response should: acknowledge the issue, apologize, explain next steps, offer com
 ```typescript
 class EducationalAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
-  async createLessonPlan(subject: string, gradeLevel: string, duration: string) {
+
+  async createLessonPlan(
+    subject: string,
+    gradeLevel: string,
+    duration: string,
+  ) {
     const prompt = `Create a comprehensive lesson plan for ${subject} (${gradeLevel}).
                    
                    Duration: ${duration}
                    Include: objectives, materials, activities, assessment, homework.
                    Make it engaging and age-appropriate.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
-      temperature: 0.7
+      temperature: 0.7,
     });
   }
-  
-  async generateQuizQuestions(topic: string, difficulty: string, count: number) {
+
+  async generateQuizQuestions(
+    topic: string,
+    difficulty: string,
+    count: number,
+  ) {
     const prompt = `Generate ${count} ${difficulty} quiz questions about ${topic}.
                    
                    Include multiple choice, true/false, and short answer questions.
                    Provide correct answers and explanations.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
-      temperature: 0.5
+      temperature: 0.5,
     });
   }
-  
-  async explainConcept(concept: string, audience: string, useAnalogies: boolean = true) {
-    const analogyInstruction = useAnalogies ? "Use simple analogies and examples." : "";
-    
+
+  async explainConcept(
+    concept: string,
+    audience: string,
+    useAnalogies: boolean = true,
+  ) {
+    const analogyInstruction = useAnalogies
+      ? "Use simple analogies and examples."
+      : "";
+
     const prompt = `Explain "${concept}" for ${audience}. ${analogyInstruction}
                    
                    Make it clear, engaging, and easy to understand.
                    Break down complex ideas into simple steps.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
-      temperature: 0.6
+      temperature: 0.6,
     });
   }
-  
+
   async createStudyGuide(materials: string[], examDate: string) {
     const prompt = `Create a study guide for exam on ${examDate}.
                    
                    Course materials:
-                   ${materials.join('\n')}
+                   ${materials.join("\n")}
                    
                    Include: key topics, important concepts, practice questions, study schedule.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
-      temperature: 0.4
+      temperature: 0.4,
     });
   }
 }
@@ -412,21 +443,21 @@ const educator = new EducationalAssistant();
 const lessonPlan = await educator.createLessonPlan(
   "Introduction to Machine Learning",
   "College Sophomore",
-  "90 minutes"
+  "90 minutes",
 );
 
 // Generate quiz
 const quiz = await educator.generateQuizQuestions(
   "JavaScript fundamentals",
   "intermediate",
-  10
+  10,
 );
 
 // Explain complex concept
 const explanation = await educator.explainConcept(
   "Quantum entanglement",
   "high school students",
-  true
+  true,
 );
 ```
 
@@ -469,28 +500,28 @@ Consider: common conditions, rare diseases, diagnostic tests needed.
 ```typescript
 class EcommerceAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async optimizeProductDescription(productInfo: any, targetKeywords: string[]) {
     const prompt = `Create an optimized product description for:
                    
                    Product: ${productInfo.name}
                    Category: ${productInfo.category}
-                   Features: ${productInfo.features.join(', ')}
-                   Target keywords: ${targetKeywords.join(', ')}
+                   Features: ${productInfo.features.join(", ")}
+                   Target keywords: ${targetKeywords.join(", ")}
                    
                    Make it compelling, SEO-friendly, and conversion-focused.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
-      temperature: 0.7
+      temperature: 0.7,
     });
   }
-  
+
   async generateCustomerEmailResponse(inquiry: string, orderInfo: any) {
     const prompt = `Generate a helpful customer service response for this inquiry:
                    
@@ -498,27 +529,27 @@ class EcommerceAssistant {
                    Order information: ${JSON.stringify(orderInfo)}
                    
                    Be professional, empathetic, and solution-focused.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
-      temperature: 0.4
+      temperature: 0.4,
     });
   }
-  
+
   async analyzeCustomerFeedback(reviews: string[]) {
-    const reviewText = reviews.join('\n---\n');
-    
+    const reviewText = reviews.join("\n---\n");
+
     const prompt = `Analyze these customer reviews and provide insights:
                    
                    ${reviewText}
                    
                    Identify: common themes, pain points, positive aspects, improvement suggestions.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
-      temperature: 0.5
+      temperature: 0.5,
     });
   }
 }
@@ -527,16 +558,19 @@ class EcommerceAssistant {
 const ecommerce = new EcommerceAssistant();
 
 // Optimize product listing
-const description = await ecommerce.optimizeProductDescription({
-  name: "Wireless Bluetooth Headphones",
-  category: "Electronics",
-  features: ["Noise cancellation", "30-hour battery", "Quick charge"]
-}, ["wireless headphones", "noise cancelling", "bluetooth"]);
+const description = await ecommerce.optimizeProductDescription(
+  {
+    name: "Wireless Bluetooth Headphones",
+    category: "Electronics",
+    features: ["Noise cancellation", "30-hour battery", "Quick charge"],
+  },
+  ["wireless headphones", "noise cancelling", "bluetooth"],
+);
 
 // Generate customer response
 const response = await ecommerce.generateCustomerEmailResponse(
   "My order hasn't arrived yet and it's been 10 days",
-  { orderNumber: "12345", estimatedDelivery: "2024-01-15" }
+  { orderNumber: "12345", estimatedDelivery: "2024-01-15" },
 );
 ```
 
@@ -574,27 +608,27 @@ Include: hook, problem, solution, benefits, call-to-action.
 ```typescript
 class DevOpsAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async generateDockerfile(appInfo: any) {
     const prompt = `Generate a production-ready Dockerfile for:
                    
                    Application: ${appInfo.type}
                    Runtime: ${appInfo.runtime}
-                   Dependencies: ${appInfo.dependencies.join(', ')}
+                   Dependencies: ${appInfo.dependencies.join(", ")}
                    
                    Include: security best practices, multi-stage build, health checks.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
-      temperature: 0.3
+      temperature: 0.3,
     });
   }
-  
+
   async analyzeLogError(errorLog: string, systemContext: any) {
     const prompt = `Analyze this error log and provide troubleshooting steps:
                    
@@ -605,11 +639,11 @@ class DevOpsAssistant {
                    ${JSON.stringify(systemContext)}
                    
                    Include: root cause analysis, fix suggestions, prevention measures.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
-      temperature: 0.4
+      temperature: 0.4,
     });
   }
 }
@@ -621,14 +655,14 @@ const devops = new DevOpsAssistant();
 const dockerfile = await devops.generateDockerfile({
   type: "Node.js web application",
   runtime: "Node.js 18",
-  dependencies: ["express", "mongodb", "redis"]
+  dependencies: ["express", "mongodb", "redis"],
 });
 
 // Analyze error
-const troubleshooting = await devops.analyzeLogError(
-  errorLogText,
-  { environment: "production", service: "api-gateway" }
-);
+const troubleshooting = await devops.analyzeLogError(errorLogText, {
+  environment: "production",
+  service: "api-gateway",
+});
 ```
 
 ## 📊 Research & Analytics
@@ -660,6 +694,6 @@ These use cases demonstrate NeuroLink's versatility across different industries 
 ## 📚 Related Documentation
 
 - [Basic Usage](basic-usage.md) - Getting started examples
-- [Advanced Examples](advanced.md) - Complex integration patterns  
+- [Advanced Examples](advanced.md) - Complex integration patterns
 - [Business Examples](business.md) - Business-focused applications
 - [CLI Examples](../cli/examples.md) - Command-line use cases

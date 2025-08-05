@@ -6,29 +6,29 @@ Welcome to NeuroLink! This section will help you get up and running quickly with
 
 <div class="grid cards" markdown>
 
--   :material-clock-fast: **[Quick Start](quick-start.md)**
+- :material-clock-fast: **[Quick Start](quick-start.md)**
 
-    ---
+  ***
 
-    Get NeuroLink working in under 2 minutes with basic examples for both CLI and SDK usage.
+  Get NeuroLink working in under 2 minutes with basic examples for both CLI and SDK usage.
 
--   :material-download: **[Installation](installation.md)**
+- :material-download: **[Installation](installation.md)**
 
-    ---
+  ***
 
-    Detailed installation instructions for different environments and package managers.
+  Detailed installation instructions for different environments and package managers.
 
--   :material-key: **[Provider Setup](provider-setup.md)**
+- :material-key: **[Provider Setup](provider-setup.md)**
 
-    ---
+  ***
 
-    Configure API keys and credentials for all 9 supported AI providers with step-by-step guides.
+  Configure API keys and credentials for all 9 supported AI providers with step-by-step guides.
 
--   :material-cog: **[Environment Variables](environment-variables.md)**
+- :material-cog: **[Environment Variables](environment-variables.md)**
 
-    ---
+  ***
 
-    Complete reference for all environment variables and configuration options.
+  Complete reference for all environment variables and configuration options.
 
 </div>
 

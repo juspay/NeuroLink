@@ -8,29 +8,29 @@ This section provides comprehensive reference materials for advanced usage, conf
 
 <div class="grid cards" markdown>
 
--   :material-help-circle: **[Troubleshooting](troubleshooting.md)**
+- :material-help-circle: **[Troubleshooting](troubleshooting.md)**
 
-    ---
+  ***
 
-    Common issues, error messages, and solutions for NeuroLink CLI and SDK usage.
+  Common issues, error messages, and solutions for NeuroLink CLI and SDK usage.
 
--   :material-cog: **[Configuration](configuration.md)**
+- :material-cog: **[Configuration](configuration.md)**
 
-    ---
+  ***
 
-    Complete configuration reference including environment variables, provider settings, and optimization.
+  Complete configuration reference including environment variables, provider settings, and optimization.
 
--   :material-compare: **[Provider Comparison](provider-comparison.md)**
+- :material-compare: **[Provider Comparison](provider-comparison.md)**
 
-    ---
+  ***
 
-    Detailed comparison of all 9 supported AI providers with features, costs, and recommendations.
+  Detailed comparison of all 9 supported AI providers with features, costs, and recommendations.
 
--   :material-frequently-asked-questions: **[FAQ](faq.md)**
+- :material-frequently-asked-questions: **[FAQ](faq.md)**
 
-    ---
+  ***
 
-    Frequently asked questions about NeuroLink features, limitations, and best practices.
+  Frequently asked questions about NeuroLink features, limitations, and best practices.
 
 </div>
 
@@ -120,27 +120,27 @@ const result = await neurolink.generate({
 
 ## 📊 Provider Comparison Matrix
 
-| Feature | OpenAI | Google AI | Anthropic | Bedrock | Azure | Vertex | HuggingFace | Ollama | Mistral |
-|---------|--------|-----------|-----------|---------|-------|---------|-------------|--------|---------|
-| **Free Tier** | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **Tool Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ |
-| **Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Vision** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| **Local** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **Enterprise** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+| Feature          | OpenAI | Google AI | Anthropic | Bedrock | Azure | Vertex | HuggingFace | Ollama | Mistral |
+| ---------------- | ------ | --------- | --------- | ------- | ----- | ------ | ----------- | ------ | ------- |
+| **Free Tier**    | ❌     | ✅        | ❌        | ❌      | ❌    | ❌     | ✅          | ✅     | ✅      |
+| **Tool Support** | ✅     | ✅        | ✅        | ✅      | ✅    | ✅     | ⚠️          | ⚠️     | ✅      |
+| **Streaming**    | ✅     | ✅        | ✅        | ✅      | ✅    | ✅     | ✅          | ✅     | ✅      |
+| **Vision**       | ✅     | ✅        | ✅        | ✅      | ✅    | ✅     | ✅          | ⚠️     | ❌      |
+| **Local**        | ❌     | ❌        | ❌        | ❌      | ❌    | ❌     | ❌          | ✅     | ❌      |
+| **Enterprise**   | ✅     | ✅        | ✅        | ✅      | ✅    | ✅     | ⚠️          | ✅     | ✅      |
 
 ## 🔍 Error Code Reference
 
 ### Common Error Codes
 
-| Code | Description | Solution |
-|------|-------------|----------|
-| `AUTH_ERROR` | Invalid API key or credentials | Check environment variables |
-| `RATE_LIMIT` | API rate limit exceeded | Implement delays or upgrade plan |
-| `TIMEOUT` | Request timeout | Increase timeout or check network |
-| `MODEL_NOT_FOUND` | Invalid model name | Check available models |
-| `TOOL_ERROR` | MCP tool execution failed | Check tool configuration |
-| `PROVIDER_UNAVAILABLE` | Provider service down | Try different provider |
+| Code                   | Description                    | Solution                          |
+| ---------------------- | ------------------------------ | --------------------------------- |
+| `AUTH_ERROR`           | Invalid API key or credentials | Check environment variables       |
+| `RATE_LIMIT`           | API rate limit exceeded        | Implement delays or upgrade plan  |
+| `TIMEOUT`              | Request timeout                | Increase timeout or check network |
+| `MODEL_NOT_FOUND`      | Invalid model name             | Check available models            |
+| `TOOL_ERROR`           | MCP tool execution failed      | Check tool configuration          |
+| `PROVIDER_UNAVAILABLE` | Provider service down          | Try different provider            |
 
 ### Debugging Tips
 
@@ -159,7 +159,7 @@ neurolink config validate
 // SDK debugging
 const neurolink = new NeuroLink({
   debug: true,
-  logLevel: 'verbose',
+  logLevel: "verbose",
 });
 ```
 

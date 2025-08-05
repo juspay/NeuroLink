@@ -13,13 +13,13 @@ import { NeuroLink } from "@juspay/neurolink";
 
 class StrategyAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink({
-      analytics: { enabled: true }
+      analytics: { enabled: true },
     });
   }
-  
+
   async analyzeMarketOpportunity(opportunity: any, companyContext: any) {
     const prompt = `Analyze this market opportunity for strategic decision-making:
                    
@@ -33,7 +33,7 @@ class StrategyAssistant {
                    4. Risk assessment and mitigation strategies
                    5. ROI projections and timeline
                    6. Go/no-go recommendation with rationale`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
@@ -42,11 +42,11 @@ class StrategyAssistant {
       context: {
         role: "strategic_analysis",
         department: "executive",
-        priority: "high"
-      }
+        priority: "high",
+      },
     });
   }
-  
+
   async generateBoardPresentation(quarterlyData: any, initiatives: any[]) {
     const prompt = `Create a board presentation summary based on:
                    
@@ -61,22 +61,22 @@ class StrategyAssistant {
                    - Next quarter priorities
                    
                    Format for C-level audience.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
       temperature: 0.5,
       context: {
         audience: "board_of_directors",
-        format: "executive_summary"
-      }
+        format: "executive_summary",
+      },
     });
   }
-  
+
   async competitorAnalysis(competitors: string[], marketSegment: string) {
     const prompt = `Conduct comprehensive competitor analysis:
                    
-                   Competitors: ${competitors.join(', ')}
+                   Competitors: ${competitors.join(", ")}
                    Market segment: ${marketSegment}
                    
                    For each competitor analyze:
@@ -87,12 +87,12 @@ class StrategyAssistant {
                    - Threats and opportunities they present
                    
                    Conclude with strategic recommendations.`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
       temperature: 0.6,
-      maxTokens: 2000
+      maxTokens: 2000,
     });
   }
 }
@@ -101,28 +101,34 @@ class StrategyAssistant {
 const strategy = new StrategyAssistant();
 
 // Analyze new market entry
-const marketAnalysis = await strategy.analyzeMarketOpportunity({
-  market: "AI-powered customer service",
-  geography: "European Union", 
-  targetSegment: "SMB",
-  entryStrategy: "acquisition"
-}, {
-  currentRevenue: "$50M",
-  employees: 200,
-  marketPresence: ["North America"],
-  coreCompetencies: ["AI/ML", "SaaS platforms"]
-});
+const marketAnalysis = await strategy.analyzeMarketOpportunity(
+  {
+    market: "AI-powered customer service",
+    geography: "European Union",
+    targetSegment: "SMB",
+    entryStrategy: "acquisition",
+  },
+  {
+    currentRevenue: "$50M",
+    employees: 200,
+    marketPresence: ["North America"],
+    coreCompetencies: ["AI/ML", "SaaS platforms"],
+  },
+);
 
 // Generate quarterly board presentation
-const boardDeck = await strategy.generateBoardPresentation({
-  revenue: "$12.5M",
-  growth: "23%",
-  customers: 1850,
-  churn: "2.1%"
-}, [
-  { name: "Product V2 Launch", status: "on-track", impact: "high" },
-  { name: "EU Expansion", status: "delayed", impact: "medium" }
-]);
+const boardDeck = await strategy.generateBoardPresentation(
+  {
+    revenue: "$12.5M",
+    growth: "23%",
+    customers: 1850,
+    churn: "2.1%",
+  },
+  [
+    { name: "Product V2 Launch", status: "on-track", impact: "high" },
+    { name: "EU Expansion", status: "delayed", impact: "medium" },
+  ],
+);
 
 console.log("Strategic Analysis:", marketAnalysis.content);
 console.log("Board Presentation:", boardDeck.content);
@@ -147,7 +153,7 @@ Provide 3-5 key insights with business implications.
   --context '{"role":"executive","type":"market_briefing","date":"'$DATE'"}' \
   > briefing-market-$DATE.md
 
-# Industry intelligence  
+# Industry intelligence
 npx @juspay/neurolink gen "
 Generate strategic intelligence for enterprise AI software company:
 1. Emerging technology trends affecting our market
@@ -177,7 +183,7 @@ Include KPIs to track and red flags to monitor.
 echo "✅ Executive briefing complete"
 echo "📄 Files generated:"
 echo "  - briefing-market-$DATE.md"
-echo "  - briefing-intelligence-$DATE.md" 
+echo "  - briefing-intelligence-$DATE.md"
 echo "  - performance-framework-$DATE.md"
 ```
 
@@ -188,16 +194,16 @@ echo "  - performance-framework-$DATE.md"
 ```typescript
 class ProcessOptimizer {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async analyzeWorkflow(processData: any, painPoints: string[]) {
     const prompt = `Analyze this business process for optimization opportunities:
                    
                    Current process: ${JSON.stringify(processData, null, 2)}
-                   Known pain points: ${painPoints.join(', ')}
+                   Known pain points: ${painPoints.join(", ")}
                    
                    Provide:
                    1. Process efficiency analysis
@@ -206,23 +212,23 @@ class ProcessOptimizer {
                    4. Resource optimization suggestions
                    5. Implementation roadmap
                    6. Expected ROI and timeline`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
       temperature: 0.4,
       context: {
         analysis_type: "process_optimization",
-        focus: "efficiency_roi"
-      }
+        focus: "efficiency_roi",
+      },
     });
   }
-  
+
   async generateSOPs(processName: string, steps: any[], compliance: string[]) {
     const prompt = `Create comprehensive Standard Operating Procedures for: ${processName}
                    
                    Process steps: ${JSON.stringify(steps, null, 2)}
-                   Compliance requirements: ${compliance.join(', ')}
+                   Compliance requirements: ${compliance.join(", ")}
                    
                    Include:
                    - Step-by-step procedures
@@ -231,16 +237,20 @@ class ProcessOptimizer {
                    - Escalation procedures
                    - Training requirements
                    - Compliance verification`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
       temperature: 0.3,
-      maxTokens: 1500
+      maxTokens: 1500,
     });
   }
-  
-  async costBenefitAnalysis(currentCosts: any, proposedSolution: any, timeframe: string) {
+
+  async costBenefitAnalysis(
+    currentCosts: any,
+    proposedSolution: any,
+    timeframe: string,
+  ) {
     const prompt = `Conduct detailed cost-benefit analysis:
                    
                    Current costs: ${JSON.stringify(currentCosts, null, 2)}
@@ -254,15 +264,15 @@ class ProcessOptimizer {
                    - Risk mitigation value
                    - ROI and payback period
                    - Sensitivity analysis`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
       temperature: 0.3,
       context: {
         analysis_type: "financial",
-        output_format: "business_case"
-      }
+        output_format: "business_case",
+      },
     });
   }
 }
@@ -271,46 +281,68 @@ class ProcessOptimizer {
 const optimizer = new ProcessOptimizer();
 
 // Analyze customer onboarding process
-const onboardingAnalysis = await optimizer.analyzeWorkflow({
-  name: "Customer Onboarding",
-  steps: [
-    { step: "Lead qualification", duration: "2 days", owner: "Sales" },
-    { step: "Contract signing", duration: "5 days", owner: "Legal" },
-    { step: "Technical setup", duration: "10 days", owner: "Engineering" },
-    { step: "Training delivery", duration: "3 days", owner: "Success" }
+const onboardingAnalysis = await optimizer.analyzeWorkflow(
+  {
+    name: "Customer Onboarding",
+    steps: [
+      { step: "Lead qualification", duration: "2 days", owner: "Sales" },
+      { step: "Contract signing", duration: "5 days", owner: "Legal" },
+      { step: "Technical setup", duration: "10 days", owner: "Engineering" },
+      { step: "Training delivery", duration: "3 days", owner: "Success" },
+    ],
+    currentDuration: "20 days",
+    customerSatisfaction: "6.5/10",
+  },
+  [
+    "Long lead times",
+    "Manual handoffs",
+    "Limited visibility",
+    "Inconsistent experience",
   ],
-  currentDuration: "20 days",
-  customerSatisfaction: "6.5/10"
-}, [
-  "Long lead times",
-  "Manual handoffs",
-  "Limited visibility",
-  "Inconsistent experience"
-]);
+);
 
 // Generate SOPs for incident response
 const incidentSOPs = await optimizer.generateSOPs(
   "Security Incident Response",
   [
-    { step: "Detection", tools: ["SIEM", "Monitoring"], timeframe: "5 minutes" },
-    { step: "Assessment", team: ["Security", "Engineering"], timeframe: "15 minutes" },
-    { step: "Containment", actions: ["Isolate", "Preserve evidence"], timeframe: "30 minutes" },
-    { step: "Recovery", validation: ["Service restoration", "Security verification"] }
+    {
+      step: "Detection",
+      tools: ["SIEM", "Monitoring"],
+      timeframe: "5 minutes",
+    },
+    {
+      step: "Assessment",
+      team: ["Security", "Engineering"],
+      timeframe: "15 minutes",
+    },
+    {
+      step: "Containment",
+      actions: ["Isolate", "Preserve evidence"],
+      timeframe: "30 minutes",
+    },
+    {
+      step: "Recovery",
+      validation: ["Service restoration", "Security verification"],
+    },
   ],
-  ["SOX", "GDPR", "ISO 27001"]
+  ["SOX", "GDPR", "ISO 27001"],
 );
 
 // Cost-benefit analysis for automation
-const automationROI = await optimizer.costBenefitAnalysis({
-  manualProcessing: "$50000/month",
-  errorRate: "5%",
-  processingTime: "4 hours/task"
-}, {
-  automationTool: "$10000/month",
-  implementationCost: "$100000",
-  expectedErrorRate: "0.5%",
-  expectedProcessingTime: "15 minutes/task"
-}, "24 months");
+const automationROI = await optimizer.costBenefitAnalysis(
+  {
+    manualProcessing: "$50000/month",
+    errorRate: "5%",
+    processingTime: "4 hours/task",
+  },
+  {
+    automationTool: "$10000/month",
+    implementationCost: "$100000",
+    expectedErrorRate: "0.5%",
+    expectedProcessingTime: "15 minutes/task",
+  },
+  "24 months",
+);
 ```
 
 ## 💰 Financial Planning & Analysis
@@ -324,7 +356,7 @@ Analyze our Q4 budget performance and create Q1 planning recommendations:
 
 Q4 Performance:
 - Revenue: $2.8M (target: $3M)
-- OpEx: $2.1M (budget: $2M)  
+- OpEx: $2.1M (budget: $2M)
 - Customer Acquisition Cost: $450
 - Gross margin: 78%
 
@@ -348,7 +380,7 @@ Evaluate this investment proposal:
 
 Analyze from CFO perspective:
 - Financial viability
-- Risk assessment  
+- Risk assessment
 - Alternative approaches
 - Investment committee recommendation
 " --enable-evaluation \
@@ -378,12 +410,16 @@ Provide Excel-ready formulas and scenarios (conservative, base, optimistic).
 ```typescript
 class SalesIntelligence {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
-  async analyzeSalesPerformance(salesData: any[], territory: string, period: string) {
+
+  async analyzeSalesPerformance(
+    salesData: any[],
+    territory: string,
+    period: string,
+  ) {
     const prompt = `Analyze sales performance for ${territory} in ${period}:
                    
                    Sales data: ${JSON.stringify(salesData, null, 2)}
@@ -396,7 +432,7 @@ class SalesIntelligence {
                    5. Competitive win/loss insights
                    6. Pipeline health assessment
                    7. Actionable recommendations for improvement`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
@@ -404,12 +440,16 @@ class SalesIntelligence {
       context: {
         department: "sales",
         analysis_type: "performance_review",
-        territory: territory
-      }
+        territory: territory,
+      },
     });
   }
-  
-  async generateSalesPlaybook(industry: string, buyerPersonas: any[], salesCycle: any) {
+
+  async generateSalesPlaybook(
+    industry: string,
+    buyerPersonas: any[],
+    salesCycle: any,
+  ) {
     const prompt = `Create a comprehensive sales playbook for ${industry}:
                    
                    Buyer personas: ${JSON.stringify(buyerPersonas, null, 2)}
@@ -423,21 +463,25 @@ class SalesIntelligence {
                    - Closing techniques
                    - Follow-up sequences
                    - Success metrics and KPIs`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
       temperature: 0.6,
-      maxTokens: 2000
+      maxTokens: 2000,
     });
   }
-  
-  async optimizePricing(marketData: any, competitorPricing: any[], valueDrivers: string[]) {
+
+  async optimizePricing(
+    marketData: any,
+    competitorPricing: any[],
+    valueDrivers: string[],
+  ) {
     const prompt = `Develop pricing optimization strategy:
                    
                    Market data: ${JSON.stringify(marketData, null, 2)}
                    Competitor pricing: ${JSON.stringify(competitorPricing, null, 2)}
-                   Value drivers: ${valueDrivers.join(', ')}
+                   Value drivers: ${valueDrivers.join(", ")}
                    
                    Recommend:
                    1. Optimal pricing structure and tiers
@@ -446,15 +490,15 @@ class SalesIntelligence {
                    4. Price sensitivity analysis
                    5. A/B testing framework
                    6. Implementation timeline and change management`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
       temperature: 0.5,
       context: {
         analysis_type: "pricing_strategy",
-        focus: "revenue_optimization"
-      }
+        focus: "revenue_optimization",
+      },
     });
   }
 }
@@ -463,30 +507,56 @@ class SalesIntelligence {
 const salesIntel = new SalesIntelligence();
 
 // Analyze quarterly sales performance
-const performanceAnalysis = await salesIntel.analyzeSalesPerformance([
-  { rep: "John", target: 100000, actual: 120000, deals: 12 },
-  { rep: "Sarah", target: 100000, actual: 85000, deals: 8 },
-  { rep: "Mike", target: 100000, actual: 110000, deals: 15 }
-], "North America", "Q4 2024");
+const performanceAnalysis = await salesIntel.analyzeSalesPerformance(
+  [
+    { rep: "John", target: 100000, actual: 120000, deals: 12 },
+    { rep: "Sarah", target: 100000, actual: 85000, deals: 8 },
+    { rep: "Mike", target: 100000, actual: 110000, deals: 15 },
+  ],
+  "North America",
+  "Q4 2024",
+);
 
 // Generate industry-specific sales playbook
-const playbook = await salesIntel.generateSalesPlaybook("Financial Services", [
-  { role: "CFO", painPoints: ["Cost control", "Compliance"], budget: "High" },
-  { role: "IT Director", painPoints: ["Security", "Integration"], influence: "High" }
-], {
-  averageLength: "6 months",
-  keyStages: ["Discovery", "Technical Evaluation", "Business Case", "Legal Review"]
-});
+const playbook = await salesIntel.generateSalesPlaybook(
+  "Financial Services",
+  [
+    { role: "CFO", painPoints: ["Cost control", "Compliance"], budget: "High" },
+    {
+      role: "IT Director",
+      painPoints: ["Security", "Integration"],
+      influence: "High",
+    },
+  ],
+  {
+    averageLength: "6 months",
+    keyStages: [
+      "Discovery",
+      "Technical Evaluation",
+      "Business Case",
+      "Legal Review",
+    ],
+  },
+);
 
 // Optimize pricing strategy
-const pricingStrategy = await salesIntel.optimizePricing({
-  marketSize: "$5B",
-  growth: "15%",
-  averageDealSize: "$50K"
-}, [
-  { competitor: "CompetitorA", startingPrice: "$10K", enterprise: "$50K" },
-  { competitor: "CompetitorB", startingPrice: "$15K", enterprise: "$75K" }
-], ["ROI improvement", "Time savings", "Risk reduction", "Compliance automation"]);
+const pricingStrategy = await salesIntel.optimizePricing(
+  {
+    marketSize: "$5B",
+    growth: "15%",
+    averageDealSize: "$50K",
+  },
+  [
+    { competitor: "CompetitorA", startingPrice: "$10K", enterprise: "$50K" },
+    { competitor: "CompetitorB", startingPrice: "$15K", enterprise: "$75K" },
+  ],
+  [
+    "ROI improvement",
+    "Time savings",
+    "Risk reduction",
+    "Compliance automation",
+  ],
+);
 ```
 
 ## 🎯 Marketing & Customer Success
@@ -500,7 +570,7 @@ Analyze our Q4 marketing campaign performance:
 
 Campaign Results:
 - Email marketing: 4.2% CTR, 18% open rate, $15 CPA
-- Paid search: 3.8% CTR, $22 CPA, 1.2M impressions  
+- Paid search: 3.8% CTR, $22 CPA, 1.2M impressions
 - Content marketing: 125K blog views, 850 leads
 - Social media: 15K engagement, 320 qualified leads
 - Events: 3 conferences, 180 leads, $45K spend
@@ -527,7 +597,7 @@ Current customer base:
 
 Create segmentation framework for:
 - Targeted messaging and positioning
-- Product development priorities  
+- Product development priorities
 - Customer success strategies
 - Upselling and expansion opportunities
 " --provider anthropic \
@@ -560,11 +630,11 @@ Develop:
 ```typescript
 class CustomerSuccessIntelligence {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async analyzeChurnRisk(customerData: any[], usageMetrics: any[]) {
     const prompt = `Analyze customer churn risk and provide retention strategies:
                    
@@ -578,18 +648,18 @@ class CustomerSuccessIntelligence {
                    4. Proactive intervention strategies
                    5. Success metrics for retention programs
                    6. Resource allocation recommendations`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
       temperature: 0.4,
       context: {
         department: "customer_success",
-        analysis_type: "churn_prevention"
-      }
+        analysis_type: "churn_prevention",
+      },
     });
   }
-  
+
   async generateExpansionStrategy(accountData: any, productCatalog: any[]) {
     const prompt = `Develop account expansion strategy:
                    
@@ -603,23 +673,23 @@ class CustomerSuccessIntelligence {
                    4. Implementation timeline and approach
                    5. Success probability assessment
                    6. Revenue impact projections`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
       temperature: 0.5,
       context: {
         focus: "revenue_expansion",
-        account_tier: accountData.tier
-      }
+        account_tier: accountData.tier,
+      },
     });
   }
-  
+
   async optimizeOnboarding(currentProcess: any, customerFeedback: string[]) {
     const prompt = `Optimize customer onboarding process:
                    
                    Current process: ${JSON.stringify(currentProcess, null, 2)}
-                   Customer feedback: ${customerFeedback.join('\n')}
+                   Customer feedback: ${customerFeedback.join("\n")}
                    
                    Provide recommendations for:
                    1. Onboarding flow optimization
@@ -628,12 +698,12 @@ class CustomerSuccessIntelligence {
                    4. Success criteria and measurement
                    5. Automation opportunities
                    6. Resource requirements`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "openai",
       temperature: 0.5,
-      maxTokens: 1200
+      maxTokens: 1200,
     });
   }
 }
@@ -642,25 +712,31 @@ class CustomerSuccessIntelligence {
 const csIntel = new CustomerSuccessIntelligence();
 
 // Analyze churn risk across customer base
-const churnAnalysis = await csIntel.analyzeChurnRisk([
-  { id: "cust1", tier: "enterprise", tenure: 24, health: "yellow" },
-  { id: "cust2", tier: "mid-market", tenure: 6, health: "red" }
-], [
-  { customer: "cust1", logins: 45, features: 8, support_tickets: 2 },
-  { customer: "cust2", logins: 12, features: 3, support_tickets: 8 }
-]);
+const churnAnalysis = await csIntel.analyzeChurnRisk(
+  [
+    { id: "cust1", tier: "enterprise", tenure: 24, health: "yellow" },
+    { id: "cust2", tier: "mid-market", tenure: 6, health: "red" },
+  ],
+  [
+    { customer: "cust1", logins: 45, features: 8, support_tickets: 2 },
+    { customer: "cust2", logins: 12, features: 3, support_tickets: 8 },
+  ],
+);
 
 // Generate expansion opportunities
-const expansionStrategy = await csIntel.generateExpansionStrategy({
-  companySize: 1500,
-  currentARR: 120000,
-  products: ["Core Platform"],
-  industry: "Financial Services"
-}, [
-  { name: "Advanced Analytics", price: 50000, fit: "high" },
-  { name: "Compliance Module", price: 30000, fit: "high" },
-  { name: "API Access", price: 20000, fit: "medium" }
-]);
+const expansionStrategy = await csIntel.generateExpansionStrategy(
+  {
+    companySize: 1500,
+    currentARR: 120000,
+    products: ["Core Platform"],
+    industry: "Financial Services",
+  },
+  [
+    { name: "Advanced Analytics", price: 50000, fit: "high" },
+    { name: "Compliance Module", price: 30000, fit: "high" },
+    { name: "API Access", price: 20000, fit: "medium" },
+  ],
+);
 ```
 
 ## 🏆 Performance Management
@@ -701,7 +777,7 @@ npx @juspay/neurolink gen "
 Analyze cross-departmental performance alignment:
 
 Sales: 108% of target, strong pipeline health
-Marketing: 95% lead target, improved conversion rates  
+Marketing: 95% lead target, improved conversion rates
 Engineering: 92% sprint completion, technical debt concerns
 Customer Success: 98% retention target, expansion opportunities
 Finance: On budget, cash flow positive
@@ -725,16 +801,20 @@ echo "✅ Executive dashboards generated"
 ```typescript
 class ComplianceAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
-  async assessComplianceGap(currentPolicies: any[], regulations: string[], industry: string) {
+
+  async assessComplianceGap(
+    currentPolicies: any[],
+    regulations: string[],
+    industry: string,
+  ) {
     const prompt = `Conduct compliance gap analysis for ${industry} industry:
                    
                    Current policies: ${JSON.stringify(currentPolicies, null, 2)}
-                   Applicable regulations: ${regulations.join(', ')}
+                   Applicable regulations: ${regulations.join(", ")}
                    
                    Identify:
                    1. Compliance gaps and deficiencies
@@ -743,7 +823,7 @@ class ComplianceAssistant {
                    4. Implementation timeline and priorities
                    5. Training and awareness requirements
                    6. Ongoing monitoring and audit needs`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "anthropic",
@@ -751,16 +831,19 @@ class ComplianceAssistant {
       context: {
         domain: "compliance",
         industry: industry,
-        urgency: "high"
-      }
+        urgency: "high",
+      },
     });
   }
-  
-  async generateRiskRegister(businessActivities: any[], riskCategories: string[]) {
+
+  async generateRiskRegister(
+    businessActivities: any[],
+    riskCategories: string[],
+  ) {
     const prompt = `Create comprehensive risk register:
                    
                    Business activities: ${JSON.stringify(businessActivities, null, 2)}
-                   Risk categories: ${riskCategories.join(', ')}
+                   Risk categories: ${riskCategories.join(", ")}
                    
                    For each identified risk provide:
                    1. Risk description and impact assessment
@@ -769,12 +852,12 @@ class ComplianceAssistant {
                    4. Residual risk assessment
                    5. Additional controls needed
                    6. Risk ownership and monitoring requirements`;
-    
+
     return await this.neurolink.generate({
       input: { text: prompt },
       provider: "google-ai",
       temperature: 0.4,
-      maxTokens: 1800
+      maxTokens: 1800,
     });
   }
 }
@@ -783,18 +866,33 @@ class ComplianceAssistant {
 const compliance = new ComplianceAssistant();
 
 // Assess GDPR compliance
-const gdprGap = await compliance.assessComplianceGap([
-  { name: "Data Processing Policy", lastUpdated: "2023-01-15" },
-  { name: "Privacy Notice", lastUpdated: "2023-06-01" },
-  { name: "Incident Response", lastUpdated: "2022-11-30" }
-], ["GDPR", "CCPA", "SOX"], "Financial Technology");
+const gdprGap = await compliance.assessComplianceGap(
+  [
+    { name: "Data Processing Policy", lastUpdated: "2023-01-15" },
+    { name: "Privacy Notice", lastUpdated: "2023-06-01" },
+    { name: "Incident Response", lastUpdated: "2022-11-30" },
+  ],
+  ["GDPR", "CCPA", "SOX"],
+  "Financial Technology",
+);
 
 // Generate operational risk register
-const riskRegister = await compliance.generateRiskRegister([
-  { activity: "Customer data processing", volume: "high", sensitivity: "high" },
-  { activity: "Third-party integrations", count: 15, criticality: "medium" },
-  { activity: "Cloud infrastructure", dependency: "high", redundancy: "partial" }
-], ["Operational", "Cyber Security", "Regulatory", "Financial", "Reputational"]);
+const riskRegister = await compliance.generateRiskRegister(
+  [
+    {
+      activity: "Customer data processing",
+      volume: "high",
+      sensitivity: "high",
+    },
+    { activity: "Third-party integrations", count: 15, criticality: "medium" },
+    {
+      activity: "Cloud infrastructure",
+      dependency: "high",
+      redundancy: "partial",
+    },
+  ],
+  ["Operational", "Cyber Security", "Regulatory", "Financial", "Reputational"],
+);
 ```
 
 These business applications demonstrate how NeuroLink can drive value across all organizational functions, from strategic decision-making to operational optimization, providing measurable ROI and competitive advantages.
@@ -803,5 +901,5 @@ These business applications demonstrate how NeuroLink can drive value across all
 
 - [Use Cases](use-cases.md) - Industry-specific applications
 - [Advanced Examples](advanced.md) - Complex integration patterns
-- [Analytics Features](../advanced/analytics.md) - Business intelligence capabilities  
+- [Analytics Features](../advanced/analytics.md) - Business intelligence capabilities
 - [Enterprise Setup](../getting-started/provider-setup.md) - Enterprise configuration

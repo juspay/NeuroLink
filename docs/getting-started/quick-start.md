@@ -50,7 +50,7 @@ console.log(`Used: ${result.provider}`);
 
 1. Visit [Google AI Studio](https://aistudio.google.com/)
 2. Sign in with your Google account
-3. Click "Get API Key" 
+3. Click "Get API Key"
 4. Create a new API key
 5. Copy and use: `export GOOGLE_AI_API_KEY="AIza-your-key"`
 

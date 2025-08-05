@@ -1,65 +1,56 @@
 ## [7.3.7](https://github.com/juspay/neurolink/compare/v7.3.6...v7.3.7) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** configure pymdownx.emoji to properly render Material Design icons ([09ba764](https://github.com/juspay/neurolink/commit/09ba764e0cb57eac3d365d53754d32ef7a178bcf))
+- **docs:** configure pymdownx.emoji to properly render Material Design icons ([09ba764](https://github.com/juspay/neurolink/commit/09ba764e0cb57eac3d365d53754d32ef7a178bcf))
 
 ## [7.3.6](https://github.com/juspay/neurolink/compare/v7.3.5...v7.3.6) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** trigger fresh deployment after GitHub Pages source change ([e9c5975](https://github.com/juspay/neurolink/commit/e9c5975bcfb2ba7e53a29282bf9a5b45cc0d0034))
+- **docs:** trigger fresh deployment after GitHub Pages source change ([e9c5975](https://github.com/juspay/neurolink/commit/e9c5975bcfb2ba7e53a29282bf9a5b45cc0d0034))
 
 ## [7.3.5](https://github.com/juspay/neurolink/compare/v7.3.4...v7.3.5) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** force fresh deployment after GitHub Pages source change to GitHub Actions ([b4b498f](https://github.com/juspay/neurolink/commit/b4b498f436986e6c017b1552af218837ad9b510e))
+- **docs:** force fresh deployment after GitHub Pages source change to GitHub Actions ([b4b498f](https://github.com/juspay/neurolink/commit/b4b498f436986e6c017b1552af218837ad9b510e))
 
 ## [7.3.4](https://github.com/juspay/neurolink/compare/v7.3.3...v7.3.4) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** retry deployment to apply .nojekyll fix for MkDocs Material theme ([ce0afab](https://github.com/juspay/neurolink/commit/ce0afab3791dc9aa10c468ba5f48783301d092cf))
+- **docs:** retry deployment to apply .nojekyll fix for MkDocs Material theme ([ce0afab](https://github.com/juspay/neurolink/commit/ce0afab3791dc9aa10c468ba5f48783301d092cf))
 
 ## [7.3.3](https://github.com/juspay/neurolink/compare/v7.3.2...v7.3.3) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** add .nojekyll file to prevent Jekyll processing ([a2f28b2](https://github.com/juspay/neurolink/commit/a2f28b2accbae0c280fcd43907d7774d92d9895f))
+- **docs:** add .nojekyll file to prevent Jekyll processing ([a2f28b2](https://github.com/juspay/neurolink/commit/a2f28b2accbae0c280fcd43907d7774d92d9895f))
 
 ## [7.3.2](https://github.com/juspay/neurolink/compare/v7.3.1...v7.3.2) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** update copyright year and set dark theme as default ([bf1973d](https://github.com/juspay/neurolink/commit/bf1973d40298554c8cab508c109decf81cd9c519))
+- **docs:** update copyright year and set dark theme as default ([bf1973d](https://github.com/juspay/neurolink/commit/bf1973d40298554c8cab508c109decf81cd9c519))
 
 ## [7.3.1](https://github.com/juspay/neurolink/compare/v7.3.0...v7.3.1) (2025-08-04)
 
-
 ### Bug Fixes
 
-* **docs:** resolve GitHub Actions workflow YAML parsing errors ([182416d](https://github.com/juspay/neurolink/commit/182416d03e1887c35619013a6a92cf3337d604a1))
+- **docs:** resolve GitHub Actions workflow YAML parsing errors ([182416d](https://github.com/juspay/neurolink/commit/182416d03e1887c35619013a6a92cf3337d604a1))
 
 # [7.3.0](https://github.com/juspay/neurolink/compare/v7.2.0...v7.3.0) (2025-08-04)
 
-
 ### Features
 
-* **docs:** implement comprehensive documentation website infrastructure ([77c81f4](https://github.com/juspay/neurolink/commit/77c81f41bc8533252a7dfc2265790bc37225450b))
+- **docs:** implement comprehensive documentation website infrastructure ([77c81f4](https://github.com/juspay/neurolink/commit/77c81f41bc8533252a7dfc2265790bc37225450b))
 
 # [7.2.0](https://github.com/juspay/neurolink/compare/v7.1.0...v7.2.0) (2025-08-04)
 
-
 ### Features
 
-* **core:** complete NeuroLink Phase 1-4 implementation with comprehensive verification ([37d5cb1](https://github.com/juspay/neurolink/commit/37d5cb1a494850cd564d6fbce68895997939886f))
+- **core:** complete NeuroLink Phase 1-4 implementation with comprehensive verification ([37d5cb1](https://github.com/juspay/neurolink/commit/37d5cb1a494850cd564d6fbce68895997939886f))
 
 # [7.1.0](https://github.com/juspay/neurolink/compare/v7.0.0...v7.1.0) (2025-08-03)
 

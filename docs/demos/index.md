@@ -8,23 +8,23 @@ This section showcases NeuroLink's capabilities through visual content, making i
 
 <div class="grid cards" markdown>
 
--   :material-camera: **[Screenshots](screenshots.md)**
+- :material-camera: **[Screenshots](screenshots.md)**
 
-    ---
+  ***
 
-    High-quality screenshots of CLI commands, web interfaces, and development workflows.
+  High-quality screenshots of CLI commands, web interfaces, and development workflows.
 
--   :material-play-circle: **[Videos](videos.md)**
+- :material-play-circle: **[Videos](videos.md)**
 
-    ---
+  ***
 
-    Video demonstrations of NeuroLink features, from basic usage to advanced integrations.
+  Video demonstrations of NeuroLink features, from basic usage to advanced integrations.
 
--   :material-web: **[Interactive Demo](interactive.md)**
+- :material-web: **[Interactive Demo](interactive.md)**
 
-    ---
+  ***
 
-    Live web demonstration with all 9 providers and real AI generation capabilities.
+  Live web demonstration with all 9 providers and real AI generation capabilities.
 
 </div>
 
@@ -49,19 +49,19 @@ The interactive web demo showcases all features with live AI generation across m
 === "Basic Commands"
 
     ![Provider Status](../assets/images/provider-status.png)
-    
+
     Check the status of all configured AI providers with detailed diagnostics.
 
 === "Text Generation"
 
     ![Text Generation](../assets/images/text-generation.png)
-    
+
     Generate content with analytics and evaluation enabled.
 
 === "MCP Tools"
 
     ![MCP Tools](../assets/images/mcp-tools.png)
-    
+
     Built-in tools working seamlessly across all providers.
 
 ### Web Applications
@@ -69,19 +69,19 @@ The interactive web demo showcases all features with live AI generation across m
 === "Business Use Cases"
 
     ![Business Demo](../assets/images/business-use-cases.png)
-    
+
     Professional applications for business automation and content generation.
 
 === "Developer Tools"
 
     ![Developer Tools](../assets/images/developer-tools.png)
-    
+
     Code generation, API development, and technical documentation.
 
 === "Creative Applications"
 
     ![Creative Tools](../assets/images/creative-tools.png)
-    
+
     Content creation, storytelling, and creative writing assistance.
 
 ## 🎬 Video Highlights
@@ -95,7 +95,7 @@ The interactive web demo showcases all features with live AI generation across m
   </video>
 </div>
 
-*Complete quick start demonstration from installation to first AI generation*
+_Complete quick start demonstration from installation to first AI generation_
 
 ### Advanced Features (5 minutes)
 
@@ -106,7 +106,7 @@ The interactive web demo showcases all features with live AI generation across m
   </video>
 </div>
 
-*Analytics, evaluation, custom tools, and MCP integration showcase*
+_Analytics, evaluation, custom tools, and MCP integration showcase_
 
 ### Enterprise Workflow (8 minutes)
 
@@ -117,7 +117,7 @@ The interactive web demo showcases all features with live AI generation across m
   </video>
 </div>
 
-*Production deployment, monitoring, and business automation examples*
+_Production deployment, monitoring, and business automation examples_
 
 ## 🌐 Interactive Demo
 
@@ -153,7 +153,7 @@ Experience NeuroLink live without installation:
 
 - **Responsive design** across devices
 - **Real-time streaming** visualization
-- **Analytics dashboards** 
+- **Analytics dashboards**
 - **Configuration management**
 
 ### Mobile Optimization
@@ -177,12 +177,12 @@ All visual content is organized and optimized for:
 
 ```markdown
 ![NeuroLink CLI Demo](../assets/images/cli-demo.png)
-*NeuroLink CLI with provider status and text generation*
+_NeuroLink CLI with provider status and text generation_
 ```
 
 ### Presentation Materials
 
-- **Slide templates** for talks and presentations  
+- **Slide templates** for talks and presentations
 - **Logo assets** in multiple formats
 - **Brand guidelines** for consistent usage
 - **Social media** preview images
@@ -212,6 +212,6 @@ Visual representations of:
 If you have questions about any of the demonstrations:
 
 1. **[Troubleshooting Guide](../reference/troubleshooting.md)** - Common issues
-2. **[FAQ](../reference/faq.md)** - Frequently asked questions  
+2. **[FAQ](../reference/faq.md)** - Frequently asked questions
 3. **[GitHub Issues](https://github.com/juspay/neurolink/issues)** - Report problems
 4. **[Examples](../examples/index.md)** - Code implementations

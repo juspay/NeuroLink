@@ -19,8 +19,8 @@ const neurolink = new NeuroLink({
   analytics: {
     enabled: true,
     endpoint: "https://analytics.yourcompany.com",
-    apiKey: process.env.ANALYTICS_API_KEY
-  }
+    apiKey: process.env.ANALYTICS_API_KEY,
+  },
 });
 
 // Analytics automatically tracked
@@ -29,8 +29,8 @@ const result = await neurolink.generate({
   context: {
     userId: "user123",
     sessionId: "sess456",
-    department: "engineering"
-  }
+    department: "engineering",
+  },
 });
 ```
 
@@ -69,8 +69,8 @@ const result = await neurolink.generate({
   evaluation: {
     enabled: true,
     domain: "Senior Software Engineer",
-    criteria: ["accuracy", "completeness", "best_practices"]
-  }
+    criteria: ["accuracy", "completeness", "best_practices"],
+  },
 });
 
 console.log(result.evaluation);
@@ -120,7 +120,7 @@ Specialized evaluation contexts:
 const analytics = await neurolink.getAnalytics({
   timeRange: "last_7_days",
   groupBy: ["provider", "user_id"],
-  metrics: ["usage", "cost", "performance"]
+  metrics: ["usage", "cost", "performance"],
 });
 
 console.log(analytics);
@@ -172,7 +172,7 @@ const neurolink = new NeuroLink({
     apiKey: process.env.ANALYTICS_API_KEY,
     batchSize: 10,
     flushInterval: 5000,
-    retryAttempts: 3
+    retryAttempts: 3,
   },
   evaluation: {
     enabled: true,
@@ -180,8 +180,8 @@ const neurolink = new NeuroLink({
     model: "gemini-2.5-flash",
     temperature: 0.1,
     maxTokens: 500,
-    fallbackProviders: ["openai", "anthropic"]
-  }
+    fallbackProviders: ["openai", "anthropic"],
+  },
 });
 ```
 
@@ -194,12 +194,13 @@ const neurolink = new NeuroLink({
 const perfMetrics = await neurolink.getProviderMetrics({
   providers: ["openai", "google-ai", "anthropic"],
   timeRange: "last_24_hours",
-  metrics: ["response_time", "success_rate", "cost_per_token"]
+  metrics: ["response_time", "success_rate", "cost_per_token"],
 });
 
 // Identify best performing provider
-const bestProvider = perfMetrics.providers
-  .sort((a, b) => a.averageResponseTime - b.averageResponseTime)[0];
+const bestProvider = perfMetrics.providers.sort(
+  (a, b) => a.averageResponseTime - b.averageResponseTime,
+)[0];
 
 console.log(`Best provider: ${bestProvider.name}`);
 ```
@@ -210,12 +211,13 @@ console.log(`Best provider: ${bestProvider.name}`);
 // Track costs and optimize
 const costAnalysis = await neurolink.getCostAnalysis({
   timeRange: "current_month",
-  groupBy: ["provider", "model", "user_id"]
+  groupBy: ["provider", "model", "user_id"],
 });
 
 // Find cost-effective providers
-const cheapestProvider = costAnalysis.providers
-  .sort((a, b) => a.costPerToken - b.costPerToken)[0];
+const cheapestProvider = costAnalysis.providers.sort(
+  (a, b) => a.costPerToken - b.costPerToken,
+)[0];
 ```
 
 ### Quality Assurance
@@ -242,7 +244,7 @@ jq '.evaluation.overall' evaluations.json | awk '{sum+=$1} END {print "Average q
 const teamMetrics = await neurolink.getTeamAnalytics({
   departments: ["engineering", "product", "marketing"],
   metrics: ["usage", "cost", "quality_scores"],
-  timeRange: "current_quarter"
+  timeRange: "current_quarter",
 });
 ```
 
@@ -256,9 +258,9 @@ const result = await neurolink.generate({
     customMetrics: {
       feature: "report_generation",
       complexity: "high",
-      businessValue: "critical"
-    }
-  }
+      businessValue: "critical",
+    },
+  },
 });
 ```
 

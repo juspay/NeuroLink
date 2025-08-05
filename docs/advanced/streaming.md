@@ -18,7 +18,7 @@ const neurolink = new NeuroLink();
 // Basic streaming
 const stream = await neurolink.stream({
   input: { text: "Tell me a story about AI" },
-  provider: "openai"
+  provider: "openai",
 });
 
 for await (const chunk of stream) {
@@ -53,8 +53,8 @@ const stream = await neurolink.stream({
   stream: {
     bufferSize: 1024,
     flushInterval: 100,
-    enableChunking: true
-  }
+    enableChunking: true,
+  },
 });
 ```
 
@@ -63,20 +63,20 @@ const stream = await neurolink.stream({
 ```typescript
 try {
   const stream = await neurolink.stream({
-    input: { text: "Your prompt" }
+    input: { text: "Your prompt" },
   });
-  
+
   for await (const chunk of stream) {
     if (chunk.error) {
       console.error("Stream error:", chunk.error);
       break;
     }
-    
+
     if (chunk.finished) {
       console.log("Stream completed");
       break;
     }
-    
+
     process.stdout.write(chunk.content);
   }
 } catch (error) {
@@ -97,14 +97,14 @@ const stream = await neurolink.stream({
     context: {
       userId: "user123",
       sessionId: "session456",
-      feature: "report_generation"
-    }
-  }
+      feature: "report_generation",
+    },
+  },
 });
 
 for await (const chunk of stream) {
   console.log(chunk.content);
-  
+
   // Access real-time analytics
   if (chunk.analytics) {
     console.log(`Tokens so far: ${chunk.analytics.tokensUsed}`);
@@ -142,24 +142,24 @@ function ChatComponent() {
   const [messages, setMessages] = useState([]);
   const [currentResponse, setCurrentResponse] = useState("");
   const neurolink = new NeuroLink();
-  
+
   const sendMessage = async (userMessage) => {
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     setCurrentResponse("");
-    
+
     const stream = await neurolink.stream({
       input: { text: userMessage },
       provider: "google-ai"
     });
-    
+
     for await (const chunk of stream) {
       setCurrentResponse(prev => prev + chunk.content);
     }
-    
+
     setMessages(prev => [...prev, { role: "assistant", content: currentResponse }]);
     setCurrentResponse("");
   };
-  
+
   return (
     <div className="chat-interface">
       {messages.map((msg, i) => (
@@ -184,30 +184,30 @@ function ChatComponent() {
 // Real-time blog post generation
 async function generateBlogPost(topic: string) {
   const stream = await neurolink.stream({
-    input: { 
-      text: `Write a comprehensive blog post about ${topic}. Include introduction, main points, and conclusion.`
+    input: {
+      text: `Write a comprehensive blog post about ${topic}. Include introduction, main points, and conclusion.`,
     },
     provider: "anthropic",
     maxTokens: 3000,
-    analytics: { enabled: true }
+    analytics: { enabled: true },
   });
-  
+
   const sections = [];
   let currentSection = "";
-  
+
   for await (const chunk of stream) {
     currentSection += chunk.content;
-    
+
     // Update UI in real-time
     updateBlogPostPreview(currentSection);
-    
+
     // Detect section breaks
     if (chunk.content.includes("\n\n## ")) {
       sections.push(currentSection);
       currentSection = "";
     }
   }
-  
+
   return sections;
 }
 ```
@@ -225,11 +225,11 @@ while read -r topic; do
   if [ "$topic" = "quit" ]; then
     break
   fi
-  
+
   echo "🔄 Generating documentation for: $topic"
   npx @juspay/neurolink stream "
   Create comprehensive technical documentation for: $topic
-  
+
   Include:
   - Overview and purpose
   - Installation/setup instructions
@@ -237,7 +237,7 @@ while read -r topic; do
   - Best practices
   - Troubleshooting
   " --provider google-ai --enable-analytics
-  
+
   echo -e "\n\n📝 Documentation complete! Enter next topic:"
 done
 ```
@@ -248,12 +248,12 @@ done
 
 ```typescript
 interface StreamConfig {
-  bufferSize?: number;        // Chunk buffer size (default: 1024)
-  flushInterval?: number;     // Flush interval in ms (default: 100)
-  timeout?: number;           // Stream timeout in ms (default: 60000)
-  enableChunking?: boolean;   // Enable smart chunking (default: true)
-  retryAttempts?: number;     // Retry attempts on failure (default: 3)
-  reconnectDelay?: number;    // Reconnection delay in ms (default: 1000)
+  bufferSize?: number; // Chunk buffer size (default: 1024)
+  flushInterval?: number; // Flush interval in ms (default: 100)
+  timeout?: number; // Stream timeout in ms (default: 60000)
+  enableChunking?: boolean; // Enable smart chunking (default: true)
+  retryAttempts?: number; // Retry attempts on failure (default: 3)
+  reconnectDelay?: number; // Reconnection delay in ms (default: 1000)
 }
 
 const stream = await neurolink.stream({
@@ -263,8 +263,8 @@ const stream = await neurolink.stream({
     flushInterval: 50,
     timeout: 120000,
     enableChunking: true,
-    retryAttempts: 5
-  }
+    retryAttempts: 5,
+  },
 });
 ```
 
@@ -278,19 +278,19 @@ const openaiStream = await neurolink.stream({
   model: "gpt-4o",
   stream: {
     enableChunking: true,
-    bufferSize: 1024
-  }
+    bufferSize: 1024,
+  },
 });
 
-// Google AI streaming  
+// Google AI streaming
 const googleStream = await neurolink.stream({
   input: { text: "Generate content" },
   provider: "google-ai",
   model: "gemini-2.5-pro",
   stream: {
-    enableChunking: false,  // Google AI handles chunking internally
-    flushInterval: 50
-  }
+    enableChunking: false, // Google AI handles chunking internally
+    flushInterval: 50,
+  },
 });
 ```
 
@@ -319,8 +319,8 @@ const stream = await neurolink.stream({
   input: { text: "Performance test" },
   analytics: {
     enabled: true,
-    metrics: ["latency", "throughput", "token_rate"]
-  }
+    metrics: ["latency", "throughput", "token_rate"],
+  },
 });
 
 let startTime = Date.now();
@@ -328,11 +328,11 @@ let tokenCount = 0;
 
 for await (const chunk of stream) {
   tokenCount += chunk.tokenCount || 0;
-  
+
   if (chunk.analytics) {
     const elapsed = Date.now() - startTime;
     const tokensPerSecond = tokenCount / (elapsed / 1000);
-    
+
     console.log(`Throughput: ${tokensPerSecond.toFixed(2)} tokens/sec`);
   }
 }
@@ -352,17 +352,17 @@ const neurolink = new NeuroLink();
 app.post("/api/stream", async (req, res) => {
   res.setHeader("Content-Type", "text/plain");
   res.setHeader("Transfer-Encoding", "chunked");
-  
+
   try {
     const stream = await neurolink.stream({
       input: { text: req.body.prompt },
-      provider: "google-ai"
+      provider: "google-ai",
     });
-    
+
     for await (const chunk of stream) {
       res.write(chunk.content);
     }
-    
+
     res.end();
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -382,21 +382,23 @@ const neurolink = new NeuroLink();
 wss.on("connection", (ws) => {
   ws.on("message", async (message) => {
     const { prompt } = JSON.parse(message.toString());
-    
+
     try {
       const stream = await neurolink.stream({
         input: { text: prompt },
-        analytics: { enabled: true }
+        analytics: { enabled: true },
       });
-      
+
       for await (const chunk of stream) {
-        ws.send(JSON.stringify({
-          type: "chunk",
-          content: chunk.content,
-          analytics: chunk.analytics
-        }));
+        ws.send(
+          JSON.stringify({
+            type: "chunk",
+            content: chunk.content,
+            analytics: chunk.analytics,
+          }),
+        );
       }
-      
+
       ws.send(JSON.stringify({ type: "complete" }));
     } catch (error) {
       ws.send(JSON.stringify({ type: "error", error: error.message }));
@@ -412,18 +414,20 @@ app.get("/api/stream-sse", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-  
+
   const stream = await neurolink.stream({
-    input: { text: req.query.prompt as string }
+    input: { text: req.query.prompt as string },
   });
-  
+
   for await (const chunk of stream) {
-    res.write(`data: ${JSON.stringify({
-      content: chunk.content,
-      finished: chunk.finished
-    })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({
+        content: chunk.content,
+        finished: chunk.finished,
+      })}\n\n`,
+    );
   }
-  
+
   res.end();
 });
 ```
@@ -436,30 +440,29 @@ app.get("/api/stream-sse", async (req, res) => {
 async function robustStreaming(prompt: string) {
   const maxRetries = 3;
   let attempts = 0;
-  
+
   while (attempts < maxRetries) {
     try {
       const stream = await neurolink.stream({
         input: { text: prompt },
-        provider: "auto"  // Auto-fallback to working provider
+        provider: "auto", // Auto-fallback to working provider
       });
-      
+
       for await (const chunk of stream) {
         if (chunk.error) {
           throw new Error(chunk.error);
         }
-        
+
         console.log(chunk.content);
       }
-      
+
       return; // Success
-      
     } catch (error) {
       attempts++;
       console.warn(`Attempt ${attempts} failed:`, error.message);
-      
+
       if (attempts < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
       } else {
         throw new Error(`Streaming failed after ${maxRetries} attempts`);
       }

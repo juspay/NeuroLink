@@ -17,15 +17,15 @@ The SDK is designed for:
 
     ```typescript
     import { NeuroLink } from "@juspay/neurolink";
-    
+
     const neurolink = new NeuroLink();
-    
+
     // Generate text
     const result = await neurolink.generate({
       input: { text: "Write a haiku about programming" },
       provider: "google-ai",
     });
-    
+
     console.log(result.content);
     ```
 
@@ -33,10 +33,10 @@ The SDK is designed for:
 
     ```typescript
     import { createBestAIProvider } from "@juspay/neurolink";
-    
+
     // Auto-selects best available provider
     const provider = createBestAIProvider();
-    
+
     const result = await provider.generate({
       input: { text: "Explain quantum computing" },
       maxTokens: 500,
@@ -51,7 +51,7 @@ The SDK is designed for:
       input: { text: "Tell me a long story" },
       provider: "anthropic",
     });
-    
+
     for await (const chunk of stream.stream) {
       process.stdout.write(chunk.content);
     }
@@ -61,23 +61,23 @@ The SDK is designed for:
 
 <div class="grid cards" markdown>
 
--   :material-api: **[API Reference](api-reference.md)**
+- :material-api: **[API Reference](api-reference.md)**
 
-    ---
+  ***
 
-    Complete TypeScript API documentation with interfaces, types, and method signatures.
+  Complete TypeScript API documentation with interfaces, types, and method signatures.
 
--   :material-web: **[Framework Integration](framework-integration.md)**
+- :material-web: **[Framework Integration](framework-integration.md)**
 
-    ---
+  ***
 
-    Integration guides for Next.js, SvelteKit, React, Vue, and other popular frameworks.
+  Integration guides for Next.js, SvelteKit, React, Vue, and other popular frameworks.
 
--   :material-tools: **[Custom Tools](custom-tools.md)**
+- :material-tools: **[Custom Tools](custom-tools.md)**
 
-    ---
+  ***
 
-    How to create and register custom tools for enhanced AI capabilities.
+  How to create and register custom tools for enhanced AI capabilities.
 
 </div>
 
@@ -104,9 +104,9 @@ The SDK automatically detects configuration from:
 
 ```typescript
 // Environment variables
-process.env.OPENAI_API_KEY
-process.env.GOOGLE_AI_API_KEY
-process.env.ANTHROPIC_API_KEY
+process.env.OPENAI_API_KEY;
+process.env.GOOGLE_AI_API_KEY;
+process.env.ANTHROPIC_API_KEY;
 // ... and more
 
 // Programmatic configuration
@@ -124,11 +124,11 @@ const neurolink = new NeuroLink({
 ```typescript
 const result = await neurolink.generate({
   input: { text: "Generate a business proposal" },
-  enableAnalytics: true,    // Track usage and costs
-  enableEvaluation: true,   // AI quality scoring
+  enableAnalytics: true, // Track usage and costs
+  enableEvaluation: true, // AI quality scoring
 });
 
-console.log(result.analytics);  // Usage data
+console.log(result.analytics); // Usage data
 console.log(result.evaluation); // Quality scores
 ```
 
@@ -154,10 +154,10 @@ neurolink.registerTool("weatherLookup", {
 ```typescript
 const result = await neurolink.generate({
   input: { text: "Create a summary" },
-  context: { 
+  context: {
     userId: "123",
     project: "Q1-report",
-    department: "sales" 
+    department: "sales",
   },
 });
 ```
@@ -169,16 +169,16 @@ const result = await neurolink.generate({
     ```typescript
     // app/api/ai/route.ts
     import { NeuroLink } from "@juspay/neurolink";
-    
+
     export async function POST(request: Request) {
       const { prompt } = await request.json();
       const neurolink = new NeuroLink();
-      
+
       const result = await neurolink.generate({
         input: { text: prompt },
         timeout: "2m",
       });
-      
+
       return Response.json({ text: result.content });
     }
     ```
@@ -188,16 +188,16 @@ const result = await neurolink.generate({
     ```typescript
     // src/routes/api/ai/+server.ts
     import { createBestAIProvider } from "@juspay/neurolink";
-    
+
     export const POST: RequestHandler = async ({ request }) => {
       const { message } = await request.json();
       const provider = createBestAIProvider();
-      
+
       const stream = await provider.stream({
         input: { text: message },
         timeout: "2m",
       });
-      
+
       return new Response(stream.toReadableStream());
     };
     ```
@@ -207,15 +207,15 @@ const result = await neurolink.generate({
     ```typescript
     import express from 'express';
     import { NeuroLink } from "@juspay/neurolink";
-    
+
     const app = express();
     const neurolink = new NeuroLink();
-    
+
     app.post('/api/generate', async (req, res) => {
       const result = await neurolink.generate({
         input: { text: req.body.prompt },
       });
-      
+
       res.json({ content: result.content });
     });
     ```

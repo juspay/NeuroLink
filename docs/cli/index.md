@@ -19,10 +19,10 @@ The CLI is designed for:
     # Text generation (primary commands)
     neurolink generate "Your prompt here"
     neurolink gen "Your prompt"           # Short form
-    
+
     # Real-time streaming
     neurolink stream "Tell me a story"
-    
+
     # Provider management
     neurolink status                      # Check all providers
     neurolink provider status --verbose  # Detailed diagnostics
@@ -33,13 +33,13 @@ The CLI is designed for:
     ```bash
     # With analytics and evaluation
     neurolink generate "Write code" --enable-analytics --enable-evaluation
-    
+
     # Custom provider and model
     neurolink gen "Explain AI" --provider openai --model gpt-4
-    
+
     # Batch processing
     echo -e "Prompt 1\nPrompt 2" | neurolink batch prompts.txt
-    
+
     # Output to file
     neurolink generate "Documentation" --output result.md
     ```
@@ -49,10 +49,10 @@ The CLI is designed for:
     ```bash
     # Built-in tools (working)
     neurolink generate "What time is it?" --debug
-    
+
     # Disable tools
     neurolink generate "Pure text" --disable-tools
-    
+
     # MCP server management
     neurolink mcp discover
     neurolink mcp list
@@ -63,23 +63,23 @@ The CLI is designed for:
 
 <div class="grid cards" markdown>
 
--   :material-book-open: **[Commands Reference](commands.md)**
+- :material-book-open: **[Commands Reference](commands.md)**
 
-    ---
+  ***
 
-    Complete reference for all CLI commands, options, and parameters with detailed explanations.
+  Complete reference for all CLI commands, options, and parameters with detailed explanations.
 
--   :material-code-block-tags: **[Examples](examples.md)**
+- :material-code-block-tags: **[Examples](examples.md)**
 
-    ---
+  ***
 
-    Practical examples and common usage patterns for different scenarios and workflows.
+  Practical examples and common usage patterns for different scenarios and workflows.
 
--   :material-rocket: **[Advanced Usage](advanced.md)**
+- :material-rocket: **[Advanced Usage](advanced.md)**
 
-    ---
+  ***
 
-    Advanced features like batch processing, streaming, analytics, and custom configurations.
+  Advanced features like batch processing, streaming, analytics, and custom configurations.
 
 </div>
 

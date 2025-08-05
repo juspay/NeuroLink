@@ -70,7 +70,7 @@ No additional configuration needed.
 NEUROLINK_LOG_LEVEL="debug"
 NEUROLINK_CACHE_ENABLED="false"
 
-# .env.production  
+# .env.production
 NEUROLINK_LOG_LEVEL="warn"
 NEUROLINK_CACHE_ENABLED="true"
 NEUROLINK_ANALYTICS_ENABLED="true"
@@ -80,15 +80,15 @@ NEUROLINK_ANALYTICS_ENABLED="true"
 
 ### Q: What's the difference between CLI and SDK?
 
-**A:** 
+**A:**
 
-| Feature | CLI | SDK |
-|---------|-----|-----|
-| **Best for** | Scripts, automation, testing | Applications, integration |
-| **Installation** | None required (npx) | npm install required |
-| **Output** | Text, JSON | Native JavaScript objects |
-| **Batch processing** | Built-in `batch` command | Manual implementation |
-| **Learning curve** | Low | Medium |
+| Feature              | CLI                          | SDK                       |
+| -------------------- | ---------------------------- | ------------------------- |
+| **Best for**         | Scripts, automation, testing | Applications, integration |
+| **Installation**     | None required (npx)          | npm install required      |
+| **Output**           | Text, JSON                   | Native JavaScript objects |
+| **Batch processing** | Built-in `batch` command     | Manual implementation     |
+| **Learning curve**   | Low                          | Medium                    |
 
 ### Q: How do I choose the best provider for my use case?
 
@@ -120,12 +120,12 @@ const neurolink = new NeuroLink();
 // Use different providers for different tasks
 const code = await neurolink.generate({
   input: { text: "Write a Python function" },
-  provider: "anthropic"
+  provider: "anthropic",
 });
 
 const creative = await neurolink.generate({
   input: { text: "Write a poem" },
-  provider: "openai"
+  provider: "openai",
 });
 ```
 
@@ -137,19 +137,21 @@ const creative = await neurolink.generate({
 
 1. **Check .env file exists** and is in the correct directory
 2. **Verify file format**: No spaces around `=` signs
+
    ```bash
    # Correct
    OPENAI_API_KEY="sk-your-key"
-   
+
    # Incorrect
    OPENAI_API_KEY = "sk-your-key"
    ```
+
 3. **Check file permissions**: `.env` file should be readable
 4. **Verify key format**: Keys should start with provider-specific prefixes
 
 ### Q: Provider status shows "Authentication failed" - what should I do?
 
-**A:** 
+**A:**
 
 1. **Verify API key is correct** and hasn't expired
 2. **Check account status** - ensure billing is set up if required
@@ -204,7 +206,7 @@ GOOGLE_VERTEX_LOCATION="us-central1"
 
 ### Q: How do I handle rate limits?
 
-**A:** 
+**A:**
 
 1. **Use batch processing** with delays:
    ```bash
@@ -218,7 +220,7 @@ GOOGLE_VERTEX_LOCATION="us-central1"
 
 ### Q: What are analytics and evaluation features?
 
-**A:** 
+**A:**
 
 - **Analytics**: Track usage metrics, costs, and performance
 - **Evaluation**: AI-powered quality scoring of responses
@@ -248,7 +250,7 @@ npx @juspay/neurolink gen "What time is it?" --debug
 
 ### Q: How do I use streaming responses?
 
-**A:** 
+**A:**
 
 ```bash
 # CLI streaming
@@ -317,7 +319,7 @@ npx @juspay/neurolink gen "prompt" \
 
 ### Q: How do I integrate NeuroLink with React?
 
-**A:** 
+**A:**
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
@@ -326,14 +328,14 @@ import { useState } from "react";
 function AIComponent() {
   const [response, setResponse] = useState("");
   const neurolink = new NeuroLink();
-  
+
   const generate = async () => {
     const result = await neurolink.generate({
       input: { text: "Hello AI" }
     });
     setResponse(result.content);
   };
-  
+
   return (
     <div>
       <button onClick={generate}>Generate</button>
@@ -345,18 +347,18 @@ function AIComponent() {
 
 ### Q: How do I handle errors properly?
 
-**A:** 
+**A:**
 
 ```typescript
 try {
   const result = await neurolink.generate({
-    input: { text: "Your prompt" }
+    input: { text: "Your prompt" },
   });
   console.log(result.content);
 } catch (error) {
-  if (error.code === 'RATE_LIMIT_EXCEEDED') {
+  if (error.code === "RATE_LIMIT_EXCEEDED") {
     // Handle rate limiting
-  } else if (error.code === 'AUTHENTICATION_FAILED') {
+  } else if (error.code === "AUTHENTICATION_FAILED") {
     // Handle auth issues
   } else {
     // Handle other errors
@@ -400,7 +402,7 @@ Use `npx @juspay/neurolink models best --use-case cheapest` to find the most cos
 
 ### Q: How can I monitor and control costs?
 
-**A:** 
+**A:**
 
 1. **Enable analytics** to track usage and costs
 2. **Set provider limits** in your AI provider dashboards
@@ -412,7 +414,7 @@ Use `npx @juspay/neurolink models best --use-case cheapest` to find the most cos
 
 ### Q: Where can I get help?
 
-**A:** 
+**A:**
 
 1. **Documentation**: Comprehensive guides and API reference
 2. **GitHub Issues**: Report bugs and request features
@@ -421,7 +423,7 @@ Use `npx @juspay/neurolink models best --use-case cheapest` to find the most cos
 
 ### Q: How do I report a bug?
 
-**A:** 
+**A:**
 
 1. **Check existing issues** on GitHub
 2. **Include reproduction steps**
@@ -434,7 +436,7 @@ Use `npx @juspay/neurolink models best --use-case cheapest` to find the most cos
 
 ### Q: How do I request a new feature?
 
-**A:** 
+**A:**
 
 1. **Search existing feature requests**
 2. **Open GitHub issue** with "enhancement" label
@@ -455,7 +457,7 @@ Use `npx @juspay/neurolink models best --use-case cheapest` to find the most cos
 
 ### Q: How do I update NeuroLink?
 
-**A:** 
+**A:**
 
 ```bash
 # For global installation
@@ -482,17 +484,17 @@ npx @juspay/neurolink --version
 
 ```typescript
 // From OpenAI SDK
-import OpenAI from 'openai';
+import OpenAI from "openai";
 const openai = new OpenAI();
 
 // To NeuroLink
-import { NeuroLink } from '@juspay/neurolink';
+import { NeuroLink } from "@juspay/neurolink";
 const neurolink = new NeuroLink();
 
 // Similar API, enhanced features
 const result = await neurolink.generate({
   input: { text: "Your prompt" },
-  provider: "openai"  // Optional, can use any provider
+  provider: "openai", // Optional, can use any provider
 });
 ```
 

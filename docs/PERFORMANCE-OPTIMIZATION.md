@@ -7,23 +7,25 @@ Comprehensive guide for optimizing NeuroLink performance, reducing latency, and 
 ### Immediate Optimizations
 
 1. **Enable Response Caching**
+
    ```typescript
    const neurolink = new NeuroLink({
      caching: {
        enabled: true,
        ttl: 300000, // 5 minutes
-       maxSize: 1000
-     }
+       maxSize: 1000,
+     },
    });
    ```
 
 2. **Use Streaming for Long Responses**
+
    ```typescript
    const stream = await neurolink.stream({
      input: { text: "Write a comprehensive report..." },
-     provider: "anthropic"
+     provider: "anthropic",
    });
-   
+
    for await (const chunk of stream) {
      console.log(chunk.content); // Process immediately
    }
@@ -43,7 +45,7 @@ Comprehensive guide for optimizing NeuroLink performance, reducing latency, and 
 ### Real-time Metrics
 
 ```typescript
-import { NeuroLink, PerformanceMonitor } from '@juspay/neurolink';
+import { NeuroLink, PerformanceMonitor } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   monitoring: {
@@ -51,17 +53,17 @@ const neurolink = new NeuroLink({
     metricsInterval: 30000, // 30 seconds
     trackLatency: true,
     trackThroughput: true,
-    trackErrors: true
-  }
+    trackErrors: true,
+  },
 });
 
 // Get performance insights
 const monitor = new PerformanceMonitor(neurolink);
 const metrics = await monitor.getMetrics();
 
-console.log('Average Response Time:', metrics.averageLatency);
-console.log('Requests per Second:', metrics.throughput);
-console.log('Error Rate:', metrics.errorRate);
+console.log("Average Response Time:", metrics.averageLatency);
+console.log("Requests per Second:", metrics.throughput);
+console.log("Error Rate:", metrics.errorRate);
 ```
 
 ### Performance Dashboard
@@ -71,13 +73,13 @@ console.log('Error Rate:', metrics.errorRate);
 const dashboard = new PerformanceDashboard({
   refreshInterval: 5000, // 5 seconds
   metrics: [
-    'response_time',
-    'throughput',
-    'cache_hit_ratio',
-    'provider_health',
-    'error_rate',
-    'token_usage'
-  ]
+    "response_time",
+    "throughput",
+    "cache_hit_ratio",
+    "provider_health",
+    "error_rate",
+    "token_usage",
+  ],
 });
 
 await dashboard.start();
@@ -91,14 +93,14 @@ await dashboard.start();
 // Intelligent provider routing
 const neurolink = new NeuroLink({
   routing: {
-    strategy: 'performance_optimized',
+    strategy: "performance_optimized",
     criteria: {
-      latency: 0.4,      // 40% weight
-      reliability: 0.3,   // 30% weight
-      cost: 0.2,         // 20% weight
-      quality: 0.1       // 10% weight
-    }
-  }
+      latency: 0.4, // 40% weight
+      reliability: 0.3, // 30% weight
+      cost: 0.2, // 20% weight
+      quality: 0.1, // 10% weight
+    },
+  },
 });
 ```
 
@@ -108,10 +110,10 @@ const neurolink = new NeuroLink({
 // Provider-specific timeouts
 const optimizedConfig = {
   providers: {
-    openai: { timeout: 15000 },      // Fast for simple tasks
-    anthropic: { timeout: 30000 },   // Balanced
-    bedrock: { timeout: 45000 }      // Longer for complex reasoning
-  }
+    openai: { timeout: 15000 }, // Fast for simple tasks
+    anthropic: { timeout: 30000 }, // Balanced
+    bedrock: { timeout: 45000 }, // Longer for complex reasoning
+  },
 };
 ```
 
@@ -120,13 +122,13 @@ const optimizedConfig = {
 ```typescript
 // Multi-provider load balancing
 const loadBalancer = new ProviderLoadBalancer({
-  providers: ['openai', 'anthropic', 'google-ai'],
-  algorithm: 'least_loaded',
+  providers: ["openai", "anthropic", "google-ai"],
+  algorithm: "least_loaded",
   healthChecks: {
     interval: 30000,
     timeout: 5000,
-    failureThreshold: 3
-  }
+    failureThreshold: 3,
+  },
 });
 ```
 
@@ -140,8 +142,8 @@ const neurolink = new NeuroLink({
     maxConnections: 20,
     keepAlive: true,
     maxIdleTime: 30000,
-    retryOnFailure: true
-  }
+    retryOnFailure: true,
+  },
 });
 ```
 
@@ -153,9 +155,9 @@ const optimizedRequest = {
   input: { text: prompt },
   maxTokens: calculateOptimalTokens(prompt),
   temperature: 0.7,
-  stopSequences: ['---', 'END'],
+  stopSequences: ["---", "END"],
   truncateInput: true,
-  compressHistory: true
+  compressHistory: true,
 };
 ```
 
@@ -165,12 +167,12 @@ const optimizedRequest = {
 // Parallel request processing
 async function processInParallel(prompts: string[]) {
   const chunks = chunkArray(prompts, 5); // Process 5 at a time
-  
+
   for (const chunk of chunks) {
-    const promises = chunk.map(prompt => 
-      neurolink.generate({ input: { text: prompt } })
+    const promises = chunk.map((prompt) =>
+      neurolink.generate({ input: { text: prompt } }),
     );
-    
+
     const results = await Promise.allSettled(promises);
     processResults(results);
   }
@@ -223,22 +225,22 @@ const neurolink = new NeuroLink({
     levels: {
       memory: {
         enabled: true,
-        maxSize: 500,    // In-memory cache
-        ttl: 300000      // 5 minutes
+        maxSize: 500, // In-memory cache
+        ttl: 300000, // 5 minutes
       },
       redis: {
         enabled: true,
-        host: 'localhost',
+        host: "localhost",
         port: 6379,
-        ttl: 3600000     // 1 hour
+        ttl: 3600000, // 1 hour
       },
       file: {
         enabled: true,
-        directory: './cache',
-        ttl: 86400000    // 24 hours
-      }
-    }
-  }
+        directory: "./cache",
+        ttl: 86400000, // 24 hours
+      },
+    },
+  },
 });
 ```
 
@@ -247,10 +249,10 @@ const neurolink = new NeuroLink({
 ```typescript
 // Content-based caching
 const cacheConfig = {
-  keyStrategy: 'content_hash',
-  includeProvider: false,     // Cache across providers
-  includeTemperature: true,   // Different temps = different cache
-  versionKey: 'v1.0'         // Cache versioning
+  keyStrategy: "content_hash",
+  includeProvider: false, // Cache across providers
+  includeTemperature: true, // Different temps = different cache
+  versionKey: "v1.0", // Cache versioning
 };
 ```
 
@@ -286,17 +288,17 @@ const productionConfig = {
   limits: {
     maxConcurrentRequests: 50,
     maxQueueSize: 200,
-    maxMemoryUsage: '512MB',
+    maxMemoryUsage: "512MB",
     requestTimeout: 30000,
-    maxTokensPerRequest: 4000
+    maxTokensPerRequest: 4000,
   },
   monitoring: {
     alertThresholds: {
-      errorRate: 0.05,        // 5% error rate
-      avgLatency: 5000,       // 5 second response time
-      queueDepth: 100         // 100 queued requests
-    }
-  }
+      errorRate: 0.05, // 5% error rate
+      avgLatency: 5000, // 5 second response time
+      queueDepth: 100, // 100 queued requests
+    },
+  },
 };
 ```
 
@@ -310,14 +312,14 @@ const scaler = new AutoScaler({
   scaleUpThreshold: {
     cpuUsage: 70,
     memoryUsage: 80,
-    queueDepth: 50
+    queueDepth: 50,
   },
   scaleDownThreshold: {
     cpuUsage: 30,
     memoryUsage: 40,
-    queueDepth: 5
+    queueDepth: 5,
   },
-  cooldown: 300000 // 5 minutes
+  cooldown: 300000, // 5 minutes
 });
 ```
 
@@ -329,11 +331,11 @@ const scaler = new AutoScaler({
 // Enable detailed profiling
 const neurolink = new NeuroLink({
   profiling: {
-    enabled: process.env.NODE_ENV === 'development',
+    enabled: process.env.NODE_ENV === "development",
     includeStackTraces: true,
     trackMemoryUsage: true,
-    outputFile: './performance.log'
-  }
+    outputFile: "./performance.log",
+  },
 });
 ```
 
@@ -354,13 +356,13 @@ npx @juspay/neurolink analyze latency \
 // Identify performance bottlenecks
 const analyzer = new PerformanceAnalyzer();
 const report = await analyzer.analyze({
-  timeRange: '24h',
-  groupBy: ['provider', 'model', 'requestSize'],
-  metrics: ['latency', 'throughput', 'errorRate']
+  timeRange: "24h",
+  groupBy: ["provider", "model", "requestSize"],
+  metrics: ["latency", "throughput", "errorRate"],
 });
 
-console.log('Slowest operations:', report.bottlenecks);
-console.log('Optimization recommendations:', report.recommendations);
+console.log("Slowest operations:", report.bottlenecks);
+console.log("Optimization recommendations:", report.recommendations);
 ```
 
 ## 🏭 Enterprise Performance
@@ -385,15 +387,15 @@ const stressTest = new StressTestRunner({
   rampUp: {
     startRPS: 1,
     endRPS: 500,
-    duration: '5m'
+    duration: "5m",
   },
   plateau: {
     targetRPS: 500,
-    duration: '10m'
+    duration: "10m",
   },
   rampDown: {
-    duration: '2m'
-  }
+    duration: "2m",
+  },
 });
 
 const results = await stressTest.run();
@@ -408,23 +410,23 @@ const planner = new CapacityPlanner({
   averageRequestsPerUser: 5,
   peakMultiplier: 3,
   responseTimeTarget: 2000, // 2 seconds
-  availabilityTarget: 99.9   // 99.9% uptime
+  availabilityTarget: 99.9, // 99.9% uptime
 });
 
 const requirements = planner.calculate();
-console.log('Required capacity:', requirements);
+console.log("Required capacity:", requirements);
 ```
 
 ## 📊 Performance Benchmarks
 
 ### Provider Comparison
 
-| Provider | Avg Latency | Throughput | Success Rate | Cost/1K tokens |
-|----------|-------------|------------|--------------|----------------|
-| OpenAI   | 1.2s        | 150 req/s  | 99.5%        | $0.03          |
-| Anthropic| 1.8s        | 120 req/s  | 99.8%        | $0.015         |
-| Google AI| 0.9s        | 200 req/s  | 99.2%        | $0.025         |
-| Bedrock  | 2.1s        | 100 req/s  | 99.9%        | $0.02          |
+| Provider  | Avg Latency | Throughput | Success Rate | Cost/1K tokens |
+| --------- | ----------- | ---------- | ------------ | -------------- |
+| OpenAI    | 1.2s        | 150 req/s  | 99.5%        | $0.03          |
+| Anthropic | 1.8s        | 120 req/s  | 99.8%        | $0.015         |
+| Google AI | 0.9s        | 200 req/s  | 99.2%        | $0.025         |
+| Bedrock   | 2.1s        | 100 req/s  | 99.9%        | $0.02          |
 
 ### Optimization Results
 
@@ -432,17 +434,17 @@ console.log('Required capacity:', requirements);
 // Before vs After optimization
 const benchmarks = {
   before: {
-    avgLatency: 3500,  // 3.5 seconds
-    throughput: 50,    // 50 req/s
-    errorRate: 0.02,   // 2% errors
-    cacheHitRate: 0    // No caching
+    avgLatency: 3500, // 3.5 seconds
+    throughput: 50, // 50 req/s
+    errorRate: 0.02, // 2% errors
+    cacheHitRate: 0, // No caching
   },
   after: {
-    avgLatency: 1200,  // 1.2 seconds (-66%)
-    throughput: 180,   // 180 req/s (+260%)
-    errorRate: 0.005,  // 0.5% errors (-75%)
-    cacheHitRate: 0.35 // 35% cache hits
-  }
+    avgLatency: 1200, // 1.2 seconds (-66%)
+    throughput: 180, // 180 req/s (+260%)
+    errorRate: 0.005, // 0.5% errors (-75%)
+    cacheHitRate: 0.35, // 35% cache hits
+  },
 };
 ```
 
@@ -455,22 +457,22 @@ const benchmarks = {
 const alerts = new AlertManager({
   thresholds: {
     responseTime: {
-      warning: 2000,   // 2 seconds
-      critical: 5000   // 5 seconds
+      warning: 2000, // 2 seconds
+      critical: 5000, // 5 seconds
     },
     errorRate: {
-      warning: 0.01,   // 1%
-      critical: 0.05   // 5%
+      warning: 0.01, // 1%
+      critical: 0.05, // 5%
     },
     throughput: {
-      warning: 50,     // Below 50 req/s
-      critical: 20     // Below 20 req/s
-    }
+      warning: 50, // Below 50 req/s
+      critical: 20, // Below 20 req/s
+    },
   },
   notifications: {
     slack: process.env.SLACK_WEBHOOK,
-    email: process.env.ALERT_EMAIL
-  }
+    email: process.env.ALERT_EMAIL,
+  },
 });
 ```
 
@@ -480,21 +482,21 @@ const alerts = new AlertManager({
 // Performance monitoring dashboard
 const dashboard = {
   metrics: [
-    'requests_per_second',
-    'average_response_time',
-    'error_rate',
-    'cache_hit_ratio',
-    'provider_health',
-    'queue_depth',
-    'memory_usage',
-    'cpu_usage'
+    "requests_per_second",
+    "average_response_time",
+    "error_rate",
+    "cache_hit_ratio",
+    "provider_health",
+    "queue_depth",
+    "memory_usage",
+    "cpu_usage",
   ],
   charts: [
-    'response_time_histogram',
-    'throughput_timeline',
-    'error_rate_timeline',
-    'provider_comparison'
-  ]
+    "response_time_histogram",
+    "throughput_timeline",
+    "error_rate_timeline",
+    "provider_comparison",
+  ],
 };
 ```
 
@@ -503,12 +505,14 @@ const dashboard = {
 ### Common Issues
 
 1. **High Latency**
+
    - Check provider response times
    - Verify network connectivity
    - Review request complexity
    - Consider request timeouts
 
 2. **Low Throughput**
+
    - Increase connection pool size
    - Enable parallel processing
    - Optimize request batching

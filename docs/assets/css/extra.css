@@ -115,7 +115,11 @@
 
 /* Quick start section */
 .quick-start {
-  background: linear-gradient(135deg, var(--neurolink-primary), var(--neurolink-accent));
+  background: linear-gradient(
+    135deg,
+    var(--neurolink-primary),
+    var(--neurolink-accent)
+  );
   color: white;
   padding: 2rem;
   border-radius: 1rem;
@@ -178,11 +182,11 @@
   .grid.cards {
     grid-template-columns: 1fr;
   }
-  
+
   .video-container {
     margin: 0.5rem 0;
   }
-  
+
   .quick-start {
     padding: 1rem;
     margin: 1rem 0;
@@ -194,11 +198,11 @@
   .grid.cards {
     break-inside: avoid;
   }
-  
+
   .video-container {
     display: none;
   }
-  
+
   .feature-highlight {
     break-inside: avoid;
   }

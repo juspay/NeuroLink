@@ -325,7 +325,7 @@ for file in $files; do
     - Security issues
     - Performance optimizations
     - Maintainability
-    
+
     File: $file
     " --enable-evaluation \
       --evaluation-domain "Senior Code Reviewer" \
@@ -350,7 +350,7 @@ if [ $working -lt $total ]; then
   Create alert message: $working out of $total AI providers are working.
   Include impact assessment and recommended actions.
   " --max-tokens 200)
-  
+
   # Send to monitoring system
   curl -X POST webhook-url -d "message=$alert"
 fi
@@ -403,7 +403,7 @@ npx @juspay/neurolink batch prompts.txt \
 generate_with_fallback() {
   local prompt="$1"
   local providers=("openai" "google-ai" "anthropic")
-  
+
   for provider in "${providers[@]}"; do
     echo "Trying $provider..."
     if result=$(npx @juspay/neurolink gen "$prompt" --provider $provider 2>/dev/null); then
@@ -414,7 +414,7 @@ generate_with_fallback() {
       echo "Failed with $provider, trying next..."
     fi
   done
-  
+
   echo "All providers failed"
   return 1
 }

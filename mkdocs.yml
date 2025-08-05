@@ -136,51 +136,51 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started:
-    - getting-started/index.md
-    - Quick Start: getting-started/quick-start.md
-    - Installation: getting-started/installation.md
-    - Provider Setup: getting-started/provider-setup.md
-    - Environment Variables: getting-started/environment-variables.md
+      - getting-started/index.md
+      - Quick Start: getting-started/quick-start.md
+      - Installation: getting-started/installation.md
+      - Provider Setup: getting-started/provider-setup.md
+      - Environment Variables: getting-started/environment-variables.md
   - CLI Guide:
-    - cli/index.md
-    - Commands Reference: cli/commands.md
-    - Examples: cli/examples.md
-    - Advanced Usage: cli/advanced.md
+      - cli/index.md
+      - Commands Reference: cli/commands.md
+      - Examples: cli/examples.md
+      - Advanced Usage: cli/advanced.md
   - SDK Reference:
-    - sdk/index.md
-    - API Reference: sdk/api-reference.md
-    - Framework Integration: sdk/framework-integration.md
-    - Custom Tools: sdk/custom-tools.md
+      - sdk/index.md
+      - API Reference: sdk/api-reference.md
+      - Framework Integration: sdk/framework-integration.md
+      - Custom Tools: sdk/custom-tools.md
   - Advanced Features:
-    - advanced/index.md
-    - MCP Integration: advanced/mcp-integration.md
-    - Analytics & Evaluation: advanced/analytics.md
-    - Factory Patterns: advanced/factory-patterns.md
-    - Dynamic Models: advanced/dynamic-models.md
-    - Streaming: advanced/streaming.md
+      - advanced/index.md
+      - MCP Integration: advanced/mcp-integration.md
+      - Analytics & Evaluation: advanced/analytics.md
+      - Factory Patterns: advanced/factory-patterns.md
+      - Dynamic Models: advanced/dynamic-models.md
+      - Streaming: advanced/streaming.md
   - Examples & Tutorials:
-    - examples/index.md
-    - Basic Usage: examples/basic-usage.md
-    - Advanced Examples: examples/advanced.md
-    - Use Cases: examples/use-cases.md
-    - Business Applications: examples/business.md
+      - examples/index.md
+      - Basic Usage: examples/basic-usage.md
+      - Advanced Examples: examples/advanced.md
+      - Use Cases: examples/use-cases.md
+      - Business Applications: examples/business.md
   - Visual Demos:
-    - demos/index.md
-    - Screenshots: demos/screenshots.md
-    - Videos: demos/videos.md
-    - Interactive Demo: demos/interactive.md
+      - demos/index.md
+      - Screenshots: demos/screenshots.md
+      - Videos: demos/videos.md
+      - Interactive Demo: demos/interactive.md
   - Development:
-    - development/index.md
-    - Contributing: development/contributing.md
-    - Testing: development/testing.md
-    - Architecture: development/architecture.md
-    - Factory Pattern Migration: development/factory-migration.md
+      - development/index.md
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+      - Architecture: development/architecture.md
+      - Factory Pattern Migration: development/factory-migration.md
   - Reference:
-    - reference/index.md
-    - Troubleshooting: reference/troubleshooting.md
-    - Configuration: reference/configuration.md
-    - Provider Comparison: reference/provider-comparison.md
-    - FAQ: reference/faq.md
+      - reference/index.md
+      - Troubleshooting: reference/troubleshooting.md
+      - Configuration: reference/configuration.md
+      - Provider Comparison: reference/provider-comparison.md
+      - FAQ: reference/faq.md
 
 # Social links and extras
 extra:

@@ -8,29 +8,29 @@ This section covers everything needed for contributing to NeuroLink, understandi
 
 <div class="grid cards" markdown>
 
--   :material-heart: **[Contributing](contributing.md)**
+- :material-heart: **[Contributing](contributing.md)**
 
-    ---
+  ***
 
-    How to contribute to NeuroLink, including setup, coding standards, and submission guidelines.
+  How to contribute to NeuroLink, including setup, coding standards, and submission guidelines.
 
--   :material-test-tube: **[Testing](testing.md)**
+- :material-test-tube: **[Testing](testing.md)**
 
-    ---
+  ***
 
-    Comprehensive testing strategies, test suite organization, and validation procedures.
+  Comprehensive testing strategies, test suite organization, and validation procedures.
 
--   :material-sitemap: **[Architecture](architecture.md)**
+- :material-sitemap: **[Architecture](architecture.md)**
 
-    ---
+  ***
 
-    Deep dive into NeuroLink's architecture, design patterns, and system organization.
+  Deep dive into NeuroLink's architecture, design patterns, and system organization.
 
--   :material-factory: **[Factory Pattern Migration](factory-migration.md)**
+- :material-factory: **[Factory Pattern Migration](factory-migration.md)**
 
-    ---
+  ***
 
-    Guide for upgrading from older architectures to the new unified factory pattern system.
+  Guide for upgrading from older architectures to the new unified factory pattern system.
 
 </div>
 
@@ -42,16 +42,16 @@ This section covers everything needed for contributing to NeuroLink, understandi
     # Clone the repository
     git clone https://github.com/juspay/neurolink
     cd neurolink
-    
+
     # Install dependencies
     pnpm install
-    
+
     # Complete automated setup
     pnpm setup:complete
-    
+
     # Run comprehensive tests
     pnpm test:adaptive
-    
+
     # Build the project
     pnpm build:complete
     ```
@@ -62,10 +62,10 @@ This section covers everything needed for contributing to NeuroLink, understandi
     # Basic development environment
     pnpm install
     pnpm env:setup
-    
+
     # Start development
     pnpm dev
-    
+
     # Run quick tests
     pnpm test:smart
     ```
@@ -75,10 +75,10 @@ This section covers everything needed for contributing to NeuroLink, understandi
     ```bash
     # Install docs dependencies
     pip install -r requirements.txt
-    
+
     # Serve documentation locally
     mkdocs serve
-    
+
     # Build documentation
     mkdocs build
     ```
@@ -97,12 +97,12 @@ graph TD
     C --> E[Google AI Provider]
     C --> F[Anthropic Provider]
     C --> G[Other Providers]
-    
+
     A --> H[MCP System]
     H --> I[Built-in Tools]
     H --> J[Custom Tools]
     H --> K[External Servers]
-    
+
     A --> L[Analytics System]
     A --> M[Evaluation System]
     A --> N[Streaming System]

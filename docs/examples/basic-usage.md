@@ -13,7 +13,7 @@ const neurolink = new NeuroLink();
 
 // Basic text generation
 const result = await neurolink.generate({
-  input: { text: "Explain TypeScript in simple terms" }
+  input: { text: "Explain TypeScript in simple terms" },
 });
 
 console.log(result.content);
@@ -41,36 +41,38 @@ import { NeuroLink } from "@juspay/neurolink";
 
 class AIAssistant {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async generateResponse(userMessage: string): Promise<string> {
     const result = await this.neurolink.generate({
       input: { text: userMessage },
-      provider: "auto",  // Auto-select best provider
-      temperature: 0.7
+      provider: "auto", // Auto-select best provider
+      temperature: 0.7,
     });
-    
+
     return result.content;
   }
-  
+
   async summarizeText(text: string): Promise<string> {
     const result = await this.neurolink.generate({
-      input: { 
-        text: `Summarize this text in 2-3 sentences: ${text}` 
+      input: {
+        text: `Summarize this text in 2-3 sentences: ${text}`,
       },
-      maxTokens: 150
+      maxTokens: 150,
     });
-    
+
     return result.content;
   }
 }
 
 // Usage
 const assistant = new AIAssistant();
-const response = await assistant.generateResponse("How do I deploy a Node.js app?");
+const response = await assistant.generateResponse(
+  "How do I deploy a Node.js app?",
+);
 console.log(response);
 ```
 
@@ -89,22 +91,22 @@ app.use(express.json());
 app.post("/api/generate", async (req, res) => {
   try {
     const { prompt, provider = "auto" } = req.body;
-    
+
     const result = await neurolink.generate({
       input: { text: prompt },
-      provider: provider
+      provider: provider,
     });
-    
+
     res.json({
       success: true,
       content: result.content,
       provider: result.provider,
-      usage: result.usage
+      usage: result.usage,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -113,25 +115,25 @@ app.post("/api/generate", async (req, res) => {
 app.post("/api/summarize", async (req, res) => {
   try {
     const { text, maxLength = 150 } = req.body;
-    
+
     const result = await neurolink.generate({
-      input: { 
-        text: `Provide a concise summary of this text: ${text}` 
+      input: {
+        text: `Provide a concise summary of this text: ${text}`,
       },
       maxTokens: maxLength,
-      temperature: 0.3  // Lower temperature for factual summarization
+      temperature: 0.3, // Lower temperature for factual summarization
     });
-    
+
     res.json({
       success: true,
       summary: result.content,
       originalLength: text.length,
-      summaryLength: result.content.length
+      summaryLength: result.content.length,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -155,18 +157,18 @@ function AIChat() {
   const [message, setMessage] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    
+
     setLoading(true);
     try {
       const result = await neurolink.generate({
         input: { text: message },
         provider: "google-ai"
       });
-      
+
       setResponse(result.content);
     } catch (error) {
       setResponse(`Error: ${error.message}`);
@@ -174,7 +176,7 @@ function AIChat() {
       setLoading(false);
     }
   };
-  
+
   return (
     <div className="ai-chat">
       <form onSubmit={handleSubmit}>
@@ -189,7 +191,7 @@ function AIChat() {
           {loading ? "Generating..." : "Send"}
         </button>
       </form>
-      
+
       {response && (
         <div className="response">
           <h3>Response:</h3>
@@ -214,17 +216,17 @@ const neurolink = new NeuroLink();
 export function useAI() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const generate = useCallback(async (prompt: string, options = {}) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await neurolink.generate({
         input: { text: prompt },
         ...options
       });
-      
+
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -234,7 +236,7 @@ export function useAI() {
       setLoading(false);
     }
   }, []);
-  
+
   return { generate, loading, error };
 }
 
@@ -242,7 +244,7 @@ export function useAI() {
 function MyComponent() {
   const { generate, loading, error } = useAI();
   const [result, setResult] = useState("");
-  
+
   const handleGenerate = async () => {
     try {
       const response = await generate("Explain React hooks");
@@ -251,7 +253,7 @@ function MyComponent() {
       console.error("Generation failed:", err);
     }
   };
-  
+
   return (
     <div>
       <button onClick={handleGenerate} disabled={loading}>
@@ -271,20 +273,20 @@ function MyComponent() {
 ```typescript
 async function generateCode(description: string, language: string) {
   const result = await neurolink.generate({
-    input: { 
-      text: `Write ${language} code for: ${description}. Include comments and error handling.`
+    input: {
+      text: `Write ${language} code for: ${description}. Include comments and error handling.`,
     },
-    provider: "anthropic",  // Claude is great for code
-    temperature: 0.3        // Lower temperature for precise code
+    provider: "anthropic", // Claude is great for code
+    temperature: 0.3, // Lower temperature for precise code
   });
-  
+
   return result.content;
 }
 
 // Usage
 const pythonCode = await generateCode(
-  "function to calculate compound interest", 
-  "Python"
+  "function to calculate compound interest",
+  "Python",
 );
 console.log(pythonCode);
 ```
@@ -294,22 +296,22 @@ console.log(pythonCode);
 ```typescript
 async function createBlogPost(topic: string, audience: string) {
   const result = await neurolink.generate({
-    input: { 
+    input: {
       text: `Write a blog post about ${topic} for ${audience}. 
-             Include: introduction, main points, conclusion, and call-to-action.`
+             Include: introduction, main points, conclusion, and call-to-action.`,
     },
     provider: "openai",
-    temperature: 0.8,  // Higher temperature for creative content
-    maxTokens: 1500
+    temperature: 0.8, // Higher temperature for creative content
+    maxTokens: 1500,
   });
-  
+
   return result.content;
 }
 
 // Usage
 const blogPost = await createBlogPost(
-  "AI automation in business", 
-  "small business owners"
+  "AI automation in business",
+  "small business owners",
 );
 ```
 
@@ -318,18 +320,18 @@ const blogPost = await createBlogPost(
 ```typescript
 async function analyzeData(data: any[], question: string) {
   const dataString = JSON.stringify(data, null, 2);
-  
+
   const result = await neurolink.generate({
-    input: { 
+    input: {
       text: `Analyze this data and answer: ${question}
              
              Data:
-             ${dataString}`
+             ${dataString}`,
     },
     provider: "google-ai",
-    maxTokens: 800
+    maxTokens: 800,
   });
-  
+
   return result.content;
 }
 
@@ -341,8 +343,8 @@ const salesData = [
 ];
 
 const analysis = await analyzeData(
-  salesData, 
-  "What trends do you see in the sales data?"
+  salesData,
+  "What trends do you see in the sales data?",
 );
 ```
 
@@ -355,25 +357,26 @@ import { NeuroLink } from "@juspay/neurolink";
 
 // Development configuration
 const devNeuroLink = new NeuroLink({
-  defaultProvider: "google-ai",  // Free tier available
+  defaultProvider: "google-ai", // Free tier available
   timeout: 30000,
   retryAttempts: 1,
-  analytics: { enabled: false }
+  analytics: { enabled: false },
 });
 
 // Production configuration
 const prodNeuroLink = new NeuroLink({
-  defaultProvider: "auto",       // Auto-select best provider
+  defaultProvider: "auto", // Auto-select best provider
   timeout: 15000,
   retryAttempts: 3,
-  analytics: { 
+  analytics: {
     enabled: true,
-    endpoint: process.env.ANALYTICS_ENDPOINT
-  }
+    endpoint: process.env.ANALYTICS_ENDPOINT,
+  },
 });
 
 // Use appropriate instance
-const neurolink = process.env.NODE_ENV === "production" ? prodNeuroLink : devNeuroLink;
+const neurolink =
+  process.env.NODE_ENV === "production" ? prodNeuroLink : devNeuroLink;
 ```
 
 ### Provider Fallback
@@ -381,22 +384,22 @@ const neurolink = process.env.NODE_ENV === "production" ? prodNeuroLink : devNeu
 ```typescript
 async function generateWithFallback(prompt: string) {
   const providers = ["google-ai", "openai", "anthropic"];
-  
+
   for (const provider of providers) {
     try {
       const result = await neurolink.generate({
         input: { text: prompt },
         provider: provider,
-        timeout: 10000
+        timeout: 10000,
       });
-      
+
       console.log(`✅ Success with ${provider}`);
       return result;
     } catch (error) {
       console.warn(`❌ ${provider} failed:`, error.message);
     }
   }
-  
+
   throw new Error("All providers failed");
 }
 ```
@@ -408,52 +411,56 @@ async function generateWithFallback(prompt: string) {
 ```typescript
 class TextProcessor {
   private neurolink: NeuroLink;
-  
+
   constructor() {
     this.neurolink = new NeuroLink();
   }
-  
+
   async translate(text: string, targetLanguage: string): Promise<string> {
     const result = await this.neurolink.generate({
-      input: { 
-        text: `Translate this text to ${targetLanguage}: ${text}` 
+      input: {
+        text: `Translate this text to ${targetLanguage}: ${text}`,
       },
-      temperature: 0.2
+      temperature: 0.2,
     });
-    
+
     return result.content;
   }
-  
+
   async improveWriting(text: string): Promise<string> {
     const result = await this.neurolink.generate({
-      input: { 
-        text: `Improve the clarity and readability of this text: ${text}` 
+      input: {
+        text: `Improve the clarity and readability of this text: ${text}`,
       },
-      temperature: 0.4
+      temperature: 0.4,
     });
-    
+
     return result.content;
   }
-  
+
   async extractKeyPoints(text: string): Promise<string[]> {
     const result = await this.neurolink.generate({
-      input: { 
-        text: `Extract the key points from this text as a bullet list: ${text}` 
+      input: {
+        text: `Extract the key points from this text as a bullet list: ${text}`,
       },
-      temperature: 0.3
+      temperature: 0.3,
     });
-    
+
     // Parse bullet points from response
     return result.content
       .split("\n")
-      .filter(line => line.trim().startsWith("•") || line.trim().startsWith("-"))
-      .map(line => line.replace(/^[•\-]\s*/, "").trim());
+      .filter(
+        (line) => line.trim().startsWith("•") || line.trim().startsWith("-"),
+      )
+      .map((line) => line.replace(/^[•\-]\s*/, "").trim());
   }
 }
 
 // Usage
 const processor = new TextProcessor();
-const improvedText = await processor.improveWriting("This text needs improvement.");
+const improvedText = await processor.improveWriting(
+  "This text needs improvement.",
+);
 const keyPoints = await processor.extractKeyPoints(longArticle);
 ```
 
@@ -462,27 +469,27 @@ const keyPoints = await processor.extractKeyPoints(longArticle);
 ```typescript
 async function batchProcess(prompts: string[], batchSize = 3) {
   const results = [];
-  
+
   for (let i = 0; i < prompts.length; i += batchSize) {
     const batch = prompts.slice(i, i + batchSize);
-    
+
     // Process batch in parallel
     const batchPromises = batch.map(async (prompt) => {
       return await neurolink.generate({
         input: { text: prompt },
-        provider: "auto"
+        provider: "auto",
       });
     });
-    
+
     const batchResults = await Promise.all(batchPromises);
     results.push(...batchResults);
-    
+
     // Rate limiting delay
     if (i + batchSize < prompts.length) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
-  
+
   return results;
 }
 
@@ -490,7 +497,7 @@ async function batchProcess(prompts: string[], batchSize = 3) {
 const prompts = [
   "Explain machine learning",
   "What is blockchain?",
-  "How does quantum computing work?"
+  "How does quantum computing work?",
 ];
 
 const results = await batchProcess(prompts);
