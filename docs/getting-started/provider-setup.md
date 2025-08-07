@@ -6,6 +6,7 @@ NeuroLink supports multiple AI providers with flexible authentication methods. T
 
 - **OpenAI** - GPT-4o, GPT-4o-mini, GPT-4-turbo
 - **Amazon Bedrock** - Claude 3.7 Sonnet, Claude 3.5 Sonnet, Claude 3 Haiku
+- **Amazon SageMaker** - Custom models deployed on SageMaker endpoints
 - **Google Vertex AI** - Gemini 2.5 Flash, Claude 4.0 Sonnet
 - **Google AI Studio** - Gemini 1.5 Pro, Gemini 2.0 Flash, Gemini 1.5 Flash
 - **Anthropic** - Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
@@ -186,6 +187,149 @@ To use AWS Bedrock, ensure your AWS account has:
   ]
 }
 ```
+
+## Amazon SageMaker Configuration
+
+**Amazon SageMaker** allows you to use your own custom models deployed on SageMaker endpoints. This provider is perfect for:
+
+- **Custom Model Hosting** - Deploy your fine-tuned models
+- **Enterprise Compliance** - Full control over model infrastructure
+- **Cost Optimization** - Pay only for inference usage
+- **Performance** - Dedicated compute resources
+
+### Basic AWS Credentials
+
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_REGION="us-east-1"  # Your SageMaker region
+```
+
+### SageMaker-Specific Configuration
+
+```bash
+# Required: Your SageMaker endpoint name
+export SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
+
+# Optional: Timeout and retry settings
+export SAGEMAKER_TIMEOUT="30000"      # 30 seconds (default)
+export SAGEMAKER_MAX_RETRIES="3"      # Retry attempts (default)
+```
+
+### Advanced Model Configuration
+
+```bash
+# Optional: Model-specific settings
+export SAGEMAKER_MODEL="custom-model-name"    # Model identifier
+export SAGEMAKER_MODEL_TYPE="custom"          # Model type
+export SAGEMAKER_CONTENT_TYPE="application/json"
+export SAGEMAKER_ACCEPT="application/json"
+```
+
+### Session Token Support (for IAM Roles)
+
+```bash
+export AWS_SESSION_TOKEN="your-session-token"  # For temporary credentials
+```
+
+### Complete SageMaker Configuration
+
+```bash
+# AWS Credentials
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+export AWS_REGION="us-east-1"
+
+# SageMaker Settings
+export SAGEMAKER_DEFAULT_ENDPOINT="my-model-endpoint-2024"
+export SAGEMAKER_TIMEOUT="45000"
+export SAGEMAKER_MAX_RETRIES="5"
+```
+
+### Usage Example
+
+```bash
+# Test SageMaker endpoint
+npx @juspay/neurolink sagemaker test my-endpoint
+
+# Generate text with SageMaker
+npx @juspay/neurolink generate "Analyze this data" --provider sagemaker
+
+# Interactive setup
+npx @juspay/neurolink sagemaker setup
+```
+
+### CLI Commands
+
+```bash
+# Check SageMaker configuration
+npx @juspay/neurolink sagemaker status
+
+# Validate connection
+npx @juspay/neurolink sagemaker validate
+
+# Show current configuration
+npx @juspay/neurolink sagemaker config
+
+# Performance benchmark
+npx @juspay/neurolink sagemaker benchmark my-endpoint
+
+# List available endpoints (requires AWS CLI)
+npx @juspay/neurolink sagemaker list-endpoints
+```
+
+### Timeout Configuration
+
+Configure request timeouts for SageMaker endpoints:
+
+```bash
+export SAGEMAKER_TIMEOUT="60000"  # 60 seconds for large models
+```
+
+### Prerequisites
+
+1. **SageMaker Endpoint**: Deploy a model to SageMaker and get the endpoint name
+2. **AWS IAM Permissions**: Ensure your credentials have `sagemaker:InvokeEndpoint` permission
+3. **Endpoint Status**: Endpoint must be in "InService" status
+
+### IAM Policy Example
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["sagemaker:InvokeEndpoint"],
+      "Resource": "arn:aws:sagemaker:*:*:endpoint/*"
+    }
+  ]
+}
+```
+
+### Environment Variables Reference
+
+| Variable                     | Required | Default   | Description               |
+| ---------------------------- | -------- | --------- | ------------------------- |
+| `AWS_ACCESS_KEY_ID`          | ✅       | -         | AWS access key            |
+| `AWS_SECRET_ACCESS_KEY`      | ✅       | -         | AWS secret key            |
+| `AWS_REGION`                 | ✅       | us-east-1 | AWS region                |
+| `SAGEMAKER_DEFAULT_ENDPOINT` | ✅       | -         | SageMaker endpoint name   |
+| `SAGEMAKER_TIMEOUT`          | ❌       | 30000     | Request timeout (ms)      |
+| `SAGEMAKER_MAX_RETRIES`      | ❌       | 3         | Retry attempts            |
+| `AWS_SESSION_TOKEN`          | ❌       | -         | For temporary credentials |
+
+### 📖 Complete SageMaker Guide
+
+For comprehensive SageMaker setup, advanced features, and production deployment:
+**[📖 Complete SageMaker Integration Guide](../SAGEMAKER-INTEGRATION.md)** - Includes:
+
+- Model deployment examples
+- Cost optimization strategies
+- Enterprise security patterns
+- Multi-model endpoint management
+- Performance testing and monitoring
+- Troubleshooting and debugging
 
 ## Google Vertex AI Configuration
 

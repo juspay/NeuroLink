@@ -204,6 +204,23 @@ export class ProviderRegistry {
         ["openai-compatible", "openrouter", "vllm", "compatible"],
       );
 
+      // Register Amazon SageMaker provider
+      ProviderFactory.registerProvider(
+        AIProviderName.SAGEMAKER,
+        async (
+          modelName?: string,
+          providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
+          const { AmazonSageMakerProvider } = await import(
+            "../providers/amazonSagemaker.js"
+          );
+          return new AmazonSageMakerProvider(modelName);
+        },
+        process.env.SAGEMAKER_MODEL || "sagemaker-model",
+        ["sagemaker", "aws-sagemaker"],
+      );
+
       logger.debug("All providers registered successfully");
       this.registered = true;
     } catch (error) {

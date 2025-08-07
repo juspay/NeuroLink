@@ -9,7 +9,7 @@
 
 > **Enterprise AI Development Platform** with universal provider support, factory pattern architecture, and **access to 100+ AI models** through LiteLLM integration. Production-ready with TypeScript support.
 
-**NeuroLink** is an Enterprise AI Development Platform that unifies **10 major AI providers** with intelligent fallback and built-in tool support. Available as both a **programmatic SDK** and **professional CLI tool**. Features LiteLLM integration for **100+ models**, plus 6 core tools working across all providers. Extracted from production use at Juspay.
+**NeuroLink** is an Enterprise AI Development Platform that unifies **11 major AI providers** with intelligent fallback and built-in tool support. Available as both a **programmatic SDK** and **professional CLI tool**. Features LiteLLM integration for **100+ models**, plus 6 core tools working across all providers. Extracted from production use at Juspay.
 
 ## 🎉 **NEW: LiteLLM Integration - Access 100+ AI Models**
 
@@ -32,6 +32,30 @@ npx @juspay/neurolink generate "Hello" --provider litellm --model "google/gemini
 ```
 
 **[📖 Complete LiteLLM Integration Guide](./docs/LITELLM-INTEGRATION.md)** - Setup, configuration, and 100+ model access
+
+## 🎉 **NEW: SageMaker Integration - Deploy Your Custom AI Models**
+
+**NeuroLink now supports Amazon SageMaker**, enabling you to deploy and use your own custom trained models through NeuroLink's unified interface:
+
+- **🏗️ Custom Model Hosting** - Deploy your fine-tuned models on AWS infrastructure
+- **💰 Cost Control** - Pay only for inference usage with auto-scaling capabilities
+- **🔒 Enterprise Security** - Full control over model infrastructure and data privacy
+- **⚡ Performance** - Dedicated compute resources with predictable latency
+- **📊 Monitoring** - Built-in CloudWatch metrics and logging
+
+```bash
+# Quick start with SageMaker
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
+
+# Use your custom deployed models
+npx @juspay/neurolink generate "Analyze this data" --provider sagemaker
+npx @juspay/neurolink sagemaker status  # Check endpoint health
+npx @juspay/neurolink sagemaker benchmark my-endpoint  # Performance testing
+```
+
+**[📖 Complete SageMaker Integration Guide](./docs/SAGEMAKER-INTEGRATION.md)** - Setup, deployment, and custom model access
 
 ## 🚀 Enterprise Platform Features
 
@@ -76,6 +100,12 @@ npx @juspay/neurolink generate "Hello, AI" --provider openai-compatible
 # Option 3: Direct Provider - Quick setup with Google AI Studio (free tier)
 export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
 npx @juspay/neurolink generate "Hello, AI" --provider google-ai
+
+# Option 3: Amazon SageMaker - Use your custom deployed models
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
+npx @juspay/neurolink generate "Hello, AI" --provider sagemaker
 
 # CLI Commands - No installation required
 npx @juspay/neurolink generate "Explain AI"  # Auto-selects best provider
@@ -276,7 +306,7 @@ console.log(productData.name, productData.price, productData.features);
 - 🔍 **Smart Model Auto-Discovery** - OpenAI Compatible provider automatically detects available models via `/v1/models` endpoint
 - 🏭 **Factory Pattern Architecture** - Unified provider management with BaseProvider inheritance
 - 🔧 **Tools-First Design** - All providers automatically include 6 direct tools (getCurrentTime, readFile, listDirectory, calculateMath, writeFile, searchFiles)
-- 🔄 **11 AI Providers** - OpenAI, Bedrock, Vertex AI, Google AI Studio, Anthropic, Azure, **LiteLLM**, **OpenAI Compatible**, Hugging Face, Ollama, Mistral AI
+- 🔄 **12 AI Providers** - OpenAI, Bedrock, Vertex AI, Google AI Studio, Anthropic, Azure, **LiteLLM**, **OpenAI Compatible**, Hugging Face, Ollama, Mistral AI, **SageMaker**
 - 💰 **Cost Optimization** - Automatic selection of cheapest models and LiteLLM routing
 - ⚡ **Automatic Fallback** - Never fail when providers are down, intelligent provider switching
 - 🖥️ **CLI + SDK** - Use from command line or integrate programmatically with TypeScript support
@@ -563,6 +593,7 @@ cd neurolink-demo && node server.js
 | **Ollama** 🆕               | Llama 3.2, Gemma, Mistral (Local)  | None (Local)       | ✅        | ⚠️ Partial   | Complete Privacy                 |
 | **Hugging Face** 🆕         | 100,000+ open source models        | API Key            | ✅        | ⚠️ Partial   | Open Source                      |
 | **Mistral AI** 🆕           | Tiny, Small, Medium, Large         | API Key            | ✅        | ✅ Full      | European/GDPR                    |
+| **Amazon SageMaker** 🆕     | Custom Models (Your Endpoints)     | AWS Credentials    | ❌        | ✅ Full      | Custom Model Hosting             |
 
 **Tool Support Legend:**
 

@@ -73,6 +73,20 @@ echo "Testing Google Gemini via LiteLLM..."
 npx @juspay/neurolink generate "Create a code snippet" --provider litellm --model "google/gemini-2.0-flash"
 
 echo ""
+echo "13. 🚀 Amazon SageMaker Custom Models"
+echo "------------------------------------"
+echo "Testing SageMaker endpoint status..."
+npx @juspay/neurolink sagemaker status
+
+echo ""
+echo "Testing custom model inference..."
+npx @juspay/neurolink generate "Analyze this business data for insights" --provider sagemaker
+
+echo ""
+echo "SageMaker endpoint benchmark..."
+npx @juspay/neurolink sagemaker benchmark
+
+echo ""
 echo "✅ CLI Examples Complete!"
 echo ""
 echo "💡 Tips:"
@@ -81,5 +95,7 @@ echo "- Use --provider to specify a provider"
 echo "- Set GOOGLE_AI_API_KEY for free tier access"
 echo "- Use --provider litellm for 100+ models via proxy"
 echo "- Set LITELLM_BASE_URL=http://localhost:4000 for LiteLLM"
+echo "- Use --provider sagemaker for custom deployed models"
+echo "- Set AWS credentials and SAGEMAKER_DEFAULT_ENDPOINT for SageMaker"
 echo "- Built-in tools work in v1.7.1!"
 echo "- External server discovery working!"

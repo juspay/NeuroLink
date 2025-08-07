@@ -645,12 +645,165 @@ LiteLLM provides access to 100+ AI models through a unified proxy interface:
 
 ---
 
+### 11. Amazon SageMaker 🆕
+
+#### Required Variables
+
+```bash
+AWS_ACCESS_KEY_ID="AKIA..."
+AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+AWS_REGION="us-east-1"
+SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
+```
+
+#### Optional Variables
+
+```bash
+SAGEMAKER_MODEL="custom-model-name"         # Model identifier (default: sagemaker-model)
+SAGEMAKER_TIMEOUT="30000"                   # Request timeout in ms (default: 30000)
+SAGEMAKER_MAX_RETRIES="3"                   # Retry attempts (default: 3)
+AWS_SESSION_TOKEN="IQoJb3..."               # For temporary credentials
+SAGEMAKER_CONTENT_TYPE="application/json"   # Request content type (default: application/json)
+SAGEMAKER_ACCEPT="application/json"         # Response accept type (default: application/json)
+```
+
+#### How to Set Up Amazon SageMaker
+
+Amazon SageMaker allows you to deploy and use your own custom trained models:
+
+1. **Deploy Your Model to SageMaker**:
+
+   - Train your model using SageMaker Training Jobs
+   - Deploy model to a SageMaker Real-time Endpoint
+   - Note the endpoint name for configuration
+
+2. **Set Up AWS Credentials**:
+
+   - Use IAM user with `sagemaker:InvokeEndpoint` permission
+   - Or use IAM role for EC2/Lambda/ECS deployments
+   - Configure AWS CLI: `aws configure`
+
+3. **Configure NeuroLink**:
+
+   ```bash
+   export AWS_ACCESS_KEY_ID="your-access-key"
+   export AWS_SECRET_ACCESS_KEY="your-secret-key"
+   export AWS_REGION="us-east-1"
+   export SAGEMAKER_DEFAULT_ENDPOINT="my-model-endpoint"
+   ```
+
+4. **Test Connection**:
+   ```bash
+   npx @juspay/neurolink sagemaker status
+   npx @juspay/neurolink sagemaker test my-endpoint
+   ```
+
+#### How to Get AWS Credentials for SageMaker
+
+1. **Create IAM User**:
+
+   - Go to [AWS IAM Console](https://console.aws.amazon.com/iam)
+   - Create new user with **Programmatic access**
+   - Attach the following policy:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["sagemaker:InvokeEndpoint"],
+         "Resource": "arn:aws:sagemaker:*:*:endpoint/*"
+       }
+     ]
+   }
+   ```
+
+2. **Download Credentials**:
+   - Save Access Key ID and Secret Access Key
+   - Set as environment variables
+
+#### Supported Models
+
+SageMaker supports **any custom model** you deploy:
+
+- **Custom Fine-tuned Models** - Your domain-specific models
+- **Foundation Model Endpoints** - Large language models deployed via SageMaker
+- **Multi-model Endpoints** - Multiple models behind single endpoint
+- **Serverless Endpoints** - Auto-scaling model deployments
+
+#### Model Deployment Types
+
+- **Real-time Inference** - Low-latency model serving (recommended)
+- **Batch Transform** - Batch processing (not supported by NeuroLink)
+- **Serverless Inference** - Pay-per-request model serving
+- **Multi-model Endpoints** - Host multiple models efficiently
+
+#### Benefits
+
+- **🏗️ Custom Models** - Deploy and use your own trained models
+- **💰 Cost Control** - Pay only for inference usage, auto-scaling available
+- **🔒 Enterprise Security** - Full control over model infrastructure and data
+- **⚡ Performance** - Dedicated compute resources with predictable latency
+- **🌍 Global Deployment** - Available in all major AWS regions
+- **📊 Monitoring** - Built-in CloudWatch metrics and logging
+
+#### CLI Commands
+
+```bash
+# Check SageMaker configuration and endpoint status
+npx @juspay/neurolink sagemaker status
+
+# Validate connection to specific endpoint
+npx @juspay/neurolink sagemaker validate
+
+# Test inference with specific endpoint
+npx @juspay/neurolink sagemaker test my-endpoint
+
+# Show current configuration
+npx @juspay/neurolink sagemaker config
+
+# Performance benchmark
+npx @juspay/neurolink sagemaker benchmark my-endpoint
+
+# List available endpoints (requires AWS CLI)
+npx @juspay/neurolink sagemaker list-endpoints
+
+# Interactive setup wizard
+npx @juspay/neurolink sagemaker setup
+```
+
+#### Environment Variables Reference
+
+| Variable                     | Required | Default          | Description                                  |
+| ---------------------------- | -------- | ---------------- | -------------------------------------------- |
+| `AWS_ACCESS_KEY_ID`          | ✅       | -                | AWS access key for authentication            |
+| `AWS_SECRET_ACCESS_KEY`      | ✅       | -                | AWS secret key for authentication            |
+| `AWS_REGION`                 | ✅       | us-east-1        | AWS region where endpoint is deployed        |
+| `SAGEMAKER_DEFAULT_ENDPOINT` | ✅       | -                | SageMaker endpoint name                      |
+| `SAGEMAKER_TIMEOUT`          | ❌       | 30000            | Request timeout in milliseconds              |
+| `SAGEMAKER_MAX_RETRIES`      | ❌       | 3                | Number of retry attempts for failed requests |
+| `AWS_SESSION_TOKEN`          | ❌       | -                | Session token for temporary credentials      |
+| `SAGEMAKER_MODEL`            | ❌       | sagemaker-model  | Model identifier for logging                 |
+| `SAGEMAKER_CONTENT_TYPE`     | ❌       | application/json | Request content type                         |
+| `SAGEMAKER_ACCEPT`           | ❌       | application/json | Response accept type                         |
+
+#### Production Considerations
+
+- **🔒 Security**: Use IAM roles instead of access keys when possible
+- **📊 Monitoring**: Enable CloudWatch logging for your endpoints
+- **💰 Cost Optimization**: Use auto-scaling and serverless options
+- **🌍 Multi-Region**: Deploy endpoints in multiple regions for redundancy
+- **⚡ Performance**: Choose appropriate instance types for your workload
+
+---
+
 ## 🔧 Configuration Examples
 
 ### Complete .env File Example
 
 ```bash
-# NeuroLink Environment Configuration - All 10 Providers
+# NeuroLink Environment Configuration - All 11 Providers
 
 # OpenAI Configuration
 OPENAI_API_KEY="sk-proj-your-openai-key"
@@ -661,6 +814,14 @@ AWS_ACCESS_KEY_ID="AKIA..."
 AWS_SECRET_ACCESS_KEY="your-aws-secret"
 AWS_REGION="us-east-1"
 BEDROCK_MODEL="arn:aws:bedrock:us-east-1:<account_id>:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+# Amazon SageMaker Configuration
+AWS_ACCESS_KEY_ID="AKIA..."
+AWS_SECRET_ACCESS_KEY="your-aws-secret"
+AWS_REGION="us-east-1"
+SAGEMAKER_DEFAULT_ENDPOINT="my-model-endpoint"
+SAGEMAKER_TIMEOUT="30000"
+SAGEMAKER_MAX_RETRIES="3"
 
 # Google Vertex AI Configuration
 GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"

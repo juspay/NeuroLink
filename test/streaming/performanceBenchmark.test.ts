@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { NeuroLink } from "../../src/lib/neurolink";
+import { NeuroLink } from "../../src/lib/neurolink.js";
 import dotenv from "dotenv";
 import type { UnknownRecord } from "../../src/lib/types/common.js";
 
@@ -10,7 +10,7 @@ dotenv.config();
  * STREAMING PERFORMANCE BENCHMARKING TESTS
  * Measures token generation rates and streaming performance across providers
  */
-import { PROVIDERS_TO_BENCHMARK } from "../config/providers";
+import { PROVIDERS_TO_BENCHMARK } from "../config/providers.js";
 
 describe("Streaming Performance Benchmarking", () => {
   let sdk: NeuroLink;
@@ -60,7 +60,9 @@ describe("Streaming Performance Benchmarking", () => {
             // TTFT should be under 5 seconds
             expect(ttft).toBeLessThan(5000);
           } catch (error) {
-            console.log(`✗ ${provider} failed:`, error.message);
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            console.log(`✗ ${provider} failed:`, errorMessage);
             results[provider] = -1;
           }
         }
@@ -127,7 +129,9 @@ describe("Streaming Performance Benchmarking", () => {
             // Should generate at least some tokens
             expect(tokenCount).toBeGreaterThan(0);
           } catch (error) {
-            console.log(`✗ ${provider} failed:`, error.message);
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            console.log(`✗ ${provider} failed:`, errorMessage);
           }
         }
 

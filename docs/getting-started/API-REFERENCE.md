@@ -17,7 +17,7 @@ function createBestAIProvider(
 
 **Parameters:**
 
-- `requestedProvider` (optional): Preferred provider name (`'openai'`, `'bedrock'`, `'vertex'`, `'anthropic'`, `'azure'`, `'google-ai'`, `'huggingface'`, `'ollama'`, `'mistral'`, `'litellm'`, or `'auto'`)
+- `requestedProvider` (optional): Preferred provider name (`'openai'`, `'bedrock'`, `'sagemaker'`, `'vertex'`, `'anthropic'`, `'azure'`, `'google-ai'`, `'huggingface'`, `'ollama'`, `'mistral'`, `'litellm'`, or `'auto'`)
 - `modelName` (optional): Specific model to use
 
 **Returns:** `AIProvider` instance
@@ -45,6 +45,9 @@ const claudeProvider = createBestAIProvider(
   "litellm",
   "anthropic/claude-3-5-sonnet",
 );
+
+// Use Amazon SageMaker for custom deployed models
+const sagemakerProvider = createBestAIProvider("sagemaker", "my-custom-model");
 ```
 
 ### `createAIProviderWithFallback(primary, fallback, modelName?)`
@@ -170,7 +173,7 @@ static createProvider(
 
 **Parameters:**
 
-- `providerName`: Provider name (`'openai'`, `'bedrock'`, `'vertex'`, `'anthropic'`, `'azure'`, `'google-ai'`, `'huggingface'`, `'ollama'`, `'mistral'`, `'litellm'`)
+- `providerName`: Provider name (`'openai'`, `'bedrock'`, `'sagemaker'`, `'vertex'`, `'anthropic'`, `'azure'`, `'google-ai'`, `'huggingface'`, `'ollama'`, `'mistral'`, `'litellm'`)
 - `modelName` (optional): Specific model to use
 
 **Returns:** `AIProvider` instance
@@ -186,6 +189,7 @@ const bedrock = AIProviderFactory.createProvider(
   "bedrock",
   "claude-3-7-sonnet",
 );
+const sagemaker = AIProviderFactory.createProvider("sagemaker", "my-endpoint");
 const vertex = AIProviderFactory.createProvider("vertex", "gemini-2.5-flash");
 
 // LiteLLM Provider - Access multiple models through proxy
@@ -1089,6 +1093,19 @@ type BedrockModel =
 
 **Note:** Bedrock requires full inference profile ARNs in environment variables.
 
+### Amazon SageMaker Models
+
+```typescript
+type SageMakerModel = string; // Any custom model deployed to SageMaker endpoint
+// Model names are user-defined based on endpoint configuration
+// Examples:
+// - 'my-custom-llm' (your custom fine-tuned model)
+// - 'company-domain-model' (domain-specific model)
+// - 'multilingual-model' (custom multilingual model)
+```
+
+**Note:** SageMaker supports any custom model you deploy. Model names are determined by your endpoint configuration and can be any identifier you choose.
+
 ### Google Vertex AI Models
 
 ```typescript
@@ -1422,6 +1439,15 @@ AWS_REGION?: string              // Default: 'us-east-2'
 AWS_SESSION_TOKEN?: string       // For temporary credentials
 BEDROCK_MODEL?: string           // Inference profile ARN
 
+// Amazon SageMaker
+AWS_ACCESS_KEY_ID: string                    // AWS access key (shared with Bedrock)
+AWS_SECRET_ACCESS_KEY: string                // AWS secret key (shared with Bedrock)
+AWS_REGION?: string                          // Default: 'us-east-1'
+SAGEMAKER_DEFAULT_ENDPOINT: string           // SageMaker endpoint name
+SAGEMAKER_TIMEOUT?: string                   // Default: '30000'
+SAGEMAKER_MAX_RETRIES?: string               // Default: '3'
+AWS_SESSION_TOKEN?: string                   // For temporary credentials
+
 // Google Vertex AI (choose one authentication method)
 GOOGLE_APPLICATION_CREDENTIALS?: string           // Method 1: File path
 GOOGLE_SERVICE_ACCOUNT_KEY?: string              // Method 2: JSON string
@@ -1470,8 +1496,8 @@ FALLBACK_MODEL?: string                          // Model to use if preferred un
 
 ```typescript
 // Provider preferences
-DEFAULT_PROVIDER?: 'auto' | 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'huggingface' | 'ollama' | 'mistral' | 'litellm'
-FALLBACK_PROVIDER?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'huggingface' | 'ollama' | 'mistral' | 'litellm'
+DEFAULT_PROVIDER?: 'auto' | 'openai' | 'bedrock' | 'sagemaker' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'huggingface' | 'ollama' | 'mistral' | 'litellm'
+FALLBACK_PROVIDER?: 'openai' | 'bedrock' | 'sagemaker' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'huggingface' | 'ollama' | 'mistral' | 'litellm'
 
 // Feature toggles
 ENABLE_STREAMING?: 'true' | 'false'
@@ -1490,6 +1516,7 @@ LOG_LEVEL?: 'error' | 'warn' | 'info' | 'debug'
 type ProviderName =
   | "openai"
   | "bedrock"
+  | "sagemaker"
   | "vertex"
   | "anthropic"
   | "azure"
@@ -1645,6 +1672,16 @@ interface OpenAIOptions extends GenerateOptions {
 interface BedrockOptions extends GenerateOptions {
   region?: string; // AWS region override
   inferenceProfile?: string; // Inference profile ARN
+}
+
+// SageMaker specific
+interface SageMakerOptions extends GenerateOptions {
+  endpoint?: string; // Override default endpoint
+  region?: string; // AWS region override
+  contentType?: string; // Request content type (default: application/json)
+  accept?: string; // Response accept type (default: application/json)
+  customAttributes?: string; // Custom attributes for the request
+  targetModel?: string; // Target model for multi-model endpoints
 }
 
 // Vertex AI specific

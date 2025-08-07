@@ -403,6 +403,12 @@ const litellmProvider = await AIProviderFactory.createProvider(
 - **[Troubleshooting](./TROUBLESHOOTING.md#litellm-provider-issues)** - Problem solving guide
 - **[Basic Usage Examples](./examples/basic-usage.md#multi-model-access-with-litellm)** - Code examples
 
+### **🔗 Other Provider Integrations**
+
+- **[🚀 SageMaker Integration](./SAGEMAKER-INTEGRATION.md)** - Deploy your custom AI models
+- **[🔧 MCP Integration](./MCP-INTEGRATION.md)** - Model Context Protocol support
+- **[🏗️ Framework Integration](./FRAMEWORK-INTEGRATION.md)** - Next.js, React, and more
+
 ## 🌟 **Why Choose LiteLLM Integration?**
 
 ### **🎯 For Developers**

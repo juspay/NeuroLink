@@ -5,6 +5,7 @@
 
 export { GoogleVertexProvider as GoogleVertexAI } from "./googleVertex.js";
 export { AmazonBedrockProvider as AmazonBedrock } from "./amazonBedrock.js";
+export { AmazonSageMakerProvider as AmazonSageMaker } from "./amazonSagemaker.js";
 export { OpenAIProvider as OpenAI } from "./openAI.js";
 export { OpenAICompatibleProvider as OpenAICompatible } from "./openaiCompatible.js";
 export { AnthropicProvider as AnthropicProvider } from "./anthropic.js";
@@ -13,6 +14,7 @@ export { GoogleAIStudioProvider as GoogleAIStudio } from "./googleAiStudio.js";
 export { HuggingFaceProvider as HuggingFace } from "./huggingFace.js";
 export { OllamaProvider as Ollama } from "./ollama.js";
 export { MistralProvider as MistralAI } from "./mistral.js";
+export { LiteLLMProvider as LiteLLM } from "./litellm.js";
 
 // Re-export the AIProvider interface for convenience
 export type { AIProvider } from "../core/types.js";
@@ -23,6 +25,7 @@ export type { AIProvider } from "../core/types.js";
 export const PROVIDERS = {
   vertex: "GoogleVertexAI",
   bedrock: "AmazonBedrock",
+  sagemaker: "AmazonSageMaker",
   openai: "OpenAI",
   "openai-compatible": "OpenAICompatible",
   anthropic: "AnthropicProvider",
@@ -31,6 +34,7 @@ export const PROVIDERS = {
   huggingface: "HuggingFace",
   ollama: "Ollama",
   mistral: "MistralAI",
+  litellm: "LiteLLM",
 } as const;
 
 /**

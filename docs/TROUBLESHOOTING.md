@@ -1089,6 +1089,119 @@ npx @juspay/neurolink generate "test proxy" --debug
 
 ---
 
+## 🚀 **SageMaker Provider Issues**
+
+### **Common SageMaker Errors**
+
+#### **"Endpoint not found" Error**
+
+```bash
+# Symptoms
+Error: The endpoint 'my-endpoint' was not found.
+
+# Solutions
+1. Check endpoint exists in SageMaker console
+2. Verify endpoint is in 'InService' status
+3. Check AWS region matches endpoint region
+```
+
+#### **"Access denied" Error**
+
+```bash
+# Symptoms
+AccessDeniedException: User: arn:aws:iam::123456789012:user/myuser is not authorized
+
+# Solutions
+1. Add SageMaker invoke permissions:
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["sagemaker:InvokeEndpoint"],
+      "Resource": "arn:aws:sagemaker:*:*:endpoint/*"
+    }
+  ]
+}
+
+2. Check AWS credentials are valid:
+aws sts get-caller-identity
+```
+
+#### **"Model not loading" Error**
+
+```bash
+# Symptoms
+ModelError: The model is not ready to serve requests
+
+# Solutions
+1. Check endpoint status:
+npx @juspay/neurolink sagemaker status
+
+2. Monitor CloudWatch logs:
+aws logs describe-log-groups --log-group-name-prefix /aws/sagemaker/Endpoints
+
+3. Wait for endpoint to be in 'InService' status
+```
+
+### **SageMaker Configuration Issues**
+
+#### **Invalid AWS Credentials**
+
+```bash
+# Check configuration
+npx @juspay/neurolink sagemaker config
+
+# Set required variables
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_REGION="us-east-1"
+export SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
+```
+
+#### **Timeout Issues**
+
+```bash
+# Increase timeout for large models
+export SAGEMAKER_TIMEOUT="60000"  # 60 seconds
+
+# Use in CLI
+npx @juspay/neurolink generate "complex task" --provider sagemaker --timeout 60s
+```
+
+### **SageMaker Debug Mode**
+
+```bash
+# Enable debug output
+export NEUROLINK_DEBUG=true
+npx @juspay/neurolink generate "test" --provider sagemaker --debug
+
+# SageMaker-specific debugging
+export SAGEMAKER_DEBUG=true
+npx @juspay/neurolink sagemaker status --verbose
+```
+
+### **SageMaker CLI Commands**
+
+```bash
+# Check endpoint health
+npx @juspay/neurolink sagemaker status
+
+# Validate configuration
+npx @juspay/neurolink sagemaker validate
+
+# Test specific endpoint
+npx @juspay/neurolink sagemaker test my-endpoint
+
+# Performance benchmark
+npx @juspay/neurolink sagemaker benchmark my-endpoint
+
+# List available endpoints (requires AWS CLI)
+npx @juspay/neurolink sagemaker list-endpoints
+```
+
+---
+
 ## 📚 **Additional Resources**
 
 - **[MCP Integration Guide](./MCP-INTEGRATION.md)** - Complete MCP setup and usage

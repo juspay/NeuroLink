@@ -1,6 +1,6 @@
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema } from "ai";
-import type { Tool, LanguageModel } from "ai";
+import type { Tool, LanguageModelV1 } from "ai";
 import type {
   AIProvider,
   TextGenerationOptions,
@@ -434,7 +434,9 @@ export abstract class BaseProvider implements AIProvider {
    * REQUIRED: Every provider MUST implement this method
    * Returns the Vercel AI SDK model instance for this provider
    */
-  protected abstract getAISDKModel(): LanguageModel | Promise<LanguageModel>;
+  protected abstract getAISDKModel():
+    | LanguageModelV1
+    | Promise<LanguageModelV1>;
 
   // ===================
   // TOOL MANAGEMENT

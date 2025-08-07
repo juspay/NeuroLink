@@ -14,7 +14,7 @@ export interface BaseCommandArgs {
   /** Enable debug output */
   debug?: boolean;
   /** Output format */
-  format?: "text" | "json" | "table";
+  format?: "text" | "json" | "table" | "yaml";
   /** Verbose output */
   verbose?: boolean;
   /** Quiet mode */
@@ -159,6 +159,42 @@ export interface OllamaCommandArgs extends BaseCommandArgs {
   remove?: boolean;
   /** Show model information */
   show?: boolean;
+}
+
+/**
+ * SageMaker command arguments
+ */
+export interface SageMakerCommandArgs extends BaseCommandArgs {
+  /** SageMaker endpoint name */
+  endpoint?: string;
+  /** Model name for the endpoint */
+  model?: string;
+  /** Test prompt for endpoint testing */
+  prompt?: string;
+  /** List endpoints */
+  list?: boolean;
+  /** Show configuration */
+  config?: boolean;
+  /** Setup configuration */
+  setup?: boolean;
+  /** Clear configuration cache */
+  clearCache?: boolean;
+  /** Run benchmark test */
+  benchmark?: boolean;
+  /** Duration for benchmark test (in seconds) */
+  duration?: number;
+  /** Concurrency level for benchmark */
+  concurrency?: number;
+  /** Number of requests for benchmark */
+  requests?: number;
+  /** Maximum tokens per request */
+  maxTokens?: number;
+  /** Validate endpoint configuration */
+  validate?: boolean;
+  /** AWS region override */
+  region?: string;
+  /** Force operation without confirmation */
+  force?: boolean;
 }
 
 /**

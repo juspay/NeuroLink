@@ -388,6 +388,278 @@ responses.forEach(({ model, response }) => {
 });
 ```
 
+### Custom Model Access with SageMaker
+
+```typescript
+async function useCustomSageMakerModel(prompt: string, endpoint?: string) {
+  const result = await neurolink.generate({
+    input: { text: prompt },
+    provider: "sagemaker",
+    model: endpoint || "my-custom-model", // Use specific endpoint or default
+    temperature: 0.7,
+    timeout: "45s", // Longer timeout for custom models
+  });
+
+  return {
+    response: result.content,
+    endpoint: result.model,
+    provider: result.provider,
+    usage: result.usage,
+  };
+}
+
+// Usage with default endpoint
+const defaultResult = await useCustomSageMakerModel(
+  "Analyze this customer feedback for sentiment",
+);
+
+// Usage with specific endpoint
+const specificResult = await useCustomSageMakerModel(
+  "Generate domain-specific recommendations",
+  "my-domain-expert-model-endpoint",
+);
+
+console.log("Default model response:", defaultResult.response);
+console.log("Domain model response:", specificResult.response);
+```
+
+### SageMaker Model Comparison
+
+```typescript
+async function compareSageMakerModels(prompt: string) {
+  const endpoints = [
+    "general-purpose-model",
+    "domain-specific-model",
+    "fine-tuned-customer-model",
+  ];
+
+  const comparisons = await Promise.all(
+    endpoints.map(async (endpoint) => {
+      try {
+        const result = await neurolink.generate({
+          input: { text: prompt },
+          provider: "sagemaker",
+          model: endpoint,
+          temperature: 0.7,
+          timeout: "30s",
+        });
+
+        return {
+          endpoint: endpoint,
+          response: result.content,
+          success: true,
+          responseTime: result.responseTime,
+        };
+      } catch (error) {
+        return {
+          endpoint: endpoint,
+          error: error.message,
+          success: false,
+        };
+      }
+    }),
+  );
+
+  return comparisons;
+}
+
+// Usage
+const prompt = "Provide recommendations for improving customer satisfaction";
+const modelComparisons = await compareSageMakerModels(prompt);
+
+modelComparisons.forEach(({ endpoint, response, success, error }) => {
+  console.log(`\n${endpoint}:`);
+  if (success) {
+    console.log(response);
+  } else {
+    console.log(`❌ Error: ${error}`);
+  }
+});
+```
+
+### Production SageMaker Integration
+
+```typescript
+class SageMakerModelManager {
+  private neurolink: NeuroLink;
+  private defaultEndpoint: string;
+
+  constructor(defaultEndpoint: string) {
+    this.neurolink = new NeuroLink();
+    this.defaultEndpoint = defaultEndpoint;
+  }
+
+  async predict(
+    input: string,
+    options: {
+      endpoint?: string;
+      temperature?: number;
+      maxTokens?: number;
+      timeout?: string;
+    } = {},
+  ) {
+    const {
+      endpoint = this.defaultEndpoint,
+      temperature = 0.7,
+      maxTokens = 1000,
+      timeout = "30s",
+    } = options;
+
+    try {
+      const result = await this.neurolink.generate({
+        input: { text: input },
+        provider: "sagemaker",
+        model: endpoint,
+        temperature,
+        maxTokens,
+        timeout,
+      });
+
+      return {
+        success: true,
+        prediction: result.content,
+        endpoint: endpoint,
+        usage: result.usage,
+        responseTime: result.responseTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        endpoint: endpoint,
+      };
+    }
+  }
+
+  async batchPredict(inputs: string[], endpoint?: string) {
+    const results = [];
+
+    for (const input of inputs) {
+      const result = await this.predict(input, { endpoint });
+      results.push(result);
+
+      // Rate limiting between requests
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    return results;
+  }
+
+  async healthCheck(endpoint?: string): Promise<boolean> {
+    try {
+      const result = await this.predict("test", {
+        endpoint,
+        timeout: "10s",
+      });
+      return result.success;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Usage
+const modelManager = new SageMakerModelManager("production-model-endpoint");
+
+// Single prediction
+const prediction = await modelManager.predict(
+  "Analyze this business scenario and provide recommendations",
+);
+
+// Batch predictions
+const inputs = [
+  "Predict market trends for Q4",
+  "Analyze customer churn risk",
+  "Recommend product improvements",
+];
+const batchResults = await modelManager.batchPredict(inputs);
+
+// Health check
+const isHealthy = await modelManager.healthCheck();
+console.log(`Model endpoint healthy: ${isHealthy}`);
+```
+
+### Multi-Provider Strategy with SageMaker
+
+```typescript
+async function hybridModelStrategy(prompt: string, useCase: string) {
+  const strategies = {
+    general: {
+      primary: { provider: "google-ai", model: "gemini-2.5-flash" },
+      fallback: { provider: "openai", model: "gpt-4o-mini" },
+    },
+    "domain-specific": {
+      primary: { provider: "sagemaker", model: "domain-expert-model" },
+      fallback: { provider: "anthropic", model: "claude-3-haiku" },
+    },
+    "code-generation": {
+      primary: { provider: "anthropic", model: "claude-3-5-sonnet" },
+      fallback: { provider: "sagemaker", model: "code-specialized-model" },
+    },
+  };
+
+  const strategy = strategies[useCase] || strategies["general"];
+
+  try {
+    // Try primary model
+    const result = await neurolink.generate({
+      input: { text: prompt },
+      provider: strategy.primary.provider,
+      model: strategy.primary.model,
+      timeout: "30s",
+    });
+
+    return {
+      ...result,
+      modelUsed: "primary",
+      strategy: strategy.primary,
+    };
+  } catch (primaryError) {
+    console.log(`Primary model failed, trying fallback...`);
+
+    try {
+      // Fallback to secondary model
+      const result = await neurolink.generate({
+        input: { text: prompt },
+        provider: strategy.fallback.provider,
+        model: strategy.fallback.model,
+        timeout: "30s",
+      });
+
+      return {
+        ...result,
+        modelUsed: "fallback",
+        strategy: strategy.fallback,
+        primaryError: primaryError.message,
+      };
+    } catch (fallbackError) {
+      throw new Error(
+        `Both models failed. Primary: ${primaryError.message}, Fallback: ${fallbackError.message}`,
+      );
+    }
+  }
+}
+
+// Usage
+const generalResult = await hybridModelStrategy(
+  "Explain artificial intelligence",
+  "general",
+);
+
+const domainResult = await hybridModelStrategy(
+  "Provide industry-specific analysis for healthcare",
+  "domain-specific",
+);
+
+const codeResult = await hybridModelStrategy(
+  "Generate a Python function for data processing",
+  "code-generation",
+);
+
+console.log("General query result:", generalResult.content);
+console.log("Used model:", generalResult.strategy);
+```
+
 ## 🔧 Configuration Examples
 
 ### Environment-based Configuration

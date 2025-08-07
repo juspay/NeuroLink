@@ -17,6 +17,7 @@ import chalk from "chalk";
 import fs from "fs";
 
 import { addOllamaCommands } from "./commands/ollama.js";
+import { addSageMakerCommands } from "./commands/sagemaker.js";
 import { CLICommandFactory } from "./factories/commandFactory.js";
 
 import { logger } from "../lib/utils/logger.js";
@@ -315,6 +316,9 @@ const cli = yargs(args)
 
 // Add Ollama Commands
 addOllamaCommands(cli);
+
+// Add SageMaker Commands
+addSageMakerCommands(cli);
 
 // Execute CLI
 (async () => {

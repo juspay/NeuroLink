@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterEach } from "vitest";
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import dotenv from "dotenv";

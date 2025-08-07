@@ -193,6 +193,34 @@ export const PROVIDER_CONFIGS: ProviderConfig[] = [
       },
     ],
   },
+  {
+    id: AIProviderName.SAGEMAKER,
+    name: "Amazon SageMaker",
+    description: "Custom models deployed on Amazon SageMaker endpoints",
+    envVars: [
+      {
+        key: "AWS_ACCESS_KEY_ID",
+        prompt: "AWS Access Key ID",
+        secure: true,
+      },
+      {
+        key: "AWS_SECRET_ACCESS_KEY",
+        prompt: "AWS Secret Access Key",
+        secure: true,
+      },
+      {
+        key: "AWS_REGION",
+        prompt: "AWS Region",
+        default: "us-east-1",
+        secure: false,
+      },
+      {
+        key: "SAGEMAKER_DEFAULT_ENDPOINT",
+        prompt: "SageMaker Endpoint Name",
+        secure: false,
+      },
+    ],
+  },
 ];
 
 export interface SetupResult {
