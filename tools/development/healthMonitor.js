@@ -7,13 +7,161 @@
  */
 
 import { execSync } from "child_process";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+} from "fs";
+import { join, dirname, extname } from "path";
 import { fileURLToPath } from "url";
+
+// Import logger utility for consistent logging
+import { logger } from "../../src/lib/utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT_DIR = join(__dirname, "../..");
+
+/**
+ * Utility function to count files by extension using Node.js APIs
+ */
+function countFilesByExtension(
+  dir,
+  extensions,
+  excludeDirs = ["node_modules", ".git"],
+) {
+  let count = 0;
+
+  function traverse(currentDir, depth = 0) {
+    if (depth > 10) {
+      return; // Prevent infinite recursion
+    }
+
+    try {
+      const entries = readdirSync(currentDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = join(currentDir, entry.name);
+
+        if (entry.isDirectory()) {
+          if (!excludeDirs.includes(entry.name)) {
+            traverse(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          const ext = extname(entry.name);
+          if (extensions.includes(ext)) {
+            count++;
+          }
+        }
+      }
+    } catch (error) {
+      // Skip directories we can't read
+      if (
+        process.env.DEBUG_HEALTH_MONITOR ||
+        process.env.NODE_ENV === "development"
+      ) {
+        logger.debug(
+          `countAllFiles: Failed to read directory "${currentDir}": ${error.message}`,
+        );
+      }
+    }
+  }
+
+  traverse(dir);
+  return count;
+}
+
+/**
+ * Utility function to count all files excluding certain directories
+ */
+function countAllFiles(dir, excludeDirs = ["node_modules", ".git"]) {
+  let count = 0;
+
+  function traverse(currentDir, depth = 0) {
+    if (depth > 10) {
+      return; // Prevent infinite recursion
+    }
+
+    try {
+      const entries = readdirSync(currentDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = join(currentDir, entry.name);
+
+        if (entry.isDirectory()) {
+          if (!excludeDirs.includes(entry.name)) {
+            traverse(fullPath, depth + 1);
+          }
+        } else if (entry.isFile()) {
+          count++;
+        }
+      }
+    } catch (error) {
+      // Skip directories we can't read
+      if (
+        process.env.DEBUG_HEALTH_MONITOR ||
+        process.env.NODE_ENV === "development"
+      ) {
+        logger.debug(
+          `countAllFiles: Failed to read directory "${currentDir}": ${error.message}`,
+        );
+      }
+    }
+  }
+
+  traverse(dir);
+  return count;
+}
+
+/**
+ * Utility function to get directory size using Node.js APIs
+ */
+function getDirectorySizeSync(dir) {
+  let totalSize = 0;
+
+  function traverse(currentDir, depth = 0) {
+    if (depth > 20) {
+      return; // Prevent infinite recursion for very deep dirs
+    }
+
+    try {
+      const entries = readdirSync(currentDir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = join(currentDir, entry.name);
+
+        if (entry.isDirectory()) {
+          traverse(fullPath, depth + 1);
+        } else if (entry.isFile()) {
+          try {
+            const stats = statSync(fullPath);
+            totalSize += stats.size;
+          } catch {
+            // Skip files we can't access
+          }
+        }
+      }
+    } catch (error) {
+      // Skip directories we can't read
+      if (
+        process.env.DEBUG_HEALTH_MONITOR ||
+        process.env.NODE_ENV === "development"
+      ) {
+        logger.debug(
+          `countAllFiles: Failed to read directory "${currentDir}": ${error.message}`,
+        );
+      }
+    }
+  }
+
+  if (existsSync(dir)) {
+    traverse(dir);
+  }
+  return totalSize;
+}
 
 class HealthMonitor {
   constructor() {
@@ -282,27 +430,19 @@ class HealthMonitor {
   }
 
   /**
-   * Count project files
+   * Count project files using Node.js APIs
    */
   countProjectFiles() {
     try {
-      const jsFiles = execSync(
-        'find . -name "*.js" -not -path "./node_modules/*" | wc -l',
-        { encoding: "utf8" },
-      ).trim();
-      const tsFiles = execSync(
-        'find . -name "*.ts" -not -path "./node_modules/*" | wc -l',
-        { encoding: "utf8" },
-      ).trim();
-      const totalFiles = execSync(
-        'find . -type f -not -path "./node_modules/*" -not -path "./.git/*" | wc -l',
-        { encoding: "utf8" },
-      ).trim();
+      // Use Node.js APIs instead of shell commands
+      const jsCount = countFilesByExtension(ROOT_DIR, [".js"]);
+      const tsCount = countFilesByExtension(ROOT_DIR, [".ts"]);
+      const totalCount = countAllFiles(ROOT_DIR);
 
       return {
-        total: parseInt(totalFiles),
-        js: parseInt(jsFiles),
-        ts: parseInt(tsFiles),
+        total: totalCount,
+        js: jsCount,
+        ts: tsCount,
       };
     } catch {
       return { total: 0, js: 0, ts: 0 };
@@ -310,22 +450,19 @@ class HealthMonitor {
   }
 
   /**
-   * Count documentation files
+   * Count documentation files using Node.js APIs
    */
   countDocumentationFiles() {
     try {
-      const mdFiles = execSync(
-        'find . -name "*.md" -not -path "./node_modules/*" | wc -l',
-        { encoding: "utf8" },
-      ).trim();
-      return parseInt(mdFiles);
+      // Use Node.js APIs instead of shell commands
+      return countFilesByExtension(ROOT_DIR, [".md"]);
     } catch {
       return 0;
     }
   }
 
   /**
-   * Get directory size
+   * Get directory size using Node.js APIs
    */
   getDirectorySize(dirPath) {
     try {
@@ -333,9 +470,8 @@ class HealthMonitor {
         return 0;
       }
 
-      const output = execSync(`du -s "${dirPath}"`, { encoding: "utf8" });
-      const sizeInKB = parseInt(output.split("\t")[0]);
-      return sizeInKB * 1024; // Convert to bytes
+      // Use Node.js APIs instead of shell commands
+      return getDirectorySizeSync(dirPath);
     } catch {
       return 0;
     }

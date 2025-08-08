@@ -19,6 +19,7 @@ import type {
   AIProviderName,
   TextGenerationOptions,
   TextGenerationResult,
+  EvaluationData,
 } from "./core/types.js";
 import { AIProviderFactory } from "./core/factory.js";
 
@@ -41,6 +42,16 @@ import {
 import type { InMemoryMCPServerConfig } from "./types/mcpTypes.js";
 import type { JsonValue, UnknownRecord } from "./types/common.js";
 import type { ToolArgs } from "./types/tools.js";
+// Factory processing imports
+import {
+  processFactoryOptions,
+  enhanceTextGenerationOptions,
+  validateFactoryConfig,
+  processStreamingFactoryOptions,
+  createCleanStreamOptions,
+} from "./utils/factoryProcessing.js";
+// Tool detection and execution imports
+import type { NeuroLinkExecutionContext } from "./mcp/factory.js";
 
 // Provider and MCP diagnostic types
 export interface ProviderStatus {
@@ -100,6 +111,11 @@ export class NeuroLink {
       return;
     }
 
+    // Track memory usage during MCP initialization
+    const { MemoryManager } = await import("./utils/performance.js");
+    const startMemory = MemoryManager.getMemoryUsageMB();
+    const initStartTime = Date.now();
+
     try {
       mcpLogger.debug("[NeuroLink] Starting isolated MCP initialization...");
 
@@ -119,7 +135,23 @@ export class NeuroLink {
       await ProviderRegistry.registerAllProviders();
 
       this.mcpInitialized = true;
-      mcpLogger.debug("[NeuroLink] MCP initialization completed successfully");
+
+      // Monitor memory usage and provide cleanup suggestions
+      const endMemory = MemoryManager.getMemoryUsageMB();
+      const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+      const initTime = Date.now() - initStartTime;
+
+      mcpLogger.debug("[NeuroLink] MCP initialization completed successfully", {
+        initTime: `${initTime}ms`,
+        memoryUsed: `${memoryDelta}MB`,
+      });
+
+      // Suggest cleanup if initialization used significant memory
+      if (memoryDelta > 30) {
+        mcpLogger.debug(
+          "💡 Memory cleanup suggestion: MCP initialization used significant memory. Consider calling MemoryManager.forceGC() after heavy operations.",
+        );
+      }
     } catch (error) {
       mcpLogger.warn("[NeuroLink] MCP initialization failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -148,22 +180,57 @@ export class NeuroLink {
       throw new Error("Input text is required and must be a non-empty string");
     }
 
-    // Convert to internal TextGenerationOptions for compatibility
-    const textOptions: TextGenerationOptions = {
+    // Process factory configuration
+    const factoryResult = processFactoryOptions(options);
+
+    // Validate factory configuration if present
+    if (factoryResult.hasFactoryConfig && options.factoryConfig) {
+      const validation = validateFactoryConfig(options.factoryConfig);
+      if (!validation.isValid) {
+        logger.warn("Invalid factory configuration detected", {
+          errors: validation.errors,
+        });
+        // Continue with warning rather than throwing - graceful degradation
+      }
+    }
+
+    // Convert to TextGenerationOptions using factory utilities
+    const baseOptions: TextGenerationOptions = {
       prompt: options.input.text,
       provider: options.provider as AIProviderName,
       model: options.model,
       temperature: options.temperature,
       maxTokens: options.maxTokens,
       systemPrompt: options.systemPrompt,
-      disableTools: options.disableTools, // FIX: Pass disableTools flag
-      // 🔧 FIX: Include analytics and evaluation options!
+      disableTools: options.disableTools,
       enableAnalytics: options.enableAnalytics,
       enableEvaluation: options.enableEvaluation,
       context: options.context as Record<string, JsonValue> | undefined,
       evaluationDomain: options.evaluationDomain,
       toolUsageContext: options.toolUsageContext,
     };
+
+    // Apply factory enhancement using centralized utilities
+    const textOptions = enhanceTextGenerationOptions(
+      baseOptions,
+      factoryResult,
+    );
+
+    // Detect and execute domain-specific tools
+    const { toolResults, enhancedPrompt } = await this.detectAndExecuteTools(
+      textOptions.prompt || options.input.text,
+      factoryResult.domainType,
+    );
+
+    // Update prompt with tool results if available
+    if (enhancedPrompt !== textOptions.prompt) {
+      textOptions.prompt = enhancedPrompt;
+      logger.debug("Enhanced prompt with tool results", {
+        originalLength: options.input.text.length,
+        enhancedLength: enhancedPrompt.length,
+        toolResults: toolResults.length,
+      });
+    }
 
     // Use redesigned generation logic
     const textResult = await this.generateTextInternal(textOptions);
@@ -231,6 +298,12 @@ export class NeuroLink {
             evaluationTime:
               ((textResult.evaluation as UnknownRecord)
                 .evaluationTime as number) ?? Date.now(),
+            // Include evaluationDomain from original options
+            evaluationDomain:
+              ((textResult.evaluation as UnknownRecord)
+                .evaluationDomain as string) ??
+              textOptions.evaluationDomain ??
+              factoryResult.domainType,
           }
         : undefined,
     };
@@ -314,7 +387,7 @@ export class NeuroLink {
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult | null> {
     const functionTag = "NeuroLink.tryMCPGeneration";
-    const startTime = Date.now(); // 🔧 FIX: Add proper timing
+    const startTime = Date.now();
 
     try {
       // Initialize MCP if needed
@@ -372,7 +445,7 @@ export class NeuroLink {
         systemPrompt: enhancedSystemPrompt,
       });
 
-      const responseTime = Date.now() - startTime; // 🔧 FIX: Proper timing calculation
+      const responseTime = Date.now() - startTime;
 
       // Check if result is meaningful
       if (!result || !result.content || result.content.trim().length === 0) {
@@ -522,6 +595,65 @@ export class NeuroLink {
   }
 
   /**
+   * Execute tools if available through centralized registry
+   * Simplified approach without domain detection - relies on tool registry
+   */
+  private async detectAndExecuteTools(
+    prompt: string,
+    domainType?: string,
+  ): Promise<{ toolResults: unknown[]; enhancedPrompt: string }> {
+    const functionTag = "NeuroLink.detectAndExecuteTools";
+
+    try {
+      // Simplified: Just return original prompt without complex detection
+      // Tools will be available through normal MCP flow when AI decides to use them
+      logger.debug(
+        `[${functionTag}] Skipping automatic tool execution - relying on centralized registry`,
+      );
+
+      return { toolResults: [], enhancedPrompt: prompt };
+    } catch (error) {
+      logger.error(`[${functionTag}] Tool detection/execution failed`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { toolResults: [], enhancedPrompt: prompt };
+    }
+  }
+
+  /**
+   * Enhance prompt with tool results (domain-agnostic)
+   */
+  private enhancePromptWithToolResults(
+    prompt: string,
+    toolResults: unknown[],
+  ): string {
+    if (toolResults.length === 0) {
+      return prompt;
+    }
+
+    let enhancedPrompt = prompt;
+
+    for (const result of toolResults) {
+      if (result && typeof result === "object") {
+        enhancedPrompt += `\n\nTool Results:\n`;
+
+        // Handle any structured result generically
+        try {
+          const resultStr =
+            typeof result === "string"
+              ? result
+              : JSON.stringify(result, null, 2);
+          enhancedPrompt += resultStr + "\n";
+        } catch {
+          enhancedPrompt += "Tool execution completed\n";
+        }
+      }
+    }
+
+    return enhancedPrompt;
+  }
+
+  /**
    * BACKWARD COMPATIBILITY: Legacy streamText method
    * Internally calls stream() and converts result format
    */
@@ -567,6 +699,30 @@ export class NeuroLink {
       );
     }
 
+    // Process factory configuration for streaming
+    const factoryResult = processFactoryOptions(options);
+    const streamingResult = processStreamingFactoryOptions(options);
+
+    // Validate factory configuration if present
+    if (factoryResult.hasFactoryConfig && options.factoryConfig) {
+      const validation = validateFactoryConfig(options.factoryConfig);
+      if (!validation.isValid) {
+        mcpLogger.warn("Invalid factory configuration detected in stream", {
+          errors: validation.errors,
+        });
+        // Continue with warning rather than throwing - graceful degradation
+      }
+    }
+
+    // Log factory processing results
+    if (factoryResult.hasFactoryConfig) {
+      mcpLogger.debug(`[${functionTag}] Factory configuration detected`, {
+        domainType: factoryResult.domainType,
+        enhancementType: factoryResult.enhancementType,
+        hasStreamingConfig: streamingResult.hasStreamingConfig,
+      });
+    }
+
     // Initialize MCP if needed
     await this.initializeMCP();
 
@@ -577,6 +733,32 @@ export class NeuroLink {
       options.provider === "auto" || !options.provider
         ? await getBestProvider()
         : options.provider;
+
+    // Prepare enhanced options for both success and fallback paths
+    let enhancedOptions = options;
+    if (factoryResult.hasFactoryConfig) {
+      enhancedOptions = {
+        ...options,
+        // Merge contexts instead of overriding to preserve provider-required context
+        context: {
+          ...(options.context || {}),
+          ...(factoryResult.processedContext || {}),
+        } as UnknownRecord,
+        // Ensure evaluation is enabled when using factory patterns
+        enableEvaluation: options.enableEvaluation ?? true,
+        // Use domain type for evaluation if available
+        evaluationDomain: factoryResult.domainType || options.evaluationDomain,
+      };
+
+      mcpLogger.debug(
+        `[${functionTag}] Enhanced stream options with factory config`,
+        {
+          domainType: factoryResult.domainType,
+          enhancementType: factoryResult.enhancementType,
+          hasProcessedContext: !!factoryResult.processedContext,
+        },
+      );
+    }
 
     try {
       mcpLogger.debug(`[${functionTag}] Starting MCP-enabled streaming`, {
@@ -592,8 +774,11 @@ export class NeuroLink {
         this as unknown as UnknownRecord, // Pass SDK instance
       );
 
-      // Call the provider's stream method directly
-      const streamResult = await provider.stream(options);
+      // Create clean options for provider (remove factoryConfig)
+      const cleanOptions = createCleanStreamOptions(enhancedOptions);
+
+      // Call the provider's stream method with clean options
+      const streamResult = await provider.stream(cleanOptions);
 
       // Extract the stream from the result
       const stream = streamResult.stream;
@@ -614,8 +799,18 @@ export class NeuroLink {
         finishReason: streamResult.finishReason,
         toolCalls: streamResult.toolCalls,
         toolResults: streamResult.toolResults,
-        analytics: streamResult.analytics, // 🔧 FIX: Pass through analytics data
-        evaluation: streamResult.evaluation, // 🔧 FIX: Pass through evaluation data
+        analytics: streamResult.analytics,
+        evaluation: streamResult.evaluation
+          ? {
+              ...(streamResult.evaluation as EvaluationData),
+              // Include evaluationDomain from factory configuration
+              evaluationDomain:
+                ((streamResult.evaluation as unknown as UnknownRecord)
+                  ?.evaluationDomain as string) ??
+                enhancedOptions.evaluationDomain ??
+                factoryResult.domainType,
+            }
+          : undefined,
         metadata: {
           streamId: `neurolink-${Date.now()}`,
           startTime,
@@ -639,7 +834,10 @@ export class NeuroLink {
         this as unknown as UnknownRecord, // Pass SDK instance
       );
 
-      const streamResult = await provider.stream(options);
+      // Create clean options for fallback provider (remove factoryConfig)
+      const cleanOptions = createCleanStreamOptions(enhancedOptions);
+
+      const streamResult = await provider.stream(cleanOptions);
       const responseTime = Date.now() - startTime;
 
       return {
@@ -650,8 +848,18 @@ export class NeuroLink {
         finishReason: streamResult.finishReason,
         toolCalls: streamResult.toolCalls,
         toolResults: streamResult.toolResults,
-        analytics: streamResult.analytics, // 🔧 FIX: Pass through analytics data in fallback
-        evaluation: streamResult.evaluation, // 🔧 FIX: Pass through evaluation data in fallback
+        analytics: streamResult.analytics,
+        evaluation: streamResult.evaluation
+          ? {
+              ...(streamResult.evaluation as EvaluationData),
+              // Include evaluationDomain in fallback stream
+              evaluationDomain:
+                ((streamResult.evaluation as unknown as UnknownRecord)
+                  ?.evaluationDomain as string) ??
+                enhancedOptions.evaluationDomain ??
+                factoryResult.domainType,
+            }
+          : undefined,
         metadata: {
           streamId: `neurolink-${Date.now()}`,
           startTime,
@@ -796,6 +1004,11 @@ export class NeuroLink {
   ): Promise<T> {
     const functionTag = "NeuroLink.executeTool";
 
+    // Track memory usage for tool execution
+    const { MemoryManager } = await import("./utils/performance.js");
+    const startMemory = MemoryManager.getMemoryUsageMB();
+    const executionStartTime = Date.now();
+
     try {
       mcpLogger.debug(`[${functionTag}] Executing tool: ${toolName}`, {
         toolName,
@@ -819,6 +1032,22 @@ export class NeuroLink {
           toolName,
           executionTime,
         });
+
+        // Track memory usage for custom tool execution
+        const endMemory = MemoryManager.getMemoryUsageMB();
+        const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+        const totalExecutionTime = Date.now() - executionStartTime;
+
+        if (memoryDelta > 5) {
+          mcpLogger.debug(
+            `🔍 Tool '${toolName}' used ${memoryDelta}MB memory in ${totalExecutionTime}ms`,
+          );
+          if (memoryDelta > 20) {
+            mcpLogger.debug(
+              "💡 Memory cleanup suggestion: Tool used significant memory. Consider optimizing tool implementation or calling MemoryManager.forceGC() after heavy operations.",
+            );
+          }
+        }
 
         return result as T;
       }
@@ -860,6 +1089,17 @@ export class NeuroLink {
                 }
               }
 
+              // Track memory usage for in-memory server tool execution
+              const endMemory = MemoryManager.getMemoryUsageMB();
+              const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+              const totalExecutionTime = Date.now() - executionStartTime;
+
+              if (memoryDelta > 5) {
+                mcpLogger.debug(
+                  `🔍 In-memory tool '${toolName}' used ${memoryDelta}MB memory in ${totalExecutionTime}ms`,
+                );
+              }
+
               return result as T;
             } catch (toolError) {
               mcpLogger.error(`[${functionTag}] Tool execution failed`, {
@@ -892,6 +1132,23 @@ export class NeuroLink {
           params,
           context,
         )) as T;
+
+        // Track memory usage for external tool execution
+        const endMemory = MemoryManager.getMemoryUsageMB();
+        const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+        const totalExecutionTime = Date.now() - executionStartTime;
+
+        if (memoryDelta > 5) {
+          mcpLogger.debug(
+            `🔍 External tool '${toolName}' used ${memoryDelta}MB memory in ${totalExecutionTime}ms`,
+          );
+          if (memoryDelta > 15) {
+            mcpLogger.debug(
+              "💡 Memory cleanup suggestion: External tool used significant memory. Consider tool optimization or periodic cleanup.",
+            );
+          }
+        }
+
         return result;
       } catch (error) {
         mcpLogger.warn(`[${functionTag}] External tool execution failed`, {
@@ -919,10 +1176,36 @@ export class NeuroLink {
    * @returns Array of available tools with metadata
    */
   async getAllAvailableTools() {
-    // MCP registry already includes direct tools, so just return MCP tools
-    // This prevents duplication since direct tools are auto-registered in MCP
-    const mcpTools = await toolRegistry.listTools();
-    return mcpTools;
+    // Track memory usage for tool listing operations
+    const { MemoryManager } = await import("./utils/performance.js");
+    const startMemory = MemoryManager.getMemoryUsageMB();
+
+    try {
+      // MCP registry already includes direct tools, so just return MCP tools
+      // This prevents duplication since direct tools are auto-registered in MCP
+      const mcpTools = await toolRegistry.listTools();
+
+      // Check memory usage after tool enumeration
+      const endMemory = MemoryManager.getMemoryUsageMB();
+      const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+
+      if (memoryDelta > 10) {
+        mcpLogger.debug(
+          `🔍 Tool listing used ${memoryDelta}MB memory (large tool registry detected)`,
+        );
+        // Suggest periodic cleanup for large tool registries
+        if (mcpTools.length > 100) {
+          mcpLogger.debug(
+            "💡 Suggestion: Consider using tool categories or lazy loading for large tool sets",
+          );
+        }
+      }
+
+      return mcpTools;
+    } catch (error) {
+      mcpLogger.error("Failed to list available tools", { error });
+      return [];
+    }
   }
 
   // ============================================================================
@@ -936,11 +1219,11 @@ export class NeuroLink {
   async getProviderStatus(options?: {
     quiet?: boolean;
   }): Promise<ProviderStatus[]> {
-    // 🔧 PERFORMANCE: Track memory and timing for provider status checks
+    // Track memory and timing for provider status checks
     const { MemoryManager } = await import("./utils/performance.js");
     const startMemory = MemoryManager.getMemoryUsageMB();
 
-    // CRITICAL FIX: Ensure providers are registered before testing
+    // Ensure providers are registered before testing
     if (!options?.quiet) {
       mcpLogger.debug("🔍 DEBUG: Initializing MCP for provider status...");
     }
@@ -966,7 +1249,7 @@ export class NeuroLink {
       "litellm",
     ] as const;
 
-    // 🚀 PERFORMANCE FIX: Test providers with controlled concurrency
+    // Test providers with controlled concurrency
     // This reduces total time from 16s (sequential) to ~3s (parallel) while preventing resource exhaustion
     const limit = pLimit(SYSTEM_LIMITS.DEFAULT_CONCURRENCY_LIMIT);
     const providerTests = providers.map((providerName) =>
@@ -1077,7 +1360,7 @@ export class NeuroLink {
     // Wait for all provider tests to complete in parallel
     const results = await Promise.all(providerTests);
 
-    // 🔧 PERFORMANCE: Track memory usage and suggest cleanup if needed
+    // Track memory usage and suggest cleanup if needed
     const endMemory = MemoryManager.getMemoryUsageMB();
     const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
 
