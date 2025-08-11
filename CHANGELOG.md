@@ -1,21 +1,18 @@
 # [7.8.0](https://github.com/juspay/neurolink/compare/v7.7.1...v7.8.0) (2025-08-11)
 
-
 ### Bug Fixes
 
-* exclude _site directory from ESLint ([c0e5f1d](https://github.com/juspay/neurolink/commit/c0e5f1dce46e91ee76cd1a4954190569b4a8d1d9))
-
+- exclude \_site directory from ESLint ([c0e5f1d](https://github.com/juspay/neurolink/commit/c0e5f1dce46e91ee76cd1a4954190569b4a8d1d9))
 
 ### Features
 
-* **providers:** add comprehensive Amazon SageMaker provider integration ([9ef4ebe](https://github.com/juspay/neurolink/commit/9ef4ebeeda520a71a7461ca5f4f34a83c2062356))
+- **providers:** add comprehensive Amazon SageMaker provider integration ([9ef4ebe](https://github.com/juspay/neurolink/commit/9ef4ebeeda520a71a7461ca5f4f34a83c2062356))
 
 ## [7.7.1](https://github.com/juspay/neurolink/compare/v7.7.0...v7.7.1) (2025-08-11)
 
-
 ### Bug Fixes
 
-* **providers:** resolve ESLint errors and improve validation in Vertex AI health checker ([a5822ee](https://github.com/juspay/neurolink/commit/a5822eee3f8b6beaf3d2168ebb8888a6beaa5cb4))
+- **providers:** resolve ESLint errors and improve validation in Vertex AI health checker ([a5822ee](https://github.com/juspay/neurolink/commit/a5822eee3f8b6beaf3d2168ebb8888a6beaa5cb4))
 
 # [7.7.0](https://github.com/juspay/neurolink/compare/v7.6.1...v7.7.0) (2025-08-10)
 
