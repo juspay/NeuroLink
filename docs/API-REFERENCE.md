@@ -227,47 +227,47 @@ getEventEmitter(): EventEmitter
 
 ```typescript
 interface NeuroLinkEvents {
-  'generation:start': {
+  "generation:start": {
     provider: string;
     timestamp: number;
   };
-  
-  'generation:end': {
+
+  "generation:end": {
     provider: string;
     responseTime: number;
     toolsUsed?: string[];
     timestamp: number;
   };
-  
-  'stream:start': {
+
+  "stream:start": {
     provider: string;
     timestamp: number;
   };
-  
-  'stream:end': {
+
+  "stream:end": {
     provider: string;
     responseTime: number;
     fallback?: boolean;
   };
-  
-  'tool:start': {
+
+  "tool:start": {
     toolName: string;
     timestamp: number;
   };
-  
-  'tool:end': {
+
+  "tool:end": {
     toolName: string;
     responseTime: number;
     success: boolean;
     timestamp: number;
   };
-  
-  'tools-register:start': {
+
+  "tools-register:start": {
     toolName: string;
     timestamp: number;
   };
-  
-  'tools-register:end': {
+
+  "tools-register:end": {
     toolName: string;
     success: boolean;
     timestamp: number;
@@ -284,24 +284,24 @@ const neurolink = new NeuroLink();
 const emitter = neurolink.getEventEmitter();
 
 // Listen to generation events
-emitter.on('generation:start', (data) => {
+emitter.on("generation:start", (data) => {
   console.log(`🚀 Generation started with ${data.provider}`);
   console.log(`⏱️ Started at timestamp: ${data.timestamp}`);
 });
 
-emitter.on('generation:end', (data) => {
+emitter.on("generation:end", (data) => {
   console.log(`✅ Generation completed in ${data.responseTime}ms`);
   if (data.toolsUsed && data.toolsUsed.length > 0) {
-    console.log(`🔧 Tools used: ${data.toolsUsed.join(', ')}`);
+    console.log(`🔧 Tools used: ${data.toolsUsed.join(", ")}`);
   }
 });
 
 // Listen to streaming events
-emitter.on('stream:start', (data) => {
+emitter.on("stream:start", (data) => {
   console.log(`🌊 Streaming started with ${data.provider}`);
 });
 
-emitter.on('stream:end', (data) => {
+emitter.on("stream:end", (data) => {
   console.log(`🏁 Streaming completed in ${data.responseTime}ms`);
   if (data.fallback) {
     console.log(`⚠️ Fallback provider was used`);
@@ -309,22 +309,26 @@ emitter.on('stream:end', (data) => {
 });
 
 // Listen to tool events
-emitter.on('tool:start', (data) => {
+emitter.on("tool:start", (data) => {
   console.log(`🔧 Tool execution started: ${data.toolName}`);
   console.log(`⏱️ Started at timestamp: ${data.timestamp}`);
 });
 
-emitter.on('tool:end', (data) => {
-  console.log(`${data.success ? '✅' : '❌'} Tool execution ${data.success ? 'completed' : 'failed'}: ${data.toolName} (${data.responseTime}ms)`);
+emitter.on("tool:end", (data) => {
+  console.log(
+    `${data.success ? "✅" : "❌"} Tool execution ${data.success ? "completed" : "failed"}: ${data.toolName} (${data.responseTime}ms)`,
+  );
 });
 
 // Listen to tool registration events
-emitter.on('tools-register:start', (data) => {
+emitter.on("tools-register:start", (data) => {
   console.log(`📋 Registering tool: ${data.toolName}`);
 });
 
-emitter.on('tools-register:end', (data) => {
-  console.log(`${data.success ? '✅' : '❌'} Tool ${data.success ? 'registered successfully' : 'registration failed'}: ${data.toolName}`);
+emitter.on("tools-register:end", (data) => {
+  console.log(
+    `${data.success ? "✅" : "❌"} Tool ${data.success ? "registered successfully" : "registration failed"}: ${data.toolName}`,
+  );
 });
 
 // Generate text with event monitoring

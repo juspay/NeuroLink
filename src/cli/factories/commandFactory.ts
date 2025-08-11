@@ -370,8 +370,13 @@ export class CLICommandFactory {
 
     // Provider and model info
     analyticsText += `   Provider: ${analytics.provider}`;
-    if (result.model) {
-      analyticsText += ` (${result.model})`;
+    // Check for model in multiple locations: result.model, analytics.model, or any model property
+    const modelName =
+      result.model ||
+      analytics.model ||
+      (analytics as { modelName?: string }).modelName;
+    if (modelName) {
+      analyticsText += ` (${modelName})`;
     }
     analyticsText += "\n";
 

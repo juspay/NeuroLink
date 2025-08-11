@@ -11,6 +11,8 @@ import {
   InvokeEndpointWithResponseStreamCommand,
   type InvokeEndpointCommandInput,
   type InvokeEndpointWithResponseStreamCommandInput,
+  type InvokeEndpointCommandOutput,
+  type InvokeEndpointWithResponseStreamCommandOutput,
 } from "@aws-sdk/client-sagemaker-runtime";
 
 import type {
@@ -106,10 +108,10 @@ export class SageMakerRuntimeClient {
       if (!client) {
         throw new Error("SageMaker client has been disposed");
       }
-      const response = await this.executeWithRetry(
+      const response = (await this.executeWithRetry(
         () => client.send(command),
         params.EndpointName,
-      );
+      )) as InvokeEndpointCommandOutput;
 
       const duration = Date.now() - startTime;
       logger.debug("SageMaker endpoint invocation successful", {
@@ -177,10 +179,10 @@ export class SageMakerRuntimeClient {
       if (!client) {
         throw new Error("SageMaker client has been disposed");
       }
-      const response = await this.executeWithRetry(
+      const response = (await this.executeWithRetry(
         () => client.send(command),
         params.EndpointName,
-      );
+      )) as InvokeEndpointWithResponseStreamCommandOutput;
 
       logger.debug("SageMaker streaming invocation started", {
         endpointName: params.EndpointName,

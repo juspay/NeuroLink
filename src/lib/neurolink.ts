@@ -119,7 +119,7 @@ export class NeuroLink {
       lastExecutionTime: number;
     }
   > = new Map();
-  
+
   /**
    * Helper method to emit tool end event in a consistent way
    * Used by executeTool in both success and error paths
@@ -130,7 +130,7 @@ export class NeuroLink {
   private emitToolEndEvent(
     toolName: string,
     startTime: number,
-    success: boolean
+    success: boolean,
   ): void {
     this.emitter.emit("tool:end", {
       toolName,
