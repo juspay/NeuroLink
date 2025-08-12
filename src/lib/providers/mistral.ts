@@ -18,6 +18,7 @@ import {
   getProviderModel,
 } from "../utils/providerConfig.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Configuration helpers - now using consolidated utility
 const getMistralApiKey = (): string => {
@@ -77,11 +78,10 @@ export class MistralProvider extends BaseProvider {
       // Get tools consistently with generate method
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const tools = shouldUseTools ? await this.getAllTools() : {};
-
+      const messages = buildMessagesArray(options);
       const result = await streamText({
         model: this.model,
-        prompt: options.input.text,
-        system: options.systemPrompt,
+        messages: messages,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         tools,

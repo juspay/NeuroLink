@@ -14,6 +14,7 @@ import {
   createAzureEndpointConfig,
 } from "../utils/providerConfig.js";
 import { logger } from "../utils/logger.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 export class AzureOpenAIProvider extends BaseProvider {
   private apiKey: string;
@@ -102,12 +103,14 @@ export class AzureOpenAIProvider extends BaseProvider {
     analysisSchema?: unknown,
   ): Promise<StreamResult> {
     try {
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const stream = await streamText({
         model: this.azureProvider(this.deployment),
-        prompt: options.input?.text || "",
+        messages: messages,
         maxTokens: options.maxTokens || 1000,
         temperature: options.temperature || 0.7,
-        system: options.systemPrompt,
       });
 
       return {

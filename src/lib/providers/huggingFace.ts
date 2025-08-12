@@ -19,6 +19,7 @@ import {
   createHuggingFaceConfig,
   getProviderModel,
 } from "../utils/providerConfig.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Configuration helpers - now using consolidated utility
 const getHuggingFaceApiKey = (): string => {
@@ -160,10 +161,12 @@ export class HuggingFaceProvider extends BaseProvider {
       // Enhanced tool handling for HuggingFace models
       const streamOptions = this.prepareStreamOptions(options, analysisSchema);
 
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const result = await streamText({
         model: this.model,
-        prompt: streamOptions.prompt,
-        system: streamOptions.system,
+        messages: messages,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         tools: streamOptions.tools as ToolSet, // Tools format conversion handled by prepareStreamOptions

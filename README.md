@@ -162,6 +162,21 @@ console.log(result.content);
 console.log(`Used: ${result.provider}`);
 ```
 
+### Conversation Memory
+
+NeuroLink supports automatic conversation history management that maintains context across multiple turns within sessions. This enables AI to remember previous interactions and provide contextually aware responses. Session-based memory isolation ensures privacy between different conversations.
+
+```typescript
+// Enable conversation memory with configurable limits
+const neurolink = new NeuroLink({
+  conversationMemory: {
+    enabled: true,
+    maxSessions: 50, // Keep last 50 sessions
+    maxTurnsPerSession: 20, // Keep last 20 turns per session
+  },
+});
+```
+
 #### 🔗 CLI-SDK Consistency (NEW! ✨)
 
 Method aliases that match CLI command names:

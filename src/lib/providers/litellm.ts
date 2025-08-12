@@ -18,6 +18,7 @@ import {
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 import { validateApiKey, getProviderModel } from "../utils/providerConfig.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Configuration helpers
 const getLiteLLMConfig = () => {
@@ -183,10 +184,12 @@ export class LiteLLMProvider extends BaseProvider {
     );
 
     try {
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const result = await streamText({
         model: this.model,
-        prompt: options.input.text,
-        system: options.systemPrompt,
+        messages: messages,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         tools: options.tools,

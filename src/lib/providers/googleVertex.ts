@@ -27,6 +27,7 @@ import {
   createVertexProjectConfig,
   createGoogleAuthConfig,
 } from "../utils/providerConfig.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Cache for anthropic module to avoid repeated imports
 let _createVertexAnthropic: unknown = null;
@@ -275,6 +276,9 @@ export class GoogleVertexProvider extends BaseProvider {
     try {
       this.validateStreamOptions(options);
 
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       logger.debug(`${functionTag}: Starting stream request`, {
         modelName: this.modelName,
         promptLength: options.input.text.length,
@@ -300,8 +304,7 @@ export class GoogleVertexProvider extends BaseProvider {
       // Build complete stream options with proper typing
       let streamOptions: Parameters<typeof streamText>[0] = {
         model: model,
-        prompt: options.input.text,
-        system: options.systemPrompt,
+        messages: messages,
         temperature: options.temperature,
         ...(maxTokens && { maxTokens }),
         tools,

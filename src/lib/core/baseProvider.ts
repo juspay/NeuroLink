@@ -19,6 +19,7 @@ import { directAgentTools } from "../agent/directTools.js";
 import { getSafeMaxTokens } from "../utils/tokenLimits.js";
 import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Interface for AI SDK generate result with steps
 interface AISDKGenerateResult {
@@ -285,10 +286,13 @@ export abstract class BaseProvider implements AIProvider {
       // EVERY provider uses Vercel AI SDK - no exceptions
       const model = await this.getAISDKModel(); // This method is now REQUIRED
 
+
+      // Build proper message array with conversation history
+      const messages = buildMessagesArray(options);
+
       const result = await generateText({
         model,
-        prompt: options.prompt || options.input?.text || "",
-        system: options.systemPrompt,
+        messages: messages,
         tools,
         maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
         toolChoice: shouldUseTools ? "auto" : "none",

@@ -23,6 +23,7 @@ import {
   getAWSRegion,
   getAWSSessionToken,
 } from "../utils/providerConfig.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Configuration helpers
 const getBedrockModelId = (): string => {
@@ -125,10 +126,12 @@ export class AmazonBedrockProvider extends BaseProvider {
     try {
       this.validateStreamOptions(options);
 
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const result = await streamText({
         model: this.model,
-        prompt: options.input.text,
-        system: options.systemPrompt,
+        messages: messages,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         temperature: options.temperature,
       });

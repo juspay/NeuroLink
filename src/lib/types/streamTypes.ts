@@ -6,6 +6,7 @@ import type {
   EvaluationData,
 } from "../core/types.js";
 import type { UnknownRecord, Unknown, JsonValue } from "./common.js";
+import type { ChatMessage } from "./conversationTypes.js";
 
 /**
  * Interface for tool execution calls (AI SDK compatible)
@@ -127,6 +128,9 @@ export interface StreamOptions {
     enableProgress?: boolean;
     fallbackToGenerate?: boolean;
   };
+
+  // NEW: Message Array Support for Conversation Memory
+  conversationMessages?: ChatMessage[]; // Previous conversation as message array
 }
 
 /**

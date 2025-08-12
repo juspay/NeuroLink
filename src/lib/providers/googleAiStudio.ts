@@ -19,6 +19,7 @@ import {
 import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import { buildMessagesArray } from "../utils/messageBuilder.js";
 
 // Environment variable setup
 if (
@@ -126,10 +127,12 @@ export class GoogleAIStudioProvider extends BaseProvider {
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const tools = shouldUseTools ? await this.getAllTools() : {};
 
+      // Build message array from options
+      const messages = buildMessagesArray(options);
+
       const result = await streamText({
         model,
-        prompt: options.input.text,
-        system: options.systemPrompt,
+        messages: messages,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         tools,

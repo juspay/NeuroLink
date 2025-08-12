@@ -3,6 +3,7 @@ import type { Schema, Tool } from "ai";
 import type { GenerateResult } from "../types/generateTypes.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue } from "../types/common.js";
+import type { ChatMessage } from "../types/conversationTypes.js";
 
 export interface TextGenerationResult {
   content: string;
@@ -179,6 +180,9 @@ export interface TextGenerationOptions {
   evaluationDomain?: string; // Domain expertise (e.g., "general AI assistant", "D2C analytics expert")
   toolUsageContext?: string; // Tools/MCPs used in this interaction
   conversationHistory?: Array<{ role: string; content: string }>; // Previous conversation context
+
+  // NEW: Message Array Support for Conversation Memory
+  conversationMessages?: ChatMessage[]; // Previous conversation as message array
 }
 
 /**
