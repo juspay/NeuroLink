@@ -188,6 +188,7 @@ jobs:
         if: github.event_name == 'pull_request' && steps.validate.outputs.status == 'compliant'
         uses: peter-evans/find-comment@v3
         id: find-comment
+        continue-on-error: true
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
@@ -196,6 +197,7 @@ jobs:
       - name: Post Minimal Success Comment
         if: github.event_name == 'pull_request' && steps.validate.outputs.status == 'compliant'
         uses: peter-evans/create-or-update-comment@v4
+        continue-on-error: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
