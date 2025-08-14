@@ -14,9 +14,11 @@ import type { JsonValue, UnknownRecord } from "../types/common.js";
 import type { ToolCall, ToolResult } from "../types/tools.js";
 import type { TokenUsage } from "../types/providers.js";
 import { logger } from "../utils/logger.js";
-import { SYSTEM_LIMITS } from "../core/constants.js";
+import { SYSTEM_LIMITS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { directAgentTools } from "../agent/directTools.js";
 import { getSafeMaxTokens } from "../utils/tokenLimits.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
+import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
 
 // Interface for AI SDK generate result with steps
 interface AISDKGenerateResult {
@@ -100,8 +102,10 @@ export abstract class BaseProvider implements AIProvider {
   protected readonly providerName: AIProviderName;
   protected readonly defaultTimeout: number = 30000; // 30 seconds
 
-  // Tools are ALWAYS part of the provider - no flags, no conditions
-  protected readonly directTools = directAgentTools;
+  // Tools are conditionally included based on centralized configuration
+  protected readonly directTools = shouldDisableBuiltinTools()
+    ? {}
+    : directAgentTools;
   protected mcpTools?: Record<string, Tool>; // MCP tools loaded dynamically when available
   protected sessionId?: string;
   protected userId?: string;
@@ -271,19 +275,22 @@ export abstract class BaseProvider implements AIProvider {
 
       // Get ALL available tools (direct + MCP when available)
       const shouldUseTools = !options.disableTools && this.supportsTools();
+
       const tools = shouldUseTools ? await this.getAllTools() : {};
+
       logger.debug(
         `[BaseProvider.generate] Tools for ${this.providerName}: ${Object.keys(tools).join(", ")}`,
       );
 
       // EVERY provider uses Vercel AI SDK - no exceptions
       const model = await this.getAISDKModel(); // This method is now REQUIRED
+
       const result = await generateText({
         model,
         prompt: options.prompt || options.input?.text || "",
         system: options.systemPrompt,
         tools,
-        maxSteps: options.maxSteps || 5,
+        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
         toolChoice: shouldUseTools ? "auto" : "none",
         temperature: options.temperature,
         maxTokens: options.maxTokens || 8192,
@@ -489,37 +496,46 @@ export abstract class BaseProvider implements AIProvider {
                   logger.debug(
                     `[BaseProvider] Converting custom tool: ${toolName}`,
                   );
-                  // Convert to AI SDK tool format
-                  const { tool: createAISDKTool } = await import("ai");
-                  const { z } = await import("zod");
 
-                  tools[toolName] = createAISDKTool({
-                    description: toolInfo.description || `Tool ${toolName}`,
-                    parameters:
-                      toolInfo.inputSchema ||
-                      toolInfo.parameters ||
-                      z.object({}),
-                    execute: async (args) => {
-                      const result = await toolInfo.execute(args);
-                      // Handle MCP-style results
-                      if (
-                        result &&
-                        typeof result === "object" &&
-                        "success" in result
-                      ) {
-                        if (result.success) {
-                          return result.data;
-                        } else {
-                          const errorMsg =
-                            typeof result.error === "string"
-                              ? result.error
-                              : "Tool execution failed";
-                          throw new Error(errorMsg);
+                  try {
+                    // Convert to AI SDK tool format
+                    const { tool: createAISDKTool } = await import("ai");
+                    const { z } = await import("zod");
+
+                    tools[toolName] = createAISDKTool({
+                      description: toolInfo.description || `Tool ${toolName}`,
+                      parameters:
+                        toolInfo.inputSchema ||
+                        toolInfo.parameters ||
+                        z.object({}),
+                      execute: async (args) => {
+                        const result = await toolInfo.execute(args);
+
+                        // Handle MCP-style results
+                        if (
+                          result &&
+                          typeof result === "object" &&
+                          "success" in result
+                        ) {
+                          if (result.success) {
+                            return result.data;
+                          } else {
+                            const errorMsg =
+                              typeof result.error === "string"
+                                ? result.error
+                                : "Tool execution failed";
+                            throw new Error(errorMsg);
+                          }
                         }
-                      }
-                      return result;
-                    },
-                  });
+                        return result;
+                      },
+                    });
+                  } catch (toolCreationError) {
+                    logger.error(
+                      `Failed to create tool: ${toolName}`,
+                      toolCreationError,
+                    );
+                  }
                 }
               }
             }
@@ -548,6 +564,7 @@ export abstract class BaseProvider implements AIProvider {
     logger.debug(
       `[BaseProvider] getAllTools returning tools: ${Object.keys(tools).join(", ")}`,
     );
+
     return tools;
   }
 
@@ -563,6 +580,256 @@ export abstract class BaseProvider implements AIProvider {
    * Provider-specific error handling
    */
   protected abstract handleProviderError(error: unknown): Error;
+
+  // ===================
+  // CONSOLIDATED PROVIDER METHODS - MOVED FROM INDIVIDUAL PROVIDERS
+  // ===================
+
+  /**
+   * Execute operation with timeout and proper cleanup
+   * Consolidates identical timeout handling from 8/10 providers
+   */
+  protected async executeWithTimeout<T>(
+    operation: () => Promise<T>,
+    options: { timeout?: number | string; operationType?: string },
+  ): Promise<T> {
+    const timeout = this.getTimeout(
+      options as StreamOptions | TextGenerationOptions,
+    );
+    const timeoutController = createTimeoutController(
+      timeout,
+      this.providerName,
+      (options.operationType as "generate" | "stream") || "generate",
+    );
+
+    try {
+      if (timeoutController) {
+        return await Promise.race([
+          operation(),
+          new Promise<never>((_, reject) => {
+            timeoutController.controller.signal.addEventListener(
+              "abort",
+              () => {
+                reject(
+                  new TimeoutError(
+                    `${this.providerName} operation timed out`,
+                    timeoutController.timeoutMs,
+                    this.providerName,
+                    (options.operationType as "generate" | "stream") ||
+                      "generate",
+                  ),
+                );
+              },
+            );
+          }),
+        ]);
+      } else {
+        return await operation();
+      }
+    } finally {
+      timeoutController?.cleanup();
+    }
+  }
+
+  /**
+   * Validate stream options - consolidates validation from 7/10 providers
+   */
+  protected validateStreamOptions(options: StreamOptions): void {
+    if (!options.input?.text || options.input.text.trim().length === 0) {
+      throw new Error("Input text is required and cannot be empty");
+    }
+
+    if (options.temperature !== undefined) {
+      if (options.temperature < 0 || options.temperature > 2) {
+        throw new Error("temperature must be between 0 and 2");
+      }
+    }
+
+    if (options.maxTokens !== undefined) {
+      if (options.maxTokens < 1) {
+        throw new Error("maxTokens must be at least 1");
+      }
+    }
+  }
+
+  /**
+   * Create text stream transformation - consolidates identical logic from 7/10 providers
+   */
+  protected createTextStream(result: {
+    textStream: AsyncIterable<string>;
+  }): AsyncGenerator<{ content: string }> {
+    return (async function* () {
+      for await (const chunk of result.textStream) {
+        yield { content: chunk };
+      }
+    })();
+  }
+
+  /**
+   * Create standardized stream result - consolidates result structure
+   */
+  protected createStreamResult(
+    stream: AsyncGenerator<{ content: string }>,
+    additionalProps: Partial<StreamResult> = {},
+  ): StreamResult {
+    return {
+      stream,
+      provider: this.providerName,
+      model: this.modelName,
+      ...additionalProps,
+    };
+  }
+
+  /**
+   * Create stream analytics - consolidates analytics from 4/10 providers
+   */
+  protected async createStreamAnalytics(
+    result: UnknownRecord,
+    startTime: number,
+    options: StreamOptions,
+  ): Promise<UnknownRecord | undefined> {
+    try {
+      const { createAnalytics } = await import("./analytics.js");
+      const analytics = await createAnalytics(
+        this.providerName,
+        this.modelName,
+        result,
+        Date.now() - startTime,
+        {
+          requestId: `${this.providerName}-stream-${Date.now()}`,
+          streamingMode: true,
+          ...options.context,
+        },
+      );
+      return analytics as unknown as UnknownRecord;
+    } catch (error) {
+      logger.warn(`Analytics creation failed for ${this.providerName}:`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Handle common error patterns - consolidates error handling from multiple providers
+   */
+  protected handleCommonErrors(error: unknown): Error | null {
+    if (error instanceof TimeoutError) {
+      return new Error(
+        `${this.providerName} request timed out after ${error.timeout}ms. Consider increasing timeout or using a lighter model.`,
+      );
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+
+    // Common API key errors
+    if (
+      message.includes("API_KEY_INVALID") ||
+      message.includes("Invalid API key") ||
+      message.includes("authentication") ||
+      message.includes("unauthorized")
+    ) {
+      return new Error(
+        `Invalid API key for ${this.providerName}. Please check your API key environment variable.`,
+      );
+    }
+
+    // Common rate limit errors
+    if (
+      message.includes("rate limit") ||
+      message.includes("quota") ||
+      message.includes("429")
+    ) {
+      return new Error(
+        `Rate limit exceeded for ${this.providerName}. Please wait before making more requests.`,
+      );
+    }
+
+    return null; // Not a common error, let provider handle it
+  }
+
+  /**
+   * Set up tool executor for a provider to enable actual tool execution
+   * Consolidates identical setupToolExecutor logic from neurolink.ts (used in 4 places)
+   * @param sdk - The NeuroLinkSDK instance for tool execution
+   * @param functionTag - Function name for logging
+   */
+  setupToolExecutor(
+    sdk: {
+      customTools: Map<string, unknown>;
+      executeTool: (toolName: string, params: unknown) => Promise<unknown>;
+    },
+    functionTag: string,
+  ): void {
+    // Type guard to check for setToolExecutor method
+    function hasSetToolExecutor(obj: unknown): obj is {
+      setToolExecutor: (
+        executor: (toolName: string, params: unknown) => Promise<unknown>,
+      ) => void;
+    } {
+      return (
+        typeof obj === "object" &&
+        obj !== null &&
+        typeof (obj as { setToolExecutor?: unknown }).setToolExecutor ===
+          "function"
+      );
+    }
+
+    if (!hasSetToolExecutor(this)) {
+      logger.warn(
+        `[${functionTag}] Provider does not support setToolExecutor - tools will not be executed`,
+        {
+          hasProvider: true,
+          providerType: this.constructor.name,
+          availableCustomTools: sdk.customTools.size,
+        },
+      );
+      return;
+    }
+
+    logger.debug(`[${functionTag}] Setting up tool executor for provider`, {
+      providerType: this.constructor.name,
+      availableCustomTools: sdk.customTools.size,
+    });
+
+    // Set up tool executor to handle actual tool calls
+    this.setToolExecutor(async (toolName: string, params: unknown) => {
+      logger.debug(
+        `[${functionTag}] AI provider requesting tool execution: ${toolName}`,
+        {
+          toolName,
+          params,
+          availableCustomTools: sdk.customTools.size,
+          hasRequestedTool: sdk.customTools.has(toolName),
+        },
+      );
+
+      try {
+        // Execute the tool using NeuroLink's executeTool method
+        const result = await sdk.executeTool(toolName, params);
+
+        logger.debug(
+          `[${functionTag}] Tool execution successful: ${toolName}`,
+          {
+            toolName,
+            result:
+              typeof result === "object"
+                ? JSON.stringify(result).substring(0, 200)
+                : result,
+            resultType: typeof result,
+          },
+        );
+
+        return result;
+      } catch (error) {
+        logger.error(`[${functionTag}] Tool execution failed: ${toolName}`, {
+          toolName,
+          error: error instanceof Error ? error.message : String(error),
+          params,
+        });
+        throw error;
+      }
+    });
+  }
+
   // ===================
   // TEMPLATE METHODS - COMMON FUNCTIONALITY
   // ===================

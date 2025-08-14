@@ -363,6 +363,15 @@ export interface AIProvider {
     optionsOrPrompt: TextGenerationOptions | string,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<EnhancedGenerateResult | null>;
+
+  // Tool execution setup - consolidated from NeuroLink SDK
+  setupToolExecutor(
+    sdk: {
+      customTools: Map<string, unknown>;
+      executeTool: (toolName: string, params: unknown) => Promise<unknown>;
+    },
+    functionTag: string,
+  ): void;
 }
 
 /**

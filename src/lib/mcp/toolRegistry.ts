@@ -13,6 +13,7 @@ import type { JsonValue, UnknownRecord } from "../types/common.js";
 import { MCPRegistry } from "./registry.js";
 import { registryLogger } from "../utils/logger.js";
 import { randomUUID } from "crypto";
+import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
 import { directAgentTools } from "../agent/directTools.js";
 
 interface ToolImplementation {
@@ -63,8 +64,12 @@ export class MCPToolRegistry extends MCPRegistry {
 
   constructor() {
     super();
-    // Auto-register direct tools on initialization
-    this.registerDirectTools();
+    // 🔧 CONDITIONAL: Only auto-register direct tools if not disabled via configuration
+    if (!shouldDisableBuiltinTools()) {
+      this.registerDirectTools();
+    } else {
+      registryLogger.debug("Built-in direct tools disabled via configuration");
+    }
   }
 
   /**

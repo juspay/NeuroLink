@@ -375,16 +375,6 @@ Available tools will be provided in the function calling format. Use them when t
   protected getAISDKModel(): LanguageModelV1 {
     return this.model;
   }
-
-  // ===================
-  // PRIVATE VALIDATION METHODS
-  // ===================
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text || options.input.text.trim().length === 0) {
-      throw new Error("Input text is required and cannot be empty");
-    }
-  }
 }
 
 // Export for factory registration

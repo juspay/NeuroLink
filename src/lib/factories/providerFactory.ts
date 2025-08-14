@@ -125,7 +125,7 @@ export class ProviderFactory {
         typeof result === "object" &&
         typeof (result as Promise<AIProvider>).then === "function"
       ) {
-        return await result;
+        result = await result;
       }
 
       return result as AIProvider;

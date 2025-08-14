@@ -359,14 +359,4 @@ export class OpenAICompatibleProvider extends BaseProvider {
       "gemini-pro",
     ];
   }
-
-  // ===================
-  // PRIVATE VALIDATION METHODS
-  // ===================
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text || options.input.text.trim().length === 0) {
-      throw new Error("Input text is required and cannot be empty");
-    }
-  }
 }

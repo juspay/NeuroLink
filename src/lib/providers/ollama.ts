@@ -780,23 +780,6 @@ export class OllamaProvider extends BaseProvider {
     );
   }
 
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text?.trim()) {
-      throw new Error("Prompt is required for streaming");
-    }
-
-    if (options.maxTokens && options.maxTokens < 1) {
-      throw new Error("maxTokens must be greater than 0");
-    }
-
-    if (
-      options.temperature &&
-      (options.temperature < 0 || options.temperature > 2)
-    ) {
-      throw new Error("temperature must be between 0 and 2");
-    }
-  }
-
   /**
    * Check if Ollama service is healthy and accessible
    */

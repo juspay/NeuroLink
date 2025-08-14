@@ -515,6 +515,15 @@ export class NeuroLink {
         this as unknown as UnknownRecord, // Pass SDK instance
       );
 
+      // Enable tool execution for the provider using BaseProvider method
+      provider.setupToolExecutor(
+        {
+          customTools: this.customTools,
+          executeTool: this.executeTool.bind(this),
+        },
+        functionTag,
+      );
+
       const result = await provider.generate({
         ...options,
         systemPrompt: enhancedSystemPrompt,
@@ -605,6 +614,15 @@ export class NeuroLink {
           options.model,
           !options.disableTools, // Pass disableTools as inverse of enableMCP
           this as unknown as UnknownRecord, // Pass SDK instance
+        );
+
+        // Enable tool execution for direct provider generation using BaseProvider method
+        provider.setupToolExecutor(
+          {
+            customTools: this.customTools,
+            executeTool: this.executeTool.bind(this),
+          },
+          functionTag,
         );
 
         const result = await provider.generate(options);
@@ -865,6 +883,15 @@ export class NeuroLink {
         this as unknown as UnknownRecord, // Pass SDK instance
       );
 
+      // Enable tool execution for streaming using BaseProvider method
+      provider.setupToolExecutor(
+        {
+          customTools: this.customTools,
+          executeTool: this.executeTool.bind(this),
+        },
+        functionTag,
+      );
+
       // Create clean options for provider (remove factoryConfig)
       const cleanOptions = createCleanStreamOptions(enhancedOptions);
 
@@ -929,6 +956,15 @@ export class NeuroLink {
         options.model,
         false, // Disable MCP for fallback
         this as unknown as UnknownRecord, // Pass SDK instance
+      );
+
+      // Enable tool execution for fallback streaming using BaseProvider method
+      provider.setupToolExecutor(
+        {
+          customTools: this.customTools,
+          executeTool: this.executeTool.bind(this),
+        },
+        functionTag,
       );
 
       // Create clean options for fallback provider (remove factoryConfig)

@@ -179,28 +179,6 @@ export class AmazonBedrockProvider extends BaseProvider {
       `❌ Amazon Bedrock Provider Error\n\n${errorMessage || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check AWS credentials and permissions\n2. Verify model availability\n3. Check network connectivity`,
     );
   }
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text?.trim()) {
-      throw new Error("Prompt is required for streaming");
-    }
-
-    if (
-      options.maxTokens &&
-      (options.maxTokens < 1 || options.maxTokens > 4096)
-    ) {
-      throw new Error(
-        "maxTokens must be between 1 and 4096 for Amazon Bedrock",
-      );
-    }
-
-    if (
-      options.temperature &&
-      (options.temperature < 0 || options.temperature > 1)
-    ) {
-      throw new Error("temperature must be between 0 and 1");
-    }
-  }
 }
 
 export default AmazonBedrockProvider;
