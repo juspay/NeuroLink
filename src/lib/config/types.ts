@@ -10,6 +10,7 @@ export interface NeuroLinkConfig {
   providers?: Record<string, ProviderConfig>;
   performance?: PerformanceConfig;
   analytics?: AnalyticsConfig;
+  tools?: ToolConfig;
   lastUpdated?: number;
   configVersion?: string;
   [key: string]: unknown; // Extensibility for existing config
@@ -99,6 +100,20 @@ export interface AnalyticsConfig {
 }
 
 /**
+ * Tool configuration
+ */
+export interface ToolConfig {
+  /** Whether built-in tools should be disabled */
+  disableBuiltinTools?: boolean;
+  /** Whether custom tools are allowed */
+  allowCustomTools?: boolean;
+  /** Maximum number of tools per provider */
+  maxToolsPerProvider?: number;
+  /** Whether MCP tools should be enabled */
+  enableMCPTools?: boolean;
+}
+
+/**
  * Backup metadata information
  */
 export interface BackupInfo {
@@ -178,6 +193,12 @@ export const DEFAULT_CONFIG: NeuroLinkConfig = {
       days: 30,
       maxEntries: 10000,
     },
+  },
+  tools: {
+    disableBuiltinTools: false,
+    allowCustomTools: true,
+    maxToolsPerProvider: 100,
+    enableMCPTools: true,
   },
   configVersion: "3.0.1",
 };

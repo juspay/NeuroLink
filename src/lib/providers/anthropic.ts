@@ -15,7 +15,7 @@ import {
   TimeoutError,
   getDefaultTimeout,
 } from "../utils/timeout.js";
-import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import {
   validateApiKey,
   createAnthropicConfig,
@@ -149,14 +149,7 @@ export class AnthropicProvider extends BaseProvider {
     options: StreamOptions,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<StreamResult> {
-    // Convert StreamOptions to TextGenerationOptions for validation
-    const validationOptions: TextGenerationOptions = {
-      prompt: options.input.text,
-      systemPrompt: options.systemPrompt,
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-    };
-    this.validateOptions(validationOptions);
+    this.validateStreamOptions(options);
 
     const timeout = this.getTimeout(options);
     const timeoutController = createTimeoutController(
@@ -170,38 +163,25 @@ export class AnthropicProvider extends BaseProvider {
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const tools = shouldUseTools ? await this.getAllTools() : {};
 
-      // 🔧 CRITICAL FIX: Vercel AI SDK streamText() hangs with tools and maxSteps > 1
-      // For stream-focused SDK, we need reliable streaming, so avoid the hanging case
-      if (shouldUseTools && Object.keys(tools).length > 0) {
-        throw new Error(
-          "Vercel AI SDK streamText() limitation with tools - falling back to synthetic streaming",
-        );
-      }
-
       const result = await streamText({
         model: this.model,
         prompt: options.input.text,
         system: options.systemPrompt || undefined,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
-        tools: {}, // 🔧 Force empty tools for real streaming to avoid hanging
-        maxSteps: 1, // 🔧 Force single step for real streaming
-        toolChoice: "none", // 🔧 Force no tools for real streaming
+        tools,
+        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
+        toolChoice: shouldUseTools ? "auto" : "none",
         abortSignal: timeoutController?.controller.signal,
       });
 
       timeoutController?.cleanup();
 
-      // Transform string stream to content object stream
-      const transformedStream = async function* () {
-        for await (const chunk of result.textStream) {
-          yield { content: chunk };
-        }
-      };
+      const transformedStream = this.createTextStream(result);
 
       // ✅ Note: Vercel AI SDK's streamText() method limitations with tools
       // The streamText() function doesn't provide the same tool result access as generateText()
-      // For full tool support, the BaseProvider will fall back to synthetic streaming when needed
+      // Full tool support is now available with real streaming
       const toolCalls: Array<{
         toolCallId: string;
         toolName: string;
@@ -219,7 +199,7 @@ export class AnthropicProvider extends BaseProvider {
       const finishReason = await result.finishReason;
 
       return {
-        stream: transformedStream(),
+        stream: transformedStream,
         provider: this.providerName,
         model: this.modelName,
         toolCalls, // ✅ Include tool calls in stream result

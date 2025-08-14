@@ -15,8 +15,12 @@ import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
 import { BaseProvider, type NeuroLinkSDK } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import { TimeoutError } from "../utils/timeout.js";
-import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import {
+  createTimeoutController,
+  TimeoutError,
+  getDefaultTimeout,
+} from "../utils/timeout.js";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { ModelConfigurationManager } from "../core/modelConfiguration.js";
 import {
   validateApiKey,
@@ -260,6 +264,14 @@ export class GoogleVertexProvider extends BaseProvider {
     const functionTag = "GoogleVertexProvider.executeStream";
     let chunkCount = 0;
 
+    // Add timeout controller for consistency with other providers
+    const timeout = this.getTimeout(options);
+    const timeoutController = createTimeoutController(
+      timeout,
+      this.providerName,
+      "stream",
+    );
+
     try {
       this.validateStreamOptions(options);
 
@@ -281,6 +293,10 @@ export class GoogleVertexProvider extends BaseProvider {
         ? options.maxTokens || DEFAULT_MAX_TOKENS
         : undefined;
 
+      // Get tools consistently with generate method (using BaseProvider pattern)
+      const shouldUseTools = !options.disableTools && this.supportsTools();
+      const tools = shouldUseTools ? await this.getAllTools() : {};
+
       // Build complete stream options with proper typing
       let streamOptions: Parameters<typeof streamText>[0] = {
         model: model,
@@ -288,6 +304,10 @@ export class GoogleVertexProvider extends BaseProvider {
         system: options.systemPrompt,
         temperature: options.temperature,
         ...(maxTokens && { maxTokens }),
+        tools,
+        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
+        toolChoice: shouldUseTools ? "auto" : "none",
+        abortSignal: timeoutController?.controller.signal,
 
         onError: (event: { error: unknown }) => {
           const error = event.error;
@@ -334,16 +354,18 @@ export class GoogleVertexProvider extends BaseProvider {
 
       const result = streamText(streamOptions);
 
+      timeoutController?.cleanup();
+
+      // Transform string stream to content object stream using BaseProvider method
+      const transformedStream = this.createTextStream(result);
+
       return {
-        stream: (async function* () {
-          for await (const chunk of result.textStream) {
-            yield { content: chunk };
-          }
-        })(),
+        stream: transformedStream,
         provider: this.providerName,
         model: this.modelName,
       };
     } catch (error) {
+      timeoutController?.cleanup();
       logger.error(`${functionTag}: Exception`, {
         provider: this.providerName,
         modelName: this.modelName,
@@ -399,33 +421,6 @@ export class GoogleVertexProvider extends BaseProvider {
     return new Error(
       `❌ Google Vertex AI Provider Error\n\n${message}\n\nTroubleshooting:\n1. Check Google Cloud credentials and permissions\n2. Verify project ID and location settings\n3. Ensure Vertex AI API is enabled\n4. Check network connectivity`,
     );
-  }
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text?.trim()) {
-      throw new Error("Prompt is required for streaming");
-    }
-
-    // Use cached model configuration for validation performance
-    const modelName = this.modelName || getDefaultVertexModel();
-    const shouldValidateMaxTokens = this.shouldSetMaxTokensCached(modelName);
-
-    if (
-      shouldValidateMaxTokens &&
-      options.maxTokens &&
-      (options.maxTokens < 1 || options.maxTokens > 8192)
-    ) {
-      throw new Error(
-        "maxTokens must be between 1 and 8192 for Google Vertex AI",
-      );
-    }
-
-    if (
-      options.temperature &&
-      (options.temperature < 0 || options.temperature > 2)
-    ) {
-      throw new Error("temperature must be between 0 and 2");
-    }
   }
 
   /**

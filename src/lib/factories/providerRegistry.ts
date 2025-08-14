@@ -45,7 +45,7 @@ export class ProviderRegistry {
         AIProviderName.GOOGLE_AI,
         async (
           modelName?: string,
-          providerName?: string,
+          _providerName?: string,
           sdk?: UnknownRecord,
         ) => {
           const { GoogleAIStudioProvider } = await import(
@@ -62,11 +62,11 @@ export class ProviderRegistry {
         AIProviderName.OPENAI,
         async (
           modelName?: string,
-          providerName?: string,
+          _providerName?: string,
           sdk?: UnknownRecord,
         ) => {
           const { OpenAIProvider } = await import("../providers/openAI.js");
-          return new OpenAIProvider(modelName);
+          return new OpenAIProvider(modelName, sdk);
         },
         OpenAIModels.GPT_4O_MINI,
         ["gpt", "chatgpt"],
@@ -77,7 +77,7 @@ export class ProviderRegistry {
         AIProviderName.ANTHROPIC,
         async (
           modelName?: string,
-          providerName?: string,
+          _providerName?: string,
           sdk?: UnknownRecord,
         ) => {
           const { AnthropicProvider } = await import(
@@ -148,7 +148,7 @@ export class ProviderRegistry {
         AIProviderName.MISTRAL,
         async (
           modelName?: string,
-          providerName?: string,
+          _providerName?: string,
           sdk?: UnknownRecord,
         ) => {
           const { MistralProvider } = await import("../providers/mistral.js");
@@ -177,7 +177,7 @@ export class ProviderRegistry {
         AIProviderName.LITELLM,
         async (
           modelName?: string,
-          providerName?: string,
+          _providerName?: string,
           sdk?: UnknownRecord,
         ) => {
           const { LiteLLMProvider } = await import("../providers/litellm.js");
@@ -192,7 +192,7 @@ export class ProviderRegistry {
         AIProviderName.OPENAI_COMPATIBLE,
         async (
           modelName?: string,
-          providerName?: string,
+          _providerName?: string,
           sdk?: UnknownRecord,
         ) => {
           const { OpenAICompatibleProvider } = await import(
@@ -209,8 +209,8 @@ export class ProviderRegistry {
         AIProviderName.SAGEMAKER,
         async (
           modelName?: string,
-          providerName?: string,
-          sdk?: UnknownRecord,
+          _providerName?: string,
+          _sdk?: UnknownRecord,
         ) => {
           const { AmazonSageMakerProvider } = await import(
             "../providers/amazonSagemaker.js"

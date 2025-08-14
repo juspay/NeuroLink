@@ -3,14 +3,14 @@ import type { ZodType, ZodTypeDef } from "zod";
 import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
 import { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import { BaseProvider } from "../core/baseProvider.js";
+import { BaseProvider, type NeuroLinkSDK } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
 import {
   createTimeoutController,
   TimeoutError,
   getDefaultTimeout,
 } from "../utils/timeout.js";
-import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import type { UnknownRecord } from "../types/common.js";
 import {
   validateApiKey,
@@ -35,8 +35,8 @@ const getOpenAIModel = (): string => {
 export class OpenAIProvider extends BaseProvider {
   private model: LanguageModelV1;
 
-  constructor(modelName?: string) {
-    super(modelName, AIProviderName.OPENAI);
+  constructor(modelName?: string, sdk?: NeuroLinkSDK) {
+    super(modelName || getOpenAIModel(), AIProviderName.OPENAI, sdk);
 
     // Set OpenAI API key as environment variable (required by @ai-sdk/openai)
     process.env.OPENAI_API_KEY = getOpenAIApiKey();
@@ -117,25 +117,26 @@ export class OpenAIProvider extends BaseProvider {
     );
 
     try {
+      // Get tools consistently with generate method
+      const shouldUseTools = !options.disableTools && this.supportsTools();
+      const tools = shouldUseTools ? await this.getAllTools() : {};
+
       const result = await streamText({
         model: this.model,
         prompt: options.input.text,
         system: options.systemPrompt,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
-        tools: options.tools,
-        toolChoice: "auto",
+        tools,
+        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
+        toolChoice: shouldUseTools ? "auto" : "none",
         abortSignal: timeoutController?.controller.signal,
       });
 
       timeoutController?.cleanup();
 
-      // Transform stream to match StreamResult interface
-      const transformedStream = async function* () {
-        for await (const chunk of result.textStream) {
-          yield { content: chunk };
-        }
-      };
+      // Transform stream to match StreamResult interface using BaseProvider method
+      const transformedStream = this.createTextStream(result);
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(
@@ -150,7 +151,7 @@ export class OpenAIProvider extends BaseProvider {
       );
 
       return {
-        stream: transformedStream(),
+        stream: transformedStream,
         provider: this.providerName,
         model: this.modelName,
         analytics: analyticsPromise,
@@ -162,16 +163,6 @@ export class OpenAIProvider extends BaseProvider {
     } catch (error) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);
-    }
-  }
-
-  // ===================
-  // PRIVATE VALIDATION METHODS
-  // ===================
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text || options.input.text.trim().length === 0) {
-      throw new Error("Input text is required and cannot be empty");
     }
   }
 }

@@ -16,7 +16,7 @@ import {
   TimeoutError,
   getDefaultTimeout,
 } from "../utils/timeout.js";
-import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 
@@ -122,25 +122,26 @@ export class GoogleAIStudioProvider extends BaseProvider {
     );
 
     try {
+      // Get tools consistently with generate method
+      const shouldUseTools = !options.disableTools && this.supportsTools();
+      const tools = shouldUseTools ? await this.getAllTools() : {};
+
       const result = await streamText({
         model,
         prompt: options.input.text,
         system: options.systemPrompt,
         temperature: options.temperature,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
-        tools: options.tools,
-        toolChoice: "auto",
+        tools,
+        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
+        toolChoice: shouldUseTools ? "auto" : "none",
         abortSignal: timeoutController?.controller.signal,
       });
 
       timeoutController?.cleanup();
 
-      // Transform string stream to content object stream
-      const transformedStream = async function* () {
-        for await (const chunk of result.textStream) {
-          yield { content: chunk };
-        }
-      };
+      // Transform string stream to content object stream using BaseProvider method
+      const transformedStream = this.createTextStream(result);
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(
@@ -155,7 +156,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
       );
 
       return {
-        stream: transformedStream(),
+        stream: transformedStream,
         provider: this.providerName,
         model: this.modelName,
         analytics: analyticsPromise,
@@ -185,12 +186,6 @@ export class GoogleAIStudioProvider extends BaseProvider {
     }
 
     return apiKey;
-  }
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text || options.input.text.trim().length === 0) {
-      throw new Error("Input text is required and cannot be empty");
-    }
   }
 }
 

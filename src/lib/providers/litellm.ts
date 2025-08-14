@@ -363,14 +363,4 @@ export class LiteLLMProvider extends BaseProvider {
       throw error;
     }
   }
-
-  // ===================
-  // PRIVATE VALIDATION METHODS
-  // ===================
-
-  private validateStreamOptions(options: StreamOptions): void {
-    if (!options.input?.text || options.input.text.trim().length === 0) {
-      throw new Error("Input text is required and cannot be empty");
-    }
-  }
 }

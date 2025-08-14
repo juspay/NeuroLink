@@ -1,15 +1,17 @@
 import { createMistral } from "@ai-sdk/mistral";
-import { streamText, type LanguageModelV1 } from "ai";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import type { ZodType, ZodTypeDef } from "zod";
+import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
+import type { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { Unknown } from "../types/common.js";
+import type { UnknownRecord } from "../types/common.js";
 import { BaseProvider, type NeuroLinkSDK } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import { createAnalytics } from "../core/analytics.js";
+import {
+  createTimeoutController,
+  TimeoutError,
+  getDefaultTimeout,
+} from "../utils/timeout.js";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import {
   validateApiKey,
   createMistralConfig,
@@ -47,7 +49,7 @@ export class MistralProvider extends BaseProvider {
     const mistral = createMistral({
       apiKey: apiKey,
     });
-    this.model = mistral(this.modelName || getDefaultMistralModel());
+    this.model = mistral(this.modelName);
 
     logger.debug("Mistral Provider v2 initialized", {
       modelName: this.modelName,
@@ -55,97 +57,48 @@ export class MistralProvider extends BaseProvider {
     });
   }
 
-  /**
-   * Generate text using Mistral API
-   */
-  async generate(
-    options: TextGenerationOptions,
-  ): Promise<EnhancedGenerateResult> {
+  // generate() method is inherited from BaseProvider; this provider uses the base implementation for generation with tools
+
+  protected async executeStream(
+    options: StreamOptions,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<StreamResult> {
+    this.validateStreamOptions(options);
+
     const startTime = Date.now();
+    const timeout = this.getTimeout(options);
+    const timeoutController = createTimeoutController(
+      timeout,
+      this.providerName,
+      "stream",
+    );
 
     try {
-      const result = await this.model.doGenerate({
-        inputFormat: "prompt",
-        mode: { type: "regular" },
-        prompt: [
-          {
-            role: "user",
-            content: [{ type: "text", text: options.prompt || "" }],
-          },
-        ],
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-      });
+      // Get tools consistently with generate method
+      const shouldUseTools = !options.disableTools && this.supportsTools();
+      const tools = shouldUseTools ? await this.getAllTools() : {};
 
-      const responseTime = Date.now() - startTime;
-
-      // Extract token usage and text content
-      const tokenUsage = result.usage;
-      const textContent = result.text || "";
-
-      // Create analytics data using helper
-      const analytics = createAnalytics(
-        "mistral",
-        this.modelName!,
-        { usage: tokenUsage, content: textContent },
-        responseTime,
-        { requestId: `mistral-${Date.now()}` },
-      );
-
-      return {
-        content: textContent,
-        usage: {
-          inputTokens: tokenUsage?.promptTokens || 0,
-          outputTokens: tokenUsage?.completionTokens || 0,
-          totalTokens:
-            (tokenUsage?.promptTokens || 0) +
-            (tokenUsage?.completionTokens || 0),
-        },
-        provider: this.providerName,
-        model: this.modelName!,
-        analytics,
-      };
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-
-      logger.error("Mistral generation failed", {
-        error: error instanceof Error ? error.message : String(error),
-        responseTime,
-      });
-
-      throw new Error(
-        `Mistral generation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
-  /**
-   * Stream text generation using Mistral API
-   */
-  async executeStream(options: StreamOptions): Promise<StreamResult> {
-    const startTime = Date.now();
-
-    try {
       const result = await streamText({
         model: this.model,
         prompt: options.input.text,
+        system: options.systemPrompt,
         temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        tools: options.tools,
-        toolChoice: "auto",
+        maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
+        tools,
+        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
+        toolChoice: shouldUseTools ? "auto" : "none",
+        abortSignal: timeoutController?.controller.signal,
       });
 
-      // Transform stream to match StreamResult interface
-      const transformedStream = async function* () {
-        for await (const chunk of result.textStream) {
-          yield { content: chunk };
-        }
-      };
+      timeoutController?.cleanup();
+
+      // Transform string stream to content object stream using BaseProvider method
+      const transformedStream = this.createTextStream(result);
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(
         this.providerName,
-        this.modelName!,
+        this.modelName,
         result,
         Date.now() - startTime,
         {
@@ -155,9 +108,9 @@ export class MistralProvider extends BaseProvider {
       );
 
       return {
-        stream: transformedStream(),
+        stream: transformedStream,
         provider: this.providerName,
-        model: this.modelName!,
+        model: this.modelName,
         analytics: analyticsPromise,
         metadata: {
           startTime,
@@ -165,45 +118,55 @@ export class MistralProvider extends BaseProvider {
         },
       };
     } catch (error) {
-      logger.error("Mistral streaming failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      throw new Error(
-        `Mistral streaming failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      timeoutController?.cleanup();
+      throw this.handleProviderError(error);
     }
   }
 
-  /**
-   * Get default model name for this provider
-   */
-  getDefaultModel(): string {
+  // ===================
+  // ABSTRACT METHOD IMPLEMENTATIONS
+  // ===================
+
+  protected getProviderName(): AIProviderName {
+    return this.providerName;
+  }
+
+  protected getDefaultModel(): string {
     return getDefaultMistralModel();
   }
 
   /**
-   * Get provider name
+   * Returns the Vercel AI SDK model instance for Mistral
    */
-  getProviderName(): AIProviderName {
-    return this.providerName;
-  }
-
-  /**
-   * Get AI SDK model instance
-   */
-  getAISDKModel(): LanguageModelV1 {
+  protected getAISDKModel(): LanguageModelV1 {
     return this.model;
   }
 
-  /**
-   * Handle provider-specific errors
-   */
-  handleProviderError(error: unknown): Error {
-    if (error instanceof Error) {
-      return error;
+  protected handleProviderError(error: unknown): Error {
+    if (error instanceof TimeoutError) {
+      return new Error(`Mistral request timed out: ${error.message}`);
     }
-    return new Error(`Mistral provider error: ${String(error)}`);
+
+    const errorRecord = error as UnknownRecord;
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error";
+
+    if (
+      message.includes("API_KEY_INVALID") ||
+      message.includes("Invalid API key")
+    ) {
+      return new Error(
+        "Invalid Mistral API key. Please check your MISTRAL_API_KEY environment variable.",
+      );
+    }
+
+    if (message.includes("rate limit")) {
+      return new Error("Mistral rate limit exceeded. Please try again later.");
+    }
+
+    return new Error(`Mistral error: ${message}`);
   }
 
   /**
