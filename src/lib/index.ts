@@ -189,3 +189,39 @@ export function getTelemetryStatus(): {
   }
   return { enabled: false, initialized: false };
 }
+
+// ============================================================================
+// BACKWARD COMPATIBILITY: Legacy generateText Function Exports
+// ============================================================================
+
+// Export legacy types for backward compatibility
+export type {
+  TextGenerationOptions,
+  TextGenerationResult,
+  AnalyticsData,
+  EvaluationData,
+} from "./core/types.js";
+
+/**
+ * BACKWARD COMPATIBILITY: Legacy generateText function
+ * Provides standalone generateText function for existing code that uses it
+ *
+ * @example
+ * ```typescript
+ * import { generateText } from '@juspay/neurolink';
+ *
+ * const result = await generateText({
+ *   prompt: 'Hello, AI!',
+ *   provider: 'bedrock',
+ *   model: 'claude-3-sonnet'
+ * });
+ * console.log(result.content);
+ * ```
+ */
+export async function generateText(
+  options: import("./core/types.js").TextGenerationOptions,
+): Promise<import("./core/types.js").TextGenerationResult> {
+  // Import neurolink instance to avoid circular dependencies
+  const { neurolink } = await import("./neurolink.js");
+  return await neurolink.generateText(options);
+}
