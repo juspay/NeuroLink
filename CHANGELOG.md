@@ -1,3 +1,9 @@
+## [7.14.2](https://github.com/juspay/neurolink/compare/v7.14.1...v7.14.2) (2025-08-16)
+
+### Bug Fixes
+
+- **(sdk):** add generateText backward compatibility and fix formatting consistency ([93ff23c](https://github.com/juspay/neurolink/commit/93ff23c766ca71cbe7f77821b35cf5156bbe9d1f))
+
 ## [7.14.1](https://github.com/juspay/neurolink/compare/v7.14.0...v7.14.1) (2025-08-15)
 
 ### Bug Fixes
