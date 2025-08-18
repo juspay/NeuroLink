@@ -1178,6 +1178,18 @@ export class NeuroLink {
     });
 
     try {
+      // --- Start: Added Validation Logic ---
+      if (!name || typeof name !== "string") {
+        throw new Error("Invalid tool name");
+      }
+      if (!tool || typeof tool !== "object") {
+        throw new Error(`Invalid tool object provided for tool: ${name}`);
+      }
+      if (typeof tool.execute !== "function") {
+        throw new Error(`Tool '${name}' must have an execute method.`);
+      }
+      // --- End: Added Validation Logic ---
+
       // Import validation functions synchronously - they are pure functions
       let validateTool: (name: string, tool: unknown) => void;
       let isToolNameAvailable: (name: string) => boolean;
