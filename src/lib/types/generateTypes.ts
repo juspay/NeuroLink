@@ -1,7 +1,13 @@
 import type { Tool } from "ai";
-import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
-import type { AIProviderName, AnalyticsData } from "../core/types.js";
-import type { EvaluationData } from "../index.js";
+import type {
+  ValidationSchema,
+  StandardRecord,
+} from "./typeAliases.js";
+import type {
+  AIProviderName,
+  AnalyticsData,
+  EvaluationData,
+} from "../core/types.js";
 import type { TokenUsage } from "./providers.js";
 
 /**

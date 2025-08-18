@@ -45,5 +45,14 @@ export function getConversationMemoryDefaults(): ConversationMemoryConfig {
     maxTurnsPerSession:
       Number(process.env.NEUROLINK_MEMORY_MAX_TURNS_PER_SESSION) ||
       DEFAULT_MAX_TURNS_PER_SESSION,
+    enableSummarization: process.env.NEUROLINK_SUMMARIZATION_ENABLED === "true",
+    summarizationThresholdTurns:
+      Number(process.env.NEUROLINK_SUMMARIZATION_THRESHOLD_TURNS) || 20,
+    summarizationTargetTurns:
+      Number(process.env.NEUROLINK_SUMMARIZATION_TARGET_TURNS) || 10,
+    summarizationProvider:
+      process.env.NEUROLINK_SUMMARIZATION_PROVIDER || "vertex",
+    summarizationModel:
+      process.env.NEUROLINK_SUMMARIZATION_MODEL || "gemini-2.5-flash",
   };
 }

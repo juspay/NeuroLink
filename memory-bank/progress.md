@@ -57,26 +57,27 @@ emitter.on('generation:end', (data) => {
 
 ---
 
-## 🧠 **AUTOMATIC CONTEXT SUMMARIZATION IMPLEMENTED** (2025-08-08)
+## 🧠 **CONVERSATION MEMORY & SUMMARIZATION IMPLEMENTED** (2025-08-18)
 
-### **🏆 LATEST ACHIEVEMENT: SDK-Style Context Management**
+### **🏆 LATEST ACHIEVEMENT: Integrated Context Management**
 
-**Objective**: Implement automatic, stateful context summarization as a non-breaking feature.
-**Achievement**: Added a new `enableContextSummarization()` method to the `NeuroLink` class. This allows developers to opt-in to the feature, which then maintains conversational history across multiple `generate()` calls and automatically summarizes it when token limits are exceeded.
-**Impact**: Enables long-running, stateful conversations without manual context management, preventing context window overflow errors and reducing token usage for large prompts.
-**Tools Used**: Systematic Implementation, End-to-End Testing.
+**Objective**: Implement automatic, stateful context summarization within the new conversation memory system.
+**Achievement**: The summarization logic is now integrated directly into the `ConversationMemoryManager`. It is enabled and configured via the `conversationMemory` object in the `NeuroLink` constructor.
+**Impact**: Provides a unified and robust system for managing long-running conversations, preventing both context window overflow and race conditions between summarization and truncation.
+**Tools Used**: Architectural Refactoring, End-to-End Testing.
 
 **Technical Breakthrough**:
-- ✅ **SDK-Style API**: Implemented `enableContextSummarization(config)` method for explicit, stateful activation, following the existing SDK design patterns.
-- ✅ **Non-Breaking Change**: The feature is 100% opt-in and does not alter the existing `generate()` method signature, ensuring full backward compatibility.
-- ✅ **Recursion-Safe**: The internal `ContextManager` calls a private generation method (`generateTextInternal`) to perform summarization, successfully avoiding infinite loops.
-- ✅ **End-to-End Verified**: Tested with a live `google-vertex` provider, demonstrating the conversation history being automatically summarized and logged when word count limits are breached.
+- ✅ **Unified Architecture**: Merged the standalone `ContextManager` into the `ConversationMemoryManager`, creating a single source of truth for conversation history.
+- ✅ **Correct Order of Operations**: The system now correctly adds a new turn, then checks for summarization, and finally truncates the history based on turn limits, fixing the previous race condition bug.
+- ✅ **Non-Breaking Change**: The feature remains 100% opt-in via the `conversationMemory` configuration object.
+- ✅ **Recursion-Safe**: The summarization call correctly uses a new, memory-disabled `NeuroLink` instance to avoid infinite loops.
+- ✅ **End-to-End Verified**: Tested with a live `google-vertex` provider, demonstrating that the AI can recall information from a summarized context after truncation would have otherwise deleted it.
 
-### **✅ CONTEXT SUMMARIZER STATUS (VERIFIED 2025-08-08)**
-- ✅ **Activation**: `neurolink.enableContextSummarization()` successfully initializes the feature.
-- ✅ **Statefulness**: Context is correctly maintained across multiple `generate()` calls on the same `NeuroLink` instance.
-- ✅ **Summarization Trigger**: Correctly triggers when `highWaterMarkWords` is exceeded.
-- ✅ **Live Test**: Works as expected with real credentials in an end-to-end test.
+### **✅ CONVERSATION MEMORY STATUS (VERIFIED 2025-08-18)**
+- ✅ **Activation**: `new NeuroLink({ conversationMemory: { enabled: true, enableSummarization: true } })` successfully initializes the feature.
+- ✅ **Statefulness**: Context is correctly maintained across multiple `generate()` calls on the same `NeuroLink` instance using a `sessionId`.
+- ✅ **Summarization Trigger**: Correctly triggers based on `summarizationThresholdTurns` before truncation occurs.
+- ✅ **Live Test**: Works as expected, preserving key information across summarization and truncation events.
 
 ---
 

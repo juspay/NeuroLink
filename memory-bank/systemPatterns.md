@@ -391,29 +391,33 @@ export class SecurityManager {
 
 ---
 
-## 🧠 **AUTOMATIC CONTEXT SUMMARIZATION PATTERN** (2025-08-08)
+## 🧠 **AUTOMATIC CONTEXT SUMMARIZATION PATTERN** (2025-08-18)
 
-### **SDK-Style Opt-In Activation**
+### **Integrated Conversation Memory Activation**
 ```typescript
-// The feature is enabled on the NeuroLink instance, which then maintains state.
-const neurolink = new NeuroLink();
-
-// Enable the feature with optional configuration overrides
-neurolink.enableContextSummarization({
-  highWaterMarkWords: 3000, // Trigger summarization above this word count
-  lowWaterMarkWords: 800,  // Target for the summarized context
+// The feature is enabled and configured via the main NeuroLink constructor.
+const neurolink = new NeuroLink({
+  conversationMemory: {
+    enabled: true,
+    enableSummarization: true,
+    summarizationThresholdTurns: 20, // Trigger summarization above this turn count
+    summarizationTargetTurns: 10,    // Summarize down to this many recent turns
+  },
 });
 
-// Subsequent generate calls are now context-aware
-await neurolink.generate({ input: { text: "This is the first turn." } });
-await neurolink.generate({ input: { text: "This is the second turn." } });
+// All generate calls are now automatically context-aware and will summarize
+// when the conversation history exceeds the configured threshold.
+await neurolink.generate({ 
+  input: { text: "This is the first turn." },
+  context: { sessionId: "session-123" } 
+});
 ```
 
 ### **Architectural Integration**
-- **Non-Breaking:** The feature is off by default and does not change any existing method signatures.
-- **Stateful Instance:** The `NeuroLink` instance holds the `ContextManager`, preserving the conversation history across multiple `generate` calls.
-- **Decoupled Logic:** The core summarization logic is encapsulated in `src/lib/context/ContextManager.ts`, which is called by the main `NeuroLink` class.
-- **Recursion-Safe:** The `ContextManager` calls an internal generation method (`generateTextInternal`) to summarize, avoiding an infinite loop with the public `generate` method.
+- **Unified System:** The summarization logic is now fully integrated into the `ConversationMemoryManager`, eliminating the separate `ContextManager`.
+- **Correct Order of Operations:** The manager now correctly adds a new turn, then checks for summarization, and finally performs turn-based truncation, preventing race conditions.
+- **Non-Breaking:** The feature remains opt-in via the `conversationMemory` configuration.
+- **Recursion-Safe:** The summarization logic creates a new, memory-disabled `NeuroLink` instance for the summarization call, preventing infinite loops.
 
 ---
 
