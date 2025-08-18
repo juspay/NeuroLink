@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "dotenv/config";
 
 /**
  * NeuroLink CLI
@@ -21,16 +22,6 @@ import { addSageMakerCommands } from "./commands/sagemaker.js";
 import { CLICommandFactory } from "./factories/commandFactory.js";
 
 import { logger } from "../lib/utils/logger.js";
-
-// Load environment variables from .env file
-try {
-  // Try to import and configure dotenv
-  const { config } = await import("dotenv");
-  config(); // Load .env from current working directory
-} catch (error) {
-  // dotenv is not available (dev dependency only) - this is fine for production
-  // Environment variables should be set externally in production
-}
 
 // Utility Functions (Simple, Zero Maintenance)
 

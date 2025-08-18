@@ -280,7 +280,7 @@ console.log("Response:", result.content);
 ### Environment Setup
 
 ```bash
-# Create .env file (automatically loaded by CLI)
+# Create .env file (now automatically loaded by the CLI)
 echo 'OPENAI_API_KEY="sk-your-openai-key"' > .env
 echo 'GOOGLE_AI_API_KEY="AIza-your-google-ai-key"' >> .env
 echo 'AWS_ACCESS_KEY_ID="your-aws-access-key"' >> .env
