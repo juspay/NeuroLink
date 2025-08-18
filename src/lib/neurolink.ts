@@ -133,9 +133,6 @@ export interface MCPStatus {
   [key: string]: unknown; // Add index signature for flexible object access
 }
 
-import { ContextManager } from "./context/ContextManager.js";
-import { defaultContextConfig } from "./context/config.js";
-import type { ContextManagerConfig } from "./context/types.js";
 import { isNonNullObject } from "./utils/typeUtils.js";
 
 // Core types imported from core/types.js
@@ -143,7 +140,6 @@ import { isNonNullObject } from "./utils/typeUtils.js";
 export class NeuroLink {
   private mcpInitialized = false;
   private emitter = new EventEmitter();
-  private contextManager: ContextManager | null = null;
 
   private autoDiscoveredServerInfos: MCPServerInfo[] = [];
   // External MCP server management
@@ -1185,27 +1181,6 @@ export class NeuroLink {
   }
 
   /**
-   * Enables automatic context summarization for the NeuroLink instance.
-   * Once enabled, the instance will maintain conversation history and
-   * automatically summarize it when it exceeds token limits.
-   * @param config Optional configuration to override default summarization settings.
-   */
-  public enableContextSummarization(
-    config?: Partial<ContextManagerConfig>,
-  ): void {
-    const contextConfig = {
-      ...defaultContextConfig,
-      ...config,
-    };
-    // Pass the internal generator function directly, bound to the correct `this` context.
-    this.contextManager = new ContextManager(
-      this.generateTextInternal.bind(this),
-      contextConfig,
-    );
-    logger.info("[NeuroLink] Automatic context summarization enabled.");
-  }
-
-  /**
    * Generate AI content using the best available provider with MCP tool integration.
    * This is the primary method for text generation with full feature support.
    *
@@ -1268,15 +1243,6 @@ export class NeuroLink {
       throw new Error("Input text is required and must be a non-empty string");
     }
 
-    // Handle Context Management if enabled
-    if (this.contextManager) {
-      // Get the full context for the prompt without permanently adding the user's turn yet
-      options.input.text = this.contextManager.getContextForPrompt(
-        "user",
-        options.input.text,
-      );
-    }
-
     const startTime = Date.now();
 
     // Emit generation start event (NeuroLink format - keep existing)
@@ -1329,6 +1295,13 @@ export class NeuroLink {
       baseOptions,
       factoryResult,
     );
+
+    // Pass conversation memory config if available
+    if (this.conversationMemory) {
+      textOptions.conversationMemoryConfig = this.conversationMemory.config;
+      // Include original prompt for context summarization
+      textOptions.originalPrompt = originalPrompt;
+    }
 
     // Detect and execute domain-specific tools
     const { toolResults, enhancedPrompt } = await this.detectAndExecuteTools(
@@ -1413,12 +1386,6 @@ export class NeuroLink {
           }
         : undefined,
     };
-
-    // Add both the user's turn and the AI's response to the permanent history
-    if (this.contextManager) {
-      await this.contextManager.addTurn("user", originalPrompt);
-      await this.contextManager.addTurn("assistant", generateResult.content);
-    }
 
     return generateResult;
   }
@@ -1570,7 +1537,6 @@ export class NeuroLink {
         hasToolRegistry: !!toolRegistry,
         toolRegistrySize: 0,
         hasExternalServerManager: !!this.externalServerManager,
-        hasContextManager: !!this.contextManager,
       },
       environmentContext: {
         nodeVersion: process.version,
@@ -2381,14 +2347,7 @@ export class NeuroLink {
 
     try {
       await this.initializeMCP();
-      const originalPrompt = options.input.text;
-
-      if (this.contextManager) {
-        options.input.text = this.contextManager.getContextForPrompt(
-          "user",
-          options.input.text,
-        );
-      }
+      const _originalPrompt = options.input.text;
 
       factoryResult = processStreamingFactoryOptions(options);
       enhancedOptions = createCleanStreamOptions(options);
@@ -2407,13 +2366,6 @@ export class NeuroLink {
         factoryResult,
       );
       const responseTime = Date.now() - startTime;
-
-      if (this.contextManager) {
-        await this.contextManager.addTurn("user", originalPrompt);
-        if (streamResult.content) {
-          await this.contextManager.addTurn("assistant", streamResult.content);
-        }
-      }
 
       this.emitStreamEndEvents(streamResult);
 

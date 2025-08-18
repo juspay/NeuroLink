@@ -6,7 +6,7 @@ import type {
 import type { GenerateResult } from "../types/generateTypes.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue } from "../types/common.js";
-import type { ChatMessage } from "../types/conversationTypes.js";
+import type { ChatMessage, ConversationMemoryConfig } from "../types/conversationTypes.js";
 import type { TokenUsage, AnalyticsData } from "../types/providers.js";
 import type { EvaluationData } from "../index.js";
 
@@ -196,6 +196,10 @@ export interface TextGenerationOptions {
 
   // NEW: Message Array Support for Conversation Memory
   conversationMessages?: ChatMessage[]; // Previous conversation as message array
+
+  // NEW: Conversation Memory Configuration
+  conversationMemoryConfig?: Partial<ConversationMemoryConfig>;
+  originalPrompt?: string; // Original prompt for context summarization
 
   // NEW: Evaluation Context Parameters
   expectedOutcome?: string; // Expected outcome for evaluation

@@ -12,7 +12,9 @@ import type {
   TextGenerationOptions,
   TextGenerationResult,
 } from "../core/types.js";
-import { getConversationMemoryDefaults } from "../config/conversationMemoryConfig.js";
+import {
+  getConversationMemoryDefaults,
+} from "../config/conversationMemoryConfig.js";
 import { logger } from "./logger.js";
 
 /**
@@ -25,16 +27,13 @@ export function applyConversationMemoryDefaults(
   const defaults = getConversationMemoryDefaults();
 
   return {
-    enabled: userConfig?.enabled ?? defaults.enabled,
-    maxSessions: userConfig?.maxSessions ?? defaults.maxSessions,
-    maxTurnsPerSession:
-      userConfig?.maxTurnsPerSession ?? defaults.maxTurnsPerSession,
+    ...defaults,
+    ...userConfig,
   };
 }
 
 /**
- * Get conversation history as message array (PREFERRED METHOD)
- * Returns proper message array format for AI providers
+ * Get conversation history as message array, summarizing if needed.
  */
 export async function getConversationMessages(
   conversationMemory: ConversationMemoryManager | undefined,
@@ -50,6 +49,7 @@ export async function getConversationMessages(
   }
 
   try {
+    // Remove duplicate summarization logic - it should be handled in ConversationMemoryManager
     const messages = conversationMemory.buildContextMessages(sessionId);
     logger.debug("Conversation messages retrieved", {
       sessionId,
@@ -65,6 +65,7 @@ export async function getConversationMessages(
     return [];
   }
 }
+
 
 /**
  * Store conversation turn for future context
@@ -92,7 +93,7 @@ export async function storeConversationTurn(
     await conversationMemory.storeConversationTurn(
       sessionId,
       userId,
-      originalOptions.prompt || "",
+      originalOptions.originalPrompt || originalOptions.prompt || "",
       result.content,
     );
 

@@ -15,6 +15,21 @@ export interface ConversationMemoryConfig {
 
   /** Maximum number of conversation turns to keep per session (default: 20) */
   maxTurnsPerSession?: number;
+
+  /** Enable automatic summarization */
+  enableSummarization?: boolean;
+
+  /** Turn count to trigger summarization */
+  summarizationThresholdTurns?: number;
+
+  /** Target turn count for the summary */
+  summarizationTargetTurns?: number;
+
+  /** Provider to use for summarization */
+  summarizationProvider?: string;
+
+  /** Model to use for summarization */
+  summarizationModel?: string;
 }
 /**
  * Complete memory for a conversation session
