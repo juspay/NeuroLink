@@ -129,6 +129,7 @@ import { ContextManager } from "./context/ContextManager.js";
 import { defaultContextConfig } from "./context/config.js";
 import type { ContextManagerConfig } from "./context/types.js";
 import { isNonNullObject } from "./utils/typeUtils.js";
+import { ProviderHealthChecker } from "./utils/providerHealth.js";
 
 // Core types imported from core/types.js
 
@@ -1875,16 +1876,45 @@ export class NeuroLink {
       "litellm",
     ] as const;
 
-    // Test providers with controlled concurrency
-    // This reduces total time from 16s (sequential) to ~3s (parallel) while preventing resource exhaustion
     const limit = pLimit(SYSTEM_LIMITS.DEFAULT_CONCURRENCY_LIMIT);
+
+    // PERFORMANCE OPTIMIZATION: Pre-check environment variables in parallel
+    // This avoids sequential environment checks within each provider test
+    const envVarChecks = await Promise.all(
+      providers.map(async (providerName) => {
+        try {
+          if (providerName === "ollama") {
+            return { provider: providerName, hasEnvVars: true };
+          }
+
+          const health = await ProviderHealthChecker.checkProviderHealth(
+            providerName as AIProviderName,
+            { includeConnectivityTest: false, cacheResults: true },
+          );
+
+          return {
+            provider: providerName,
+            // Use configuration status only for the env-var gate
+            hasEnvVars: health.isConfigured,
+          };
+        } catch (error) {
+          return { provider: providerName, hasEnvVars: false };
+        }
+      }),
+    );
+
+    // Create a map for quick lookup - O(1) access
+    const envVarMap = new Map(
+      envVarChecks.map((item) => [item.provider, item.hasEnvVars]),
+    );
+
+    // PERFORMANCE OPTIMIZATION: Streamlined provider testing with efficient parallelization
     const providerTests = providers.map((providerName) =>
       limit(async () => {
         const startTime = Date.now();
 
         try {
-          // Check if provider has required environment variables
-          const hasEnvVars = await this.hasProviderEnvVars(providerName);
+          const hasEnvVars = envVarMap.get(providerName) || false;
 
           if (!hasEnvVars && providerName !== "ollama") {
             return {
