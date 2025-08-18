@@ -1,3 +1,9 @@
+## [7.14.7](https://github.com/juspay/neurolink/compare/v7.14.6...v7.14.7) (2025-08-18)
+
+### Bug Fixes
+
+- **(core):** add validation for tool registration ([caed431](https://github.com/juspay/neurolink/commit/caed431ca1a025599ae8f901a4f4cb36b970379c))
+
 ## [7.14.6](https://github.com/juspay/neurolink/compare/v7.14.5...v7.14.6) (2025-08-18)
 
 ### Bug Fixes
