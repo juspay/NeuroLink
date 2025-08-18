@@ -1,11 +1,26 @@
 /**
  * NeuroLink Unified Logger Utility
  *
- * Centralized logging for the entire NeuroLink ecosystem
- * Supports both CLI --debug flag and NEUROLINK_DEBUG environment variable
- * Migrated from MCP logging with enhanced features
+ * Centralized logging for the entire NeuroLink ecosystem.
+ * Provides structured logging with different severity levels and consistent formatting.
+ * Supports both CLI --debug flag and NEUROLINK_DEBUG environment variable.
+ * Maintains compatibility with MCP logging while providing enhanced features.
+ *
+ * Features:
+ * - Multiple log levels (debug, info, warn, error)
+ * - Log history retention with configurable limits
+ * - Conditional logging based on environment settings
+ * - Structured data support for complex objects
+ * - Tabular data display
  */
 
+/**
+ * Represents the available logging severity levels.
+ * - debug: Detailed information for debugging purposes
+ * - info: General information about system operation
+ * - warn: Potential issues that don't prevent operation
+ * - error: Critical issues that may cause failures
+ */
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 // Pre-computed uppercase log levels for performance optimization
@@ -16,10 +31,18 @@ const UPPERCASE_LOG_LEVELS: Record<LogLevel, string> = {
   error: "ERROR",
 } as const;
 
+/**
+ * Represents a single log entry in the logging system.
+ * Each entry contains metadata about the log event along with the actual message.
+ */
 interface LogEntry {
+  /** The severity level of the log entry */
   level: LogLevel;
+  /** The text message to be logged */
   message: string;
+  /** When the log entry was created */
   timestamp: Date;
+  /** Optional additional data associated with the log entry (objects, arrays, etc.) */
   data?: unknown;
 }
 
@@ -43,10 +66,27 @@ class NeuroLinkLogger {
     }
   }
 
+  /**
+   * Sets the minimum log level that will be processed and output.
+   * Log messages with a level lower than this will be ignored.
+   *
+   * @param level - The minimum log level to process ("debug", "info", "warn", or "error")
+   */
   setLogLevel(level: LogLevel): void {
     this.logLevel = level;
   }
 
+  /**
+   * Determines whether a message with the given log level should be processed.
+   * This method considers both the configured log level and the current debug mode.
+   *
+   * Logic:
+   * 1. If not in debug mode, only error messages are allowed
+   * 2. If in debug mode, messages at or above the configured log level are allowed
+   *
+   * @param level - The log level to check
+   * @returns True if a message with this level should be logged, false otherwise
+   */
   shouldLog(level: LogLevel): boolean {
     // Dynamic debug mode check to handle CLI middleware timing
     const currentDebugMode =
@@ -62,6 +102,14 @@ class NeuroLinkLogger {
     return levels.indexOf(level) >= levels.indexOf(this.logLevel);
   }
 
+  /**
+   * Generates a standardized prefix for log messages.
+   * The prefix includes a timestamp and the log level in a consistent format.
+   *
+   * @param timestamp - ISO string representation of the log timestamp
+   * @param level - The log level for this message
+   * @returns Formatted prefix string like "[2025-08-18T13:45:30.123Z] [NEUROLINK:ERROR]"
+   */
   private getLogPrefix(timestamp: string, level: LogLevel): string {
     return `[${timestamp}] [NEUROLINK:${UPPERCASE_LOG_LEVELS[level]}]`;
   }
@@ -93,6 +141,19 @@ class NeuroLinkLogger {
     }
   }
 
+  /**
+   * Core internal logging method that handles:
+   * 1. Creating log entries with consistent format
+   * 2. Storing entries in the log history
+   * 3. Managing log rotation to prevent memory issues
+   * 4. Outputting formatted logs to the console
+   *
+   * This is the central method called by all specific logging methods (debug, info, etc.)
+   *
+   * @param level - The severity level for this log entry
+   * @param message - The message text to log
+   * @param data - Optional additional context data to include
+   */
   private log(level: LogLevel, message: string, data?: unknown): void {
     if (!this.shouldLog(level)) {
       return;
@@ -119,22 +180,57 @@ class NeuroLinkLogger {
     this.outputToConsole(level, prefix, message, data);
   }
 
+  /**
+   * Logs a message at the debug level.
+   * Used for detailed troubleshooting information.
+   *
+   * @param message - The message to log
+   * @param data - Optional additional context data
+   */
   debug(message: string, data?: unknown): void {
     this.log("debug", message, data);
   }
 
+  /**
+   * Logs a message at the info level.
+   * Used for general information about system operation.
+   *
+   * @param message - The message to log
+   * @param data - Optional additional context data
+   */
   info(message: string, data?: unknown): void {
     this.log("info", message, data);
   }
 
+  /**
+   * Logs a message at the warn level.
+   * Used for potentially problematic situations that don't prevent operation.
+   *
+   * @param message - The message to log
+   * @param data - Optional additional context data
+   */
   warn(message: string, data?: unknown): void {
     this.log("warn", message, data);
   }
 
+  /**
+   * Logs a message at the error level.
+   * Used for critical issues that may cause failures.
+   *
+   * @param message - The message to log
+   * @param data - Optional additional context data
+   */
   error(message: string, data?: unknown): void {
     this.log("error", message, data);
   }
 
+  /**
+   * Retrieves stored log entries, optionally filtered by log level.
+   * Returns a copy of the log entries to prevent external modification.
+   *
+   * @param level - Optional log level to filter by
+   * @returns Array of log entries, either all or filtered by level
+   */
   getLogs(level?: LogLevel): LogEntry[] {
     if (level) {
       return this.logs.filter((log) => log.level === level);
@@ -142,6 +238,10 @@ class NeuroLinkLogger {
     return [...this.logs];
   }
 
+  /**
+   * Removes all stored log entries.
+   * Useful for testing or when log history is no longer needed.
+   */
   clearLogs(): void {
     this.logs = [];
   }
@@ -153,6 +253,14 @@ class NeuroLinkLogger {
    * It bypasses the structured logging mechanism and should only be used when
    * unstructured, unconditional logging is required.
    *
+   * Use with caution in production environments as it outputs to the console
+   * regardless of the current log level or debug mode settings.
+   *
+   * Use cases:
+   * - Critical system information that must always be visible
+   * - Status messages during initialization before logging is fully configured
+   * - Debugging in environments where normal logging might be suppressed
+   *
    * @param args - The arguments to log. These are passed directly to `console.log`.
    */
   always(...args: unknown[]): void {
@@ -162,17 +270,43 @@ class NeuroLinkLogger {
   /**
    * Displays tabular data unconditionally using `console.table`.
    *
-   * @param data - The data to display in table format
+   * Similar to the `always` method, this bypasses log level checks and
+   * will display data regardless of current logging settings.
+   *
+   * Important differences from other logging methods:
+   * - Does NOT store entries in the log history
+   * - Does NOT use the structured logging format with timestamps and prefixes
+   * - Outputs directly to console without additional formatting
+   *
+   * Particularly useful for:
+   * - Displaying structured data in a readable format during debugging
+   * - Showing configuration options and their current values
+   * - Presenting comparison data between different system states
+   * - Performance metrics and timing data
+   *
+   * @param data - The data to display in table format. Can be an array of objects or an object with key-value pairs.
    */
   table(data: unknown): void {
     console.table(data);
   }
 }
 
-// Export singleton instance
+// Export singleton instance to ensure consistent logging across the application
 const neuroLinkLogger = new NeuroLinkLogger();
 
-// Helper function to process arguments with minimal overhead
+/**
+ * Helper function to process logger arguments with minimal overhead.
+ * Handles variable argument patterns and ensures safe serialization of objects.
+ *
+ * This function:
+ * 1. Extracts the first argument as the message
+ * 2. Handles serialization of non-string first arguments
+ * 3. Collects remaining arguments as additional data
+ * 4. Passes the processed arguments to the actual logging method
+ *
+ * @param args - Array of arguments passed to the logger
+ * @param logMethod - Function that will perform the actual logging
+ */
 function processLoggerArgs(
   args: unknown[],
   logMethod: (message: string, data?: unknown) => void,
@@ -194,7 +328,16 @@ function processLoggerArgs(
   logMethod(message, data);
 }
 
-// Main unified logger export
+/**
+ * Main unified logger export that provides a simplified API for logging.
+ * This is the primary interface that should be used by application code.
+ *
+ * Features:
+ * - Convenient logging methods (debug, info, warn, error)
+ * - Unconditional logging (always, table)
+ * - Log level control and configuration
+ * - Log history management
+ */
 export const logger = {
   debug: (...args: unknown[]) => {
     if (neuroLinkLogger.shouldLog("debug")) {
@@ -236,18 +379,43 @@ export const logger = {
   clearLogs: () => neuroLinkLogger.clearLogs(),
 };
 
-// MCP compatibility exports - all use the same unified logger
+/**
+ * MCP compatibility exports - all use the same unified logger instance.
+ * These exports maintain backward compatibility with code that expects
+ * separate loggers for different MCP components, while actually using
+ * the same underlying logger instance.
+ */
 export const mcpLogger = neuroLinkLogger;
 export const autoDiscoveryLogger = neuroLinkLogger;
 export const registryLogger = neuroLinkLogger;
 export const unifiedRegistryLogger = neuroLinkLogger;
 
-// Global log level setter
+/**
+ * Sets the global log level for all MCP-related logging.
+ * This function provides a convenient way to adjust logging verbosity
+ * for all MCP components at once.
+ *
+ * @param level - The log level to set ("debug", "info", "warn", or "error")
+ */
 export function setGlobalMCPLogLevel(level: LogLevel): void {
   neuroLinkLogger.setLogLevel(level);
 }
 
-// Export LogLevel enum for runtime use
+/**
+ * Export LogLevel enum for runtime use.
+ * Provides type-safe log level constants for use in application code.
+ *
+ * Example usage:
+ * ```
+ * import { logger, LogLevels } from './logger';  // Import from your project's path
+ * 
+ * // Using the LogLevels constants (recommended for type safety):
+ * logger.setLogLevel(LogLevels.debug);
+ * 
+ * // Or directly using string values:
+ * logger.setLogLevel('debug');
+ * ```
+ */
 export const LogLevels = {
   debug: "debug" as const,
   info: "info" as const,
