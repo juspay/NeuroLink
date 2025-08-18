@@ -23,7 +23,6 @@ import type { JsonValue, JsonObject, UnknownRecord } from "../types/common.js";
 import type { ToolResult, ToolArgs } from "../types/tools.js";
 import { logger } from "../utils/logger.js";
 import { DEFAULT_MAX_STEPS, STEP_LIMITS } from "../core/constants.js";
-import { directAgentTools } from "../agent/directTools.js";
 import { getSafeMaxTokens } from "../utils/tokenLimits.js";
 import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
@@ -55,9 +54,7 @@ export abstract class BaseProvider implements AIProvider {
   protected middlewareOptions?: MiddlewareFactoryOptions; // TODO: Implement global level middlewares that can be used
 
   // Tools are conditionally included based on centralized configuration
-  protected readonly directTools = shouldDisableBuiltinTools()
-    ? {}
-    : directAgentTools;
+  protected directTools: Record<string, Tool> | null = null;
   protected mcpTools?: Record<string, Tool>; // MCP tools loaded dynamically when available
   protected customTools?: Map<string, unknown>; // Custom tools from registerTool()
   protected toolExecutor?: (
@@ -897,17 +894,23 @@ export abstract class BaseProvider implements AIProvider {
    * MCP tools are added when available (without blocking)
    */
   protected async getAllTools(): Promise<Record<string, Tool>> {
+    // Lazy load direct tools on first use
+    if (this.directTools === null && !shouldDisableBuiltinTools()) {
+      const { directAgentTools } = await import("../agent/directTools.js");
+      this.directTools = directAgentTools;
+    }
+
     const tools: Record<string, Tool> = {
-      ...this.directTools, // Always include direct tools
+      ...(this.directTools || {}), // Always include direct tools
     };
 
     logger.debug(`[BaseProvider] getAllTools called for ${this.providerName}`, {
       neurolinkAvailable: !!this.neurolink,
       neurolinkType: typeof this.neurolink,
-      directToolsCount: getKeyCount(this.directTools),
+      directToolsCount: getKeyCount(this.directTools || {}),
     });
     logger.debug(
-      `[BaseProvider] Direct tools: ${getKeysAsString(this.directTools)}`,
+      `[BaseProvider] Direct tools: ${getKeysAsString(this.directTools || {})}`,
     );
 
     // Process all tool types using dedicated helper methods

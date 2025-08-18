@@ -328,7 +328,13 @@ export interface AIProvider {
     },
     functionTag: string,
   ): void;
+  healthCheck?: () => Promise<ProviderHealth>;
 }
+
+/**
+ * Health check result shape
+ */
+export type ProviderHealth = { isHealthy: boolean; message?: string };
 
 /**
  * Provider attempt result for iteration tracking

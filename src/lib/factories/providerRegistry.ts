@@ -42,9 +42,7 @@ export class ProviderRegistry {
     }
 
     try {
-      // Register providers with dynamic import factory functions
-      const { ProviderFactory } = await import("./providerFactory.js");
-
+      // Using static import: ProviderFactory
       // Register Google AI Studio Provider (our validated baseline)
       ProviderFactory.registerProvider(
         AIProviderName.GOOGLE_AI,
@@ -113,8 +111,9 @@ export class ProviderRegistry {
             sdk as NeuroLink | undefined,
           );
         },
-        undefined, // Let provider read BEDROCK_MODEL from .env
+        undefined,
         ["bedrock", "aws"],
+        "BEDROCK_MODEL",
       );
 
       // Register Azure OpenAI provider
@@ -126,10 +125,9 @@ export class ProviderRegistry {
           );
           return new AzureOpenAIProvider(modelName);
         },
-        process.env.AZURE_MODEL ||
-          process.env.AZURE_OPENAI_DEPLOYMENT_ID ||
-          "gpt-4o-mini",
+        "gpt-4o-mini",
         ["azure", "azureOpenai"],
+        "AZURE_MODEL",
       );
 
       // Register Google Vertex AI provider
@@ -162,8 +160,9 @@ export class ProviderRegistry {
           );
           return new HuggingFaceProvider(modelName);
         },
-        process.env.HUGGINGFACE_MODEL || "microsoft/DialoGPT-medium",
+        "microsoft/DialoGPT-medium",
         ["huggingface", "hf"],
+        "HUGGINGFACE_MODEL",
       );
 
       // Register Mistral AI provider
@@ -191,8 +190,9 @@ export class ProviderRegistry {
           const { OllamaProvider } = await import("../providers/ollama.js");
           return new OllamaProvider(modelName);
         },
-        process.env.OLLAMA_MODEL || "llama3.1:8b",
+        "llama3.1:8b",
         ["ollama", "local"],
+        "OLLAMA_MODEL",
       );
 
       // Register LiteLLM provider
@@ -206,8 +206,9 @@ export class ProviderRegistry {
           const { LiteLLMProvider } = await import("../providers/litellm.js");
           return new LiteLLMProvider(modelName, sdk as NeuroLink | undefined);
         },
-        process.env.LITELLM_MODEL || "openai/gpt-4o-mini",
+        "openai/gpt-4o-mini",
         ["litellm"],
+        "LITELLM_MODEL",
       );
 
       // Register OpenAI Compatible provider
@@ -226,8 +227,9 @@ export class ProviderRegistry {
             sdk as NeuroLink | undefined,
           );
         },
-        process.env.OPENAI_COMPATIBLE_MODEL || undefined, // Enable auto-discovery when no model specified
+        undefined, // Enable auto-discovery when no model specified
         ["openai-compatible", "openrouter", "vllm", "compatible"],
+        "OPENAI_COMPATIBLE_MODEL",
       );
 
       // Register Amazon SageMaker provider
@@ -243,8 +245,9 @@ export class ProviderRegistry {
           );
           return new AmazonSageMakerProvider(modelName);
         },
-        process.env.SAGEMAKER_MODEL || "sagemaker-model",
+        "sagemaker-model",
         ["sagemaker", "aws-sagemaker"],
+        "SAGEMAKER_MODEL",
       );
 
       logger.debug("All providers registered successfully");

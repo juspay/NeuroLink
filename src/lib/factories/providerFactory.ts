@@ -1,4 +1,10 @@
-import type { AIProvider, AIProviderName } from "../types/index.js";
+import stringSimilarity from "string-similarity";
+const { findBestMatch } = stringSimilarity;
+import type {
+  AIProvider,
+  AIProviderName,
+  ProviderHealth,
+} from "../types/index.js";
 import type { UnknownRecord } from "../types/common.js";
 import { logger } from "../utils/logger.js";
 
@@ -26,9 +32,12 @@ type ProviderConstructor =
  * Provider registration entry
  */
 interface ProviderRegistration {
+  primaryName: string; // canonical registration name (lowercase)
   constructor: ProviderConstructor;
   defaultModel?: string; // Optional - provider can read from env
+  modelEnvVar?: string; // Optional - environment variable for model name
   aliases?: string[];
+  isFactory?: boolean; // Explicitly mark if the constructor is a factory function
 }
 
 /**
@@ -37,7 +46,14 @@ interface ProviderRegistration {
  * and enable dynamic provider registration
  */
 export class ProviderFactory {
+  private static readonly SIMILARITY_SUGGESTION_THRESHOLD = 0.6;
+  static healthCheckTtlMs = 300_000;
   private static readonly providers = new Map<string, ProviderRegistration>();
+  private static readonly providerCache = new Map<string, AIProvider>();
+  private static readonly providerStatus = new Map<
+    string,
+    { isHealthy: boolean; lastCheck: number }
+  >();
   private static initialized = false;
 
   /**
@@ -46,13 +62,18 @@ export class ProviderFactory {
   static registerProvider(
     name: AIProviderName | string,
     constructor: ProviderConstructor,
-    defaultModel?: string, // Optional - provider can read from env
+    defaultModel?: string,
     aliases: string[] = [],
+    modelEnvVar?: string,
+    isFactory?: boolean,
   ): void {
     const registration: ProviderRegistration = {
+      primaryName: String(name).toLowerCase(),
       constructor,
       defaultModel,
       aliases,
+      modelEnvVar,
+      isFactory,
     };
 
     // Register main name
@@ -75,57 +96,106 @@ export class ProviderFactory {
     modelName?: string,
     sdk?: UnknownRecord,
   ): Promise<AIProvider> {
-    // Note: Providers are registered explicitly by ProviderRegistry to avoid circular dependencies
-
     const normalizedName = providerName.toLowerCase();
-    const registration = this.providers.get(normalizedName);
+    const resolvedProviderName =
+      this.normalizeProviderName(providerName) || normalizedName;
+
+    const registration = this.providers.get(resolvedProviderName);
 
     if (!registration) {
-      throw new Error(
-        `Unknown provider: ${providerName}. Available providers: ${this.getAvailableProviders().join(", ")}`,
-      );
+      const availableProviders = this.getAvailableProviders();
+      const bestMatch = findBestMatch(
+        normalizedName,
+        availableProviders,
+      ).bestMatch;
+
+      let errorMessage = `Unknown provider: '${providerName}'.`;
+      if (bestMatch.rating > this.SIMILARITY_SUGGESTION_THRESHOLD) {
+        // Suggest only if the similarity is reasonably high
+        errorMessage += ` Did you mean '${bestMatch.target}'?`;
+      }
+      errorMessage += `\nAvailable providers: ${availableProviders.join(", ")}`;
+
+      throw new Error(errorMessage);
     }
 
-    // Respect environment variables before falling back to registry default
-    let model = modelName;
-    if (!model) {
-      // Check for provider-specific environment variables
-      if (providerName.toLowerCase().includes("vertex")) {
-        model = process.env.VERTEX_MODEL;
-      } else if (providerName.toLowerCase().includes("bedrock")) {
-        model = process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
+    // Resolve the final model name *before* generating the cache key
+    const model =
+      modelName ||
+      (registration.modelEnvVar && process.env[registration.modelEnvVar]) ||
+      registration.defaultModel;
+
+    const canonicalName = registration.primaryName;
+    const cacheKey = `${canonicalName}:${model || "default"}`;
+
+    // Check cache first with the correctly resolved model name
+    if (this.providerCache.has(cacheKey)) {
+      const status = this.providerStatus.get(cacheKey);
+      const ttlMs = ProviderFactory.healthCheckTtlMs ?? 300_000;
+      if (status?.isHealthy && Date.now() - status.lastCheck < ttlMs) {
+        // 5-minute health check validity
+        return this.providerCache.get(cacheKey)!;
       }
-      // Fallback to registry default if no env var
-      model = model || registration.defaultModel;
     }
 
     try {
-      let result: AIProvider | Promise<AIProvider>;
+      let providerInstance: AIProvider;
 
-      try {
-        // Try as async factory function first (most providers are async functions)
+      const ctor = registration.constructor;
+      // Use the explicit `isFactory` flag if available, otherwise fallback to the heuristic
+      // for backward compatibility with any registrations that don't use the new flag.
+      const isFactoryFunction =
+        registration.isFactory ?? typeof ctor.prototype === "undefined";
 
-        result = await (
-          registration.constructor as (
+      if (isFactoryFunction) {
+        // Treat as a factory function
+        providerInstance = await (
+          ctor as (
             modelName?: string,
             providerName?: string,
             sdk?: UnknownRecord,
-          ) => Promise<AIProvider> | AIProvider
-        )(model, providerName, sdk);
-      } catch {
-        // Fallback to constructor - ensure parameters are maintained
-        result = new (registration.constructor as new (
+          ) => Promise<AIProvider>
+        )(model, canonicalName, sdk);
+      } else {
+        // Treat as a class constructor
+        providerInstance = new (ctor as new (
           modelName?: string,
           providerName?: string,
           sdk?: UnknownRecord,
-        ) => AIProvider)(model, providerName, sdk);
+        ) => AIProvider)(model, canonicalName, sdk);
       }
 
-      // Return result (no need to await again if already awaited in try block)
-      return result as AIProvider;
+      // Perform health check if available
+      if (typeof providerInstance.healthCheck === "function") {
+        const health: ProviderHealth = await providerInstance.healthCheck();
+        this.providerStatus.set(cacheKey, {
+          isHealthy: health.isHealthy,
+          lastCheck: Date.now(),
+        });
+        if (!health.isHealthy) {
+          throw new Error(
+            `Provider ${providerName} failed health check: ${health.message || "Unknown error"}`,
+          );
+        }
+      } else {
+        // If no health check, assume healthy
+        this.providerStatus.set(cacheKey, {
+          isHealthy: true,
+          lastCheck: Date.now(),
+        });
+      }
+
+      this.providerCache.set(cacheKey, providerInstance);
+      return providerInstance;
     } catch (error) {
       logger.error(`Failed to create provider ${providerName}:`, error);
-      throw new Error(`Failed to create provider ${providerName}: ${error}`);
+      // Set status to unhealthy *before* throwing
+      this.providerStatus.set(cacheKey, {
+        isHealthy: false,
+        lastCheck: Date.now(),
+      });
+      // Re-throw original error to preserve stack trace and context
+      throw error;
     }
   }
 
@@ -139,9 +209,16 @@ export class ProviderFactory {
    * Get list of available providers
    */
   static getAvailableProviders(): string[] {
-    return Array.from(this.providers.keys()).filter(
-      (name, index, arr) => arr.indexOf(name) === index, // Remove duplicates from aliases
-    );
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const [, reg] of this.providers) {
+      const name = reg.primaryName;
+      if (!seen.has(name)) {
+        seen.add(name);
+        result.push(name);
+      }
+    }
+    return result;
   }
 
   /**
@@ -158,17 +235,10 @@ export class ProviderFactory {
    */
   static normalizeProviderName(providerName: string): string | null {
     const normalized = providerName.toLowerCase();
+    const registration = this.providers.get(normalized);
 
-    // Check direct registration
-    if (this.providers.has(normalized)) {
-      return normalized;
-    }
-
-    // Check aliases from all registrations
-    for (const [name, registration] of this.providers.entries()) {
-      if (registration.aliases?.includes(normalized)) {
-        return name;
-      }
+    if (registration) {
+      return registration.primaryName;
     }
 
     return null;
@@ -179,6 +249,8 @@ export class ProviderFactory {
    */
   static clearRegistrations(): void {
     this.providers.clear();
+    this.providerCache.clear();
+    this.providerStatus.clear();
     this.initialized = false;
   }
 

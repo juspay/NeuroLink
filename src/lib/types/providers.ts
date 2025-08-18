@@ -223,6 +223,14 @@ export type ModelUseCase =
   | "classification";
 
 /**
+ * Provider health check result
+ */
+export type ProviderHealth = {
+  isHealthy: boolean;
+  message?: string;
+};
+
+/**
  * Provider health status
  */
 export type ProviderHealthStatus =
@@ -379,6 +387,8 @@ export type AIProvider = {
     },
     functionTag: string,
   ): void;
+
+  healthCheck?: () => Promise<ProviderHealth>;
 };
 
 /**
