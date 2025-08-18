@@ -86,6 +86,28 @@ function safeMetadataConversion(
 }
 
 /**
+ * Prefer the top-level field if present, otherwise fall back to metadata
+ * @param topLevel The value at the top level
+ * @param metadata The metadata object
+ * @param key The key to look up in metadata
+ * @param type The expected type ("number", "string", "boolean")
+ */
+function preferTopLevelField<T>(
+  topLevel: unknown,
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+  type: string,
+): T | undefined {
+  if (typeof topLevel === type) {
+    return topLevel as T;
+  }
+  if (typeof metadata?.[key] === type) {
+    return metadata![key] as T;
+  }
+  return undefined;
+}
+
+/**
  * Type guard to validate external MCP server configuration
  */
 function isValidExternalMCPServerConfig(
@@ -200,124 +222,96 @@ export class ExternalServerManager extends EventEmitter {
   }
 
   /**
-   * Load MCP server configurations from .mcp-config.json file
+   * Load MCP server configurations from .mcp-config.json or .mcp-servers.json file (with fallback)
    * Automatically registers servers found in the configuration
-   * @param configPath Optional path to config file (defaults to .mcp-config.json in cwd)
+   * @param configPath Optional path to config file (defaults to .mcp-config.json or .mcp-servers.json in cwd)
    * @returns Promise resolving to number of servers loaded
    */
   async loadMCPConfiguration(configPath?: string): Promise<ServerLoadResult> {
     const fs = await import("fs");
     const path = await import("path");
 
-    const finalConfigPath =
-      configPath || path.join(process.cwd(), ".mcp-config.json");
+    // Try user-provided path first
+    if (configPath) {
+      if (fs.existsSync(configPath)) {
+        return this.processConfigFile(configPath);
+      } else {
+        mcpLogger.debug(
+          `[ExternalServerManager] No MCP config found at provided path: ${configPath}`,
+        );
+      }
+    }
 
-    if (!fs.existsSync(finalConfigPath)) {
-      mcpLogger.debug(
-        `[ExternalServerManager] No MCP config found at ${finalConfigPath}`,
-      );
-      return { serversLoaded: 0, errors: [] };
+    // Try standard configuration files in priority order
+    const standardPaths = [
+      path.join(process.cwd(), ".mcp-config.json"),
+      path.join(process.cwd(), ".mcp-servers.json"),
+    ];
+
+    for (const filePath of standardPaths) {
+      if (fs.existsSync(filePath)) {
+        mcpLogger.debug(
+          `[ExternalServerManager] Found MCP configuration at ${filePath}`,
+        );
+        return this.processConfigFile(filePath);
+      }
     }
 
     mcpLogger.debug(
-      `[ExternalServerManager] Loading MCP configuration from ${finalConfigPath}`,
+      "[ExternalServerManager] No MCP configuration found in any standard location",
+    );
+    return { serversLoaded: 0, errors: [] };
+  }
+
+  /**
+   * Process a configuration file once it's found
+   * @param configPath Path to the configuration file
+   * @returns Promise resolving to the server load result
+   */
+  private async processConfigFile(
+    configPath: string,
+  ): Promise<ServerLoadResult> {
+    const fs = await import("fs");
+
+    mcpLogger.debug(
+      `[ExternalServerManager] Loading MCP configuration from ${configPath}`,
     );
 
     try {
-      const configContent = fs.readFileSync(finalConfigPath, "utf8");
+      const configContent = fs.readFileSync(configPath, "utf8");
       const config = JSON.parse(configContent);
 
-      if (!config.mcpServers || typeof config.mcpServers !== "object") {
+      // Support both mcpServers and servers property names for backward compatibility
+      const serverConfigs = config.mcpServers || config.servers;
+
+      if (!serverConfigs || typeof serverConfigs !== "object") {
         mcpLogger.debug(
-          "[ExternalServerManager] No mcpServers found in configuration",
+          "[ExternalServerManager] No server configurations found in configuration",
         );
         return { serversLoaded: 0, errors: [] };
       }
 
-      let serversLoaded = 0;
-      const errors: string[] = [];
+      // Process server configurations
+      const result = await this.loadServerConfigs(serverConfigs);
 
-      for (const [serverId, serverConfig] of Object.entries(
-        config.mcpServers,
-      )) {
-        try {
-          // Validate and convert config format to MCPServerInfo
-          if (!isValidExternalMCPServerConfig(serverConfig)) {
-            throw new Error(
-              `Invalid server config for ${serverId}: missing required properties or wrong types`,
-            );
-          }
-          const externalConfig: MCPServerInfo = {
-            id: serverId,
-            name: serverId,
-            description: `External MCP server: ${serverId}`,
-            transport:
-              typeof serverConfig.transport === "string"
-                ? (serverConfig.transport as MCPTransportType)
-                : "stdio",
-            status: "initializing" as const,
-            tools: [],
-            command: serverConfig.command as string,
-            args: Array.isArray(serverConfig.args)
-              ? (serverConfig.args as string[])
-              : [],
-            env: isNonNullObject(serverConfig.env)
-              ? (serverConfig.env as Record<string, string>)
-              : {},
-            timeout:
-              typeof serverConfig.timeout === "number"
-                ? serverConfig.timeout
-                : undefined,
-            retries:
-              typeof serverConfig.retries === "number"
-                ? serverConfig.retries
-                : undefined,
-            healthCheckInterval:
-              typeof serverConfig.healthCheckInterval === "number"
-                ? serverConfig.healthCheckInterval
-                : undefined,
-            autoRestart:
-              typeof serverConfig.autoRestart === "boolean"
-                ? serverConfig.autoRestart
-                : undefined,
-            cwd:
-              typeof serverConfig.cwd === "string"
-                ? serverConfig.cwd
-                : undefined,
-            url:
-              typeof serverConfig.url === "string"
-                ? serverConfig.url
-                : undefined,
-            metadata: safeMetadataConversion(serverConfig.metadata),
-          };
+      // Check for auto-discovery configuration
+      if (config.autoDiscovery?.enabled === true) {
+        mcpLogger.info(
+          "[ExternalServerManager] Auto-discovery is enabled, checking for external servers",
+        );
+        const discoveryResults = await this.discoverAndRegisterExternalServers(
+          config.autoDiscovery.autoRegister === true,
+        );
 
-          const result = await this.addServer(serverId, externalConfig);
+        result.serversLoaded += discoveryResults.serversLoaded;
+        result.errors.push(...discoveryResults.errors);
 
-          if (result.success) {
-            serversLoaded++;
-            mcpLogger.debug(
-              `[ExternalServerManager] Successfully loaded MCP server: ${serverId}`,
-            );
-          } else {
-            const error = `Failed to load server ${serverId}: ${result.error}`;
-            errors.push(error);
-            mcpLogger.warn(`[ExternalServerManager] ${error}`);
-          }
-        } catch (error) {
-          const errorMsg = `Failed to load MCP server ${serverId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`;
-          errors.push(errorMsg);
-          mcpLogger.warn(`[ExternalServerManager] ${errorMsg}`);
-          // Continue with other servers - don't let one failure break everything
-        }
+        mcpLogger.info(
+          `[ExternalServerManager] Auto-discovery found ${discoveryResults.serversLoaded} servers`,
+        );
       }
 
-      mcpLogger.info(
-        `[ExternalServerManager] MCP configuration loading complete: ${serversLoaded} servers loaded, ${errors.length} errors`,
-      );
-
-      return { serversLoaded, errors };
+      return result;
     } catch (error) {
       const errorMsg = `Failed to load MCP configuration: ${
         error instanceof Error ? error.message : String(error)
@@ -475,12 +469,30 @@ export class ExternalServerManager extends EventEmitter {
         command: serverInfo.command || "",
         args: serverInfo.args || [],
         env: serverInfo.env || {},
-        timeout: serverInfo.metadata?.timeout as number,
-        retries: serverInfo.metadata?.retries as number,
-        healthCheckInterval: serverInfo.metadata?.healthCheckInterval as number,
-        autoRestart: serverInfo.metadata?.autoRestart as boolean,
-        cwd: serverInfo.metadata?.cwd as string,
-        url: serverInfo.metadata?.url as string,
+        timeout:
+          typeof serverInfo.metadata?.timeout === "number"
+            ? serverInfo.metadata.timeout
+            : undefined,
+        retries:
+          typeof serverInfo.metadata?.retries === "number"
+            ? serverInfo.metadata.retries
+            : undefined,
+        healthCheckInterval:
+          typeof serverInfo.metadata?.healthCheckInterval === "number"
+            ? serverInfo.metadata.healthCheckInterval
+            : undefined,
+        autoRestart:
+          typeof serverInfo.metadata?.autoRestart === "boolean"
+            ? serverInfo.metadata.autoRestart
+            : undefined,
+        cwd:
+          typeof serverInfo.metadata?.cwd === "string"
+            ? serverInfo.metadata.cwd
+            : undefined,
+        url:
+          typeof serverInfo.metadata?.url === "string"
+            ? serverInfo.metadata.url
+            : undefined,
         metadata: safeMetadataConversion(serverInfo.metadata),
       };
 
@@ -1443,6 +1455,299 @@ export class ExternalServerManager extends EventEmitter {
       );
       throw error;
     }
+  }
+
+  /**
+   * Load server configurations from a parsed config object
+   * @param serverConfigs Object containing server configurations
+   * @returns Promise resolving to the server load result
+   */
+  private async loadServerConfigs(
+    serverConfigs: Record<string, unknown>,
+  ): Promise<ServerLoadResult> {
+    let serversLoaded = 0;
+    const errors: string[] = [];
+
+    for (const [serverId, serverConfig] of Object.entries(serverConfigs)) {
+      try {
+        // Validate and convert config format to MCPServerInfo
+        if (!isValidExternalMCPServerConfig(serverConfig)) {
+          throw new Error(
+            `Invalid server config for ${serverId}: missing required properties or wrong types`,
+          );
+        }
+        const externalConfig: MCPServerInfo = {
+          id: serverId,
+          name: serverId,
+          description: `External MCP server: ${serverId}`,
+          transport:
+            typeof serverConfig.transport === "string"
+              ? (serverConfig.transport as MCPTransportType)
+              : "stdio",
+          status: "initializing" as const,
+          tools: [],
+          command: serverConfig.command as string,
+          args: Array.isArray(serverConfig.args)
+            ? (serverConfig.args as string[])
+            : [],
+          env: isNonNullObject(serverConfig.env)
+            ? (serverConfig.env as Record<string, string>)
+            : {},
+          timeout:
+            typeof serverConfig.timeout === "number"
+              ? serverConfig.timeout
+              : undefined,
+          retries:
+            typeof serverConfig.retries === "number"
+              ? serverConfig.retries
+              : undefined,
+          healthCheckInterval:
+            typeof serverConfig.healthCheckInterval === "number"
+              ? serverConfig.healthCheckInterval
+              : undefined,
+          autoRestart:
+            typeof serverConfig.autoRestart === "boolean"
+              ? serverConfig.autoRestart
+              : undefined,
+          cwd:
+            typeof serverConfig.cwd === "string" ? serverConfig.cwd : undefined,
+          url:
+            typeof serverConfig.url === "string" ? serverConfig.url : undefined,
+          metadata: safeMetadataConversion(serverConfig.metadata),
+        };
+
+        const result = await this.addServer(serverId, externalConfig);
+
+        if (result.success) {
+          serversLoaded++;
+          mcpLogger.debug(
+            `[ExternalServerManager] Successfully loaded MCP server: ${serverId}`,
+          );
+        } else {
+          const error = `Failed to load server ${serverId}: ${result.error}`;
+          errors.push(error);
+          mcpLogger.warn(`[ExternalServerManager] ${error}`);
+        }
+      } catch (error) {
+        const errorMsg = `Failed to load MCP server ${serverId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        errors.push(errorMsg);
+        mcpLogger.warn(`[ExternalServerManager] ${errorMsg}`);
+        // Continue with other servers - don't let one failure break everything
+      }
+    }
+
+    mcpLogger.info(
+      `[ExternalServerManager] Configuration loading complete: ${serversLoaded} servers loaded, ${errors.length} errors`,
+    );
+
+    return { serversLoaded, errors };
+  }
+
+  /**
+   * Discover and optionally register external MCP servers
+   * @param autoRegister Whether to automatically register discovered servers
+   * @returns Promise resolving to the server load result
+   */
+  private async discoverAndRegisterExternalServers(
+    autoRegister: boolean = false,
+  ): Promise<ServerLoadResult> {
+    const path = await import("path");
+    const os = await import("os");
+
+    let serversLoaded = 0;
+    const errors: string[] = [];
+
+    try {
+      // Discover external servers from common locations
+      const discoveredServers = await this.discoverExternalMCPServers();
+
+      // Auto-register discovered servers if configured
+      if (autoRegister && Object.keys(discoveredServers).length > 0) {
+        mcpLogger.info(
+          `[ExternalServerManager] Auto-registering ${Object.keys(discoveredServers).length} discovered servers`,
+        );
+
+        for (const [serverId, serverConfig] of Object.entries(
+          discoveredServers,
+        )) {
+          try {
+            if (!isValidExternalMCPServerConfig(serverConfig)) {
+              const error = `Discovered server config for ${serverId} is invalid`;
+              errors.push(error);
+              mcpLogger.warn(`[ExternalServerManager] ${error}`);
+              continue;
+            }
+
+            // Convert to MCPServerInfo
+            const externalConfig: MCPServerInfo = {
+              id: serverId,
+              name: `Discovered: ${serverId}`,
+              description: `Auto-discovered MCP server: ${serverId}`,
+              transport:
+                typeof serverConfig.transport === "string"
+                  ? (serverConfig.transport as MCPTransportType)
+                  : "stdio",
+              status: "initializing" as const,
+              tools: [],
+              command: serverConfig.command as string,
+              args: Array.isArray(serverConfig.args)
+                ? (serverConfig.args as string[])
+                : [],
+              env: isNonNullObject(serverConfig.env)
+                ? (serverConfig.env as Record<string, string>)
+                : {},
+              timeout:
+                typeof serverConfig.timeout === "number"
+                  ? serverConfig.timeout
+                  : undefined,
+              retries:
+                typeof serverConfig.retries === "number"
+                  ? serverConfig.retries
+                  : undefined,
+              healthCheckInterval:
+                typeof serverConfig.healthCheckInterval === "number"
+                  ? serverConfig.healthCheckInterval
+                  : undefined,
+              autoRestart:
+                typeof serverConfig.autoRestart === "boolean"
+                  ? serverConfig.autoRestart
+                  : undefined,
+              cwd:
+                typeof serverConfig.cwd === "string"
+                  ? serverConfig.cwd
+                  : undefined,
+              url:
+                typeof serverConfig.url === "string"
+                  ? serverConfig.url
+                  : undefined,
+              metadata: {
+                ...safeMetadataConversion(serverConfig.metadata),
+                discovered: true,
+                discoverySource:
+                  typeof (serverConfig as Record<string, unknown>)
+                    ._discoverySource === "string"
+                    ? ((serverConfig as Record<string, unknown>)
+                        ._discoverySource as string)
+                    : "unknown",
+              },
+            };
+
+            // Check if server already exists (avoid duplicates)
+            if (this.servers.has(serverId)) {
+              mcpLogger.debug(
+                `[ExternalServerManager] Server '${serverId}' already exists, skipping auto-registration`,
+              );
+              continue;
+            }
+
+            const result = await this.addServer(serverId, externalConfig);
+
+            if (result.success) {
+              serversLoaded++;
+              mcpLogger.info(
+                `[ExternalServerManager] Successfully auto-registered discovered server: ${serverId}`,
+              );
+            } else {
+              const error = `Failed to auto-register discovered server ${serverId}: ${result.error}`;
+              errors.push(error);
+              mcpLogger.warn(`[ExternalServerManager] ${error}`);
+            }
+          } catch (error) {
+            const errorMsg = `Failed to process discovered server ${serverId}: ${
+              error instanceof Error ? error.message : String(error)
+            }`;
+            errors.push(errorMsg);
+            mcpLogger.warn(`[ExternalServerManager] ${errorMsg}`);
+          }
+        }
+      }
+
+      return { serversLoaded, errors };
+    } catch (error) {
+      const errorMsg = `Server discovery failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      mcpLogger.error(`[ExternalServerManager] ${errorMsg}`);
+      return { serversLoaded: 0, errors: [errorMsg] };
+    }
+  }
+
+  /**
+   * Discover external MCP servers from common locations
+   * @returns Promise resolving to a record of discovered server configurations
+   */
+  private async discoverExternalMCPServers(): Promise<Record<string, unknown>> {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+
+    const discoveredServers: Record<string, unknown> = {};
+
+    // Common locations where MCP servers might be configured
+    const locations = [
+      {
+        path: path.join(os.homedir(), ".cursor", "mcp.json"),
+        source: "cursor",
+      },
+      {
+        path: path.join(os.homedir(), ".cursor", "mcp_config.json"),
+        source: "cursor",
+      },
+      {
+        path: path.join(
+          os.homedir(),
+          ".codeium",
+          "windsurf",
+          "mcp_config.json",
+        ),
+        source: "windsurf",
+      },
+      // Add more potential locations based on the memory-bank documents
+    ];
+
+    for (const location of locations) {
+      try {
+        if (fs.existsSync(location.path)) {
+          mcpLogger.debug(
+            `[ExternalServerManager] Checking for MCP servers in ${location.path}`,
+          );
+
+          const content = fs.readFileSync(location.path, "utf8");
+          const config = JSON.parse(content);
+
+          // Extract server configurations
+          const servers = config.mcpServers || config.servers;
+
+          if (isNonNullObject(servers)) {
+            // Add discovered servers to the result
+            Object.entries(servers).forEach(([serverId, serverConfig]) => {
+              if (isNonNullObject(serverConfig)) {
+                const fullServerId = `discovered.${location.source}.${serverId}`;
+
+                // Add discovery source to the config for later reference
+                const configWithSource = {
+                  ...serverConfig,
+                  _discoverySource: location.source,
+                };
+
+                discoveredServers[fullServerId] = configWithSource;
+                mcpLogger.debug(
+                  `[ExternalServerManager] Discovered server: ${fullServerId}`,
+                );
+              }
+            });
+          }
+        }
+      } catch (error) {
+        mcpLogger.debug(
+          `[ExternalServerManager] Failed to process discovery location ${location.path}: ${error}`,
+        );
+      }
+    }
+
+    return discoveredServers;
   }
 
   /**
