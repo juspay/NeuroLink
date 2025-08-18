@@ -146,32 +146,7 @@ const { NeuroLink } = require('@juspay/neurolink');
 ### Basic Usage
 
 ```typescript
-import { NeuroLink, AIProviderFactory } from "@juspay/neurolink";
-
-// LiteLLM - Access 100+ models through unified interface
-const litellmProvider = await AIProviderFactory.createProvider(
-  "litellm",
-  "openai/gpt-4o",
-);
-const result = await litellmProvider.generate({
-  input: { text: "Write a haiku about programming" },
-});
-
-// Compare multiple models simultaneously
-const models = [
-  "openai/gpt-4o",
-  "anthropic/claude-3-5-sonnet",
-  "google/gemini-2.0-flash",
-];
-const comparisons = await Promise.all(
-  models.map(async (model) => {
-    const provider = await AIProviderFactory.createProvider("litellm", model);
-    const result = await provider.generate({
-      input: { text: "Explain quantum computing" },
-    });
-    return { model, response: result.content, provider: result.provider };
-  }),
-);
+import { NeuroLink } from "@juspay/neurolink";
 
 // Auto-select best available provider
 const neurolink = new NeuroLink();
@@ -181,8 +156,8 @@ const autoResult = await neurolink.generate({
   timeout: "30s",
 });
 
-console.log(result.content);
-console.log(`Used: ${result.provider}`);
+console.log(autoResult.content);
+console.log(`Used: ${autoResult.provider}`);
 ```
 
 ### Conversation Memory
@@ -241,27 +216,10 @@ npx @juspay/neurolink generate "Write a proposal" --enable-analytics --enable-ev
 npx @juspay/neurolink stream "What time is it and write a file with the current date"
 ```
 
-#### SDK with LiteLLM and Enhancement Features
+#### SDK and Enhancement Features
 
 ```typescript
-import { NeuroLink, AIProviderFactory } from "@juspay/neurolink";
-
-// LiteLLM multi-model comparison
-const models = [
-  "openai/gpt-4o",
-  "anthropic/claude-3-5-sonnet",
-  "google/gemini-2.0-flash",
-];
-const comparisons = await Promise.all(
-  models.map(async (model) => {
-    const provider = await AIProviderFactory.createProvider("litellm", model);
-    return await provider.generate({
-      input: { text: "Explain the benefits of renewable energy" },
-      enableAnalytics: true,
-      enableEvaluation: true,
-    });
-  }),
-);
+import { NeuroLink } from "@juspay/neurolink";
 
 // Enhanced generation with analytics
 const neurolink = new NeuroLink();
