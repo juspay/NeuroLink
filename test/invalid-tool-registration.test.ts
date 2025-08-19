@@ -41,7 +41,6 @@ describe("Invalid Tool Registration", () => {
       },
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const registrationAttempt = () =>
       neurolink.registerTools([invalidTool as any]);
 

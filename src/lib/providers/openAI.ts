@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
 import type {
   ZodUnknownSchema,
@@ -23,6 +23,7 @@ import {
 } from "../utils/providerConfig.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Configuration helpers - now using consolidated utility
 const getOpenAIApiKey = (): string => {
@@ -43,8 +44,11 @@ export class OpenAIProvider extends BaseProvider {
   constructor(modelName?: string, neurolink?: NeuroLink) {
     super(modelName || getOpenAIModel(), AIProviderName.OPENAI, neurolink);
 
-    // Set OpenAI API key as environment variable (required by @ai-sdk/openai)
-    process.env.OPENAI_API_KEY = getOpenAIApiKey();
+    // Initialize OpenAI provider with proxy support
+    const openai = createOpenAI({
+      apiKey: getOpenAIApiKey(),
+      fetch: createProxyFetch(),
+    });
 
     // Initialize model
     this.model = openai(this.modelName);

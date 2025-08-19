@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
 import type { ValidationSchema } from "../types/typeAliases.js";
 import type {
@@ -23,6 +23,7 @@ import {
   getProviderModel,
 } from "../utils/providerConfig.js";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Configuration helpers - now using consolidated utility
 const getAnthropicApiKey = (): string => {
@@ -47,13 +48,16 @@ export class AnthropicProvider extends BaseProvider {
       sdk as NeuroLink | undefined,
     );
 
-    // Initialize Anthropic model with API key validation
+    // Initialize Anthropic model with API key validation and proxy support
     const apiKey = getAnthropicApiKey();
 
-    // Set Anthropic API key as environment variable (required by @ai-sdk/anthropic)
-    process.env.ANTHROPIC_API_KEY = apiKey;
+    // Create Anthropic instance with proxy fetch
+    const anthropic = createAnthropic({
+      apiKey: apiKey,
+      fetch: createProxyFetch(),
+    });
 
-    // Initialize Anthropic with proper configuration
+    // Initialize Anthropic model with proxy-aware instance
     this.model = anthropic(this.modelName || getDefaultAnthropicModel());
 
     logger.debug("Anthropic Provider v2 initialized", {

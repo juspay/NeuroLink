@@ -62,6 +62,7 @@ npx @juspay/neurolink sagemaker benchmark my-endpoint  # Performance testing
 - **🏭 Factory Pattern Architecture** - Unified provider management through BaseProvider inheritance
 - **🔧 Tools-First Design** - All providers include built-in tool support without additional configuration
 - **🔗 LiteLLM Integration** - **100+ models** from all major providers through unified interface
+- **🏢 Enterprise Proxy Support** - Comprehensive corporate proxy support with MCP compatibility
 - **🏗️ Enterprise Architecture** - Production-ready with clean abstractions
 - **🔄 Configuration Management** - Flexible provider configuration with automatic backups
 - **✅ Type Safety** - Industry-standard TypeScript interfaces
@@ -404,6 +405,7 @@ npx @juspay/neurolink generate "Weather in Tokyo now" --provider vertex
 - ⚡ **Automatic Fallback** - Never fail when providers are down, intelligent provider switching
 - 🖥️ **CLI + SDK** - Use from command line or integrate programmatically with TypeScript support
 - 🛡️ **Production Ready** - Enterprise-grade error handling, performance optimization, extracted from production
+- 🏢 **Enterprise Proxy Support** - Comprehensive corporate proxy support with zero configuration
 - ✅ **External MCP Integration** - Model Context Protocol with built-in tools + full external MCP server support
 - 🔍 **Smart Model Resolution** - Fuzzy matching, aliases, and capability-based search across all providers
 - 🏠 **Local AI Support** - Run completely offline with Ollama or through LiteLLM proxy
