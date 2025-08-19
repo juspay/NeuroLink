@@ -1,3 +1,9 @@
+## [7.16.0](https://github.com/juspay/neurolink/compare/v7.15.0...v7.16.0) (2025-08-19)
+
+### Features
+
+- **(cli):** Add validate provider config support in CLI ([2e8d6ad](https://github.com/juspay/neurolink/commit/2e8d6ad6475bf24f67f61a76d33689f323821b70))
+
 ## [7.15.0](https://github.com/juspay/neurolink/compare/v7.14.8...v7.15.0) (2025-08-19)
 
 ### Features
