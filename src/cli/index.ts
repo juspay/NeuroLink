@@ -15,12 +15,22 @@ import { hideBin } from "yargs/helpers";
 import _ora from "ora";
 import chalk from "chalk";
 import _fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import { addOllamaCommands } from "./commands/ollama.js";
 import { addSageMakerCommands } from "./commands/sagemaker.js";
 import { CLICommandFactory } from "./factories/commandFactory.js";
 
 import { logger } from "../lib/utils/logger.js";
+
+// Get version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageJson = JSON.parse(
+  _fs.readFileSync(path.resolve(__dirname, "../../package.json"), "utf-8"),
+);
+const cliVersion = packageJson.version;
 
 // Load environment variables from .env file
 try {
@@ -170,7 +180,7 @@ const args = hideBin(process.argv);
 const cli = yargs(args)
   .scriptName("neurolink")
   .usage("Usage: $0 <command> [options]")
-  .version()
+  .version(cliVersion)
   .help()
   .alias("h", "help")
   .alias("V", "version")
@@ -233,7 +243,9 @@ const cli = yargs(args)
       if (!alreadyExitedByHandleError) {
         process.stderr.write(
           chalk.red(
-            `CLI Error: ${err.message || msg || "An unexpected error occurred."}\n`,
+            `CLI Error: ${
+              err.message || msg || "An unexpected error occurred."
+            }\n`,
           ),
         );
         // If it's a yargs internal parsing error, show help.
