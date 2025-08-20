@@ -21,7 +21,12 @@ import { fileURLToPath } from "url";
 import { addOllamaCommands } from "./commands/ollama.js";
 import { addSageMakerCommands } from "./commands/sagemaker.js";
 import { CLICommandFactory } from "./factories/commandFactory.js";
-
+import {
+  AuthenticationError,
+  AuthorizationError,
+  NetworkError,
+  RateLimitError,
+} from "../lib/types/errors.js";
 import { logger } from "../lib/utils/logger.js";
 
 // Get version from package.json
@@ -45,79 +50,9 @@ try {
 // Utility Functions (Simple, Zero Maintenance)
 
 function handleError(error: Error, context: string): void {
-  const specificErrorMessage = error.message;
-  const originalErrorMessageLowerCase = error.message
-    ? error.message.toLowerCase()
-    : "";
-  const errorStringLowerCase = String(error).toLowerCase();
+  logger.error(chalk.red(`❌ ${context} failed: ${error.message}`));
 
-  let isAuthError = false;
-  let genericMessage = specificErrorMessage; // Initialize genericMessage with the specific one
-
-  if (
-    originalErrorMessageLowerCase.includes("api_key") ||
-    originalErrorMessageLowerCase.includes("google_ai_api_key") ||
-    originalErrorMessageLowerCase.includes("aws_access_key_id") ||
-    originalErrorMessageLowerCase.includes("aws_secret_access_key") ||
-    originalErrorMessageLowerCase.includes("aws_session_token") ||
-    originalErrorMessageLowerCase.includes("google_application_credentials") ||
-    originalErrorMessageLowerCase.includes("google_service_account_key") ||
-    originalErrorMessageLowerCase.includes("google_auth_client_email") ||
-    originalErrorMessageLowerCase.includes("anthropic_api_key") ||
-    originalErrorMessageLowerCase.includes("azure_openai_api_key")
-  ) {
-    isAuthError = true;
-  } else if (
-    // Fallback to checking the full stringified error if direct message didn't match
-    errorStringLowerCase.includes("api_key") ||
-    errorStringLowerCase.includes("google_ai_api_key") ||
-    errorStringLowerCase.includes("aws_access_key_id") ||
-    errorStringLowerCase.includes("aws_secret_access_key") ||
-    errorStringLowerCase.includes("aws_session_token") ||
-    errorStringLowerCase.includes("google_application_credentials") ||
-    errorStringLowerCase.includes("google_service_account_key") ||
-    errorStringLowerCase.includes("google_auth_client_email") ||
-    errorStringLowerCase.includes("anthropic_api_key") ||
-    errorStringLowerCase.includes("azure_openai_api_key")
-  ) {
-    isAuthError = true;
-  }
-
-  if (isAuthError) {
-    genericMessage =
-      "Authentication error: Missing or invalid API key/credentials for the selected provider.";
-  } else if (
-    originalErrorMessageLowerCase.includes("enotfound") || // Prefer direct message checks
-    originalErrorMessageLowerCase.includes("econnrefused") ||
-    originalErrorMessageLowerCase.includes("invalid-endpoint") ||
-    originalErrorMessageLowerCase.includes("network error") ||
-    originalErrorMessageLowerCase.includes("could not connect") ||
-    originalErrorMessageLowerCase.includes("timeout") ||
-    errorStringLowerCase.includes("enotfound") || // Fallback to full string
-    errorStringLowerCase.includes("econnrefused") ||
-    errorStringLowerCase.includes("invalid-endpoint") ||
-    errorStringLowerCase.includes("network error") ||
-    errorStringLowerCase.includes("could not connect") ||
-    errorStringLowerCase.includes("timeout") // General timeout
-  ) {
-    genericMessage =
-      "Network error: Could not connect to the API endpoint or the request timed out.";
-  } else if (
-    errorStringLowerCase.includes("not authorized") ||
-    errorStringLowerCase.includes("permission denied")
-  ) {
-    genericMessage =
-      "Authorization error: You are not authorized to perform this action or access this resource.";
-  }
-  // If no specific condition matched, genericMessage remains error.message
-
-  logger.error(chalk.red(`❌ ${context} failed: ${genericMessage}`));
-
-  // Smart hints for common errors (just string matching!)
-  if (
-    genericMessage.toLowerCase().includes("api key") ||
-    genericMessage.toLowerCase().includes("credential")
-  ) {
+  if (error instanceof AuthenticationError) {
     logger.error(
       chalk.yellow(
         "💡 Set Google AI Studio API key (RECOMMENDED): export GOOGLE_AI_API_KEY=AIza-...",
@@ -146,18 +81,11 @@ function handleError(error: Error, context: string): void {
         "💡 Or set Azure OpenAI credentials: export AZURE_OPENAI_API_KEY=... AZURE_OPENAI_ENDPOINT=...",
       ),
     );
-  }
-
-  if (error.message.toLowerCase().includes("rate limit")) {
+  } else if (error instanceof RateLimitError) {
     logger.error(
       chalk.yellow("💡 Try again in a few moments or use --provider vertex"),
     );
-  }
-
-  if (
-    error.message.toLowerCase().includes("not authorized") ||
-    error.message.toLowerCase().includes("permission denied")
-  ) {
+  } else if (error instanceof AuthorizationError) {
     logger.error(
       chalk.yellow(
         "💡 Check your account permissions for the selected model/service.",
@@ -166,6 +94,12 @@ function handleError(error: Error, context: string): void {
     logger.error(
       chalk.yellow(
         "💡 For AWS Bedrock, ensure you have permissions for the specific model and consider using inference profile ARNs.",
+      ),
+    );
+  } else if (error instanceof NetworkError) {
+    logger.error(
+      chalk.yellow(
+        "💡 Check your internet connection and the provider's status page.",
       ),
     );
   }
