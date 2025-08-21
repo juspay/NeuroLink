@@ -1,3 +1,5 @@
+## [7.24.1](https://github.com/juspay/neurolink/compare/v7.24.0...v7.24.1) (2025-08-21)
+
 ## [7.24.0](https://github.com/juspay/neurolink/compare/v7.23.0...v7.24.0) (2025-08-20)
 
 ### Features
