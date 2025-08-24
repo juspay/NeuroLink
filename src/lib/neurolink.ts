@@ -11,7 +11,7 @@ import { config as dotenvConfig } from "dotenv";
 
 try {
   dotenvConfig(); // Load .env from current working directory
-} catch (error) {
+} catch {
   // Environment variables should be set externally in production
 }
 
@@ -55,11 +55,8 @@ import {
   processFactoryOptions,
   enhanceTextGenerationOptions,
   validateFactoryConfig,
-  processStreamingFactoryOptions,
   createCleanStreamOptions,
 } from "./utils/factoryProcessing.js";
-// Tool detection and execution imports
-import type { NeuroLinkExecutionContext } from "./mcp/factory.js";
 // Transformation utilities
 import {
   transformToolExecutions,
@@ -81,6 +78,8 @@ import {
   isRetriableError,
   logStructuredError,
   CircuitBreaker,
+  ErrorCategory,
+  ErrorSeverity,
 } from "./utils/errorHandling.js";
 import { EventEmitter } from "events";
 import type { ConversationMemoryConfig } from "./types/conversationTypes.js";
@@ -316,25 +315,6 @@ export class NeuroLink {
   }
 
   /**
-   * MAIN ENTRY POINT: Enhanced generate method with new function signature
-   * Replaces both generateText and legacy methods
-   */
-  /**
-   * Extracts the original prompt text from the provided input.
-   * If a string is provided, it returns the string directly.
-   * If a GenerateOptions object is provided, it returns the input text from the object.
-   * @param optionsOrPrompt The prompt input, either as a string or a GenerateOptions object.
-   * @returns The original prompt text as a string.
-   */
-  private _extractOriginalPrompt(
-    optionsOrPrompt: GenerateOptions | string,
-  ): string {
-    return typeof optionsOrPrompt === "string"
-      ? optionsOrPrompt
-      : optionsOrPrompt.input.text;
-  }
-
-  /**
    * Enables automatic context summarization for the NeuroLink instance.
    * Once enabled, the instance will maintain conversation history and
    * automatically summarize it when it exceeds token limits.
@@ -355,53 +335,140 @@ export class NeuroLink {
     logger.info("[NeuroLink] Automatic context summarization enabled.");
   }
 
+  /**
+   * MAIN ENTRY POINT: Enhanced generate method with new function signature
+   * Replaces both generateText and legacy methods. This method acts as a coordinator,
+   * delegating tasks to smaller, more specialized private methods.
+   */
   async generate(
     optionsOrPrompt: GenerateOptions | string,
   ): Promise<GenerateResult> {
+    const startTime = Date.now();
+    this.emitter.emit("generation:start", {
+      provider:
+        (typeof optionsOrPrompt === "object" && optionsOrPrompt.provider) ||
+        "auto",
+      timestamp: startTime,
+    });
+
+    try {
+      // 1. Normalize and Validate
+      const { options, originalPrompt } =
+        this._normalizeAndValidateInput(optionsOrPrompt);
+
+      // 2. Apply Context and Tools (simplified)
+      const enhancedOptions = await this._applyContextAndTools(options);
+
+      // 3. Process Factory Config
+      const { finalOptions, factoryResult } =
+        this._processFactoryConfig(enhancedOptions);
+
+      // 4. Execute Core Generation (delegates to internal method)
+      const rawResult = await this.generateTextInternal(finalOptions);
+
+      // 5. Format and Store Result
+      const finalResult = await this._formatAndStoreResult(
+        rawResult,
+        originalPrompt,
+        finalOptions,
+        factoryResult,
+      );
+
+      this.emitter.emit("generation:end", {
+        provider: finalResult.provider,
+        responseTime: Date.now() - startTime,
+        toolsUsed: finalResult.toolsUsed,
+        timestamp: Date.now(),
+      });
+      return finalResult;
+    } catch (error) {
+      // Handle errors
+      this.emitter.emit("generation:error", {
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Extracts the original prompt text from the provided input.
+   * @param optionsOrPrompt The prompt input, either as a string or a GenerateOptions object.
+   * @returns The original prompt text as a string.
+   */
+  private _extractOriginalPrompt(
+    optionsOrPrompt: GenerateOptions | string,
+  ): string {
+    return typeof optionsOrPrompt === "string"
+      ? optionsOrPrompt
+      : optionsOrPrompt.input.text;
+  }
+
+  /**
+   * Normalizes and validates the input for the generate method.
+   * @param optionsOrPrompt The user-provided input.
+   * @returns An object containing the normalized options and the original prompt text.
+   */
+  private _normalizeAndValidateInput(
+    optionsOrPrompt: GenerateOptions | string,
+  ): { options: GenerateOptions; originalPrompt: string } {
     const originalPrompt = this._extractOriginalPrompt(optionsOrPrompt);
-    // Convert string prompt to full options
     const options: GenerateOptions =
       typeof optionsOrPrompt === "string"
         ? { input: { text: optionsOrPrompt } }
         : optionsOrPrompt;
 
-    // Validate prompt
     if (!options.input?.text || typeof options.input.text !== "string") {
       throw new Error("Input text is required and must be a non-empty string");
     }
 
-    // Handle Context Management if enabled
-    if (this.contextManager) {
-      // Get the full context for the prompt without permanently adding the user's turn yet
-      options.input.text = this.contextManager.getContextForPrompt(
-        "user",
-        options.input.text,
-      );
+    return { options, originalPrompt };
+  }
+
+  /**
+   * Applies context from the context manager. Tool detection is now part of the core generation flow.
+   * @param options The current generation options.
+   * @returns The enhanced options with context.
+   */
+  private async _applyContextAndTools(
+    options: GenerateOptions,
+  ): Promise<GenerateOptions> {
+    if (!this.contextManager) {
+      return { ...options };
     }
+    const contextualText = this.contextManager.getContextForPrompt(
+      "user",
+      options.input.text,
+    );
+    return {
+      ...options,
+      input: {
+        ...options.input,
+        text: contextualText,
+      },
+    };
+  }
 
-    const startTime = Date.now();
-
-    // Emit generation start event
-    this.emitter.emit("generation:start", {
-      provider: options.provider || "auto",
-      timestamp: startTime,
-    });
-
-    // Process factory configuration
+  /**
+   * Processes factory-specific configurations.
+   * @param options The generation options.
+   * @returns The final options ready for core generation and the factory result.
+   */
+  private _processFactoryConfig(options: GenerateOptions): {
+    finalOptions: TextGenerationOptions;
+    factoryResult: ReturnType<typeof processFactoryOptions>;
+  } {
     const factoryResult = processFactoryOptions(options);
 
-    // Validate factory configuration if present
     if (factoryResult.hasFactoryConfig && options.factoryConfig) {
       const validation = validateFactoryConfig(options.factoryConfig);
       if (!validation.isValid) {
         logger.warn("Invalid factory configuration detected", {
           errors: validation.errors,
         });
-        // Continue with warning rather than throwing - graceful degradation
       }
     }
 
-    // Convert to TextGenerationOptions using factory utilities
     const baseOptions: TextGenerationOptions = {
       prompt: options.input.text,
       provider: options.provider as AIProviderName,
@@ -417,89 +484,101 @@ export class NeuroLink {
       toolUsageContext: options.toolUsageContext,
     };
 
-    // Apply factory enhancement using centralized utilities
-    const textOptions = enhanceTextGenerationOptions(
+    const finalOptions = enhanceTextGenerationOptions(
       baseOptions,
       factoryResult,
     );
+    return { finalOptions, factoryResult };
+  }
 
-    // Detect and execute domain-specific tools
-    const { toolResults, enhancedPrompt } = await this.detectAndExecuteTools(
-      textOptions.prompt || options.input.text,
-      factoryResult.domainType,
-    );
-
-    // Update prompt with tool results if available
-    if (enhancedPrompt !== textOptions.prompt) {
-      textOptions.prompt = enhancedPrompt;
-      logger.debug("Enhanced prompt with tool results", {
-        originalLength: options.input.text.length,
-        enhancedLength: enhancedPrompt.length,
-        toolResults: toolResults.length,
-      });
-    }
-
-    // Use redesigned generation logic
-    const textResult = await this.generateTextInternal(textOptions);
-
-    // Emit generation completion event
-    this.emitter.emit("generation:end", {
-      provider: textResult.provider,
-      responseTime: Date.now() - startTime,
-      toolsUsed: textResult.toolsUsed,
-      timestamp: Date.now(),
-    });
-
-    // Convert back to GenerateResult
+  /**
+   * Formats the raw generation result and stores the conversation turn.
+   * @param rawResult The result from the core generation logic.
+   * @param originalPrompt The original user prompt.
+   * @param textOptions The options used for generation.
+   * @param factoryResult The result from factory processing.
+   * @returns The final, formatted GenerateResult.
+   */
+  private async _formatAndStoreResult(
+    rawResult: TextGenerationResult,
+    originalPrompt: string,
+    textOptions: TextGenerationOptions,
+    factoryResult: ReturnType<typeof processFactoryOptions>,
+  ): Promise<GenerateResult> {
     const generateResult: GenerateResult = {
-      content: textResult.content,
-      provider: textResult.provider,
-      model: textResult.model,
-      usage: textResult.usage
+      content: rawResult.content,
+      provider: rawResult.provider,
+      model: rawResult.model,
+      usage: rawResult.usage
         ? {
-            inputTokens: textResult.usage.promptTokens || 0,
-            outputTokens: textResult.usage.completionTokens || 0,
-            totalTokens: textResult.usage.totalTokens || 0,
+            inputTokens: rawResult.usage.promptTokens || 0,
+            outputTokens: rawResult.usage.completionTokens || 0,
+            totalTokens: rawResult.usage.totalTokens || 0,
           }
         : undefined,
-      responseTime: textResult.responseTime,
-      toolsUsed: textResult.toolsUsed,
-      toolExecutions: transformToolExecutions(textResult.toolExecutions),
-      enhancedWithTools: textResult.enhancedWithTools,
-      availableTools: transformAvailableTools(textResult.availableTools),
-      analytics: textResult.analytics,
-      evaluation: textResult.evaluation
+      responseTime: rawResult.responseTime,
+      toolsUsed: rawResult.toolsUsed,
+      toolExecutions: transformToolExecutions(rawResult.toolExecutions),
+      enhancedWithTools: rawResult.enhancedWithTools,
+      availableTools: transformAvailableTools(rawResult.availableTools),
+      analytics: rawResult.analytics,
+      evaluation: rawResult.evaluation
         ? {
-            ...textResult.evaluation,
+            // Required fields from EvaluationData
+            relevance: rawResult.evaluation.relevance,
+            accuracy: rawResult.evaluation.accuracy,
+            completeness: rawResult.evaluation.completeness,
+            overall: rawResult.evaluation.overall,
             isOffTopic:
-              ((textResult.evaluation as UnknownRecord)
-                .isOffTopic as boolean) ?? false,
+              ((rawResult.evaluation as UnknownRecord).isOffTopic as boolean) ??
+              false,
             alertSeverity:
-              ((textResult.evaluation as UnknownRecord).alertSeverity as
+              ((rawResult.evaluation as UnknownRecord).alertSeverity as
                 | "low"
                 | "medium"
                 | "high"
-                | "none") ?? ("none" as const),
+                | "none") ?? "none",
             reasoning:
-              ((textResult.evaluation as UnknownRecord).reasoning as string) ??
-              "No evaluation provided",
+              ((rawResult.evaluation as UnknownRecord).reasoning as string) ??
+              "No reasoning provided",
             evaluationModel:
-              ((textResult.evaluation as UnknownRecord)
+              ((rawResult.evaluation as UnknownRecord)
                 .evaluationModel as string) ?? "unknown",
             evaluationTime:
-              ((textResult.evaluation as UnknownRecord)
+              ((rawResult.evaluation as UnknownRecord)
                 .evaluationTime as number) ?? Date.now(),
-            // Include evaluationDomain from original options
+
+            // Optional fields from EvaluationData
+            suggestedImprovements:
+              ((rawResult.evaluation as UnknownRecord)
+                .suggestedImprovements as string) || undefined,
             evaluationDomain:
-              ((textResult.evaluation as UnknownRecord)
+              ((rawResult.evaluation as UnknownRecord)
                 .evaluationDomain as string) ??
               textOptions.evaluationDomain ??
               factoryResult.domainType,
+            domainAlignment:
+              ((rawResult.evaluation as UnknownRecord)
+                .domainAlignment as number) || undefined,
+            terminologyAccuracy:
+              ((rawResult.evaluation as UnknownRecord)
+                .terminologyAccuracy as number) || undefined,
+            toolEffectiveness:
+              ((rawResult.evaluation as UnknownRecord)
+                .toolEffectiveness as number) || undefined,
           }
         : undefined,
     };
 
-    // Add both the user's turn and the AI's response to the permanent history
+    // Store conversation turn if memory is enabled
+    if (this.conversationMemory) {
+      await storeConversationTurn(
+        this.conversationMemory,
+        textOptions,
+        rawResult,
+      );
+    }
+
     if (this.contextManager) {
       await this.contextManager.addTurn("user", originalPrompt);
       await this.contextManager.addTurn("assistant", generateResult.content);
@@ -543,7 +622,6 @@ export class NeuroLink {
   private async generateTextInternal(
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult> {
-    const startTime = Date.now();
     const functionTag = "NeuroLink.generateTextInternal";
 
     logger.debug(`[${functionTag}] Starting generation`, {
@@ -566,13 +644,6 @@ export class NeuroLink {
           if (mcpResult && mcpResult.content) {
             logger.debug(`[${functionTag}] MCP generation successful`);
 
-            // Store conversation turn
-            await storeConversationTurn(
-              this.conversationMemory,
-              options,
-              mcpResult,
-            );
-
             return mcpResult;
           } else {
             logger.debug(
@@ -594,13 +665,6 @@ export class NeuroLink {
       // Fall back to direct provider generation
       const directResult = await this.directProviderGeneration(options);
       logger.debug(`[${functionTag}] Direct generation successful`);
-
-      // Store conversation turn
-      await storeConversationTurn(
-        this.conversationMemory,
-        options,
-        directResult,
-      );
 
       return directResult;
     } catch (error) {
@@ -846,7 +910,6 @@ export class NeuroLink {
    */
   private async detectAndExecuteTools(
     prompt: string,
-    domainType?: string,
   ): Promise<ToolExecutionResult> {
     const functionTag = "NeuroLink.detectAndExecuteTools";
 
@@ -932,9 +995,47 @@ export class NeuroLink {
    */
   async stream(options: StreamOptions): Promise<StreamResult> {
     const startTime = Date.now();
-    const functionTag = "NeuroLink.stream";
+    this._validateStreamInput(options);
 
-    // Validate input
+    this.emitter.emit("stream:start", {
+      provider: options.provider || "auto",
+      timestamp: startTime,
+    });
+
+    const { factoryResult, enhancedOptions } =
+      this._processStreamFactoryConfig(options);
+
+    await this.initializeMCP();
+
+    const providerName =
+      options.provider === "auto" || !options.provider
+        ? await getBestProvider()
+        : options.provider;
+
+    try {
+      return await this._performMCPStream(
+        startTime,
+        providerName,
+        enhancedOptions,
+        factoryResult,
+      );
+    } catch (error) {
+      mcpLogger.warn(
+        `[NeuroLink.stream] MCP streaming failed, falling back to regular`,
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return this._performFallbackStream(
+        startTime,
+        providerName,
+        enhancedOptions,
+        factoryResult,
+      );
+    }
+  }
+
+  private _validateStreamInput(options: StreamOptions): void {
     if (
       !options?.input?.text ||
       typeof options.input.text !== "string" ||
@@ -944,213 +1045,138 @@ export class NeuroLink {
         "Stream options must include input.text as a non-empty string",
       );
     }
+  }
 
-    // Emit stream start event
-    this.emitter.emit("stream:start", {
-      provider: options.provider || "auto",
-      timestamp: startTime,
-    });
-
-    // Process factory configuration for streaming
+  private _processStreamFactoryConfig(options: StreamOptions): {
+    factoryResult: ReturnType<typeof processFactoryOptions>;
+    enhancedOptions: StreamOptions;
+  } {
     const factoryResult = processFactoryOptions(options);
-    const streamingResult = processStreamingFactoryOptions(options);
-
-    // Validate factory configuration if present
     if (factoryResult.hasFactoryConfig && options.factoryConfig) {
       const validation = validateFactoryConfig(options.factoryConfig);
       if (!validation.isValid) {
         mcpLogger.warn("Invalid factory configuration detected in stream", {
           errors: validation.errors,
         });
-        // Continue with warning rather than throwing - graceful degradation
       }
     }
 
-    // Log factory processing results
-    if (factoryResult.hasFactoryConfig) {
-      mcpLogger.debug(`[${functionTag}] Factory configuration detected`, {
-        domainType: factoryResult.domainType,
-        enhancementType: factoryResult.enhancementType,
-        hasStreamingConfig: streamingResult.hasStreamingConfig,
-      });
-    }
-
-    // Initialize MCP if needed
-    await this.initializeMCP();
-
-    // Context creation removed - was never used
-
-    // Determine provider to use
-    const providerName =
-      options.provider === "auto" || !options.provider
-        ? await getBestProvider()
-        : options.provider;
-
-    // Prepare enhanced options for both success and fallback paths
     let enhancedOptions = options;
     if (factoryResult.hasFactoryConfig) {
       enhancedOptions = {
         ...options,
-        // Merge contexts instead of overriding to preserve provider-required context
         context: {
           ...(options.context || {}),
           ...(factoryResult.processedContext || {}),
         } as UnknownRecord,
-        // Ensure evaluation is enabled when using factory patterns
         enableEvaluation: options.enableEvaluation ?? true,
-        // Use domain type for evaluation if available
         evaluationDomain: factoryResult.domainType || options.evaluationDomain,
       };
-
-      mcpLogger.debug(
-        `[${functionTag}] Enhanced stream options with factory config`,
-        {
-          domainType: factoryResult.domainType,
-          enhancementType: factoryResult.enhancementType,
-          hasProcessedContext: !!factoryResult.processedContext,
-        },
-      );
     }
+    return { factoryResult, enhancedOptions };
+  }
 
-    try {
-      mcpLogger.debug(`[${functionTag}] Starting MCP-enabled streaming`, {
-        provider: providerName,
-        prompt: (options.input.text?.substring(0, 100) || "No text") + "...",
-      });
+  private async _performMCPStream(
+    startTime: number,
+    providerName: string,
+    options: StreamOptions,
+    factoryResult: ReturnType<typeof processFactoryOptions>,
+  ): Promise<StreamResult> {
+    const provider = await AIProviderFactory.createBestProvider(
+      providerName,
+      options.model,
+      true,
+      this as unknown as UnknownRecord,
+    );
 
-      // Create provider using the same factory pattern as generate
-      const provider = await AIProviderFactory.createBestProvider(
-        providerName,
-        options.model,
-        true,
-        this as unknown as UnknownRecord, // Pass SDK instance
-      );
+    provider.setupToolExecutor(
+      {
+        customTools: this.getCustomTools(),
+        executeTool: this.executeTool.bind(this),
+      },
+      "NeuroLink.stream",
+    );
 
-      // Enable tool execution for streaming using BaseProvider method
-      provider.setupToolExecutor(
-        {
-          customTools: this.getCustomTools(),
-          executeTool: this.executeTool.bind(this),
-        },
-        functionTag,
-      );
+    const cleanOptions = createCleanStreamOptions(options);
+    const streamResult = await provider.stream(cleanOptions);
+    const responseTime = Date.now() - startTime;
 
-      // Create clean options for provider (remove factoryConfig)
-      const cleanOptions = createCleanStreamOptions(enhancedOptions);
+    this.emitter.emit("stream:end", { provider: providerName, responseTime });
 
-      // Call the provider's stream method with clean options
-      const streamResult = await provider.stream(cleanOptions);
-
-      // Extract the stream from the result
-      const stream = streamResult.stream;
-
-      const responseTime = Date.now() - startTime;
-
-      mcpLogger.debug(`[${functionTag}] MCP-enabled streaming completed`, {
+    return {
+      ...streamResult,
+      provider: providerName,
+      model: options.model,
+      evaluation: streamResult.evaluation
+        ? {
+            ...(streamResult.evaluation as EvaluationData),
+            evaluationDomain:
+              ((streamResult.evaluation as unknown as UnknownRecord)
+                ?.evaluationDomain as string) ??
+              options.evaluationDomain ??
+              factoryResult.domainType,
+          }
+        : undefined,
+      metadata: {
+        streamId: `neurolink-${Date.now()}`,
+        startTime,
         responseTime,
-        provider: providerName,
-      });
+      },
+    };
+  }
 
-      // Emit stream completion event
-      this.emitter.emit("stream:end", {
-        provider: providerName,
-        responseTime,
-      });
+  private async _performFallbackStream(
+    startTime: number,
+    providerName: string,
+    options: StreamOptions,
+    factoryResult: ReturnType<typeof processFactoryOptions>,
+  ): Promise<StreamResult> {
+    const provider = await AIProviderFactory.createBestProvider(
+      providerName,
+      options.model,
+      false, // Disable MCP for fallback
+      this as unknown as UnknownRecord,
+    );
 
-      // Convert to StreamResult format - Include analytics and evaluation from provider
-      return {
-        stream,
-        provider: providerName,
-        model: options.model,
-        usage: streamResult.usage,
-        finishReason: streamResult.finishReason,
-        toolCalls: streamResult.toolCalls,
-        toolResults: streamResult.toolResults,
-        analytics: streamResult.analytics,
-        evaluation: streamResult.evaluation
-          ? {
-              ...(streamResult.evaluation as EvaluationData),
-              // Include evaluationDomain from factory configuration
-              evaluationDomain:
-                ((streamResult.evaluation as unknown as UnknownRecord)
-                  ?.evaluationDomain as string) ??
-                enhancedOptions.evaluationDomain ??
-                factoryResult.domainType,
-            }
-          : undefined,
-        metadata: {
-          streamId: `neurolink-${Date.now()}`,
-          startTime,
-          responseTime,
-        },
-      };
-    } catch (error) {
-      // Fall back to regular streaming if MCP fails
-      mcpLogger.warn(
-        `[${functionTag}] MCP streaming failed, falling back to regular`,
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
+    provider.setupToolExecutor(
+      {
+        customTools: this.getCustomTools(),
+        executeTool: this.executeTool.bind(this),
+      },
+      "NeuroLink.stream",
+    );
 
-      // Use factory to create provider without MCP
-      const provider = await AIProviderFactory.createBestProvider(
-        providerName,
-        options.model,
-        false, // Disable MCP for fallback
-        this as unknown as UnknownRecord, // Pass SDK instance
-      );
+    const cleanOptions = createCleanStreamOptions(options);
+    const streamResult = await provider.stream(cleanOptions);
+    const responseTime = Date.now() - startTime;
 
-      // Enable tool execution for fallback streaming using BaseProvider method
-      provider.setupToolExecutor(
-        {
-          customTools: this.getCustomTools(),
-          executeTool: this.executeTool.bind(this),
-        },
-        functionTag,
-      );
+    this.emitter.emit("stream:end", {
+      provider: providerName,
+      responseTime,
+      fallback: true,
+    });
 
-      // Create clean options for fallback provider (remove factoryConfig)
-      const cleanOptions = createCleanStreamOptions(enhancedOptions);
-
-      const streamResult = await provider.stream(cleanOptions);
-      const responseTime = Date.now() - startTime;
-
-      // Emit stream completion event for fallback
-      this.emitter.emit("stream:end", {
-        provider: providerName,
+    return {
+      ...streamResult,
+      provider: providerName,
+      model: options.model,
+      evaluation: streamResult.evaluation
+        ? {
+            ...(streamResult.evaluation as EvaluationData),
+            evaluationDomain:
+              ((streamResult.evaluation as unknown as UnknownRecord)
+                ?.evaluationDomain as string) ??
+              options.evaluationDomain ??
+              factoryResult.domainType,
+          }
+        : undefined,
+      metadata: {
+        streamId: `neurolink-${Date.now()}`,
+        startTime,
         responseTime,
         fallback: true,
-      });
-
-      return {
-        stream: streamResult.stream,
-        provider: providerName,
-        model: options.model,
-        usage: streamResult.usage,
-        finishReason: streamResult.finishReason,
-        toolCalls: streamResult.toolCalls,
-        toolResults: streamResult.toolResults,
-        analytics: streamResult.analytics,
-        evaluation: streamResult.evaluation
-          ? {
-              ...(streamResult.evaluation as EvaluationData),
-              // Include evaluationDomain in fallback stream
-              evaluationDomain:
-                ((streamResult.evaluation as unknown as UnknownRecord)
-                  ?.evaluationDomain as string) ??
-                enhancedOptions.evaluationDomain ??
-                factoryResult.domainType,
-            }
-          : undefined,
-        metadata: {
-          streamId: `neurolink-${Date.now()}`,
-          startTime,
-          responseTime,
-          fallback: true,
-        },
-      };
-    }
+      },
+    };
   }
 
   /**
@@ -1473,7 +1499,18 @@ export class NeuroLink {
     if (!this.toolCircuitBreakers.has(toolName)) {
       this.toolCircuitBreakers.set(toolName, new CircuitBreaker(5, 60000)); // 5 failures, 1 minute timeout
     }
-    const circuitBreaker = this.toolCircuitBreakers.get(toolName)!;
+    const circuitBreaker = this.toolCircuitBreakers.get(toolName);
+    if (!circuitBreaker) {
+      // This should not happen based on the logic above, but it's a safe guard.
+      throw new NeuroLinkError({
+        code: "INTERNAL_STATE_ERROR",
+        message: `Circuit breaker not found for tool: ${toolName}`,
+        category: ErrorCategory.SYSTEM,
+        severity: ErrorSeverity.CRITICAL,
+        retriable: false,
+        toolName,
+      });
+    }
 
     // Initialize metrics for this tool if not exists
     if (!this.toolExecutionMetrics.has(toolName)) {
@@ -1485,7 +1522,18 @@ export class NeuroLink {
         lastExecutionTime: 0,
       });
     }
-    const metrics = this.toolExecutionMetrics.get(toolName)!;
+    const metrics = this.toolExecutionMetrics.get(toolName);
+    if (!metrics) {
+      // This should not happen based on the logic above, but it's a safe guard.
+      throw new NeuroLinkError({
+        code: "INTERNAL_STATE_ERROR",
+        message: `Metrics not found for tool: ${toolName}`,
+        category: ErrorCategory.SYSTEM,
+        severity: ErrorSeverity.CRITICAL,
+        retriable: false,
+        toolName,
+      });
+    }
     metrics.totalExecutions++;
 
     try {
@@ -1793,7 +1841,6 @@ export class NeuroLink {
                 isExternal: true,
                 serverId: tool.serverId,
               }),
-              inputSchema: {},
             },
           );
           allTools.set(tool.name, optimizedTool);
@@ -1857,9 +1904,6 @@ export class NeuroLink {
     if (!options?.quiet) {
       mcpLogger.debug("🔍 DEBUG: MCP initialized:", this.mcpInitialized);
     }
-
-    const { AIProviderFactory } = await import("./core/factory.js");
-    const { hasProviderEnvVars } = await import("./utils/providerUtils.js");
 
     const providers = [
       "openai",
@@ -2170,7 +2214,10 @@ export class NeuroLink {
       // Test in-memory servers
       const inMemoryServers = this.getInMemoryServers();
       if (inMemoryServers.has(serverId)) {
-        const serverInfo = inMemoryServers.get(serverId)!;
+        const serverInfo = inMemoryServers.get(serverId);
+        if (!serverInfo) {
+          return false;
+        }
         return !!(serverInfo.tools && serverInfo.tools.length > 0);
       }
 
