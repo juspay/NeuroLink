@@ -1,3 +1,9 @@
+## [7.28.0](https://github.com/juspay/neurolink/compare/v7.27.0...v7.28.0) (2025-08-25)
+
+### Features
+
+- **(proxy):** comprehensive proxy support for all AI providers ([332974a](https://github.com/juspay/neurolink/commit/332974ae73e9ccc84a8dbbea65f10bc3262fecd5))
+
 ## [7.27.0](https://github.com/juspay/neurolink/compare/v7.26.1...v7.27.0) (2025-08-24)
 
 ### Features
