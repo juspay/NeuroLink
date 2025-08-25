@@ -1,25 +1,18 @@
-import { openai, createOpenAI } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import type { ZodType, ZodTypeDef } from "zod";
-import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import { streamText, type Schema, type LanguageModelV1 } from "ai";
+import type { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { Unknown, UnknownRecord } from "../types/common.js";
+import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import {
-  createTimeoutController,
-  TimeoutError,
-  getDefaultTimeout,
-} from "../utils/timeout.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
-import { validateApiKey, getProviderModel } from "../utils/providerConfig.js";
+import { getProviderModel } from "../utils/providerConfig.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Configuration helpers
 const getLiteLLMConfig = () => {
@@ -71,6 +64,7 @@ export class LiteLLMProvider extends BaseProvider {
     const customOpenAI = createOpenAI({
       baseURL: config.baseURL,
       apiKey: config.apiKey,
+      fetch: createProxyFetch(),
     });
 
     this.model = customOpenAI(this.modelName || getDefaultLiteLLMModel());
@@ -168,7 +162,7 @@ export class LiteLLMProvider extends BaseProvider {
    */
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+    _analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<StreamResult> {
     this.validateStreamOptions(options);
 
@@ -184,7 +178,7 @@ export class LiteLLMProvider extends BaseProvider {
       // Build message array from options
       const messages = buildMessagesArray(options);
 
-      const result = await streamText({
+      const result = streamText({
         model: this.model,
         messages: messages,
         temperature: options.temperature,
@@ -306,7 +300,8 @@ export class LiteLLMProvider extends BaseProvider {
     try {
       logger.debug(`[${functionTag}] Fetching models from ${modelsUrl}`);
 
-      const response = await fetch(modelsUrl, {
+      const proxyFetch = createProxyFetch();
+      const response = await proxyFetch(modelsUrl, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${config.apiKey}`,

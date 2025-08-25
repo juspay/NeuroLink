@@ -87,14 +87,14 @@ export function transformToolExecutions(toolExecutions?: unknown[]): Array<{
     }
 
     // Enhanced output extraction with success indication
-    let output =
+    const output =
       (teRecord.output as unknown) ||
       (teRecord.result as unknown) ||
       (teRecord.response as unknown) ||
       "success";
 
     // Enhanced duration extraction
-    let duration =
+    const duration =
       (teRecord.duration as number) ??
       (teRecord.executionTime as number) ??
       (teRecord.responseTime as number) ??
@@ -152,7 +152,7 @@ export function transformToolExecutionsForMCP(
     }
 
     // Enhanced execution time extraction
-    let executionTime =
+    const executionTime =
       (teRecord.duration as number) ??
       (teRecord.executionTime as number) ??
       (teRecord.responseTime as number) ??

@@ -1,20 +1,12 @@
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import type { AmazonBedrockProvider as BedrockProviderType } from "@ai-sdk/amazon-bedrock";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import { streamText, type LanguageModelV1 } from "ai";
+import type { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import {
-  createTimeoutController,
-  TimeoutError,
-  getDefaultTimeout,
-} from "../utils/timeout.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 import {
   validateApiKey,
@@ -24,14 +16,17 @@ import {
   getAWSSessionToken,
 } from "../utils/providerConfig.js";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Configuration helpers
 const getBedrockModelId = (): string => {
-  return (
-    process.env.BEDROCK_MODEL ||
-    process.env.BEDROCK_MODEL_ID ||
-    "arn:aws:bedrock:us-east-2:225681119357:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-  );
+  const model = process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
+  if (!model) {
+    throw new Error(
+      "BEDROCK_MODEL (or BEDROCK_MODEL_ID) is required. Example: 'anthropic.claude-3-haiku-20240307-v1:0' or a valid inference profile ARN.",
+    );
+  }
+  return model;
 };
 
 // Configuration helpers - now using consolidated utility
@@ -74,10 +69,12 @@ export class AmazonBedrockProvider extends BaseProvider {
       secretAccessKey: string;
       region: string;
       sessionToken?: string;
+      fetch?: typeof fetch;
     } = {
       accessKeyId: getAWSAccessKeyId(),
       secretAccessKey: getAWSSecretAccessKey(),
       region: getAWSRegion(),
+      fetch: createProxyFetch(),
     };
 
     // Add session token for development environment
@@ -121,22 +118,29 @@ export class AmazonBedrockProvider extends BaseProvider {
 
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: ZodUnknownSchema | Schema<unknown>,
+    _analysisSchema?: ZodUnknownSchema,
   ): Promise<StreamResult> {
     try {
       this.validateStreamOptions(options);
+      const timeout = this.getTimeout(options);
+      const timeoutController = createTimeoutController(
+        timeout,
+        this.providerName,
+        "stream",
+      );
 
       // Build message array from options
       const messages = buildMessagesArray(options);
 
-      const result = await streamText({
+      const result = streamText({
         model: this.model,
         messages: messages,
         maxTokens: options.maxTokens || DEFAULT_MAX_TOKENS,
         temperature: options.temperature,
+        abortSignal: timeoutController?.controller.signal,
       });
 
-      return {
+      const streamResult = {
         stream: (async function* () {
           for await (const chunk of result.textStream) {
             yield { content: chunk };
@@ -145,6 +149,8 @@ export class AmazonBedrockProvider extends BaseProvider {
         provider: this.providerName,
         model: this.modelName,
       };
+      timeoutController?.cleanup();
+      return streamResult;
     } catch (error) {
       throw this.handleProviderError(error);
     }

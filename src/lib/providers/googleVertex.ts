@@ -2,6 +2,10 @@ import {
   createVertex,
   type GoogleVertexProviderSettings,
 } from "@ai-sdk/google-vertex";
+import {
+  createVertexAnthropic,
+  type GoogleVertexAnthropicProviderSettings,
+} from "@ai-sdk/google-vertex/anthropic";
 import type { ZodType, ZodTypeDef } from "zod";
 import {
   streamText,
@@ -16,11 +20,7 @@ import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import {
-  createTimeoutController,
-  TimeoutError,
-  getDefaultTimeout,
-} from "../utils/timeout.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { ModelConfigurationManager } from "../core/modelConfiguration.js";
 import {
@@ -28,38 +28,23 @@ import {
   createVertexProjectConfig,
   createGoogleAuthConfig,
 } from "../utils/providerConfig.js";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import dns from "dns";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 
-// Cache for anthropic module to avoid repeated imports
-let _createVertexAnthropic: unknown = null;
-let _anthropicImportAttempted = false;
-
-// Function to dynamically import anthropic support
-async function getCreateVertexAnthropic() {
-  if (_anthropicImportAttempted) {
-    return _createVertexAnthropic;
-  }
-
-  _anthropicImportAttempted = true;
-
+// Enhanced Anthropic support with direct imports
+// Using the dual provider architecture from Vercel AI SDK
+const hasAnthropicSupport = (): boolean => {
   try {
-    // Try to import the anthropic module - available in @ai-sdk/google-vertex ^2.2.0+
-    // Use proper dynamic import without eval() for security
-    const anthropicModule = (await import(
-      "@ai-sdk/google-vertex/anthropic"
-    )) as UnknownRecord;
-    _createVertexAnthropic = anthropicModule.createVertexAnthropic;
-    logger.debug("[GoogleVertexAI] Anthropic module successfully loaded");
-    return _createVertexAnthropic;
-  } catch (error) {
-    // Anthropic module not available
-    logger.warn(
-      "[GoogleVertexAI] Anthropic module not available. Install @ai-sdk/google-vertex ^2.2.0 for Anthropic model support.",
-    );
-    return null;
+    // Verify the anthropic module is available
+    return typeof createVertexAnthropic === "function";
+  } catch {
+    return false;
   }
-}
+};
 
 // Configuration helpers - now using consolidated utility
 const getVertexProjectId = (): string => {
@@ -91,61 +76,207 @@ const hasGoogleCredentials = (): boolean => {
 };
 
 // Enhanced Vertex settings creation with authentication fallback and proxy support
-const createVertexSettings = (): GoogleVertexProviderSettings => {
-  const baseSettings: GoogleVertexProviderSettings = {
-    project: getVertexProjectId(),
-    location: getVertexLocation(),
-    fetch: createProxyFetch(),
-  };
+const createVertexSettings =
+  async (): Promise<GoogleVertexProviderSettings> => {
+    const baseSettings: GoogleVertexProviderSettings = {
+      project: getVertexProjectId(),
+      location: getVertexLocation(),
+      fetch: createProxyFetch(),
+    };
 
-  // Check for principal account authentication first (recommended for production)
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    logger.debug("Using principal account authentication (recommended)", {
-      credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS
-        ? "[PROVIDED]"
-        : "[NOT_PROVIDED]",
-      authMethod: "principal_account",
-    });
-    // For principal account auth, we don't need to provide explicit credentials
-    // The google-auth-library will use GOOGLE_APPLICATION_CREDENTIALS automatically
-    return baseSettings;
-  }
+    // 🎯 OPTION 2: Create credentials file from environment variables at runtime
+    // This solves the problem where GOOGLE_APPLICATION_CREDENTIALS exists in ZSHRC locally
+    // but the file doesn't exist on production servers
 
-  // Fallback to explicit credentials for development
-  if (
-    process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
-    process.env.GOOGLE_AUTH_PRIVATE_KEY
-  ) {
-    logger.debug("Using explicit credentials authentication", {
-      authMethod: "explicit_credentials",
-      hasClientEmail: !!process.env.GOOGLE_AUTH_CLIENT_EMAIL,
-      hasPrivateKey: !!process.env.GOOGLE_AUTH_PRIVATE_KEY,
-    });
-    return {
-      ...baseSettings,
-      googleAuthOptions: {
-        credentials: {
-          client_email: process.env.GOOGLE_AUTH_CLIENT_EMAIL,
-          private_key: process.env.GOOGLE_AUTH_PRIVATE_KEY.replace(
-            /\\n/g,
-            "\n",
-          ),
+    // First, try to create credentials file from individual environment variables
+    const requiredEnvVarsForFile = {
+      type: process.env.GOOGLE_AUTH_TYPE,
+      project_id: process.env.GOOGLE_AUTH_BREEZE_PROJECT_ID,
+      private_key: process.env.GOOGLE_AUTH_PRIVATE_KEY,
+      client_email: process.env.GOOGLE_AUTH_CLIENT_EMAIL,
+      client_id: process.env.GOOGLE_AUTH_CLIENT_ID,
+      auth_uri: process.env.GOOGLE_AUTH_AUTH_URI,
+      token_uri: process.env.GOOGLE_AUTH_TOKEN_URI,
+      auth_provider_x509_cert_url:
+        process.env.GOOGLE_AUTH_AUTH_PROVIDER_CERT_URL,
+      client_x509_cert_url: process.env.GOOGLE_AUTH_CLIENT_CERT_URL,
+      universe_domain: process.env.GOOGLE_AUTH_UNIVERSE_DOMAIN,
+    };
+
+    // If we have the essential fields, create a runtime credentials file
+    if (
+      requiredEnvVarsForFile.client_email &&
+      requiredEnvVarsForFile.private_key
+    ) {
+      try {
+        // Build complete service account credentials object
+        const serviceAccountCredentials = {
+          type: requiredEnvVarsForFile.type || "service_account",
+          project_id: requiredEnvVarsForFile.project_id || getVertexProjectId(),
+          private_key: requiredEnvVarsForFile.private_key.replace(/\\n/g, "\n"),
+          client_email: requiredEnvVarsForFile.client_email,
+          client_id: requiredEnvVarsForFile.client_id || "",
+          auth_uri:
+            requiredEnvVarsForFile.auth_uri ||
+            "https://accounts.google.com/o/oauth2/auth",
+          token_uri:
+            requiredEnvVarsForFile.token_uri ||
+            "https://oauth2.googleapis.com/token",
+          auth_provider_x509_cert_url:
+            requiredEnvVarsForFile.auth_provider_x509_cert_url ||
+            "https://www.googleapis.com/oauth2/v1/certs",
+          client_x509_cert_url:
+            requiredEnvVarsForFile.client_x509_cert_url || "",
+          universe_domain:
+            requiredEnvVarsForFile.universe_domain || "googleapis.com",
+        };
+
+        // Create temporary credentials file
+        const tmpDir = os.tmpdir();
+        const credentialsFileName = `google-credentials-${Date.now()}-${Math.random().toString(36).substring(2, 11)}.json`;
+        const credentialsFilePath = path.join(tmpDir, credentialsFileName);
+
+        fs.writeFileSync(
+          credentialsFilePath,
+          JSON.stringify(serviceAccountCredentials, null, 2),
+        );
+
+        // Set the environment variable to point to our runtime-created file
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsFilePath;
+
+        // Now continue with the normal flow - check if the file exists
+        const fileExists = fs.existsSync(credentialsFilePath);
+        if (fileExists) {
+          return baseSettings;
+        }
+      } catch (_error) {
+        // Silent error handling for runtime credentials file creation
+      }
+    }
+
+    // 🎯 OPTION 1: Check for principal account authentication (existing flow with debug logs)
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+      // 🚨 CRITICAL FIX: Check if the credentials file actually exists
+      let fileExists = false;
+      try {
+        fileExists = fs.existsSync(credentialsPath);
+      } catch {
+        fileExists = false;
+      }
+
+      if (fileExists) {
+        return baseSettings;
+      }
+    }
+
+    // Fallback to explicit credentials for development and production
+    // Enhanced to check ALL required fields from the .env file configuration
+    const requiredEnvVars = {
+      type: process.env.GOOGLE_AUTH_TYPE,
+      project_id: process.env.GOOGLE_AUTH_BREEZE_PROJECT_ID,
+      private_key: process.env.GOOGLE_AUTH_PRIVATE_KEY,
+      client_email: process.env.GOOGLE_AUTH_CLIENT_EMAIL,
+      client_id: process.env.GOOGLE_AUTH_CLIENT_ID,
+      auth_uri: process.env.GOOGLE_AUTH_AUTH_URI,
+      token_uri: process.env.GOOGLE_AUTH_TOKEN_URI,
+      auth_provider_x509_cert_url:
+        process.env.GOOGLE_AUTH_AUTH_PROVIDER_CERT_URL,
+      client_x509_cert_url: process.env.GOOGLE_AUTH_CLIENT_CERT_URL,
+      universe_domain: process.env.GOOGLE_AUTH_UNIVERSE_DOMAIN,
+    };
+
+    // Check if we have the minimal required fields (client_email and private_key are essential)
+    if (requiredEnvVars.client_email && requiredEnvVars.private_key) {
+      logger.debug(
+        "Using explicit service account credentials authentication",
+        {
+          authMethod: "explicit_service_account_credentials",
+          hasType: !!requiredEnvVars.type,
+          hasProjectId: !!requiredEnvVars.project_id,
+          hasClientEmail: !!requiredEnvVars.client_email,
+          hasPrivateKey: !!requiredEnvVars.private_key,
+          hasClientId: !!requiredEnvVars.client_id,
+          hasAuthUri: !!requiredEnvVars.auth_uri,
+          hasTokenUri: !!requiredEnvVars.token_uri,
+          hasAuthProviderCertUrl: !!requiredEnvVars.auth_provider_x509_cert_url,
+          hasClientCertUrl: !!requiredEnvVars.client_x509_cert_url,
+          hasUniverseDomain: !!requiredEnvVars.universe_domain,
+          credentialsCompleteness: "using_individual_env_vars_as_fallback",
+        },
+      );
+
+      // Build complete service account credentials object
+      const serviceAccountCredentials = {
+        type: requiredEnvVars.type || "service_account",
+        project_id: requiredEnvVars.project_id || getVertexProjectId(),
+        private_key: requiredEnvVars.private_key.replace(/\\n/g, "\n"),
+        client_email: requiredEnvVars.client_email,
+        client_id: requiredEnvVars.client_id || "",
+        auth_uri:
+          requiredEnvVars.auth_uri ||
+          "https://accounts.google.com/o/oauth2/auth",
+        token_uri:
+          requiredEnvVars.token_uri || "https://oauth2.googleapis.com/token",
+        auth_provider_x509_cert_url:
+          requiredEnvVars.auth_provider_x509_cert_url ||
+          "https://www.googleapis.com/oauth2/v1/certs",
+        client_x509_cert_url: requiredEnvVars.client_x509_cert_url || "",
+        universe_domain: requiredEnvVars.universe_domain || "googleapis.com",
+      };
+
+      return {
+        ...baseSettings,
+        googleAuthOptions: {
+          credentials: serviceAccountCredentials,
+        },
+      };
+    }
+
+    // Log comprehensive warning if no valid authentication is available
+    logger.warn("No valid authentication found for Google Vertex AI", {
+      authMethod: "none",
+      authenticationAttempts: {
+        principalAccountFile: {
+          envVarSet: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+          filePath: process.env.GOOGLE_APPLICATION_CREDENTIALS || "NOT_SET",
+          fileExists: false, // We already checked above
+        },
+        explicitCredentials: {
+          hasClientEmail: !!requiredEnvVars.client_email,
+          hasPrivateKey: !!requiredEnvVars.private_key,
+          hasProjectId: !!requiredEnvVars.project_id,
+          hasType: !!requiredEnvVars.type,
+          missingFields: Object.entries(requiredEnvVars)
+            .filter(([key, value]) => !value)
+            .map(([key]) => key),
         },
       },
-    };
-  }
+      troubleshooting: [
+        "1. Ensure GOOGLE_APPLICATION_CREDENTIALS points to an existing file, OR",
+        "2. Set individual environment variables: GOOGLE_AUTH_CLIENT_EMAIL and GOOGLE_AUTH_PRIVATE_KEY",
+      ],
+    });
+    return baseSettings;
+  };
 
-  // Log warning if no valid authentication is available
-  logger.warn("No valid authentication found for Google Vertex AI", {
-    authMethod: "none",
-    hasPrincipalAccount: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    hasExplicitCredentials: !!(
-      process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
-      process.env.GOOGLE_AUTH_PRIVATE_KEY
-    ),
-  });
-  return baseSettings;
-};
+// Create Anthropic-specific Vertex settings with the same authentication and proxy support
+const createVertexAnthropicSettings =
+  async (): Promise<GoogleVertexAnthropicProviderSettings> => {
+    const baseVertexSettings = await createVertexSettings();
+
+    // GoogleVertexAnthropicProviderSettings extends GoogleVertexProviderSettings
+    // so we can use the same settings with proper typing
+    return {
+      project: baseVertexSettings.project,
+      location: baseVertexSettings.location,
+      fetch: baseVertexSettings.fetch,
+      ...(baseVertexSettings.googleAuthOptions && {
+        googleAuthOptions: baseVertexSettings.googleAuthOptions,
+      }),
+    } as GoogleVertexAnthropicProviderSettings;
+  };
 
 // Helper function to determine if a model is an Anthropic model
 const isAnthropicModel = (modelName: string): boolean => {
@@ -187,7 +318,7 @@ export class GoogleVertexProvider extends BaseProvider {
   private static maxTokensCache: Map<string, boolean> = new Map();
   private static maxTokensCacheTime = 0;
 
-  constructor(modelName?: string, providerName?: string, sdk?: unknown) {
+  constructor(modelName?: string, _providerName?: string, sdk?: unknown) {
     super(modelName, "vertex" as AIProviderName, sdk as NeuroLink | undefined);
 
     // Validate Google Cloud credentials - now using consolidated utility
@@ -226,23 +357,220 @@ export class GoogleVertexProvider extends BaseProvider {
 
   /**
    * Gets the appropriate model instance (Google or Anthropic)
+   * Uses dual provider architecture for proper model routing
    * Creates fresh instances for each request to ensure proper authentication
    */
   private async getModel(): Promise<LanguageModelV1> {
+    // 🚀 EXHAUSTIVE LOGGING POINT V001: MODEL CREATION ENTRY
+    const modelCreationId = `vertex-model-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const modelCreationStartTime = Date.now();
+    const modelCreationHrTimeStart = process.hrtime.bigint();
+
     const modelName = this.modelName || getDefaultVertexModel();
 
-    // Check if this is an Anthropic model
-    if (isAnthropicModel(modelName)) {
-      logger.debug("Creating Anthropic model for Vertex AI", { modelName });
-      const anthropicModel = await this.createAnthropicModel(modelName);
-      if (anthropicModel) {
-        return anthropicModel;
+    logger.debug(
+      `[GoogleVertexProvider] 🏭 LOG_POINT_V001_MODEL_CREATION_START`,
+      {
+        logPoint: "V001_MODEL_CREATION_START",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        modelCreationStartTime,
+        modelCreationHrTimeStart: modelCreationHrTimeStart.toString(),
+        requestedModel: this.modelName,
+        resolvedModel: modelName,
+        defaultModel: getDefaultVertexModel(),
+        projectId: this.projectId,
+        location: this.location,
+
+        // Environment analysis for network issues
+        environmentAnalysis: {
+          httpProxy:
+            process.env.HTTP_PROXY || process.env.http_proxy || "NOT_SET",
+          httpsProxy:
+            process.env.HTTPS_PROXY || process.env.https_proxy || "NOT_SET",
+          googleAppCreds:
+            process.env.GOOGLE_APPLICATION_CREDENTIALS || "NOT_SET",
+          googleServiceKey: process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+            ? "SET"
+            : "NOT_SET",
+          nodeVersion: process.version,
+          platform: process.platform,
+          arch: process.arch,
+        },
+
+        // Memory and performance baseline
+        memoryUsage: process.memoryUsage(),
+        cpuUsage: process.cpuUsage(),
+        message:
+          "Starting model creation with comprehensive environment analysis",
+      },
+    );
+
+    // 🚀 EXHAUSTIVE LOGGING POINT V002: ANTHROPIC MODEL CHECK
+    const anthropicCheckStartTime = process.hrtime.bigint();
+    const isAnthropic = isAnthropicModel(modelName);
+
+    logger.debug(`[GoogleVertexProvider] 🤖 LOG_POINT_V002_ANTHROPIC_CHECK`, {
+      logPoint: "V002_ANTHROPIC_CHECK",
+      modelCreationId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - modelCreationStartTime,
+      elapsedNs: (
+        process.hrtime.bigint() - modelCreationHrTimeStart
+      ).toString(),
+      anthropicCheckStartTimeNs: anthropicCheckStartTime.toString(),
+      modelName,
+      isAnthropicModel: isAnthropic,
+      modelNameLowerCase: modelName.toLowerCase(),
+      containsClaude: modelName.toLowerCase().includes("claude"),
+      anthropicModelPatterns: ["claude"],
+      message: "Checking if model is Anthropic-based",
+    });
+
+    // Check if this is an Anthropic model and use appropriate provider
+    if (isAnthropic) {
+      // 🚀 EXHAUSTIVE LOGGING POINT V003: ANTHROPIC MODEL CREATION START
+      const anthropicModelStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] 🧠 LOG_POINT_V003_ANTHROPIC_MODEL_START`,
+        {
+          logPoint: "V003_ANTHROPIC_MODEL_START",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - modelCreationStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - modelCreationHrTimeStart
+          ).toString(),
+          anthropicModelStartTimeNs: anthropicModelStartTime.toString(),
+          modelName,
+          hasAnthropicSupport: hasAnthropicSupport(),
+          message: "Creating Anthropic model using vertexAnthropic provider",
+        },
+      );
+
+      logger.debug("Creating Anthropic model using vertexAnthropic provider", {
+        modelName,
+      });
+
+      if (!hasAnthropicSupport()) {
+        logger.warn(
+          `[GoogleVertexProvider] Anthropic support not available, falling back to Google model`,
+        );
+      } else {
+        try {
+          const anthropicModel = await this.createAnthropicModel(modelName);
+
+          if (anthropicModel) {
+            const anthropicModelSuccessTime = process.hrtime.bigint();
+            const anthropicModelDurationNs =
+              anthropicModelSuccessTime - anthropicModelStartTime;
+
+            logger.debug(
+              `[GoogleVertexProvider] ✅ LOG_POINT_V004_ANTHROPIC_MODEL_SUCCESS`,
+              {
+                logPoint: "V004_ANTHROPIC_MODEL_SUCCESS",
+                modelCreationId,
+                timestamp: new Date().toISOString(),
+                elapsedMs: Date.now() - modelCreationStartTime,
+                elapsedNs: (
+                  process.hrtime.bigint() - modelCreationHrTimeStart
+                ).toString(),
+                anthropicModelDurationNs: anthropicModelDurationNs.toString(),
+                anthropicModelDurationMs:
+                  Number(anthropicModelDurationNs) / 1000000,
+                modelName,
+                hasAnthropicModel: !!anthropicModel,
+                anthropicModelType: typeof anthropicModel,
+                memoryUsageAfterAnthropicCreation: process.memoryUsage(),
+                message:
+                  "Anthropic model created successfully via vertexAnthropic",
+              },
+            );
+
+            return anthropicModel;
+          }
+
+          // Anthropic model creation returned null
+          const anthropicModelNullTime = process.hrtime.bigint();
+          const anthropicModelDurationNs =
+            anthropicModelNullTime - anthropicModelStartTime;
+
+          logger.warn(
+            `[GoogleVertexProvider] ⚠️ LOG_POINT_V005_ANTHROPIC_MODEL_NULL`,
+            {
+              logPoint: "V005_ANTHROPIC_MODEL_NULL",
+              modelCreationId,
+              timestamp: new Date().toISOString(),
+              elapsedMs: Date.now() - modelCreationStartTime,
+              elapsedNs: (
+                process.hrtime.bigint() - modelCreationHrTimeStart
+              ).toString(),
+              anthropicModelDurationNs: anthropicModelDurationNs.toString(),
+              anthropicModelDurationMs:
+                Number(anthropicModelDurationNs) / 1000000,
+              modelName,
+              hasAnthropicModel: false,
+              fallbackToGoogle: true,
+              message:
+                "Anthropic model creation returned null - falling back to Google model",
+            },
+          );
+        } catch (error) {
+          const anthropicModelErrorTime = process.hrtime.bigint();
+          const anthropicModelDurationNs =
+            anthropicModelErrorTime - anthropicModelStartTime;
+
+          logger.error(
+            `[GoogleVertexProvider] ❌ LOG_POINT_V006_ANTHROPIC_MODEL_ERROR`,
+            {
+              logPoint: "V006_ANTHROPIC_MODEL_ERROR",
+              modelCreationId,
+              timestamp: new Date().toISOString(),
+              elapsedMs: Date.now() - modelCreationStartTime,
+              elapsedNs: (
+                process.hrtime.bigint() - modelCreationHrTimeStart
+              ).toString(),
+              anthropicModelDurationNs: anthropicModelDurationNs.toString(),
+              anthropicModelDurationMs:
+                Number(anthropicModelDurationNs) / 1000000,
+              modelName,
+              error: error instanceof Error ? error.message : String(error),
+              errorName: error instanceof Error ? error.name : "UnknownError",
+              errorStack: error instanceof Error ? error.stack : undefined,
+              fallbackToGoogle: true,
+              message:
+                "Anthropic model creation failed - falling back to Google model",
+            },
+          );
+        }
       }
+
       // Fall back to regular model if Anthropic not available
       logger.warn(
         `Anthropic model ${modelName} requested but not available, falling back to Google model`,
       );
     }
+
+    // 🚀 EXHAUSTIVE LOGGING POINT V007: GOOGLE VERTEX MODEL CREATION START
+    const googleModelStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[GoogleVertexProvider] 🌐 LOG_POINT_V007_GOOGLE_MODEL_START`,
+      {
+        logPoint: "V007_GOOGLE_MODEL_START",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - modelCreationStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - modelCreationHrTimeStart
+        ).toString(),
+        googleModelStartTimeNs: googleModelStartTime.toString(),
+        modelName,
+        projectId: this.projectId,
+        location: this.location,
+        reason: isAnthropic ? "ANTHROPIC_FALLBACK" : "DIRECT_GOOGLE_MODEL",
+        message: "Creating fresh Google Vertex model with current settings",
+      },
+    );
 
     // Create fresh Google Vertex model with current settings
     logger.debug("Creating Google Vertex model", {
@@ -250,9 +578,302 @@ export class GoogleVertexProvider extends BaseProvider {
       project: this.projectId,
       location: this.location,
     });
-    const vertex = createVertex(createVertexSettings());
-    const model = vertex(modelName);
-    return model as LanguageModelV1;
+
+    // 🚀 EXHAUSTIVE LOGGING POINT V008: VERTEX SETTINGS CREATION
+    const vertexSettingsStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[GoogleVertexProvider] ⚙️ LOG_POINT_V008_VERTEX_SETTINGS_START`,
+      {
+        logPoint: "V008_VERTEX_SETTINGS_START",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - modelCreationStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - modelCreationHrTimeStart
+        ).toString(),
+        vertexSettingsStartTimeNs: vertexSettingsStartTime.toString(),
+
+        // Network configuration analysis
+        networkConfig: {
+          projectId: this.projectId,
+          location: this.location,
+          expectedEndpoint: `https://${this.location}-aiplatform.googleapis.com`,
+          httpProxy: process.env.HTTP_PROXY || process.env.http_proxy,
+          httpsProxy: process.env.HTTPS_PROXY || process.env.https_proxy,
+          noProxy: process.env.NO_PROXY || process.env.no_proxy,
+          proxyConfigured: !!(
+            process.env.HTTP_PROXY ||
+            process.env.HTTPS_PROXY ||
+            process.env.http_proxy ||
+            process.env.https_proxy
+          ),
+        },
+
+        message:
+          "Starting Vertex settings creation with network configuration analysis",
+      },
+    );
+
+    try {
+      const vertexSettings = await createVertexSettings();
+
+      const vertexSettingsEndTime = process.hrtime.bigint();
+      const vertexSettingsDurationNs =
+        vertexSettingsEndTime - vertexSettingsStartTime;
+
+      logger.debug(
+        `[GoogleVertexProvider] ✅ LOG_POINT_V009_VERTEX_SETTINGS_SUCCESS`,
+        {
+          logPoint: "V009_VERTEX_SETTINGS_SUCCESS",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - modelCreationStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - modelCreationHrTimeStart
+          ).toString(),
+          vertexSettingsDurationNs: vertexSettingsDurationNs.toString(),
+          vertexSettingsDurationMs: Number(vertexSettingsDurationNs) / 1000000,
+
+          // Settings analysis
+          vertexSettingsAnalysis: {
+            hasSettings: !!vertexSettings,
+            settingsType: typeof vertexSettings,
+            settingsKeys: vertexSettings ? Object.keys(vertexSettings) : [],
+            projectId: vertexSettings?.project,
+            location: vertexSettings?.location,
+            hasFetch: !!vertexSettings?.fetch,
+            hasGoogleAuthOptions: !!vertexSettings?.googleAuthOptions,
+            settingsSize: vertexSettings
+              ? JSON.stringify(vertexSettings).length
+              : 0,
+          },
+
+          message: "Vertex settings created successfully",
+        },
+      );
+
+      // 🚀 EXHAUSTIVE LOGGING POINT V010: VERTEX INSTANCE CREATION
+      const vertexInstanceStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] 🏗️ LOG_POINT_V010_VERTEX_INSTANCE_START`,
+        {
+          logPoint: "V010_VERTEX_INSTANCE_START",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - modelCreationStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - modelCreationHrTimeStart
+          ).toString(),
+          vertexInstanceStartTimeNs: vertexInstanceStartTime.toString(),
+
+          // Pre-creation network environment
+          networkEnvironment: {
+            dnsServers: (() => {
+              try {
+                return dns.getServers ? dns.getServers() : "NOT_AVAILABLE";
+              } catch {
+                return "NOT_AVAILABLE";
+              }
+            })(),
+            networkInterfaces: (() => {
+              try {
+                return Object.keys(os.networkInterfaces());
+              } catch {
+                return [];
+              }
+            })(),
+            hostname: (() => {
+              try {
+                return os.hostname();
+              } catch {
+                return "UNKNOWN";
+              }
+            })(),
+            platform: (() => {
+              try {
+                return os.platform();
+              } catch {
+                return "UNKNOWN";
+              }
+            })(),
+            release: (() => {
+              try {
+                return os.release();
+              } catch {
+                return "UNKNOWN";
+              }
+            })(),
+          },
+
+          message: "Creating Vertex AI instance",
+        },
+      );
+
+      const vertex = createVertex(vertexSettings);
+
+      const vertexInstanceEndTime = process.hrtime.bigint();
+      const vertexInstanceDurationNs =
+        vertexInstanceEndTime - vertexInstanceStartTime;
+
+      logger.debug(
+        `[GoogleVertexProvider] ✅ LOG_POINT_V011_VERTEX_INSTANCE_SUCCESS`,
+        {
+          logPoint: "V011_VERTEX_INSTANCE_SUCCESS",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - modelCreationStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - modelCreationHrTimeStart
+          ).toString(),
+          vertexInstanceDurationNs: vertexInstanceDurationNs.toString(),
+          vertexInstanceDurationMs: Number(vertexInstanceDurationNs) / 1000000,
+          hasVertexInstance: !!vertex,
+          vertexInstanceType: typeof vertex,
+          message: "Vertex AI instance created successfully",
+        },
+      );
+
+      // 🚀 EXHAUSTIVE LOGGING POINT V012: MODEL INSTANCE CREATION
+      const modelInstanceStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] 🎯 LOG_POINT_V012_MODEL_INSTANCE_START`,
+        {
+          logPoint: "V012_MODEL_INSTANCE_START",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - modelCreationStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - modelCreationHrTimeStart
+          ).toString(),
+          modelInstanceStartTimeNs: modelInstanceStartTime.toString(),
+          modelName,
+          hasVertexInstance: !!vertex,
+          message: "Creating model instance from Vertex AI instance",
+        },
+      );
+
+      const model = vertex(modelName);
+
+      const modelInstanceEndTime = process.hrtime.bigint();
+      const modelInstanceDurationNs =
+        modelInstanceEndTime - modelInstanceStartTime;
+      const totalModelCreationDurationNs =
+        modelInstanceEndTime - modelCreationHrTimeStart;
+
+      logger.info(
+        `[GoogleVertexProvider] 🏁 LOG_POINT_V013_MODEL_CREATION_COMPLETE`,
+        {
+          logPoint: "V013_MODEL_CREATION_COMPLETE",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          totalElapsedMs: Date.now() - modelCreationStartTime,
+          totalElapsedNs: totalModelCreationDurationNs.toString(),
+          totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
+          modelInstanceDurationNs: modelInstanceDurationNs.toString(),
+          modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
+
+          // Final model analysis
+          finalModel: {
+            hasModel: !!model,
+            modelType: typeof model,
+            modelName,
+            isAnthropicModel: isAnthropic,
+            projectId: this.projectId,
+            location: this.location,
+          },
+
+          // Performance summary
+          performanceSummary: {
+            vertexSettingsDurationMs:
+              Number(vertexSettingsDurationNs) / 1000000,
+            vertexInstanceDurationMs:
+              Number(vertexInstanceDurationNs) / 1000000,
+            modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
+            totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
+          },
+
+          // Memory usage
+          finalMemoryUsage: process.memoryUsage(),
+
+          message:
+            "Model creation completed successfully - ready for API calls",
+        },
+      );
+
+      return model as LanguageModelV1;
+    } catch (error) {
+      const vertexSettingsErrorTime = process.hrtime.bigint();
+      const vertexSettingsDurationNs =
+        vertexSettingsErrorTime - vertexSettingsStartTime;
+      const totalErrorDurationNs =
+        vertexSettingsErrorTime - modelCreationHrTimeStart;
+
+      logger.error(
+        `[GoogleVertexProvider] ❌ LOG_POINT_V014_VERTEX_SETTINGS_ERROR`,
+        {
+          logPoint: "V014_VERTEX_SETTINGS_ERROR",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          totalElapsedMs: Date.now() - modelCreationStartTime,
+          totalElapsedNs: totalErrorDurationNs.toString(),
+          totalErrorDurationMs: Number(totalErrorDurationNs) / 1000000,
+          vertexSettingsDurationNs: vertexSettingsDurationNs.toString(),
+          vertexSettingsDurationMs: Number(vertexSettingsDurationNs) / 1000000,
+
+          // Comprehensive error analysis
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorStack: error instanceof Error ? error.stack : undefined,
+
+          // Network diagnostic information
+          networkDiagnostics: {
+            errorCode: (error as Record<string, unknown>)?.code || "UNKNOWN",
+            errorErrno: (error as Record<string, unknown>)?.errno || "UNKNOWN",
+            errorAddress:
+              (error as Record<string, unknown>)?.address || "UNKNOWN",
+            errorPort: (error as Record<string, unknown>)?.port || "UNKNOWN",
+            errorSyscall:
+              (error as Record<string, unknown>)?.syscall || "UNKNOWN",
+            errorHostname:
+              (error as Record<string, unknown>)?.hostname || "UNKNOWN",
+            isTimeoutError:
+              error instanceof Error &&
+              (error.message.includes("timeout") ||
+                error.message.includes("ETIMEDOUT")),
+            isNetworkError:
+              error instanceof Error &&
+              (error.message.includes("ENOTFOUND") ||
+                error.message.includes("ECONNREFUSED") ||
+                error.message.includes("ETIMEDOUT")),
+            isAuthError:
+              error instanceof Error &&
+              (error.message.includes("PERMISSION_DENIED") ||
+                error.message.includes("401") ||
+                error.message.includes("403")),
+            infrastructureIssue:
+              error instanceof Error &&
+              error.message.includes("ETIMEDOUT") &&
+              error.message.includes("aiplatform.googleapis.com"),
+          },
+
+          // Environment at error time
+          errorEnvironment: {
+            httpProxy: process.env.HTTP_PROXY || process.env.http_proxy,
+            httpsProxy: process.env.HTTPS_PROXY || process.env.https_proxy,
+            googleAppCreds: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+            hasGoogleServiceKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+            nodeVersion: process.version,
+            memoryUsage: process.memoryUsage(),
+            uptime: process.uptime(),
+          },
+
+          message:
+            "Vertex settings creation failed - critical network/authentication error",
+        },
+      );
+
+      throw error;
+    }
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools
@@ -261,22 +882,228 @@ export class GoogleVertexProvider extends BaseProvider {
     options: StreamOptions,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<StreamResult> {
+    // 🚀 EXHAUSTIVE LOGGING POINT S001: STREAM EXECUTION ENTRY
+    const streamExecutionId = `vertex-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const streamExecutionStartTime = Date.now();
+    const streamExecutionHrTimeStart = process.hrtime.bigint();
     const functionTag = "GoogleVertexProvider.executeStream";
     let chunkCount = 0;
 
-    // Add timeout controller for consistency with other providers
+    logger.info(
+      `[GoogleVertexProvider] 🎬 LOG_POINT_S001_STREAM_EXECUTION_START`,
+      {
+        logPoint: "S001_STREAM_EXECUTION_START",
+        streamExecutionId,
+        timestamp: new Date().toISOString(),
+        streamExecutionStartTime,
+        streamExecutionHrTimeStart: streamExecutionHrTimeStart.toString(),
+        functionTag,
+
+        // Input analysis
+        inputAnalysis: {
+          hasOptions: !!options,
+          optionsType: typeof options,
+          optionsKeys: options ? Object.keys(options) : [],
+          hasInputText: !!options?.input?.text,
+          inputTextLength: options?.input?.text?.length || 0,
+          inputTextPreview:
+            options?.input?.text?.substring(0, 200) || "NO_TEXT",
+          hasAnalysisSchema: !!analysisSchema,
+          schemaType: analysisSchema ? typeof analysisSchema : "NO_SCHEMA",
+          disableTools: options?.disableTools || false,
+          temperature: options?.temperature,
+          maxTokens: options?.maxTokens,
+        },
+
+        // Provider context
+        providerContext: {
+          modelName: this.modelName,
+          providerName: this.providerName,
+          projectId: this.projectId,
+          location: this.location,
+          defaultTimeout: this.defaultTimeout,
+        },
+
+        // Network environment
+        networkEnvironment: {
+          httpProxy:
+            process.env.HTTP_PROXY || process.env.http_proxy || "NOT_SET",
+          httpsProxy:
+            process.env.HTTPS_PROXY || process.env.https_proxy || "NOT_SET",
+          googleAppCreds:
+            process.env.GOOGLE_APPLICATION_CREDENTIALS || "NOT_SET",
+          hasGoogleServiceKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
+          expectedEndpoint: `https://${this.location}-aiplatform.googleapis.com`,
+          proxyConfigured: !!(
+            process.env.HTTP_PROXY ||
+            process.env.HTTPS_PROXY ||
+            process.env.http_proxy ||
+            process.env.https_proxy
+          ),
+        },
+
+        // Performance baseline
+        memoryUsage: process.memoryUsage(),
+        cpuUsage: process.cpuUsage(),
+        message: "Stream execution starting with comprehensive analysis",
+      },
+    );
+
+    // 🚀 EXHAUSTIVE LOGGING POINT S002: TIMEOUT CONTROLLER SETUP
+    const timeoutSetupStartTime = process.hrtime.bigint();
     const timeout = this.getTimeout(options);
+
+    logger.debug(`[GoogleVertexProvider] ⏰ LOG_POINT_S002_TIMEOUT_SETUP`, {
+      logPoint: "S002_TIMEOUT_SETUP",
+      streamExecutionId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - streamExecutionStartTime,
+      elapsedNs: (
+        process.hrtime.bigint() - streamExecutionHrTimeStart
+      ).toString(),
+      timeoutSetupStartTimeNs: timeoutSetupStartTime.toString(),
+      timeout,
+      providerName: this.providerName,
+      streamType: "stream",
+      message: "Setting up timeout controller for stream execution",
+    });
+
+    // Add timeout controller for consistency with other providers
     const timeoutController = createTimeoutController(
       timeout,
       this.providerName,
       "stream",
     );
 
+    const timeoutSetupEndTime = process.hrtime.bigint();
+    const timeoutSetupDurationNs = timeoutSetupEndTime - timeoutSetupStartTime;
+
+    logger.debug(
+      `[GoogleVertexProvider] ✅ LOG_POINT_S003_TIMEOUT_SETUP_SUCCESS`,
+      {
+        logPoint: "S003_TIMEOUT_SETUP_SUCCESS",
+        streamExecutionId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - streamExecutionStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - streamExecutionHrTimeStart
+        ).toString(),
+        timeoutSetupDurationNs: timeoutSetupDurationNs.toString(),
+        timeoutSetupDurationMs: Number(timeoutSetupDurationNs) / 1000000,
+        hasTimeoutController: !!timeoutController,
+        timeoutValue: timeout,
+        message: "Timeout controller setup completed",
+      },
+    );
+
     try {
+      // 🚀 EXHAUSTIVE LOGGING POINT S004: STREAM OPTIONS VALIDATION
+      const validationStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] ✔️ LOG_POINT_S004_VALIDATION_START`,
+        {
+          logPoint: "S004_VALIDATION_START",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          validationStartTimeNs: validationStartTime.toString(),
+          message: "Starting stream options validation",
+        },
+      );
+
       this.validateStreamOptions(options);
+
+      const validationEndTime = process.hrtime.bigint();
+      const validationDurationNs = validationEndTime - validationStartTime;
+
+      logger.debug(
+        `[GoogleVertexProvider] ✅ LOG_POINT_S005_VALIDATION_SUCCESS`,
+        {
+          logPoint: "S005_VALIDATION_SUCCESS",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          validationDurationNs: validationDurationNs.toString(),
+          validationDurationMs: Number(validationDurationNs) / 1000000,
+          message: "Stream options validation successful",
+        },
+      );
+
+      // 🚀 EXHAUSTIVE LOGGING POINT S006: MESSAGE ARRAY BUILDING
+      const messagesBuildStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] 📝 LOG_POINT_S006_MESSAGES_BUILD_START`,
+        {
+          logPoint: "S006_MESSAGES_BUILD_START",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          messagesBuildStartTimeNs: messagesBuildStartTime.toString(),
+          message: "Building message array from stream options",
+        },
+      );
 
       // Build message array from options
       const messages = buildMessagesArray(options);
+
+      const messagesBuildEndTime = process.hrtime.bigint();
+      const messagesBuildDurationNs =
+        messagesBuildEndTime - messagesBuildStartTime;
+
+      logger.debug(
+        `[GoogleVertexProvider] ✅ LOG_POINT_S007_MESSAGES_BUILD_SUCCESS`,
+        {
+          logPoint: "S007_MESSAGES_BUILD_SUCCESS",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          messagesBuildDurationNs: messagesBuildDurationNs.toString(),
+          messagesBuildDurationMs: Number(messagesBuildDurationNs) / 1000000,
+          messagesCount: messages?.length || 0,
+          messagesType: typeof messages,
+          hasMessages: !!messages,
+          message: "Message array built successfully",
+        },
+      );
+
+      // 🚀 EXHAUSTIVE LOGGING POINT S008: INITIAL STREAM REQUEST LOG
+      logger.debug(
+        `[GoogleVertexProvider] 🚀 LOG_POINT_S008_STREAM_REQUEST_DETAILS`,
+        {
+          logPoint: "S008_STREAM_REQUEST_DETAILS",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+
+          // Detailed request information
+          streamRequestDetails: {
+            modelName: this.modelName,
+            promptLength: options.input.text.length,
+            hasSchema: !!analysisSchema,
+            messagesCount: messages?.length || 0,
+            temperature: options?.temperature,
+            maxTokens: options?.maxTokens,
+            disableTools: options?.disableTools || false,
+          },
+
+          message: "Starting comprehensive stream request processing",
+        },
+      );
 
       logger.debug(`${functionTag}: Starting stream request`, {
         modelName: this.modelName,
@@ -284,11 +1111,95 @@ export class GoogleVertexProvider extends BaseProvider {
         hasSchema: !!analysisSchema,
       });
 
-      const model = await this.getModel();
+      // 🚀 EXHAUSTIVE LOGGING POINT S009: MODEL CREATION FOR STREAM
+      const modelCreationStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] 🏭 LOG_POINT_S009_MODEL_CREATION_FOR_STREAM`,
+        {
+          logPoint: "S009_MODEL_CREATION_FOR_STREAM",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          modelCreationStartTimeNs: modelCreationStartTime.toString(),
+          requestedModel: this.modelName,
+          message:
+            "Starting model creation for stream execution (this will include network setup)",
+        },
+      );
+
+      const model = await this.getModel(); // This is where network connection happens!
+
+      const modelCreationEndTime = process.hrtime.bigint();
+      const modelCreationDurationNs =
+        modelCreationEndTime - modelCreationStartTime;
+
+      logger.info(
+        `[GoogleVertexProvider] ✅ LOG_POINT_S010_MODEL_CREATION_SUCCESS`,
+        {
+          logPoint: "S010_MODEL_CREATION_SUCCESS",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          modelCreationDurationNs: modelCreationDurationNs.toString(),
+          modelCreationDurationMs: Number(modelCreationDurationNs) / 1000000,
+          hasModel: !!model,
+          modelType: typeof model,
+          message:
+            "Model creation completed successfully - network connection established",
+        },
+      );
+
+      // 🚀 EXHAUSTIVE LOGGING POINT S011: TOOLS SETUP FOR STREAMING
+      const toolsSetupStartTime = process.hrtime.bigint();
+      logger.debug(
+        `[GoogleVertexProvider] 🛠️ LOG_POINT_S011_TOOLS_SETUP_START`,
+        {
+          logPoint: "S011_TOOLS_SETUP_START",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          toolsSetupStartTimeNs: toolsSetupStartTime.toString(),
+          disableTools: options?.disableTools || false,
+          supportsTools: this.supportsTools(),
+          message: "Setting up tools for streaming",
+        },
+      );
 
       // Get all available tools (direct + MCP + external) for streaming
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const tools = shouldUseTools ? await this.getAllTools() : {};
+
+      const toolsSetupEndTime = process.hrtime.bigint();
+      const toolsSetupDurationNs = toolsSetupEndTime - toolsSetupStartTime;
+
+      logger.debug(
+        `[GoogleVertexProvider] ✅ LOG_POINT_S012_TOOLS_SETUP_SUCCESS`,
+        {
+          logPoint: "S012_TOOLS_SETUP_SUCCESS",
+          streamExecutionId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - streamExecutionStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - streamExecutionHrTimeStart
+          ).toString(),
+          toolsSetupDurationNs: toolsSetupDurationNs.toString(),
+          toolsSetupDurationMs: Number(toolsSetupDurationNs) / 1000000,
+          shouldUseTools,
+          toolCount: Object.keys(tools).length,
+          toolNames: Object.keys(tools),
+          hasTools: Object.keys(tools).length > 0,
+          message: "Tools setup completed for streaming",
+        },
+      );
 
       logger.debug(`${functionTag}: Tools for streaming`, {
         shouldUseTools,
@@ -578,52 +1489,587 @@ export class GoogleVertexProvider extends BaseProvider {
    * @returns Promise<boolean> indicating if Anthropic support is available
    */
   async hasAnthropicSupport(): Promise<boolean> {
-    const createVertexAnthropic = await getCreateVertexAnthropic();
-    return createVertexAnthropic !== null;
+    return hasAnthropicSupport();
   }
 
   /**
-   * Create an Anthropic model instance if available
-   * Uses fresh vertex settings for each request
+   * Create an Anthropic model instance using vertexAnthropic provider
+   * Uses fresh vertex settings for each request with comprehensive validation
    * @param modelName Anthropic model name (e.g., 'claude-3-sonnet@20240229')
    * @returns LanguageModelV1 instance or null if not available
    */
-  createAnthropicModel(modelName: string): Promise<LanguageModelV1 | null> {
-    return getCreateVertexAnthropic().then((createVertexAnthropic) => {
-      if (!createVertexAnthropic) {
+  async createAnthropicModel(
+    modelName: string,
+  ): Promise<LanguageModelV1 | null> {
+    const validationId = `anthropic-validation-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+    logger.debug(
+      "[GoogleVertexProvider] 🧠 Starting comprehensive Anthropic model validation",
+      {
+        validationId,
+        modelName,
+        timestamp: new Date().toISOString(),
+      },
+    );
+
+    // 1. SDK Module Availability Validation
+    if (!hasAnthropicSupport()) {
+      logger.error("[GoogleVertexProvider] ❌ SDK module validation failed", {
+        validationId,
+        issue: "createVertexAnthropic function not available",
+        solution:
+          "Update @ai-sdk/google-vertex to latest version with Anthropic support",
+        command: "npm install @ai-sdk/google-vertex@latest",
+        documentation:
+          "https://sdk.vercel.ai/providers/ai-sdk-providers/google-vertex#anthropic-models",
+      });
+      return null;
+    }
+
+    // 2. Authentication Validation
+    const authValidation = await this.validateVertexAuthentication();
+    if (!authValidation.isValid) {
+      logger.error(
+        "[GoogleVertexProvider] ❌ Authentication validation failed",
+        {
+          validationId,
+          method: authValidation.method,
+          issues: authValidation.issues,
+          solutions: [
+            "Option 1: Set GOOGLE_APPLICATION_CREDENTIALS to valid service account file",
+            "Option 2: Set individual env vars: GOOGLE_AUTH_CLIENT_EMAIL, GOOGLE_AUTH_PRIVATE_KEY",
+            "Documentation: https://cloud.google.com/docs/authentication/provide-credentials-adc",
+          ],
+        },
+      );
+      return null;
+    }
+
+    // 3. Project Configuration Validation
+    const projectValidation = await this.validateVertexProjectConfiguration();
+    if (!projectValidation.isValid) {
+      logger.error(
+        "[GoogleVertexProvider] ❌ Project configuration validation failed",
+        {
+          validationId,
+          projectId: projectValidation.projectId,
+          region: projectValidation.region,
+          issues: projectValidation.issues,
+          solutions: [
+            "Set GOOGLE_VERTEX_PROJECT or GOOGLE_CLOUD_PROJECT environment variable",
+            "Ensure project exists and has Vertex AI API enabled",
+            "Check: https://console.cloud.google.com/apis/library/aiplatform.googleapis.com",
+          ],
+        },
+      );
+      return null;
+    }
+
+    // 4. Regional Support Validation
+    const regionSupported = await this.checkVertexRegionalSupport(
+      projectValidation.region,
+    );
+    if (!regionSupported) {
+      logger.warn("[GoogleVertexProvider] ⚠️ Regional support warning", {
+        validationId,
+        region: projectValidation.region,
+        warning: "Anthropic models may not be available in this region",
+        supportedRegions: [
+          "us-central1",
+          "us-east4",
+          "europe-west1",
+          "asia-southeast1",
+        ],
+        solution: "Set GOOGLE_CLOUD_LOCATION to a supported region",
+      });
+      // Continue with warning, don't block
+    }
+
+    // 5. Model Name Validation
+    const modelValidation = this.validateAnthropicModelName(modelName);
+    if (!modelValidation.isValid) {
+      logger.error("[GoogleVertexProvider] ❌ Model name validation failed", {
+        validationId,
+        modelName,
+        issue: modelValidation.issue,
+        recommendedModels: [
+          "claude-sonnet-4@20250514",
+          "claude-opus-4@20250514",
+          "claude-3-5-sonnet-20241022",
+          "claude-3-5-haiku-20241022",
+        ],
+      });
+      return null;
+    }
+
+    try {
+      // 6. Settings Creation with Enhanced Error Handling
+      logger.debug(
+        "[GoogleVertexProvider] 🔧 Creating vertexAnthropic settings",
+        {
+          validationId,
+          authMethod: authValidation.method,
+          projectId: projectValidation.projectId,
+          region: projectValidation.region,
+        },
+      );
+
+      const vertexAnthropicSettings = await createVertexAnthropicSettings();
+
+      // 7. Settings Validation
+      if (
+        !vertexAnthropicSettings.project ||
+        !vertexAnthropicSettings.location
+      ) {
+        logger.error("[GoogleVertexProvider] ❌ Settings validation failed", {
+          validationId,
+          hasProject: !!vertexAnthropicSettings.project,
+          hasLocation: !!vertexAnthropicSettings.location,
+          hasProxy: !!vertexAnthropicSettings.fetch,
+          hasAuth: !!vertexAnthropicSettings.googleAuthOptions,
+        });
         return null;
       }
 
-      // Use fresh vertex settings instead of cached config
-      // Type guard to ensure createVertexAnthropic is callable
-      if (typeof createVertexAnthropic !== "function") {
-        throw new Error("createVertexAnthropic is not a function");
-      }
+      logger.debug(
+        "[GoogleVertexProvider] ✅ Creating vertexAnthropic instance",
+        {
+          validationId,
+          modelName,
+          project: vertexAnthropicSettings.project,
+          location: vertexAnthropicSettings.location,
+          hasProxy: !!vertexAnthropicSettings.fetch,
+          hasAuth: !!vertexAnthropicSettings.googleAuthOptions,
+        },
+      );
 
-      const vertexSettings = createVertexSettings();
-      const vertexAnthropicInstance = createVertexAnthropic(vertexSettings);
+      // 8. Provider Instance Creation
+      const vertexAnthropicInstance = createVertexAnthropic(
+        vertexAnthropicSettings,
+      );
 
-      // Type guard to ensure the returned instance has the expected model creation method
-      if (
-        !vertexAnthropicInstance ||
-        typeof vertexAnthropicInstance !== "function"
-      ) {
-        throw new Error("Failed to create valid Anthropic instance");
-      }
-
+      // 9. Model Instance Creation with Network Error Handling
       const model = vertexAnthropicInstance(modelName);
 
-      // Type guard to ensure the returned model implements LanguageModelV1
-      if (
-        !model ||
-        typeof model !== "object" ||
-        !("specificationVersion" in model)
-      ) {
-        throw new Error("Failed to create valid LanguageModelV1 instance");
-      }
+      logger.info(
+        "[GoogleVertexProvider] ✅ Anthropic model created successfully",
+        {
+          validationId,
+          modelName,
+          hasModel: !!model,
+          modelType: typeof model,
+          authMethod: authValidation.method,
+          projectId: projectValidation.projectId,
+          region: projectValidation.region,
+          validationsPassed: [
+            "SDK_MODULE_AVAILABLE",
+            "AUTHENTICATION_VALID",
+            "PROJECT_CONFIGURED",
+            "MODEL_NAME_VALID",
+            "SETTINGS_CREATED",
+            "PROVIDER_INSTANCE_CREATED",
+            "MODEL_INSTANCE_CREATED",
+          ],
+        },
+      );
 
       return model as LanguageModelV1;
-    });
+    } catch (error) {
+      // Enhanced error analysis and reporting
+      const errorAnalysis = this.analyzeAnthropicCreationError(error, {
+        validationId,
+        modelName,
+        projectId: projectValidation.projectId,
+        region: projectValidation.region,
+        authMethod: authValidation.method,
+      });
+
+      logger.error(
+        "[GoogleVertexProvider] ❌ Anthropic model creation failed",
+        {
+          validationId,
+          modelName,
+          ...errorAnalysis,
+          detailedTroubleshooting:
+            this.getAnthropicTroubleshootingSteps(errorAnalysis),
+        },
+      );
+
+      return null;
+    }
+  }
+
+  /**
+   * Validate Vertex AI authentication configuration
+   */
+  private async validateVertexAuthentication(): Promise<{
+    isValid: boolean;
+    method: string;
+    issues: string[];
+  }> {
+    const result = {
+      isValid: false,
+      method: "none",
+      issues: [] as string[],
+    };
+
+    try {
+      // Check for service account file authentication (preferred)
+      if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+        try {
+          if (fs.existsSync(credentialsPath)) {
+            // Validate JSON structure
+            const credentialsContent = fs.readFileSync(credentialsPath, "utf8");
+            const credentials = JSON.parse(credentialsContent);
+
+            if (
+              credentials.type === "service_account" &&
+              credentials.project_id &&
+              credentials.client_email &&
+              credentials.private_key
+            ) {
+              result.isValid = true;
+              result.method = "service_account_file";
+              return result;
+            } else {
+              result.issues.push(
+                "Service account file missing required fields",
+              );
+            }
+          } else {
+            result.issues.push(
+              `Service account file not found: ${credentialsPath}`,
+            );
+          }
+        } catch (fileError) {
+          result.issues.push(
+            `Service account file validation failed: ${fileError}`,
+          );
+        }
+      }
+
+      // Check for individual environment variables
+      if (
+        process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
+        process.env.GOOGLE_AUTH_PRIVATE_KEY
+      ) {
+        const email = process.env.GOOGLE_AUTH_CLIENT_EMAIL;
+        const privateKey = process.env.GOOGLE_AUTH_PRIVATE_KEY;
+
+        if (email.includes("@") && privateKey.includes("BEGIN PRIVATE KEY")) {
+          result.isValid = true;
+          result.method = "environment_variables";
+          return result;
+        } else {
+          result.issues.push("Individual credentials format validation failed");
+        }
+      } else {
+        result.issues.push(
+          "Missing individual credential environment variables",
+        );
+      }
+
+      if (!result.isValid) {
+        result.issues.push("No valid authentication method found");
+      }
+    } catch (error) {
+      result.issues.push(`Authentication validation error: ${error}`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate Vertex AI project configuration
+   */
+  private async validateVertexProjectConfiguration(): Promise<{
+    isValid: boolean;
+    projectId: string | undefined;
+    region: string | undefined;
+    issues: string[];
+  }> {
+    const result = {
+      isValid: false,
+      projectId: undefined as string | undefined,
+      region: undefined as string | undefined,
+      issues: [] as string[],
+    };
+
+    // Check project ID
+    const projectId =
+      process.env.GOOGLE_VERTEX_PROJECT ||
+      process.env.GOOGLE_CLOUD_PROJECT_ID ||
+      process.env.GOOGLE_PROJECT_ID ||
+      process.env.GOOGLE_CLOUD_PROJECT;
+
+    if (projectId) {
+      result.projectId = projectId;
+
+      // Validate project ID format
+      const projectIdPattern = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+      if (projectIdPattern.test(projectId)) {
+        result.isValid = true;
+      } else {
+        result.issues.push(`Invalid project ID format: ${projectId}`);
+      }
+    } else {
+      result.issues.push("No project ID configured");
+    }
+
+    // Check region/location
+    const region =
+      process.env.GOOGLE_CLOUD_LOCATION ||
+      process.env.VERTEX_LOCATION ||
+      process.env.GOOGLE_VERTEX_LOCATION ||
+      "us-central1";
+
+    result.region = region;
+
+    // Validate region format
+    const regionPattern = /^[a-z]+-[a-z]+\d+$/;
+    if (!regionPattern.test(region)) {
+      result.issues.push(`Invalid region format: ${region}`);
+      result.isValid = false;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if the specified region supports Anthropic models
+   */
+  private async checkVertexRegionalSupport(
+    region: string = "us-central1",
+  ): Promise<boolean> {
+    // Based on Google Cloud documentation, these regions support Anthropic models
+    const supportedRegions = [
+      "us-central1",
+      "us-east4",
+      "us-west1",
+      "us-west4",
+      "europe-west1",
+      "europe-west4",
+      "asia-southeast1",
+      "asia-northeast1",
+    ];
+
+    return supportedRegions.includes(region);
+  }
+
+  /**
+   * Validate Anthropic model name format and availability
+   */
+  private validateAnthropicModelName(modelName: string): {
+    isValid: boolean;
+    issue?: string;
+  } {
+    if (!modelName || typeof modelName !== "string") {
+      return {
+        isValid: false,
+        issue: "Model name is required and must be a string",
+      };
+    }
+
+    // Check if it's a Claude model
+    if (!modelName.toLowerCase().includes("claude")) {
+      return {
+        isValid: false,
+        issue: 'Model name must be a Claude model (should contain "claude")',
+      };
+    }
+
+    // Validate against known Claude model patterns
+    const validPatterns = [
+      /^claude-sonnet-4@\d{8}$/,
+      /^claude-opus-4@\d{8}$/,
+      /^claude-3-5-sonnet-\d{8}$/,
+      /^claude-3-5-haiku-\d{8}$/,
+      /^claude-3-sonnet-\d{8}$/,
+      /^claude-3-haiku-\d{8}$/,
+      /^claude-3-opus-\d{8}$/,
+    ];
+
+    const isValidFormat = validPatterns.some((pattern) =>
+      pattern.test(modelName),
+    );
+
+    if (!isValidFormat) {
+      return {
+        isValid: false,
+        issue: `Model name format not recognized. Expected formats like "claude-3-5-sonnet-20241022" or "claude-sonnet-4@20250514"`,
+      };
+    }
+
+    return { isValid: true };
+  }
+
+  /**
+   * Analyze Anthropic model creation errors for detailed troubleshooting
+   */
+  private analyzeAnthropicCreationError(
+    error: unknown,
+    context: {
+      validationId: string;
+      modelName: string;
+      projectId?: string;
+      region?: string;
+      authMethod: string;
+    },
+  ) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+
+    const analysis = {
+      error: errorMessage,
+      errorName,
+      errorType: "UNKNOWN",
+      isNetworkError: false,
+      isAuthError: false,
+      isConfigurationError: false,
+      isModelError: false,
+      isRegionalError: false,
+      specificIssue: "Unknown error occurred",
+      errorStack: error instanceof Error ? error.stack : undefined,
+    };
+
+    // Network-related errors
+    if (
+      errorMessage.includes("ETIMEDOUT") ||
+      errorMessage.includes("ECONNREFUSED") ||
+      errorMessage.includes("ENOTFOUND") ||
+      errorMessage.includes("timeout")
+    ) {
+      analysis.errorType = "NETWORK";
+      analysis.isNetworkError = true;
+      analysis.specificIssue =
+        "Network connectivity issue - cannot reach Google Cloud endpoints";
+    }
+    // Authentication errors
+    else if (
+      errorMessage.includes("PERMISSION_DENIED") ||
+      errorMessage.includes("401") ||
+      errorMessage.includes("403") ||
+      errorMessage.includes("Unauthorized") ||
+      errorMessage.includes("Forbidden")
+    ) {
+      analysis.errorType = "AUTHENTICATION";
+      analysis.isAuthError = true;
+      analysis.specificIssue =
+        "Authentication failed - invalid credentials or insufficient permissions";
+    }
+    // Model availability errors
+    else if (
+      errorMessage.includes("NOT_FOUND") ||
+      errorMessage.includes("404") ||
+      (errorMessage.includes("model") && errorMessage.includes("not available"))
+    ) {
+      analysis.errorType = "MODEL_AVAILABILITY";
+      analysis.isModelError = true;
+      analysis.specificIssue = `Model "${context.modelName}" not available in region "${context.region}"`;
+    }
+    // Regional/quota errors
+    else if (
+      errorMessage.includes("QUOTA_EXCEEDED") ||
+      errorMessage.includes("quota") ||
+      errorMessage.includes("limit")
+    ) {
+      analysis.errorType = "QUOTA";
+      analysis.isRegionalError = true;
+      analysis.specificIssue = "Quota exceeded or rate limit reached";
+    }
+    // Configuration errors
+    else if (
+      errorMessage.includes("INVALID_ARGUMENT") ||
+      errorMessage.includes("BadRequest") ||
+      errorMessage.includes("400")
+    ) {
+      analysis.errorType = "CONFIGURATION";
+      analysis.isConfigurationError = true;
+      analysis.specificIssue = "Invalid configuration or request parameters";
+    }
+
+    return analysis;
+  }
+
+  /**
+   * Get detailed troubleshooting steps based on error analysis
+   */
+  private getAnthropicTroubleshootingSteps(errorAnalysis: {
+    errorType: string;
+    [key: string]: unknown;
+  }): string[] {
+    const steps: string[] = [];
+
+    switch (errorAnalysis.errorType) {
+      case "NETWORK":
+        steps.push(
+          "🌐 Network Troubleshooting:",
+          "1. Check internet connectivity",
+          "2. Verify proxy configuration if behind corporate firewall",
+          "3. Ensure firewall allows HTTPS to *.googleapis.com",
+          "4. Try different network or wait for network issues to resolve",
+          "5. Check if using VPN that might block Google Cloud endpoints",
+        );
+        break;
+
+      case "AUTHENTICATION":
+        steps.push(
+          "🔐 Authentication Troubleshooting:",
+          "1. Verify GOOGLE_APPLICATION_CREDENTIALS file exists and is valid",
+          "2. Check individual credentials: GOOGLE_AUTH_CLIENT_EMAIL, GOOGLE_AUTH_PRIVATE_KEY",
+          '3. Ensure service account has "Vertex AI User" role',
+          "4. Verify project ID matches the one in your credentials",
+          "5. Enable Vertex AI API: https://console.cloud.google.com/apis/library/aiplatform.googleapis.com",
+        );
+        break;
+
+      case "MODEL_AVAILABILITY":
+        steps.push(
+          "🤖 Model Availability Troubleshooting:",
+          "1. Verify model name format and spelling",
+          "2. Check if Anthropic integration is enabled in your project",
+          "3. Enable Claude models: https://console.cloud.google.com/vertex-ai/publishers/anthropic",
+          "4. Try a different region if current region lacks Anthropic support",
+          "5. Accept Anthropic terms and conditions in Google Cloud Console",
+        );
+        break;
+
+      case "QUOTA":
+        steps.push(
+          "📊 Quota Troubleshooting:",
+          "1. Check Vertex AI quotas in Google Cloud Console",
+          "2. Request quota increase if needed",
+          "3. Try a different model with lower resource requirements",
+          "4. Wait before retrying if rate limited",
+          "5. Consider using a different region with available quota",
+        );
+        break;
+
+      case "CONFIGURATION":
+        steps.push(
+          "⚙️ Configuration Troubleshooting:",
+          "1. Verify all required environment variables are set",
+          "2. Check project ID and region format",
+          "3. Ensure model name follows correct format",
+          "4. Verify request parameters are within model limits",
+          "5. Update @ai-sdk/google-vertex to latest version",
+        );
+        break;
+
+      default:
+        steps.push(
+          "🔧 General Troubleshooting:",
+          "1. Update @ai-sdk/google-vertex to latest version",
+          "2. Check Google Cloud service status",
+          "3. Verify all authentication and configuration",
+          "4. Try with a simple Claude model like claude-3-haiku-20240307",
+          "5. Enable debug logging with NEUROLINK_DEBUG=true",
+        );
+    }
+
+    return steps;
   }
 
   /**

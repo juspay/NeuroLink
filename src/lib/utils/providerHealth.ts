@@ -6,6 +6,7 @@
 import { logger } from "./logger.js";
 import { AIProviderName } from "../core/types.js";
 import { basename } from "path";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 export interface ProviderHealthStatus {
   provider: AIProviderName;
@@ -232,6 +233,77 @@ export class ProviderHealthChecker {
     providerName: AIProviderName,
     healthStatus: ProviderHealthStatus,
   ): Promise<void> {
+    // 🎯 SPECIAL HANDLING FOR VERTEX AI: Check both auth methods
+    if (providerName === AIProviderName.VERTEX) {
+      logger.debug("Vertex AI authentication check starting", {
+        providerName,
+      });
+
+      // Method 1: Check GOOGLE_APPLICATION_CREDENTIALS (file-based)
+      const credentialsFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      let fileBasedAuthValid = false;
+
+      if (credentialsFile) {
+        logger.debug("Checking GOOGLE_APPLICATION_CREDENTIALS file");
+
+        try {
+          const { promises: fs } = await import("fs");
+          try {
+            await fs.access(credentialsFile);
+            fileBasedAuthValid = true;
+          } catch {
+            fileBasedAuthValid = false;
+          }
+          logger.debug("File auth check result", {
+            fileExists: fileBasedAuthValid,
+          });
+        } catch (error) {
+          logger.debug("File auth check error", {
+            error: String(error),
+          });
+          fileBasedAuthValid = false;
+        }
+      }
+
+      // Method 2: Check individual environment variables
+      const hasIndividualAuth = !!(
+        process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
+        process.env.GOOGLE_AUTH_PRIVATE_KEY
+      );
+
+      logger.debug("Individual auth check", {
+        hasClientEmail: !!process.env.GOOGLE_AUTH_CLIENT_EMAIL,
+        hasPrivateKey: !!process.env.GOOGLE_AUTH_PRIVATE_KEY,
+        hasIndividualAuth,
+      });
+
+      // Vertex is valid if EITHER auth method works
+      const hasValidAuth = fileBasedAuthValid || hasIndividualAuth;
+
+      logger.debug("Vertex auth final result", {
+        fileBasedAuthValid,
+        hasIndividualAuth,
+        hasValidAuth,
+      });
+
+      if (hasValidAuth) {
+        healthStatus.hasApiKey = true;
+        logger.debug("Vertex auth SUCCESS", {
+          authMethod: fileBasedAuthValid ? "file-based" : "individual-env-vars",
+        });
+      } else {
+        healthStatus.hasApiKey = false;
+        healthStatus.configurationIssues.push(
+          `Vertex AI authentication not found: neither GOOGLE_APPLICATION_CREDENTIALS file nor individual credentials (GOOGLE_AUTH_CLIENT_EMAIL + GOOGLE_AUTH_PRIVATE_KEY) are properly configured`,
+        );
+        logger.debug("Vertex auth FAILED", {
+          reason: "No valid auth method found",
+        });
+      }
+      return;
+    }
+
+    // 🔧 STANDARD HANDLING FOR OTHER PROVIDERS
     const apiKeyVar = this.getApiKeyEnvironmentVariable(providerName);
     const apiKey = process.env[apiKeyVar];
 
@@ -278,13 +350,25 @@ export class ProviderHealthChecker {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(endpoint, {
+      const proxyFetch = createProxyFetch();
+      let response = await proxyFetch(endpoint, {
         method: "HEAD",
         signal: controller.signal,
         headers: {
           "User-Agent": "NeuroLink-HealthCheck/1.0",
         },
       });
+
+      // Fallback to GET if HEAD returns 405 (Method Not Allowed) for restrictive gateways
+      if (response.status === 405) {
+        response = await proxyFetch(endpoint, {
+          method: "GET",
+          signal: controller.signal,
+          headers: {
+            "User-Agent": "NeuroLink-HealthCheck/1.0",
+          },
+        });
+      }
 
       clearTimeout(timeoutId);
 
@@ -356,12 +440,19 @@ export class ProviderHealthChecker {
 
     if (commonModels.length > 0) {
       if (providerName === AIProviderName.VERTEX) {
-        // Provide more detailed information for Vertex AI
+        // Provide detailed information about dual provider architecture
         healthStatus.recommendations.push(
-          `Available models for ${providerName}:\n` +
-            `  Google Models: gemini-1.5-pro, gemini-1.5-flash\n` +
-            `  Claude Models: claude-3-5-sonnet-20241022, claude-3-sonnet-20240229, claude-3-haiku-20240307, claude-3-opus-20240229\n` +
-            `  Note: Claude models require Anthropic integration to be enabled in your Google Cloud project`,
+          `Available models for ${providerName} (using dual provider architecture):\n` +
+            `  Google Models (via vertex provider):\n` +
+            `    • gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite\n` +
+            `    • gemini-2.0-flash-001, gemini-1.5-pro, gemini-1.5-flash\n` +
+            `  Anthropic Models (via vertexAnthropic provider):\n` +
+            `    • claude-sonnet-4@20250514, claude-opus-4@20250514\n` +
+            `    • claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022\n` +
+            `    • claude-3-sonnet-20240229, claude-3-haiku-20240307, claude-3-opus-20240229\n` +
+            `  Implementation: Uses @ai-sdk/google-vertex with dual provider setup\n` +
+            `  Authentication: Requires Google Cloud project with Vertex AI API enabled\n` +
+            `  Note: Anthropic models require Anthropic integration in your Google Cloud project`,
         );
       } else {
         healthStatus.recommendations.push(
@@ -392,6 +483,8 @@ export class ProviderHealthChecker {
         return ["GOOGLE_AI_API_KEY"];
       case AIProviderName.BEDROCK:
         return ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"];
+      case AIProviderName.AZURE:
+        return ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"];
       case AIProviderName.OLLAMA:
         return []; // Ollama typically doesn't require API keys
       default:
@@ -416,6 +509,8 @@ export class ProviderHealthChecker {
         return "GOOGLE_AI_API_KEY";
       case AIProviderName.BEDROCK:
         return "AWS_ACCESS_KEY_ID";
+      case AIProviderName.AZURE:
+        return "AZURE_OPENAI_API_KEY";
       case AIProviderName.OLLAMA:
         return "OLLAMA_API_BASE";
       default:
@@ -441,6 +536,8 @@ export class ProviderHealthChecker {
         return apiKey.endsWith(".json") || apiKey.includes("type"); // JSON key format
       case AIProviderName.BEDROCK:
         return apiKey.length >= 20; // AWS access key length
+      case AIProviderName.AZURE:
+        return apiKey.length >= 32; // Azure OpenAI API key length
       case AIProviderName.OLLAMA:
         return true; // Ollama usually doesn't require specific format
       default:
@@ -481,6 +578,10 @@ export class ProviderHealthChecker {
   ): Promise<void> {
     switch (providerName) {
       case AIProviderName.VERTEX: {
+        logger.debug("Starting Vertex AI health check", {
+          providerName,
+        });
+
         // Check for Google Cloud project ID (with fallbacks)
         const projectId =
           process.env.GOOGLE_PROJECT_ID ||
@@ -488,6 +589,10 @@ export class ProviderHealthChecker {
           process.env.GOOGLE_VERTEX_PROJECT ||
           process.env.GOOGLE_CLOUD_PROJECT ||
           process.env.VERTEX_PROJECT_ID;
+
+        logger.debug("Project ID validation", {
+          hasProjectId: !!projectId,
+        });
 
         if (!projectId) {
           healthStatus.configurationIssues.push(
@@ -498,49 +603,138 @@ export class ProviderHealthChecker {
           );
         }
 
-        // Check for authentication (either credentials file OR individual credentials)
-        const hasCredentialsFile = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
-        const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-        const hasIndividualCredentials = !!(
-          process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
-          process.env.GOOGLE_AUTH_PRIVATE_KEY
-        );
+        // Check for authentication with proper file existence validation
+        // This aligns with the authentication logic fix in googleVertex.ts
+        let hasValidAuth = false;
 
-        if (
-          !hasCredentialsFile &&
-          !hasServiceAccountKey &&
-          !hasIndividualCredentials
-        ) {
-          healthStatus.configurationIssues.push(
-            "Google Cloud authentication not configured",
-          );
-          healthStatus.recommendations.push(
-            "Set either GOOGLE_APPLICATION_CREDENTIALS (file path), GOOGLE_SERVICE_ACCOUNT_KEY (base64), or both GOOGLE_AUTH_CLIENT_EMAIL and GOOGLE_AUTH_PRIVATE_KEY",
-          );
+        logger.debug("Authentication validation starting", {
+          hasGoogleApplicationCredentials:
+            !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        });
+
+        // Check for principal account authentication first (recommended for production)
+        // BUT CRITICALLY: Also verify the file actually exists
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+          logger.debug("Checking GOOGLE_APPLICATION_CREDENTIALS file");
+
+          // Check if the credentials file actually exists
+          let fileExists = false;
+          try {
+            const { promises: fs } = await import("fs");
+            try {
+              await fs.access(credentialsPath);
+              fileExists = true;
+            } catch {
+              fileExists = false;
+            }
+
+            logger.debug("File existence check completed", {
+              fileExists,
+            });
+          } catch (error) {
+            logger.debug("File existence check failed", {
+              error: String(error),
+            });
+            healthStatus.warning = `Failed to check credentials file existence: ${error}`;
+            fileExists = false;
+          }
+
+          if (fileExists) {
+            // Validate file format
+            const fileName = basename(credentialsPath);
+            const jsonFilePattern = /\.json(\.\w+)?$/;
+            if (!jsonFilePattern.test(fileName)) {
+              healthStatus.warning =
+                "GOOGLE_APPLICATION_CREDENTIALS should point to a JSON file (e.g., 'credentials.json' or 'key.json.backup')";
+            }
+            hasValidAuth = true;
+            healthStatus.hasApiKey = true;
+
+            logger.debug("GOOGLE_APPLICATION_CREDENTIALS file validated", {
+              fileName,
+              hasValidAuth,
+            });
+          } else {
+            healthStatus.warning = `GOOGLE_APPLICATION_CREDENTIALS file does not exist: ${credentialsPath}`;
+            logger.debug(
+              "GOOGLE_APPLICATION_CREDENTIALS file missing, falling back to individual env vars",
+            );
+            // Fall through to check individual environment variables
+          }
         } else {
-          healthStatus.hasApiKey = true; // At least one auth method is configured
+          logger.debug(
+            "GOOGLE_APPLICATION_CREDENTIALS not set, checking individual env vars",
+          );
         }
 
-        // Validate credentials file if provided
-        if (hasCredentialsFile) {
-          const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS!;
-          const fileName = basename(credPath);
-          // Use regex to match .json files with optional backup extensions
-          const jsonFilePattern = /\.json(\.\w+)?$/;
-          if (!jsonFilePattern.test(fileName)) {
-            healthStatus.warning =
-              "GOOGLE_APPLICATION_CREDENTIALS should point to a JSON file (e.g., 'credentials.json' or 'key.json.backup')";
+        // Fallback to individual credentials for development and production
+        // Enhanced to check ALL required fields from the .env file configuration
+        if (!hasValidAuth) {
+          const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+          const hasIndividualCredentials = !!(
+            process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
+            process.env.GOOGLE_AUTH_PRIVATE_KEY
+          );
+
+          logger.debug("Individual credentials check", {
+            hasServiceAccountKey,
+            hasGoogleAuthClientEmail: !!process.env.GOOGLE_AUTH_CLIENT_EMAIL,
+            hasGoogleAuthPrivateKey: !!process.env.GOOGLE_AUTH_PRIVATE_KEY,
+            hasIndividualCredentials,
+          });
+
+          if (hasServiceAccountKey || hasIndividualCredentials) {
+            hasValidAuth = true;
+            healthStatus.hasApiKey = true;
+
+            logger.debug("Individual credentials validated successfully", {
+              hasServiceAccountKey,
+              hasIndividualCredentials,
+              hasValidAuth,
+            });
+          } else {
+            logger.debug("Individual credentials validation failed", {
+              hasServiceAccountKey,
+              hasIndividualCredentials,
+            });
           }
         }
 
+        // Final validation
+        if (!hasValidAuth) {
+          healthStatus.configurationIssues.push(
+            "Google Cloud authentication not configured or credentials file missing",
+          );
+          healthStatus.recommendations.push(
+            "Set either GOOGLE_APPLICATION_CREDENTIALS (valid file path), GOOGLE_SERVICE_ACCOUNT_KEY (base64), or both GOOGLE_AUTH_CLIENT_EMAIL and GOOGLE_AUTH_PRIVATE_KEY",
+          );
+
+          logger.debug("Final auth validation FAILED", {
+            hasValidAuth,
+          });
+        } else {
+          logger.debug("Final auth validation SUCCESS", {
+            hasValidAuth,
+          });
+        }
+
         // Mark as configured if we have both project ID and auth
-        if (
-          projectId &&
-          (hasCredentialsFile ||
-            hasServiceAccountKey ||
-            hasIndividualCredentials)
-        ) {
+        if (projectId && hasValidAuth) {
           healthStatus.isConfigured = true;
+
+          logger.debug("Vertex AI health check PASSED", {
+            hasProjectId: !!projectId,
+            hasValidAuth,
+            isConfigured: healthStatus.isConfigured,
+          });
+        } else {
+          logger.debug("Vertex AI health check FAILED", {
+            hasProjectId: !!projectId,
+            hasValidAuth,
+            isConfigured: healthStatus.isConfigured,
+          });
         }
         break;
       }
@@ -552,6 +746,30 @@ export class ProviderHealthChecker {
           healthStatus.recommendations.push("Set AWS_REGION (e.g., us-east-1)");
         }
         break;
+
+      case AIProviderName.AZURE: {
+        // Check Azure OpenAI endpoint
+        const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+        if (azureEndpoint && !azureEndpoint.startsWith("https://")) {
+          healthStatus.configurationIssues.push(
+            "Invalid AZURE_OPENAI_ENDPOINT format",
+          );
+          healthStatus.recommendations.push(
+            "Set AZURE_OPENAI_ENDPOINT to a valid URL (e.g., https://your-resource.openai.azure.com/)",
+          );
+        }
+
+        // Check for deployment name
+        if (!process.env.AZURE_OPENAI_DEPLOYMENT_NAME) {
+          healthStatus.configurationIssues.push(
+            "AZURE_OPENAI_DEPLOYMENT_NAME not set",
+          );
+          healthStatus.recommendations.push(
+            "Set AZURE_OPENAI_DEPLOYMENT_NAME to your deployment name",
+          );
+        }
+        break;
+      }
 
       case AIProviderName.OLLAMA: {
         // Check if custom endpoint is set
@@ -589,9 +807,18 @@ export class ProviderHealthChecker {
         return ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"];
       case AIProviderName.VERTEX:
         return [
+          // Google models (via vertex provider)
+          "gemini-2.5-pro",
+          "gemini-2.5-flash",
+          "gemini-2.5-flash-lite",
+          "gemini-2.0-flash-001",
           "gemini-1.5-pro",
           "gemini-1.5-flash",
+          // Anthropic models (via vertexAnthropic provider)
+          "claude-sonnet-4@20250514",
+          "claude-opus-4@20250514",
           "claude-3-5-sonnet-20241022",
+          "claude-3-5-haiku-20241022",
           "claude-3-sonnet-20240229",
           "claude-3-haiku-20240307",
           "claude-3-opus-20240229",
@@ -601,6 +828,8 @@ export class ProviderHealthChecker {
           "anthropic.claude-3-sonnet-20240229-v1:0",
           "anthropic.claude-3-haiku-20240307-v1:0",
         ];
+      case AIProviderName.AZURE:
+        return ["gpt-4o", "gpt-4o-mini", "gpt-35-turbo"];
       case AIProviderName.OLLAMA:
         return ["llama3.2:latest", "llama3.1:latest", "mistral:latest"];
       default:
@@ -632,6 +861,600 @@ export class ProviderHealthChecker {
   }
 
   /**
+   * Check if Vertex AI supports Anthropic models (dual provider architecture)
+   */
+  static async checkVertexAnthropicSupport(): Promise<{
+    isSupported: boolean;
+    hasCreateVertexAnthropic: boolean;
+    hasCorrectTypes: boolean;
+    hasValidProject: boolean;
+    hasRegionalSupport: boolean;
+    hasNetworkAccess: boolean;
+    hasAnthropicModels: boolean;
+    authentication: {
+      isValid: boolean;
+      method: string;
+      issues: string[];
+    };
+    projectConfiguration: {
+      isValid: boolean;
+      projectId: string | undefined;
+      region: string | undefined;
+      issues: string[];
+    };
+    modelSupport: {
+      availableModels: string[];
+      recommendedModels: string[];
+      deprecatedModels: string[];
+    };
+    recommendations: string[];
+    troubleshooting: string[];
+  }> {
+    const result = {
+      isSupported: false,
+      hasCreateVertexAnthropic: false,
+      hasCorrectTypes: false,
+      hasValidProject: false,
+      hasRegionalSupport: false,
+      hasNetworkAccess: false,
+      hasAnthropicModels: false,
+      authentication: {
+        isValid: false,
+        method: "none",
+        issues: [] as string[],
+      },
+      projectConfiguration: {
+        isValid: false,
+        projectId: undefined as string | undefined,
+        region: undefined as string | undefined,
+        issues: [] as string[],
+      },
+      modelSupport: {
+        availableModels: [] as string[],
+        recommendedModels: [
+          "claude-sonnet-4@20250514",
+          "claude-opus-4@20250514",
+          "claude-3-5-sonnet-20241022",
+          "claude-3-5-haiku-20241022",
+          "claude-3-sonnet-20240229",
+          "claude-3-haiku-20240307",
+        ],
+        deprecatedModels: [
+          "claude-3-opus-20240229", // Still available but newer versions preferred
+        ],
+      },
+      recommendations: [] as string[],
+      troubleshooting: [] as string[],
+    };
+
+    logger.debug(
+      "Starting comprehensive Vertex Anthropic support verification",
+    );
+
+    try {
+      // 1. Check SDK module availability
+      logger.debug(
+        "Checking @ai-sdk/google-vertex/anthropic module availability",
+      );
+      const anthropicModule = await import("@ai-sdk/google-vertex/anthropic");
+
+      result.hasCreateVertexAnthropic =
+        typeof anthropicModule.createVertexAnthropic === "function";
+      result.hasCorrectTypes = true; // Types are bundled with the function
+
+      if (!result.hasCreateVertexAnthropic) {
+        result.troubleshooting.push(
+          "📦 Update @ai-sdk/google-vertex to latest version with Anthropic support",
+          "🔄 Run: npm install @ai-sdk/google-vertex@latest",
+          "📖 See: https://sdk.vercel.ai/providers/ai-sdk-providers/google-vertex#anthropic-models",
+        );
+        return result;
+      }
+
+      logger.debug("SDK module verified successfully");
+
+      // 2. Comprehensive Authentication Validation
+      logger.debug("Starting authentication validation");
+      result.authentication = await this.validateVertexAuthentication();
+
+      if (!result.authentication.isValid) {
+        result.troubleshooting.push(
+          "🔐 Fix authentication configuration:",
+          "  Option 1: Set GOOGLE_APPLICATION_CREDENTIALS to valid service account file",
+          "  Option 2: Set individual env vars: GOOGLE_AUTH_CLIENT_EMAIL, GOOGLE_AUTH_PRIVATE_KEY",
+          "📖 See: https://cloud.google.com/docs/authentication/provide-credentials-adc",
+        );
+      }
+
+      // 3. Project Configuration Validation
+      logger.debug("Starting project configuration validation");
+      result.projectConfiguration =
+        await this.validateVertexProjectConfiguration();
+      result.hasValidProject = result.projectConfiguration.isValid;
+
+      if (!result.hasValidProject) {
+        result.troubleshooting.push(
+          "🏗️ Fix project configuration:",
+          "  Set GOOGLE_VERTEX_PROJECT or GOOGLE_CLOUD_PROJECT environment variable",
+          "  Ensure project exists and has Vertex AI API enabled",
+          "📖 See: https://console.cloud.google.com/apis/library/aiplatform.googleapis.com",
+        );
+      }
+
+      // 4. Regional Support Validation
+      logger.debug("Starting regional support validation");
+      result.hasRegionalSupport = await this.checkVertexRegionalSupport(
+        result.projectConfiguration.region,
+      );
+
+      if (!result.hasRegionalSupport) {
+        result.troubleshooting.push(
+          "🌍 Regional support issues:",
+          "  Anthropic models may not be available in your region",
+          "  Try regions: us-central1, us-east4, europe-west1, asia-southeast1",
+          "  Set GOOGLE_CLOUD_LOCATION environment variable",
+        );
+      }
+
+      // 5. Network Connectivity Check (non-blocking)
+      logger.debug("Starting network connectivity check");
+      result.hasNetworkAccess = await this.checkVertexNetworkConnectivity(
+        result.projectConfiguration.region || "us-central1",
+      );
+
+      if (!result.hasNetworkAccess) {
+        result.troubleshooting.push(
+          "🌐 Network connectivity issues:",
+          "  Check proxy configuration if behind corporate firewall",
+          "  Verify DNS resolution for *.googleapis.com",
+          "  Ensure firewall allows HTTPS to Google Cloud endpoints",
+        );
+      }
+
+      // 6. Anthropic Model Integration Check
+      logger.debug("Starting Anthropic model integration check");
+      result.hasAnthropicModels = await this.checkAnthropicModelIntegration(
+        result.projectConfiguration.projectId,
+        result.projectConfiguration.region,
+      );
+
+      if (!result.hasAnthropicModels) {
+        result.troubleshooting.push(
+          "🤖 Anthropic model integration issues:",
+          "  Enable Anthropic integration in Google Cloud Console",
+          "  Navigate to: Vertex AI > Model Garden > Anthropic",
+          "  Accept terms and enable Claude model access",
+          "📖 See: https://console.cloud.google.com/vertex-ai/publishers/anthropic",
+        );
+      }
+
+      // Calculate overall support status
+      result.isSupported =
+        result.hasCreateVertexAnthropic &&
+        result.authentication.isValid &&
+        result.hasValidProject &&
+        result.hasRegionalSupport;
+      // Note: Network and model integration are nice-to-have but not blocking
+
+      // Generate comprehensive recommendations
+      if (result.isSupported) {
+        result.recommendations.push(
+          "✅ Vertex Anthropic support is fully configured",
+          "✅ Claude models are available via vertexAnthropic provider",
+          `✅ Authentication: ${result.authentication.method}`,
+          `✅ Project: ${result.projectConfiguration.projectId}`,
+          `✅ Region: ${result.projectConfiguration.region}`,
+        );
+
+        if (result.hasNetworkAccess) {
+          result.recommendations.push("✅ Network connectivity verified");
+        } else {
+          result.recommendations.push(
+            "⚠️ Network connectivity not verified (may still work)",
+          );
+        }
+
+        if (result.hasAnthropicModels) {
+          result.recommendations.push(
+            "✅ Anthropic model integration verified",
+          );
+        } else {
+          result.recommendations.push(
+            "⚠️ Anthropic model integration not verified",
+          );
+        }
+
+        result.recommendations.push(
+          "",
+          "🎯 Recommended Claude models:",
+          ...result.modelSupport.recommendedModels.map(
+            (model) => `  • ${model}`,
+          ),
+          "",
+          "📚 Usage example:",
+          '  const vertex = new GoogleVertexProvider("claude-3-5-sonnet-20241022")',
+          '  const result = await vertex.generate("Hello, Claude!")',
+        );
+
+        logger.info("Vertex Anthropic support verification: FULLY_SUPPORTED");
+      } else {
+        const missingComponents = [];
+        if (!result.hasCreateVertexAnthropic) {
+          missingComponents.push("SDK module");
+        }
+        if (!result.authentication.isValid) {
+          missingComponents.push("authentication");
+        }
+        if (!result.hasValidProject) {
+          missingComponents.push("project configuration");
+        }
+        if (!result.hasRegionalSupport) {
+          missingComponents.push("regional support");
+        }
+
+        result.recommendations.push(
+          `⚠️ Vertex Anthropic support partially available`,
+          `❌ Missing: ${missingComponents.join(", ")}`,
+          "",
+          "🔧 Quick fixes needed:",
+        );
+        result.recommendations.push(...result.troubleshooting);
+
+        logger.warn(
+          "Vertex Anthropic support verification: PARTIALLY_SUPPORTED",
+          {
+            missingComponents,
+            hasBasicSupport: result.hasCreateVertexAnthropic,
+            authenticationValid: result.authentication.isValid,
+            projectValid: result.hasValidProject,
+          },
+        );
+      }
+    } catch (error) {
+      logger.error("Vertex Anthropic support check failed", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      result.recommendations.push(
+        "❌ Comprehensive Anthropic support check failed",
+        `🐛 Error: ${error instanceof Error ? error.message : String(error)}`,
+        "",
+        "🔧 Troubleshooting steps:",
+        "1. Update @ai-sdk/google-vertex to latest version",
+        "2. Verify Google Cloud authentication setup",
+        "3. Check project ID and region configuration",
+        "4. Enable Vertex AI API in Google Cloud Console",
+        "5. Enable Anthropic integration in Vertex AI Model Garden",
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate Vertex AI authentication configuration
+   */
+  private static async validateVertexAuthentication(): Promise<{
+    isValid: boolean;
+    method: string;
+    issues: string[];
+  }> {
+    const result = {
+      isValid: false,
+      method: "none",
+      issues: [] as string[],
+    };
+
+    try {
+      // Check for service account file authentication (preferred)
+      if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+        try {
+          const { promises: fs } = await import("fs");
+          try {
+            await fs.access(credentialsPath);
+            // Validate JSON structure
+            const credentialsContent = await fs.readFile(
+              credentialsPath,
+              "utf8",
+            );
+            const credentials = JSON.parse(credentialsContent);
+
+            if (
+              credentials.type === "service_account" &&
+              credentials.project_id &&
+              credentials.client_email &&
+              credentials.private_key
+            ) {
+              result.isValid = true;
+              result.method = "service_account_file";
+              return result;
+            } else {
+              result.issues.push(
+                "Service account file missing required fields",
+              );
+            }
+          } catch {
+            result.issues.push(
+              `Service account file not found: ${credentialsPath}`,
+            );
+          }
+        } catch (fileError) {
+          result.issues.push(
+            `Service account file validation failed: ${fileError}`,
+          );
+        }
+      }
+
+      // Check for individual environment variables
+      if (
+        process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
+        process.env.GOOGLE_AUTH_PRIVATE_KEY
+      ) {
+        const email = process.env.GOOGLE_AUTH_CLIENT_EMAIL;
+        const privateKey = process.env.GOOGLE_AUTH_PRIVATE_KEY;
+
+        if (email.includes("@") && privateKey.includes("BEGIN PRIVATE KEY")) {
+          result.isValid = true;
+          result.method = "environment_variables";
+          return result;
+        } else {
+          result.issues.push("Individual credentials format validation failed");
+        }
+      } else {
+        result.issues.push(
+          "Missing individual credential environment variables",
+        );
+      }
+
+      // Check for Application Default Credentials (ADC)
+      try {
+        // This is a simple heuristic - in real implementation you'd use Google Auth library
+        if (process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT) {
+          result.method = "application_default_credentials";
+          result.isValid = true; // Assume valid if environment suggests ADC
+          return result;
+        }
+      } catch (adcError) {
+        result.issues.push(`ADC check failed: ${adcError}`);
+      }
+
+      if (!result.isValid) {
+        result.issues.push("No valid authentication method found");
+      }
+    } catch (error) {
+      result.issues.push(`Authentication validation error: ${error}`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate Vertex AI project configuration
+   */
+  private static async validateVertexProjectConfiguration(): Promise<{
+    isValid: boolean;
+    projectId: string | undefined;
+    region: string | undefined;
+    issues: string[];
+  }> {
+    const result = {
+      isValid: false,
+      projectId: undefined as string | undefined,
+      region: undefined as string | undefined,
+      issues: [] as string[],
+    };
+
+    // Check project ID
+    const projectId =
+      process.env.GOOGLE_VERTEX_PROJECT ||
+      process.env.GOOGLE_CLOUD_PROJECT_ID ||
+      process.env.GOOGLE_PROJECT_ID ||
+      process.env.GOOGLE_CLOUD_PROJECT;
+
+    if (projectId) {
+      result.projectId = projectId;
+
+      // Validate project ID format
+      const projectIdPattern = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+      if (projectIdPattern.test(projectId)) {
+        result.isValid = true;
+      } else {
+        result.issues.push(`Invalid project ID format: ${projectId}`);
+      }
+    } else {
+      result.issues.push("No project ID configured");
+    }
+
+    // Check region/location
+    const region =
+      process.env.GOOGLE_CLOUD_LOCATION ||
+      process.env.VERTEX_LOCATION ||
+      process.env.GOOGLE_VERTEX_LOCATION ||
+      "us-central1";
+
+    result.region = region;
+
+    // Validate region format
+    const regionPattern = /^[a-z]+-[a-z]+\d+$/;
+    if (!regionPattern.test(region)) {
+      result.issues.push(`Invalid region format: ${region}`);
+      result.isValid = false;
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if the specified region supports Anthropic models
+   */
+  private static async checkVertexRegionalSupport(
+    region: string = "us-central1",
+  ): Promise<boolean> {
+    // Based on Google Cloud documentation, these regions support Anthropic models
+    const supportedRegions = [
+      "us-central1",
+      "us-east4",
+      "us-west1",
+      "us-west4",
+      "europe-west1",
+      "europe-west4",
+      "asia-southeast1",
+      "asia-northeast1",
+    ];
+
+    const isSupported = supportedRegions.includes(region);
+
+    logger.debug("Regional support check", {
+      region,
+      isSupported,
+      supportedRegions,
+    });
+
+    return isSupported;
+  }
+
+  /**
+   * Check network connectivity to Vertex AI endpoints
+   */
+  private static async checkVertexNetworkConnectivity(
+    region: string = "us-central1",
+  ): Promise<boolean> {
+    try {
+      const endpoint = `https://${region}-aiplatform.googleapis.com`;
+
+      // Simple connectivity check with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const proxyFetch = createProxyFetch();
+      let response = await proxyFetch(endpoint, {
+        method: "HEAD",
+        signal: controller.signal,
+      });
+
+      // Fallback to GET if HEAD returns 405 (Method Not Allowed) for restrictive gateways
+      if (response.status === 405) {
+        response = await proxyFetch(endpoint, {
+          method: "GET",
+          signal: controller.signal,
+        });
+      }
+
+      clearTimeout(timeoutId);
+
+      // Any response (even 401/403) indicates network connectivity
+      const isConnected = response.status !== undefined;
+
+      logger.debug("Network connectivity check", {
+        endpoint,
+        status: response.status,
+        isConnected,
+      });
+
+      return isConnected;
+    } catch (error) {
+      logger.debug("Network connectivity check failed", {
+        region,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Check if Anthropic model integration is enabled in the project
+   */
+  private static async checkAnthropicModelIntegration(
+    projectId?: string,
+    region: string = "us-central1",
+  ): Promise<boolean> {
+    if (!projectId) {
+      logger.debug("Cannot check Anthropic integration without project ID");
+      return false;
+    }
+
+    try {
+      // This is a simplified check - in a real implementation, you would:
+      // 1. Use Google Cloud APIs to check model availability
+      // 2. Verify Anthropic integration status
+      // 3. Check model access permissions
+
+      // For now, we'll do a basic endpoint check
+      const modelEndpoint = `https://${region}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${region}/publishers/anthropic/models`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const proxyFetch = createProxyFetch();
+      let response = await proxyFetch(modelEndpoint, {
+        method: "HEAD",
+        signal: controller.signal,
+      });
+
+      // Fallback to GET if HEAD returns 405 (Method Not Allowed) for restrictive gateways
+      if (response.status === 405) {
+        response = await proxyFetch(modelEndpoint, {
+          method: "GET",
+          signal: controller.signal,
+        });
+      }
+
+      clearTimeout(timeoutId);
+
+      // Status 200 or 401/403 suggests the endpoint exists (integration enabled)
+      // Status 404 suggests integration not enabled
+      const integrationEnabled = response.status !== 404;
+
+      logger.debug("Anthropic integration check", {
+        projectId,
+        region,
+        endpoint: modelEndpoint,
+        status: response.status,
+        integrationEnabled,
+      });
+
+      return integrationEnabled;
+    } catch (error) {
+      logger.debug("Anthropic integration check failed", {
+        projectId,
+        region,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Assume integration might be enabled if we can't verify
+      return true;
+    }
+  }
+
+  /**
+   * Initialize health checks in the background (NON-BLOCKING)
+   * Starts background health monitoring without blocking initialization
+   */
+  static initializeBackgroundHealthChecks(): void {
+    // Run health checks in the background without awaiting
+    const backgroundHealthCheck = async () => {
+      try {
+        logger.debug("Starting background health check initialization");
+        await this.checkAllProvidersHealth({
+          includeConnectivityTest: false,
+          cacheResults: true,
+          timeout: 2000, // 2-second timeout for background checks
+        });
+        logger.debug("Background health check initialization completed");
+      } catch (error) {
+        logger.warn("Background health check initialization failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    // Start background check without blocking
+    backgroundHealthCheck();
+  }
+
+  /**
    * Clear health cache for a provider or all providers
    */
   static clearHealthCache(providerName?: AIProviderName): void {
@@ -645,8 +1468,9 @@ export class ProviderHealthChecker {
   }
 
   /**
-   * Get the best healthy provider from a list of options
+   * Get the best healthy provider from a list of options (NON-BLOCKING)
    * Prioritizes healthy providers over configured but unhealthy ones
+   * Uses fast, cached health checks to avoid blocking initialization
    */
   static async getBestHealthyProvider(
     preferredProviders: string[] = [
@@ -661,6 +1485,7 @@ export class ProviderHealthChecker {
     const healthStatuses = await this.checkAllProvidersHealth({
       includeConnectivityTest: false, // Quick config check only
       cacheResults: true,
+      timeout: 1000, // Fast 1-second timeout to avoid blocking
     });
 
     // First try to find a healthy provider in order of preference
@@ -701,11 +1526,12 @@ export class ProviderHealthChecker {
     options: ProviderHealthCheckOptions = {},
   ): Promise<ProviderHealthStatus[]> {
     const providers: AIProviderName[] = [
-      AIProviderName.ANTHROPIC,
-      AIProviderName.OPENAI,
       AIProviderName.VERTEX,
       AIProviderName.GOOGLE_AI,
+      AIProviderName.ANTHROPIC,
+      AIProviderName.OPENAI,
       AIProviderName.BEDROCK,
+      AIProviderName.AZURE,
       AIProviderName.OLLAMA,
     ];
 

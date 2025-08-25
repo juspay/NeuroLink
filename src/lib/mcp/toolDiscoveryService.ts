@@ -737,10 +737,12 @@ export class ToolDiscoveryService extends EventEmitter {
     // GENERIC ERROR HANDLING FOR ALL MCP TOOLS
     // Different MCP servers return different error formats, so we should be permissive
     // and let the AI handle any response format instead of throwing errors
-    
+
     // Only throw for truly invalid responses (null/undefined)
     if (isNullish(result)) {
-      mcpLogger.debug("[ToolDiscoveryService] Tool returned null/undefined, treating as empty response");
+      mcpLogger.debug(
+        "[ToolDiscoveryService] Tool returned null/undefined, treating as empty response",
+      );
       // Even null responses can be valid for some tools - don't throw
       return;
     }
@@ -751,7 +753,7 @@ export class ToolDiscoveryService extends EventEmitter {
       isArray: Array.isArray(result),
       isObject: isObject(result),
       hasKeys: isObject(result) ? Object.keys(result as object).length : 0,
-      fullResponse: result // Log the complete response, not a truncated sample
+      fullResponse: result, // Log the complete response, not a truncated sample
     });
 
     // COMPLETELY PERMISSIVE APPROACH:
@@ -759,7 +761,7 @@ export class ToolDiscoveryService extends EventEmitter {
     // - Even error responses are passed to the AI to handle
     // - The AI can interpret error messages and retry with different approaches
     // - This works with any MCP server regardless of their response format
-    
+
     // No validation or throwing - let the AI handle everything
     return;
   }

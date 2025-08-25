@@ -184,58 +184,442 @@ export class NeuroLink {
   constructor(config?: {
     conversationMemory?: Partial<ConversationMemoryConfig>;
   }) {
-    // SDK always disables manual MCP config for security
-    ProviderRegistry.setOptions({
-      enableManualMCP: false,
+    // 🚀 EXHAUSTIVE LOGGING POINT C001: CONSTRUCTOR ENTRY
+    const constructorStartTime = Date.now();
+    const constructorHrTimeStart = process.hrtime.bigint();
+    const constructorId = `neurolink-constructor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    logger.debug(`[NeuroLink] 🏗️ LOG_POINT_C001_CONSTRUCTOR_START`, {
+      logPoint: "C001_CONSTRUCTOR_START",
+      constructorId,
+      timestamp: new Date().toISOString(),
+      constructorStartTime,
+      constructorHrTimeStart: constructorHrTimeStart.toString(),
+
+      // Configuration analysis
+      hasConfig: !!config,
+      configType: typeof config,
+      configKeys: config ? Object.keys(config) : [],
+      configSize: config ? JSON.stringify(config).length : 0,
+
+      // Conversation memory config analysis
+      hasConversationMemoryConfig: !!config?.conversationMemory,
+      conversationMemoryEnabled: config?.conversationMemory?.enabled || false,
+      conversationMemoryKeys: config?.conversationMemory
+        ? Object.keys(config.conversationMemory)
+        : [],
+
+      // Environment context
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      nodeEnv: process.env.NODE_ENV || "UNKNOWN",
+
+      // Memory and performance baseline
+      memoryUsage: process.memoryUsage(),
+      cpuUsage: process.cpuUsage(),
+      uptime: process.uptime(),
+
+      // Process PID and parent info
+      pid: process.pid,
+      ppid: process.ppid,
+
+      message:
+        "NeuroLink constructor initialization starting with comprehensive environment analysis",
     });
 
-    // Initialize conversation memory if enabled
-    if (config?.conversationMemory?.enabled) {
-      const memoryConfig = applyConversationMemoryDefaults(
-        config.conversationMemory,
+    // 🚀 EXHAUSTIVE LOGGING POINT C002: PROVIDER REGISTRY SETUP
+    const registrySetupStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[NeuroLink] 🏗️ LOG_POINT_C002_PROVIDER_REGISTRY_SETUP_START`,
+      {
+        logPoint: "C002_PROVIDER_REGISTRY_SETUP_START",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        registrySetupStartTimeNs: registrySetupStartTime.toString(),
+        message: "Starting ProviderRegistry configuration for security",
+      },
+    );
+
+    // SDK always disables manual MCP config for security
+    try {
+      ProviderRegistry.setOptions({
+        enableManualMCP: false,
+      });
+
+      const registrySetupEndTime = process.hrtime.bigint();
+      const registrySetupDurationNs =
+        registrySetupEndTime - registrySetupStartTime;
+
+      logger.debug(
+        `[NeuroLink] ✅ LOG_POINT_C003_PROVIDER_REGISTRY_SETUP_SUCCESS`,
+        {
+          logPoint: "C003_PROVIDER_REGISTRY_SETUP_SUCCESS",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          registrySetupDurationNs: registrySetupDurationNs.toString(),
+          registrySetupDurationMs: Number(registrySetupDurationNs) / 1000000,
+          enableManualMCP: false,
+          message:
+            "ProviderRegistry configured successfully with security settings",
+        },
       );
-      this.conversationMemory = new ConversationMemoryManager(memoryConfig);
-      logger.info("NeuroLink initialized with conversation memory", {
-        maxSessions: memoryConfig.maxSessions,
-        maxTurnsPerSession: memoryConfig.maxTurnsPerSession,
+    } catch (error) {
+      const registrySetupErrorTime = process.hrtime.bigint();
+      const registrySetupDurationNs =
+        registrySetupErrorTime - registrySetupStartTime;
+
+      logger.error(
+        `[NeuroLink] ❌ LOG_POINT_C004_PROVIDER_REGISTRY_SETUP_ERROR`,
+        {
+          logPoint: "C004_PROVIDER_REGISTRY_SETUP_ERROR",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          registrySetupDurationNs: registrySetupDurationNs.toString(),
+          registrySetupDurationMs: Number(registrySetupDurationNs) / 1000000,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorStack: error instanceof Error ? error.stack : undefined,
+          message:
+            "ProviderRegistry setup failed - critical initialization error",
+        },
+      );
+      throw error;
+    }
+
+    // 🚀 EXHAUSTIVE LOGGING POINT C005: CONVERSATION MEMORY INITIALIZATION
+    if (config?.conversationMemory?.enabled) {
+      const memoryInitStartTime = process.hrtime.bigint();
+
+      logger.debug(`[NeuroLink] 🧠 LOG_POINT_C005_MEMORY_INIT_START`, {
+        logPoint: "C005_MEMORY_INIT_START",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        memoryInitStartTimeNs: memoryInitStartTime.toString(),
+
+        // Detailed memory config analysis
+        memoryConfig: {
+          enabled: config.conversationMemory.enabled,
+          maxSessions: config.conversationMemory.maxSessions,
+          maxTurnsPerSession: config.conversationMemory.maxTurnsPerSession,
+          keys: Object.keys(config.conversationMemory),
+        },
+        message: "Starting conversation memory initialization",
+      });
+
+      try {
+        const memoryConfig = applyConversationMemoryDefaults(
+          config.conversationMemory,
+        );
+
+        const memoryManagerCreateStartTime = process.hrtime.bigint();
+        this.conversationMemory = new ConversationMemoryManager(memoryConfig);
+        const memoryManagerCreateEndTime = process.hrtime.bigint();
+        const memoryManagerCreateDurationNs =
+          memoryManagerCreateEndTime - memoryManagerCreateStartTime;
+
+        const memoryInitEndTime = process.hrtime.bigint();
+        const memoryInitDurationNs = memoryInitEndTime - memoryInitStartTime;
+
+        logger.info(`[NeuroLink] ✅ LOG_POINT_C006_MEMORY_INIT_SUCCESS`, {
+          logPoint: "C006_MEMORY_INIT_SUCCESS",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          memoryInitDurationNs: memoryInitDurationNs.toString(),
+          memoryInitDurationMs: Number(memoryInitDurationNs) / 1000000,
+          memoryManagerCreateDurationNs:
+            memoryManagerCreateDurationNs.toString(),
+          memoryManagerCreateDurationMs:
+            Number(memoryManagerCreateDurationNs) / 1000000,
+
+          // Final memory configuration
+          finalMemoryConfig: {
+            maxSessions: memoryConfig.maxSessions,
+            maxTurnsPerSession: memoryConfig.maxTurnsPerSession,
+          },
+
+          // Memory usage after initialization
+          memoryUsageAfterInit: process.memoryUsage(),
+          message:
+            "NeuroLink initialized with conversation memory successfully",
+        });
+      } catch (error) {
+        const memoryInitErrorTime = process.hrtime.bigint();
+        const memoryInitDurationNs = memoryInitErrorTime - memoryInitStartTime;
+
+        logger.error(`[NeuroLink] ❌ LOG_POINT_C007_MEMORY_INIT_ERROR`, {
+          logPoint: "C007_MEMORY_INIT_ERROR",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          memoryInitDurationNs: memoryInitDurationNs.toString(),
+          memoryInitDurationMs: Number(memoryInitDurationNs) / 1000000,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorStack: error instanceof Error ? error.stack : undefined,
+          memoryConfig: config.conversationMemory,
+          message: "Conversation memory initialization failed",
+        });
+        throw error;
+      }
+    } else {
+      logger.debug(`[NeuroLink] 🚫 LOG_POINT_C008_MEMORY_DISABLED`, {
+        logPoint: "C008_MEMORY_DISABLED",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        hasConfig: !!config,
+        hasMemoryConfig: !!config?.conversationMemory,
+        memoryEnabled: config?.conversationMemory?.enabled || false,
+        reason: !config
+          ? "NO_CONFIG"
+          : !config.conversationMemory
+            ? "NO_MEMORY_CONFIG"
+            : !config.conversationMemory.enabled
+              ? "MEMORY_DISABLED"
+              : "UNKNOWN",
+        message: "Conversation memory not enabled - skipping initialization",
       });
     }
 
-    // Initialize external server manager with main registry integration
-    this.externalServerManager = new ExternalServerManager(
-      {
+    // 🚀 EXHAUSTIVE LOGGING POINT C009: EXTERNAL SERVER MANAGER INITIALIZATION
+    const externalServerInitStartTime = process.hrtime.bigint();
+    logger.debug(`[NeuroLink] 🌐 LOG_POINT_C009_EXTERNAL_SERVER_INIT_START`, {
+      logPoint: "C009_EXTERNAL_SERVER_INIT_START",
+      constructorId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - constructorStartTime,
+      elapsedNs: (process.hrtime.bigint() - constructorHrTimeStart).toString(),
+      externalServerInitStartTimeNs: externalServerInitStartTime.toString(),
+      serverManagerConfig: {
         maxServers: 20,
         defaultTimeout: 15000,
         enableAutoRestart: true,
         enablePerformanceMonitoring: true,
       },
-      {
-        enableMainRegistryIntegration: true, // Enable integration with main toolRegistry
+      registryIntegrationConfig: {
+        enableMainRegistryIntegration: true,
       },
-    );
-
-    // Forward external server events
-    this.externalServerManager.on("connected", (event) => {
-      this.emitter.emit("externalMCP:serverConnected", event);
+      message: "Starting external server manager initialization",
     });
 
-    this.externalServerManager.on("disconnected", (event) => {
-      this.emitter.emit("externalMCP:serverDisconnected", event);
-    });
+    try {
+      // Initialize external server manager with main registry integration
+      this.externalServerManager = new ExternalServerManager(
+        {
+          maxServers: 20,
+          defaultTimeout: 15000,
+          enableAutoRestart: true,
+          enablePerformanceMonitoring: true,
+        },
+        {
+          enableMainRegistryIntegration: true, // Enable integration with main toolRegistry
+        },
+      );
 
-    this.externalServerManager.on("failed", (event) => {
-      this.emitter.emit("externalMCP:serverFailed", event);
-    });
+      const externalServerInitEndTime = process.hrtime.bigint();
+      const externalServerInitDurationNs =
+        externalServerInitEndTime - externalServerInitStartTime;
 
-    this.externalServerManager.on("toolDiscovered", (event) => {
-      this.emitter.emit("externalMCP:toolDiscovered", event);
-      // Tools are already registered on server connection, no need to duplicate here
-    });
+      logger.debug(
+        `[NeuroLink] ✅ LOG_POINT_C010_EXTERNAL_SERVER_INIT_SUCCESS`,
+        {
+          logPoint: "C010_EXTERNAL_SERVER_INIT_SUCCESS",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          externalServerInitDurationNs: externalServerInitDurationNs.toString(),
+          externalServerInitDurationMs:
+            Number(externalServerInitDurationNs) / 1000000,
+          hasExternalServerManager: !!this.externalServerManager,
+          message: "External server manager initialized successfully",
+        },
+      );
 
-    this.externalServerManager.on("toolRemoved", (event) => {
-      this.emitter.emit("externalMCP:toolRemoved", event);
-      // Unregister removed tools from main tool registry
-      this.unregisterExternalMCPToolFromRegistry(event.toolName);
+      // 🚀 EXHAUSTIVE LOGGING POINT C011: EVENT HANDLER SETUP
+      const eventHandlerSetupStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🔗 LOG_POINT_C011_EVENT_HANDLER_SETUP_START`, {
+        logPoint: "C011_EVENT_HANDLER_SETUP_START",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        eventHandlerSetupStartTimeNs: eventHandlerSetupStartTime.toString(),
+        message: "Setting up external server event handlers",
+      });
+
+      // Forward external server events with detailed logging
+      this.externalServerManager.on("connected", (event) => {
+        logger.debug(`[NeuroLink] 🔗 EXTERNAL_SERVER_EVENT_CONNECTED`, {
+          constructorId,
+          eventType: "connected",
+          event,
+          timestamp: new Date().toISOString(),
+          message: "External MCP server connected event received",
+        });
+        this.emitter.emit("externalMCP:serverConnected", event);
+      });
+
+      this.externalServerManager.on("disconnected", (event) => {
+        logger.debug(`[NeuroLink] 🔗 EXTERNAL_SERVER_EVENT_DISCONNECTED`, {
+          constructorId,
+          eventType: "disconnected",
+          event,
+          timestamp: new Date().toISOString(),
+          message: "External MCP server disconnected event received",
+        });
+        this.emitter.emit("externalMCP:serverDisconnected", event);
+      });
+
+      this.externalServerManager.on("failed", (event) => {
+        logger.warn(`[NeuroLink] 🔗 EXTERNAL_SERVER_EVENT_FAILED`, {
+          constructorId,
+          eventType: "failed",
+          event,
+          timestamp: new Date().toISOString(),
+          message: "External MCP server failed event received",
+        });
+        this.emitter.emit("externalMCP:serverFailed", event);
+      });
+
+      this.externalServerManager.on("toolDiscovered", (event) => {
+        logger.debug(`[NeuroLink] 🔗 EXTERNAL_SERVER_EVENT_TOOL_DISCOVERED`, {
+          constructorId,
+          eventType: "toolDiscovered",
+          toolName: event.toolName,
+          serverId: event.serverId,
+          timestamp: new Date().toISOString(),
+          message: "External MCP tool discovered event received",
+        });
+        this.emitter.emit("externalMCP:toolDiscovered", event);
+        // Tools are already registered on server connection, no need to duplicate here
+      });
+
+      this.externalServerManager.on("toolRemoved", (event) => {
+        logger.debug(`[NeuroLink] 🔗 EXTERNAL_SERVER_EVENT_TOOL_REMOVED`, {
+          constructorId,
+          eventType: "toolRemoved",
+          toolName: event.toolName,
+          serverId: event.serverId,
+          timestamp: new Date().toISOString(),
+          message: "External MCP tool removed event received",
+        });
+        this.emitter.emit("externalMCP:toolRemoved", event);
+        // Unregister removed tools from main tool registry
+        this.unregisterExternalMCPToolFromRegistry(event.toolName);
+      });
+
+      const eventHandlerSetupEndTime = process.hrtime.bigint();
+      const eventHandlerSetupDurationNs =
+        eventHandlerSetupEndTime - eventHandlerSetupStartTime;
+
+      logger.debug(
+        `[NeuroLink] ✅ LOG_POINT_C012_EVENT_HANDLER_SETUP_SUCCESS`,
+        {
+          logPoint: "C012_EVENT_HANDLER_SETUP_SUCCESS",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          eventHandlerSetupDurationNs: eventHandlerSetupDurationNs.toString(),
+          eventHandlerSetupDurationMs:
+            Number(eventHandlerSetupDurationNs) / 1000000,
+          eventHandlersCount: 5,
+          eventHandlerTypes: [
+            "connected",
+            "disconnected",
+            "failed",
+            "toolDiscovered",
+            "toolRemoved",
+          ],
+          message: "Event handlers set up successfully",
+        },
+      );
+    } catch (error) {
+      const externalServerInitErrorTime = process.hrtime.bigint();
+      const externalServerInitDurationNs =
+        externalServerInitErrorTime - externalServerInitStartTime;
+
+      logger.error(`[NeuroLink] ❌ LOG_POINT_C013_EXTERNAL_SERVER_INIT_ERROR`, {
+        logPoint: "C013_EXTERNAL_SERVER_INIT_ERROR",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        externalServerInitDurationNs: externalServerInitDurationNs.toString(),
+        externalServerInitDurationMs:
+          Number(externalServerInitDurationNs) / 1000000,
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorStack: error instanceof Error ? error.stack : undefined,
+        message: "External server manager initialization failed",
+      });
+      throw error;
+    }
+
+    // 🚀 EXHAUSTIVE LOGGING POINT C014: CONSTRUCTOR COMPLETION
+    const constructorEndTime = process.hrtime.bigint();
+    const constructorDurationNs = constructorEndTime - constructorHrTimeStart;
+
+    logger.info(`[NeuroLink] 🏁 LOG_POINT_C014_CONSTRUCTOR_COMPLETE`, {
+      logPoint: "C014_CONSTRUCTOR_COMPLETE",
+      constructorId,
+      timestamp: new Date().toISOString(),
+      constructorDurationNs: constructorDurationNs.toString(),
+      constructorDurationMs: Number(constructorDurationNs) / 1000000,
+      totalElapsedMs: Date.now() - constructorStartTime,
+
+      // Final state summary
+      finalState: {
+        hasConversationMemory: !!this.conversationMemory,
+        hasExternalServerManager: !!this.externalServerManager,
+        hasEmitter: !!this.emitter,
+        mcpInitialized: this.mcpInitialized,
+        toolCircuitBreakersCount: this.toolCircuitBreakers.size,
+        toolExecutionMetricsCount: this.toolExecutionMetrics.size,
+      },
+
+      // Final memory usage
+      finalMemoryUsage: process.memoryUsage(),
+      finalCpuUsage: process.cpuUsage(),
+
+      message:
+        "NeuroLink constructor completed successfully with all components initialized",
     });
   }
 
@@ -244,20 +628,136 @@ export class NeuroLink {
    * Uses isolated async context to prevent hanging
    */
   private async initializeMCP(): Promise<void> {
+    // 🚀 EXHAUSTIVE LOGGING POINT M001: MCP INITIALIZATION ENTRY CHECK
+    const mcpInitId = `mcp-init-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mcpInitStartTime = Date.now();
+    const mcpInitHrTimeStart = process.hrtime.bigint();
+
+    logger.debug(`[NeuroLink] 🔧 LOG_POINT_M001_MCP_INIT_ENTRY`, {
+      logPoint: "M001_MCP_INIT_ENTRY",
+      mcpInitId,
+      timestamp: new Date().toISOString(),
+      mcpInitStartTime,
+      mcpInitHrTimeStart: mcpInitHrTimeStart.toString(),
+      mcpInitialized: this.mcpInitialized,
+      hasExternalServerManager: !!this.externalServerManager,
+      memoryUsage: process.memoryUsage(),
+      cpuUsage: process.cpuUsage(),
+      message:
+        "MCP initialization entry point - checking if already initialized",
+    });
+
     if (this.mcpInitialized) {
+      logger.debug(`[NeuroLink] ✅ LOG_POINT_M002_MCP_ALREADY_INITIALIZED`, {
+        logPoint: "M002_MCP_ALREADY_INITIALIZED",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        mcpInitialized: this.mcpInitialized,
+        message: "MCP already initialized - skipping initialization",
+      });
       return;
     }
 
-    // Track memory usage during MCP initialization
-    const { MemoryManager } = await import("./utils/performance.js");
-    const startMemory = MemoryManager.getMemoryUsageMB();
-    const initStartTime = Date.now();
+    // 🚀 EXHAUSTIVE LOGGING POINT M003: PERFORMANCE MANAGER IMPORT
+    const performanceImportStartTime = process.hrtime.bigint();
+    logger.debug(`[NeuroLink] 📊 LOG_POINT_M003_PERFORMANCE_IMPORT_START`, {
+      logPoint: "M003_PERFORMANCE_IMPORT_START",
+      mcpInitId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - mcpInitStartTime,
+      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+      performanceImportStartTimeNs: performanceImportStartTime.toString(),
+      message: "Starting MemoryManager import for performance tracking",
+    });
+
+    let MemoryManager:
+      | typeof import("./utils/performance.js").MemoryManager
+      | undefined;
+    let startMemory: ReturnType<
+      typeof import("./utils/performance.js").MemoryManager.getMemoryUsageMB
+    >;
+    try {
+      // Track memory usage during MCP initialization
+      const moduleImport = await import("./utils/performance.js");
+      MemoryManager = moduleImport.MemoryManager;
+      startMemory = MemoryManager.getMemoryUsageMB();
+
+      const performanceImportEndTime = process.hrtime.bigint();
+      const performanceImportDurationNs =
+        performanceImportEndTime - performanceImportStartTime;
+
+      logger.debug(`[NeuroLink] ✅ LOG_POINT_M004_PERFORMANCE_IMPORT_SUCCESS`, {
+        logPoint: "M004_PERFORMANCE_IMPORT_SUCCESS",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        performanceImportDurationNs: performanceImportDurationNs.toString(),
+        performanceImportDurationMs:
+          Number(performanceImportDurationNs) / 1000000,
+        hasMemoryManager: !!MemoryManager,
+        startMemory,
+        message: "MemoryManager imported successfully",
+      });
+    } catch (error) {
+      const performanceImportErrorTime = process.hrtime.bigint();
+      const performanceImportDurationNs =
+        performanceImportErrorTime - performanceImportStartTime;
+
+      logger.warn(`[NeuroLink] ⚠️ LOG_POINT_M005_PERFORMANCE_IMPORT_ERROR`, {
+        logPoint: "M005_PERFORMANCE_IMPORT_ERROR",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        performanceImportDurationNs: performanceImportDurationNs.toString(),
+        performanceImportDurationMs:
+          Number(performanceImportDurationNs) / 1000000,
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        message:
+          "MemoryManager import failed - continuing without performance tracking",
+      });
+      // Continue without performance tracking
+      startMemory = { heapUsed: 0, heapTotal: 0, rss: 0, external: 0 };
+    }
 
     try {
+      // 🚀 EXHAUSTIVE LOGGING POINT M006: MAIN MCP INITIALIZATION START
+      logger.info(`[NeuroLink] 🚀 LOG_POINT_M006_MCP_MAIN_INIT_START`, {
+        logPoint: "M006_MCP_MAIN_INIT_START",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        startMemory,
+        message: "Starting isolated MCP initialization process",
+      });
+
       mcpLogger.debug("[NeuroLink] Starting isolated MCP initialization...");
 
-      // Initialize tool registry with timeout protection
+      // 🚀 EXHAUSTIVE LOGGING POINT M007: TOOL REGISTRY TIMEOUT SETUP
+      const toolRegistryStartTime = process.hrtime.bigint();
       const initTimeout = 3000; // 3 second timeout
+
+      logger.debug(
+        `[NeuroLink] ⏱️ LOG_POINT_M007_TOOL_REGISTRY_TIMEOUT_SETUP`,
+        {
+          logPoint: "M007_TOOL_REGISTRY_TIMEOUT_SETUP",
+          mcpInitId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - mcpInitStartTime,
+          elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+          toolRegistryStartTimeNs: toolRegistryStartTime.toString(),
+          initTimeoutMs: initTimeout,
+          message:
+            "Setting up tool registry initialization with timeout protection",
+        },
+      );
+
+      // Initialize tool registry with timeout protection
       await Promise.race([
         Promise.resolve(), // toolRegistry doesn't need explicit initialization
         new Promise<void>((_, reject) => {
@@ -268,8 +768,64 @@ export class NeuroLink {
         }),
       ]);
 
+      const toolRegistryEndTime = process.hrtime.bigint();
+      const toolRegistryDurationNs =
+        toolRegistryEndTime - toolRegistryStartTime;
+
+      logger.debug(`[NeuroLink] ✅ LOG_POINT_M008_TOOL_REGISTRY_SUCCESS`, {
+        logPoint: "M008_TOOL_REGISTRY_SUCCESS",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        toolRegistryDurationNs: toolRegistryDurationNs.toString(),
+        toolRegistryDurationMs: Number(toolRegistryDurationNs) / 1000000,
+        message: "Tool registry initialization completed within timeout",
+      });
+
+      // 🚀 EXHAUSTIVE LOGGING POINT M009: PROVIDER REGISTRY START
+      const providerRegistryStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🏭 LOG_POINT_M009_PROVIDER_REGISTRY_START`, {
+        logPoint: "M009_PROVIDER_REGISTRY_START",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        providerRegistryStartTimeNs: providerRegistryStartTime.toString(),
+        message: "Starting provider registry registration with lazy loading",
+      });
+
       // Register all providers with lazy loading support
       await ProviderRegistry.registerAllProviders();
+
+      const providerRegistryEndTime = process.hrtime.bigint();
+      const providerRegistryDurationNs =
+        providerRegistryEndTime - providerRegistryStartTime;
+
+      logger.debug(`[NeuroLink] ✅ LOG_POINT_M010_PROVIDER_REGISTRY_SUCCESS`, {
+        logPoint: "M010_PROVIDER_REGISTRY_SUCCESS",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        providerRegistryDurationNs: providerRegistryDurationNs.toString(),
+        providerRegistryDurationMs:
+          Number(providerRegistryDurationNs) / 1000000,
+        message: "Provider registry registration completed successfully",
+      });
+
+      // 🚀 EXHAUSTIVE LOGGING POINT M011: DIRECT TOOLS SERVER REGISTRATION
+      const directToolsStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🛠️ LOG_POINT_M011_DIRECT_TOOLS_START`, {
+        logPoint: "M011_DIRECT_TOOLS_START",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        directToolsStartTimeNs: directToolsStartTime.toString(),
+        serverId: "neurolink-direct",
+        message: "Starting direct tools server registration",
+      });
 
       // Register the direct tools server to make websearch and other tools available
       try {
@@ -278,6 +834,23 @@ export class NeuroLink {
           "neurolink-direct",
           directToolsServer,
         );
+
+        const directToolsSuccessTime = process.hrtime.bigint();
+        const directToolsDurationNs =
+          directToolsSuccessTime - directToolsStartTime;
+
+        logger.debug(`[NeuroLink] ✅ LOG_POINT_M012_DIRECT_TOOLS_SUCCESS`, {
+          logPoint: "M012_DIRECT_TOOLS_SUCCESS",
+          mcpInitId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - mcpInitStartTime,
+          elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+          directToolsDurationNs: directToolsDurationNs.toString(),
+          directToolsDurationMs: Number(directToolsDurationNs) / 1000000,
+          serverId: "neurolink-direct",
+          message: "Direct tools server registered successfully",
+        });
+
         mcpLogger.debug(
           "[NeuroLink] Direct tools server registered successfully",
           {
@@ -285,15 +858,71 @@ export class NeuroLink {
           },
         );
       } catch (error) {
+        const directToolsErrorTime = process.hrtime.bigint();
+        const directToolsDurationNs =
+          directToolsErrorTime - directToolsStartTime;
+
+        logger.warn(`[NeuroLink] ⚠️ LOG_POINT_M013_DIRECT_TOOLS_ERROR`, {
+          logPoint: "M013_DIRECT_TOOLS_ERROR",
+          mcpInitId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - mcpInitStartTime,
+          elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+          directToolsDurationNs: directToolsDurationNs.toString(),
+          directToolsDurationMs: Number(directToolsDurationNs) / 1000000,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorStack: error instanceof Error ? error.stack : undefined,
+          serverId: "neurolink-direct",
+          message: "Direct tools server registration failed but continuing",
+        });
+
         mcpLogger.warn("[NeuroLink] Failed to register direct tools server", {
           error: error instanceof Error ? error.message : String(error),
         });
       }
 
+      // 🚀 EXHAUSTIVE LOGGING POINT M014: MCP CONFIG LOADING START
+      const mcpConfigStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 📄 LOG_POINT_M014_MCP_CONFIG_START`, {
+        logPoint: "M014_MCP_CONFIG_START",
+        mcpInitId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - mcpInitStartTime,
+        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+        mcpConfigStartTimeNs: mcpConfigStartTime.toString(),
+        hasExternalServerManager: !!this.externalServerManager,
+        message: "Starting MCP configuration loading from .mcp-config.json",
+      });
+
       // Load MCP configuration from .mcp-config.json using ExternalServerManager
       try {
         const configResult =
           await this.externalServerManager.loadMCPConfiguration();
+
+        const mcpConfigSuccessTime = process.hrtime.bigint();
+        const mcpConfigDurationNs = mcpConfigSuccessTime - mcpConfigStartTime;
+
+        logger.debug(`[NeuroLink] ✅ LOG_POINT_M015_MCP_CONFIG_SUCCESS`, {
+          logPoint: "M015_MCP_CONFIG_SUCCESS",
+          mcpInitId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - mcpInitStartTime,
+          elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
+          mcpConfigDurationNs: mcpConfigDurationNs.toString(),
+          mcpConfigDurationMs: Number(mcpConfigDurationNs) / 1000000,
+          serversLoaded: configResult.serversLoaded,
+          errorsCount: configResult.errors.length,
+          configResult: {
+            serversLoaded: configResult.serversLoaded,
+            errors: configResult.errors.map((err: unknown) => ({
+              message: err instanceof Error ? err.message : String(err),
+              name: err instanceof Error ? err.name : "UnknownError",
+            })),
+          },
+          message: "MCP configuration loaded successfully",
+        });
+
         mcpLogger.debug("[NeuroLink] MCP configuration loaded successfully", {
           serversLoaded: configResult.serversLoaded,
           errors: configResult.errors.length,
@@ -316,9 +945,11 @@ export class NeuroLink {
       this.mcpInitialized = true;
 
       // Monitor memory usage and provide cleanup suggestions
-      const endMemory = MemoryManager.getMemoryUsageMB();
+      const endMemory = MemoryManager
+        ? MemoryManager.getMemoryUsageMB()
+        : { heapUsed: 0, heapTotal: 0, rss: 0, external: 0 };
       const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
-      const initTime = Date.now() - initStartTime;
+      const initTime = Date.now() - mcpInitStartTime;
 
       mcpLogger.debug("[NeuroLink] MCP initialization completed successfully", {
         initTime: `${initTime}ms`,
@@ -567,8 +1198,70 @@ export class NeuroLink {
   private async generateTextInternal(
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult> {
-    const startTime = Date.now();
+    // 🚀 EXHAUSTIVE LOGGING POINT G001: GENERATE TEXT INTERNAL ENTRY
+    const generateInternalId = `generate-internal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const generateInternalStartTime = Date.now();
+    const generateInternalHrTimeStart = process.hrtime.bigint();
     const functionTag = "NeuroLink.generateTextInternal";
+
+    logger.debug(`[NeuroLink] 🎯 LOG_POINT_G001_GENERATE_INTERNAL_START`, {
+      logPoint: "G001_GENERATE_INTERNAL_START",
+      generateInternalId,
+      timestamp: new Date().toISOString(),
+      generateInternalStartTime,
+      generateInternalHrTimeStart: generateInternalHrTimeStart.toString(),
+
+      // 📊 Input analysis
+      inputAnalysis: {
+        provider: options.provider || "auto",
+        providerType: typeof options.provider,
+        isAutoProvider: options.provider === "auto" || !options.provider,
+        model: options.model || "NOT_SET",
+        modelType: typeof options.model,
+        temperature: options.temperature,
+        temperatureType: typeof options.temperature,
+        maxTokens: options.maxTokens,
+        maxTokensType: typeof options.maxTokens,
+        promptLength: options.prompt?.length || 0,
+        promptPreview: options.prompt?.substring(0, 200) || "NO_PROMPT",
+        hasSystemPrompt: !!options.systemPrompt,
+        systemPromptLength: options.systemPrompt?.length || 0,
+        disableTools: options.disableTools || false,
+        enableAnalytics: options.enableAnalytics || false,
+        enableEvaluation: options.enableEvaluation || false,
+        hasContext: !!options.context,
+        contextKeys: options.context ? Object.keys(options.context) : [],
+        evaluationDomain: options.evaluationDomain || "NOT_SET",
+        toolUsageContext: options.toolUsageContext || "NOT_SET",
+      },
+
+      // 🧠 Memory and initialization state
+      instanceState: {
+        hasConversationMemory: !!this.conversationMemory,
+        conversationMemoryType:
+          this.conversationMemory?.constructor?.name || "NOT_SET",
+        mcpInitialized: this.mcpInitialized,
+        hasProviderRegistry: !!AIProviderFactory,
+        providerRegistrySize: 0, // Not accessible as size property
+        hasToolRegistry: !!toolRegistry,
+        toolRegistrySize: 0, // Not accessible as size property
+        hasExternalServerManager: !!this.externalServerManager,
+        hasContextManager: !!this.contextManager,
+      },
+
+      // 🔧 Environment context
+      environmentContext: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        memoryUsage: process.memoryUsage(),
+        cpuUsage: process.cpuUsage(),
+        uptime: process.uptime(),
+      },
+
+      message:
+        "Starting generateTextInternal with comprehensive input analysis",
+    });
 
     logger.debug(`[${functionTag}] Starting generation`, {
       provider: options.provider || "auto",
@@ -577,26 +1270,194 @@ export class NeuroLink {
     });
 
     try {
+      // 🚀 EXHAUSTIVE LOGGING POINT G002: CONVERSATION MEMORY INITIALIZATION
+      const conversationMemoryStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🧠 LOG_POINT_G002_CONVERSATION_MEMORY_CHECK`, {
+        logPoint: "G002_CONVERSATION_MEMORY_CHECK",
+        generateInternalId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - generateInternalStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - generateInternalHrTimeStart
+        ).toString(),
+        conversationMemoryStartTimeNs: conversationMemoryStartTime.toString(),
+        hasConversationMemory: !!this.conversationMemory,
+        conversationMemoryEnabled: !!this.conversationMemory,
+        conversationMemoryType:
+          this.conversationMemory?.constructor?.name || "NOT_AVAILABLE",
+        message: "Checking conversation memory initialization requirement",
+      });
+
       // Initialize conversation memory if enabled
       if (this.conversationMemory) {
+        logger.debug(
+          `[NeuroLink] 🧠 LOG_POINT_G003_CONVERSATION_MEMORY_INIT_START`,
+          {
+            logPoint: "G003_CONVERSATION_MEMORY_INIT_START",
+            generateInternalId,
+            timestamp: new Date().toISOString(),
+            elapsedMs: Date.now() - generateInternalStartTime,
+            elapsedNs: (
+              process.hrtime.bigint() - generateInternalHrTimeStart
+            ).toString(),
+            message: "Starting conversation memory initialization",
+          },
+        );
+
         await this.conversationMemory.initialize();
+
+        const conversationMemoryEndTime = process.hrtime.bigint();
+        const conversationMemoryDurationNs =
+          conversationMemoryEndTime - conversationMemoryStartTime;
+
+        logger.debug(
+          `[NeuroLink] ✅ LOG_POINT_G004_CONVERSATION_MEMORY_INIT_SUCCESS`,
+          {
+            logPoint: "G004_CONVERSATION_MEMORY_INIT_SUCCESS",
+            generateInternalId,
+            timestamp: new Date().toISOString(),
+            elapsedMs: Date.now() - generateInternalStartTime,
+            elapsedNs: (
+              process.hrtime.bigint() - generateInternalHrTimeStart
+            ).toString(),
+            conversationMemoryDurationNs:
+              conversationMemoryDurationNs.toString(),
+            conversationMemoryDurationMs:
+              Number(conversationMemoryDurationNs) / 1000000,
+            message:
+              "Conversation memory initialization completed successfully",
+          },
+        );
       }
+
+      // 🚀 EXHAUSTIVE LOGGING POINT G005: MCP GENERATION BRANCH DECISION
+      const mcpDecisionStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🔧 LOG_POINT_G005_MCP_DECISION_CHECK`, {
+        logPoint: "G005_MCP_DECISION_CHECK",
+        generateInternalId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - generateInternalStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - generateInternalHrTimeStart
+        ).toString(),
+        mcpDecisionStartTimeNs: mcpDecisionStartTime.toString(),
+
+        // 🎯 MCP decision factors
+        mcpDecisionFactors: {
+          disableTools: options.disableTools || false,
+          toolsEnabled: !options.disableTools,
+          mcpInitialized: this.mcpInitialized,
+          hasExternalServerManager: !!this.externalServerManager,
+          hasToolRegistry: !!toolRegistry,
+          toolRegistrySize: 0, // Not accessible as size property
+          shouldTryMCP: !options.disableTools,
+        },
+
+        // 🔍 MCP readiness analysis
+        mcpReadinessAnalysis: {
+          mcpAvailable: !options.disableTools && this.mcpInitialized,
+          componentsReady: {
+            externalServerManager: !!this.externalServerManager,
+            toolRegistry: !!toolRegistry,
+            providerRegistry: !!AIProviderFactory,
+          },
+        },
+
+        message: "Analyzing MCP generation eligibility and readiness",
+      });
 
       // Try MCP-enhanced generation first (if not explicitly disabled)
       if (!options.disableTools) {
-        let mcpAttempts = 0;
+        // 🚀 EXHAUSTIVE LOGGING POINT G006: MCP RETRY LOOP INITIALIZATION
+        const mcpAttempts = 0;
         const maxMcpRetries = 2; // Allow retries for tool-related failures
+        const mcpRetryLoopStartTime = process.hrtime.bigint();
 
-        while (mcpAttempts <= maxMcpRetries) {
+        logger.debug(`[NeuroLink] 🔄 LOG_POINT_G006_MCP_RETRY_LOOP_START`, {
+          logPoint: "G006_MCP_RETRY_LOOP_START",
+          generateInternalId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - generateInternalStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - generateInternalHrTimeStart
+          ).toString(),
+          mcpRetryLoopStartTimeNs: mcpRetryLoopStartTime.toString(),
+          maxMcpRetries,
+          totalPossibleAttempts: maxMcpRetries + 1,
+          currentAttempt: mcpAttempts + 1,
+          message: "Starting MCP generation retry loop with failure tolerance",
+        });
+
+        const maxAttempts = maxMcpRetries + 1;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
+            // 🚀 EXHAUSTIVE LOGGING POINT G007: MCP GENERATION ATTEMPT
+            const mcpAttemptStartTime = process.hrtime.bigint();
+            logger.debug(`[NeuroLink] 🎯 LOG_POINT_G007_MCP_ATTEMPT_START`, {
+              logPoint: "G007_MCP_ATTEMPT_START",
+              generateInternalId,
+              timestamp: new Date().toISOString(),
+              elapsedMs: Date.now() - generateInternalStartTime,
+              elapsedNs: (
+                process.hrtime.bigint() - generateInternalHrTimeStart
+              ).toString(),
+              mcpAttemptStartTimeNs: mcpAttemptStartTime.toString(),
+              currentAttempt: attempt,
+              maxAttempts,
+              isFirstAttempt: attempt === 1,
+              isLastAttempt: attempt === maxAttempts,
+              attemptType: attempt === 1 ? "INITIAL" : "RETRY",
+              message: `Attempting MCP generation (attempt ${attempt}/${maxAttempts})`,
+            });
+
             logger.debug(
-              `[${functionTag}] Attempting MCP generation (attempt ${mcpAttempts + 1}/${maxMcpRetries + 1})...`,
+              `[${functionTag}] Attempting MCP generation (attempt ${attempt}/${maxAttempts})...`,
             );
             const mcpResult = await this.tryMCPGeneration(options);
 
+            // 🚀 EXHAUSTIVE LOGGING POINT G008: MCP GENERATION ATTEMPT RESULT
+            const mcpAttemptEndTime = process.hrtime.bigint();
+            const mcpAttemptDurationNs =
+              mcpAttemptEndTime - mcpAttemptStartTime;
+
+            logger.debug(`[NeuroLink] 📊 LOG_POINT_G008_MCP_ATTEMPT_RESULT`, {
+              logPoint: "G008_MCP_ATTEMPT_RESULT",
+              generateInternalId,
+              timestamp: new Date().toISOString(),
+              elapsedMs: Date.now() - generateInternalStartTime,
+              elapsedNs: (
+                process.hrtime.bigint() - generateInternalHrTimeStart
+              ).toString(),
+              mcpAttemptDurationNs: mcpAttemptDurationNs.toString(),
+              mcpAttemptDurationMs: Number(mcpAttemptDurationNs) / 1000000,
+              currentAttempt: attempt,
+
+              // 🎯 Result analysis
+              resultAnalysis: {
+                hasResult: !!mcpResult,
+                resultType: typeof mcpResult,
+                hasContent: !!(mcpResult && mcpResult.content),
+                contentLength: mcpResult?.content?.length || 0,
+                contentPreview:
+                  mcpResult?.content?.substring(0, 200) || "NO_CONTENT",
+                hasToolExecutions: !!(
+                  mcpResult &&
+                  mcpResult.toolExecutions &&
+                  mcpResult.toolExecutions.length > 0
+                ),
+                toolExecutionsCount: mcpResult?.toolExecutions?.length || 0,
+                toolsUsedCount: mcpResult?.toolsUsed?.length || 0,
+                provider: mcpResult?.provider || "NOT_SET",
+                responseTime: mcpResult?.responseTime || 0,
+                enhancedWithTools: mcpResult?.enhancedWithTools || false,
+              },
+
+              message: `MCP generation attempt ${attempt} completed - analyzing result`,
+            });
+
             if (mcpResult && mcpResult.content) {
               logger.debug(
-                `[${functionTag}] MCP generation successful on attempt ${mcpAttempts + 1}`,
+                `[${functionTag}] MCP generation successful on attempt ${attempt}`,
                 {
                   contentLength: mcpResult.content.length,
                   toolsUsed: mcpResult.toolsUsed?.length || 0,
@@ -614,7 +1475,7 @@ export class NeuroLink {
               return mcpResult;
             } else {
               logger.debug(
-                `[${functionTag}] MCP generation returned empty result on attempt ${mcpAttempts + 1}:`,
+                `[${functionTag}] MCP generation returned empty result on attempt ${attempt}:`,
                 {
                   hasResult: !!mcpResult,
                   hasContent: !!(mcpResult && mcpResult.content),
@@ -642,17 +1503,16 @@ export class NeuroLink {
               }
             }
           } catch (error) {
-            mcpAttempts++;
             logger.debug(
-              `[${functionTag}] MCP generation failed on attempt ${mcpAttempts}/${maxMcpRetries + 1}`,
+              `[${functionTag}] MCP generation failed on attempt ${attempt}/${maxAttempts}`,
               {
                 error: error instanceof Error ? error.message : String(error),
-                willRetry: mcpAttempts <= maxMcpRetries,
+                willRetry: attempt < maxAttempts,
               },
             );
 
             // If this was the last attempt, break and fall back
-            if (mcpAttempts > maxMcpRetries) {
+            if (attempt >= maxAttempts) {
               logger.debug(
                 `[${functionTag}] All MCP attempts exhausted, falling back to direct generation`,
               );
@@ -662,8 +1522,6 @@ export class NeuroLink {
             // Small delay before retry to allow transient issues to resolve
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
-
-          mcpAttempts++;
         }
       }
 
@@ -693,14 +1551,100 @@ export class NeuroLink {
   private async tryMCPGeneration(
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult | null> {
+    // 🚀 EXHAUSTIVE LOGGING POINT T001: TRY MCP GENERATION ENTRY
+    const tryMCPId = `try-mcp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const tryMCPStartTime = Date.now();
+    const tryMCPHrTimeStart = process.hrtime.bigint();
     const functionTag = "NeuroLink.tryMCPGeneration";
-    const startTime = Date.now();
+
+    logger.debug(`[NeuroLink] 🚀 LOG_POINT_T001_TRY_MCP_START`, {
+      logPoint: "T001_TRY_MCP_START",
+      tryMCPId,
+      timestamp: new Date().toISOString(),
+      tryMCPStartTime,
+      tryMCPHrTimeStart: tryMCPHrTimeStart.toString(),
+
+      // 📊 Input options analysis
+      optionsAnalysis: {
+        provider: options.provider || "auto",
+        isAutoProvider: options.provider === "auto" || !options.provider,
+        model: options.model || "NOT_SET",
+        promptLength: options.prompt?.length || 0,
+        promptPreview: options.prompt?.substring(0, 150) || "NO_PROMPT",
+        hasSystemPrompt: !!options.systemPrompt,
+        systemPromptLength: options.systemPrompt?.length || 0,
+        disableTools: options.disableTools || false,
+        enableAnalytics: options.enableAnalytics || false,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+      },
+
+      // 🔧 MCP state analysis
+      mcpStateAnalysis: {
+        mcpInitialized: this.mcpInitialized,
+        hasExternalServerManager: !!this.externalServerManager,
+        hasToolRegistry: !!toolRegistry,
+        toolRegistrySize: 0, // Not accessible as size property
+        hasProviderRegistry: !!AIProviderFactory,
+        providerRegistrySize: 0, // Not accessible as size property
+      },
+
+      message:
+        "Starting MCP-enhanced generation attempt with comprehensive analysis",
+    });
 
     try {
+      // 🚀 EXHAUSTIVE LOGGING POINT T002: MCP INITIALIZATION CHECK
+      const mcpInitCheckStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🔧 LOG_POINT_T002_MCP_INIT_CHECK`, {
+        logPoint: "T002_MCP_INIT_CHECK",
+        tryMCPId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - tryMCPStartTime,
+        elapsedNs: (process.hrtime.bigint() - tryMCPHrTimeStart).toString(),
+        mcpInitCheckStartTimeNs: mcpInitCheckStartTime.toString(),
+        mcpInitializedBefore: this.mcpInitialized,
+        needsInitialization: !this.mcpInitialized,
+        message: "Checking MCP initialization status before generation",
+      });
+
       // Initialize MCP if needed
       await this.initializeMCP();
 
+      const mcpInitCheckEndTime = process.hrtime.bigint();
+      const mcpInitCheckDurationNs =
+        mcpInitCheckEndTime - mcpInitCheckStartTime;
+
+      logger.debug(`[NeuroLink] ✅ LOG_POINT_T003_MCP_INIT_CHECK_COMPLETE`, {
+        logPoint: "T003_MCP_INIT_CHECK_COMPLETE",
+        tryMCPId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - tryMCPStartTime,
+        elapsedNs: (process.hrtime.bigint() - tryMCPHrTimeStart).toString(),
+        mcpInitCheckDurationNs: mcpInitCheckDurationNs.toString(),
+        mcpInitCheckDurationMs: Number(mcpInitCheckDurationNs) / 1000000,
+        mcpInitializedAfter: this.mcpInitialized,
+        initializationSuccessful: this.mcpInitialized,
+        message: "MCP initialization check completed",
+      });
+
       if (!this.mcpInitialized) {
+        logger.warn(`[NeuroLink] ⚠️ LOG_POINT_T004_MCP_NOT_AVAILABLE`, {
+          logPoint: "T004_MCP_NOT_AVAILABLE",
+          tryMCPId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - tryMCPStartTime,
+          elapsedNs: (process.hrtime.bigint() - tryMCPHrTimeStart).toString(),
+          mcpInitialized: this.mcpInitialized,
+          mcpComponents: {
+            hasExternalServerManager: !!this.externalServerManager,
+            hasToolRegistry: !!toolRegistry,
+            hasProviderRegistry: !!AIProviderFactory,
+          },
+          fallbackReason: "MCP_NOT_INITIALIZED",
+          message:
+            "MCP not available - returning null for fallback to direct generation",
+        });
         return null; // Skip MCP if not available
       }
 
@@ -750,7 +1694,7 @@ export class NeuroLink {
         conversationMessages, // Inject conversation history
       });
 
-      const responseTime = Date.now() - startTime;
+      const responseTime = Date.now() - tryMCPStartTime;
 
       // Enhanced result validation - consider tool executions as valid results
       const hasContent =
@@ -1039,18 +1983,292 @@ export class NeuroLink {
    */
   async stream(options: StreamOptions): Promise<StreamResult> {
     const startTime = Date.now();
+    const hrTimeStart = process.hrtime.bigint();
     const functionTag = "NeuroLink.stream";
+    const streamId = `neurolink-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const journeyStartTime = new Date().toISOString();
 
-    // Validate input
+    // 🚀 EXHAUSTIVE LOGGING POINT 1: MAIN NEUROLINK STREAM ENTRY POINT
+    logger.debug(`[NeuroLink] 🎯 LOG_POINT_001_STREAM_ENTRY_START`, {
+      logPoint: "001_STREAM_ENTRY_START",
+      streamId,
+      timestamp: journeyStartTime,
+      functionTag,
+      startTime,
+      hrTimeStart: hrTimeStart.toString(),
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      memoryUsage: process.memoryUsage(),
+      cpuUsage: process.cpuUsage(),
+
+      // Comprehensive input validation
+      hasOptions: !!options,
+      optionsType: typeof options,
+      optionsKeys: options ? Object.keys(options) : [],
+      optionsSize: options ? JSON.stringify(options).length : 0,
+
+      // Deep input analysis
+      hasInput: !!options?.input,
+      inputType: typeof options?.input,
+      inputKeys: options?.input ? Object.keys(options.input) : [],
+      hasInputText: !!options?.input?.text,
+      inputTextType: typeof options?.input?.text,
+      inputTextLength: options?.input?.text?.length || 0,
+      inputTextPreview: options?.input?.text?.substring(0, 200) || "NO_TEXT",
+      inputTextHash: options?.input?.text
+        ? "hash-" +
+          options.input.text.length +
+          "-" +
+          Math.random().toString(36).substr(2, 8)
+        : "NO_HASH",
+
+      // Provider configuration analysis
+      hasProvider: !!options?.provider,
+      providerValue: options?.provider || "NOT_SET",
+      isAutoProvider: options?.provider === "auto" || !options?.provider,
+
+      // Model configuration analysis
+      hasModel: !!options?.model,
+      modelValue: options?.model || "NOT_SET",
+      isDefaultModel: !options?.model,
+
+      // Advanced configuration analysis
+      hasSystemPrompt: !!options?.systemPrompt,
+      systemPromptLength: options?.systemPrompt?.length || 0,
+      systemPromptPreview:
+        options?.systemPrompt?.substring(0, 100) || "NO_SYSTEM_PROMPT",
+      hasTemperature: !!options?.temperature,
+      temperatureValue: options?.temperature || "NOT_SET",
+      isValidTemperature:
+        typeof options?.temperature === "number" &&
+        options.temperature >= 0 &&
+        options.temperature <= 2,
+      hasMaxTokens: !!options?.maxTokens,
+      maxTokensValue: options?.maxTokens || "NOT_SET",
+      isValidMaxTokens:
+        typeof options?.maxTokens === "number" && options.maxTokens > 0,
+      hasDisableTools: options?.disableTools !== undefined,
+      disableToolsValue: options?.disableTools || false,
+      hasContext: !!options?.context,
+      contextKeys: options?.context ? Object.keys(options.context) : [],
+      contextSize: options?.context
+        ? JSON.stringify(options.context).length
+        : 0,
+
+      // Environment analysis
+      nodeEnv: process.env.NODE_ENV || "UNKNOWN",
+      hasProxyConfig: !!(
+        process.env.HTTP_PROXY ||
+        process.env.HTTPS_PROXY ||
+        process.env.http_proxy ||
+        process.env.https_proxy
+      ),
+      httpProxy: process.env.HTTP_PROXY || process.env.http_proxy || "NOT_SET",
+      httpsProxy:
+        process.env.HTTPS_PROXY || process.env.https_proxy || "NOT_SET",
+      hasGoogleCredentials: !!(
+        process.env.GOOGLE_APPLICATION_CREDENTIALS ||
+        process.env.GOOGLE_SERVICE_ACCOUNT_KEY
+      ),
+      googleCredentialsPath:
+        process.env.GOOGLE_APPLICATION_CREDENTIALS || "NOT_SET",
+
+      message:
+        "EXHAUSTIVE NeuroLink main stream method entry point with comprehensive environment analysis",
+    });
+
+    // 🚀 EXHAUSTIVE LOGGING POINT 2: MEMORY AND PERFORMANCE BASELINE
+    const memoryBaseline = process.memoryUsage();
+    const cpuBaseline = process.cpuUsage();
+    logger.debug(`[NeuroLink] 🎯 LOG_POINT_002_PERFORMANCE_BASELINE`, {
+      logPoint: "002_PERFORMANCE_BASELINE",
+      streamId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startTime,
+      elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
+      memoryBaseline: {
+        rss: memoryBaseline.rss,
+        heapTotal: memoryBaseline.heapTotal,
+        heapUsed: memoryBaseline.heapUsed,
+        external: memoryBaseline.external,
+        arrayBuffers: memoryBaseline.arrayBuffers,
+      },
+      cpuBaseline: {
+        user: cpuBaseline.user,
+        system: cpuBaseline.system,
+      },
+      gcStats: global.gc
+        ? (() => {
+            try {
+              global.gc();
+              return process.memoryUsage();
+            } catch (e) {
+              return null;
+            }
+          })()
+        : null,
+      message: "Performance baseline metrics captured for stream processing",
+    });
+
+    // 🚀 EXHAUSTIVE LOGGING POINT 3: INPUT VALIDATION START
+    const validationStartTime = process.hrtime.bigint();
+    logger.debug(`[NeuroLink] 🎯 LOG_POINT_003_VALIDATION_START`, {
+      logPoint: "003_VALIDATION_START",
+      streamId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startTime,
+      elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
+      validationStartTimeNs: validationStartTime.toString(),
+      message: "Starting comprehensive input validation process",
+    });
+
+    // 🚀 EXHAUSTIVE LOGGING POINT 4: DETAILED VALIDATION CHECKS
+    logger.debug(`[NeuroLink] 🎯 LOG_POINT_004_VALIDATION_CHECKS`, {
+      logPoint: "004_VALIDATION_CHECKS",
+      streamId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startTime,
+      checks: {
+        hasOptions: !!options,
+        optionsIsObject: typeof options === "object" && options !== null,
+        hasInput: !!(options && options.input),
+        inputIsObject: !!(
+          options &&
+          options.input &&
+          typeof options.input === "object"
+        ),
+        hasInputText: !!(options && options.input && options.input.text),
+        inputTextIsString: !!(
+          options &&
+          options.input &&
+          typeof options.input.text === "string"
+        ),
+        inputTextNotEmpty: !!(
+          options &&
+          options.input &&
+          options.input.text &&
+          options.input.text.trim() !== ""
+        ),
+        inputTextLength: options?.input?.text?.length || 0,
+        inputTextTrimmedLength: options?.input?.text?.trim()?.length || 0,
+      },
+      optionsStructure: options
+        ? {
+            keys: Object.keys(options),
+            inputKeys: options.input ? Object.keys(options.input) : null,
+            inputTextType: typeof options.input?.text,
+            inputTextValue:
+              options.input?.text?.substring(0, 50) +
+              (options.input?.text?.length > 50 ? "..." : ""),
+            inputTextCharCodes: options.input?.text
+              ? Array.from(options.input.text.substring(0, 10)).map((c) =>
+                  c.charCodeAt(0),
+                )
+              : null,
+          }
+        : null,
+      message: "Detailed validation checks performed",
+    });
+
+    // Validate input with comprehensive error reporting
     if (
       !options?.input?.text ||
       typeof options.input.text !== "string" ||
       options.input.text.trim() === ""
     ) {
+      const validationFailTime = process.hrtime.bigint();
+      const validationDurationNs = validationFailTime - validationStartTime;
+
+      logger.debug(`[NeuroLink] 💥 LOG_POINT_005_VALIDATION_FAILED`, {
+        logPoint: "005_VALIDATION_FAILED",
+        streamId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - startTime,
+        elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
+        validationDurationNs: validationDurationNs.toString(),
+        validationDurationMs: Number(validationDurationNs) / 1000000,
+        validationError:
+          "Stream options must include input.text as a non-empty string",
+
+        // Detailed failure analysis
+        failureReason: !options
+          ? "NO_OPTIONS"
+          : !options.input
+            ? "NO_INPUT"
+            : !options.input.text
+              ? "NO_INPUT_TEXT"
+              : typeof options.input.text !== "string"
+                ? "INPUT_TEXT_NOT_STRING"
+                : options.input.text.trim() === ""
+                  ? "INPUT_TEXT_EMPTY_OR_WHITESPACE"
+                  : "UNKNOWN",
+
+        // Deep analysis for debugging
+        hasOptions: !!options,
+        optionsType: typeof options,
+        hasInput: !!options?.input,
+        inputType: typeof options?.input,
+        hasInputText: !!options?.input?.text,
+        inputTextType: typeof options?.input?.text,
+        inputTextValue: options?.input?.text,
+        inputTextLength: options?.input?.text?.length || 0,
+        inputTextTrimmed: options?.input?.text?.trim(),
+        inputTextTrimmedLength: options?.input?.text?.trim()?.length || 0,
+
+        // Character analysis for whitespace debugging
+        inputTextCharacters: options?.input?.text
+          ? Array.from(options.input.text)
+              .map((char, index) => ({
+                index,
+                char,
+                charCode: char.charCodeAt(0),
+                isWhitespace: /\s/.test(char),
+              }))
+              .slice(0, 20)
+          : null,
+
+        memoryAtFailure: process.memoryUsage(),
+        cpuAtFailure: process.cpuUsage(),
+        message:
+          "EXHAUSTIVE validation failure analysis with character-level debugging",
+      });
+
       throw new Error(
         "Stream options must include input.text as a non-empty string",
       );
     }
+
+    // 🚀 EXHAUSTIVE LOGGING POINT 6: VALIDATION SUCCESS
+    const validationSuccessTime = process.hrtime.bigint();
+    const validationDurationNs = validationSuccessTime - validationStartTime;
+
+    logger.debug(`[NeuroLink] ✅ LOG_POINT_006_VALIDATION_SUCCESS`, {
+      logPoint: "006_VALIDATION_SUCCESS",
+      streamId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startTime,
+      elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
+      validationDurationNs: validationDurationNs.toString(),
+      validationDurationMs: Number(validationDurationNs) / 1000000,
+      inputTextValid: true,
+      inputTextLength: options.input.text.length,
+      inputTextTrimmedLength: options.input.text.trim().length,
+      inputTextPreview: options.input.text.substring(0, 100),
+      inputTextHash:
+        "hash-" +
+        options.input.text.length +
+        "-" +
+        Math.random().toString(36).substr(2, 8),
+      inputTextWordCount: options.input.text
+        .split(/\s+/)
+        .filter((word) => word.length > 0).length,
+      inputTextLineCount: options.input.text.split(/\n/).length,
+      memoryAfterValidation: process.memoryUsage(),
+      cpuAfterValidation: process.cpuUsage(),
+      message:
+        "EXHAUSTIVE validation success - proceeding with stream processing",
+    });
 
     // Emit stream start event
     this.emitter.emit("stream:start", {
@@ -1977,13 +3195,72 @@ export class NeuroLink {
    * @returns Array of available tools with metadata
    */
   async getAllAvailableTools() {
+    // 🚀 EXHAUSTIVE LOGGING POINT A001: GET ALL AVAILABLE TOOLS ENTRY
+    const getAllToolsId = `get-all-tools-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const getAllToolsStartTime = Date.now();
+    const getAllToolsHrTimeStart = process.hrtime.bigint();
+
+    logger.debug(`[NeuroLink] 🛠️ LOG_POINT_A001_GET_ALL_TOOLS_START`, {
+      logPoint: "A001_GET_ALL_TOOLS_START",
+      getAllToolsId,
+      timestamp: new Date().toISOString(),
+      getAllToolsStartTime,
+      getAllToolsHrTimeStart: getAllToolsHrTimeStart.toString(),
+
+      // 🔧 Tool registry state
+      toolRegistryState: {
+        hasToolRegistry: !!toolRegistry,
+        toolRegistrySize: 0, // Not accessible as size property
+        toolRegistryType: toolRegistry?.constructor?.name || "NOT_SET",
+        hasExternalServerManager: !!this.externalServerManager,
+        externalServerManagerType:
+          this.externalServerManager?.constructor?.name || "NOT_SET",
+      },
+
+      // 🌐 MCP state
+      mcpState: {
+        mcpInitialized: this.mcpInitialized,
+        hasProviderRegistry: !!AIProviderFactory,
+        providerRegistrySize: 0, // Not accessible as size property
+      },
+
+      message: "Starting comprehensive tool discovery across all sources",
+    });
+
     // Track memory usage for tool listing operations
     const { MemoryManager } = await import("./utils/performance.js");
     const startMemory = MemoryManager.getMemoryUsageMB();
 
+    logger.debug(`[NeuroLink] 📊 LOG_POINT_A002_MEMORY_BASELINE`, {
+      logPoint: "A002_MEMORY_BASELINE",
+      getAllToolsId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - getAllToolsStartTime,
+      elapsedNs: (process.hrtime.bigint() - getAllToolsHrTimeStart).toString(),
+      memoryBaseline: startMemory,
+      heapUsed: startMemory.heapUsed,
+      heapTotal: startMemory.heapTotal,
+      external: startMemory.external,
+      message: "Established memory baseline before tool enumeration",
+    });
+
     try {
       // Optimized: Collect all tools with minimal object creation
       const allTools = new Map<string, ToolInfo>();
+
+      // 🚀 EXHAUSTIVE LOGGING POINT A003: MCP TOOLS COLLECTION START
+      const mcpToolsStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🔧 LOG_POINT_A003_MCP_TOOLS_START`, {
+        logPoint: "A003_MCP_TOOLS_START",
+        getAllToolsId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - getAllToolsStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - getAllToolsHrTimeStart
+        ).toString(),
+        mcpToolsStartTimeNs: mcpToolsStartTime.toString(),
+        message: "Starting MCP server tools collection",
+      });
 
       // 1. Add MCP server tools (built-in direct tools)
       const mcpToolsRaw = await toolRegistry.listTools();

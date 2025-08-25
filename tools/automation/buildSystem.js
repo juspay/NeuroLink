@@ -347,7 +347,10 @@ class BuildSystem {
     console.log(`\n🚀 Deploying to ${target}...`);
 
     // Set the default forceRebuild value to false as build is always run with a 'complete' target before deploy.
-    const deployCommands = this.getDeployCommands(target, options.forceRebuild ?? false);
+    const deployCommands = this.getDeployCommands(
+      target,
+      options.forceRebuild ?? false,
+    );
 
     for (const command of deployCommands) {
       console.log(`🔄 ${command}`);
@@ -374,7 +377,8 @@ class BuildSystem {
    * Get deployment commands for target
    */
   getDeployCommands(target, forceRebuild = false) {
-    const echoSkipBuildMessage = 'echo "Skipping build as it is already completed"';
+    const echoSkipBuildMessage =
+      'echo "Skipping build as it is already completed"';
     switch (target) {
       case "staging":
         return [
@@ -461,7 +465,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         "Usage: node buildSystem.js [build|deploy|watch] [target] [options]",
       );
       console.log("Targets: fast, quality, content, complete");
-      console.log("Options: --dry-run, --verbose, --skip-optional, --force-rebuild");
+      console.log(
+        "Options: --dry-run, --verbose, --skip-optional, --force-rebuild",
+      );
       break;
   }
 }

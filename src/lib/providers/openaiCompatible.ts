@@ -1,24 +1,16 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, type Schema, type LanguageModelV1 } from "ai";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import type { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { Unknown, UnknownRecord } from "../types/common.js";
+import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import {
-  createTimeoutController,
-  TimeoutError,
-  getDefaultTimeout,
-} from "../utils/timeout.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
-import { validateApiKey, getProviderModel } from "../utils/providerConfig.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Constants
 const FALLBACK_OPENAI_COMPATIBLE_MODEL = "gpt-3.5-turbo";
@@ -95,6 +87,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
     this.customOpenAI = createOpenAI({
       baseURL: this.config.baseURL,
       apiKey: this.config.apiKey,
+      fetch: createProxyFetch(),
     });
 
     logger.debug("OpenAI Compatible Provider initialized", {
@@ -231,7 +224,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
    */
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: ZodUnknownSchema | Schema<unknown>,
+    _analysisSchema?: ZodUnknownSchema | Schema<unknown>,
   ): Promise<StreamResult> {
     this.validateStreamOptions(options);
 
@@ -245,7 +238,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
 
     try {
       const model = await this.getAISDKModel();
-      const result = await streamText({
+      const result = streamText({
         model,
         prompt: options.input.text,
         system: options.systemPrompt,
@@ -304,7 +297,8 @@ export class OpenAICompatibleProvider extends BaseProvider {
       const modelsUrl = new URL("/v1/models", this.config.baseURL).toString();
       logger.debug(`Fetching available models from: ${modelsUrl}`);
 
-      const response = await fetch(modelsUrl, {
+      const proxyFetch = createProxyFetch();
+      const response = await proxyFetch(modelsUrl, {
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,
           "Content-Type": "application/json",
