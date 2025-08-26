@@ -1,3 +1,10 @@
+## [7.28.1](https://github.com/juspay/neurolink/compare/v7.28.0...v7.28.1) (2025-08-26)
+
+### Bug Fixes
+
+- **(cli):** resolve ESM interop and spawn synchronization issues ([4983221](https://github.com/juspay/neurolink/commit/49832210cd56df14e7cb77925fcc89c1cc72c046))
+- **(security):** prevent command injection in ollama pull ([27e6088](https://github.com/juspay/neurolink/commit/27e6088aa9e2d7dddaa1839d777e6b642e095549))
+
 ## [7.28.0](https://github.com/juspay/neurolink/compare/v7.27.0...v7.28.0) (2025-08-25)
 
 ### Features
