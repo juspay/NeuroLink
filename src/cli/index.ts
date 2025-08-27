@@ -27,6 +27,15 @@ import {
 } from "../lib/types/errors.js";
 import { logger } from "../lib/utils/logger.js";
 
+// Clean up pnpm-specific environment variables that cause npm warnings
+// These variables are set by pnpm but cause "Unknown env config" warnings in npm
+if (process.env.npm_config_verify_deps_before_run) {
+  delete process.env.npm_config_verify_deps_before_run;
+}
+if (process.env.npm_config__jsr_registry) {
+  delete process.env.npm_config__jsr_registry;
+}
+
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

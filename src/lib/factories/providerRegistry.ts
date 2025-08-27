@@ -96,11 +96,19 @@ export class ProviderRegistry {
       // Register Amazon Bedrock provider
       ProviderFactory.registerProvider(
         AIProviderName.BEDROCK,
-        async (modelName?: string) => {
+        async (
+          modelName?: string,
+          _providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
           const { AmazonBedrockProvider } = await import(
             "../providers/amazonBedrock.js"
           );
-          return new AmazonBedrockProvider(modelName);
+          return new AmazonBedrockProvider(
+            modelName,
+            undefined,
+            sdk as NeuroLink | undefined,
+          );
         },
         undefined, // Let provider read BEDROCK_MODEL from .env
         ["bedrock", "aws"],

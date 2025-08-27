@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": ["WebFetch(domain:docs.anthropic.com)", "Bash(find:*)"],
-    "deny": []
+    "deny": [],
+    "additionalDirectories": [
+      "/Users/sachinsharma/Developer/temp/ai-coder/Bedrock-MCP-Connector"
+    ]
   },
   "memoryBank": {
     "testingLearnings": {

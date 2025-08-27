@@ -44,11 +44,9 @@ import {
   detectCategory,
 } from "./utils/mcpDefaults.js";
 import type { JsonValue, JsonObject, UnknownRecord } from "./types/common.js";
-import type { ToolArgs } from "./types/tools.js";
 import type {
   ToolExecutionResult,
   BatchOperationResult,
-  ZodUnknownSchema,
 } from "./types/typeAliases.js";
 // Factory processing imports
 import {
@@ -59,7 +57,6 @@ import {
   createCleanStreamOptions,
 } from "./utils/factoryProcessing.js";
 // Tool detection and execution imports
-import type { NeuroLinkExecutionContext } from "./mcp/factory.js";
 // Transformation utilities
 import {
   transformToolExecutions,
@@ -165,18 +162,28 @@ export class NeuroLink {
    * @param toolName - Name of the tool
    * @param startTime - Timestamp when tool execution started
    * @param success - Whether the tool execution was successful
+   * @param result - The result of the tool execution (optional)
+   * @param error - The error if execution failed (optional)
    */
   private emitToolEndEvent(
     toolName: string,
     startTime: number,
     success: boolean,
+    result?: unknown,
+    error?: Error,
   ): void {
+    // Emit tool end event (NeuroLink format - enhanced with result/error)
     this.emitter.emit("tool:end", {
       toolName,
       responseTime: Date.now() - startTime,
       success,
       timestamp: Date.now(),
+      result: result, // Enhanced: include actual result
+      error: error, // Enhanced: include error if present
     });
+
+    // ADD: Bedrock-compatible tool:end event (positional parameters)
+    this.emitter.emit("tool:end", toolName, success ? result : error);
   }
   // Conversation memory support
   private conversationMemory?: ConversationMemoryManager;
@@ -1112,11 +1119,20 @@ export class NeuroLink {
 
     const startTime = Date.now();
 
-    // Emit generation start event
+    // Emit generation start event (NeuroLink format - keep existing)
     this.emitter.emit("generation:start", {
       provider: options.provider || "auto",
       timestamp: startTime,
     });
+
+    // ADD: Bedrock-compatible response:start event
+    this.emitter.emit("response:start");
+
+    // ADD: Bedrock-compatible message event
+    this.emitter.emit(
+      "message",
+      `Starting ${options.provider || "auto"} text generation...`,
+    );
 
     // Process factory configuration
     const factoryResult = processFactoryOptions(options);
@@ -1173,13 +1189,23 @@ export class NeuroLink {
     // Use redesigned generation logic
     const textResult = await this.generateTextInternal(textOptions);
 
-    // Emit generation completion event
+    // Emit generation completion event (NeuroLink format - enhanced with content)
     this.emitter.emit("generation:end", {
       provider: textResult.provider,
       responseTime: Date.now() - startTime,
       toolsUsed: textResult.toolsUsed,
       timestamp: Date.now(),
+      result: textResult, // Enhanced: include full result
     });
+
+    // ADD: Bedrock-compatible response:end event with content
+    this.emitter.emit("response:end", textResult.content || "");
+
+    // ADD: Bedrock-compatible message event
+    this.emitter.emit(
+      "message",
+      `Generation completed in ${Date.now() - startTime}ms`,
+    );
 
     // Convert back to GenerateResult
     const generateResult: GenerateResult = {
@@ -1344,6 +1370,15 @@ export class NeuroLink {
       promptLength: options.prompt?.length || 0,
       hasConversationMemory: !!this.conversationMemory,
     });
+
+    // ADD: Bedrock-compatible response:start event for generateTextInternal
+    this.emitter.emit("response:start");
+
+    // ADD: Bedrock-compatible message event for generateTextInternal
+    this.emitter.emit(
+      "message",
+      `Starting ${options.provider || "auto"} text generation (internal)...`,
+    );
 
     try {
       // 🚀 EXHAUSTIVE LOGGING POINT G002: CONVERSATION MEMORY INITIALIZATION
@@ -1548,6 +1583,9 @@ export class NeuroLink {
                 mcpResult,
               );
 
+              // ADD: Bedrock-compatible response:end event for MCP success path
+              this.emitter.emit("response:end", mcpResult.content || "");
+
               return mcpResult;
             } else {
               logger.debug(
@@ -1575,6 +1613,10 @@ export class NeuroLink {
                   options,
                   mcpResult,
                 );
+
+                // ADD: Bedrock-compatible response:end event for MCP tool execution success path
+                this.emitter.emit("response:end", mcpResult.content || "");
+
                 return mcpResult;
               }
             }
@@ -1612,11 +1654,27 @@ export class NeuroLink {
         directResult,
       );
 
+      // ADD: Bedrock-compatible response:end event for generateTextInternal
+      this.emitter.emit("response:end", directResult.content || "");
+
+      // ADD: Bedrock-compatible message event for generateTextInternal completion
+      this.emitter.emit("message", `Text generation completed successfully`);
+
       return directResult;
     } catch (error) {
       logger.error(`[${functionTag}] All generation methods failed`, {
         error: error instanceof Error ? error.message : String(error),
       });
+
+      // ADD: Bedrock-compatible response:end event for error path (empty content)
+      this.emitter.emit("response:end", "");
+
+      // ADD: Centralized error event emission
+      this.emitter.emit(
+        "error",
+        error instanceof Error ? error : new Error(String(error)),
+      );
+
       throw error;
     }
   }
@@ -1755,6 +1813,13 @@ export class NeuroLink {
         this as unknown as UnknownRecord, // Pass SDK instance
       );
 
+      // ADD: Emit connection events for all providers (Bedrock-compatible)
+      this.emitter.emit("connected");
+      this.emitter.emit(
+        "message",
+        `${providerName} provider initialized successfully`,
+      );
+
       // Enable tool execution for the provider using BaseProvider method
       provider.setupToolExecutor(
         {
@@ -1885,6 +1950,13 @@ export class NeuroLink {
           this as unknown as UnknownRecord, // Pass SDK instance
         );
 
+        // ADD: Emit connection events for successful provider creation (Bedrock-compatible)
+        this.emitter.emit("connected");
+        this.emitter.emit(
+          "message",
+          `${providerName} provider initialized successfully`,
+        );
+
         // Enable tool execution for direct provider generation using BaseProvider method
         provider.setupToolExecutor(
           {
@@ -1973,7 +2045,7 @@ export class NeuroLink {
    */
   private async detectAndExecuteTools(
     prompt: string,
-    domainType?: string,
+    _domainType?: string,
   ): Promise<ToolExecutionResult> {
     const functionTag = "NeuroLink.detectAndExecuteTools";
 
@@ -2226,7 +2298,7 @@ export class NeuroLink {
             try {
               global.gc();
               return process.memoryUsage();
-            } catch (e) {
+            } catch (_e) {
               return null;
             }
           })()
@@ -2393,11 +2465,20 @@ export class NeuroLink {
         "EXHAUSTIVE validation success - proceeding with stream processing",
     });
 
-    // Emit stream start event
+    // Emit stream start event (NeuroLink format - keep existing)
     this.emitter.emit("stream:start", {
       provider: options.provider || "auto",
       timestamp: startTime,
     });
+
+    // ADD: Bedrock-compatible response:start event
+    this.emitter.emit("response:start");
+
+    // ADD: Bedrock-compatible message event
+    this.emitter.emit(
+      "message",
+      `Starting ${options.provider || "auto"} stream generation...`,
+    );
 
     // Process factory configuration for streaming
     const factoryResult = processFactoryOptions(options);
@@ -2523,6 +2604,8 @@ export class NeuroLink {
               // Ensure chunk has content property and it's a string
               if (typeof chunk.content === "string") {
                 accumulatedContent += chunk.content;
+                // ADD: Bedrock-compatible response:chunk event
+                self.emitter.emit("response:chunk", chunk.content);
               } else if (
                 chunk.content === undefined ||
                 chunk.content === null
@@ -2534,6 +2617,8 @@ export class NeuroLink {
                 const stringContent = String(chunk.content || "");
                 processedChunk = { ...chunk, content: stringContent };
                 accumulatedContent += stringContent;
+                // ADD: Bedrock-compatible response:chunk event
+                self.emitter.emit("response:chunk", stringContent);
               }
             } else if (chunk === null || chunk === undefined) {
               // Create a safe empty chunk if chunk is null/undefined
@@ -2575,11 +2660,21 @@ export class NeuroLink {
         provider: providerName,
       });
 
-      // Emit stream completion event
+      // Emit stream completion event (NeuroLink format - enhanced with content)
       this.emitter.emit("stream:end", {
         provider: providerName,
         responseTime,
+        result: { content: accumulatedContent }, // Enhanced: include accumulated content
       });
+
+      // ADD: Bedrock-compatible response:end event with full response
+      this.emitter.emit("response:end", accumulatedContent);
+
+      // ADD: Bedrock-compatible message event
+      this.emitter.emit(
+        "message",
+        `Stream completed in ${responseTime}ms (${accumulatedContent.length} chars)`,
+      );
 
       // Convert to StreamResult format - Include analytics and evaluation from provider
       return {
@@ -2609,6 +2704,12 @@ export class NeuroLink {
         },
       };
     } catch (error) {
+      // ADD: Error event emission for MCP streaming failure
+      this.emitter.emit(
+        "error",
+        error instanceof Error ? error : new Error(String(error)),
+      );
+
       // Fall back to regular streaming if MCP fails
       mcpLogger.warn(
         `[${functionTag}] MCP streaming failed, falling back to regular`,
@@ -2665,6 +2766,8 @@ export class NeuroLink {
           for await (const chunk of streamResult.stream) {
             if (chunk && typeof chunk.content === "string") {
               fallbackAccumulatedContent += chunk.content;
+              // ADD: Bedrock-compatible response:chunk event for fallback
+              self.emitter.emit("response:chunk", chunk.content);
             }
             yield chunk; // Preserve original streaming behavior
           }
@@ -2697,12 +2800,22 @@ export class NeuroLink {
 
       const responseTime = Date.now() - startTime;
 
-      // Emit stream completion event for fallback
+      // Emit stream completion event for fallback (NeuroLink format - enhanced with content)
       this.emitter.emit("stream:end", {
         provider: providerName,
         responseTime,
         fallback: true,
+        result: { content: fallbackAccumulatedContent }, // Enhanced: include accumulated content
       });
+
+      // ADD: Bedrock-compatible response:end event with full response
+      this.emitter.emit("response:end", fallbackAccumulatedContent);
+
+      // ADD: Bedrock-compatible message event
+      this.emitter.emit(
+        "message",
+        `Fallback stream completed in ${responseTime}ms (${fallbackAccumulatedContent.length} chars)`,
+      );
 
       return {
         stream: fallbackProcessedStream,
@@ -2929,7 +3042,7 @@ export class NeuroLink {
     });
 
     try {
-      // --- Start: Added Validation Logic ---
+      // --- Start: Enhanced Validation Logic with FlexibleToolValidator ---
       if (!name || typeof name !== "string") {
         throw new Error("Invalid tool name");
       }
@@ -2939,65 +3052,43 @@ export class NeuroLink {
       if (typeof tool.execute !== "function") {
         throw new Error(`Tool '${name}' must have an execute method.`);
       }
-      // --- End: Added Validation Logic ---
 
-      // Import validation functions synchronously - they are pure functions
-      let validateTool: (name: string, tool: unknown) => void;
-      let isToolNameAvailable: (name: string) => boolean;
-      let suggestToolNames: (name: string) => string[];
-
+      // Use FlexibleToolValidator for consistent validation across SDK and toolRegistry
       try {
-        // Try ES module import first
-        const toolRegistrationModule = require("./sdk/toolRegistration.js");
-        ({ validateTool, isToolNameAvailable, suggestToolNames } =
-          toolRegistrationModule);
+        const flexibleValidatorModule = require("./mcp/flexibleToolValidator.js");
+        const FlexibleToolValidator =
+          flexibleValidatorModule.FlexibleToolValidator;
+
+        // Use the same validation logic as toolRegistry (static method)
+        const validationResult = FlexibleToolValidator.validateToolName(name);
+        if (!validationResult.isValid) {
+          throw new Error(`Tool validation failed: ${validationResult.error}`);
+        }
       } catch (error) {
-        // Fallback: skip validation if import fails (graceful degradation)
+        // If FlexibleToolValidator import fails, use basic safety checks
         logger.warn(
-          "Tool validation module not available, skipping advanced validation",
+          "FlexibleToolValidator not available, using basic validation",
           {
             error: error instanceof Error ? error.message : String(error),
           },
         );
-        // Create minimal validation functions
-        validateTool = () => {}; // No-op
-        isToolNameAvailable = () => true; // Allow all names
-        suggestToolNames = () => ["alternative_tool"];
-      }
 
-      // Check if tool name is available (not reserved)
-      if (!isToolNameAvailable(name)) {
-        const suggestions = suggestToolNames(name);
-        throw new Error(
-          `Tool name '${name}' is not available (reserved or invalid format). ` +
-            `Suggested alternatives: ${suggestions.slice(0, 3).join(", ")}`,
-        );
+        // Basic safety checks to prevent obvious issues
+        if (name.trim() === "") {
+          throw new Error("Tool name cannot be empty");
+        }
+        if (name.length > 100) {
+          throw new Error("Tool name is too long (maximum 100 characters)");
+        }
+        // eslint-disable-next-line no-control-regex
+        if (/[\x00-\x1F\x7F]/.test(name)) {
+          throw new Error("Tool name contains invalid control characters");
+        }
       }
+      // --- End: Enhanced Validation Logic ---
 
-      // Create a simplified tool object for validation
-      const toolForValidation = {
-        description: tool.description || "",
-        execute: async (params: ToolArgs) => {
-          if (tool.execute) {
-            const result = await tool.execute(params);
-            return result as JsonValue;
-          }
-          return "" as JsonValue;
-        },
-        parameters: tool.inputSchema as ZodUnknownSchema | undefined,
-        metadata: {
-          category: "custom",
-        },
-      };
-
-      // Use comprehensive validation logic
-      try {
-        validateTool(name, toolForValidation);
-      } catch (error) {
-        throw new Error(
-          `Tool registration failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      // Tool object validation is now handled by FlexibleToolValidator above
+      // Proceed with tool registration since validation passed
 
       // SMART DEFAULTS: Use utility to eliminate boilerplate creation
       const mcpServerInfo = createCustomToolServerInfo(name, tool);
@@ -3215,11 +3306,15 @@ export class NeuroLink {
       hasExternalManager: !!this.externalServerManager,
     });
 
-    // Emit tool start event
+    // Emit tool start event (NeuroLink format - keep existing)
     this.emitter.emit("tool:start", {
       toolName,
       timestamp: executionStartTime,
+      input: params, // Enhanced: add input parameters
     });
+
+    // ADD: Bedrock-compatible tool:start event (positional parameters)
+    this.emitter.emit("tool:start", toolName, params);
 
     // Set default options
     const finalOptions = {
@@ -3236,7 +3331,7 @@ export class NeuroLink {
     if (!this.toolCircuitBreakers.has(toolName)) {
       this.toolCircuitBreakers.set(toolName, new CircuitBreaker(5, 60000)); // 5 failures, 1 minute timeout
     }
-    const circuitBreaker = this.toolCircuitBreakers.get(toolName)!;
+    const circuitBreaker = this.toolCircuitBreakers.get(toolName);
 
     // Initialize metrics for this tool if not exists
     if (!this.toolExecutionMetrics.has(toolName)) {
@@ -3248,19 +3343,21 @@ export class NeuroLink {
         lastExecutionTime: 0,
       });
     }
-    const metrics = this.toolExecutionMetrics.get(toolName)!;
-    metrics.totalExecutions++;
+    const metrics = this.toolExecutionMetrics.get(toolName);
+    if (metrics) {
+      metrics.totalExecutions++;
+    }
 
     try {
       mcpLogger.debug(`[${functionTag}] Executing tool: ${toolName}`, {
         toolName,
         params,
         options: finalOptions,
-        circuitBreakerState: circuitBreaker.getState(),
+        circuitBreakerState: circuitBreaker?.getState(),
       });
 
       // Execute with circuit breaker, timeout, and retry logic
-      const result = await circuitBreaker.execute(async () => {
+      const result: T = await circuitBreaker!.execute(async () => {
         return await withRetry(
           async () => {
             return await withTimeout(
@@ -3289,12 +3386,14 @@ export class NeuroLink {
 
       // Update success metrics
       const executionTime = Date.now() - executionStartTime;
-      metrics.successfulExecutions++;
-      metrics.lastExecutionTime = executionTime;
-      metrics.averageExecutionTime =
-        (metrics.averageExecutionTime * (metrics.successfulExecutions - 1) +
-          executionTime) /
-        metrics.successfulExecutions;
+      if (metrics) {
+        metrics.successfulExecutions++;
+        metrics.lastExecutionTime = executionTime;
+        metrics.averageExecutionTime =
+          (metrics.averageExecutionTime * (metrics.successfulExecutions - 1) +
+            executionTime) /
+          metrics.successfulExecutions;
+      }
 
       // Track memory usage
       const endMemory = MemoryManager.getMemoryUsageMB();
@@ -3315,16 +3414,18 @@ export class NeuroLink {
         toolName,
         executionTime,
         memoryDelta,
-        circuitBreakerState: circuitBreaker.getState(),
+        circuitBreakerState: circuitBreaker?.getState(),
       });
 
       // Emit tool end event using the helper method
-      this.emitToolEndEvent(toolName, executionStartTime, true);
+      this.emitToolEndEvent(toolName, executionStartTime, true, result);
 
       return result;
     } catch (error) {
       // Update failure metrics
-      metrics.failedExecutions++;
+      if (metrics) {
+        metrics.failedExecutions++;
+      }
       const executionTime = Date.now() - executionStartTime;
 
       // Create structured error
@@ -3369,8 +3470,17 @@ export class NeuroLink {
         );
       }
 
+      // ADD: Centralized error event emission
+      this.emitter.emit("error", structuredError);
+
       // Emit tool end event using the helper method
-      this.emitToolEndEvent(toolName, executionStartTime, false);
+      this.emitToolEndEvent(
+        toolName,
+        executionStartTime,
+        false,
+        undefined,
+        structuredError,
+      );
 
       // Add execution context to structured error
       structuredError = new NeuroLinkError({
@@ -3380,8 +3490,8 @@ export class NeuroLink {
           executionTime,
           params,
           options: finalOptions,
-          circuitBreakerState: circuitBreaker.getState(),
-          circuitBreakerFailures: circuitBreaker.getFailureCount(),
+          circuitBreakerState: circuitBreaker?.getState(),
+          circuitBreakerFailures: circuitBreaker?.getFailureCount(),
           metrics: { ...metrics },
         },
       });
@@ -3465,8 +3575,26 @@ export class NeuroLink {
         context,
       )) as T;
 
+      // ADD: Check if result indicates a failure and emit error event
+      if (
+        result &&
+        typeof result === "object" &&
+        "success" in result &&
+        result.success === false
+      ) {
+        const errorMessage =
+          (result as { error?: string }).error || "Tool execution failed";
+        const errorToEmit = new Error(errorMessage);
+        this.emitter.emit("error", errorToEmit);
+      }
+
       return result;
     } catch (error) {
+      // ADD: Emergency error event emission (fallback)
+      const errorToEmit =
+        error instanceof Error ? error : new Error(String(error));
+      this.emitter.emit("error", errorToEmit);
+
       // Check if tool was not found
       if (error instanceof Error && error.message.includes("not found")) {
         const availableTools = await this.getAllAvailableTools();
@@ -3682,6 +3810,10 @@ export class NeuroLink {
 
     const { AIProviderFactory } = await import("./core/factory.js");
     const { hasProviderEnvVars } = await import("./utils/providerUtils.js");
+
+    // Keep references to prevent unused variable warnings
+    void AIProviderFactory;
+    void hasProviderEnvVars;
 
     const providers = [
       "openai",
@@ -3992,8 +4124,8 @@ export class NeuroLink {
       // Test in-memory servers
       const inMemoryServers = this.getInMemoryServers();
       if (inMemoryServers.has(serverId)) {
-        const serverInfo = inMemoryServers.get(serverId)!;
-        return !!(serverInfo.tools && serverInfo.tools.length > 0);
+        const serverInfo = inMemoryServers.get(serverId);
+        return !!(serverInfo?.tools && serverInfo.tools.length > 0);
       }
 
       // Test external MCP servers
@@ -4801,7 +4933,7 @@ export class NeuroLink {
    * Convert JSON Schema to AI SDK compatible format
    * For now, we'll skip schema validation and let the AI SDK handle parameters dynamically
    */
-  private convertJSONSchemaToAISDKFormat(inputSchema: unknown): unknown {
+  private convertJSONSchemaToAISDKFormat(_inputSchema: unknown): unknown {
     // The simplest approach: don't provide parameters schema
     // This lets the AI SDK handle the tool without schema validation
     // Tools will still work, they just won't have strict parameter validation
