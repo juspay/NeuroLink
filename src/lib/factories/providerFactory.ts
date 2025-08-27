@@ -92,6 +92,8 @@ export class ProviderFactory {
       // Check for provider-specific environment variables
       if (providerName.toLowerCase().includes("vertex")) {
         model = process.env.VERTEX_MODEL;
+      } else if (providerName.toLowerCase().includes("bedrock")) {
+        model = process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
       }
       // Fallback to registry default if no env var
       model = model || registration.defaultModel;

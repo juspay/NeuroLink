@@ -9,8 +9,7 @@ import type {
   ToolInfo,
 } from "./contracts/mcpContract.js";
 import type { ToolResult } from "./factory.js";
-import type { UnknownRecord, JsonValue } from "../types/common.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import type { UnknownRecord } from "../types/common.js";
 import type { MCPServerInfo, MCPServerCategory } from "../types/mcpTypes.js";
 import { MCPRegistry } from "./registry.js";
 import { registryLogger } from "../utils/logger.js";
@@ -18,6 +17,7 @@ import { randomUUID } from "crypto";
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
 import { directAgentTools } from "../agent/directTools.js";
 import { detectCategory, createMCPServerInfo } from "../utils/mcpDefaults.js";
+import { FlexibleToolValidator } from "./flexibleToolValidator.js";
 
 interface ToolImplementation {
   execute: (
@@ -29,16 +29,6 @@ interface ToolImplementation {
   outputSchema?: unknown;
   category?: string;
   permissions?: string[];
-}
-
-interface ServerRegistration {
-  id?: string;
-  serverId?: string;
-  description?: string;
-  title?: string;
-  category?: string;
-  tools?: Record<string, ToolImplementation>;
-  configuration?: Record<string, unknown>;
 }
 
 // Use the compatible ToolResult from factory.ts
@@ -59,7 +49,7 @@ export interface ToolExecutionOptions {
 
 export class MCPToolRegistry extends MCPRegistry {
   private tools: Map<string, ToolInfo> = new Map();
-  private toolImpls: Map<string, ToolImplementation> = new Map(); // Store actual tool implementations
+  private toolImplementations: Map<string, ToolImplementation> = new Map(); // Store actual tool implementations
   private toolExecutionStats: Map<
     string,
     { count: number; totalTime: number }
@@ -93,7 +83,7 @@ export class MCPToolRegistry extends MCPRegistry {
       };
 
       this.tools.set(toolId, toolInfo);
-      this.toolImpls.set(toolId, {
+      this.toolImplementations.set(toolId, {
         execute: async (params: unknown, context?: ExecutionContext) => {
           try {
             // Direct tools from AI SDK expect their specific parameter structure
@@ -246,7 +236,7 @@ export class MCPToolRegistry extends MCPRegistry {
       this.tools.set(toolId, toolInfo);
 
       // Store the actual tool implementation for execution using toolId as key
-      this.toolImpls.set(toolId, {
+      this.toolImplementations.set(toolId, {
         execute:
           tool.execute ||
           (async () => {
@@ -348,13 +338,13 @@ export class MCPToolRegistry extends MCPRegistry {
       };
 
       // Get the tool implementation using the resolved toolId
-      const toolImpl = this.toolImpls.get(toolId);
+      const toolImpl = this.toolImplementations.get(toolId);
       registryLogger.debug(
         `Looking for tool '${toolName}' (toolId: '${toolId}'), found: ${!!toolImpl}, type: ${typeof toolImpl?.execute}`,
       );
       registryLogger.debug(
         `Available tools:`,
-        Array.from(this.toolImpls.keys()),
+        Array.from(this.toolImplementations.keys()),
       );
 
       if (!toolImpl || typeof toolImpl?.execute !== "function") {
@@ -648,73 +638,41 @@ export class MCPToolRegistry extends MCPRegistry {
    * Register a tool with implementation directly
    * This is used for external MCP server tools
    */
-  registerTool(
+  async registerTool(
     toolId: string,
     toolInfo: ToolInfo,
     toolImpl: ToolImplementation,
-  ): void {
+  ): Promise<void> {
     registryLogger.debug(`Registering tool: ${toolId}`);
 
-    // Import validation functions synchronously - they are pure functions
-    let validateTool: (name: string, tool: unknown) => void;
-    let isToolNameAvailable: (name: string) => boolean;
-    let suggestToolNames: (name: string) => string[];
+    // Universal safety validation using FlexibleToolValidator
+    // Only blocks truly dangerous cases to support maximum MCP tool compatibility
+    const validation = FlexibleToolValidator.validateToolInfo(toolId, {
+      description: toolInfo.description,
+      serverId: toolInfo.serverId,
+    });
 
-    try {
-      // Try ES module import first
-      const toolRegistrationModule = require("../sdk/toolRegistration.js");
-      ({ validateTool, isToolNameAvailable, suggestToolNames } =
-        toolRegistrationModule);
-    } catch (error) {
-      // Fallback: skip validation if import fails (graceful degradation)
+    if (!validation.isValid) {
+      registryLogger.error(
+        `Tool registration failed for ${toolId}: ${validation.error}`,
+      );
+      throw new Error(`Tool validation failed: ${validation.error}`);
+    }
+
+    // Log any warnings but allow registration to proceed
+    if (validation.warnings && validation.warnings.length > 0) {
       registryLogger.warn(
-        "Tool validation module not available, skipping advanced validation",
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
-      // Create minimal validation functions
-      validateTool = () => {}; // No-op
-      isToolNameAvailable = () => true; // Allow all names
-      suggestToolNames = () => ["alternative_tool"];
-    }
-
-    // Check if tool name is available (not reserved)
-    if (!isToolNameAvailable(toolId)) {
-      const suggestions = suggestToolNames(toolId);
-      registryLogger.error(
-        `Tool registration failed for ${toolId}: Name not available`,
-      );
-      throw new Error(
-        `Tool name '${toolId}' is not available (reserved or invalid format). ` +
-          `Suggested alternatives: ${suggestions.slice(0, 3).join(", ")}`,
+        `Tool registration warnings for ${toolId}:`,
+        validation.warnings,
       );
     }
 
-    // Create a simplified tool object for validation
-    const toolForValidation = {
-      description: toolInfo.description || "",
-      execute: async () => "" as JsonValue,
-      parameters: undefined as ZodUnknownSchema | undefined,
-      metadata: {
-        category: toolInfo.category,
-        serverId: toolInfo.serverId,
-      },
-    };
-
-    // Use comprehensive validation logic
-    try {
-      validateTool(toolId, toolForValidation);
-    } catch (error) {
-      registryLogger.error(
-        `Tool registration failed for ${toolId}:`,
-        error instanceof Error ? error.message : String(error),
-      );
-      throw error;
-    }
+    registryLogger.debug(
+      `✅ Tool '${toolId}' passed flexible validation - registration proceeding`,
+    );
 
     this.tools.set(toolId, toolInfo);
-    this.toolImpls.set(toolId, toolImpl);
+    this.toolImplementations.set(toolId, toolImpl);
 
     registryLogger.debug(`Successfully registered tool: ${toolId}`);
   }
@@ -727,6 +685,7 @@ export class MCPToolRegistry extends MCPRegistry {
     let removed = false;
     if (this.tools.has(toolName)) {
       this.tools.delete(toolName);
+      this.toolImplementations.delete(toolName); // Fix memory leak
       this.toolExecutionStats.delete(toolName);
       registryLogger.info(`Removed tool: ${toolName}`);
       removed = true;
@@ -735,6 +694,7 @@ export class MCPToolRegistry extends MCPRegistry {
       for (const [toolId, tool] of Array.from(this.tools.entries())) {
         if (tool.name === toolName) {
           this.tools.delete(toolId);
+          this.toolImplementations.delete(toolId); // Fix memory leak
           this.toolExecutionStats.delete(toolId);
           registryLogger.info(`Removed tool: ${toolId}`);
           removed = true;
@@ -800,6 +760,8 @@ export class MCPToolRegistry extends MCPRegistry {
     for (const [toolId, tool] of this.tools.entries()) {
       if (tool.serverId === serverId) {
         this.tools.delete(toolId);
+        this.toolImplementations.delete(toolId); // Fix memory leak
+        this.toolExecutionStats.delete(toolId); // Fix memory leak
         removedTools.push(toolId);
       }
     }
@@ -821,6 +783,9 @@ export class MCPToolRegistry extends MCPRegistry {
     );
     return removed;
   }
+
+  // TODO: Add FlexibleToolValidator class in next task
+  // This will contain only universal safety checks (empty names, control characters, length limits)
 }
 
 // Create default instance

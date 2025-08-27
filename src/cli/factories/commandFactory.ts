@@ -350,16 +350,70 @@ export class CLICommandFactory {
     }
   }
 
-  // Helper method to validate token usage data
+  // Helper method to validate token usage data with fallback handling
   private static isValidTokenUsage(tokens: unknown): tokens is AnalyticsTokens {
-    return !!(
-      tokens &&
-      typeof tokens === "object" &&
-      tokens !== null &&
-      typeof (tokens as AnalyticsTokens).input === "number" &&
-      typeof (tokens as AnalyticsTokens).output === "number" &&
-      typeof (tokens as AnalyticsTokens).total === "number"
-    );
+    if (!tokens || typeof tokens !== "object" || tokens === null) {
+      return false;
+    }
+
+    const tokensObj = tokens as unknown as Record<string, unknown>;
+
+    // Check primary format: analytics.tokens {input, output, total}
+    if (
+      typeof tokensObj.input === "number" &&
+      typeof tokensObj.output === "number" &&
+      typeof tokensObj.total === "number"
+    ) {
+      return true;
+    }
+
+    // Check fallback format: tokenUsage {inputTokens, outputTokens, totalTokens}
+    if (
+      typeof tokensObj.inputTokens === "number" &&
+      typeof tokensObj.outputTokens === "number" &&
+      typeof tokensObj.totalTokens === "number"
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // Helper method to normalize token usage data to standard format
+  private static normalizeTokenUsage(tokens: unknown): AnalyticsTokens | null {
+    if (!this.isValidTokenUsage(tokens)) {
+      return null;
+    }
+
+    const tokensObj = tokens as unknown as Record<string, unknown>;
+
+    // Primary format: analytics.tokens {input, output, total}
+    if (
+      typeof tokensObj.input === "number" &&
+      typeof tokensObj.output === "number" &&
+      typeof tokensObj.total === "number"
+    ) {
+      return {
+        input: tokensObj.input,
+        output: tokensObj.output,
+        total: tokensObj.total,
+      };
+    }
+
+    // Fallback format: tokenUsage {inputTokens, outputTokens, totalTokens}
+    if (
+      typeof tokensObj.inputTokens === "number" &&
+      typeof tokensObj.outputTokens === "number" &&
+      typeof tokensObj.totalTokens === "number"
+    ) {
+      return {
+        input: tokensObj.inputTokens,
+        output: tokensObj.outputTokens,
+        total: tokensObj.totalTokens,
+      };
+    }
+
+    return null;
   }
 
   // Helper method to format analytics for text mode display
@@ -383,10 +437,10 @@ export class CLICommandFactory {
     }
     analyticsText += "\n";
 
-    // Token usage
-    if (this.isValidTokenUsage(analytics.tokens)) {
-      const tokens = analytics.tokens as AnalyticsTokens;
-      analyticsText += `   Tokens: ${tokens.input} input + ${tokens.output} output = ${tokens.total} total\n`;
+    // Token usage with fallback handling
+    const normalizedTokens = this.normalizeTokenUsage(analytics.tokens);
+    if (normalizedTokens) {
+      analyticsText += `   Tokens: ${normalizedTokens.input} input + ${normalizedTokens.output} output = ${normalizedTokens.total} total\n`;
     }
 
     // Cost information
@@ -398,9 +452,13 @@ export class CLICommandFactory {
       analyticsText += `   Cost: $${analytics.cost.toFixed(5)}\n`;
     }
 
-    // Response time
-    if (analytics.responseTime && typeof analytics.responseTime === "number") {
-      const timeInSeconds = (analytics.responseTime / 1000).toFixed(1);
+    // Response time with fallback handling for requestDuration vs responseTime
+    const duration =
+      analytics.responseTime ||
+      analytics.requestDuration ||
+      (analytics as Record<string, unknown>).duration;
+    if (duration && typeof duration === "number") {
+      const timeInSeconds = (duration / 1000).toFixed(1);
       analyticsText += `   Time: ${timeInSeconds}s\n`;
     }
 
@@ -1206,16 +1264,78 @@ export class CLICommandFactory {
       });
 
       let fullContent = "";
+      let contentReceived = false;
+      const abortController = new AbortController();
 
-      // Process the stream
-      for await (const chunk of stream.stream) {
-        if (options.delay && options.delay > 0) {
-          // Demo mode - add delay between chunks
-          await new Promise((resolve) => setTimeout(resolve, options.delay));
+      // Create timeout promise for stream consumption (30 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        const timeoutId = setTimeout(() => {
+          if (!contentReceived) {
+            const timeoutError = new Error(
+              "\n❌ Stream timeout - no content received within 30 seconds\n" +
+                "This usually indicates authentication or network issues\n\n" +
+                "🔧 Try these steps:\n" +
+                "1. Check your provider credentials are configured correctly\n" +
+                `2. Test generate mode: neurolink generate "test" --provider ${options.provider}\n` +
+                `3. Use debug mode: neurolink stream "test" --provider ${options.provider} --debug`,
+            );
+            reject(timeoutError);
+          }
+        }, 30000);
+
+        // Clean up timeout when aborted
+        abortController.signal.addEventListener("abort", () => {
+          clearTimeout(timeoutId);
+        });
+      });
+
+      try {
+        // Process the stream with timeout handling
+        const streamIterator = stream.stream[Symbol.asyncIterator]();
+        let timeoutActive = true;
+
+        while (true) {
+          let nextResult;
+
+          if (timeoutActive && !contentReceived) {
+            // Race between next chunk and timeout for first chunk only
+            nextResult = await Promise.race([
+              streamIterator.next(),
+              timeoutPromise,
+            ]);
+          } else {
+            // No timeout for subsequent chunks
+            nextResult = await streamIterator.next();
+          }
+
+          if (nextResult.done) {
+            break;
+          }
+
+          if (!contentReceived) {
+            contentReceived = true;
+            timeoutActive = false;
+            abortController.abort(); // Cancel timeout
+          }
+
+          if (options.delay && options.delay > 0) {
+            // Demo mode - add delay between chunks
+            await new Promise((resolve) => setTimeout(resolve, options.delay));
+          }
+
+          process.stdout.write(nextResult.value.content);
+          fullContent += nextResult.value.content;
         }
+      } catch (error) {
+        abortController.abort(); // Clean up timeout
+        throw error;
+      }
 
-        process.stdout.write(chunk.content);
-        fullContent += chunk.content;
+      if (!contentReceived) {
+        throw new Error(
+          "\n❌ No content received from stream\n" +
+            "Check your credentials and provider configuration",
+        );
       }
 
       if (!options.quiet) {

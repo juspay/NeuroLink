@@ -45,63 +45,6 @@ import path from "path";
  * };
  * ```
  */
-interface MCPStatusResponse {
-  /**
-   * Array of servers that were automatically discovered from various sources.
-   * These servers are found by scanning configuration files from Claude Desktop,
-   * VS Code, and other MCP-compatible applications.
-   *
-   * @optional
-   * @since 7.6.1
-   */
-  autoDiscoveredServers?: Array<{
-    /**
-     * Display name of the discovered MCP server.
-     * Falls back to `id` if name is not available.
-     *
-     * @optional
-     * @example "filesystem" | "github-integration" | "database-connector"
-     */
-    name?: string;
-
-    /**
-     * Unique identifier for the MCP server instance.
-     * Used for internal tracking and deduplication.
-     *
-     * @optional
-     * @example "fs-server-001" | "gh-server-abc123"
-     */
-    id?: string;
-
-    /**
-     * Current connection status of the discovered server.
-     * Indicates whether the server is operational and reachable.
-     *
-     * @optional
-     * @example "connected" | "disconnected" | "error" | "unknown"
-     */
-    status?: string;
-
-    /**
-     * Source from which this server was discovered.
-     * Helps users understand where the server configuration originated.
-     *
-     * @optional
-     * @example "claude-desktop" | "vscode" | "manual-config" | "auto-scan"
-     */
-    source?: string;
-  }>;
-
-  /**
-   * Additional properties that may be included in the status response.
-   * Allows for extensibility and compatibility with future SDK versions.
-   * Common properties include `mcpInitialized`, `totalServers`, `availableServers`, etc.
-   *
-   * @since 7.6.1
-   */
-  [key: string]: unknown;
-}
-
 /**
  * Popular MCP servers registry
  */

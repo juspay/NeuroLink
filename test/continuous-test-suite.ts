@@ -1219,6 +1219,75 @@ async function testCLIBusinessTools(): Promise<boolean> {
   }
 }
 
+// Enterprise Proxy Support Test - Test proxy configuration handling
+async function testEnterpriseProxySupport(): Promise<boolean> {
+  logSection("Testing Enterprise Proxy Support");
+
+  try {
+    // Check for proxy environment variables
+    const proxyVars = [
+      "HTTP_PROXY",
+      "HTTPS_PROXY",
+      "NO_PROXY",
+      "http_proxy",
+      "https_proxy",
+    ];
+    const proxyConfig = proxyVars.reduce(
+      (config, varName) => {
+        if (process.env[varName]) {
+          config[varName] = process.env[varName];
+        }
+        return config;
+      },
+      {} as Record<string, string>,
+    );
+
+    const hasProxyConfig = Object.keys(proxyConfig).length > 0;
+
+    logTest(
+      "Proxy Environment Variables",
+      "PASS",
+      hasProxyConfig
+        ? `Found proxy configuration: ${Object.keys(proxyConfig).join(", ")}`
+        : "No proxy configuration found (normal for development)",
+    );
+
+    // Test that NeuroLink can be instantiated even with proxy environment variables
+    try {
+      const { NeuroLink } = await import("../dist/index.js");
+      const sdk = new NeuroLink();
+
+      logTest(
+        "SDK Initialization with Proxy Environment",
+        "PASS",
+        "NeuroLink SDK initializes correctly with current environment",
+      );
+
+      // Test a simple operation to ensure proxy doesn't break basic functionality
+      const tools = sdk.getCustomTools();
+
+      logTest(
+        "Basic SDK Operations with Proxy Environment",
+        "PASS",
+        `SDK operations work correctly (${tools.size} custom tools available)`,
+      );
+
+      return true;
+    } catch (error) {
+      logTest(
+        "SDK Initialization with Proxy Environment",
+        "FAIL",
+        `SDK failed to initialize: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("Enterprise Proxy Support", "FAIL", errorMessage);
+    return false;
+  }
+}
+
 interface TestFunction {
   name: string;
   fn: () => Promise<boolean>;

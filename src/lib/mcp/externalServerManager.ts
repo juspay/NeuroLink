@@ -956,6 +956,9 @@ export class ExternalServerManager extends EventEmitter {
       `[ExternalServerManager] Scheduling restart for ${serverId} in ${delay}ms (attempt ${instance.reconnectAttempts})`,
     );
 
+    if (instance.restartTimer) {
+      return;
+    } // already scheduled
     instance.restartTimer = setTimeout(async () => {
       try {
         await this.stopServer(serverId);
@@ -1283,6 +1286,7 @@ export class ExternalServerManager extends EventEmitter {
         `[ExternalServerManager] Registering ${instance.toolsMap.size} tools with main registry for server: ${serverId}`,
       );
 
+      const registrations: Array<Promise<unknown>> = [];
       for (const [toolName, tool] of instance.toolsMap.entries()) {
         const toolId = `${serverId}.${toolName}`;
 
@@ -1294,33 +1298,21 @@ export class ExternalServerManager extends EventEmitter {
           category: detectCategory({ isExternal: true, serverId }),
         };
 
-        // Register with main tool registry
-        try {
+        registrations.push(
           toolRegistry.registerTool(toolId, toolInfo, {
-            execute: async (params: unknown, context?: Unknown) => {
-              // Execute tool via ExternalServerManager for proper lifecycle management
-              return await this.executeTool(
-                serverId,
-                toolName,
-                params as JsonObject,
-                { timeout: this.config.defaultTimeout },
-              );
-            },
-          });
-
-          mcpLogger.debug(
-            `[ExternalServerManager] Registered tool with main registry: ${toolId}`,
-          );
-        } catch (registrationError) {
-          mcpLogger.warn(
-            `[ExternalServerManager] Failed to register tool ${toolId} with main registry:`,
-            registrationError,
-          );
-        }
+            execute: async (params: unknown) =>
+              await this.executeTool(serverId, toolName, params as JsonObject, {
+                timeout: this.config.defaultTimeout,
+              }),
+          }),
+        );
       }
 
+      const results = await Promise.allSettled(registrations);
+      const ok = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - ok;
       mcpLogger.info(
-        `[ExternalServerManager] Successfully registered ${instance.toolsMap.size} tools with main registry for ${serverId}`,
+        `[ExternalServerManager] Registered ${ok}/${results.length} tools with main registry for ${serverId}${failed ? ` (${failed} failed)` : ""}`,
       );
     } catch (error) {
       mcpLogger.error(

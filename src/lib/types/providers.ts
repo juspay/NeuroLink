@@ -50,6 +50,52 @@ export interface AnalyticsData {
 }
 
 /**
+ * AWS Credential Configuration for Bedrock provider
+ */
+export interface AWSCredentialConfig {
+  region?: string;
+  profile?: string;
+  roleArn?: string;
+  roleSessionName?: string;
+  timeout?: number;
+  /** @deprecated Prefer maxAttempts to match AWS SDK v3 config */
+  maxRetries?: number;
+  /** Number of attempts as per AWS SDK v3 ("retry-mode") */
+  maxAttempts?: number;
+  enableDebugLogging?: boolean;
+  /** Optional service endpoint override (e.g., VPC/Gov endpoints) */
+  endpoint?: string;
+}
+
+/**
+ * AWS Credential Validation Result
+ */
+export interface CredentialValidationResult {
+  isValid: boolean;
+  credentialSource: string;
+  region: string;
+  hasExpiration: boolean;
+  expirationTime?: Date;
+  error?: string;
+  debugInfo: {
+    accessKeyId: string;
+    hasSessionToken: boolean;
+    providerConfig: Readonly<Required<AWSCredentialConfig>>;
+  };
+}
+
+/**
+ * Service Connectivity Test Result
+ */
+export interface ServiceConnectivityResult {
+  bedrockAccessible: boolean;
+  availableModels: number;
+  responseTimeMs: number;
+  error?: string;
+  sampleModels: string[];
+}
+
+/**
  * Model Capabilities - Maximally Reusable
  */
 export type ModelCapability =

@@ -9,7 +9,6 @@ import type {
   AIProvider,
   AIProviderName,
   SupportedModelName,
-  TextGenerationOptions,
 } from "./types.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { ProviderPairResult } from "../types/typeAliases.js";
@@ -86,7 +85,7 @@ export class AIProviderFactory {
     enableMCP: boolean = true,
     sdk?: UnknownRecord,
   ): Promise<AIProvider> {
-    const functionTag = "AIawait ProviderFactory.createProvider";
+    const functionTag = "AIProviderFactory.createProvider";
 
     // Providers are registered via ProviderFactory.initialize() on first use
 
@@ -94,6 +93,12 @@ export class AIProviderFactory {
       providerName,
       modelName: modelName || "default",
       enableMCP,
+      environmentVariables: {
+        BEDROCK_MODEL: process.env.BEDROCK_MODEL || "not set",
+        BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID || "not set",
+        VERTEX_MODEL: process.env.VERTEX_MODEL || "not set",
+        OPENAI_MODEL: process.env.OPENAI_MODEL || "not set",
+      },
     });
 
     try {
@@ -109,13 +114,78 @@ export class AIProviderFactory {
 
       let resolvedModelName = modelName;
 
-      // Enable dynamic model resolution with timeout-protected initialization
+      // PRIORITY 1: Check environment variables BEFORE dynamic resolution
       if (!modelName || modelName === "default") {
+        logger.debug(
+          `[${functionTag}] Checking environment variables for provider: ${providerName}`,
+        );
+
+        // Check for provider-specific environment variables first
+        if (providerName.toLowerCase().includes("bedrock")) {
+          const envModel =
+            process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
+          if (envModel) {
+            resolvedModelName = envModel;
+            logger.debug(
+              `[${functionTag}] Environment variable found for Bedrock`,
+              {
+                envVariable: process.env.BEDROCK_MODEL
+                  ? "BEDROCK_MODEL"
+                  : "BEDROCK_MODEL_ID",
+                resolvedModel: envModel,
+              },
+            );
+          } else {
+            logger.debug(
+              `[${functionTag}] No Bedrock environment variables found (BEDROCK_MODEL, BEDROCK_MODEL_ID)`,
+            );
+          }
+        } else if (providerName.toLowerCase().includes("vertex")) {
+          const envModel = process.env.VERTEX_MODEL;
+          if (envModel) {
+            resolvedModelName = envModel;
+            logger.debug(
+              `[${functionTag}] Environment variable found for Vertex`,
+              {
+                envVariable: "VERTEX_MODEL",
+                resolvedModel: envModel,
+              },
+            );
+          } else {
+            logger.debug(
+              `[${functionTag}] No Vertex environment variables found (VERTEX_MODEL)`,
+            );
+          }
+        } else {
+          logger.debug(
+            `[${functionTag}] Provider ${providerName} - no environment variable check implemented`,
+          );
+        }
+      } else {
+        logger.debug(
+          `[${functionTag}] Skipping environment variable check - explicit model provided: ${modelName}`,
+        );
+      }
+
+      // PRIORITY 2: Enable dynamic model resolution only if no env var found
+      if (
+        (!resolvedModelName || resolvedModelName === "default") &&
+        (!modelName || modelName === "default")
+      ) {
+        logger.debug(`[${functionTag}] Attempting dynamic model resolution`, {
+          currentResolvedModel: resolvedModelName || "none",
+          reason:
+            "No environment variable found and no explicit model provided",
+        });
+
         try {
           const normalizedProvider = this.normalizeProviderName(providerName);
 
           // Initialize with timeout protection - won't hang anymore
           if (dynamicModelProvider.needsRefresh()) {
+            logger.debug(
+              `[${functionTag}] Dynamic model provider needs refresh - initializing`,
+            );
             await this.initializeDynamicProviderWithTimeout();
           }
 
@@ -133,6 +203,14 @@ export class AIProviderFactory {
               displayName: dynamicModel.displayName,
               pricing: dynamicModel.pricing.input,
             });
+          } else {
+            logger.debug(
+              `[${functionTag}] Dynamic model resolution returned null`,
+              {
+                provider: normalizedProvider,
+                requestedModel: modelName || "default",
+              },
+            );
           }
         } catch (resolveError) {
           logger.debug(
@@ -146,6 +224,12 @@ export class AIProviderFactory {
           );
           // Continue with static model name - no functionality loss
         }
+      } else {
+        logger.debug(`[${functionTag}] Skipping dynamic model resolution`, {
+          resolvedModelName: resolvedModelName || "none",
+          reason:
+            "Model already resolved from environment variables or explicit parameter",
+        });
       }
 
       // CRITICAL FIX: Initialize providers before using them
@@ -158,12 +242,26 @@ export class AIProviderFactory {
           ? undefined
           : resolvedModelName;
 
+      logger.debug(`[${functionTag}] Final provider configuration`, {
+        originalProviderName: providerName,
+        normalizedProviderName: normalizedName,
+        originalModelName: modelName || "not provided",
+        resolvedModelName: resolvedModelName || "not resolved",
+        finalModelName: finalModelName || "using provider default",
+      });
+
       // Create provider with enhanced SDK
       const provider = await ProviderFactory.createProvider(
         normalizedName,
         finalModelName,
         sdk,
       );
+
+      // Summary logging in format expected by debugging tools
+      logger.debug(
+        `[AIProviderFactory] Provider creation completed { providerName: '${normalizedName}', modelName: '${finalModelName}' }`,
+      );
+      logger.debug(`[AIProviderFactory] Resolved model: ${finalModelName}`);
 
       logger.debug(
         componentIdentifier,
@@ -225,7 +323,7 @@ export class AIProviderFactory {
     provider: AIProviderName,
     model: SupportedModelName,
   ): Promise<AIProvider> {
-    const functionTag = "AIawait ProviderFactory.createProviderWithModel";
+    const functionTag = "AIProviderFactory.createProviderWithModel";
 
     logger.debug(`[${functionTag}] Provider model creation started`, {
       provider,
@@ -309,7 +407,7 @@ export class AIProviderFactory {
     modelName?: string | null,
     enableMCP: boolean = true,
   ): Promise<ProviderPairResult<AIProvider>> {
-    const functionTag = "AIawait ProviderFactory.createProviderWithFallback";
+    const functionTag = "AIProviderFactory.createProviderWithFallback";
 
     logger.debug(`[${functionTag}] Fallback provider setup started`, {
       primaryProvider,

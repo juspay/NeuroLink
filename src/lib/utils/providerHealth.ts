@@ -200,6 +200,20 @@ export class ProviderHealthChecker {
   ): Promise<void> {
     const requiredEnvVars = this.getRequiredEnvironmentVariables(providerName);
 
+    logger.debug(
+      `[ProviderHealthChecker] Checking environment configuration for ${providerName}`,
+      {
+        requiredEnvVars,
+        presentEnvVars: requiredEnvVars.map((envVar) => ({
+          name: envVar,
+          present: !!process.env[envVar],
+          hasValue: !!(
+            process.env[envVar] && process.env[envVar].trim() !== ""
+          ),
+        })),
+      },
+    );
+
     let allConfigured = true;
     const missingVars: string[] = [];
 
@@ -212,6 +226,16 @@ export class ProviderHealthChecker {
     }
 
     healthStatus.isConfigured = allConfigured;
+
+    logger.debug(
+      `[ProviderHealthChecker] Environment configuration result for ${providerName}`,
+      {
+        isConfigured: allConfigured,
+        missingVars,
+        totalRequired: requiredEnvVars.length,
+        totalMissing: missingVars.length,
+      },
+    );
 
     if (!allConfigured) {
       healthStatus.configurationIssues.push(
@@ -300,6 +324,15 @@ export class ProviderHealthChecker {
           reason: "No valid auth method found",
         });
       }
+      return;
+    }
+
+    // Providers that don't use API keys directly
+    if (
+      providerName === AIProviderName.OLLAMA ||
+      providerName === AIProviderName.BEDROCK
+    ) {
+      healthStatus.hasApiKey = true;
       return;
     }
 
@@ -482,7 +515,9 @@ export class ProviderHealthChecker {
       case AIProviderName.GOOGLE_AI:
         return ["GOOGLE_AI_API_KEY"];
       case AIProviderName.BEDROCK:
-        return ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"];
+        // Bedrock credentials are resolved via AWS SDK default provider chain.
+        // Region/auth validated in provider-specific checks.
+        return [];
       case AIProviderName.AZURE:
         return ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"];
       case AIProviderName.OLLAMA:
@@ -739,13 +774,141 @@ export class ProviderHealthChecker {
         break;
       }
 
-      case AIProviderName.BEDROCK:
-        // Check AWS region
-        if (!process.env.AWS_REGION) {
+      case AIProviderName.BEDROCK: {
+        logger.debug("Starting AWS Bedrock comprehensive health check", {
+          providerName,
+        });
+
+        // Check AWS region configuration
+        const awsRegion = process.env.AWS_REGION;
+        const validBedrockRegions = [
+          "us-east-1",
+          "us-west-2",
+          "ap-southeast-1",
+          "ap-northeast-1",
+          "eu-central-1",
+          "eu-west-1",
+          "ap-south-1",
+        ];
+
+        logger.debug("AWS Region validation", {
+          hasAwsRegion: !!awsRegion,
+          awsRegion: awsRegion || "not set",
+          validBedrockRegions,
+        });
+
+        if (!awsRegion) {
           healthStatus.configurationIssues.push("AWS_REGION not set");
-          healthStatus.recommendations.push("Set AWS_REGION (e.g., us-east-1)");
+          healthStatus.recommendations.push(
+            `Set AWS_REGION to a Bedrock-supported region: ${validBedrockRegions.join(", ")}`,
+          );
+        } else if (!validBedrockRegions.includes(awsRegion)) {
+          healthStatus.configurationIssues.push(
+            `AWS_REGION '${awsRegion}' may not support all Bedrock models`,
+          );
+          healthStatus.recommendations.push(
+            `Consider using a primary Bedrock region: ${validBedrockRegions.slice(0, 3).join(", ")}`,
+          );
         }
+
+        // Check AWS credentials configuration
+        const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
+        const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+        const awsSessionToken = process.env.AWS_SESSION_TOKEN;
+        const awsProfile = process.env.AWS_PROFILE;
+
+        logger.debug("AWS Credentials validation", {
+          hasAccessKeyId: !!awsAccessKeyId,
+          hasSecretAccessKey: !!awsSecretAccessKey,
+          hasSessionToken: !!awsSessionToken,
+          hasProfile: !!awsProfile,
+          authMethod: awsProfile
+            ? "AWS Profile"
+            : awsAccessKeyId
+              ? "Access Keys"
+              : "None detected",
+        });
+
+        if (!awsAccessKeyId && !awsProfile) {
+          healthStatus.configurationIssues.push("No AWS credentials found");
+          healthStatus.recommendations.push(
+            "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or configure AWS_PROFILE",
+          );
+        } else if (awsAccessKeyId && !awsSecretAccessKey) {
+          healthStatus.configurationIssues.push(
+            "AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY missing",
+          );
+          healthStatus.recommendations.push(
+            "Set AWS_SECRET_ACCESS_KEY to match your AWS_ACCESS_KEY_ID",
+          );
+        }
+
+        // Check for Bedrock-specific model configuration
+        const bedrockModel =
+          process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
+        const supportedModels = [
+          "anthropic.claude-3-sonnet-20240229-v1:0",
+          "anthropic.claude-3-haiku-20240307-v1:0",
+          "anthropic.claude-3-opus-20240229-v1:0",
+          "anthropic.claude-v2:1",
+          "amazon.titan-text-express-v1",
+        ];
+
+        logger.debug("Bedrock Model validation", {
+          hasBedrockModel: !!bedrockModel,
+          bedrockModel: bedrockModel || "not set",
+          supportedModels: supportedModels.slice(0, 3),
+        });
+
+        if (!bedrockModel) {
+          healthStatus.recommendations.push(
+            "Set BEDROCK_MODEL or BEDROCK_MODEL_ID for faster startup (e.g., anthropic.claude-3-sonnet-20240229-v1:0)",
+          );
+        } else if (!supportedModels.some((model) => model === bedrockModel)) {
+          healthStatus.recommendations.push(
+            `Consider using a popular Bedrock model: ${supportedModels.slice(0, 3).join(", ")}`,
+          );
+        }
+
+        // Check for additional Bedrock configuration
+        const bedrockEndpoint = process.env.BEDROCK_ENDPOINT_URL;
+        if (bedrockEndpoint) {
+          logger.debug("Custom Bedrock endpoint detected", {
+            endpoint: bedrockEndpoint,
+          });
+          if (!bedrockEndpoint.startsWith("https://")) {
+            healthStatus.configurationIssues.push(
+              "BEDROCK_ENDPOINT_URL should use HTTPS",
+            );
+            healthStatus.recommendations.push(
+              "Update BEDROCK_ENDPOINT_URL to use HTTPS protocol",
+            );
+          }
+        }
+
+        // AWS SDK Configuration checks
+        const awsConfig = {
+          maxAttempts: process.env.AWS_MAX_ATTEMPTS,
+          retryMode: process.env.AWS_RETRY_MODE,
+          defaultsMode: process.env.AWS_DEFAULTS_MODE,
+        };
+
+        logger.debug("AWS SDK Configuration", {
+          awsConfig,
+          hasAdvancedConfig: Object.values(awsConfig).some(Boolean),
+        });
+
+        if (healthStatus.configurationIssues.length === 0) {
+          healthStatus.hasApiKey = true;
+          logger.debug("AWS Bedrock configuration appears valid", {
+            region: awsRegion,
+            hasCredentials: !!(awsAccessKeyId || awsProfile),
+            hasModel: !!bedrockModel,
+          });
+        }
+
         break;
+      }
 
       case AIProviderName.AZURE: {
         // Check Azure OpenAI endpoint

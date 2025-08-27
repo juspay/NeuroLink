@@ -418,9 +418,12 @@ export function createAnthropicBaseConfig(): ProviderConfigOptions {
 
 /**
  * Gets AWS Region with default fallback
+ * Supports both AWS_REGION and AWS_DEFAULT_REGION for broader compatibility
  */
 export function getAWSRegion(): string {
-  return process.env.AWS_REGION || "us-east-1";
+  return (
+    process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1"
+  );
 }
 
 /**
