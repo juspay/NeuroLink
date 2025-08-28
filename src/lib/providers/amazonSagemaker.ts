@@ -7,11 +7,7 @@
 
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema, LanguageModelV1 } from "ai";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import type { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { ConnectivityResult } from "../types/typeAliases.js";
 import { BaseProvider } from "../core/baseProvider.js";
@@ -86,17 +82,18 @@ export class AmazonSageMakerProvider extends BaseProvider {
   }
 
   protected async executeStream(
-    options: StreamOptions,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+    _options: StreamOptions,
+    _analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<StreamResult> {
     try {
       // For now, throw an error indicating this is not yet implemented
       throw new SageMakerError(
         "SageMaker streaming not yet fully implemented. Coming in next phase.",
-        "MODEL_ERROR",
-        501,
-        undefined,
-        this.modelConfig.endpointName,
+        {
+          code: "MODEL_ERROR",
+          statusCode: 501,
+          endpoint: this.modelConfig.endpointName,
+        },
       );
     } catch (error) {
       throw this.handleProviderError(error);
@@ -111,10 +108,12 @@ export class AmazonSageMakerProvider extends BaseProvider {
     if (error instanceof Error && error.name === "TimeoutError") {
       return new SageMakerError(
         `SageMaker request timed out. Consider increasing timeout.`,
-        "NETWORK_ERROR",
-        408,
-        error,
-        this.modelConfig.endpointName,
+        {
+          code: "NETWORK_ERROR",
+          statusCode: 408,
+          cause: error,
+          endpoint: this.modelConfig.endpointName,
+        },
       );
     }
 

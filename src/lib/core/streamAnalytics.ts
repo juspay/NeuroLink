@@ -5,19 +5,21 @@ import { createAnalytics } from "./analytics.js";
 import { logger } from "../utils/logger.js";
 
 /**
+ * Raw usage data from Vercel AI SDK (uses different field names)
+ */
+interface AISDKUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/**
  * Stream analytics result from Vercel AI SDK streamText
  */
 export interface StreamTextResult {
   textStream: AsyncIterable<string>;
   text: Promise<string>;
-  usage: Promise<
-    | {
-        promptTokens: number;
-        completionTokens: number;
-        totalTokens: number;
-      }
-    | undefined
-  >;
+  usage: Promise<AISDKUsage | undefined>;
   response: Promise<
     | {
         id?: string;
@@ -78,25 +80,25 @@ export class BaseStreamAnalyticsCollector implements StreamAnalyticsCollector {
       if (!usage) {
         logger.debug("No usage data available from stream result");
         return {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
+          input: 0,
+          output: 0,
+          total: 0,
         };
       }
 
       return {
-        inputTokens: usage.promptTokens || 0,
-        outputTokens: usage.completionTokens || 0,
-        totalTokens:
+        input: usage.promptTokens || 0,
+        output: usage.completionTokens || 0,
+        total:
           usage.totalTokens ||
           (usage.promptTokens || 0) + (usage.completionTokens || 0),
       };
     } catch (error) {
       logger.warn("Failed to collect usage from stream result", { error });
       return {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
+        input: 0,
+        output: 0,
+        total: 0,
       };
     }
   }
@@ -188,7 +190,7 @@ export class BaseStreamAnalyticsCollector implements StreamAnalyticsCollector {
       return createAnalytics(
         provider,
         model,
-        { usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } },
+        { usage: { input: 0, output: 0, total: 0 } },
         responseTime,
         {
           ...metadata,

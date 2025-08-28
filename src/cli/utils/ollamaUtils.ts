@@ -41,6 +41,59 @@ export class OllamaUtils {
   }
 
   /**
+   * Check if Ollama command line is available
+   */
+  private static isOllamaCommandReady(): boolean {
+    const cmdCheck = this.safeSpawn("ollama", ["list"]);
+    return !cmdCheck.error && cmdCheck.status === 0;
+  }
+
+  /**
+   * Validate HTTP API response from Ollama
+   */
+  private static validateApiResponse(output: string): boolean {
+    const httpCodeMatch = output.match(/(\d{3})$/);
+    if (!httpCodeMatch || httpCodeMatch[1] !== "200") {
+      return false;
+    }
+
+    // Try to parse the JSON response (excluding HTTP code)
+    const jsonResponse = output.replace(/\d{3}$/, "");
+    try {
+      const parsedResponse = JSON.parse(jsonResponse);
+      return parsedResponse && typeof parsedResponse === "object";
+    } catch {
+      // JSON parsing failed, but HTTP 200 is good enough
+      return true;
+    }
+  }
+
+  /**
+   * Check if Ollama HTTP API is ready
+   */
+  private static isOllamaApiReady(): boolean {
+    try {
+      const apiCheck = this.safeSpawn("curl", [
+        "-s",
+        "--max-time",
+        "3",
+        "--fail", // Fail on HTTP error codes
+        "-w",
+        "%{http_code}",
+        "http://localhost:11434/api/tags",
+      ]);
+
+      if (apiCheck.error || apiCheck.status !== 0 || !apiCheck.stdout.trim()) {
+        return false;
+      }
+
+      return this.validateApiResponse(apiCheck.stdout.trim());
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Wait for Ollama service to become ready with exponential backoff
    */
   public static async waitForOllamaReady(
@@ -51,49 +104,18 @@ export class OllamaUtils {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        // Try both command line and HTTP API checks
-        const cmdCheck = this.safeSpawn("ollama", ["list"]);
-        if (!cmdCheck.error && cmdCheck.status === 0) {
-          // Stronger HTTP API probe with response validation
-          try {
-            const apiCheck = this.safeSpawn("curl", [
-              "-s",
-              "--max-time",
-              "3",
-              "--fail", // Fail on HTTP error codes
-              "-w",
-              "%{http_code}",
-              "http://localhost:11434/api/tags",
-            ]);
-            if (
-              !apiCheck.error &&
-              apiCheck.status === 0 &&
-              apiCheck.stdout.trim()
-            ) {
-              // Validate that we get a proper HTTP 200 response and JSON structure
-              const output = apiCheck.stdout.trim();
-              const httpCodeMatch = output.match(/(\d{3})$/);
-              if (httpCodeMatch && httpCodeMatch[1] === "200") {
-                // Try to parse the JSON response (excluding HTTP code)
-                const jsonResponse = output.replace(/\d{3}$/, "");
-                try {
-                  const parsedResponse = JSON.parse(jsonResponse);
-                  // Verify it has the expected structure
-                  if (parsedResponse && typeof parsedResponse === "object") {
-                    return true; // Strong verification passed
-                  }
-                } catch {
-                  // JSON parsing failed, but HTTP 200 is good enough
-                  return true;
-                }
-              }
-            }
-          } catch {
-            // If curl fails, fall back to command check only
-            return true;
-          }
-          return true; // Command check passed
+        // Try command line check first
+        if (!this.isOllamaCommandReady()) {
+          continue;
         }
+
+        // If command check passes, verify HTTP API
+        if (this.isOllamaApiReady()) {
+          return true;
+        }
+
+        // Command check passed but API not ready, still consider ready
+        return true;
       } catch {
         // Service not ready yet
       }

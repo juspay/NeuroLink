@@ -209,8 +209,8 @@ export type {
   TextGenerationOptions,
   TextGenerationResult,
   AnalyticsData,
-  EvaluationData,
 } from "./core/types.js";
+export type { EvaluationData } from "./types/providers.js";
 
 /**
  * BACKWARD COMPATIBILITY: Legacy generateText function

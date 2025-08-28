@@ -89,11 +89,19 @@ export class PerformanceTracker {
 
     const memoryMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
 
+    if (!metric.memoryDelta) {
+      return [
+        `${operationName}:`,
+        `  Duration: ${metric.duration}ms`,
+        `  Memory Delta: Not available`,
+      ].join("\n");
+    }
+
     return [
       `${operationName}:`,
       `  Duration: ${metric.duration}ms`,
-      `  Memory Delta: +${memoryMB(metric.memoryDelta!.heapUsed)}MB heap`,
-      `  RSS Delta: +${memoryMB(metric.memoryDelta!.rss)}MB`,
+      `  Memory Delta: +${memoryMB(metric.memoryDelta.heapUsed)}MB heap`,
+      `  RSS Delta: +${memoryMB(metric.memoryDelta.rss)}MB`,
     ].join("\n");
   }
 }
@@ -193,7 +201,12 @@ export function trackPerformance(operationName: string) {
     propertyName: string,
     descriptor: TypedPropertyDescriptor<T>,
   ) {
-    const method = descriptor.value!;
+    const method = descriptor.value;
+    if (!method) {
+      throw new Error(
+        `Method descriptor value is required for performance tracking`,
+      );
+    }
 
     descriptor.value = async function (this: unknown, ...args: unknown[]) {
       globalTracker.start(operationName);

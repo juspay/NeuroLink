@@ -16,7 +16,7 @@ import { logger } from "../../utils/logger.js";
 /**
  * Configurable constants for detection timing and performance
  */
-const DETECTION_TEST_DELAY_MS = 100; // Base delay between detection tests (ms)
+const _DETECTION_TEST_DELAY_MS = 100; // Base delay between detection tests (ms)
 const DETECTION_STAGGER_DELAY_MS = 25; // Delay between staggered test starts (ms)
 const DETECTION_RATE_LIMIT_BACKOFF_MS = 200; // Initial backoff on rate limit detection (ms)
 
@@ -195,7 +195,7 @@ export class SageMakerDetector {
 
     // Run detection tests in parallel with intelligent rate limiting
     const testNames = ["HuggingFace", "LLaMA", "PyTorch", "TensorFlow"];
-    const results = await this.runDetectionTestsInParallel(
+    const _results = await this.runDetectionTestsInParallel(
       detectionTests,
       testNames,
       endpointName,
@@ -374,7 +374,7 @@ export class SageMakerDetector {
       if (parsedResponse.error?.includes("transformers")) {
         evidence.push("huggingface: transformers error message");
       }
-    } catch (error) {
+    } catch {
       // Test failed, no evidence
     }
   }
@@ -408,7 +408,7 @@ export class SageMakerDetector {
       if (parsedResponse.object === "text_completion") {
         evidence.push("llama: openai text_completion object");
       }
-    } catch (error) {
+    } catch {
       // Test failed, no evidence
     }
   }
@@ -437,7 +437,7 @@ export class SageMakerDetector {
       ) {
         evidence.push("pytorch: prediction/output field pattern");
       }
-    } catch (error) {
+    } catch {
       // Test failed, no evidence
     }
   }
@@ -467,7 +467,7 @@ export class SageMakerDetector {
       if (parsedResponse.predictions) {
         evidence.push("tensorflow: serving predictions field");
       }
-    } catch (error) {
+    } catch {
       // Test failed, no evidence
     }
   }
@@ -669,8 +669,10 @@ export class SageMakerDetector {
 
       release(): void {
         if (this.waiters.length > 0) {
-          const waiter = this.waiters.shift()!;
-          waiter();
+          const waiter = this.waiters.shift();
+          if (waiter) {
+            waiter();
+          }
         } else {
           this.count++;
         }
@@ -690,15 +692,14 @@ export class SageMakerDetector {
         await this.executeWithStaggeredStart(config.test, config.index);
         return { status: "fulfilled", value: undefined };
       } catch (error) {
-        const result = await this.handleDetectionTestError(
-          error,
-          config.test,
-          config.testName,
-          config.endpointName,
-          config.incrementRateLimit,
-          config.maxRateLimitRetries,
-          config.rateLimitState.count,
-        );
+        const result = await this.handleDetectionTestError(error, {
+          test: config.test,
+          testName: config.testName,
+          endpointName: config.endpointName,
+          incrementRateLimit: config.incrementRateLimit,
+          maxRateLimitRetries: config.maxRateLimitRetries,
+          rateLimitCount: config.rateLimitState.count,
+        });
         return result;
       } finally {
         config.semaphore.release();
@@ -725,14 +726,24 @@ export class SageMakerDetector {
    */
   private async handleDetectionTestError(
     error: unknown,
-    test: () => Promise<void>,
-    testName: string,
-    endpointName: string,
-    incrementRateLimit: () => void,
-    maxRateLimitRetries: number,
-    rateLimitCount: number,
+    options: {
+      test: () => Promise<void>;
+      testName: string;
+      endpointName: string;
+      incrementRateLimit: () => void;
+      maxRateLimitRetries: number;
+      rateLimitCount: number;
+    },
   ): Promise<PromiseSettledResult<void>> {
     const isRateLimit = this.isRateLimitError(error);
+    const {
+      test,
+      testName,
+      endpointName,
+      incrementRateLimit,
+      maxRateLimitRetries,
+      rateLimitCount,
+    } = options;
 
     if (isRateLimit && rateLimitCount < maxRateLimitRetries) {
       return await this.retryWithBackoff(

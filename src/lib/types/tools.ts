@@ -4,13 +4,7 @@
  */
 
 import { z } from "zod";
-import type {
-  Result,
-  FunctionParameters,
-  UnknownRecord,
-  JsonValue,
-  ErrorInfo,
-} from "./common.js";
+import type { Result, JsonValue, ErrorInfo } from "./common.js";
 
 /**
  * Commonly used Zod schema type aliases for cleaner type declarations

@@ -31,7 +31,7 @@ interface ToolImplementation {
   permissions?: string[];
 }
 
-interface ServerRegistration {
+interface _ServerRegistration {
   id?: string;
   serverId?: string;
   description?: string;
@@ -161,12 +161,12 @@ export class MCPToolRegistry extends MCPRegistry {
   ): Promise<void> {
     // Handle both signatures for backward compatibility
     let serverInfo: MCPServerInfo;
-    let finalContext: ExecutionContext | undefined;
+    let _finalContext: ExecutionContext | undefined;
 
     if (typeof serverInfoOrId === "string") {
       // Legacy signature: registerServer(serverId, serverConfig, context)
       const serverId = serverInfoOrId;
-      finalContext = context;
+      _finalContext = context;
 
       // Convert legacy call to MCPServerInfo format using smart defaults
       serverInfo = createMCPServerInfo({
@@ -178,7 +178,7 @@ export class MCPToolRegistry extends MCPRegistry {
     } else {
       // New signature: registerServer(serverInfo, context)
       serverInfo = serverInfoOrId;
-      finalContext = serverConfigOrContext as ExecutionContext | undefined;
+      _finalContext = serverConfigOrContext as ExecutionContext | undefined;
     }
     const serverId = serverInfo.id;
     registryLogger.info(`Registering MCPServerInfo directly: ${serverId}`);
@@ -518,8 +518,10 @@ export class MCPToolRegistry extends MCPRegistry {
         result = result.filter((tool) => {
           const toolPermissions =
             (tool as ToolInfo & { permissions?: string[] }).permissions || [];
-          return filter.permissions!.some((perm) =>
-            toolPermissions.includes(perm),
+          return (
+            filter.permissions?.some((perm) =>
+              toolPermissions.includes(perm),
+            ) ?? false
           );
         });
       }

@@ -1,24 +1,18 @@
 import type { CommandModule, Argv } from "yargs";
 import { NeuroLink } from "../../lib/neurolink.js";
-import type { AIProviderName } from "../../lib/index.js";
 import type { UnknownRecord, JsonValue } from "../../lib/types/common.js";
 import type {
   BaseCommandArgs,
   GenerateCommandArgs,
   StreamCommandArgs,
+  BatchCommandArgs,
   GenerateResult,
-  CommandResult,
-  OutputOptions,
 } from "../../lib/types/cli.js";
 import type { TokenUsage, AnalyticsData } from "../../lib/types/providers.js";
 import { configManager } from "../commands/config.js";
+import { handleError } from "../index.js";
 
-// Interface for tokens with simplified property names (as used in analytics)
-interface AnalyticsTokens {
-  input: number;
-  output: number;
-  total: number;
-}
+// Use TokenUsage from standard types - no local interface needed
 import {
   ContextFactory,
   type BaseContext,
@@ -33,42 +27,7 @@ import chalk from "chalk";
 import { logger } from "../../lib/utils/logger.js";
 import fs from "fs";
 
-// Universal CLI command arguments interface extending BaseCommandArgs with all common options
-interface CLICommandArgs extends BaseCommandArgs {
-  input?: string;
-  provider?: AIProviderName;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  system?: string;
-  timeout?: number;
-  disableTools?: boolean;
-  enableAnalytics?: boolean;
-  enableEvaluation?: boolean;
-  domain?: string;
-  outputFormat?: "text" | "structured" | "json";
-  output?: string;
-  delay?: number;
-  file?: string;
-  prompts?: string[];
-  server?: string;
-  list?: boolean;
-  discover?: boolean;
-  info?: boolean;
-  tool?: string;
-  params?: string;
-  pull?: boolean;
-  remove?: boolean;
-  show?: boolean;
-  all?: boolean;
-  export?: boolean;
-  context?: Record<string, unknown>;
-  noColor?: boolean;
-  configFile?: string;
-  dryRun?: boolean;
-  [key: string]: unknown;
-}
+// Use specific command interfaces from cli.ts instead of universal interface
 
 /**
  * CLI Command Factory for generate commands
@@ -236,7 +195,9 @@ export class CLICommandFactory {
   }
 
   // Helper method to process common options
-  private static processOptions(argv: CLICommandArgs) {
+  private static processOptions(
+    argv: BaseCommandArgs & Record<string, unknown>,
+  ) {
     // Handle noColor option by disabling chalk
     if (argv.noColor) {
       process.env.FORCE_COLOR = "0";
@@ -284,36 +245,39 @@ export class CLICommandFactory {
     }
 
     return {
-      provider: argv.provider === "auto" ? undefined : argv.provider,
-      model: argv.model,
-      temperature: argv.temperature,
-      maxTokens: argv.maxTokens,
-      systemPrompt: argv.system,
-      timeout: argv.timeout,
-      disableTools: argv.disableTools,
-      enableAnalytics: argv.enableAnalytics,
-      enableEvaluation: argv.enableEvaluation,
-      domain: argv.domain,
-      evaluationDomain: argv.evaluationDomain,
-      toolUsageContext: argv.toolUsageContext,
-      domainAware: argv.domainAware,
+      provider:
+        argv.provider === "auto"
+          ? undefined
+          : (argv.provider as string | undefined),
+      model: argv.model as string | undefined,
+      temperature: argv.temperature as number | undefined,
+      maxTokens: argv.maxTokens as number | undefined,
+      systemPrompt: argv.system as string | undefined,
+      timeout: argv.timeout as number | undefined,
+      disableTools: argv.disableTools as boolean | undefined,
+      enableAnalytics: argv.enableAnalytics as boolean | undefined,
+      enableEvaluation: argv.enableEvaluation as boolean | undefined,
+      domain: argv.domain as string | undefined,
+      evaluationDomain: argv.evaluationDomain as string | undefined,
+      toolUsageContext: argv.toolUsageContext as string | undefined,
+      domainAware: argv.domainAware as boolean | undefined,
       context: processedContext,
       contextConfig,
-      debug: argv.debug,
-      quiet: argv.quiet,
-      format: argv.format,
-      output: argv.output,
-      delay: argv.delay,
-      noColor: argv.noColor,
-      configFile: argv.configFile,
-      dryRun: argv.dryRun,
+      debug: argv.debug as boolean | undefined,
+      quiet: argv.quiet as boolean | undefined,
+      format: argv.format as "text" | "json" | "table" | "yaml" | undefined,
+      output: argv.output as string | undefined,
+      delay: argv.delay as number | undefined,
+      noColor: argv.noColor as boolean | undefined,
+      configFile: argv.configFile as string | undefined,
+      dryRun: argv.dryRun as boolean | undefined,
     };
   }
 
   // Helper method to handle output
   private static handleOutput(
     result: GenerateResult | unknown,
-    options: CLICommandArgs,
+    options: BaseCommandArgs & Record<string, unknown>,
   ) {
     let output: string;
 
@@ -341,7 +305,7 @@ export class CLICommandFactory {
     }
 
     if (options.output) {
-      fs.writeFileSync(options.output, output);
+      fs.writeFileSync(options.output as string, output);
       if (!options.quiet) {
         logger.always(`Output saved to ${options.output}`);
       }
@@ -351,14 +315,14 @@ export class CLICommandFactory {
   }
 
   // Helper method to validate token usage data
-  private static isValidTokenUsage(tokens: unknown): tokens is AnalyticsTokens {
+  private static isValidTokenUsage(tokens: unknown): tokens is TokenUsage {
     return !!(
       tokens &&
       typeof tokens === "object" &&
       tokens !== null &&
-      typeof (tokens as AnalyticsTokens).input === "number" &&
-      typeof (tokens as AnalyticsTokens).output === "number" &&
-      typeof (tokens as AnalyticsTokens).total === "number"
+      typeof (tokens as TokenUsage).input === "number" &&
+      typeof (tokens as TokenUsage).output === "number" &&
+      typeof (tokens as TokenUsage).total === "number"
     );
   }
 
@@ -384,8 +348,8 @@ export class CLICommandFactory {
     analyticsText += "\n";
 
     // Token usage
-    if (this.isValidTokenUsage(analytics.tokens)) {
-      const tokens = analytics.tokens as AnalyticsTokens;
+    if (analytics.tokenUsage && this.isValidTokenUsage(analytics.tokenUsage)) {
+      const tokens = analytics.tokenUsage;
       analyticsText += `   Tokens: ${tokens.input} input + ${tokens.output} output = ${tokens.total} total\n`;
     }
 
@@ -399,8 +363,11 @@ export class CLICommandFactory {
     }
 
     // Response time
-    if (analytics.responseTime && typeof analytics.responseTime === "number") {
-      const timeInSeconds = (analytics.responseTime / 1000).toFixed(1);
+    if (
+      analytics.requestDuration &&
+      typeof analytics.requestDuration === "number"
+    ) {
+      const timeInSeconds = (analytics.requestDuration / 1000).toFixed(1);
       analyticsText += `   Time: ${timeInSeconds}s\n`;
     }
 
@@ -461,7 +428,7 @@ export class CLICommandFactory {
         );
       },
       handler: async (argv) =>
-        await this.executeGenerate(argv as CLICommandArgs),
+        await this.executeGenerate(argv as GenerateCommandArgs),
     };
   }
 
@@ -494,7 +461,8 @@ export class CLICommandFactory {
             .example('echo "Live demo" | $0 stream', "Stream from stdin"),
         );
       },
-      handler: async (argv) => await this.executeStream(argv as CLICommandArgs),
+      handler: async (argv) =>
+        await this.executeStream(argv as StreamCommandArgs),
     };
   }
 
@@ -528,7 +496,8 @@ export class CLICommandFactory {
             ),
         );
       },
-      handler: async (argv) => await this.executeBatch(argv as CLICommandArgs),
+      handler: async (argv) =>
+        await this.executeBatch(argv as BatchCommandArgs),
     };
   }
 
@@ -553,7 +522,7 @@ export class CLICommandFactory {
                 )
                 .example("$0 provider status --quiet", "Minimal status output"),
             (argv) =>
-              CLICommandFactory.executeProviderStatus(argv as CLICommandArgs),
+              CLICommandFactory.executeProviderStatus(argv as BaseCommandArgs),
           )
           .demandCommand(1, "Please specify a provider subcommand");
       },
@@ -575,7 +544,7 @@ export class CLICommandFactory {
           .example("$0 status --verbose", "Detailed connectivity diagnostics")
           .example("$0 status --format json", "Export status as JSON"),
       handler: async (argv) =>
-        await CLICommandFactory.executeProviderStatus(argv as CLICommandArgs),
+        await CLICommandFactory.executeProviderStatus(argv as BaseCommandArgs),
     };
   }
 
@@ -652,7 +621,7 @@ export class CLICommandFactory {
             "export",
             "Export current configuration",
             (y) => this.buildOptions(y),
-            (argv) => this.executeConfigExport(argv as CLICommandArgs),
+            (argv) => this.executeConfigExport(argv as BaseCommandArgs),
           )
           .demandCommand(1, "");
       },
@@ -694,7 +663,7 @@ export class CLICommandFactory {
           .example("$0 get-best-provider --format json", "Get provider as JSON")
           .example("$0 get-best-provider --quiet", "Just the provider name"),
       handler: async (argv) =>
-        await this.executeGetBestProvider(argv as CLICommandArgs),
+        await this.executeGetBestProvider(argv as BaseCommandArgs),
     };
   }
 
@@ -734,14 +703,14 @@ export class CLICommandFactory {
             "Add the completion script to your shell profile for persistent completions",
           ),
       handler: async (argv) =>
-        await this.executeCompletion(argv as CLICommandArgs),
+        await this.executeCompletion(argv as BaseCommandArgs),
     };
   }
 
   /**
    * Execute provider status command
    */
-  private static async executeProviderStatus(argv: UnknownRecord) {
+  private static async executeProviderStatus(argv: BaseCommandArgs) {
     if (argv.verbose && !argv.quiet) {
       logger.always(
         chalk.yellow("ℹ️ Verbose mode enabled. Displaying detailed status.\n"),
@@ -759,21 +728,21 @@ export class CLICommandFactory {
             provider: "google-ai",
             status: "working",
             configured: true,
-            responseTime: 150,
+            requestDuration: 150,
             model: "gemini-2.5-flash",
           },
           {
             provider: "openai",
             status: "working",
             configured: true,
-            responseTime: 200,
+            requestDuration: 200,
             model: "gpt-4o-mini",
           },
           {
             provider: "anthropic",
             status: "working",
             configured: true,
-            responseTime: 180,
+            requestDuration: 180,
             model: "claude-3-haiku",
           },
           { provider: "bedrock", status: "not configured", configured: false },
@@ -795,7 +764,9 @@ export class CLICommandFactory {
                 ? chalk.red("❌ Failed")
                 : chalk.gray("⚪ Not configured");
 
-          const time = result.responseTime ? ` (${result.responseTime}ms)` : "";
+          const time = result.requestDuration
+            ? ` (${result.requestDuration}ms)`
+            : "";
           const model = result.model ? ` [${result.model}]` : "";
           logger.always(`${result.provider}: ${status}${time}${model}`);
         }
@@ -854,7 +825,7 @@ export class CLICommandFactory {
   /**
    * Execute the generate command
    */
-  private static async executeGenerate(argv: CLICommandArgs) {
+  private static async executeGenerate(argv: GenerateCommandArgs) {
     // Handle stdin input if no input provided
     if (!argv.input && !process.stdin.isTTY) {
       let stdinData = "";
@@ -919,9 +890,9 @@ export class CLICommandFactory {
           provider: options.provider || "auto",
           model: options.model || "test-model",
           usage: {
-            inputTokens: 10,
-            outputTokens: 15,
-            totalTokens: 25,
+            input: 10,
+            output: 15,
+            total: 25,
           },
           responseTime: 150,
           analytics: options.enableAnalytics
@@ -930,7 +901,7 @@ export class CLICommandFactory {
                 model: options.model || "test-model",
                 tokens: { input: 10, output: 15, total: 25 },
                 cost: 0.00025,
-                responseTime: 150,
+                requestDuration: 150,
                 context: contextMetadata,
               }
             : undefined,
@@ -963,7 +934,6 @@ export class CLICommandFactory {
         }
 
         process.exit(0);
-        return;
       }
 
       const sdk = new NeuroLink();
@@ -1025,20 +995,14 @@ export class CLICommandFactory {
       if (spinner) {
         spinner.fail();
       }
-      logger.error(
-        chalk.red(`❌ Generation failed: ${(error as Error).message}`),
-      );
-      if (options.debug) {
-        logger.error(chalk.gray((error as Error).stack));
-      }
-      process.exit(1);
+      handleError(error as Error, "Generation");
     }
   }
 
   /**
    * Execute the stream command
    */
-  private static async executeStream(argv: CLICommandArgs) {
+  private static async executeStream(argv: StreamCommandArgs) {
     // Handle stdin input if no input provided
     if (!argv.input && !process.stdin.isTTY) {
       let stdinData = "";
@@ -1133,11 +1097,11 @@ export class CLICommandFactory {
             model: options.model || "test-model",
             requestDuration: 300,
             tokenUsage: {
-              inputTokens: 10,
-              outputTokens: 15,
-              totalTokens: 25,
+              input: 10,
+              output: 15,
+              total: 25,
             },
-            timestamp: Date.now(),
+            timestamp: new Date().toISOString(),
             context: contextMetadata as JsonValue,
           };
 
@@ -1180,7 +1144,6 @@ export class CLICommandFactory {
         }
 
         process.exit(0);
-        return;
       }
 
       const sdk = new NeuroLink();
@@ -1293,20 +1256,14 @@ export class CLICommandFactory {
 
       process.exit(0);
     } catch (error) {
-      logger.error(
-        chalk.red(`❌ Streaming failed: ${(error as Error).message}`),
-      );
-      if (options.debug) {
-        logger.error(chalk.gray((error as Error).stack));
-      }
-      process.exit(1);
+      handleError(error as Error, "Streaming");
     }
   }
 
   /**
    * Execute the batch command
    */
-  private static async executeBatch(argv: CLICommandArgs) {
+  private static async executeBatch(argv: BatchCommandArgs) {
     const options = this.processOptions(argv);
     const spinner = options.quiet ? null : ora().start();
 
@@ -1401,7 +1358,7 @@ export class CLICommandFactory {
             context: contextMetadata,
             factoryConfig: options.domain
               ? {
-                  domainType: options.domain,
+                  domainType: options.domain as string,
                   enhancementType: "domain-configuration",
                   validateDomainData: true,
                 }
@@ -1444,20 +1401,14 @@ export class CLICommandFactory {
       if (spinner) {
         spinner.fail();
       }
-      logger.error(
-        chalk.red(`❌ Batch processing failed: ${(error as Error).message}`),
-      );
-      if (options.debug) {
-        logger.error(chalk.gray((error as Error).stack));
-      }
-      process.exit(1);
+      handleError(error as Error, "Batch processing");
     }
   }
 
   /**
    * Execute config export command
    */
-  private static async executeConfigExport(argv: CLICommandArgs) {
+  private static async executeConfigExport(argv: BaseCommandArgs) {
     const options = this.processOptions(argv);
 
     try {
@@ -1487,19 +1438,14 @@ export class CLICommandFactory {
 
       this.handleOutput(config, options);
     } catch (error) {
-      logger.error(
-        chalk.red(
-          `❌ Configuration export failed: ${(error as Error).message}`,
-        ),
-      );
-      process.exit(1);
+      handleError(error as Error, "Configuration export");
     }
   }
 
   /**
    * Execute get best provider command
    */
-  private static async executeGetBestProvider(argv: CLICommandArgs) {
+  private static async executeGetBestProvider(argv: BaseCommandArgs) {
     const options = this.processOptions(argv);
 
     try {
@@ -1520,17 +1466,16 @@ export class CLICommandFactory {
         }
       }
     } catch (error) {
-      logger.error(
-        chalk.red(`❌ Provider selection failed: ${(error as Error).message}`),
-      );
-      process.exit(1);
+      handleError(error as Error, "Provider selection");
     }
   }
 
   /**
    * Execute completion command
    */
-  private static async executeCompletion(argv: CLICommandArgs) {
+  private static async executeCompletion(
+    argv: BaseCommandArgs & { output?: string },
+  ) {
     try {
       // Generate shell completion script as concatenated strings to avoid template literal issues
       const completionScript =
@@ -1668,12 +1613,7 @@ export class CLICommandFactory {
         );
       }
     } catch (error) {
-      logger.error(
-        chalk.red(
-          `❌ Completion generation failed: ${(error as Error).message}`,
-        ),
-      );
-      process.exit(1);
+      handleError(error as Error, "Completion generation");
     }
   }
 }

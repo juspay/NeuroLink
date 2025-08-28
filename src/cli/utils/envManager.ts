@@ -93,7 +93,7 @@ export function generateEnvContent(
   existingContent?: string,
 ): string {
   const lines: string[] = [];
-  const existingVars = existingContent ? parseEnvFile(existingContent) : {};
+  const _existingVars = existingContent ? parseEnvFile(existingContent) : {};
   const processedKeys = new Set<string>();
 
   // If we have existing content, preserve its structure and comments
@@ -168,17 +168,17 @@ export function updateEnvFile(
 
   // Read existing content
   let existingContent = "";
-  let existingVars: Record<string, string> = {};
+  let _existingVars: Record<string, string> = {};
 
   if (fs.existsSync(envPath)) {
     existingContent = fs.readFileSync(envPath, "utf8");
-    existingVars = parseEnvFile(existingContent);
+    _existingVars = parseEnvFile(existingContent);
   }
 
   // Categorize changes
   for (const [key, value] of Object.entries(newVars)) {
-    if (Object.prototype.hasOwnProperty.call(existingVars, key)) {
-      if (existingVars[key] !== value) {
+    if (Object.prototype.hasOwnProperty.call(_existingVars, key)) {
+      if (_existingVars[key] !== value) {
         result.updated.push(key);
       } else {
         result.unchanged.push(key);

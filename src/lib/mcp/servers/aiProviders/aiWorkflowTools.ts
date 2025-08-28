@@ -114,7 +114,7 @@ const debugAIOutputSchema = z.object({
 });
 
 // Type definitions for tool results
-interface TestCase {
+interface _TestCase {
   name: string;
   type: string;
   code: string;
@@ -155,7 +155,7 @@ interface DebugResult {
 /**
  * Generate test cases for code functions
  */
-const generateTestCasesTool: NeuroLinkMCPTool = {
+const _generateTestCasesTool: NeuroLinkMCPTool = {
   name: "generate-test-cases",
   description:
     "Generate comprehensive test cases for code functions with various test types and frameworks",
@@ -286,7 +286,7 @@ Generate 3-5 comprehensive test cases covering the requested types.`;
 /**
  * Refactor code for improved quality
  */
-const refactorCodeTool: NeuroLinkMCPTool = {
+const _refactorCodeTool: NeuroLinkMCPTool = {
   name: "refactor-code",
   description:
     "AI-powered code refactoring for improved readability, performance, and maintainability",
@@ -416,7 +416,7 @@ Focus on real, actionable improvements based on the specified objectives.`;
 /**
  * Generate documentation from code
  */
-const generateDocumentationTool: NeuroLinkMCPTool = {
+const _generateDocumentationTool: NeuroLinkMCPTool = {
   name: "generate-documentation",
   description: "Automatically generate comprehensive documentation from code",
   category: "ai-workflow",
@@ -551,7 +551,7 @@ Focus on creating accurate, useful documentation that explains the code's purpos
 /**
  * Debug AI-generated output
  */
-const debugAIOutputTool: NeuroLinkMCPTool = {
+const _debugAIOutputTool: NeuroLinkMCPTool = {
   name: "debug-ai-output",
   description:
     "Analyze and debug AI-generated output to identify issues and suggest improvements",
@@ -694,17 +694,17 @@ Provide thorough, actionable analysis focused on improving AI output quality.`;
 };
 
 // Helper functions
-function extractFunctionName(code: string): string {
+function _extractFunctionName(code: string): string {
   const match = code.match(/function\s+(\w+)|const\s+(\w+)\s*=|(\w+)\s*\(/);
   return match
     ? match[1] || match[2] || match[3] || "processData"
     : "processData";
 }
 
-function simulateRefactoring(
+function _simulateRefactoring(
   code: string,
   objectives: string[],
-  styleGuide?: string,
+  _styleGuide?: string,
 ): string {
   // Simulate basic refactoring
   let refactored = code;

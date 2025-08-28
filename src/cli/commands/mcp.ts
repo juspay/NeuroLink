@@ -22,87 +22,6 @@ import path from "path";
 // Using MCPCommandArgs from types/cli.ts
 
 /**
- * Response interface for MCP status information returned from the NeuroLink SDK.
- * This interface represents the raw status data that gets converted to CLI-friendly format.
- *
- * @interface MCPStatusResponse
- * @since 7.6.1
- *
- * @example
- * ```typescript
- * const status: MCPStatusResponse = {
- *   autoDiscoveredServers: [
- *     {
- *       name: "filesystem",
- *       id: "fs-server-001",
- *       status: "connected",
- *       source: "claude-desktop"
- *     }
- *   ],
- *   mcpInitialized: true,
- *   totalServers: 3,
- *   availableServers: 2
- * };
- * ```
- */
-interface MCPStatusResponse {
-  /**
-   * Array of servers that were automatically discovered from various sources.
-   * These servers are found by scanning configuration files from Claude Desktop,
-   * VS Code, and other MCP-compatible applications.
-   *
-   * @optional
-   * @since 7.6.1
-   */
-  autoDiscoveredServers?: Array<{
-    /**
-     * Display name of the discovered MCP server.
-     * Falls back to `id` if name is not available.
-     *
-     * @optional
-     * @example "filesystem" | "github-integration" | "database-connector"
-     */
-    name?: string;
-
-    /**
-     * Unique identifier for the MCP server instance.
-     * Used for internal tracking and deduplication.
-     *
-     * @optional
-     * @example "fs-server-001" | "gh-server-abc123"
-     */
-    id?: string;
-
-    /**
-     * Current connection status of the discovered server.
-     * Indicates whether the server is operational and reachable.
-     *
-     * @optional
-     * @example "connected" | "disconnected" | "error" | "unknown"
-     */
-    status?: string;
-
-    /**
-     * Source from which this server was discovered.
-     * Helps users understand where the server configuration originated.
-     *
-     * @optional
-     * @example "claude-desktop" | "vscode" | "manual-config" | "auto-scan"
-     */
-    source?: string;
-  }>;
-
-  /**
-   * Additional properties that may be included in the status response.
-   * Allows for extensibility and compatibility with future SDK versions.
-   * Common properties include `mcpInitialized`, `totalServers`, `availableServers`, etc.
-   *
-   * @since 7.6.1
-   */
-  [key: string]: unknown;
-}
-
-/**
  * Popular MCP servers registry
  */
 const POPULAR_MCP_SERVERS: Record<
@@ -556,7 +475,11 @@ export class MCPCommandFactory {
    */
   private static async executeInstall(argv: MCPCommandArgs): Promise<void> {
     try {
-      const serverName = argv.server!;
+      const serverName = argv.server;
+      if (!serverName) {
+        logger.error(chalk.red("❌ Server name is required"));
+        process.exit(1);
+      }
       const serverConfig = POPULAR_MCP_SERVERS[serverName];
 
       if (!serverConfig) {
@@ -580,11 +503,16 @@ export class MCPCommandFactory {
         try {
           const parsedEnv = JSON.parse(argv.env);
           env = { ...env, ...parsedEnv } as Record<string, string>;
-        } catch (_error) {
+        } catch (error) {
           if (spinner) {
             spinner.fail();
           }
           logger.error(chalk.red("❌ Invalid JSON in env parameter"));
+          logger.error(
+            chalk.red(
+              `Error details: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          );
           process.exit(1);
         }
       }
@@ -593,6 +521,7 @@ export class MCPCommandFactory {
         ...serverConfig,
         id: serverName,
         name: serverName,
+        env,
       });
 
       // Add server to NeuroLink - direct usage, zero transformations!
@@ -643,6 +572,9 @@ export class MCPCommandFactory {
         }
       } catch (testError) {
         logger.always(chalk.yellow("⚠️  Could not test connection"));
+        logger.debug(
+          `Test connection _error: ${testError instanceof Error ? testError.message : String(testError)}`,
+        );
       }
     } catch (_error) {
       logger.error(
@@ -657,8 +589,16 @@ export class MCPCommandFactory {
    */
   private static async executeAdd(argv: MCPCommandArgs): Promise<void> {
     try {
-      const name = argv.name!;
-      const command = argv.command!;
+      const name = argv.name;
+      if (!name) {
+        logger.error(chalk.red("❌ Server name is required"));
+        process.exit(1);
+      }
+      const command = argv.command;
+      if (!command) {
+        logger.error(chalk.red("❌ Command is required"));
+        process.exit(1);
+      }
 
       const spinner = argv.quiet
         ? null
@@ -669,11 +609,16 @@ export class MCPCommandFactory {
       if (argv.env) {
         try {
           env = JSON.parse(argv.env) as Record<string, string>;
-        } catch (_error) {
+        } catch (error) {
           if (spinner) {
             spinner.fail();
           }
           logger.error(chalk.red("❌ Invalid JSON in env parameter"));
+          logger.error(
+            chalk.red(
+              `Error details: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          );
           process.exit(1);
         }
       }
@@ -731,8 +676,6 @@ export class MCPCommandFactory {
         : ora("Testing MCP server connections...").start();
 
       const sdk = new NeuroLink();
-      const rawMcpStatus = await sdk.getMCPStatus();
-
       let serversToTest = await sdk.listMCPServers();
       if (targetServer) {
         serversToTest = serversToTest.filter((s) => s.name === targetServer);
@@ -811,8 +754,16 @@ export class MCPCommandFactory {
    */
   private static async executeExec(argv: MCPCommandArgs): Promise<void> {
     try {
-      const serverName = argv.server!;
-      const toolName = argv.tool!;
+      const serverName = argv.server;
+      if (!serverName) {
+        logger.error(chalk.red("❌ Server name is required"));
+        process.exit(1);
+      }
+      const toolName = argv.tool;
+      if (!toolName) {
+        logger.error(chalk.red("❌ Tool name is required"));
+        process.exit(1);
+      }
 
       const spinner = argv.quiet
         ? null
@@ -823,11 +774,16 @@ export class MCPCommandFactory {
       if (argv.params) {
         try {
           params = JSON.parse(argv.params);
-        } catch (_error) {
+        } catch (error) {
           if (spinner) {
             spinner.fail();
           }
           logger.error(chalk.red("❌ Invalid JSON in params parameter"));
+          logger.error(
+            chalk.red(
+              `Error details: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          );
           process.exit(1);
         }
       }
@@ -924,7 +880,7 @@ export class MCPCommandFactory {
           tool: toolName,
           server: serverName,
           params,
-          error: errorMessage,
+          _error: errorMessage,
           success: false,
           timestamp: new Date().toISOString(),
         };
@@ -953,7 +909,11 @@ export class MCPCommandFactory {
    */
   private static async executeRemove(argv: MCPCommandArgs): Promise<void> {
     try {
-      const serverName = argv.server!;
+      const serverName = argv.server;
+      if (!serverName) {
+        logger.error(chalk.red("❌ Server name is required"));
+        process.exit(1);
+      }
 
       const sdk = new NeuroLink();
       const allServers = await sdk.listMCPServers();
@@ -1152,8 +1112,11 @@ export class MCPCommandFactory {
           break; // Found config file, stop searching
         }
       }
-    } catch (_error) {
-      // Ignore errors in discovery
+    } catch (error) {
+      // Log discovery errors for debugging but don't fail
+      logger.debug(
+        `Claude Desktop discovery error: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return servers;
@@ -1209,8 +1172,11 @@ export class MCPCommandFactory {
           break;
         }
       }
-    } catch (_error) {
-      // Ignore errors in discovery
+    } catch (error) {
+      // Log discovery errors for debugging but don't fail
+      logger.debug(
+        `VS Code discovery error: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return servers;

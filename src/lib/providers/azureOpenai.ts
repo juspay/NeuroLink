@@ -1,13 +1,9 @@
 import { createAzure } from "@ai-sdk/azure";
 import { streamText, type LanguageModelV1 } from "ai";
 import { BaseProvider } from "../core/baseProvider.js";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import type { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { Unknown, UnknownRecord } from "../types/common.js";
+import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import {
   validateApiKey,
@@ -99,7 +95,7 @@ export class AzureOpenAIProvider extends BaseProvider {
 
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: unknown,
+    _analysisSchema?: unknown,
   ): Promise<StreamResult> {
     try {
       // Build message array from options

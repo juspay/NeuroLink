@@ -42,7 +42,11 @@ describe("Invalid Tool Registration", () => {
     };
 
     const registrationAttempt = () =>
-      neurolink.registerTools([invalidTool as any]);
+      neurolink.registerTools([
+        invalidTool as unknown as Parameters<
+          typeof neurolink.registerTools
+        >[0][number],
+      ]);
 
     expect(registrationAttempt).toThrowError(/must have an execute method/i);
   });

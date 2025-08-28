@@ -18,8 +18,6 @@ import { createMCPServerInfo } from "../utils/mcpDefaults.js";
 import {
   validateToolName,
   validateToolDescription,
-  ValidationError,
-  createValidationSummary,
 } from "../utils/parameterValidation.js";
 
 /**
@@ -207,7 +205,7 @@ export function createMCPServerFromTools(
 /**
  * Helper to create a tool with type safety
  */
-export function createTool<TParams = ToolArgs>(config: SimpleTool): SimpleTool {
+export function createTool(config: SimpleTool): SimpleTool {
   return config;
 }
 

@@ -1,22 +1,14 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
+import { streamText, type Schema, type LanguageModelV1 } from "ai";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import type { AIProviderName } from "../core/types.js";
 import { GoogleAIModels } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { Unknown, UnknownRecord } from "../types/common.js";
+import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import {
-  createTimeoutController,
-  TimeoutError,
-  getDefaultTimeout,
-} from "../utils/timeout.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import {
   AuthenticationError,
   NetworkError,
@@ -24,7 +16,6 @@ import {
   RateLimitError,
 } from "../types/errors.js";
 import { DEFAULT_MAX_TOKENS, DEFAULT_MAX_STEPS } from "../core/constants.js";
-import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
 
@@ -104,7 +95,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
   // executeGenerate removed - BaseProvider handles all generation with tools
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: ZodUnknownSchema | Schema<unknown>,
+    _analysisSchema?: ZodUnknownSchema | Schema<unknown>,
   ): Promise<StreamResult> {
     this.validateStreamOptions(options);
 

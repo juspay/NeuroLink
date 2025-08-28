@@ -115,11 +115,11 @@ async function createProtocolSpecificStream(
         while (true) {
           // Check for abort signal
           if (options.abortSignal?.aborted) {
-            throw new SageMakerError(
-              "Stream aborted by user",
-              "NETWORK_ERROR",
-              499,
-            );
+            throw new SageMakerError("Stream aborted by user", {
+              code: "NETWORK_ERROR",
+              statusCode: 499,
+              retryable: false,
+            });
           }
 
           const { done, value } = await reader.next();
@@ -141,7 +141,7 @@ async function createProtocolSpecificStream(
               finalUsage || {
                 promptTokens: 0,
                 completionTokens: 0,
-                totalTokens: 0,
+                total: 0,
               },
             );
             controller.close();
@@ -432,6 +432,6 @@ export function estimateTokenUsage(
   return {
     promptTokens,
     completionTokens,
-    totalTokens: promptTokens + completionTokens,
+    total: promptTokens + completionTokens,
   };
 }

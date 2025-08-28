@@ -8,16 +8,13 @@ import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue } from "../types/common.js";
 import type { ChatMessage } from "../types/conversationTypes.js";
 import type { AnalyticsData } from "./analytics.js";
+import type { TokenUsage, EvaluationData } from "../types/providers.js";
 
 export interface TextGenerationResult {
   content: string;
   provider?: string;
   model?: string;
-  usage?: {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  };
+  usage?: TokenUsage;
   responseTime?: number;
   toolsUsed?: string[];
   toolExecutions?: Array<{
@@ -35,13 +32,7 @@ export interface TextGenerationResult {
   }>;
   // Analytics and evaluation data
   analytics?: AnalyticsData;
-  evaluation?: {
-    relevance: number;
-    accuracy: number;
-    completeness: number;
-    overall: number;
-    reasoning?: string;
-  };
+  evaluation?: EvaluationData;
 }
 
 /**
@@ -187,119 +178,13 @@ export interface TextGenerationOptions {
 
   // NEW: Message Array Support for Conversation Memory
   conversationMessages?: ChatMessage[]; // Previous conversation as message array
+
+  // NEW: Evaluation Context Parameters
+  expectedOutcome?: string; // Expected outcome for evaluation
+  evaluationCriteria?: string[]; // Criteria for evaluation
 }
 
 export type { AnalyticsData };
-
-/**
- * Response quality evaluation scores
- * Comprehensive evaluation interface for response quality assessment
- */
-export interface EvaluationData {
-  // Core scores (1-10 scale) - Compatible with GenerateResult format
-  relevance: number; // How well response addresses query intent and domain alignment
-  accuracy: number; // Factual correctness and terminological accuracy
-  completeness: number; // How completely the response addresses the query
-  overall: number; // Overall quality (derived from above scores)
-  domainAlignment?: number;
-  terminologyAccuracy?: number;
-  toolEffectiveness?: number;
-
-  // Advanced insights
-  isOffTopic: boolean; // True if response significantly deviates from query/domain
-  alertSeverity: "low" | "medium" | "high" | "none"; // Quality alert level
-  reasoning: string; // Brief justification for scores (max 150 words)
-  suggestedImprovements?: string; // How to improve the response (max 100 words)
-
-  // Metadata
-  evaluationModel: string; // Model used for evaluation
-  evaluationTime: number; // Time taken for evaluation (ms)
-  evaluationDomain?: string; // Domain for evaluation (e.g., "healthcare", "analytics")
-
-  // Enhanced metadata (Universal Evaluation System)
-  evaluationProvider?: string; // Provider used for evaluation
-  evaluationAttempt?: number; // Attempt number (for retry logic)
-  evaluationConfig?: {
-    // Evaluation configuration details
-    mode: string;
-    fallbackUsed: boolean;
-    costEstimate: number;
-  };
-
-  // NEW: Domain configuration support
-  domainConfig?: {
-    domainName: string;
-    domainDescription: string;
-    keyTerms: string[];
-    failurePatterns: string[];
-    successPatterns: string[];
-    evaluationCriteria?: Record<string, unknown>;
-  };
-
-  // NEW: Domain-specific evaluation metadata
-  domainEvaluation?: {
-    domainRelevance: number;
-    terminologyAccuracy: number;
-    domainExpertise: number;
-    domainSpecificInsights: string[];
-  };
-}
-
-/**
- * BACKWARD COMPATIBILITY: Legacy evaluation interface
- * Maintains existing field names for backward compatibility
- */
-export interface LegacyEvaluationData {
-  relevance: number; // Legacy field name
-  accuracy: number; // Legacy field name
-  completeness: number; // Legacy field name
-  overall: number;
-  isOffTopic: boolean;
-  alertSeverity: "low" | "medium" | "high" | "none";
-  reasoning: string;
-  suggestedImprovements?: string;
-  evaluationModel: string;
-  evaluationTime: number;
-}
-
-/**
- * Evaluation system configuration for multi-provider support
- */
-export interface EvaluationConfig {
-  provider: string;
-  model: string;
-  mode: "fast" | "balanced" | "quality";
-  fallbackEnabled: boolean;
-  fallbackProviders: string[];
-  timeout: number;
-  maxTokens: number;
-  temperature: number;
-  preferCheap: boolean;
-  maxCostPerEval: number;
-  retryAttempts: number;
-}
-
-/**
- * Provider model configuration for evaluation
- */
-export interface ProviderModelConfig {
-  provider: string;
-  models: {
-    fast: string;
-    balanced: string;
-    quality: string;
-  };
-  costPerToken: {
-    input: number;
-    output: number;
-  };
-  requiresApiKey: string[];
-  performance: {
-    speed: number; // 1-3 scale
-    quality: number; // 1-3 scale
-    cost: number; // 1-3 scale (higher = cheaper)
-  };
-}
 
 /**
  * Enhanced result interfaces with optional analytics/evaluation

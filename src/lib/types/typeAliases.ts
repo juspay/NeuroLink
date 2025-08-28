@@ -5,7 +5,7 @@
 
 import type { ZodType, ZodTypeDef } from "zod";
 import type { Schema } from "ai";
-import type { JsonValue, JsonObject, UnknownRecord } from "./common.js";
+import type { JsonValue, JsonObject } from "./common.js";
 
 // ============================================================================
 // ZOD TYPE ALIASES
@@ -486,7 +486,7 @@ export type NetworkTransportResult = {
  * Re-export commonly used types from other modules
  * Provides one-stop shop for type imports
  */
-export type { JsonValue, JsonObject, UnknownRecord } from "./common.js";
+export type { JsonValue, JsonObject } from "./common.js";
 
 // ============================================================================
 // TYPE GUARDS AND UTILITIES

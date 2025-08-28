@@ -77,7 +77,7 @@ utilityServer.registerTool({
             timeZone: timezone,
           });
           resultData.actualTimezone = timezone;
-        } catch (tzError) {
+        } catch {
           const fallbackTimezone = "Asia/Kolkata";
           logger.warn(
             `[Utility] Invalid timezone '${timezone}', falling back to ${fallbackTimezone}`,

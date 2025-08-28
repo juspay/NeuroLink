@@ -16,12 +16,7 @@ import type {
 } from "../types/externalMcp.js";
 import type { MCPServerInfo } from "../types/mcpTypes.js";
 import type { JsonObject, JsonValue } from "../types/common.js";
-import {
-  isObject,
-  isString,
-  isBoolean,
-  isNullish,
-} from "../utils/typeUtils.js";
+import { isObject, isNullish } from "../utils/typeUtils.js";
 import {
   validateToolName,
   validateToolDescription,
@@ -310,7 +305,10 @@ export class ToolDiscoveryService extends EventEmitter {
         if (!this.serverToolStorage.has(serverId)) {
           this.serverToolStorage.set(serverId, []);
         }
-        const serverTools = this.serverToolStorage.get(serverId)!;
+        const serverTools = this.serverToolStorage.get(serverId);
+        if (!serverTools) {
+          throw new Error(`Server tools storage not found for ${serverId}`);
+        }
         // Add tool if not already present
         if (!serverTools.find((t) => t.name === tool.name)) {
           serverTools.push({
@@ -324,7 +322,10 @@ export class ToolDiscoveryService extends EventEmitter {
         if (!this.serverTools.has(serverId)) {
           this.serverTools.set(serverId, new Set());
         }
-        this.serverTools.get(serverId)!.add(tool.name);
+        const serverToolSet = this.serverTools.get(serverId);
+        if (serverToolSet) {
+          serverToolSet.add(tool.name);
+        }
 
         registeredTools.push(toolInfo);
 

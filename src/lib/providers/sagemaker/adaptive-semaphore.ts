@@ -75,8 +75,10 @@ export class AdaptiveSemaphore {
   release(): void {
     this.activeRequests--;
     if (this.waiters.length > 0) {
-      const waiter = this.waiters.shift()!;
-      waiter();
+      const waiter = this.waiters.shift();
+      if (waiter) {
+        waiter();
+      }
     } else {
       this.count++;
     }
@@ -134,10 +136,12 @@ export class AdaptiveSemaphore {
 
     // Wake up waiting requests if we increased concurrency
     while (this.count > 0 && this.waiters.length > 0) {
-      const waiter = this.waiters.shift()!;
-      this.count--;
-      this.activeRequests++;
-      waiter();
+      const waiter = this.waiters.shift();
+      if (waiter) {
+        this.count--;
+        this.activeRequests++;
+        waiter();
+      }
     }
   }
 

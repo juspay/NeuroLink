@@ -138,9 +138,10 @@ async function removeModelHandler(argv: { model: string }) {
     }
 
     spinner.succeed(`Successfully removed ${model}`);
-  } catch (error: unknown) {
+  } catch (_error: unknown) {
     spinner.fail(`Failed to remove ${model}`);
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage =
+      _error instanceof Error ? _error.message : String(_error);
     logger.error(chalk.red("Error:", errorMessage));
     process.exit(1);
   }

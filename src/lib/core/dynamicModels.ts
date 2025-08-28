@@ -139,13 +139,6 @@ export class DynamicModelProvider {
       // Setup timeout and abort controller
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      // Load from URL
-      const response = await fetch(source, {
-        headers: {
-          "User-Agent": "NeuroLink/1.0 (+https://github.com/juspay/neurolink)",
-        },
-      });
-
       try {
         // Add health check for localhost before attempting full request
         if (source.includes("localhost") || source.includes("127.0.0.1")) {
@@ -155,7 +148,7 @@ export class DynamicModelProvider {
         const response = await fetch(source, {
           headers: {
             "User-Agent":
-              "NeuroLink/1.0 (+https://github.com/sachinsharma92/neurolink)",
+              "NeuroLink/1.0 (+https://github.com/juspay/neurolink)",
             Accept: "application/json",
             "Cache-Control": "no-cache",
           },
@@ -330,8 +323,12 @@ export class DynamicModelProvider {
       config: ModelConfig;
     }> = [];
 
+    if (!this.modelRegistry) {
+      return results;
+    }
+
     for (const [providerName, models] of Object.entries(
-      this.modelRegistry!.models,
+      this.modelRegistry.models,
     )) {
       if (options.provider && providerName !== options.provider) {
         continue;
@@ -434,8 +431,12 @@ export class DynamicModelProvider {
       config: ModelConfig;
     }> = [];
 
+    if (!this.modelRegistry) {
+      return results;
+    }
+
     for (const [providerName, models] of Object.entries(
-      this.modelRegistry!.models,
+      this.modelRegistry.models,
     )) {
       for (const [modelName, modelConfig] of Object.entries(models)) {
         results.push({

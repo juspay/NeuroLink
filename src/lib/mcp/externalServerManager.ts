@@ -536,7 +536,10 @@ export class ExternalServerManager extends EventEmitter {
       // Start the server
       await this.startServer(serverId);
 
-      const finalInstance = this.servers.get(serverId)!;
+      const finalInstance = this.servers.get(serverId);
+      if (!finalInstance) {
+        throw new Error(`Server ${serverId} not found after registration`);
+      }
 
       // Convert RuntimeMCPServerInfo to ExternalMCPServerInstance for return
       const convertedInstance: ExternalMCPServerInstance = {
@@ -1297,7 +1300,7 @@ export class ExternalServerManager extends EventEmitter {
         // Register with main tool registry
         try {
           toolRegistry.registerTool(toolId, toolInfo, {
-            execute: async (params: unknown, context?: Unknown) => {
+            execute: async (params: unknown, _context?: Unknown) => {
               // Execute tool via ExternalServerManager for proper lifecycle management
               return await this.executeTool(
                 serverId,
@@ -1434,7 +1437,6 @@ export class ExternalServerManager extends EventEmitter {
         throw new Error(result.error || "Tool execution failed");
       }
     } catch (error) {
-      const duration = Date.now() - startTime;
       instance.metrics.totalErrors++;
 
       mcpLogger.error(

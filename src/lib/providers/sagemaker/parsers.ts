@@ -366,11 +366,11 @@ export class HuggingFaceStreamParser extends BaseStreamingParser {
       const errorMessage = extractApiErrorMessage(
         data.error as Record<string, unknown> | string,
       );
-      throw new SageMakerError(
-        `HuggingFace streaming error: ${errorMessage}`,
-        "MODEL_ERROR",
-        500,
-      );
+      throw new SageMakerError(`HuggingFace streaming error: ${errorMessage}`, {
+        code: "MODEL_ERROR",
+        statusCode: 500,
+        retryable: false,
+      });
     }
 
     return null;
@@ -387,7 +387,7 @@ export class HuggingFaceStreamParser extends BaseStreamingParser {
     return {
       promptTokens: Number(tokens.input) || 0,
       completionTokens: Number(tokens.generated) || 0,
-      totalTokens: Number(tokens.total) || 0,
+      total: Number(tokens.total) || 0,
     };
   }
 
@@ -516,11 +516,11 @@ export class LlamaStreamParser extends BaseStreamingParser {
     if (data.error) {
       const errorData = data.error as Record<string, unknown> | string;
       const errorMessage = extractApiErrorMessage(errorData);
-      throw new SageMakerError(
-        `LLaMA streaming error: ${errorMessage}`,
-        "MODEL_ERROR",
-        500,
-      );
+      throw new SageMakerError(`LLaMA streaming error: ${errorMessage}`, {
+        code: "MODEL_ERROR",
+        statusCode: 500,
+        retryable: false,
+      });
     }
 
     return null;
@@ -593,7 +593,7 @@ export class LlamaStreamParser extends BaseStreamingParser {
     return {
       promptTokens: Number(usage.prompt_tokens) || 0,
       completionTokens: Number(usage.completion_tokens) || 0,
-      totalTokens: Number(usage.total_tokens) || 0,
+      total: Number(usage.total_tokens) || 0,
     };
   }
 
@@ -747,7 +747,7 @@ export class CustomStreamParser extends BaseStreamingParser {
       promptTokens: Number(usage.prompt_tokens || usage.input_tokens) || 0,
       completionTokens:
         Number(usage.completion_tokens || usage.output_tokens) || 0,
-      totalTokens: Number(usage.total_tokens) || 0,
+      total: Number(usage.total_tokens) || 0,
     };
   }
 }
@@ -822,6 +822,6 @@ export function estimateTokenUsage(
   return {
     promptTokens,
     completionTokens,
-    totalTokens: promptTokens + completionTokens,
+    total: promptTokens + completionTokens,
   };
 }

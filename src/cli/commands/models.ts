@@ -6,16 +6,8 @@
 
 import type { CommandModule, Argv } from "yargs";
 import type { AIProviderName } from "../../lib/core/types.js";
-import type { UnknownRecord } from "../../lib/types/common.js";
 import type { ModelsCommandArgs } from "../../lib/types/cli.js";
-import type {
-  ModelCapability,
-  ModelUseCase,
-  ModelFilter,
-  ModelResolutionContext,
-  ModelStats,
-  ModelPricing,
-} from "../../lib/types/providers.js";
+import type { ModelPricing } from "../../lib/types/providers.js";
 import {
   ModelResolver,
   formatSearchResults,
@@ -94,57 +86,6 @@ function mapRequirementToCapability(
 }
 
 /**
- * Models command arguments interface (extended)
- */
-interface Extended_ModelsCommandArgs extends UnknownRecord {
-  // List command options
-  provider?: AIProviderName | AIProviderName[];
-  category?: string;
-  capability?: string[];
-  deprecated?: boolean;
-
-  // Search command options
-  query?: string;
-  useCase?: string;
-  maxCost?: number;
-  minContext?: number;
-  maxContext?: number;
-  performance?: "fast" | "medium" | "slow" | "high" | "low";
-
-  // Best command options
-  coding?: boolean;
-  creative?: boolean;
-  analysis?: boolean;
-  conversation?: boolean;
-  reasoning?: boolean;
-  translation?: boolean;
-  summarization?: boolean;
-  costEffective?: boolean;
-  highQuality?: boolean;
-  fast?: boolean;
-  requireVision?: boolean;
-  requireFunctionCalling?: boolean;
-  excludeProviders?: string[];
-  preferLocal?: boolean;
-
-  // Resolve command options
-  model?: string;
-  fuzzy?: boolean;
-
-  // Compare command options
-  models?: string[];
-
-  // Stats command options
-  detailed?: boolean;
-
-  // Output formatting
-  format?: "table" | "json" | "compact";
-  output?: string;
-  quiet?: boolean;
-  debug?: boolean;
-}
-
-/**
  * Models CLI command factory
  */
 export class ModelsCommandFactory {
@@ -160,37 +101,37 @@ export class ModelsCommandFactory {
           .command(
             "list",
             "List available models with filtering options",
-            this.buildListOptions,
+            (yargs: Argv) => this.buildListOptions(yargs),
             this.executeList,
           )
           .command(
             "search [query]",
             "Search models by capabilities, use case, or features",
-            this.buildSearchOptions,
+            (yargs: Argv) => this.buildSearchOptions(yargs),
             this.executeSearch,
           )
           .command(
             "best",
             "Get the best model recommendation for your use case",
-            this.buildBestOptions,
+            (yargs: Argv) => this.buildBestOptions(yargs),
             this.executeBest,
           )
           .command(
             "resolve <model>",
             "Resolve model aliases and find exact model names",
-            this.buildResolveOptions,
+            (yargs: Argv) => this.buildResolveOptions(yargs),
             this.executeResolve,
           )
           .command(
             "compare <models..>",
             "Compare multiple models side by side",
-            this.buildCompareOptions,
+            (yargs: Argv) => this.buildCompareOptions(yargs),
             this.executeCompare,
           )
           .command(
             "stats",
             "Show model registry statistics and insights",
-            this.buildStatsOptions,
+            (yargs: Argv) => this.buildStatsOptions(yargs),
             this.executeStats,
           )
           .option("format", {
@@ -228,17 +169,7 @@ export class ModelsCommandFactory {
   private static buildListOptions(yargs: Argv): Argv {
     return yargs
       .option("provider", {
-        choices: [
-          "openai",
-          "bedrock",
-          "vertex",
-          "anthropic",
-          "azure",
-          "google-ai",
-          "huggingface",
-          "ollama",
-          "mistral",
-        ],
+        choices: getAvailableProviders(),
         description: "Filter by AI provider",
       })
       .option("category", {
@@ -471,9 +402,7 @@ export class ModelsCommandFactory {
   /**
    * Execute list command
    */
-  private static async executeList(
-    argv: Extended_ModelsCommandArgs,
-  ): Promise<void> {
+  private static async executeList(argv: ModelsCommandArgs): Promise<void> {
     try {
       const spinner = argv.quiet
         ? null
@@ -481,12 +410,18 @@ export class ModelsCommandFactory {
 
       let models = getAllModels();
 
-      // Apply filters
+      // Apply filters - Use getModelsByProvider for efficiency when provider is specified
       if (argv.provider) {
         const providers = Array.isArray(argv.provider)
           ? argv.provider
           : [argv.provider];
-        models = models.filter((model) => providers.includes(model.provider));
+
+        // Use optimized function for single provider, filter for multiple
+        if (providers.length === 1) {
+          models = getModelsByProvider(providers[0] as AIProviderName);
+        } else {
+          models = models.filter((model) => providers.includes(model.provider));
+        }
       }
 
       if (argv.category) {
@@ -495,8 +430,11 @@ export class ModelsCommandFactory {
 
       if (argv.capability) {
         models = models.filter((model) => {
-          return argv.capability!.every(
-            (cap) => model.capabilities[cap as keyof typeof model.capabilities],
+          return (
+            argv.capability?.every(
+              (cap) =>
+                model.capabilities[cap as keyof typeof model.capabilities],
+            ) ?? false
           );
         });
       }
@@ -554,9 +492,7 @@ export class ModelsCommandFactory {
   /**
    * Execute search command
    */
-  private static async executeSearch(
-    argv: Extended_ModelsCommandArgs,
-  ): Promise<void> {
+  private static async executeSearch(argv: ModelsCommandArgs): Promise<void> {
     try {
       const spinner = argv.quiet ? null : ora("Searching models...").start();
 
@@ -640,9 +576,7 @@ export class ModelsCommandFactory {
   /**
    * Execute best command
    */
-  private static async executeBest(
-    argv: Extended_ModelsCommandArgs,
-  ): Promise<void> {
+  private static async executeBest(argv: ModelsCommandArgs): Promise<void> {
     try {
       const spinner = argv.quiet ? null : ora("Finding best model...").start();
 
@@ -749,11 +683,13 @@ export class ModelsCommandFactory {
   /**
    * Execute resolve command
    */
-  private static async executeResolve(
-    argv: Extended_ModelsCommandArgs,
-  ): Promise<void> {
+  private static async executeResolve(argv: ModelsCommandArgs): Promise<void> {
     try {
-      const query = argv.model!;
+      const query = argv.model;
+      if (!query) {
+        logger.error(chalk.red("❌ Model name is required"));
+        process.exit(1);
+      }
       const model = ModelResolver.resolveModel(query);
 
       if (!model) {
@@ -804,11 +740,13 @@ export class ModelsCommandFactory {
   /**
    * Execute compare command
    */
-  private static async executeCompare(
-    argv: Extended_ModelsCommandArgs,
-  ): Promise<void> {
+  private static async executeCompare(argv: ModelsCommandArgs): Promise<void> {
     try {
-      const modelIds = argv.models!;
+      const modelIds = argv.models;
+      if (!modelIds || modelIds.length === 0) {
+        logger.error(chalk.red("❌ Model IDs are required for comparison"));
+        process.exit(1);
+      }
       const comparison = ModelResolver.compareModels(modelIds);
 
       if (argv.format === "json") {
@@ -868,9 +806,7 @@ export class ModelsCommandFactory {
   /**
    * Execute stats command
    */
-  private static async executeStats(
-    argv: Extended_ModelsCommandArgs,
-  ): Promise<void> {
+  private static async executeStats(argv: ModelsCommandArgs): Promise<void> {
     try {
       const stats = ModelResolver.getModelStatistics();
 

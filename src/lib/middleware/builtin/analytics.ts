@@ -42,9 +42,9 @@ export function createAnalyticsMiddleware(): NeuroLinkMiddleware {
           responseTime,
           timestamp: new Date().toISOString(),
           usage: {
-            inputTokens: result.usage?.promptTokens || 0,
-            outputTokens: result.usage?.completionTokens || 0,
-            totalTokens:
+            input: result.usage?.promptTokens || 0,
+            output: result.usage?.completionTokens || 0,
+            total:
               (result.usage?.promptTokens || 0) +
               (result.usage?.completionTokens || 0),
           },

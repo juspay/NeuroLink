@@ -1,18 +1,11 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
-import type {
-  ZodUnknownSchema,
-  ValidationSchema,
-} from "../types/typeAliases.js";
+import { streamText, type LanguageModelV1 } from "ai";
+import type { ValidationSchema } from "../types/typeAliases.js";
 import { AIProviderName } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import {
-  createTimeoutController,
-  TimeoutError,
-  getDefaultTimeout,
-} from "../utils/timeout.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import {
   AuthenticationError,
   InvalidModelError,
@@ -137,7 +130,7 @@ export class OpenAIProvider extends BaseProvider {
 
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: ValidationSchema,
+    _analysisSchema?: ValidationSchema,
   ): Promise<StreamResult> {
     this.validateStreamOptions(options);
 

@@ -9,7 +9,6 @@ import type {
   AIProvider,
   AIProviderName,
   SupportedModelName,
-  TextGenerationOptions,
 } from "./types.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { ProviderPairResult } from "../types/typeAliases.js";

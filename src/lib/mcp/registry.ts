@@ -3,7 +3,6 @@
  */
 
 import type {
-  McpMetadata,
   DiscoveredMcp,
   ExecutionContext,
   ToolInfo,
@@ -90,7 +89,7 @@ export class MCPRegistry implements McpRegistry {
   async registerServer(
     serverId: string,
     serverConfig?: unknown,
-    context?: ExecutionContext,
+    _context?: ExecutionContext,
   ): Promise<void> {
     const plugin: DiscoveredMcp = {
       metadata: {
@@ -120,7 +119,7 @@ export class MCPRegistry implements McpRegistry {
   async executeTool<T = unknown>(
     toolName: string,
     args?: unknown,
-    context?: ExecutionContext,
+    _context?: ExecutionContext,
   ): Promise<T> {
     registryLogger.info(`Executing tool: ${toolName}`);
     return { result: `Mock execution of ${toolName}`, args } as T;
@@ -129,7 +128,7 @@ export class MCPRegistry implements McpRegistry {
   /**
    * List all tools (compatible with new interface)
    */
-  async listTools(context?: ExecutionContext): Promise<ToolInfo[]> {
+  async listTools(_context?: ExecutionContext): Promise<ToolInfo[]> {
     const tools = this.list().map((plugin) => ({
       name: plugin.metadata.name,
       description: plugin.metadata.description || "No description",

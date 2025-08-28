@@ -1,4 +1,17 @@
-import type { ProviderModelConfig } from "./types.js";
+// Legacy types for evaluation providers - simplified interface
+interface ProviderModelConfig {
+  provider: string;
+  models: string[];
+  costPerToken?: number | { input: number; output: number };
+  requiresApiKey?: string[];
+  performance?: {
+    averageLatency?: number;
+    reliability?: number;
+    speed?: number;
+    quality?: number;
+    cost?: number;
+  };
+}
 import { modelConfig, type ProviderConfig } from "./modelConfiguration.js";
 
 const PERFORMANCE_THRESHOLDS = {
@@ -27,8 +40,8 @@ const providerMetrics = new Map<string, ProviderPerformanceMetrics>();
  */
 function convertToLegacyFormat(config: ProviderConfig): ProviderModelConfig {
   return {
-    provider: config.provider,
-    models: config.models,
+    provider: config.provider as string,
+    models: Object.keys(config.models || {}),
     costPerToken: config.defaultCost,
     requiresApiKey: config.requiredEnvVars,
     performance: config.performance,
@@ -86,24 +99,27 @@ export function sortProvidersByPreference(
   preferCheap: boolean = true,
 ): ProviderModelConfig[] {
   return providers.sort((a, b) => {
+    const aPerf = a.performance || { cost: 0, speed: 0, quality: 0 };
+    const bPerf = b.performance || { cost: 0, speed: 0, quality: 0 };
+
     if (preferCheap) {
       // Cost > Speed > Quality for cheap preference
-      if (a.performance.cost !== b.performance.cost) {
-        return b.performance.cost - a.performance.cost;
+      if ((aPerf.cost || 0) !== (bPerf.cost || 0)) {
+        return (bPerf.cost || 0) - (aPerf.cost || 0);
       }
-      if (a.performance.speed !== b.performance.speed) {
-        return b.performance.speed - a.performance.speed;
+      if ((aPerf.speed || 0) !== (bPerf.speed || 0)) {
+        return (bPerf.speed || 0) - (aPerf.speed || 0);
       }
-      return b.performance.quality - a.performance.quality;
+      return (bPerf.quality || 0) - (aPerf.quality || 0);
     } else {
       // Quality > Speed > Cost for quality preference
-      if (a.performance.quality !== b.performance.quality) {
-        return b.performance.quality - a.performance.quality;
+      if ((aPerf.quality || 0) !== (bPerf.quality || 0)) {
+        return (bPerf.quality || 0) - (aPerf.quality || 0);
       }
-      if (a.performance.speed !== b.performance.speed) {
-        return b.performance.speed - a.performance.speed;
+      if ((aPerf.speed || 0) !== (bPerf.speed || 0)) {
+        return (bPerf.speed || 0) - (aPerf.speed || 0);
       }
-      return b.performance.cost - a.performance.cost;
+      return (bPerf.cost || 0) - (aPerf.cost || 0);
     }
   });
 }
@@ -114,15 +130,15 @@ export function sortProvidersByPreference(
  */
 export function estimateProviderCost(
   providerName: string,
-  inputTokens: number,
-  outputTokens: number,
+  input: number,
+  output: number,
 ): number {
   const costInfo = modelConfig.getCostInfo(providerName);
   if (!costInfo) {
     return 0;
   }
 
-  return inputTokens * costInfo.input + outputTokens * costInfo.output;
+  return input * costInfo.input + output * costInfo.output;
 }
 
 /**

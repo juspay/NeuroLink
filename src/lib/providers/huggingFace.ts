@@ -202,7 +202,7 @@ export class HuggingFaceProvider extends BaseProvider {
    */
   private prepareStreamOptions(
     options: StreamOptions,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+    _analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ) {
     const modelSupportsTools = this.supportsTools();
 
