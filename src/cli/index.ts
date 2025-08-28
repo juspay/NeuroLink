@@ -7,9 +7,6 @@
  * Features: Spinners, colors, batch processing, provider testing, rich help
  */
 
-import { NeuroLink } from "../lib/neurolink.js";
-import type { AIProviderName } from "../lib/index.js";
-import type { UnknownRecord } from "../lib/types/common.js";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import _ora from "ora";
@@ -49,17 +46,17 @@ try {
   // Try to import and configure dotenv
   const { config } = await import("dotenv");
   config(); // Load .env from current working directory
-} catch (error) {
+} catch {
   // dotenv is not available (dev dependency only) - this is fine for production
   // Environment variables should be set externally in production
 }
 
 // Utility Functions (Simple, Zero Maintenance)
 
-function handleError(error: Error, context: string): void {
-  logger.error(chalk.red(`❌ ${context} failed: ${error.message}`));
+export function handleError(_error: Error, context: string): void {
+  logger.error(chalk.red(`❌ ${context} failed: ${_error.message}`));
 
-  if (error instanceof AuthenticationError) {
+  if (_error instanceof AuthenticationError) {
     logger.error(
       chalk.yellow(
         "💡 Set Google AI Studio API key (RECOMMENDED): export GOOGLE_AI_API_KEY=AIza-...",
@@ -88,11 +85,11 @@ function handleError(error: Error, context: string): void {
         "💡 Or set Azure OpenAI credentials: export AZURE_OPENAI_API_KEY=... AZURE_OPENAI_ENDPOINT=...",
       ),
     );
-  } else if (error instanceof RateLimitError) {
+  } else if (_error instanceof RateLimitError) {
     logger.error(
       chalk.yellow("💡 Try again in a few moments or use --provider vertex"),
     );
-  } else if (error instanceof AuthorizationError) {
+  } else if (_error instanceof AuthorizationError) {
     logger.error(
       chalk.yellow(
         "💡 Check your account permissions for the selected model/service.",
@@ -103,7 +100,7 @@ function handleError(error: Error, context: string): void {
         "💡 For AWS Bedrock, ensure you have permissions for the specific model and consider using inference profile ARNs.",
       ),
     );
-  } else if (error instanceof NetworkError) {
+  } else if (_error instanceof NetworkError) {
     logger.error(
       chalk.yellow(
         "💡 Check your internet connection and the provider's status page.",
@@ -165,9 +162,9 @@ const cli = yargs(args)
     };
 
     if (err) {
-      // Error likely from an async command handler (e.g., via handleError)
-      // handleError already prints and calls process.exit(1).
-      // If we're here, it means handleError's process.exit might not have been caught by the top-level async IIFE.
+      // Error likely from an async command handler (e.g., via _handleError)
+      // _handleError already prints and calls process.exit(1).
+      // If we're here, it means _handleError's process.exit might not have been caught by the top-level async IIFE.
       // Or, it's a synchronous yargs error during parsing that yargs itself throws.
       const alreadyExitedByHandleError =
         (err as Error & { exitCode?: number })?.exitCode !== undefined;
@@ -284,7 +281,7 @@ const cli = yargs(args)
   } catch (error) {
     // Global error handler - should not reach here due to fail() handler
     process.stderr.write(
-      chalk.red(`Unexpected CLI error: ${(error as Error).message}\n`),
+      chalk.red(`Unexpected CLI _error: ${(error as Error).message}\n`),
     );
     process.exit(1);
   }

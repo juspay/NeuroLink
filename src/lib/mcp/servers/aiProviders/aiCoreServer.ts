@@ -8,7 +8,6 @@ import { z } from "zod";
 import type { Unknown } from "../../../types/common.js";
 import { createMCPServer } from "../../factory.js";
 import type { NeuroLinkExecutionContext, ToolResult } from "../../factory.js";
-import { ServiceRegistry } from "../../../core/serviceRegistry.js";
 import {
   getBestProvider,
   getAvailableProviders,

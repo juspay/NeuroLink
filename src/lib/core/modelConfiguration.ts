@@ -172,427 +172,427 @@ export class ModelConfigurationManager {
   }
 
   /**
+   * Create Google AI provider configuration
+   */
+  private createGoogleAIConfig(): ProviderConfig {
+    return {
+      provider: "google-ai",
+      models: {
+        fast: this.getConfigValue(
+          "GOOGLE_AI_FAST_MODEL",
+          MODEL_NAMES.GOOGLE_AI.FAST,
+        ),
+        balanced: this.getConfigValue(
+          "GOOGLE_AI_BALANCED_MODEL",
+          MODEL_NAMES.GOOGLE_AI.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "GOOGLE_AI_QUALITY_MODEL",
+          MODEL_NAMES.GOOGLE_AI.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(
+          process.env.GOOGLE_AI_DEFAULT_INPUT_COST,
+          0.000075,
+        ),
+        output: this.parseFloat(
+          process.env.GOOGLE_AI_DEFAULT_OUTPUT_COST,
+          0.0003,
+        ),
+      },
+      requiredEnvVars: ["GOOGLE_AI_API_KEY"],
+      performance: {
+        speed: this.parseInt(process.env.GOOGLE_AI_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.GOOGLE_AI_QUALITY_RATING, 3),
+        cost: this.parseInt(process.env.GOOGLE_AI_COST_RATING, 3),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("GOOGLE_AI_MAX_TOKENS_ISSUES", [
+          MODEL_NAMES.GOOGLE_AI.FAST,
+          MODEL_NAMES.GOOGLE_AI.BALANCED,
+        ]),
+      },
+    };
+  }
+
+  /**
+   * Create Google Vertex AI provider configuration
+   */
+  private createVertexConfig(): ProviderConfig {
+    return {
+      provider: "google-vertex",
+      models: {
+        fast: this.getConfigValue(
+          "GOOGLE_VERTEX_FAST_MODEL",
+          MODEL_NAMES.GOOGLE_VERTEX.FAST,
+        ),
+        balanced: this.getConfigValue(
+          "GOOGLE_VERTEX_BALANCED_MODEL",
+          MODEL_NAMES.GOOGLE_VERTEX.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "GOOGLE_VERTEX_QUALITY_MODEL",
+          MODEL_NAMES.GOOGLE_VERTEX.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(
+          process.env.GOOGLE_VERTEX_DEFAULT_INPUT_COST,
+          0.000075,
+        ),
+        output: this.parseFloat(
+          process.env.GOOGLE_VERTEX_DEFAULT_OUTPUT_COST,
+          0.0003,
+        ),
+      },
+      requiredEnvVars: ["GOOGLE_VERTEX_PROJECT_ID", "GOOGLE_VERTEX_LOCATION"],
+      performance: {
+        speed: this.parseInt(process.env.GOOGLE_VERTEX_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.GOOGLE_VERTEX_QUALITY_RATING, 3),
+        cost: this.parseInt(process.env.GOOGLE_VERTEX_COST_RATING, 3),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray(
+          "GOOGLE_VERTEX_MAX_TOKENS_ISSUES",
+          [MODEL_NAMES.GOOGLE_VERTEX.FAST, MODEL_NAMES.GOOGLE_VERTEX.BALANCED],
+        ),
+      },
+    };
+  }
+
+  /**
+   * Create OpenAI provider configuration
+   */
+  private createOpenAIConfig(): ProviderConfig {
+    return {
+      provider: "openai",
+      models: {
+        fast: this.getConfigValue("OPENAI_FAST_MODEL", MODEL_NAMES.OPENAI.FAST),
+        balanced: this.getConfigValue(
+          "OPENAI_BALANCED_MODEL",
+          MODEL_NAMES.OPENAI.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "OPENAI_QUALITY_MODEL",
+          MODEL_NAMES.OPENAI.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(process.env.OPENAI_DEFAULT_INPUT_COST, 0.00015),
+        output: this.parseFloat(process.env.OPENAI_DEFAULT_OUTPUT_COST, 0.0006),
+      },
+      requiredEnvVars: ["OPENAI_API_KEY"],
+      performance: {
+        speed: this.parseInt(process.env.OPENAI_SPEED_RATING, 2),
+        quality: this.parseInt(process.env.OPENAI_QUALITY_RATING, 3),
+        cost: this.parseInt(process.env.OPENAI_COST_RATING, 2),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("OPENAI_MAX_TOKENS_ISSUES", []),
+        specialHandling: this.getConfigObject("OPENAI_SPECIAL_HANDLING", {}),
+      },
+    };
+  }
+
+  /**
+   * Create all provider configurations - centralized approach
+   */
+  private createAllProviderConfigs(): Record<string, ProviderConfig> {
+    return {
+      "google-ai": this.createGoogleAIConfig(),
+      "google-vertex": this.createVertexConfig(),
+      openai: this.createOpenAIConfig(),
+      anthropic: this.createAnthropicConfig(),
+      vertex: this.createVertexAlternativeConfig(),
+      bedrock: this.createBedrockConfig(),
+      azure: this.createAzureConfig(),
+      ollama: this.createOllamaConfig(),
+      huggingface: this.createHuggingFaceConfig(),
+      mistral: this.createMistralConfig(),
+    };
+  }
+
+  /**
+   * Create Anthropic provider configuration
+   */
+  private createAnthropicConfig(): ProviderConfig {
+    return {
+      provider: "anthropic",
+      models: {
+        fast: this.getConfigValue(
+          "ANTHROPIC_FAST_MODEL",
+          MODEL_NAMES.ANTHROPIC.FAST,
+        ),
+        balanced: this.getConfigValue(
+          "ANTHROPIC_BALANCED_MODEL",
+          MODEL_NAMES.ANTHROPIC.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "ANTHROPIC_QUALITY_MODEL",
+          MODEL_NAMES.ANTHROPIC.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(
+          process.env.ANTHROPIC_DEFAULT_INPUT_COST,
+          0.0015,
+        ),
+        output: this.parseFloat(
+          process.env.ANTHROPIC_DEFAULT_OUTPUT_COST,
+          0.0075,
+        ),
+      },
+      requiredEnvVars: ["ANTHROPIC_API_KEY"],
+      performance: {
+        speed: this.parseInt(process.env.ANTHROPIC_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.ANTHROPIC_QUALITY_RATING, 4),
+        cost: this.parseInt(process.env.ANTHROPIC_COST_RATING, 2),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("ANTHROPIC_MAX_TOKENS_ISSUES", []),
+      },
+    };
+  }
+
+  /**
+   * Create Vertex alternative provider configuration
+   */
+  private createVertexAlternativeConfig(): ProviderConfig {
+    return {
+      provider: "vertex",
+      models: {
+        fast: this.getConfigValue("VERTEX_FAST_MODEL", MODEL_NAMES.VERTEX.FAST),
+        balanced: this.getConfigValue(
+          "VERTEX_BALANCED_MODEL",
+          MODEL_NAMES.VERTEX.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "VERTEX_QUALITY_MODEL",
+          MODEL_NAMES.VERTEX.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(process.env.VERTEX_DEFAULT_INPUT_COST, 0.000075),
+        output: this.parseFloat(process.env.VERTEX_DEFAULT_OUTPUT_COST, 0.0003),
+      },
+      requiredEnvVars: ["GOOGLE_VERTEX_PROJECT_ID", "GOOGLE_VERTEX_LOCATION"],
+      performance: {
+        speed: this.parseInt(process.env.VERTEX_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.VERTEX_QUALITY_RATING, 4),
+        cost: this.parseInt(process.env.VERTEX_COST_RATING, 3),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("VERTEX_MAX_TOKENS_ISSUES", []),
+      },
+    };
+  }
+
+  /**
+   * Create Bedrock provider configuration
+   */
+  private createBedrockConfig(): ProviderConfig {
+    return {
+      provider: "bedrock",
+      models: {
+        fast: this.getConfigValue(
+          "BEDROCK_FAST_MODEL",
+          MODEL_NAMES.BEDROCK.FAST,
+        ),
+        balanced: this.getConfigValue(
+          "BEDROCK_BALANCED_MODEL",
+          MODEL_NAMES.BEDROCK.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "BEDROCK_QUALITY_MODEL",
+          MODEL_NAMES.BEDROCK.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(process.env.BEDROCK_DEFAULT_INPUT_COST, 0.0015),
+        output: this.parseFloat(
+          process.env.BEDROCK_DEFAULT_OUTPUT_COST,
+          0.0075,
+        ),
+      },
+      requiredEnvVars: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
+      performance: {
+        speed: this.parseInt(process.env.BEDROCK_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.BEDROCK_QUALITY_RATING, 4),
+        cost: this.parseInt(process.env.BEDROCK_COST_RATING, 3),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("BEDROCK_MAX_TOKENS_ISSUES", []),
+      },
+    };
+  }
+
+  /**
+   * Create Azure provider configuration
+   */
+  private createAzureConfig(): ProviderConfig {
+    return {
+      provider: "azure",
+      models: {
+        fast: this.getConfigValue("AZURE_FAST_MODEL", MODEL_NAMES.AZURE.FAST),
+        balanced: this.getConfigValue(
+          "AZURE_BALANCED_MODEL",
+          MODEL_NAMES.AZURE.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "AZURE_QUALITY_MODEL",
+          MODEL_NAMES.AZURE.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(process.env.AZURE_DEFAULT_INPUT_COST, 0.00015),
+        output: this.parseFloat(process.env.AZURE_DEFAULT_OUTPUT_COST, 0.0006),
+      },
+      requiredEnvVars: ["AZURE_API_KEY", "AZURE_ENDPOINT"],
+      performance: {
+        speed: this.parseInt(process.env.AZURE_SPEED_RATING, 2),
+        quality: this.parseInt(process.env.AZURE_QUALITY_RATING, 3),
+        cost: this.parseInt(process.env.AZURE_COST_RATING, 2),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("AZURE_MAX_TOKENS_ISSUES", []),
+      },
+    };
+  }
+
+  /**
+   * Create Ollama provider configuration
+   */
+  private createOllamaConfig(): ProviderConfig {
+    return {
+      provider: "ollama",
+      models: {
+        fast: this.getConfigValue("OLLAMA_FAST_MODEL", MODEL_NAMES.OLLAMA.FAST),
+        balanced: this.getConfigValue(
+          "OLLAMA_BALANCED_MODEL",
+          MODEL_NAMES.OLLAMA.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "OLLAMA_QUALITY_MODEL",
+          MODEL_NAMES.OLLAMA.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(process.env.OLLAMA_DEFAULT_INPUT_COST, 0),
+        output: this.parseFloat(process.env.OLLAMA_DEFAULT_OUTPUT_COST, 0),
+      },
+      requiredEnvVars: [],
+      performance: {
+        speed: this.parseInt(process.env.OLLAMA_SPEED_RATING, 4),
+        quality: this.parseInt(process.env.OLLAMA_QUALITY_RATING, 2),
+        cost: this.parseInt(process.env.OLLAMA_COST_RATING, 5),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("OLLAMA_MAX_TOKENS_ISSUES", [
+          MODEL_NAMES.OLLAMA.FAST,
+          MODEL_NAMES.OLLAMA.BALANCED,
+          MODEL_NAMES.OLLAMA.QUALITY,
+        ]),
+        specialHandling: this.getConfigObject("OLLAMA_SPECIAL_HANDLING", {
+          baseUrl: this.getConfigValue(
+            "OLLAMA_BASE_URL",
+            "http://localhost:11434",
+          ),
+        }),
+      },
+    };
+  }
+
+  /**
+   * Create HuggingFace provider configuration
+   */
+  private createHuggingFaceConfig(): ProviderConfig {
+    return {
+      provider: "huggingface",
+      models: {
+        fast: this.getConfigValue(
+          "HUGGINGFACE_FAST_MODEL",
+          MODEL_NAMES.HUGGINGFACE.FAST,
+        ),
+        balanced: this.getConfigValue(
+          "HUGGINGFACE_BALANCED_MODEL",
+          MODEL_NAMES.HUGGINGFACE.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "HUGGINGFACE_QUALITY_MODEL",
+          MODEL_NAMES.HUGGINGFACE.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(
+          process.env.HUGGINGFACE_DEFAULT_INPUT_COST,
+          0.0002,
+        ),
+        output: this.parseFloat(
+          process.env.HUGGINGFACE_DEFAULT_OUTPUT_COST,
+          0.0008,
+        ),
+      },
+      requiredEnvVars: ["HUGGINGFACE_API_KEY"],
+      performance: {
+        speed: this.parseInt(process.env.HUGGINGFACE_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.HUGGINGFACE_QUALITY_RATING, 3),
+        cost: this.parseInt(process.env.HUGGINGFACE_COST_RATING, 4),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray(
+          "HUGGINGFACE_MAX_TOKENS_ISSUES",
+          [],
+        ),
+      },
+    };
+  }
+
+  /**
+   * Create Mistral provider configuration
+   */
+  private createMistralConfig(): ProviderConfig {
+    return {
+      provider: "mistral",
+      models: {
+        fast: this.getConfigValue(
+          "MISTRAL_FAST_MODEL",
+          MODEL_NAMES.MISTRAL.FAST,
+        ),
+        balanced: this.getConfigValue(
+          "MISTRAL_BALANCED_MODEL",
+          MODEL_NAMES.MISTRAL.BALANCED,
+        ),
+        quality: this.getConfigValue(
+          "MISTRAL_QUALITY_MODEL",
+          MODEL_NAMES.MISTRAL.QUALITY,
+        ),
+      },
+      defaultCost: {
+        input: this.parseFloat(process.env.MISTRAL_DEFAULT_INPUT_COST, 0.0001),
+        output: this.parseFloat(
+          process.env.MISTRAL_DEFAULT_OUTPUT_COST,
+          0.0003,
+        ),
+      },
+      requiredEnvVars: ["MISTRAL_API_KEY"],
+      performance: {
+        speed: this.parseInt(process.env.MISTRAL_SPEED_RATING, 3),
+        quality: this.parseInt(process.env.MISTRAL_QUALITY_RATING, 3),
+        cost: this.parseInt(process.env.MISTRAL_COST_RATING, 4),
+      },
+      modelBehavior: {
+        maxTokensIssues: this.getConfigArray("MISTRAL_MAX_TOKENS_ISSUES", []),
+      },
+    };
+  }
+
+  /**
    * Load default configurations (replaces hardcoded values)
    */
   private loadDefaultConfigurations(): void {
-    // Default provider configurations - these can be overridden
-    const defaultConfigs: Record<string, ProviderConfig> = {
-      "google-ai": {
-        provider: "google-ai",
-        models: {
-          fast: this.getConfigValue(
-            "GOOGLE_AI_FAST_MODEL",
-            MODEL_NAMES.GOOGLE_AI.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "GOOGLE_AI_BALANCED_MODEL",
-            MODEL_NAMES.GOOGLE_AI.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "GOOGLE_AI_QUALITY_MODEL",
-            MODEL_NAMES.GOOGLE_AI.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.GOOGLE_AI_DEFAULT_INPUT_COST,
-            0.000075,
-          ),
-          output: this.parseFloat(
-            process.env.GOOGLE_AI_DEFAULT_OUTPUT_COST,
-            0.0003,
-          ),
-        },
-        requiredEnvVars: ["GOOGLE_AI_API_KEY"],
-        performance: {
-          speed: this.parseInt(process.env.GOOGLE_AI_SPEED_RATING, 3),
-          quality: this.parseInt(process.env.GOOGLE_AI_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.GOOGLE_AI_COST_RATING, 3),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("GOOGLE_AI_MAX_TOKENS_ISSUES", [
-            MODEL_NAMES.GOOGLE_AI.FAST,
-            MODEL_NAMES.GOOGLE_AI.BALANCED,
-          ]),
-        },
-      },
-
-      "google-vertex": {
-        provider: "google-vertex",
-        models: {
-          fast: this.getConfigValue(
-            "GOOGLE_VERTEX_FAST_MODEL",
-            MODEL_NAMES.GOOGLE_VERTEX.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "GOOGLE_VERTEX_BALANCED_MODEL",
-            MODEL_NAMES.GOOGLE_VERTEX.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "GOOGLE_VERTEX_QUALITY_MODEL",
-            MODEL_NAMES.GOOGLE_VERTEX.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.GOOGLE_VERTEX_DEFAULT_INPUT_COST,
-            0.000075,
-          ),
-          output: this.parseFloat(
-            process.env.GOOGLE_VERTEX_DEFAULT_OUTPUT_COST,
-            0.0003,
-          ),
-        },
-        requiredEnvVars: ["GOOGLE_VERTEX_PROJECT_ID", "GOOGLE_VERTEX_LOCATION"],
-        performance: {
-          speed: this.parseInt(process.env.GOOGLE_VERTEX_SPEED_RATING, 3),
-          quality: this.parseInt(process.env.GOOGLE_VERTEX_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.GOOGLE_VERTEX_COST_RATING, 3),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray(
-            "GOOGLE_VERTEX_MAX_TOKENS_ISSUES",
-            [
-              MODEL_NAMES.GOOGLE_VERTEX.FAST,
-              MODEL_NAMES.GOOGLE_VERTEX.BALANCED,
-            ],
-          ),
-        },
-      },
-
-      openai: {
-        provider: "openai",
-        models: {
-          fast: this.getConfigValue(
-            "OPENAI_FAST_MODEL",
-            MODEL_NAMES.OPENAI.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "OPENAI_BALANCED_MODEL",
-            MODEL_NAMES.OPENAI.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "OPENAI_QUALITY_MODEL",
-            MODEL_NAMES.OPENAI.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.OPENAI_DEFAULT_INPUT_COST,
-            0.00015,
-          ),
-          output: this.parseFloat(
-            process.env.OPENAI_DEFAULT_OUTPUT_COST,
-            0.0006,
-          ),
-        },
-        requiredEnvVars: ["OPENAI_API_KEY"],
-        performance: {
-          speed: this.parseInt(process.env.OPENAI_SPEED_RATING, 2),
-          quality: this.parseInt(process.env.OPENAI_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.OPENAI_COST_RATING, 2),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("OPENAI_MAX_TOKENS_ISSUES", []),
-          specialHandling: this.getConfigObject("OPENAI_SPECIAL_HANDLING", {}),
-        },
-      },
-
-      anthropic: {
-        provider: "anthropic",
-        models: {
-          fast: this.getConfigValue(
-            "ANTHROPIC_FAST_MODEL",
-            MODEL_NAMES.ANTHROPIC.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "ANTHROPIC_BALANCED_MODEL",
-            MODEL_NAMES.ANTHROPIC.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "ANTHROPIC_QUALITY_MODEL",
-            MODEL_NAMES.ANTHROPIC.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.ANTHROPIC_DEFAULT_INPUT_COST,
-            0.00025,
-          ),
-          output: this.parseFloat(
-            process.env.ANTHROPIC_DEFAULT_OUTPUT_COST,
-            0.00125,
-          ),
-        },
-        requiredEnvVars: ["ANTHROPIC_API_KEY"],
-        performance: {
-          speed: this.parseInt(process.env.ANTHROPIC_SPEED_RATING, 2),
-          quality: this.parseInt(process.env.ANTHROPIC_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.ANTHROPIC_COST_RATING, 2),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray(
-            "ANTHROPIC_MAX_TOKENS_ISSUES",
-            [],
-          ),
-          specialHandling: this.getConfigObject(
-            "ANTHROPIC_SPECIAL_HANDLING",
-            {},
-          ),
-        },
-      },
-
-      vertex: {
-        provider: "vertex",
-        models: {
-          fast: this.getConfigValue(
-            "VERTEX_FAST_MODEL",
-            MODEL_NAMES.VERTEX.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "VERTEX_BALANCED_MODEL",
-            MODEL_NAMES.VERTEX.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "VERTEX_QUALITY_MODEL",
-            MODEL_NAMES.VERTEX.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.VERTEX_DEFAULT_INPUT_COST,
-            0.000075,
-          ),
-          output: this.parseFloat(
-            process.env.VERTEX_DEFAULT_OUTPUT_COST,
-            0.0003,
-          ),
-        },
-        requiredEnvVars: [
-          "GOOGLE_VERTEX_PROJECT",
-          "GOOGLE_APPLICATION_CREDENTIALS",
-        ],
-        performance: {
-          speed: this.parseInt(process.env.VERTEX_SPEED_RATING, 2),
-          quality: this.parseInt(process.env.VERTEX_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.VERTEX_COST_RATING, 3),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("VERTEX_MAX_TOKENS_ISSUES", [
-            MODEL_NAMES.VERTEX.FAST,
-            MODEL_NAMES.VERTEX.BALANCED,
-          ]),
-          specialHandling: this.getConfigObject("VERTEX_SPECIAL_HANDLING", {}),
-        },
-      },
-
-      bedrock: {
-        provider: "bedrock",
-        models: {
-          fast: this.getConfigValue(
-            "BEDROCK_FAST_MODEL",
-            MODEL_NAMES.BEDROCK.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "BEDROCK_BALANCED_MODEL",
-            MODEL_NAMES.BEDROCK.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "BEDROCK_QUALITY_MODEL",
-            MODEL_NAMES.BEDROCK.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.BEDROCK_DEFAULT_INPUT_COST,
-            0.00025,
-          ),
-          output: this.parseFloat(
-            process.env.BEDROCK_DEFAULT_OUTPUT_COST,
-            0.00125,
-          ),
-        },
-        requiredEnvVars: ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
-        performance: {
-          speed: this.parseInt(process.env.BEDROCK_SPEED_RATING, 2),
-          quality: this.parseInt(process.env.BEDROCK_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.BEDROCK_COST_RATING, 2),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("BEDROCK_MAX_TOKENS_ISSUES", []),
-          specialHandling: this.getConfigObject("BEDROCK_SPECIAL_HANDLING", {}),
-        },
-      },
-
-      azure: {
-        provider: "azure",
-        models: {
-          fast: this.getConfigValue("AZURE_FAST_MODEL", MODEL_NAMES.AZURE.FAST),
-          balanced: this.getConfigValue(
-            "AZURE_BALANCED_MODEL",
-            MODEL_NAMES.AZURE.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "AZURE_QUALITY_MODEL",
-            MODEL_NAMES.AZURE.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(process.env.AZURE_DEFAULT_INPUT_COST, 0.00015),
-          output: this.parseFloat(
-            process.env.AZURE_DEFAULT_OUTPUT_COST,
-            0.0006,
-          ),
-        },
-        requiredEnvVars: ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"],
-        performance: {
-          speed: this.parseInt(process.env.AZURE_SPEED_RATING, 2),
-          quality: this.parseInt(process.env.AZURE_QUALITY_RATING, 3),
-          cost: this.parseInt(process.env.AZURE_COST_RATING, 2),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("AZURE_MAX_TOKENS_ISSUES", []),
-          specialHandling: this.getConfigObject("AZURE_SPECIAL_HANDLING", {}),
-        },
-      },
-
-      ollama: {
-        provider: "ollama",
-        models: {
-          fast: this.getConfigValue(
-            "OLLAMA_FAST_MODEL",
-            MODEL_NAMES.OLLAMA.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "OLLAMA_BALANCED_MODEL",
-            MODEL_NAMES.OLLAMA.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "OLLAMA_QUALITY_MODEL",
-            MODEL_NAMES.OLLAMA.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: 0, // Local models are free
-          output: 0,
-        },
-        requiredEnvVars: [], // No API key needed
-        performance: {
-          speed: this.parseInt(process.env.OLLAMA_SPEED_RATING, 1),
-          quality: this.parseInt(process.env.OLLAMA_QUALITY_RATING, 2),
-          cost: this.parseInt(process.env.OLLAMA_COST_RATING, 3),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("OLLAMA_MAX_TOKENS_ISSUES", []),
-          specialHandling: this.getConfigObject("OLLAMA_SPECIAL_HANDLING", {}),
-          // Tool-capable models configuration (replaces hardcoded list in ollama.ts)
-          toolCapableModels: this.getConfigArray("OLLAMA_TOOL_CAPABLE_MODELS", [
-            // Llama 3.1 series (excellent tool calling)
-            "llama3.1:8b-instruct",
-            "llama3.1:70b-instruct",
-            "llama3.1",
-            // Mistral series (reliable function calling)
-            "mistral:7b-instruct",
-            "mistral-nemo:12b",
-            "mistral",
-            // Hermes series (specialized for tools)
-            "hermes3:8b",
-            "hermes2-pro",
-            // Function-calling specialized models
-            "firefunction-v2",
-            "firefunction",
-            // Code Llama (code-focused tools)
-            "codellama:34b-instruct",
-            "codellama:13b-instruct",
-            // Other capable models
-            "qwen2.5:14b-instruct",
-            "gemma2:27b-instruct",
-          ]),
-        },
-      },
-
-      huggingface: {
-        provider: "huggingface",
-        models: {
-          fast: this.getConfigValue(
-            "HUGGINGFACE_FAST_MODEL",
-            MODEL_NAMES.HUGGINGFACE.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "HUGGINGFACE_BALANCED_MODEL",
-            MODEL_NAMES.HUGGINGFACE.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "HUGGINGFACE_QUALITY_MODEL",
-            MODEL_NAMES.HUGGINGFACE.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.HUGGINGFACE_DEFAULT_INPUT_COST,
-            0.0002,
-          ),
-          output: this.parseFloat(
-            process.env.HUGGINGFACE_DEFAULT_OUTPUT_COST,
-            0.0006,
-          ),
-        },
-        requiredEnvVars: ["HUGGINGFACE_API_KEY"],
-        performance: {
-          speed: this.parseInt(process.env.HUGGINGFACE_SPEED_RATING, 1),
-          quality: this.parseInt(process.env.HUGGINGFACE_QUALITY_RATING, 2),
-          cost: this.parseInt(process.env.HUGGINGFACE_COST_RATING, 2),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray(
-            "HUGGINGFACE_MAX_TOKENS_ISSUES",
-            [],
-          ),
-          specialHandling: this.getConfigObject(
-            "HUGGINGFACE_SPECIAL_HANDLING",
-            {},
-          ),
-        },
-      },
-
-      mistral: {
-        provider: "mistral",
-        models: {
-          fast: this.getConfigValue(
-            "MISTRAL_FAST_MODEL",
-            MODEL_NAMES.MISTRAL.FAST,
-          ),
-          balanced: this.getConfigValue(
-            "MISTRAL_BALANCED_MODEL",
-            MODEL_NAMES.MISTRAL.BALANCED,
-          ),
-          quality: this.getConfigValue(
-            "MISTRAL_QUALITY_MODEL",
-            MODEL_NAMES.MISTRAL.QUALITY,
-          ),
-        },
-        defaultCost: {
-          input: this.parseFloat(
-            process.env.MISTRAL_DEFAULT_INPUT_COST,
-            0.0002,
-          ),
-          output: this.parseFloat(
-            process.env.MISTRAL_DEFAULT_OUTPUT_COST,
-            0.0006,
-          ),
-        },
-        requiredEnvVars: ["MISTRAL_API_KEY"],
-        performance: {
-          speed: this.parseInt(process.env.MISTRAL_SPEED_RATING, 2),
-          quality: this.parseInt(process.env.MISTRAL_QUALITY_RATING, 2),
-          cost: this.parseInt(process.env.MISTRAL_COST_RATING, 2),
-        },
-        modelBehavior: {
-          maxTokensIssues: this.getConfigArray("MISTRAL_MAX_TOKENS_ISSUES", []),
-          specialHandling: this.getConfigObject("MISTRAL_SPECIAL_HANDLING", {}),
-        },
-      },
-    };
+    // Load all provider configurations using centralized method
+    const defaultConfigs = this.createAllProviderConfigs();
 
     // Load configurations
     for (const [provider, config] of Object.entries(defaultConfigs)) {
@@ -740,6 +740,81 @@ export class ModelConfigurationManager {
   }
 
   /**
+   * Parse YAML content with basic support
+   * For full YAML support, would need a proper YAML library
+   */
+  private parseYAMLContent(configContent: string): unknown {
+    // Basic YAML parsing for simple configurations
+    try {
+      return JSON.parse(configContent);
+    } catch {
+      return this.convertSimpleYAMLToJSON(configContent);
+    }
+  }
+
+  /**
+   * Convert simple YAML to JSON object
+   * Handles basic key-value pairs only
+   */
+  private convertSimpleYAMLToJSON(
+    configContent: string,
+  ): Record<string, unknown> {
+    const yamlLines = configContent.split("\n");
+    const jsonObj: Record<string, unknown> = {};
+
+    for (const line of yamlLines) {
+      const processedLine = this.processYAMLLine(line);
+      if (processedLine) {
+        jsonObj[processedLine.key] = processedLine.value;
+      }
+    }
+
+    return jsonObj;
+  }
+
+  /**
+   * Process a single YAML line
+   * Returns key-value pair if valid, null otherwise
+   */
+  private processYAMLLine(
+    line: string,
+  ): { key: string; value: unknown } | null {
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith("#")) {
+      return null;
+    }
+
+    const colonIndex = trimmedLine.indexOf(":");
+    if (colonIndex <= 0) {
+      return null;
+    }
+
+    const key = trimmedLine.substring(0, colonIndex).trim();
+    const value = trimmedLine.substring(colonIndex + 1).trim();
+
+    return {
+      key,
+      value: this.convertYAMLValue(value),
+    };
+  }
+
+  /**
+   * Convert YAML value to appropriate JavaScript type
+   */
+  private convertYAMLValue(value: string): unknown {
+    if (value === "true") {
+      return true;
+    }
+    if (value === "false") {
+      return false;
+    }
+    if (!isNaN(Number(value))) {
+      return Number(value);
+    }
+    return value.replace(/['"]/g, "");
+  }
+
+  /**
    * Load configurations from external source
    */
   loadConfigurationsFromFile(configPath: string): void {
@@ -758,38 +833,7 @@ export class ModelConfigurationManager {
       if (fileExtension === ".json") {
         configData = JSON.parse(configContent);
       } else if (fileExtension === ".yaml" || fileExtension === ".yml") {
-        // Basic YAML parsing for simple configurations
-        // For full YAML support, would need a proper YAML library
-        try {
-          configData = JSON.parse(configContent);
-        } catch {
-          // Simple YAML-to-JSON conversion for basic cases
-          const yamlLines = configContent.split("\n");
-          const jsonObj: Record<string, unknown> = {};
-
-          for (const line of yamlLines) {
-            const trimmedLine = line.trim();
-            if (trimmedLine && !trimmedLine.startsWith("#")) {
-              const colonIndex = trimmedLine.indexOf(":");
-              if (colonIndex > 0) {
-                const key = trimmedLine.substring(0, colonIndex).trim();
-                const value = trimmedLine.substring(colonIndex + 1).trim();
-
-                // Basic type conversion
-                if (value === "true") {
-                  jsonObj[key] = true;
-                } else if (value === "false") {
-                  jsonObj[key] = false;
-                } else if (!isNaN(Number(value))) {
-                  jsonObj[key] = Number(value);
-                } else {
-                  jsonObj[key] = value.replace(/['"]/g, "");
-                }
-              }
-            }
-          }
-          configData = jsonObj;
-        }
+        configData = this.parseYAMLContent(configContent);
       } else {
         throw new Error(
           `Unsupported configuration file format: ${fileExtension}. Supported formats: .json, .yaml, .yml`,

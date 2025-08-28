@@ -30,12 +30,7 @@ import type {
   MCPServerCategory,
   MCPTransportType,
 } from "../types/mcpTypes.js";
-import type {
-  JsonValue,
-  JsonObject,
-  UnknownRecord,
-  Unknown,
-} from "../types/common.js";
+import type { JsonValue, JsonObject, UnknownRecord } from "../types/common.js";
 import { detectCategory } from "../utils/mcpDefaults.js";
 import type { ServerLoadResult } from "../types/typeAliases.js";
 import { isObject, isNonNullObject } from "../utils/typeUtils.js";
@@ -536,7 +531,10 @@ export class ExternalServerManager extends EventEmitter {
       // Start the server
       await this.startServer(serverId);
 
-      const finalInstance = this.servers.get(serverId)!;
+      const finalInstance = this.servers.get(serverId);
+      if (!finalInstance) {
+        throw new Error(`Server ${serverId} not found after registration`);
+      }
 
       // Convert RuntimeMCPServerInfo to ExternalMCPServerInstance for return
       const convertedInstance: ExternalMCPServerInstance = {
@@ -1298,14 +1296,30 @@ export class ExternalServerManager extends EventEmitter {
           category: detectCategory({ isExternal: true, serverId }),
         };
 
-        registrations.push(
-          toolRegistry.registerTool(toolId, toolInfo, {
-            execute: async (params: unknown) =>
-              await this.executeTool(serverId, toolName, params as JsonObject, {
-                timeout: this.config.defaultTimeout,
-              }),
-          }),
-        );
+        try {
+          registrations.push(
+            toolRegistry.registerTool(toolId, toolInfo, {
+              execute: async (params: unknown, _context?: unknown) => {
+                // Execute tool via ExternalServerManager for proper lifecycle management
+                return await this.executeTool(
+                  serverId,
+                  toolName,
+                  params as JsonObject,
+                  { timeout: this.config.defaultTimeout },
+                );
+              },
+            }),
+          );
+
+          mcpLogger.debug(
+            `[ExternalServerManager] Registered tool with main registry: ${toolId}`,
+          );
+        } catch (registrationError) {
+          mcpLogger.warn(
+            `[ExternalServerManager] Failed to register tool ${toolId} with main registry:`,
+            registrationError,
+          );
+        }
       }
 
       const results = await Promise.allSettled(registrations);
@@ -1426,7 +1440,6 @@ export class ExternalServerManager extends EventEmitter {
         throw new Error(result.error || "Tool execution failed");
       }
     } catch (error) {
-      const duration = Date.now() - startTime;
       instance.metrics.totalErrors++;
 
       mcpLogger.error(

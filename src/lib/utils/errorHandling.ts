@@ -280,7 +280,7 @@ export async function withRetry<T>(
 ): Promise<T> {
   const { maxAttempts, delayMs, isRetriable = () => true, onRetry } = options;
 
-  let lastError: Error;
+  let lastError: Error | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -302,7 +302,10 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError!;
+  if (lastError) {
+    throw lastError;
+  }
+  throw new Error("Retry operation failed with no error information");
 }
 
 /**

@@ -1,15 +1,9 @@
-import type { Tool, Schema } from "ai";
-import type {
-  ZodUnknownSchema,
-  ValidationSchema,
-  StandardRecord,
-} from "./typeAliases.js";
-import type {
-  AIProviderName,
-  AnalyticsData,
-  EvaluationData,
-} from "../core/types.js";
-import type { UnknownRecord, Unknown, JsonValue } from "./common.js";
+import type { Tool } from "ai";
+import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
+import type { AIProviderName, AnalyticsData } from "../core/types.js";
+import type { EvaluationData } from "../index.js";
+import type { TokenUsage } from "./providers.js";
+import type { UnknownRecord, JsonValue } from "./common.js";
 import type { ChatMessage } from "./conversationTypes.js";
 
 /**
@@ -149,11 +143,7 @@ export interface StreamResult {
   model?: string;
 
   // Usage information
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    totalTokens?: number;
-  };
+  usage?: TokenUsage;
 
   // Finish reason
   finishReason?: string;

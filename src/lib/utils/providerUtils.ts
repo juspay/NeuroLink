@@ -140,7 +140,7 @@ async function isProviderAvailable(providerName: string): Promise<boolean> {
         return models.some((m: UnknownRecord) => m.name === defaultOllamaModel);
       }
       return false;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -149,7 +149,7 @@ async function isProviderAvailable(providerName: string): Promise<boolean> {
     const provider = await AIProviderFactory.createProvider(providerName);
     await provider.generate({ prompt: "test", maxTokens: 1 });
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

@@ -107,7 +107,7 @@ async function configureSocksAgents(proxyUrl: string): Promise<void> {
 /**
  * Minimal HTTP agent configuration (fallback)
  */
-async function configureMinimalHttpAgents(_proxyUrl: string): Promise<void> {
+async function _configureMinimalHttpAgents(_proxyUrl: string): Promise<void> {
   // Remove broken fallback. Use explicit proxy-aware HttpHandler instead.
   logger.warn(
     "[AWS Proxy] Minimal agent fallback removed; a proper proxy agent is required.",

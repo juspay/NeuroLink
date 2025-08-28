@@ -612,342 +612,292 @@ export class ProviderHealthChecker {
     healthStatus: ProviderHealthStatus,
   ): Promise<void> {
     switch (providerName) {
-      case AIProviderName.VERTEX: {
-        logger.debug("Starting Vertex AI health check", {
-          providerName,
-        });
-
-        // Check for Google Cloud project ID (with fallbacks)
-        const projectId =
-          process.env.GOOGLE_PROJECT_ID ||
-          process.env.GOOGLE_CLOUD_PROJECT_ID ||
-          process.env.GOOGLE_VERTEX_PROJECT ||
-          process.env.GOOGLE_CLOUD_PROJECT ||
-          process.env.VERTEX_PROJECT_ID;
-
-        logger.debug("Project ID validation", {
-          hasProjectId: !!projectId,
-        });
-
-        if (!projectId) {
-          healthStatus.configurationIssues.push(
-            "Google Cloud project ID not set",
-          );
-          healthStatus.recommendations.push(
-            "Set one of: GOOGLE_VERTEX_PROJECT, GOOGLE_CLOUD_PROJECT_ID, GOOGLE_PROJECT_ID, or GOOGLE_CLOUD_PROJECT",
-          );
-        }
-
-        // Check for authentication with proper file existence validation
-        // This aligns with the authentication logic fix in googleVertex.ts
-        let hasValidAuth = false;
-
-        logger.debug("Authentication validation starting", {
-          hasGoogleApplicationCredentials:
-            !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        });
-
-        // Check for principal account authentication first (recommended for production)
-        // BUT CRITICALLY: Also verify the file actually exists
-        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-          const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
-          logger.debug("Checking GOOGLE_APPLICATION_CREDENTIALS file");
-
-          // Check if the credentials file actually exists
-          let fileExists = false;
-          try {
-            const { promises: fs } = await import("fs");
-            try {
-              await fs.access(credentialsPath);
-              fileExists = true;
-            } catch {
-              fileExists = false;
-            }
-
-            logger.debug("File existence check completed", {
-              fileExists,
-            });
-          } catch (error) {
-            logger.debug("File existence check failed", {
-              error: String(error),
-            });
-            healthStatus.warning = `Failed to check credentials file existence: ${error}`;
-            fileExists = false;
-          }
-
-          if (fileExists) {
-            // Validate file format
-            const fileName = basename(credentialsPath);
-            const jsonFilePattern = /\.json(\.\w+)?$/;
-            if (!jsonFilePattern.test(fileName)) {
-              healthStatus.warning =
-                "GOOGLE_APPLICATION_CREDENTIALS should point to a JSON file (e.g., 'credentials.json' or 'key.json.backup')";
-            }
-            hasValidAuth = true;
-            healthStatus.hasApiKey = true;
-
-            logger.debug("GOOGLE_APPLICATION_CREDENTIALS file validated", {
-              fileName,
-              hasValidAuth,
-            });
-          } else {
-            healthStatus.warning = `GOOGLE_APPLICATION_CREDENTIALS file does not exist: ${credentialsPath}`;
-            logger.debug(
-              "GOOGLE_APPLICATION_CREDENTIALS file missing, falling back to individual env vars",
-            );
-            // Fall through to check individual environment variables
-          }
-        } else {
-          logger.debug(
-            "GOOGLE_APPLICATION_CREDENTIALS not set, checking individual env vars",
-          );
-        }
-
-        // Fallback to individual credentials for development and production
-        // Enhanced to check ALL required fields from the .env file configuration
-        if (!hasValidAuth) {
-          const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-          const hasIndividualCredentials = !!(
-            process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
-            process.env.GOOGLE_AUTH_PRIVATE_KEY
-          );
-
-          logger.debug("Individual credentials check", {
-            hasServiceAccountKey,
-            hasGoogleAuthClientEmail: !!process.env.GOOGLE_AUTH_CLIENT_EMAIL,
-            hasGoogleAuthPrivateKey: !!process.env.GOOGLE_AUTH_PRIVATE_KEY,
-            hasIndividualCredentials,
-          });
-
-          if (hasServiceAccountKey || hasIndividualCredentials) {
-            hasValidAuth = true;
-            healthStatus.hasApiKey = true;
-
-            logger.debug("Individual credentials validated successfully", {
-              hasServiceAccountKey,
-              hasIndividualCredentials,
-              hasValidAuth,
-            });
-          } else {
-            logger.debug("Individual credentials validation failed", {
-              hasServiceAccountKey,
-              hasIndividualCredentials,
-            });
-          }
-        }
-
-        // Final validation
-        if (!hasValidAuth) {
-          healthStatus.configurationIssues.push(
-            "Google Cloud authentication not configured or credentials file missing",
-          );
-          healthStatus.recommendations.push(
-            "Set either GOOGLE_APPLICATION_CREDENTIALS (valid file path), GOOGLE_SERVICE_ACCOUNT_KEY (base64), or both GOOGLE_AUTH_CLIENT_EMAIL and GOOGLE_AUTH_PRIVATE_KEY",
-          );
-
-          logger.debug("Final auth validation FAILED", {
-            hasValidAuth,
-          });
-        } else {
-          logger.debug("Final auth validation SUCCESS", {
-            hasValidAuth,
-          });
-        }
-
-        // Mark as configured if we have both project ID and auth
-        if (projectId && hasValidAuth) {
-          healthStatus.isConfigured = true;
-
-          logger.debug("Vertex AI health check PASSED", {
-            hasProjectId: !!projectId,
-            hasValidAuth,
-            isConfigured: healthStatus.isConfigured,
-          });
-        } else {
-          logger.debug("Vertex AI health check FAILED", {
-            hasProjectId: !!projectId,
-            hasValidAuth,
-            isConfigured: healthStatus.isConfigured,
-          });
-        }
+      case AIProviderName.VERTEX:
+        await this.checkVertexAIConfig(healthStatus);
         break;
+      case AIProviderName.BEDROCK:
+        await this.checkBedrockConfig(healthStatus);
+        break;
+      case AIProviderName.AZURE:
+        await this.checkAzureConfig(healthStatus);
+        break;
+      case AIProviderName.OLLAMA:
+        await this.checkOllamaConfig(healthStatus);
+        break;
+    }
+  }
+
+  /**
+   * Check Vertex AI configuration
+   */
+  private static async checkVertexAIConfig(
+    healthStatus: ProviderHealthStatus,
+  ): Promise<void> {
+    logger.debug("Starting Vertex AI health check");
+
+    const projectId = this.getVertexProjectId();
+    if (!projectId) {
+      healthStatus.configurationIssues.push("Google Cloud project ID not set");
+      healthStatus.recommendations.push(
+        "Set one of: GOOGLE_VERTEX_PROJECT, GOOGLE_CLOUD_PROJECT_ID, GOOGLE_PROJECT_ID, or GOOGLE_CLOUD_PROJECT",
+      );
+    }
+
+    const hasValidAuth = await this.checkVertexAuthentication(healthStatus);
+
+    if (projectId && hasValidAuth) {
+      healthStatus.isConfigured = true;
+      logger.debug("Vertex AI health check PASSED");
+    } else {
+      logger.debug("Vertex AI health check FAILED");
+    }
+  }
+
+  /**
+   * Get Vertex AI project ID from environment variables
+   */
+  private static getVertexProjectId(): string | undefined {
+    return (
+      process.env.GOOGLE_PROJECT_ID ||
+      process.env.GOOGLE_CLOUD_PROJECT_ID ||
+      process.env.GOOGLE_VERTEX_PROJECT ||
+      process.env.GOOGLE_CLOUD_PROJECT ||
+      process.env.VERTEX_PROJECT_ID
+    );
+  }
+
+  /**
+   * Check Vertex AI authentication
+   */
+  private static async checkVertexAuthentication(
+    healthStatus: ProviderHealthStatus,
+  ): Promise<boolean> {
+    let hasValidAuth = false;
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      hasValidAuth = await this.checkGoogleApplicationCredentials(healthStatus);
+    }
+
+    if (!hasValidAuth) {
+      hasValidAuth = this.checkIndividualGoogleCredentials(healthStatus);
+    }
+
+    if (!hasValidAuth) {
+      healthStatus.configurationIssues.push(
+        "Google Cloud authentication not configured or credentials file missing",
+      );
+      healthStatus.recommendations.push(
+        "Set either GOOGLE_APPLICATION_CREDENTIALS (valid file path), GOOGLE_SERVICE_ACCOUNT_KEY (base64), or both GOOGLE_AUTH_CLIENT_EMAIL and GOOGLE_AUTH_PRIVATE_KEY",
+      );
+    }
+
+    return hasValidAuth;
+  }
+
+  /**
+   * Check Google Application Credentials file
+   */
+  private static async checkGoogleApplicationCredentials(
+    healthStatus: ProviderHealthStatus,
+  ): Promise<boolean> {
+    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!credentialsPath) {
+      healthStatus.warning =
+        "GOOGLE_APPLICATION_CREDENTIALS environment variable not set";
+      return false;
+    }
+
+    try {
+      const { promises: fs } = await import("fs");
+      await fs.access(credentialsPath);
+
+      const fileName = basename(credentialsPath);
+      const jsonFilePattern = /\.json(\.\w+)?$/;
+      if (!jsonFilePattern.test(fileName)) {
+        healthStatus.warning =
+          "GOOGLE_APPLICATION_CREDENTIALS should point to a JSON file";
       }
 
-      case AIProviderName.BEDROCK: {
-        logger.debug("Starting AWS Bedrock comprehensive health check", {
-          providerName,
-        });
+      healthStatus.hasApiKey = true;
+      return true;
+    } catch {
+      healthStatus.warning = `GOOGLE_APPLICATION_CREDENTIALS file does not exist: ${credentialsPath}`;
+      return false;
+    }
+  }
 
-        // Check AWS region configuration
-        const awsRegion = process.env.AWS_REGION;
-        const validBedrockRegions = [
-          "us-east-1",
-          "us-west-2",
-          "ap-southeast-1",
-          "ap-northeast-1",
-          "eu-central-1",
-          "eu-west-1",
-          "ap-south-1",
-        ];
+  /**
+   * Check individual Google credentials
+   */
+  private static checkIndividualGoogleCredentials(
+    healthStatus: ProviderHealthStatus,
+  ): boolean {
+    const hasServiceAccountKey = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    const hasIndividualCredentials = !!(
+      process.env.GOOGLE_AUTH_CLIENT_EMAIL &&
+      process.env.GOOGLE_AUTH_PRIVATE_KEY
+    );
 
-        logger.debug("AWS Region validation", {
-          hasAwsRegion: !!awsRegion,
-          awsRegion: awsRegion || "not set",
-          validBedrockRegions,
-        });
+    if (hasServiceAccountKey || hasIndividualCredentials) {
+      healthStatus.hasApiKey = true;
+      return true;
+    }
 
-        if (!awsRegion) {
-          healthStatus.configurationIssues.push("AWS_REGION not set");
-          healthStatus.recommendations.push(
-            `Set AWS_REGION to a Bedrock-supported region: ${validBedrockRegions.join(", ")}`,
-          );
-        } else if (!validBedrockRegions.includes(awsRegion)) {
-          healthStatus.configurationIssues.push(
-            `AWS_REGION '${awsRegion}' may not support all Bedrock models`,
-          );
-          healthStatus.recommendations.push(
-            `Consider using a primary Bedrock region: ${validBedrockRegions.slice(0, 3).join(", ")}`,
-          );
-        }
+    return false;
+  }
 
-        // Check AWS credentials configuration
-        const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
-        const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-        const awsSessionToken = process.env.AWS_SESSION_TOKEN;
-        const awsProfile = process.env.AWS_PROFILE;
+  /**
+   * Check AWS Bedrock configuration
+   */
+  private static async checkBedrockConfig(
+    healthStatus: ProviderHealthStatus,
+  ): Promise<void> {
+    logger.debug("Starting AWS Bedrock comprehensive health check");
 
-        logger.debug("AWS Credentials validation", {
-          hasAccessKeyId: !!awsAccessKeyId,
-          hasSecretAccessKey: !!awsSecretAccessKey,
-          hasSessionToken: !!awsSessionToken,
-          hasProfile: !!awsProfile,
-          authMethod: awsProfile
-            ? "AWS Profile"
-            : awsAccessKeyId
-              ? "Access Keys"
-              : "None detected",
-        });
+    this.checkAWSRegion(healthStatus);
+    this.checkAWSCredentials(healthStatus);
+    this.checkBedrockModels(healthStatus);
+    this.checkBedrockEndpoint(healthStatus);
 
-        if (!awsAccessKeyId && !awsProfile) {
-          healthStatus.configurationIssues.push("No AWS credentials found");
-          healthStatus.recommendations.push(
-            "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or configure AWS_PROFILE",
-          );
-        } else if (awsAccessKeyId && !awsSecretAccessKey) {
-          healthStatus.configurationIssues.push(
-            "AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY missing",
-          );
-          healthStatus.recommendations.push(
-            "Set AWS_SECRET_ACCESS_KEY to match your AWS_ACCESS_KEY_ID",
-          );
-        }
+    if (healthStatus.configurationIssues.length === 0) {
+      healthStatus.hasApiKey = true;
+      logger.debug("AWS Bedrock configuration appears valid");
+    }
+  }
 
-        // Check for Bedrock-specific model configuration
-        const bedrockModel =
-          process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
-        const supportedModels = [
-          "anthropic.claude-3-sonnet-20240229-v1:0",
-          "anthropic.claude-3-haiku-20240307-v1:0",
-          "anthropic.claude-3-opus-20240229-v1:0",
-          "anthropic.claude-v2:1",
-          "amazon.titan-text-express-v1",
-        ];
+  /**
+   * Check AWS region configuration
+   */
+  private static checkAWSRegion(healthStatus: ProviderHealthStatus): void {
+    const awsRegion = process.env.AWS_REGION;
+    const validBedrockRegions = [
+      "us-east-1",
+      "us-west-2",
+      "ap-southeast-1",
+      "ap-northeast-1",
+      "eu-central-1",
+      "eu-west-1",
+      "ap-south-1",
+    ];
 
-        logger.debug("Bedrock Model validation", {
-          hasBedrockModel: !!bedrockModel,
-          bedrockModel: bedrockModel || "not set",
-          supportedModels: supportedModels.slice(0, 3),
-        });
+    if (!awsRegion) {
+      healthStatus.configurationIssues.push("AWS_REGION not set");
+      healthStatus.recommendations.push(
+        `Set AWS_REGION to a Bedrock-supported region: ${validBedrockRegions.join(", ")}`,
+      );
+    } else if (!validBedrockRegions.includes(awsRegion)) {
+      healthStatus.configurationIssues.push(
+        `AWS_REGION '${awsRegion}' may not support all Bedrock models`,
+      );
+      healthStatus.recommendations.push(
+        `Consider using a primary Bedrock region: ${validBedrockRegions.slice(0, 3).join(", ")}`,
+      );
+    }
+  }
 
-        if (!bedrockModel) {
-          healthStatus.recommendations.push(
-            "Set BEDROCK_MODEL or BEDROCK_MODEL_ID for faster startup (e.g., anthropic.claude-3-sonnet-20240229-v1:0)",
-          );
-        } else if (!supportedModels.some((model) => model === bedrockModel)) {
-          healthStatus.recommendations.push(
-            `Consider using a popular Bedrock model: ${supportedModels.slice(0, 3).join(", ")}`,
-          );
-        }
+  /**
+   * Check AWS credentials
+   */
+  private static checkAWSCredentials(healthStatus: ProviderHealthStatus): void {
+    const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
+    const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    const awsProfile = process.env.AWS_PROFILE;
 
-        // Check for additional Bedrock configuration
-        const bedrockEndpoint = process.env.BEDROCK_ENDPOINT_URL;
-        if (bedrockEndpoint) {
-          logger.debug("Custom Bedrock endpoint detected", {
-            endpoint: bedrockEndpoint,
-          });
-          if (!bedrockEndpoint.startsWith("https://")) {
-            healthStatus.configurationIssues.push(
-              "BEDROCK_ENDPOINT_URL should use HTTPS",
-            );
-            healthStatus.recommendations.push(
-              "Update BEDROCK_ENDPOINT_URL to use HTTPS protocol",
-            );
-          }
-        }
+    if (!awsAccessKeyId && !awsProfile) {
+      healthStatus.configurationIssues.push("No AWS credentials found");
+      healthStatus.recommendations.push(
+        "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or configure AWS_PROFILE",
+      );
+    } else if (awsAccessKeyId && !awsSecretAccessKey) {
+      healthStatus.configurationIssues.push(
+        "AWS_ACCESS_KEY_ID set but AWS_SECRET_ACCESS_KEY missing",
+      );
+      healthStatus.recommendations.push(
+        "Set AWS_SECRET_ACCESS_KEY to match your AWS_ACCESS_KEY_ID",
+      );
+    }
+  }
 
-        // AWS SDK Configuration checks
-        const awsConfig = {
-          maxAttempts: process.env.AWS_MAX_ATTEMPTS,
-          retryMode: process.env.AWS_RETRY_MODE,
-          defaultsMode: process.env.AWS_DEFAULTS_MODE,
-        };
+  /**
+   * Check Bedrock models
+   */
+  private static checkBedrockModels(healthStatus: ProviderHealthStatus): void {
+    const bedrockModel =
+      process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
+    const supportedModels = [
+      "anthropic.claude-3-sonnet-20240229-v1:0",
+      "anthropic.claude-3-haiku-20240307-v1:0",
+      "anthropic.claude-3-opus-20240229-v1:0",
+      "anthropic.claude-v2:1",
+      "amazon.titan-text-express-v1",
+    ];
 
-        logger.debug("AWS SDK Configuration", {
-          awsConfig,
-          hasAdvancedConfig: Object.values(awsConfig).some(Boolean),
-        });
+    if (!bedrockModel) {
+      healthStatus.recommendations.push(
+        "Set BEDROCK_MODEL or BEDROCK_MODEL_ID for faster startup (e.g., anthropic.claude-3-sonnet-20240229-v1:0)",
+      );
+    } else if (!supportedModels.includes(bedrockModel)) {
+      healthStatus.recommendations.push(
+        `Consider using a popular Bedrock model: ${supportedModels.slice(0, 3).join(", ")}`,
+      );
+    }
+  }
 
-        if (healthStatus.configurationIssues.length === 0) {
-          healthStatus.hasApiKey = true;
-          logger.debug("AWS Bedrock configuration appears valid", {
-            region: awsRegion,
-            hasCredentials: !!(awsAccessKeyId || awsProfile),
-            hasModel: !!bedrockModel,
-          });
-        }
+  /**
+   * Check Bedrock endpoint
+   */
+  private static checkBedrockEndpoint(
+    healthStatus: ProviderHealthStatus,
+  ): void {
+    const bedrockEndpoint = process.env.BEDROCK_ENDPOINT_URL;
+    if (bedrockEndpoint && !bedrockEndpoint.startsWith("https://")) {
+      healthStatus.configurationIssues.push(
+        "BEDROCK_ENDPOINT_URL should use HTTPS",
+      );
+      healthStatus.recommendations.push(
+        "Update BEDROCK_ENDPOINT_URL to use HTTPS protocol",
+      );
+    }
+  }
 
-        break;
-      }
+  /**
+   * Check Azure OpenAI configuration
+   */
+  private static async checkAzureConfig(
+    healthStatus: ProviderHealthStatus,
+  ): Promise<void> {
+    const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    if (azureEndpoint && !azureEndpoint.startsWith("https://")) {
+      healthStatus.configurationIssues.push(
+        "Invalid AZURE_OPENAI_ENDPOINT format",
+      );
+      healthStatus.recommendations.push(
+        "Set AZURE_OPENAI_ENDPOINT to a valid URL (e.g., https://your-resource.openai.azure.com/)",
+      );
+    }
 
-      case AIProviderName.AZURE: {
-        // Check Azure OpenAI endpoint
-        const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT;
-        if (azureEndpoint && !azureEndpoint.startsWith("https://")) {
-          healthStatus.configurationIssues.push(
-            "Invalid AZURE_OPENAI_ENDPOINT format",
-          );
-          healthStatus.recommendations.push(
-            "Set AZURE_OPENAI_ENDPOINT to a valid URL (e.g., https://your-resource.openai.azure.com/)",
-          );
-        }
+    if (!process.env.AZURE_OPENAI_DEPLOYMENT_NAME) {
+      healthStatus.configurationIssues.push(
+        "AZURE_OPENAI_DEPLOYMENT_NAME not set",
+      );
+      healthStatus.recommendations.push(
+        "Set AZURE_OPENAI_DEPLOYMENT_NAME to your deployment name",
+      );
+    }
+  }
 
-        // Check for deployment name
-        if (!process.env.AZURE_OPENAI_DEPLOYMENT_NAME) {
-          healthStatus.configurationIssues.push(
-            "AZURE_OPENAI_DEPLOYMENT_NAME not set",
-          );
-          healthStatus.recommendations.push(
-            "Set AZURE_OPENAI_DEPLOYMENT_NAME to your deployment name",
-          );
-        }
-        break;
-      }
-
-      case AIProviderName.OLLAMA: {
-        // Check if custom endpoint is set
-        const ollamaBase =
-          process.env.OLLAMA_API_BASE || "http://localhost:11434";
-        if (!ollamaBase.startsWith("http")) {
-          healthStatus.configurationIssues.push(
-            "Invalid OLLAMA_API_BASE format",
-          );
-          healthStatus.recommendations.push(
-            "Set OLLAMA_API_BASE to a valid URL (e.g., http://localhost:11434)",
-          );
-        }
-        break;
-      }
+  /**
+   * Check Ollama configuration
+   */
+  private static async checkOllamaConfig(
+    healthStatus: ProviderHealthStatus,
+  ): Promise<void> {
+    const ollamaBase = process.env.OLLAMA_API_BASE || "http://localhost:11434";
+    if (!ollamaBase.startsWith("http")) {
+      healthStatus.configurationIssues.push("Invalid OLLAMA_API_BASE format");
+      healthStatus.recommendations.push(
+        "Set OLLAMA_API_BASE to a valid URL (e.g., http://localhost:11434)",
+      );
     }
   }
 

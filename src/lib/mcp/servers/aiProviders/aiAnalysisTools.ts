@@ -98,7 +98,7 @@ const OptimizeParametersSchema = z.object({
  * AI Usage Analysis Tool
  * Analyzes AI usage patterns, token consumption, and cost optimization opportunities
  */
-const analyzeAIUsageTool: NeuroLinkMCPTool = {
+const _analyzeAIUsageTool: NeuroLinkMCPTool = {
   name: "analyze-ai-usage",
   description:
     "Analyze AI usage patterns, token consumption, and cost optimization opportunities",
@@ -198,7 +198,7 @@ const analyzeAIUsageTool: NeuroLinkMCPTool = {
  * Provider Performance Benchmarking Tool
  * Benchmarks AI provider performance across latency, quality, and cost metrics
  */
-const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
+const _benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
   name: "benchmark-provider-performance",
   description:
     "Benchmark AI provider performance across latency, quality, and cost metrics",
@@ -243,7 +243,7 @@ const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
             });
             if (result && result.usage) {
               totalLatency += Date.now() - testStartTime;
-              totalTokens += result.usage.totalTokens || 0;
+              totalTokens += result.usage.total || 0;
               successfulTests++;
             }
           }
@@ -256,7 +256,7 @@ const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
               successfulTests > 0
                 ? Math.round(totalLatency / successfulTests)
                 : 0,
-            totalTokens: totalTokens,
+            total: totalTokens,
             successRate:
               (successfulTests /
                 (testPrompts.length * typedParams.iterations)) *
@@ -308,7 +308,7 @@ const benchmarkProviderPerformanceTool: NeuroLinkMCPTool = {
  * Prompt Parameter Optimization Tool
  * Optimizes prompt parameters (temperature, max tokens) for better AI output quality and efficiency
  */
-const optimizePromptParametersTool: NeuroLinkMCPTool = {
+const _optimizePromptParametersTool: NeuroLinkMCPTool = {
   name: "optimize-prompt-parameters",
   description:
     "Optimize prompt parameters (temperature, max tokens) for better AI output quality and efficiency",

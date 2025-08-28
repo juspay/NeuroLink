@@ -112,7 +112,7 @@ export class ProviderFactory {
             sdk?: UnknownRecord,
           ) => Promise<AIProvider> | AIProvider
         )(model, providerName, sdk);
-      } catch (functionError) {
+      } catch {
         // Fallback to constructor - ensure parameters are maintained
         result = new (registration.constructor as new (
           modelName?: string,

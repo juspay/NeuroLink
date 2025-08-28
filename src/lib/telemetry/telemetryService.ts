@@ -9,13 +9,11 @@ import {
 } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { Resource } from "@opentelemetry/resources";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
-import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { logger } from "../utils/logger.js";
 
 export interface HealthMetrics {

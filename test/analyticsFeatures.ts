@@ -243,7 +243,7 @@ describe(`Analytics Features Tests (${getTestProvider().toUpperCase()})`, () => 
         const jsonContent = lines.slice(jsonStartIndex).join("\n");
         const response = JSON.parse(jsonContent.trim());
         expect(response.usage).toBeDefined();
-        expect(response.usage.totalTokens).toBeGreaterThan(0);
+        expect(response.usage.total).toBeGreaterThan(0);
         expect(response.responseTime).toBeGreaterThan(0);
         expect(response.provider).toBe(getTestProvider());
 
@@ -296,7 +296,7 @@ describe(`Analytics Features Tests (${getTestProvider().toUpperCase()})`, () => 
             dryRun: true
           });
         }).then(r => {
-          const hasAnalytics = !!(r.usage && r.responseTime && r.usage.totalTokens > 0);
+          const hasAnalytics = !!(r.usage && r.responseTime && r.usage.total > 0);
           console.log('SDK_ANALYTICS_SUCCESS:', hasAnalytics);
           console.log('SDK_ANALYTICS_DATA:', JSON.stringify({usage: r.usage, responseTime: r.responseTime, provider: r.provider}, null, 2));
           console.log('SDK_CONTENT_LENGTH:', r.content?.length || 0);
@@ -360,7 +360,7 @@ describe(`Analytics Features Tests (${getTestProvider().toUpperCase()})`, () => 
 
         // Validate analytics structure
         expect(response.usage).toBeDefined();
-        expect(response.usage.totalTokens).toBeGreaterThan(0);
+        expect(response.usage.total).toBeGreaterThan(0);
         expect(response.responseTime).toBeGreaterThan(0);
 
         console.log(

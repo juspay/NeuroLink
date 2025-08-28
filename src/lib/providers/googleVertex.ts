@@ -149,7 +149,7 @@ const createVertexSettings =
         if (fileExists) {
           return baseSettings;
         }
-      } catch (_error) {
+      } catch {
         // Silent error handling for runtime credentials file creation
       }
     }
@@ -249,7 +249,7 @@ const createVertexSettings =
           hasProjectId: !!requiredEnvVars.project_id,
           hasType: !!requiredEnvVars.type,
           missingFields: Object.entries(requiredEnvVars)
-            .filter(([key, value]) => !value)
+            .filter(([_key, value]) => !value)
             .map(([key]) => key),
         },
       },
@@ -356,16 +356,17 @@ export class GoogleVertexProvider extends BaseProvider {
   }
 
   /**
-   * Gets the appropriate model instance (Google or Anthropic)
-   * Uses dual provider architecture for proper model routing
-   * Creates fresh instances for each request to ensure proper authentication
+   * Initialize model creation logging and tracking
    */
-  private async getModel(): Promise<LanguageModelV1> {
-    // 🚀 EXHAUSTIVE LOGGING POINT V001: MODEL CREATION ENTRY
+  private initializeModelCreationLogging(): {
+    modelCreationId: string;
+    modelCreationStartTime: number;
+    modelCreationHrTimeStart: bigint;
+    modelName: string;
+  } {
     const modelCreationId = `vertex-model-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const modelCreationStartTime = Date.now();
     const modelCreationHrTimeStart = process.hrtime.bigint();
-
     const modelName = this.modelName || getDefaultVertexModel();
 
     logger.debug(
@@ -406,7 +407,23 @@ export class GoogleVertexProvider extends BaseProvider {
       },
     );
 
-    // 🚀 EXHAUSTIVE LOGGING POINT V002: ANTHROPIC MODEL CHECK
+    return {
+      modelCreationId,
+      modelCreationStartTime,
+      modelCreationHrTimeStart,
+      modelName,
+    };
+  }
+
+  /**
+   * Check if model is Anthropic-based and attempt creation
+   */
+  private async attemptAnthropicModelCreation(
+    modelName: string,
+    modelCreationId: string,
+    modelCreationStartTime: number,
+    modelCreationHrTimeStart: bigint,
+  ): Promise<LanguageModelV1 | null> {
     const anthropicCheckStartTime = process.hrtime.bigint();
     const isAnthropic = isAnthropicModel(modelName);
 
@@ -427,131 +444,140 @@ export class GoogleVertexProvider extends BaseProvider {
       message: "Checking if model is Anthropic-based",
     });
 
-    // Check if this is an Anthropic model and use appropriate provider
-    if (isAnthropic) {
-      // 🚀 EXHAUSTIVE LOGGING POINT V003: ANTHROPIC MODEL CREATION START
-      const anthropicModelStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] 🧠 LOG_POINT_V003_ANTHROPIC_MODEL_START`,
+    if (!isAnthropic) {
+      return null;
+    }
+
+    const anthropicModelStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[GoogleVertexProvider] 🧠 LOG_POINT_V003_ANTHROPIC_MODEL_START`,
+      {
+        logPoint: "V003_ANTHROPIC_MODEL_START",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - modelCreationStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - modelCreationHrTimeStart
+        ).toString(),
+        anthropicModelStartTimeNs: anthropicModelStartTime.toString(),
+        modelName,
+        hasAnthropicSupport: hasAnthropicSupport(),
+        message: "Creating Anthropic model using vertexAnthropic provider",
+      },
+    );
+
+    logger.debug("Creating Anthropic model using vertexAnthropic provider", {
+      modelName,
+    });
+
+    if (!hasAnthropicSupport()) {
+      logger.warn(
+        `[GoogleVertexProvider] Anthropic support not available, falling back to Google model`,
+      );
+      return null;
+    }
+
+    try {
+      const anthropicModel = await this.createAnthropicModel(modelName);
+
+      if (anthropicModel) {
+        const anthropicModelSuccessTime = process.hrtime.bigint();
+        const anthropicModelDurationNs =
+          anthropicModelSuccessTime - anthropicModelStartTime;
+
+        logger.debug(
+          `[GoogleVertexProvider] ✅ LOG_POINT_V004_ANTHROPIC_MODEL_SUCCESS`,
+          {
+            logPoint: "V004_ANTHROPIC_MODEL_SUCCESS",
+            modelCreationId,
+            timestamp: new Date().toISOString(),
+            elapsedMs: Date.now() - modelCreationStartTime,
+            elapsedNs: (
+              process.hrtime.bigint() - modelCreationHrTimeStart
+            ).toString(),
+            anthropicModelDurationNs: anthropicModelDurationNs.toString(),
+            anthropicModelDurationMs:
+              Number(anthropicModelDurationNs) / 1000000,
+            modelName,
+            hasAnthropicModel: !!anthropicModel,
+            anthropicModelType: typeof anthropicModel,
+            memoryUsageAfterAnthropicCreation: process.memoryUsage(),
+            message: "Anthropic model created successfully via vertexAnthropic",
+          },
+        );
+
+        return anthropicModel;
+      }
+
+      // Anthropic model creation returned null
+      const anthropicModelNullTime = process.hrtime.bigint();
+      const anthropicModelDurationNs =
+        anthropicModelNullTime - anthropicModelStartTime;
+
+      logger.warn(
+        `[GoogleVertexProvider] ⚠️ LOG_POINT_V005_ANTHROPIC_MODEL_NULL`,
         {
-          logPoint: "V003_ANTHROPIC_MODEL_START",
+          logPoint: "V005_ANTHROPIC_MODEL_NULL",
           modelCreationId,
           timestamp: new Date().toISOString(),
           elapsedMs: Date.now() - modelCreationStartTime,
           elapsedNs: (
             process.hrtime.bigint() - modelCreationHrTimeStart
           ).toString(),
-          anthropicModelStartTimeNs: anthropicModelStartTime.toString(),
+          anthropicModelDurationNs: anthropicModelDurationNs.toString(),
+          anthropicModelDurationMs: Number(anthropicModelDurationNs) / 1000000,
           modelName,
-          hasAnthropicSupport: hasAnthropicSupport(),
-          message: "Creating Anthropic model using vertexAnthropic provider",
+          hasAnthropicModel: false,
+          fallbackToGoogle: true,
+          message:
+            "Anthropic model creation returned null - falling back to Google model",
         },
       );
+    } catch (error) {
+      const anthropicModelErrorTime = process.hrtime.bigint();
+      const anthropicModelDurationNs =
+        anthropicModelErrorTime - anthropicModelStartTime;
 
-      logger.debug("Creating Anthropic model using vertexAnthropic provider", {
-        modelName,
-      });
-
-      if (!hasAnthropicSupport()) {
-        logger.warn(
-          `[GoogleVertexProvider] Anthropic support not available, falling back to Google model`,
-        );
-      } else {
-        try {
-          const anthropicModel = await this.createAnthropicModel(modelName);
-
-          if (anthropicModel) {
-            const anthropicModelSuccessTime = process.hrtime.bigint();
-            const anthropicModelDurationNs =
-              anthropicModelSuccessTime - anthropicModelStartTime;
-
-            logger.debug(
-              `[GoogleVertexProvider] ✅ LOG_POINT_V004_ANTHROPIC_MODEL_SUCCESS`,
-              {
-                logPoint: "V004_ANTHROPIC_MODEL_SUCCESS",
-                modelCreationId,
-                timestamp: new Date().toISOString(),
-                elapsedMs: Date.now() - modelCreationStartTime,
-                elapsedNs: (
-                  process.hrtime.bigint() - modelCreationHrTimeStart
-                ).toString(),
-                anthropicModelDurationNs: anthropicModelDurationNs.toString(),
-                anthropicModelDurationMs:
-                  Number(anthropicModelDurationNs) / 1000000,
-                modelName,
-                hasAnthropicModel: !!anthropicModel,
-                anthropicModelType: typeof anthropicModel,
-                memoryUsageAfterAnthropicCreation: process.memoryUsage(),
-                message:
-                  "Anthropic model created successfully via vertexAnthropic",
-              },
-            );
-
-            return anthropicModel;
-          }
-
-          // Anthropic model creation returned null
-          const anthropicModelNullTime = process.hrtime.bigint();
-          const anthropicModelDurationNs =
-            anthropicModelNullTime - anthropicModelStartTime;
-
-          logger.warn(
-            `[GoogleVertexProvider] ⚠️ LOG_POINT_V005_ANTHROPIC_MODEL_NULL`,
-            {
-              logPoint: "V005_ANTHROPIC_MODEL_NULL",
-              modelCreationId,
-              timestamp: new Date().toISOString(),
-              elapsedMs: Date.now() - modelCreationStartTime,
-              elapsedNs: (
-                process.hrtime.bigint() - modelCreationHrTimeStart
-              ).toString(),
-              anthropicModelDurationNs: anthropicModelDurationNs.toString(),
-              anthropicModelDurationMs:
-                Number(anthropicModelDurationNs) / 1000000,
-              modelName,
-              hasAnthropicModel: false,
-              fallbackToGoogle: true,
-              message:
-                "Anthropic model creation returned null - falling back to Google model",
-            },
-          );
-        } catch (error) {
-          const anthropicModelErrorTime = process.hrtime.bigint();
-          const anthropicModelDurationNs =
-            anthropicModelErrorTime - anthropicModelStartTime;
-
-          logger.error(
-            `[GoogleVertexProvider] ❌ LOG_POINT_V006_ANTHROPIC_MODEL_ERROR`,
-            {
-              logPoint: "V006_ANTHROPIC_MODEL_ERROR",
-              modelCreationId,
-              timestamp: new Date().toISOString(),
-              elapsedMs: Date.now() - modelCreationStartTime,
-              elapsedNs: (
-                process.hrtime.bigint() - modelCreationHrTimeStart
-              ).toString(),
-              anthropicModelDurationNs: anthropicModelDurationNs.toString(),
-              anthropicModelDurationMs:
-                Number(anthropicModelDurationNs) / 1000000,
-              modelName,
-              error: error instanceof Error ? error.message : String(error),
-              errorName: error instanceof Error ? error.name : "UnknownError",
-              errorStack: error instanceof Error ? error.stack : undefined,
-              fallbackToGoogle: true,
-              message:
-                "Anthropic model creation failed - falling back to Google model",
-            },
-          );
-        }
-      }
-
-      // Fall back to regular model if Anthropic not available
-      logger.warn(
-        `Anthropic model ${modelName} requested but not available, falling back to Google model`,
+      logger.error(
+        `[GoogleVertexProvider] ❌ LOG_POINT_V006_ANTHROPIC_MODEL_ERROR`,
+        {
+          logPoint: "V006_ANTHROPIC_MODEL_ERROR",
+          modelCreationId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - modelCreationStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - modelCreationHrTimeStart
+          ).toString(),
+          anthropicModelDurationNs: anthropicModelDurationNs.toString(),
+          anthropicModelDurationMs: Number(anthropicModelDurationNs) / 1000000,
+          modelName,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorStack: error instanceof Error ? error.stack : undefined,
+          fallbackToGoogle: true,
+          message:
+            "Anthropic model creation failed - falling back to Google model",
+        },
       );
     }
 
-    // 🚀 EXHAUSTIVE LOGGING POINT V007: GOOGLE VERTEX MODEL CREATION START
+    // Fall back to regular model if Anthropic not available
+    logger.warn(
+      `Anthropic model ${modelName} requested but not available, falling back to Google model`,
+    );
+    return null;
+  }
+
+  /**
+   * Create Google Vertex model with comprehensive logging and error handling
+   */
+  private async createGoogleVertexModel(
+    modelName: string,
+    modelCreationId: string,
+    modelCreationStartTime: number,
+    modelCreationHrTimeStart: bigint,
+    isAnthropic: boolean,
+  ): Promise<LanguageModelV1> {
     const googleModelStartTime = process.hrtime.bigint();
     logger.debug(
       `[GoogleVertexProvider] 🌐 LOG_POINT_V007_GOOGLE_MODEL_START`,
@@ -572,14 +598,12 @@ export class GoogleVertexProvider extends BaseProvider {
       },
     );
 
-    // Create fresh Google Vertex model with current settings
     logger.debug("Creating Google Vertex model", {
       modelName,
       project: this.projectId,
       location: this.location,
     });
 
-    // 🚀 EXHAUSTIVE LOGGING POINT V008: VERTEX SETTINGS CREATION
     const vertexSettingsStartTime = process.hrtime.bigint();
     logger.debug(
       `[GoogleVertexProvider] ⚙️ LOG_POINT_V008_VERTEX_SETTINGS_START`,
@@ -652,155 +676,13 @@ export class GoogleVertexProvider extends BaseProvider {
         },
       );
 
-      // 🚀 EXHAUSTIVE LOGGING POINT V010: VERTEX INSTANCE CREATION
-      const vertexInstanceStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] 🏗️ LOG_POINT_V010_VERTEX_INSTANCE_START`,
-        {
-          logPoint: "V010_VERTEX_INSTANCE_START",
-          modelCreationId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - modelCreationStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - modelCreationHrTimeStart
-          ).toString(),
-          vertexInstanceStartTimeNs: vertexInstanceStartTime.toString(),
-
-          // Pre-creation network environment
-          networkEnvironment: {
-            dnsServers: (() => {
-              try {
-                return dns.getServers ? dns.getServers() : "NOT_AVAILABLE";
-              } catch {
-                return "NOT_AVAILABLE";
-              }
-            })(),
-            networkInterfaces: (() => {
-              try {
-                return Object.keys(os.networkInterfaces());
-              } catch {
-                return [];
-              }
-            })(),
-            hostname: (() => {
-              try {
-                return os.hostname();
-              } catch {
-                return "UNKNOWN";
-              }
-            })(),
-            platform: (() => {
-              try {
-                return os.platform();
-              } catch {
-                return "UNKNOWN";
-              }
-            })(),
-            release: (() => {
-              try {
-                return os.release();
-              } catch {
-                return "UNKNOWN";
-              }
-            })(),
-          },
-
-          message: "Creating Vertex AI instance",
-        },
+      return await this.createVertexInstance(
+        vertexSettings,
+        modelName,
+        modelCreationId,
+        modelCreationStartTime,
+        modelCreationHrTimeStart,
       );
-
-      const vertex = createVertex(vertexSettings);
-
-      const vertexInstanceEndTime = process.hrtime.bigint();
-      const vertexInstanceDurationNs =
-        vertexInstanceEndTime - vertexInstanceStartTime;
-
-      logger.debug(
-        `[GoogleVertexProvider] ✅ LOG_POINT_V011_VERTEX_INSTANCE_SUCCESS`,
-        {
-          logPoint: "V011_VERTEX_INSTANCE_SUCCESS",
-          modelCreationId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - modelCreationStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - modelCreationHrTimeStart
-          ).toString(),
-          vertexInstanceDurationNs: vertexInstanceDurationNs.toString(),
-          vertexInstanceDurationMs: Number(vertexInstanceDurationNs) / 1000000,
-          hasVertexInstance: !!vertex,
-          vertexInstanceType: typeof vertex,
-          message: "Vertex AI instance created successfully",
-        },
-      );
-
-      // 🚀 EXHAUSTIVE LOGGING POINT V012: MODEL INSTANCE CREATION
-      const modelInstanceStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] 🎯 LOG_POINT_V012_MODEL_INSTANCE_START`,
-        {
-          logPoint: "V012_MODEL_INSTANCE_START",
-          modelCreationId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - modelCreationStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - modelCreationHrTimeStart
-          ).toString(),
-          modelInstanceStartTimeNs: modelInstanceStartTime.toString(),
-          modelName,
-          hasVertexInstance: !!vertex,
-          message: "Creating model instance from Vertex AI instance",
-        },
-      );
-
-      const model = vertex(modelName);
-
-      const modelInstanceEndTime = process.hrtime.bigint();
-      const modelInstanceDurationNs =
-        modelInstanceEndTime - modelInstanceStartTime;
-      const totalModelCreationDurationNs =
-        modelInstanceEndTime - modelCreationHrTimeStart;
-
-      logger.info(
-        `[GoogleVertexProvider] 🏁 LOG_POINT_V013_MODEL_CREATION_COMPLETE`,
-        {
-          logPoint: "V013_MODEL_CREATION_COMPLETE",
-          modelCreationId,
-          timestamp: new Date().toISOString(),
-          totalElapsedMs: Date.now() - modelCreationStartTime,
-          totalElapsedNs: totalModelCreationDurationNs.toString(),
-          totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
-          modelInstanceDurationNs: modelInstanceDurationNs.toString(),
-          modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
-
-          // Final model analysis
-          finalModel: {
-            hasModel: !!model,
-            modelType: typeof model,
-            modelName,
-            isAnthropicModel: isAnthropic,
-            projectId: this.projectId,
-            location: this.location,
-          },
-
-          // Performance summary
-          performanceSummary: {
-            vertexSettingsDurationMs:
-              Number(vertexSettingsDurationNs) / 1000000,
-            vertexInstanceDurationMs:
-              Number(vertexInstanceDurationNs) / 1000000,
-            modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
-            totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
-          },
-
-          // Memory usage
-          finalMemoryUsage: process.memoryUsage(),
-
-          message:
-            "Model creation completed successfully - ready for API calls",
-        },
-      );
-
-      return model as LanguageModelV1;
     } catch (error) {
       const vertexSettingsErrorTime = process.hrtime.bigint();
       const vertexSettingsDurationNs =
@@ -876,19 +758,211 @@ export class GoogleVertexProvider extends BaseProvider {
     }
   }
 
+  /**
+   * Create Vertex AI instance and model with comprehensive logging
+   */
+  private async createVertexInstance(
+    vertexSettings: unknown,
+    modelName: string,
+    modelCreationId: string,
+    modelCreationStartTime: number,
+    modelCreationHrTimeStart: bigint,
+  ): Promise<LanguageModelV1> {
+    const vertexInstanceStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[GoogleVertexProvider] 🏗️ LOG_POINT_V010_VERTEX_INSTANCE_START`,
+      {
+        logPoint: "V010_VERTEX_INSTANCE_START",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - modelCreationStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - modelCreationHrTimeStart
+        ).toString(),
+        vertexInstanceStartTimeNs: vertexInstanceStartTime.toString(),
+
+        // Pre-creation network environment
+        networkEnvironment: {
+          dnsServers: (() => {
+            try {
+              return dns.getServers ? dns.getServers() : "NOT_AVAILABLE";
+            } catch {
+              return "NOT_AVAILABLE";
+            }
+          })(),
+          networkInterfaces: (() => {
+            try {
+              return Object.keys(os.networkInterfaces());
+            } catch {
+              return [];
+            }
+          })(),
+          hostname: (() => {
+            try {
+              return os.hostname();
+            } catch {
+              return "UNKNOWN";
+            }
+          })(),
+          platform: (() => {
+            try {
+              return os.platform();
+            } catch {
+              return "UNKNOWN";
+            }
+          })(),
+          release: (() => {
+            try {
+              return os.release();
+            } catch {
+              return "UNKNOWN";
+            }
+          })(),
+        },
+
+        message: "Creating Vertex AI instance",
+      },
+    );
+
+    const vertex = createVertex(vertexSettings as GoogleVertexProviderSettings);
+
+    const vertexInstanceEndTime = process.hrtime.bigint();
+    const vertexInstanceDurationNs =
+      vertexInstanceEndTime - vertexInstanceStartTime;
+
+    logger.debug(
+      `[GoogleVertexProvider] ✅ LOG_POINT_V011_VERTEX_INSTANCE_SUCCESS`,
+      {
+        logPoint: "V011_VERTEX_INSTANCE_SUCCESS",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - modelCreationStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - modelCreationHrTimeStart
+        ).toString(),
+        vertexInstanceDurationNs: vertexInstanceDurationNs.toString(),
+        vertexInstanceDurationMs: Number(vertexInstanceDurationNs) / 1000000,
+        hasVertexInstance: !!vertex,
+        vertexInstanceType: typeof vertex,
+        message: "Vertex AI instance created successfully",
+      },
+    );
+
+    const modelInstanceStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[GoogleVertexProvider] 🎯 LOG_POINT_V012_MODEL_INSTANCE_START`,
+      {
+        logPoint: "V012_MODEL_INSTANCE_START",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - modelCreationStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - modelCreationHrTimeStart
+        ).toString(),
+        modelInstanceStartTimeNs: modelInstanceStartTime.toString(),
+        modelName,
+        hasVertexInstance: !!vertex,
+        message: "Creating model instance from Vertex AI instance",
+      },
+    );
+
+    const model = vertex(modelName);
+
+    const modelInstanceEndTime = process.hrtime.bigint();
+    const modelInstanceDurationNs =
+      modelInstanceEndTime - modelInstanceStartTime;
+    const totalModelCreationDurationNs =
+      modelInstanceEndTime - modelCreationHrTimeStart;
+
+    logger.info(
+      `[GoogleVertexProvider] 🏁 LOG_POINT_V013_MODEL_CREATION_COMPLETE`,
+      {
+        logPoint: "V013_MODEL_CREATION_COMPLETE",
+        modelCreationId,
+        timestamp: new Date().toISOString(),
+        totalElapsedMs: Date.now() - modelCreationStartTime,
+        totalElapsedNs: totalModelCreationDurationNs.toString(),
+        totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
+        modelInstanceDurationNs: modelInstanceDurationNs.toString(),
+        modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
+
+        // Final model analysis
+        finalModel: {
+          hasModel: !!model,
+          modelType: typeof model,
+          modelName,
+          isAnthropicModel: isAnthropicModel(modelName),
+          projectId: this.projectId,
+          location: this.location,
+        },
+
+        // Performance summary
+        performanceSummary: {
+          vertexSettingsDurationMs: Number(vertexInstanceDurationNs) / 1000000,
+          vertexInstanceDurationMs: Number(vertexInstanceDurationNs) / 1000000,
+          modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
+          totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
+        },
+
+        // Memory usage
+        finalMemoryUsage: process.memoryUsage(),
+
+        message: "Model creation completed successfully - ready for API calls",
+      },
+    );
+
+    return model as LanguageModelV1;
+  }
+
+  /**
+   * Gets the appropriate model instance (Google or Anthropic)
+   * Uses dual provider architecture for proper model routing
+   * Creates fresh instances for each request to ensure proper authentication
+   */
+  private async getModel(): Promise<LanguageModelV1> {
+    // Initialize logging and setup
+    const {
+      modelCreationId,
+      modelCreationStartTime,
+      modelCreationHrTimeStart,
+      modelName,
+    } = this.initializeModelCreationLogging();
+
+    // Check if this is an Anthropic model and attempt creation
+    const anthropicModel = await this.attemptAnthropicModelCreation(
+      modelName,
+      modelCreationId,
+      modelCreationStartTime,
+      modelCreationHrTimeStart,
+    );
+
+    if (anthropicModel) {
+      return anthropicModel;
+    }
+
+    // Fall back to Google Vertex model creation
+    return await this.createGoogleVertexModel(
+      modelName,
+      modelCreationId,
+      modelCreationStartTime,
+      modelCreationHrTimeStart,
+      isAnthropicModel(modelName),
+    );
+  }
+
   // executeGenerate removed - BaseProvider handles all generation with tools
 
-  protected async executeStream(
+  /**
+   * Log stream execution start with comprehensive analysis
+   */
+  private logStreamExecutionStart(
+    streamExecutionId: string,
+    streamExecutionStartTime: number,
+    streamExecutionHrTimeStart: bigint,
+    functionTag: string,
     options: StreamOptions,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): Promise<StreamResult> {
-    // 🚀 EXHAUSTIVE LOGGING POINT S001: STREAM EXECUTION ENTRY
-    const streamExecutionId = `vertex-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    const streamExecutionStartTime = Date.now();
-    const streamExecutionHrTimeStart = process.hrtime.bigint();
-    const functionTag = "GoogleVertexProvider.executeStream";
-    let chunkCount = 0;
-
+  ): void {
     logger.info(
       `[GoogleVertexProvider] 🎬 LOG_POINT_S001_STREAM_EXECUTION_START`,
       {
@@ -948,11 +1022,18 @@ export class GoogleVertexProvider extends BaseProvider {
         message: "Stream execution starting with comprehensive analysis",
       },
     );
+  }
 
-    // 🚀 EXHAUSTIVE LOGGING POINT S002: TIMEOUT CONTROLLER SETUP
-    const timeoutSetupStartTime = process.hrtime.bigint();
-    const timeout = this.getTimeout(options);
-
+  /**
+   * Log timeout setup process
+   */
+  private logTimeoutSetup(
+    streamExecutionId: string,
+    streamExecutionStartTime: number,
+    streamExecutionHrTimeStart: bigint,
+    timeoutSetupStartTime: bigint,
+    timeout: number,
+  ): void {
     logger.debug(`[GoogleVertexProvider] ⏰ LOG_POINT_S002_TIMEOUT_SETUP`, {
       logPoint: "S002_TIMEOUT_SETUP",
       streamExecutionId,
@@ -967,14 +1048,19 @@ export class GoogleVertexProvider extends BaseProvider {
       streamType: "stream",
       message: "Setting up timeout controller for stream execution",
     });
+  }
 
-    // Add timeout controller for consistency with other providers
-    const timeoutController = createTimeoutController(
-      timeout,
-      this.providerName,
-      "stream",
-    );
-
+  /**
+   * Log successful timeout setup
+   */
+  private logTimeoutSetupSuccess(
+    streamExecutionId: string,
+    streamExecutionStartTime: number,
+    streamExecutionHrTimeStart: bigint,
+    timeoutSetupStartTime: bigint,
+    timeoutController: unknown,
+    timeout: number,
+  ): void {
     const timeoutSetupEndTime = process.hrtime.bigint();
     const timeoutSetupDurationNs = timeoutSetupEndTime - timeoutSetupStartTime;
 
@@ -995,121 +1081,205 @@ export class GoogleVertexProvider extends BaseProvider {
         message: "Timeout controller setup completed",
       },
     );
+  }
+
+  /**
+   * Log and perform stream options validation
+   */
+  private logAndValidateStreamOptions(
+    streamExecutionId: string,
+    streamExecutionStartTime: number,
+    streamExecutionHrTimeStart: bigint,
+    options: StreamOptions,
+  ): void {
+    const validationStartTime = process.hrtime.bigint();
+    logger.debug(`[GoogleVertexProvider] ✔️ LOG_POINT_S004_VALIDATION_START`, {
+      logPoint: "S004_VALIDATION_START",
+      streamExecutionId,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - streamExecutionStartTime,
+      elapsedNs: (
+        process.hrtime.bigint() - streamExecutionHrTimeStart
+      ).toString(),
+      validationStartTimeNs: validationStartTime.toString(),
+      message: "Starting stream options validation",
+    });
+
+    this.validateStreamOptions(options);
+
+    const validationEndTime = process.hrtime.bigint();
+    const validationDurationNs = validationEndTime - validationStartTime;
+
+    logger.debug(
+      `[GoogleVertexProvider] ✅ LOG_POINT_S005_VALIDATION_SUCCESS`,
+      {
+        logPoint: "S005_VALIDATION_SUCCESS",
+        streamExecutionId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - streamExecutionStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - streamExecutionHrTimeStart
+        ).toString(),
+        validationDurationNs: validationDurationNs.toString(),
+        validationDurationMs: Number(validationDurationNs) / 1000000,
+        message: "Stream options validation successful",
+      },
+    );
+  }
+
+  /**
+   * Log start of message building process
+   */
+  private logMessageBuildStart(
+    streamExecutionId: string,
+    streamExecutionStartTime: number,
+    streamExecutionHrTimeStart: bigint,
+  ): bigint {
+    const messagesBuildStartTime = process.hrtime.bigint();
+    logger.debug(
+      `[GoogleVertexProvider] 📝 LOG_POINT_S006_MESSAGES_BUILD_START`,
+      {
+        logPoint: "S006_MESSAGES_BUILD_START",
+        streamExecutionId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - streamExecutionStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - streamExecutionHrTimeStart
+        ).toString(),
+        messagesBuildStartTimeNs: messagesBuildStartTime.toString(),
+        message: "Starting message array building",
+      },
+    );
+    return messagesBuildStartTime;
+  }
+
+  /**
+   * Log successful message building
+   */
+  private logMessageBuildSuccess(
+    streamExecutionId: string,
+    streamExecutionStartTime: number,
+    streamExecutionHrTimeStart: bigint,
+    messagesBuildStartTime: bigint,
+    messages: unknown,
+  ): void {
+    const messagesBuildEndTime = process.hrtime.bigint();
+    const messagesBuildDurationNs =
+      messagesBuildEndTime - messagesBuildStartTime;
+
+    logger.debug(
+      `[GoogleVertexProvider] ✅ LOG_POINT_S007_MESSAGES_BUILD_SUCCESS`,
+      {
+        logPoint: "S007_MESSAGES_BUILD_SUCCESS",
+        streamExecutionId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - streamExecutionStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - streamExecutionHrTimeStart
+        ).toString(),
+        messagesBuildDurationNs: messagesBuildDurationNs.toString(),
+        messagesBuildDurationMs: Number(messagesBuildDurationNs) / 1000000,
+        messagesCount: Array.isArray(messages) ? messages.length : 0,
+        messagesType: typeof messages,
+        hasMessages: !!messages,
+        message: "Message array built successfully",
+      },
+    );
+  }
+
+  protected async executeStream(
+    options: StreamOptions,
+    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+  ): Promise<StreamResult> {
+    // Initialize stream execution tracking
+    const streamExecutionId = `vertex-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const streamExecutionStartTime = Date.now();
+    const streamExecutionHrTimeStart = process.hrtime.bigint();
+    const functionTag = "GoogleVertexProvider.executeStream";
+    let chunkCount = 0;
+
+    // Log stream execution start
+    this.logStreamExecutionStart(
+      streamExecutionId,
+      streamExecutionStartTime,
+      streamExecutionHrTimeStart,
+      functionTag,
+      options,
+      analysisSchema,
+    );
+
+    // Setup timeout controller
+    const timeoutSetupStartTime = process.hrtime.bigint();
+    const timeout = this.getTimeout(options);
+
+    this.logTimeoutSetup(
+      streamExecutionId,
+      streamExecutionStartTime,
+      streamExecutionHrTimeStart,
+      timeoutSetupStartTime,
+      timeout,
+    );
+
+    const timeoutController = createTimeoutController(
+      timeout,
+      this.providerName,
+      "stream",
+    );
+
+    this.logTimeoutSetupSuccess(
+      streamExecutionId,
+      streamExecutionStartTime,
+      streamExecutionHrTimeStart,
+      timeoutSetupStartTime,
+      timeoutController,
+      timeout,
+    );
 
     try {
-      // 🚀 EXHAUSTIVE LOGGING POINT S004: STREAM OPTIONS VALIDATION
-      const validationStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] ✔️ LOG_POINT_S004_VALIDATION_START`,
-        {
-          logPoint: "S004_VALIDATION_START",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          validationStartTimeNs: validationStartTime.toString(),
-          message: "Starting stream options validation",
-        },
+      // Validate stream options with logging
+      this.logAndValidateStreamOptions(
+        streamExecutionId,
+        streamExecutionStartTime,
+        streamExecutionHrTimeStart,
+        options,
       );
 
-      this.validateStreamOptions(options);
-
-      const validationEndTime = process.hrtime.bigint();
-      const validationDurationNs = validationEndTime - validationStartTime;
-
-      logger.debug(
-        `[GoogleVertexProvider] ✅ LOG_POINT_S005_VALIDATION_SUCCESS`,
-        {
-          logPoint: "S005_VALIDATION_SUCCESS",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          validationDurationNs: validationDurationNs.toString(),
-          validationDurationMs: Number(validationDurationNs) / 1000000,
-          message: "Stream options validation successful",
-        },
-      );
-
-      // 🚀 EXHAUSTIVE LOGGING POINT S006: MESSAGE ARRAY BUILDING
-      const messagesBuildStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] 📝 LOG_POINT_S006_MESSAGES_BUILD_START`,
-        {
-          logPoint: "S006_MESSAGES_BUILD_START",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          messagesBuildStartTimeNs: messagesBuildStartTime.toString(),
-          message: "Building message array from stream options",
-        },
+      // Build messages with logging
+      const messagesBuildStartTime = this.logMessageBuildStart(
+        streamExecutionId,
+        streamExecutionStartTime,
+        streamExecutionHrTimeStart,
       );
 
       // Build message array from options
       const messages = buildMessagesArray(options);
 
-      const messagesBuildEndTime = process.hrtime.bigint();
-      const messagesBuildDurationNs =
-        messagesBuildEndTime - messagesBuildStartTime;
-
-      logger.debug(
-        `[GoogleVertexProvider] ✅ LOG_POINT_S007_MESSAGES_BUILD_SUCCESS`,
-        {
-          logPoint: "S007_MESSAGES_BUILD_SUCCESS",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          messagesBuildDurationNs: messagesBuildDurationNs.toString(),
-          messagesBuildDurationMs: Number(messagesBuildDurationNs) / 1000000,
-          messagesCount: messages?.length || 0,
-          messagesType: typeof messages,
-          hasMessages: !!messages,
-          message: "Message array built successfully",
-        },
+      this.logMessageBuildSuccess(
+        streamExecutionId,
+        streamExecutionStartTime,
+        streamExecutionHrTimeStart,
+        messagesBuildStartTime,
+        messages,
       );
 
-      // 🚀 EXHAUSTIVE LOGGING POINT S008: INITIAL STREAM REQUEST LOG
+      // Log stream request details
       logger.debug(
         `[GoogleVertexProvider] 🚀 LOG_POINT_S008_STREAM_REQUEST_DETAILS`,
         {
           logPoint: "S008_STREAM_REQUEST_DETAILS",
           streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-
-          // Detailed request information
           streamRequestDetails: {
             modelName: this.modelName,
             promptLength: options.input.text.length,
             hasSchema: !!analysisSchema,
-            messagesCount: messages?.length || 0,
+            messagesCount: Array.isArray(messages) ? messages.length : 0,
             temperature: options?.temperature,
             maxTokens: options?.maxTokens,
             disableTools: options?.disableTools || false,
           },
-
           message: "Starting comprehensive stream request processing",
         },
       );
-
-      logger.debug(`${functionTag}: Starting stream request`, {
-        modelName: this.modelName,
-        promptLength: options.input.text.length,
-        hasSchema: !!analysisSchema,
-      });
 
       // 🚀 EXHAUSTIVE LOGGING POINT S009: MODEL CREATION FOR STREAM
       const modelCreationStartTime = process.hrtime.bigint();

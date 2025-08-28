@@ -1,7 +1,6 @@
 import type { Argv, CommandModule } from "yargs";
 import {
   spawnSync,
-  spawn,
   type SpawnSyncReturns,
   type SpawnSyncOptions,
   type SpawnSyncOptionsWithStringEncoding,
@@ -254,7 +253,10 @@ export class OllamaCommandFactory {
           chalk.green(`\n${modelsData.models.length} models available`),
         );
       }
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.debug("Error:", errorMessage);
       spinner.fail("Ollama service is not running");
       logger.always(chalk.yellow("\nStart Ollama with: ollama serve"));
       logger.always(

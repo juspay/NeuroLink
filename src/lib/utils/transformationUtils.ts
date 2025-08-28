@@ -4,11 +4,7 @@
  */
 
 import type { UnknownRecord } from "../types/common.js";
-import type {
-  StandardRecord,
-  StringArray,
-  ToolExecutionFunction,
-} from "../types/typeAliases.js";
+import type { StandardRecord, StringArray } from "../types/typeAliases.js";
 
 // ============================================================================
 // TOOL EXECUTION TRANSFORMATIONS

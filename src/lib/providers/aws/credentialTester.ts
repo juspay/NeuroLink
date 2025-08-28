@@ -296,7 +296,7 @@ export class CredentialTester {
         responseTimeMs: responseTime,
         sampleModels: models
           .slice(0, 5)
-          .map((model) => model.modelId || "unknown"),
+          .map((model: { modelId?: string }) => model.modelId || "unknown"),
       };
 
       logger.debug("Bedrock connectivity test successful", {

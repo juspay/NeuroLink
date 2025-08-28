@@ -1,23 +1,18 @@
-import type {
-  AIProviderName,
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../core/types.js";
+import type { AIProviderName } from "../core/types.js";
 import type {
   LanguageModelV1,
   LanguageModelV1CallOptions,
   LanguageModelV1StreamPart,
 } from "ai";
-import { streamText, Output } from "ai";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
 import type { Schema } from "ai";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import { getDefaultTimeout, TimeoutError } from "../utils/timeout.js";
 import { DEFAULT_MAX_TOKENS } from "../core/constants.js";
 import { modelConfig } from "../core/modelConfiguration.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
+import { TimeoutError } from "../utils/timeout.js";
 
 // Model version constants (configurable via environment)
 const DEFAULT_OLLAMA_MODEL = "llama3.1:8b";
@@ -304,7 +299,9 @@ class OllamaLanguageModel implements LanguageModelV1 {
                 return;
               }
             } catch (error) {
-              // Ignore JSON parse errors for incomplete chunks
+              logger.error("Error parsing Ollama stream response", {
+                error,
+              });
             }
           }
         }
@@ -513,7 +510,7 @@ export class OllamaProvider extends BaseProvider {
    */
   private async executeStreamWithoutTools(
     options: StreamOptions,
-    analysisSchema?: ZodUnknownSchema | Schema<unknown>,
+    _analysisSchema?: ZodUnknownSchema | Schema<unknown>,
   ): Promise<StreamResult> {
     const response = await proxyFetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
@@ -590,11 +587,49 @@ export class OllamaProvider extends BaseProvider {
   }
 
   /**
+   * Process individual stream data chunk from Ollama
+   */
+  private processOllamaStreamData(
+    data: unknown,
+  ): { content?: string; shouldReturn?: boolean } | null {
+    const dataRecord = data as Record<string, unknown>;
+    const choices = dataRecord.choices as
+      | Array<{ delta?: Record<string, unknown>; finish_reason?: string }>
+      | undefined;
+    const delta = choices?.[0]?.delta;
+    let content = "";
+
+    if (delta?.content && typeof delta.content === "string") {
+      content += delta.content;
+    }
+
+    if (delta?.tool_calls) {
+      // Handle tool calls - for now, we'll include them as content
+      // Future enhancement: Execute tools and return results
+      const toolCallDescription = this.formatToolCallForDisplay(
+        delta.tool_calls as Array<{
+          function?: {
+            name?: string;
+            arguments?: string;
+          };
+        }>,
+      );
+      if (toolCallDescription) {
+        content += toolCallDescription;
+      }
+    }
+
+    const shouldReturn = !!choices?.[0]?.finish_reason;
+
+    return content ? { content, shouldReturn } : { shouldReturn };
+  }
+
+  /**
    * Create stream generator for Ollama chat API with tool call support
    */
   private async *createOllamaChatStream(
     response: Response,
-    tools?: unknown,
+    _tools?: unknown,
   ): AsyncGenerator<{ content: string }> {
     const reader = response.body?.getReader();
     if (!reader) {
@@ -624,28 +659,19 @@ export class OllamaProvider extends BaseProvider {
 
             try {
               const data = JSON.parse(dataLine);
-              const delta = data.choices?.[0]?.delta;
+              const result = this.processOllamaStreamData(data);
 
-              if (delta?.content) {
-                yield { content: delta.content };
+              if (result?.content) {
+                yield { content: result.content };
               }
 
-              if (delta?.tool_calls) {
-                // Handle tool calls - for now, we'll include them as content
-                // Future enhancement: Execute tools and return results
-                const toolCallDescription = this.formatToolCallForDisplay(
-                  delta.tool_calls,
-                );
-                if (toolCallDescription) {
-                  yield { content: toolCallDescription };
-                }
-              }
-
-              if (data.choices?.[0]?.finish_reason) {
+              if (result?.shouldReturn) {
                 return;
               }
             } catch (error) {
-              // Ignore JSON parse errors for incomplete chunks
+              logger.error("Error parsing Ollama stream response", {
+                error,
+              });
             }
           }
         }
@@ -737,7 +763,9 @@ export class OllamaProvider extends BaseProvider {
                 return;
               }
             } catch (error) {
-              // Ignore JSON parse errors for incomplete chunks
+              logger.error("Error parsing Ollama stream response", {
+                error,
+              });
             }
           }
         }

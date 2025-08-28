@@ -42,9 +42,15 @@ describe("Invalid Tool Registration", () => {
     };
 
     const registrationAttempt = () =>
-      neurolink.registerTools([invalidTool as any]);
+      neurolink.registerTools([
+        invalidTool as unknown as Parameters<
+          typeof neurolink.registerTools
+        >[0][number],
+      ]);
 
-    expect(registrationAttempt).toThrowError(/must have an execute method/i);
+    expect(registrationAttempt).toThrowError(
+      /must have an execute (method|function)/i,
+    );
   });
 
   test("should throw an error when the tool's 'name' is not a string", () => {
@@ -76,6 +82,8 @@ describe("Invalid Tool Registration", () => {
     // @ts-expect-error - We are intentionally passing an invalid tool shape to test validation.
     const registrationAttempt = () => neurolink.registerTools([invalidTool]);
 
-    expect(registrationAttempt).toThrowError(/must have an execute method/i);
+    expect(registrationAttempt).toThrowError(
+      /must have an execute (method|function)/i,
+    );
   });
 });

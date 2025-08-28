@@ -39,10 +39,10 @@ export async function listMCPs(): Promise<McpMetadata[]> {
  * Execute an MCP operation - simplified
  */
 export async function executeMCP<T = unknown>(
-  name: string,
-  config: unknown,
-  args: unknown,
-  context?: {
+  _name: string,
+  _config: unknown,
+  _args: unknown,
+  _context?: {
     sessionId?: string;
     userId?: string;
   },

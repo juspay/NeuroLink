@@ -14,7 +14,7 @@ import { MiddlewareRegistry } from "./registry.js";
 import { createAnalyticsMiddleware } from "./builtin/analytics.js";
 import { createGuardrailsMiddleware } from "./builtin/guardrails.js";
 import { logger } from "../utils/logger.js";
-import { JsonValue } from "../types/common.js";
+import type { JsonValue } from "../types/common.js";
 
 /**
  * Middleware factory for creating and applying middleware chains.

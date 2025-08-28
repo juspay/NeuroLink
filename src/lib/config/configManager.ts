@@ -14,8 +14,8 @@ import type {
   BackupMetadata,
   ConfigValidationResult,
   ConfigUpdateOptions,
-  DEFAULT_CONFIG,
 } from "./types.js";
+import { DEFAULT_CONFIG } from "./types.js";
 
 const { readFile, writeFile, readdir, mkdir, unlink, access } = fs;
 
@@ -322,7 +322,6 @@ export default ${JSON.stringify(currentConfig, null, 2)};`;
    * Generate default configuration
    */
   async generateDefaultConfig(): Promise<NeuroLinkConfig> {
-    const { DEFAULT_CONFIG } = await import("./types.js");
     return {
       ...DEFAULT_CONFIG,
       lastUpdated: Date.now(),
@@ -357,7 +356,10 @@ export default ${JSON.stringify(currentConfig, null, 2)};`;
 
       throw new Error("Invalid config file format");
     } catch (error) {
-      logger.info("Config file not found, generating default...");
+      logger.info("Config file not found or invalid, generating default...", {
+        error: error instanceof Error ? error.message : String(error),
+        configPath: this.configPath,
+      });
       return await this.generateDefaultConfig();
     }
   }

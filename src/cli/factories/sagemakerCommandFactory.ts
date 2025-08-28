@@ -457,11 +457,11 @@ export class SageMakerCommandFactory {
         } else {
           logger.always(chalk.yellow("No SageMaker endpoints found"));
         }
-      } catch (_awsError) {
+      } catch (error) {
         spinner.fail("Failed to list endpoints");
-        logger.error(
-          chalk.red("AWS SDK credentials error or insufficient permissions"),
-        );
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error(chalk.red("Error:", errorMessage));
         logger.always(chalk.yellow("\nTo list endpoints, please:"));
         logger.always("1. Set AWS_ACCESS_KEY_ID environment variable");
         logger.always("2. Set AWS_SECRET_ACCESS_KEY environment variable");

@@ -12,7 +12,6 @@ import {
   ERROR_MESSAGE_PREFIXES,
   RETRY_DELAYS,
   RETRYABLE_ERROR_CONDITIONS,
-  AWS_ERROR_MAPPINGS,
   ERROR_KEYWORDS,
 } from "./error-constants.js";
 
@@ -29,21 +28,23 @@ export class SageMakerError extends Error {
 
   constructor(
     message: string,
-    code: SageMakerErrorCode = "UNKNOWN_ERROR",
-    statusCode?: number,
-    cause?: Error,
-    endpoint?: string,
-    requestId?: string,
-    retryable: boolean = false,
+    options: {
+      code?: SageMakerErrorCode;
+      statusCode?: number;
+      cause?: Error;
+      endpoint?: string;
+      requestId?: string;
+      retryable?: boolean;
+    } = {},
   ) {
     super(message);
     this.name = "SageMakerError";
-    this.code = code;
-    this.statusCode = statusCode;
-    this.cause = cause;
-    this.endpoint = endpoint;
-    this.requestId = requestId;
-    this.retryable = retryable;
+    this.code = options.code ?? "UNKNOWN_ERROR";
+    this.statusCode = options.statusCode;
+    this.cause = options.cause;
+    this.endpoint = options.endpoint;
+    this.requestId = options.requestId;
+    this.retryable = options.retryable ?? false;
 
     // Capture stack trace if available
     if (Error.captureStackTrace) {
@@ -122,12 +123,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.VALIDATION}: ${error.message}`,
-        "VALIDATION_ERROR",
-        400,
-        error,
-        endpoint,
-        extractRequestId(error),
-        false,
+        {
+          code: "VALIDATION_ERROR",
+          statusCode: 400,
+          cause: error,
+          endpoint,
+          requestId: extractRequestId(error),
+          retryable: false,
+        },
       );
     }
 
@@ -137,12 +140,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.MODEL}: ${error.message}`,
-        "MODEL_ERROR",
-        500,
-        error,
-        endpoint,
-        extractRequestId(error),
-        false,
+        {
+          code: "MODEL_ERROR",
+          statusCode: 500,
+          cause: error,
+          endpoint,
+          requestId: extractRequestId(error),
+          retryable: false,
+        },
       );
     }
 
@@ -152,12 +157,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.INTERNAL}: ${error.message}`,
-        "INTERNAL_ERROR",
-        500,
-        error,
-        endpoint,
-        extractRequestId(error),
-        true,
+        {
+          code: "INTERNAL_ERROR",
+          statusCode: 500,
+          cause: error,
+          endpoint,
+          requestId: extractRequestId(error),
+          retryable: true,
+        },
       );
     }
 
@@ -169,12 +176,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.SERVICE_UNAVAILABLE}: ${error.message}`,
-        "SERVICE_UNAVAILABLE",
-        503,
-        error,
-        endpoint,
-        extractRequestId(error),
-        true,
+        {
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          cause: error,
+          endpoint,
+          requestId: extractRequestId(error),
+          retryable: true,
+        },
       );
     }
 
@@ -186,12 +195,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.THROTTLING}: ${error.message}`,
-        "THROTTLING_ERROR",
-        429,
-        error,
-        endpoint,
-        extractRequestId(error),
-        true,
+        {
+          code: "THROTTLING_ERROR",
+          statusCode: 429,
+          cause: error,
+          endpoint,
+          requestId: extractRequestId(error),
+          retryable: true,
+        },
       );
     }
 
@@ -203,12 +214,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.CREDENTIALS}: ${error.message}`,
-        "CREDENTIALS_ERROR",
-        401,
-        error,
-        endpoint,
-        undefined,
-        false,
+        {
+          code: "CREDENTIALS_ERROR",
+          statusCode: 401,
+          cause: error,
+          endpoint,
+          requestId: undefined,
+          retryable: false,
+        },
       );
     }
 
@@ -218,12 +231,14 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.NETWORK}: ${error.message}`,
-        "NETWORK_ERROR",
-        0,
-        error,
-        endpoint,
-        undefined,
-        true,
+        {
+          code: "NETWORK_ERROR",
+          statusCode: 0,
+          cause: error,
+          endpoint,
+          requestId: undefined,
+          retryable: true,
+        },
       );
     }
 
@@ -234,39 +249,39 @@ export function handleSageMakerError(
     ) {
       return new SageMakerError(
         `${ERROR_MESSAGE_PREFIXES.ENDPOINT_NOT_FOUND}: ${error.message}`,
-        "ENDPOINT_NOT_FOUND",
-        404,
-        error,
-        endpoint,
-        extractRequestId(error),
-        false,
+        {
+          code: "ENDPOINT_NOT_FOUND",
+          statusCode: 404,
+          cause: error,
+          endpoint,
+          requestId: extractRequestId(error),
+          retryable: false,
+        },
       );
     }
 
     // Generic error handling
-    return new SageMakerError(
-      error.message,
-      "UNKNOWN_ERROR",
-      500,
-      error,
+    return new SageMakerError(error.message, {
+      code: "UNKNOWN_ERROR",
+      statusCode: 500,
+      cause: error,
       endpoint,
-      extractRequestId(error),
-      false,
-    );
+      requestId: extractRequestId(error),
+      retryable: false,
+    });
   }
 
   // Handle non-Error objects
   const errorMessage =
     typeof error === "string" ? error : "Unknown error occurred";
-  return new SageMakerError(
-    errorMessage,
-    "UNKNOWN_ERROR",
-    500,
-    undefined,
+  return new SageMakerError(errorMessage, {
+    code: "UNKNOWN_ERROR",
+    statusCode: 500,
+    cause: undefined,
     endpoint,
-    undefined,
-    false,
-  );
+    requestId: undefined,
+    retryable: false,
+  });
 }
 
 /**
@@ -324,7 +339,11 @@ export function createValidationError(
   const fullMessage = field
     ? `${ERROR_MESSAGE_PREFIXES.VALIDATION_FIELD} '${field}': ${message}`
     : message;
-  return new SageMakerError(fullMessage, "VALIDATION_ERROR", 400);
+  return new SageMakerError(fullMessage, {
+    code: "VALIDATION_ERROR",
+    statusCode: 400,
+    retryable: false,
+  });
 }
 
 /**
@@ -336,12 +355,11 @@ export function createValidationError(
 export function createCredentialsError(message: string): SageMakerError {
   return new SageMakerError(
     `${ERROR_MESSAGE_PREFIXES.CREDENTIALS_SETUP}: ${message}`,
-    "CREDENTIALS_ERROR",
-    401,
-    undefined,
-    undefined,
-    undefined,
-    false,
+    {
+      code: "CREDENTIALS_ERROR",
+      statusCode: 401,
+      retryable: false,
+    },
   );
 }
 
@@ -358,12 +376,12 @@ export function createNetworkError(
 ): SageMakerError {
   return new SageMakerError(
     `${ERROR_MESSAGE_PREFIXES.NETWORK_CONNECTION}: ${message}`,
-    "NETWORK_ERROR",
-    0,
-    undefined,
-    endpoint,
-    undefined,
-    true,
+    {
+      code: "NETWORK_ERROR",
+      statusCode: 0,
+      endpoint,
+      retryable: true,
+    },
   );
 }
 

@@ -21,32 +21,43 @@ async function evaluationDemo() {
   try {
     // 1. Basic Evaluation
     console.log("1. 🔹 Basic Evaluation");
-    const result = await evaluateResponse(query, response);
+    const result = await evaluateResponse({
+      userQuery: query,
+      aiResponse: response,
+    });
 
-    console.log(`   Relevance: ${result.relevanceScore}/10`);
-    console.log(`   Accuracy: ${result.accuracyScore}/10`);
-    console.log(`   Completeness: ${result.completenessScore}/10`);
+    console.log(`   Relevance: ${result.relevance}/10`);
+    console.log(`   Accuracy: ${result.accuracy}/10`);
+    console.log(`   Completeness: ${result.completeness}/10`);
     console.log(`   Overall: ${result.overall}/10`);
     console.log(`   Alert: ${result.alertSeverity}`);
     console.log(`   Reasoning: ${result.reasoning}\n`);
 
     // 2. Domain-Aware Evaluation
     console.log("2. 🎯 Domain-Aware Evaluation");
-    const domainResult = await evaluateResponse(
-      query,
-      response,
-      { team: "small-team", feature: "ai-education" },
-      "AI education platform",
-      "knowledge-base, simplification tools",
-      [
+    const domainResult = await evaluateResponse({
+      userQuery: query,
+      aiResponse: response,
+      context: { team: "small-team", feature: "ai-education" },
+      primaryDomain: "AI education platform",
+      assistantRole: "AI tutor",
+      conversationHistory: [
         { role: "user", content: "I want to understand AI concepts" },
         { role: "assistant", content: "I can help explain AI in simple terms" },
       ],
-    );
+      toolUsage: [
+        {
+          toolName: "knowledge-base",
+          input: { query: "machine learning basics" },
+          output: { result: "definitions and examples" },
+          executionTime: 150,
+        },
+      ],
+    });
 
-    console.log(`   Relevance: ${domainResult.relevanceScore}/10`);
-    console.log(`   Accuracy: ${domainResult.accuracyScore}/10`);
-    console.log(`   Completeness: ${domainResult.completenessScore}/10`);
+    console.log(`   Relevance: ${domainResult.relevance}/10`);
+    console.log(`   Accuracy: ${domainResult.accuracy}/10`);
+    console.log(`   Completeness: ${domainResult.completeness}/10`);
     console.log(`   Overall: ${domainResult.overall}/10`);
     console.log(`   Alert: ${domainResult.alertSeverity}`);
     console.log(`   Reasoning: ${domainResult.reasoning}\n`);

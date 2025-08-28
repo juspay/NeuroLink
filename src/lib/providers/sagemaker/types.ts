@@ -113,7 +113,7 @@ export interface SageMakerUsage {
   /** Number of completion tokens */
   completionTokens: number;
   /** Total tokens used */
-  totalTokens: number;
+  total: number;
   /** Request processing time in milliseconds */
   requestTime?: number;
   /** Model inference time in milliseconds */

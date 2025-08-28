@@ -4,9 +4,7 @@ import type {
   MiddlewareConfig,
   MiddlewareContext,
   MiddlewareRegistrationOptions,
-  MiddlewareChainStats,
   MiddlewareExecutionResult,
-  MiddlewarePreset,
 } from "./types.js";
 import { logger } from "../utils/logger.js";
 
@@ -204,10 +202,10 @@ export class MiddlewareRegistry {
     middleware: NeuroLinkMiddleware,
     config: MiddlewareConfig | undefined,
     globalConfig: Record<string, unknown> | undefined,
-    context: MiddlewareContext,
+    _context: MiddlewareContext,
   ): LanguageModelV1Middleware {
     // Merge configurations: global < middleware config < runtime config
-    const mergedConfig = {
+    const _mergedConfig = {
       ...globalConfig,
       ...config?.config,
     };
@@ -221,7 +219,10 @@ export class MiddlewareRegistry {
       wrappedMiddleware.transformParams = async (args) => {
         const startTime = Date.now();
         try {
-          const result = await middleware.transformParams!(args);
+          if (!middleware.transformParams) {
+            throw new Error("transformParams method is required");
+          }
+          const result = await middleware.transformParams(args);
           this.recordExecution(middleware.metadata.id, startTime, true);
           return result;
         } catch (error) {
@@ -240,7 +241,10 @@ export class MiddlewareRegistry {
       wrappedMiddleware.wrapGenerate = async (args) => {
         const startTime = Date.now();
         try {
-          const result = await middleware.wrapGenerate!(args);
+          if (!middleware.wrapGenerate) {
+            throw new Error("wrapGenerate method is required");
+          }
+          const result = await middleware.wrapGenerate(args);
           this.recordExecution(middleware.metadata.id, startTime, true);
           return result;
         } catch (error) {
@@ -259,7 +263,10 @@ export class MiddlewareRegistry {
       wrappedMiddleware.wrapStream = async (args) => {
         const startTime = Date.now();
         try {
-          const result = await middleware.wrapStream!(args);
+          if (!middleware.wrapStream) {
+            throw new Error("wrapStream method is required");
+          }
+          const result = await middleware.wrapStream(args);
           this.recordExecution(middleware.metadata.id, startTime, true);
           return result;
         } catch (error) {

@@ -439,7 +439,7 @@ export class ContextFactory {
 /**
  * Type guard to check if value is valid context
  */
-function isValidContext(value: unknown): value is BaseContext {
+function _isValidContext(value: unknown): value is BaseContext {
   return ContextFactory.validateContext(value) !== null;
 }
 
@@ -468,7 +468,7 @@ export class ContextConverter {
   ): ExecutionContext {
     const {
       preserveLegacyFields = false,
-      validateDomainData = true,
+      validateDomainData: _validateDomainData = true,
       includeMetadata = true,
     } = options;
 

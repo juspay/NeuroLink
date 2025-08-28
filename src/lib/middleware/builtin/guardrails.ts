@@ -37,7 +37,7 @@ export function createGuardrailsMiddleware(
   };
 
   const middleware: LanguageModelV1Middleware = {
-    wrapGenerate: async ({ doGenerate, params }) => {
+    wrapGenerate: async ({ doGenerate, params: _params }) => {
       logger.debug(`[GuardrailsMiddleware] Applying to generate call.`, {
         badWordsEnabled: !!config.badWords?.enabled,
         modelFilterEnabled: !!config.modelFilter?.enabled,
@@ -84,7 +84,7 @@ export function createGuardrailsMiddleware(
       return result;
     },
 
-    wrapStream: async ({ doStream, params }) => {
+    wrapStream: async ({ doStream, params: _params }) => {
       logger.debug(`[GuardrailsMiddleware] Applying to stream call.`, {
         badWordsEnabled: !!config.badWords?.enabled,
       });

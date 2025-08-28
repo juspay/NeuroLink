@@ -82,7 +82,7 @@ export default [
 
       // TypeScript-specific rules (BALANCED ENFORCEMENT)
       "@typescript-eslint/no-unused-vars": [
-        "warn",
+        "error",
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
@@ -90,19 +90,17 @@ export default [
           args: "after-used",
           vars: "local",
         },
-      ], // Warn about unused vars but be lenient with imports and function args
+      ], // Error for unused vars (unused imports should be caught)
       "@typescript-eslint/no-explicit-any": "error", // Error on any types - enforce strict typing
       "@typescript-eslint/prefer-as-const": "error",
       "@typescript-eslint/no-non-null-assertion": "warn", // Warn about non-null assertions but don't block builds
-      "@typescript-eslint/explicit-function-return-type": "off", // Too many to fix immediately
 
       // Enhanced type safety (basic rules only)
 
-      // Code quality gates (relaxed for existing codebase)
-      complexity: ["warn", 25], // Warn instead of error for large functions
-      "max-depth": ["warn", 6], // Warn instead of error for deeply nested code
-      "max-lines-per-function": ["warn", 300], // Warn for very large functions
-      "max-params": ["warn", 6], // Warn for too many parameters
+      // Code quality gates (balanced enforcement - warnings for legacy code)
+      "max-depth": ["error", 6], // Error for deeply nested code
+      "max-lines-per-function": ["warn", 300], // Warn for very large functions (legacy methods)
+      "max-params": ["error", 6], // Error for too many parameters
 
       // Security rules
       "no-eval": "error",

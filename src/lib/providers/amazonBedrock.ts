@@ -17,7 +17,7 @@ import {
 } from "../utils/providerConfig.js";
 import { buildMessagesArray } from "../utils/messageBuilder.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import { configureAWSProxySupport } from "../proxy/awsProxyIntegration.js";
+import { configureAWSProxySupport as _configureAWSProxySupport } from "../proxy/awsProxyIntegration.js";
 import { AWSCredentialProvider } from "./aws/credentialProvider.js";
 import { BedrockRuntimeClient } from "@aws-sdk/client-bedrock-runtime";
 import type { AWSCredentialConfig } from "../types/providers.js";

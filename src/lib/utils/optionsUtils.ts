@@ -115,7 +115,7 @@ export class OptionsEnhancer {
     if (typeof SharedArrayBuffer !== "undefined" && crossOriginIsolated) {
       try {
         return new SharedArrayBuffer(4); // 4 bytes for Int32
-      } catch (e) {
+      } catch {
         // SharedArrayBuffer is defined but not usable (browser CORS headers not set)
         if (typeof logger !== "undefined" && logger?.warn) {
           logger.warn(
@@ -475,12 +475,23 @@ export class OptionsEnhancer {
     options: GenerateOptions,
     enhancementOptions: EnhancementOptions,
   ): EnhancementResult {
-    const legacyMigration = enhancementOptions.legacyMigration!;
+    const legacyMigration = enhancementOptions.legacyMigration;
+    if (!legacyMigration) {
+      throw new Error("Legacy migration configuration is required");
+    }
+
+    if (!legacyMigration.legacyContext) {
+      throw new Error("Legacy context is required for migration");
+    }
+
+    if (!legacyMigration.domainType) {
+      throw new Error("Domain type is required for migration");
+    }
 
     // Convert legacy context to execution context
     const executionContext = ContextConverter.convertBusinessContext(
-      legacyMigration.legacyContext!,
-      legacyMigration.domainType!,
+      legacyMigration.legacyContext,
+      legacyMigration.domainType,
       {
         preserveLegacyFields: legacyMigration.preserveFields,
         validateDomainData: true,
@@ -525,7 +536,7 @@ export class OptionsEnhancer {
         configurationUsed: {
           domainType: legacyMigration.domainType,
           preserveFields: legacyMigration.preserveFields,
-          legacyContextKeys: Object.keys(legacyMigration.legacyContext!),
+          legacyContextKeys: Object.keys(legacyMigration.legacyContext),
         },
         warnings: [],
         recommendations: [

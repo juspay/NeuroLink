@@ -297,8 +297,12 @@ export class MCPClientFactory {
     }
 
     // Create transport
+    if (!config.command) {
+      throw new Error(`Command is required for stdio transport`);
+    }
+
     const transport = new StdioClientTransport({
-      command: config.command!,
+      command: config.command,
       args: config.args || [],
       env: Object.fromEntries(
         Object.entries({

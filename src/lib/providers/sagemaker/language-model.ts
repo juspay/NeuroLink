@@ -17,10 +17,7 @@ import { handleSageMakerError } from "./errors.js";
 import { estimateTokenUsage, createSageMakerStream } from "./streaming.js";
 import type { SageMakerConfig, SageMakerModelConfig } from "./types.js";
 import type { ConnectivityResult } from "../../types/typeAliases.js";
-import {
-  AdaptiveSemaphore,
-  createAdaptiveSemaphore,
-} from "./adaptive-semaphore.js";
+import { createAdaptiveSemaphore } from "./adaptive-semaphore.js";
 import { logger } from "../../utils/logger.js";
 import type { UnknownRecord } from "../../types/common.js";
 
@@ -289,7 +286,7 @@ export class SageMakerLanguageModel implements LanguageModelV1 {
         usage: {
           promptTokens: usage.promptTokens,
           completionTokens: usage.completionTokens,
-          totalTokens: usage.totalTokens,
+          totalTokens: usage.total,
         },
         finishReason,
         rawCall: {
@@ -870,7 +867,7 @@ export class SageMakerLanguageModel implements LanguageModelV1 {
       usage: {
         promptTokens: number;
         completionTokens: number;
-        totalTokens: number;
+        total: number;
       };
       finishReason:
         | "stop"
@@ -922,7 +919,7 @@ export class SageMakerLanguageModel implements LanguageModelV1 {
       usage: {
         promptTokens: number;
         completionTokens: number;
-        totalTokens: number;
+        total: number;
       };
       finishReason:
         | "stop"
@@ -948,7 +945,7 @@ export class SageMakerLanguageModel implements LanguageModelV1 {
       usage: {
         promptTokens: number;
         completionTokens: number;
-        totalTokens: number;
+        total: number;
       };
       finishReason:
         | "stop"
@@ -999,8 +996,8 @@ export class SageMakerLanguageModel implements LanguageModelV1 {
           usage: {
             promptTokens: result.usage.promptTokens,
             completionTokens: result.usage.completionTokens,
-            totalTokens:
-              result.usage.totalTokens ||
+            total:
+              result.usage.totalTokens ??
               result.usage.promptTokens + result.usage.completionTokens,
           },
           finishReason: result.finishReason,
@@ -1022,7 +1019,7 @@ export class SageMakerLanguageModel implements LanguageModelV1 {
         // Create error result
         results[index] = {
           text: "",
-          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          usage: { promptTokens: 0, completionTokens: 0, total: 0 },
           finishReason: "error",
           index,
         };

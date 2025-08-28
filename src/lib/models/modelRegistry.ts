@@ -568,11 +568,11 @@ export function getAvailableProviders(): AIProviderName[] {
  */
 export function calculateCost(
   model: ModelInfo,
-  inputTokens: number,
-  outputTokens: number,
+  input: number,
+  output: number,
 ): number {
-  const inputCost = (inputTokens / 1000) * model.pricing.inputCostPer1K;
-  const outputCost = (outputTokens / 1000) * model.pricing.outputCostPer1K;
+  const inputCost = (input / 1000) * model.pricing.inputCostPer1K;
+  const outputCost = (output / 1000) * model.pricing.outputCostPer1K;
   return inputCost + outputCost;
 }
 

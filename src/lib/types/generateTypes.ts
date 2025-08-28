@@ -1,15 +1,8 @@
-import type { Tool, Schema } from "ai";
-import type {
-  ZodUnknownSchema,
-  ValidationSchema,
-  StandardRecord,
-} from "./typeAliases.js";
-import type {
-  AIProviderName,
-  AnalyticsData,
-  EvaluationData,
-} from "../core/types.js";
-import type { ContextManagerConfig } from "../context/types.js";
+import type { Tool } from "ai";
+import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
+import type { AIProviderName, AnalyticsData } from "../core/types.js";
+import type { EvaluationData } from "../index.js";
+import type { TokenUsage } from "./providers.js";
 
 /**
  * Generate function options interface - Primary method for content generation
@@ -77,11 +70,7 @@ export interface GenerateResult {
   model?: string;
 
   // Usage and performance
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-  };
+  usage?: TokenUsage;
   responseTime?: number;
 
   // Tool integration

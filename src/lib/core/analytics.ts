@@ -8,31 +8,10 @@
 import { logger } from "../utils/logger.js";
 import type { JsonValue, UnknownRecord } from "../types/common.js";
 import { modelConfig } from "./modelConfiguration.js";
+import type { AnalyticsData, TokenUsage } from "../types/providers.js";
 
-export interface AnalyticsData {
-  provider: string;
-  model: string;
-  tokens: {
-    input: number;
-    output: number;
-    total: number;
-  };
-  cost?: number;
-  responseTime: number;
-  context?: Record<string, JsonValue>;
-  timestamp: string;
-  // Extended fields from analytics-helper consolidation
-  evaluation?: {
-    relevanceScore: number;
-    accuracyScore: number;
-    completenessScore: number;
-    overall: number;
-    evaluationProvider?: string;
-    evaluationTime?: number;
-    evaluationAttempt?: number;
-  };
-  costDetails?: UnknownRecord;
-}
+// Re-export AnalyticsData and TokenUsage from the standard location
+export type { AnalyticsData, TokenUsage } from "../types/providers.js";
 
 /**
  * Create analytics data structure from AI response
@@ -56,9 +35,9 @@ export function createAnalytics(
     const analytics: AnalyticsData = {
       provider,
       model,
-      tokens,
+      tokenUsage: tokens,
       cost,
-      responseTime,
+      requestDuration: responseTime,
       context: context as Record<string, JsonValue> | undefined,
       timestamp: new Date().toISOString(),
     };
@@ -79,8 +58,8 @@ export function createAnalytics(
     return {
       provider,
       model,
-      tokens: { input: 0, output: 0, total: 0 },
-      responseTime,
+      tokenUsage: { input: 0, output: 0, total: 0 },
+      requestDuration: responseTime,
       context: context as Record<string, JsonValue> | undefined,
       timestamp: new Date().toISOString(),
     };
@@ -90,11 +69,7 @@ export function createAnalytics(
 /**
  * Extract token usage from various AI result formats
  */
-function extractTokenUsage(result: UnknownRecord): {
-  input: number;
-  output: number;
-  total: number;
-} {
+function extractTokenUsage(result: UnknownRecord): TokenUsage {
   // Use properly typed usage object from BaseProvider or direct AI SDK
   if (
     result.usage &&
@@ -103,19 +78,12 @@ function extractTokenUsage(result: UnknownRecord): {
   ) {
     const usage = result.usage as Record<string, unknown>;
 
-    // Try BaseProvider normalized format first (inputTokens/outputTokens)
-    if (
-      typeof usage.inputTokens === "number" ||
-      typeof usage.outputTokens === "number"
-    ) {
-      const input =
-        typeof usage.inputTokens === "number" ? usage.inputTokens : 0;
-      const output =
-        typeof usage.outputTokens === "number" ? usage.outputTokens : 0;
+    // Try BaseProvider normalized format first (input/output/total)
+    if (typeof usage.input === "number" || typeof usage.output === "number") {
+      const input = typeof usage.input === "number" ? usage.input : 0;
+      const output = typeof usage.output === "number" ? usage.output : 0;
       const total =
-        typeof usage.totalTokens === "number"
-          ? usage.totalTokens
-          : input + output;
+        typeof usage.total === "number" ? usage.total : input + output;
       return { input, output, total };
     }
 
@@ -129,15 +97,13 @@ function extractTokenUsage(result: UnknownRecord): {
       const output =
         typeof usage.completionTokens === "number" ? usage.completionTokens : 0;
       const total =
-        typeof usage.totalTokens === "number"
-          ? usage.totalTokens
-          : input + output;
+        typeof usage.total === "number" ? usage.total : input + output;
       return { input, output, total };
     }
 
     // Handle total-only case
-    if (typeof usage.totalTokens === "number") {
-      return { input: 0, output: 0, total: usage.totalTokens };
+    if (typeof usage.total === "number") {
+      return { input: 0, output: 0, total: usage.total };
     }
   }
 
@@ -152,7 +118,7 @@ function extractTokenUsage(result: UnknownRecord): {
 function estimateCost(
   provider: string,
   model: string,
-  tokens: { input: number; output: number; total: number },
+  tokens: TokenUsage,
 ): number | undefined {
   try {
     // Use the new configuration system instead of hardcoded costs

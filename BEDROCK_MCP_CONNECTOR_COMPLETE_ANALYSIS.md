@@ -2763,18 +2763,15 @@ const defaultSystemPrompt = `You are a helpful assistant with access to external
 **CRITICAL**: Events must be emitted at exact points in the code:
 
 1. **MCP Connection Events**:
-
    - `message`: "Connecting to MCP server..."
    - `message`: "Connected to MCP server"
    - `connected`: (no parameters)
 
 2. **Tool Execution Events**:
-
    - `tool:start`: (toolName, input)
    - `tool:end`: (toolName, result)
 
 3. **Response Events**:
-
    - `response:start`: (no parameters)
    - `response:chunk`: (chunk)
    - `response:end`: (fullResponse)

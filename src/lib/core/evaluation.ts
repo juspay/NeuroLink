@@ -1,17 +1,17 @@
 /**
- * NeuroLink Unified Evaluation System
+ * NeuroLink Evaluation System
  */
 
 import { logger } from "../utils/logger.js";
 import { AIProviderFactory } from "./factory.js";
-import type { EvaluationData } from "./types.js";
-import type { UnknownRecord } from "../types/common.js";
+import type { EvaluationData } from "../index.js";
 import { z } from "zod";
 import { ProviderRegistry } from "../factories/providerRegistry.js";
 import { modelConfig } from "./modelConfiguration.js";
+import { normalizeEvaluationData } from "../utils/evaluationUtils.js";
 
 // Enhanced evaluation result interface
-export interface UnifiedEvaluationResult extends EvaluationData {
+export interface EvaluationResult extends EvaluationData {
   domainAlignment?: number;
   terminologyAccuracy?: number;
   toolEffectiveness?: number;
@@ -32,7 +32,7 @@ export interface UnifiedEvaluationResult extends EvaluationData {
 }
 
 // Enhanced evaluation context
-export interface UnifiedEvaluationContext {
+export interface EvaluationContext {
   userQuery: string;
   aiResponse: string;
   context?: Record<string, unknown>;
@@ -54,7 +54,7 @@ export interface UnifiedEvaluationContext {
 }
 
 // Zod schema for validation
-const UnifiedEvaluationSchema = z.object({
+const EvaluationSchema = z.object({
   relevance: z.number().min(1).max(10),
   accuracy: z.number().min(1).max(10),
   completeness: z.number().min(1).max(10),
@@ -67,12 +67,12 @@ const UnifiedEvaluationSchema = z.object({
 /**
  * Get default evaluation when evaluation fails
  */
-function getDefaultUnifiedEvaluation(
+function getDefaultEvaluation(
   reason: string,
   evaluationTime: number,
-  context: UnifiedEvaluationContext,
-): UnifiedEvaluationResult {
-  const functionTag = "getDefaultUnifiedEvaluation";
+  context: EvaluationContext,
+): EvaluationResult {
+  const functionTag = "getDefaultEvaluation";
 
   logger.debug(`[${functionTag}] Creating default evaluation`, {
     reason,
@@ -116,15 +116,18 @@ function getDefaultUnifiedEvaluation(
 /**
  * Parse unified evaluation result from text response
  */
-function parseUnifiedEvaluationResult(
+function parseEvaluationResult(
   response: string,
-  context: UnifiedEvaluationContext,
-): Partial<UnifiedEvaluationResult> {
-  const functionTag = "parseUnifiedEvaluationResult";
+  context: EvaluationContext,
+): Partial<EvaluationResult> {
+  const functionTag = "parseEvaluationResult";
 
   try {
     logger.debug(`[${functionTag}] Parsing evaluation response`, {
       responseLength: response.length,
+      domain: context.primaryDomain,
+      hasToolUsage: !!context.toolUsage?.length,
+      hasConversationHistory: !!context.conversationHistory?.length,
     });
 
     // Try JSON parsing first
@@ -133,13 +136,17 @@ function parseUnifiedEvaluationResult(
       try {
         const parsed = JSON.parse(jsonMatch[0]);
         return parsed;
-      } catch (e) {
-        logger.debug(`[${functionTag}] JSON parsing failed, trying regex`);
+      } catch (jsonError) {
+        logger.debug(`[${functionTag}] JSON parsing failed, trying regex`, {
+          error:
+            jsonError instanceof Error ? jsonError.message : String(jsonError),
+          jsonContent: jsonMatch[0].substring(0, 100), // First 100 chars for debugging
+        });
       }
     }
 
     // Fallback to regex parsing
-    const result: Partial<UnifiedEvaluationResult> = {};
+    const result: Partial<EvaluationResult> = {};
 
     const patterns = {
       relevance: /relevance[:\s]*([0-9]+(?:\.[0-9]+)?)/i,
@@ -174,14 +181,54 @@ function parseUnifiedEvaluationResult(
       }
     }
 
-    // Ensure minimum valid scores
-    return {
+    // Ensure minimum valid scores and validate with schema
+    // Use context to enhance evaluation data
+    const evaluationData = {
       relevance: result.relevance || 1,
       accuracy: result.accuracy || 1,
       completeness: result.completeness || 1,
       overall: result.overall || 1,
-      reasoning: result.reasoning || "No detailed reasoning provided",
+      domainAlignment:
+        result.domainAlignment || (context.primaryDomain ? 5 : undefined), // Default to 5 if domain-specific
+      terminologyAccuracy:
+        result.terminologyAccuracy || (context.primaryDomain ? 5 : undefined),
+      toolEffectiveness:
+        result.toolEffectiveness || (context.toolUsage?.length ? 5 : undefined), // Default to 5 if tools were used
     };
+
+    // Validate against schema
+    try {
+      const validated = EvaluationSchema.parse(evaluationData);
+      // Enhance reasoning with context information
+      let enhancedReasoning =
+        result.reasoning || "No detailed reasoning provided";
+      if (context.primaryDomain) {
+        enhancedReasoning += ` (Domain: ${context.primaryDomain})`;
+      }
+      if (context.toolUsage?.length) {
+        enhancedReasoning += ` (Tools used: ${context.toolUsage.map((t) => t.toolName).join(", ")})`;
+      }
+      if (context.conversationHistory?.length) {
+        enhancedReasoning += ` (Conversation turns: ${context.conversationHistory.length})`;
+      }
+
+      return {
+        ...validated,
+        reasoning: enhancedReasoning,
+      };
+    } catch (validationError) {
+      logger.warn(`[${functionTag}] Schema validation failed, using fallback`, {
+        validationError,
+        originalData: evaluationData,
+      });
+      return {
+        relevance: Math.max(1, Math.min(10, result.relevance || 1)),
+        accuracy: Math.max(1, Math.min(10, result.accuracy || 1)),
+        completeness: Math.max(1, Math.min(10, result.completeness || 1)),
+        overall: Math.max(1, Math.min(10, result.overall || 1)),
+        reasoning: result.reasoning || "No detailed reasoning provided",
+      };
+    }
   } catch (error) {
     logger.error(`[${functionTag}] Failed to parse evaluation result`, {
       error,
@@ -199,10 +246,10 @@ function parseUnifiedEvaluationResult(
 /**
  * Main unified evaluation function
  */
-export async function generateUnifiedEvaluation(
-  context: UnifiedEvaluationContext,
-): Promise<UnifiedEvaluationResult> {
-  const functionTag = "generateUnifiedEvaluation";
+export async function generateEvaluation(
+  context: EvaluationContext,
+): Promise<EvaluationResult> {
+  const functionTag = "generateEvaluation";
   const startTime = Date.now();
 
   logger.debug(`[${functionTag}] Starting evaluation`, {
@@ -237,7 +284,7 @@ export async function generateUnifiedEvaluation(
       logger.debug(
         `[${functionTag}] No evaluation provider available, returning defaults`,
       );
-      return getDefaultUnifiedEvaluation(
+      return getDefaultEvaluation(
         "no-provider",
         Date.now() - startTime,
         context,
@@ -270,7 +317,7 @@ Reasoning: [Provide a detailed explanation of your evaluation, explaining why yo
 
     if (!result) {
       logger.debug(`[${functionTag}] No response from provider`);
-      return getDefaultUnifiedEvaluation(
+      return getDefaultEvaluation(
         "no-response",
         Date.now() - startTime,
         context,
@@ -282,37 +329,76 @@ Reasoning: [Provide a detailed explanation of your evaluation, explaining why yo
       typeof result === "string" ? result : result?.content || String(result);
 
     // Parse evaluation result
-    const parsed = parseUnifiedEvaluationResult(response, context);
+    const parsed = parseEvaluationResult(response, context);
 
-    // Validate and enhance result
-    const validatedResult = {
-      ...parsed,
-      evaluationModel: `${evaluationProvider}/${evaluationModel}`,
-      evaluationTime: Date.now() - startTime,
-      evaluationProvider,
-      evaluationAttempt: 1,
-      evaluationConfig: {
-        mode: "standard",
-        fallbackUsed: false,
-        costEstimate: 0.001, // Rough estimate
-      },
+    // Validate and enhance result using schema
+    const baseResult = {
+      relevance: parsed.relevance || 1,
+      accuracy: parsed.accuracy || 1,
+      completeness: parsed.completeness || 1,
+      overall: parsed.overall || 1,
+      domainAlignment: parsed.domainAlignment,
+      terminologyAccuracy: parsed.terminologyAccuracy,
+      toolEffectiveness: parsed.toolEffectiveness,
     };
 
-    logger.debug(`[${functionTag}] Evaluation completed`, {
-      relevance: validatedResult.relevance,
-      accuracy: validatedResult.accuracy,
-      completeness: validatedResult.completeness,
-      overall: validatedResult.overall,
-      evaluationTime: validatedResult.evaluationTime,
-    });
+    // Validate against schema before finalizing
+    try {
+      const validatedScores = EvaluationSchema.parse(baseResult);
+      const validatedResult = normalizeEvaluationData({
+        ...parsed,
+        ...validatedScores,
+        evaluationModel: `${evaluationProvider}/${evaluationModel}`,
+        evaluationTime: Date.now() - startTime,
+        evaluationProvider,
+        evaluationAttempt: 1,
+        evaluationConfig: {
+          mode: "standard",
+          fallbackUsed: false,
+          costEstimate: 0.001, // Rough estimate
+        },
+      });
 
-    return validatedResult as UnifiedEvaluationResult;
+      logger.debug(`[${functionTag}] Schema validation passed`, {
+        validatedScores,
+      });
+
+      return validatedResult as EvaluationResult;
+    } catch (validationError) {
+      logger.warn(
+        `[${functionTag}] Schema validation failed in main evaluation`,
+        {
+          validationError,
+          baseResult,
+        },
+      );
+
+      // Fallback with clamped values using normalizer
+      const validatedResult = normalizeEvaluationData({
+        ...parsed,
+        relevance: parsed.relevance || 1,
+        accuracy: parsed.accuracy || 1,
+        completeness: parsed.completeness || 1,
+        overall: parsed.overall || 1,
+        evaluationModel: `${evaluationProvider}/${evaluationModel}`,
+        evaluationTime: Date.now() - startTime,
+        evaluationProvider,
+        evaluationAttempt: 1,
+        evaluationConfig: {
+          mode: "standard",
+          fallbackUsed: false,
+          costEstimate: 0.001, // Rough estimate
+        },
+      });
+
+      return validatedResult as EvaluationResult;
+    }
   } catch (error) {
     logger.error(`[${functionTag}] Evaluation failed`, {
       error: error instanceof Error ? error.message : String(error),
     });
 
-    return getDefaultUnifiedEvaluation(
+    return getDefaultEvaluation(
       error instanceof Error ? error.message : "unknown-error",
       Date.now() - startTime,
       context,
@@ -320,43 +406,12 @@ Reasoning: [Provide a detailed explanation of your evaluation, explaining why yo
   }
 }
 
-// Legacy compatibility function with flexible arguments
+// Simplified evaluation function
 export async function evaluateResponse(
-  responseOrContext: unknown,
-  contextOrUserQuery?: unknown,
-  userQuery?: unknown,
-  providedContexts?: unknown,
-  options?: unknown,
-  additionalArgs?: unknown,
-): Promise<unknown> {
-  // Handle different call patterns for backward compatibility
-  let aiResponse: string;
-  let context: unknown;
-
-  if (typeof responseOrContext === "string") {
-    // Normal call: evaluateResponse(response, context, ...)
-    aiResponse = responseOrContext;
-    context = contextOrUserQuery;
-  } else {
-    // Provider call pattern: evaluateResponse(contextObject, userQuery, ...)
-    context = responseOrContext as UnknownRecord;
-    aiResponse =
-      ((context as UnknownRecord)?.aiResponse as string) ||
-      ((context as UnknownRecord)?.response as string) ||
-      String(contextOrUserQuery || "");
-  }
-
-  const evalContext: UnifiedEvaluationContext = {
-    userQuery:
-      (typeof userQuery === "string" ? userQuery : "") ||
-      ((context as UnknownRecord)?.userQuery as string) ||
-      (typeof contextOrUserQuery === "string" ? contextOrUserQuery : "") ||
-      "Generated response",
-    aiResponse,
-    context: context as UnknownRecord | undefined,
-  };
-  return generateUnifiedEvaluation(evalContext);
+  context: EvaluationContext,
+): Promise<EvaluationResult> {
+  return generateEvaluation(context);
 }
 
 // Export additional utilities
-export { getDefaultUnifiedEvaluation, parseUnifiedEvaluationResult };
+export { getDefaultEvaluation, parseEvaluationResult };

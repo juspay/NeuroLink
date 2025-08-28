@@ -259,13 +259,13 @@ export class ModelResolver {
    */
   static calculateCostComparison(
     models: ModelInfo[],
-    inputTokens: number = 1000,
-    outputTokens: number = 500,
+    input: number = 1000,
+    output: number = 500,
   ): Array<{ model: ModelInfo; cost: number; costPer1K: number }> {
     return models
       .map((model) => ({
         model,
-        cost: calculateCost(model, inputTokens, outputTokens),
+        cost: calculateCost(model, input, output),
         costPer1K: model.pricing.inputCostPer1K + model.pricing.outputCostPer1K,
       }))
       .sort((a, b) => a.cost - b.cost);
