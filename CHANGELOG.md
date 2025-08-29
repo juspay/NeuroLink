@@ -1,3 +1,9 @@
+## [7.29.2](https://github.com/juspay/neurolink/compare/v7.29.1...v7.29.2) (2025-08-29)
+
+### Bug Fixes
+
+- **(providers):** enable drop-in replacement for bedrock-mcp-connector ([9b67d23](https://github.com/juspay/neurolink/commit/9b67d233c2e8400a401759e34ffaf46a9a9c77a8))
+
 ## [7.29.1](https://github.com/juspay/neurolink/compare/v7.29.0...v7.29.1) (2025-08-28)
 
 ### Bug Fixes
