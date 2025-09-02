@@ -118,6 +118,9 @@ import type {
 } from "./types/externalMcp.js";
 // Import direct tools server for automatic registration
 import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
+// Import orchestration components
+import { ModelRouter } from "./utils/modelRouter.js";
+import { BinaryTaskClassifier } from "./utils/taskClassifier.js";
 
 // Provider and MCP diagnostic types
 export interface ProviderStatus {
@@ -218,6 +221,9 @@ export class NeuroLink {
     conversationMemory?: Partial<ConversationMemoryConfig>;
   };
 
+  // Add orchestration property
+  private enableOrchestration: boolean;
+
   /**
    * Creates a new NeuroLink instance for AI text generation with MCP tool integration.
    *
@@ -226,6 +232,7 @@ export class NeuroLink {
    * @param config.conversationMemory.enabled - Whether to enable conversation memory (default: false)
    * @param config.conversationMemory.maxSessions - Maximum number of concurrent sessions (default: 100)
    * @param config.conversationMemory.maxTurnsPerSession - Maximum conversation turns per session (default: 50)
+   * @param config.enableOrchestration - Whether to enable smart model orchestration (default: false)
    *
    * @example
    * ```typescript
@@ -240,6 +247,11 @@ export class NeuroLink {
    *     maxTurnsPerSession: 20
    *   }
    * });
+   *
+   * // With orchestration enabled
+   * const neurolink = new NeuroLink({
+   *   enableOrchestration: true
+   * });
    * ```
    *
    * @throws {Error} When provider registry setup fails
@@ -248,6 +260,7 @@ export class NeuroLink {
    */
   constructor(config?: {
     conversationMemory?: Partial<ConversationMemoryConfig>;
+    enableOrchestration?: boolean;
   }) {
     // Read tool cache duration from environment variables, with a default
     const cacheDurationEnv = process.env.NEUROLINK_TOOL_CACHE_DURATION;
@@ -258,6 +271,9 @@ export class NeuroLink {
     const constructorStartTime = Date.now();
     const constructorHrTimeStart = process.hrtime.bigint();
     const constructorId = `neurolink-constructor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Initialize orchestration setting
+    this.enableOrchestration = config?.enableOrchestration ?? false;
 
     this.logConstructorStart(
       constructorId,
@@ -1174,6 +1190,234 @@ export class NeuroLink {
   }
 
   /**
+   * Apply orchestration to determine optimal provider and model
+   * @param options - Original GenerateOptions
+   * @returns Modified options with orchestrated provider marked in context, or empty object if validation fails
+   */
+  private async applyOrchestration(
+    options: GenerateOptions,
+  ): Promise<Partial<GenerateOptions>> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure input.text exists before proceeding
+      if (!options.input?.text || typeof options.input.text !== "string") {
+        logger.debug("Orchestration skipped - no valid input text", {
+          hasInput: !!options.input,
+          hasText: !!options.input?.text,
+          textType: typeof options.input?.text,
+        });
+        return {}; // Return empty object to preserve existing fallback behavior
+      }
+
+      // Compute classification once to avoid duplicate calls
+      const classification = BinaryTaskClassifier.classify(options.input.text);
+      
+      // Use the model router to get the optimal route
+      const route = ModelRouter.route(options.input.text);
+
+      // Validate that the routed provider is available and configured
+      const isProviderAvailable = await this.hasProviderEnvVars(route.provider);
+      
+      if (!isProviderAvailable && route.provider !== "ollama") {
+        logger.debug("Orchestration provider validation failed", {
+          taskType: classification.type,
+          routedProvider: route.provider,
+          routedModel: route.model,
+          reason: "Provider not configured or missing environment variables",
+          orchestrationTime: `${Date.now() - startTime}ms`,
+        });
+        return {}; // Return empty object to preserve existing fallback behavior
+      }
+
+      // For Ollama, check if service is running and model is available
+      if (route.provider === "ollama") {
+        try {
+          const response = await fetch("http://localhost:11434/api/tags", {
+            method: "GET",
+            signal: AbortSignal.timeout(2000),
+          });
+
+          if (!response.ok) {
+            logger.debug("Orchestration provider validation failed", {
+              taskType: classification.type,
+              routedProvider: route.provider,
+              routedModel: route.model,
+              reason: "Ollama service not responding",
+              orchestrationTime: `${Date.now() - startTime}ms`,
+            });
+            return {}; // Return empty object to preserve existing fallback behavior
+          }
+
+          const { models } = await response.json();
+          const modelIsAvailable = models.some(
+            (m: { name: string }) => m.name === (route.model || "llama3.2:latest"),
+          );
+
+          if (!modelIsAvailable) {
+            logger.debug("Orchestration provider validation failed", {
+              taskType: classification.type,
+              routedProvider: route.provider,
+              routedModel: route.model,
+              reason: `Ollama model '${route.model || "llama3.2:latest"}' not found`,
+              orchestrationTime: `${Date.now() - startTime}ms`,
+            });
+            return {}; // Return empty object to preserve existing fallback behavior
+          }
+        } catch (error) {
+          logger.debug("Orchestration provider validation failed", {
+            taskType: classification.type,
+            routedProvider: route.provider,
+            routedModel: route.model,
+            reason: error instanceof Error ? error.message : "Ollama service check failed",
+            orchestrationTime: `${Date.now() - startTime}ms`,
+          });
+          return {}; // Return empty object to preserve existing fallback behavior
+        }
+      }
+
+      logger.debug("Orchestration route determined", {
+        taskType: classification.type,
+        selectedProvider: route.provider,
+        selectedModel: route.model,
+        confidence: route.confidence,
+        reasoning: route.reasoning,
+        orchestrationTime: `${Date.now() - startTime}ms`,
+      });
+
+      // Mark preferred provider in context instead of directly setting provider
+      // This preserves global fallback behavior while indicating orchestration preference
+      return {
+        model: route.model,
+        context: {
+          ...(options.context || {}),
+          __orchestratedPreferredProvider: route.provider,
+        },
+      };
+    } catch (error) {
+      logger.error("Orchestration failed", {
+        error: error instanceof Error ? error.message : String(error),
+        orchestrationTime: `${Date.now() - startTime}ms`,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Apply orchestration to determine optimal provider and model for streaming
+   * @param options - Original StreamOptions
+   * @returns Modified options with orchestrated provider marked in context, or empty object if validation fails
+   */
+  private async applyStreamOrchestration(
+    options: StreamOptions,
+  ): Promise<Partial<StreamOptions>> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure input.text exists before proceeding
+      if (!options.input?.text || typeof options.input.text !== "string") {
+        logger.debug("Stream orchestration skipped - no valid input text", {
+          hasInput: !!options.input,
+          hasText: !!options.input?.text,
+          textType: typeof options.input?.text,
+        });
+        return {}; // Return empty object to preserve existing fallback behavior
+      }
+
+      // Compute classification once to avoid duplicate calls
+      const classification = BinaryTaskClassifier.classify(options.input.text);
+      
+      // Use the model router to get the optimal route
+      const route = ModelRouter.route(options.input.text);
+
+      // Validate that the routed provider is available and configured
+      const isProviderAvailable = await this.hasProviderEnvVars(route.provider);
+      
+      if (!isProviderAvailable && route.provider !== "ollama") {
+        logger.debug("Stream orchestration provider validation failed", {
+          taskType: classification.type,
+          routedProvider: route.provider,
+          routedModel: route.model,
+          reason: "Provider not configured or missing environment variables",
+          orchestrationTime: `${Date.now() - startTime}ms`,
+        });
+        return {}; // Return empty object to preserve existing fallback behavior
+      }
+
+      // For Ollama, check if service is running and model is available
+      if (route.provider === "ollama") {
+        try {
+          const response = await fetch("http://localhost:11434/api/tags", {
+            method: "GET",
+            signal: AbortSignal.timeout(2000),
+          });
+
+          if (!response.ok) {
+            logger.debug("Stream orchestration provider validation failed", {
+              taskType: classification.type,
+              routedProvider: route.provider,
+              routedModel: route.model,
+              reason: "Ollama service not responding",
+              orchestrationTime: `${Date.now() - startTime}ms`,
+            });
+            return {}; // Return empty object to preserve existing fallback behavior
+          }
+
+          const { models } = await response.json();
+          const modelIsAvailable = models.some(
+            (m: { name: string }) => m.name === (route.model || "llama3.2:latest"),
+          );
+
+          if (!modelIsAvailable) {
+            logger.debug("Stream orchestration provider validation failed", {
+              taskType: classification.type,
+              routedProvider: route.provider,
+              routedModel: route.model,
+              reason: `Ollama model '${route.model || "llama3.2:latest"}' not found`,
+              orchestrationTime: `${Date.now() - startTime}ms`,
+            });
+            return {}; // Return empty object to preserve existing fallback behavior
+          }
+        } catch (error) {
+          logger.debug("Stream orchestration provider validation failed", {
+            taskType: classification.type,
+            routedProvider: route.provider,
+            routedModel: route.model,
+            reason: error instanceof Error ? error.message : "Ollama service check failed",
+            orchestrationTime: `${Date.now() - startTime}ms`,
+          });
+          return {}; // Return empty object to preserve existing fallback behavior
+        }
+      }
+
+      logger.debug("Stream orchestration route determined", {
+        taskType: classification.type,
+        selectedProvider: route.provider,
+        selectedModel: route.model,
+        confidence: route.confidence,
+        reasoning: route.reasoning,
+        orchestrationTime: `${Date.now() - startTime}ms`,
+      });
+
+      // Mark preferred provider in context instead of directly setting provider
+      // This preserves global fallback behavior while indicating orchestration preference
+      return {
+        model: route.model,
+        context: {
+          ...(options.context || {}),
+          __orchestratedPreferredProvider: route.provider,
+        },
+      };
+    } catch (error) {
+      logger.error("Stream orchestration failed", {
+        error: error instanceof Error ? error.message : String(error),
+        orchestrationTime: `${Date.now() - startTime}ms`,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * MAIN ENTRY POINT: Enhanced generate method with new function signature
    * Replaces both generateText and legacy methods
    */
@@ -1256,6 +1500,28 @@ export class NeuroLink {
     }
 
     const startTime = Date.now();
+
+    // Apply orchestration if enabled and no specific provider/model requested
+    if (this.enableOrchestration && !options.provider && !options.model) {
+      try {
+        const orchestratedOptions = await this.applyOrchestration(options);
+        logger.debug("Orchestration applied", {
+          originalProvider: options.provider || "auto",
+          orchestratedProvider: orchestratedOptions.provider,
+          orchestratedModel: orchestratedOptions.model,
+          prompt: options.input.text.substring(0, 100),
+        });
+
+        // Use orchestrated options
+        Object.assign(options, orchestratedOptions);
+      } catch (error) {
+        logger.warn("Orchestration failed, continuing with original options", {
+          error: error instanceof Error ? error.message : String(error),
+          originalProvider: options.provider || "auto",
+        });
+        // Continue with original options if orchestration fails
+      }
+    }
 
     // Emit generation start event (NeuroLink format - keep existing)
     this.emitter.emit("generation:start", {
@@ -2091,15 +2357,24 @@ export class NeuroLink {
     const requestedProvider =
       options.provider === "auto" ? undefined : options.provider;
 
-    // If specific provider requested, only use that provider (no fallback)
-    const tryProviders = requestedProvider
-      ? [requestedProvider]
-      : providerPriority;
+    // Check for orchestrated preferred provider in context
+    const preferredOrchestrated = 
+      options.context && typeof options.context === 'object' && '__orchestratedPreferredProvider' in options.context
+        ? (options.context as { __orchestratedPreferredProvider?: string }).__orchestratedPreferredProvider
+        : undefined;
+
+    // Build provider list with orchestrated preference first, then fallback to full list
+    const tryProviders = preferredOrchestrated
+      ? [preferredOrchestrated, ...providerPriority.filter((p) => p !== preferredOrchestrated)]
+      : requestedProvider
+        ? [requestedProvider]
+        : providerPriority;
 
     logger.debug(`[${functionTag}] Starting direct generation`, {
       requestedProvider: requestedProvider || "auto",
+      preferredOrchestrated: preferredOrchestrated || "none",
       tryProviders,
-      allowFallback: !requestedProvider,
+      allowFallback: !requestedProvider || !!preferredOrchestrated,
     });
 
     let lastError: Error | null = null;
@@ -2391,6 +2666,30 @@ export class NeuroLink {
 
       // Initialize MCP
       await this.initializeMCP();
+      const _originalPrompt = options.input.text;
+
+      // Apply orchestration if enabled and no specific provider/model requested
+      if (this.enableOrchestration && !options.provider && !options.model) {
+        try {
+          const orchestratedOptions = await this.applyStreamOrchestration(options);
+          logger.debug("Stream orchestration applied", {
+            originalProvider: options.provider || "auto",
+            orchestratedProvider: orchestratedOptions.provider,
+            orchestratedModel: orchestratedOptions.model,
+            prompt: options.input.text?.substring(0, 100),
+          });
+
+          // Use orchestrated options
+          Object.assign(options, orchestratedOptions);
+        } catch (error) {
+          logger.warn("Stream orchestration failed, continuing with original options", {
+            error: error instanceof Error ? error.message : String(error),
+            originalProvider: options.provider || "auto",
+          });
+          // Continue with original options if orchestration fails
+        }
+      }
+
       factoryResult = processStreamingFactoryOptions(options);
       enhancedOptions = createCleanStreamOptions(options);
       if (options.input?.text) {
@@ -2653,7 +2952,7 @@ export class NeuroLink {
     this.emitter.emit("response:start");
     this.emitter.emit(
       "message",
-      `Starting ${options.provider || "auto"} stream...`,
+      `Starting ${options.provider || "auto"} stream...`
     );
   }
 

@@ -14,6 +14,9 @@ export * from "./providers.js";
 // CLI types
 export * from "./cli.js";
 
+// Task classification types
+export * from "./taskClassificationTypes.js";
+
 // Re-export commonly used types for convenience
 export type {
   Unknown,
@@ -48,6 +51,14 @@ export type {
   GenerateResult,
   StreamChunk,
 } from "./cli.js";
+
+export type {
+  TaskType,
+  TaskClassification,
+  ClassificationScores,
+  ClassificationStats,
+  ClassificationValidation,
+} from "./taskClassificationTypes.js";
 
 // MCP domain types
 export type {
