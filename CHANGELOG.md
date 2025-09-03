@@ -1,3 +1,9 @@
+## [7.32.0](https://github.com/juspay/neurolink/compare/v7.31.0...v7.32.0) (2025-09-03)
+
+### Features
+
+- **(sdk):** Add Speech to Speech agents implementation ([a8bf953](https://github.com/juspay/neurolink/commit/a8bf953993a16303d3c4a5b3a94d5ea5b6bd83d7))
+
 ## [7.31.0](https://github.com/juspay/neurolink/compare/v7.30.1...v7.31.0) (2025-09-01)
 
 ### Features
