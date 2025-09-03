@@ -8,13 +8,13 @@ import type {
   SessionMemory,
   ConversationMemoryStats,
   ChatMessage,
-} from "../types/conversationTypes.js";
-import { ConversationMemoryError } from "../types/conversationTypes.js";
+} from "../types/conversation.js";
+import { ConversationMemoryError } from "../types/conversation.js";
 import {
   DEFAULT_MAX_TURNS_PER_SESSION,
   DEFAULT_MAX_SESSIONS,
   MESSAGES_PER_TURN,
-} from "../config/conversationMemoryConfig.js";
+} from "../config/conversationMemory.js";
 import { logger } from "../utils/logger.js";
 import { NeuroLink } from "../neurolink.js";
 
@@ -114,8 +114,9 @@ export class ConversationMemoryManager {
   /**
    * Build context messages for AI prompt injection (ULTRA-OPTIMIZED)
    * Returns pre-stored message array with zero conversion overhead
+   * Now consistently async to match Redis implementation
    */
-  buildContextMessages(sessionId: string): ChatMessage[] {
+  async buildContextMessages(sessionId: string): Promise<ChatMessage[]> {
     const session = this.sessions.get(sessionId);
     return session ? session.messages : [];
   }

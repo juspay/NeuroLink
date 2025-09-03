@@ -179,6 +179,7 @@
     "ora": "^7.0.1",
     "p-limit": "^6.2.0",
     "reconnecting-eventsource": "^1.6.4",
+    "redis": "^5.8.2",
     "undici": "^6.6.2",
     "uuid": "^11.1.0",
     "ws": "^8.18.3",

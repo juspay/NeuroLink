@@ -103,13 +103,13 @@ import { EventEmitter } from "events";
 import type {
   ConversationMemoryConfig,
   ChatMessage,
-} from "./types/conversationTypes.js";
+} from "./types/conversation.js";
 import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
+import { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
 import {
-  applyConversationMemoryDefaults,
   getConversationMessages,
   storeConversationTurn,
-} from "./utils/conversationMemoryUtils.js";
+} from "./utils/conversationMemory.js";
 import { ExternalServerManager } from "./mcp/externalServerManager.js";
 import type {
   ExternalMCPServerInstance,
@@ -209,7 +209,14 @@ export class NeuroLink {
     this.emitter.emit("tool:end", toolName, success ? result : error);
   }
   // Conversation memory support
-  private conversationMemory?: ConversationMemoryManager;
+  private conversationMemory?:
+    | ConversationMemoryManager
+    | RedisConversationMemoryManager
+    | null;
+  private conversationMemoryNeedsInit = false;
+  private conversationMemoryConfig?: {
+    conversationMemory?: Partial<ConversationMemoryConfig>;
+  };
 
   /**
    * Creates a new NeuroLink instance for AI text generation with MCP tool integration.
@@ -424,23 +431,19 @@ export class NeuroLink {
           maxTurnsPerSession: config.conversationMemory.maxTurnsPerSession,
           keys: Object.keys(config.conversationMemory),
         },
-        message: "Starting conversation memory initialization",
+        message: "Conversation memory initialization flag set for lazy loading",
       });
 
-      try {
-        const memoryConfig = applyConversationMemoryDefaults(
-          config.conversationMemory,
-        );
-        const memoryManagerCreateStartTime = process.hrtime.bigint();
-        this.conversationMemory = new ConversationMemoryManager(memoryConfig);
-        const memoryManagerCreateEndTime = process.hrtime.bigint();
-        const memoryManagerCreateDurationNs =
-          memoryManagerCreateEndTime - memoryManagerCreateStartTime;
-        const memoryInitEndTime = process.hrtime.bigint();
-        const memoryInitDurationNs = memoryInitEndTime - memoryInitStartTime;
+      // Store config for later use and set flag for lazy initialization
+      this.conversationMemoryConfig = config;
+      this.conversationMemoryNeedsInit = true;
 
-        logger.info(`[NeuroLink] ✅ LOG_POINT_C006_MEMORY_INIT_SUCCESS`, {
-          logPoint: "C006_MEMORY_INIT_SUCCESS",
+      const memoryInitEndTime = process.hrtime.bigint();
+      const memoryInitDurationNs = memoryInitEndTime - memoryInitStartTime;
+      logger.debug(
+        `[NeuroLink] ✅ LOG_POINT_C006_MEMORY_INIT_FLAG_SET_SUCCESS`,
+        {
+          logPoint: "C006_MEMORY_INIT_FLAG_SET_SUCCESS",
           constructorId,
           timestamp: new Date().toISOString(),
           elapsedMs: Date.now() - constructorStartTime,
@@ -450,41 +453,10 @@ export class NeuroLink {
           memoryInitDurationNs: memoryInitDurationNs.toString(),
           memoryInitDurationMs:
             Number(memoryInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-          memoryManagerCreateDurationNs:
-            memoryManagerCreateDurationNs.toString(),
-          memoryManagerCreateDurationMs:
-            Number(memoryManagerCreateDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-          finalMemoryConfig: {
-            maxSessions: memoryConfig.maxSessions,
-            maxTurnsPerSession: memoryConfig.maxTurnsPerSession,
-          },
-          memoryUsageAfterInit: process.memoryUsage(),
           message:
-            "NeuroLink initialized with conversation memory successfully",
-        });
-      } catch (error) {
-        const memoryInitErrorTime = process.hrtime.bigint();
-        const memoryInitDurationNs = memoryInitErrorTime - memoryInitStartTime;
-
-        logger.error(`[NeuroLink] ❌ LOG_POINT_C007_MEMORY_INIT_ERROR`, {
-          logPoint: "C007_MEMORY_INIT_ERROR",
-          constructorId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - constructorStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - constructorHrTimeStart
-          ).toString(),
-          memoryInitDurationNs: memoryInitDurationNs.toString(),
-          memoryInitDurationMs:
-            Number(memoryInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-          error: error instanceof Error ? error.message : String(error),
-          errorName: error instanceof Error ? error.name : "UnknownError",
-          errorStack: error instanceof Error ? error.stack : undefined,
-          memoryConfig: config.conversationMemory,
-          message: "Conversation memory initialization failed",
-        });
-        throw error;
-      }
+            "Conversation memory initialization flag set successfully for lazy loading",
+        },
+      );
     } else {
       logger.debug(`[NeuroLink] 🚫 LOG_POINT_C008_MEMORY_DISABLED`, {
         logPoint: "C008_MEMORY_DISABLED",
@@ -1610,6 +1582,7 @@ export class NeuroLink {
 
   /**
    * Initialize conversation memory for generation
+   * Lazily initializes memory if needed from constructor flags
    */
   private async initializeConversationMemoryForGeneration(
     generateInternalId: string,
@@ -1627,12 +1600,21 @@ export class NeuroLink {
       ).toString(),
       conversationMemoryStartTimeNs: conversationMemoryStartTime.toString(),
       hasConversationMemory: !!this.conversationMemory,
-      conversationMemoryEnabled: !!this.conversationMemory,
-      conversationMemoryType:
-        this.conversationMemory?.constructor?.name || "NOT_AVAILABLE",
+      needsLazyInit: this.conversationMemoryNeedsInit,
+      hasConfig: !!this.conversationMemoryConfig,
       message: "Checking conversation memory initialization requirement",
     });
 
+    // Handle lazy initialization if needed
+    if (this.conversationMemoryNeedsInit && this.conversationMemoryConfig) {
+      await this.lazyInitializeConversationMemory(
+        generateInternalId,
+        generateInternalStartTime,
+        generateInternalHrTimeStart,
+      );
+    }
+
+    // Normal initialization for already created memory manager
     if (this.conversationMemory) {
       logger.debug(
         `[NeuroLink] 🧠 LOG_POINT_G003_CONVERSATION_MEMORY_INIT_START`,
@@ -2377,6 +2359,7 @@ export class NeuroLink {
     const functionTag = "NeuroLink.stream";
     const streamId = `neurolink-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const journeyStartTime = new Date().toISOString();
+    const originalPrompt = options.input.text; // Store the original prompt for memory storage
 
     this.logStreamEntryPoint(
       streamId,
@@ -2398,6 +2381,14 @@ export class NeuroLink {
     };
 
     try {
+      // Initialize conversation memory if needed (for lazy loading)
+      await this.initializeConversationMemoryForGeneration(
+        streamId,
+        startTime,
+        hrTimeStart,
+      );
+
+      // Initialize MCP
       await this.initializeMCP();
       factoryResult = processStreamingFactoryOptions(options);
       enhancedOptions = createCleanStreamOptions(options);
@@ -2411,6 +2402,46 @@ export class NeuroLink {
 
       const { stream: mcpStream, provider: providerName } =
         await this.createMCPStream(enhancedOptions);
+
+        // Create a wrapper around the stream that accumulates content
+      let accumulatedContent = "";
+
+      const processedStream = (async function* (self: NeuroLink) {
+        try {
+          for await (const chunk of mcpStream) {
+            if (chunk && "content" in chunk && typeof chunk.content === "string") {
+              accumulatedContent += chunk.content;
+              // Emit chunk event for compatibility
+              self.emitter.emit("response:chunk", chunk.content);
+            }
+            yield chunk; // Preserve original streaming behavior
+          }
+        } finally {
+          // Store memory after stream consumption is complete
+          if (self.conversationMemory) {
+            try {
+              await self.conversationMemory.storeConversationTurn(
+                (enhancedOptions.context as Record<string, unknown>)
+                  ?.sessionId as string,
+                (enhancedOptions.context as Record<string, unknown>)
+                  ?.userId as string,
+                originalPrompt ?? "",
+                accumulatedContent,
+              );
+              logger.debug("Stream conversation turn stored", {
+                sessionId: (enhancedOptions.context as Record<string, unknown>)
+                  ?.sessionId,
+                userInputLength: originalPrompt?.length ?? 0,
+                responseLength: accumulatedContent.length,
+              });
+            } catch (error) {
+              logger.warn("Failed to store stream conversation turn", {
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }
+        }
+      })(this);
       const streamResult = await this.processStreamResult(
         mcpStream,
         enhancedOptions,
@@ -2420,7 +2451,7 @@ export class NeuroLink {
 
       this.emitStreamEndEvents(streamResult);
 
-      return this.createStreamResponse(streamResult, mcpStream, {
+      return this.createStreamResponse(streamResult, processedStream, {
         providerName,
         options,
         startTime,
@@ -2648,7 +2679,20 @@ export class NeuroLink {
       "NeuroLink.createMCPStream",
     );
 
-    const streamResult = await provider.stream(options);
+    // Get conversation messages for context by creating a minimal TextGenerationOptions object
+    const conversationMessages = await getConversationMessages(
+      this.conversationMemory,
+      {
+        prompt: options.input.text,
+        context: options.context as Record<string, unknown>,
+      } as TextGenerationOptions,
+    );
+
+    // Pass conversation history to stream just like in generate method
+    const streamResult = await provider.stream({
+      ...options,
+      conversationMessages, // Inject conversation history
+    });
     return { stream: streamResult.stream, provider: providerName };
   }
 
@@ -2745,13 +2789,14 @@ export class NeuroLink {
     options: StreamOptions,
     startTime: number,
     streamId: string,
-    _enhancedOptions?: unknown,
+    enhancedOptions?: StreamOptions,
     _factoryResult?: unknown,
   ): Promise<StreamResult> {
     logger.error("Stream generation failed, attempting fallback", {
       error: error instanceof Error ? error.message : String(error),
     });
 
+    const originalPrompt = options.input.text;
     const responseTime = Date.now() - startTime;
     const providerName = await getBestProvider(options.provider);
     const provider = await AIProviderFactory.createProvider(
@@ -2759,23 +2804,66 @@ export class NeuroLink {
       options.model,
       false,
     );
-    const fallbackStream = await provider.stream({
+    const fallbackStreamResult = await provider.stream({
       input: { text: options.input.text },
       model: options.model,
       temperature: options.temperature,
       maxTokens: options.maxTokens,
     });
 
+    // Create a wrapper around the fallback stream that accumulates content
+    let fallbackAccumulatedContent = "";
+
+    const fallbackProcessedStream = (async function* (self: NeuroLink) {
+      try {
+        for await (const chunk of fallbackStreamResult.stream) {
+          if (chunk && "content" in chunk && typeof chunk.content === "string") {
+            fallbackAccumulatedContent += chunk.content;
+            // Emit chunk event
+            self.emitter.emit("response:chunk", chunk.content);
+          }
+          yield chunk; // Preserve original streaming behavior
+        }
+      } finally {
+        // Store memory after fallback stream consumption is complete
+        if (self.conversationMemory) {
+          try {
+            const sessionId = (
+              enhancedOptions?.context as Record<string, unknown>
+            )?.sessionId as string;
+            const userId = (enhancedOptions?.context as Record<string, unknown>)
+              ?.userId as string;
+
+            await self.conversationMemory.storeConversationTurn(
+              sessionId || (options.context?.sessionId as string),
+              userId || (options.context?.userId as string),
+              originalPrompt ?? "",
+              fallbackAccumulatedContent,
+            );
+            logger.debug("Fallback stream conversation turn stored", {
+              sessionId: sessionId || options.context?.sessionId,
+              userInputLength: originalPrompt?.length ?? 0,
+              responseLength: fallbackAccumulatedContent.length,
+            });
+          } catch (error) {
+            logger.warn("Failed to store fallback stream conversation turn", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+    })(this);
+
     return {
-      stream: fallbackStream.stream,
+      stream: fallbackProcessedStream,
       provider: providerName,
       model: options.model,
-      usage: fallbackStream.usage,
-      finishReason: fallbackStream.finishReason || "stop",
-      toolCalls: fallbackStream.toolCalls || [],
-      toolResults: fallbackStream.toolResults || [],
-      analytics: fallbackStream.analytics,
-      evaluation: fallbackStream.evaluation,
+      usage: fallbackStreamResult.usage,
+      finishReason: fallbackStreamResult.finishReason || "stop",
+      toolCalls: fallbackStreamResult.toolCalls || [],
+      toolResults: fallbackStreamResult.toolResults || [],
+      analytics: fallbackStreamResult.analytics,
+      evaluation: fallbackStreamResult.evaluation,
       metadata: {
         streamId,
         startTime,
@@ -4519,6 +4607,14 @@ export class NeuroLink {
    * Get conversation memory statistics (public API)
    */
   async getConversationStats() {
+    // First ensure memory is initialized
+    const initId = `stats-init-${Date.now()}`;
+    await this.initializeConversationMemoryForGeneration(
+      initId,
+      Date.now(),
+      process.hrtime.bigint(),
+    );
+
     if (!this.conversationMemory) {
       throw new Error("Conversation memory is not enabled");
     }
@@ -4532,6 +4628,14 @@ export class NeuroLink {
    * @returns Array of ChatMessage objects in chronological order, or empty array if session doesn't exist
    */
   async getConversationHistory(sessionId: string): Promise<ChatMessage[]> {
+    // First ensure memory is initialized
+    const initId = `history-init-${Date.now()}`;
+    await this.initializeConversationMemoryForGeneration(
+      initId,
+      Date.now(),
+      process.hrtime.bigint(),
+    );
+
     if (!this.conversationMemory) {
       throw new Error("Conversation memory is not enabled");
     }
@@ -4542,7 +4646,8 @@ export class NeuroLink {
 
     try {
       // Use the existing buildContextMessages method to get the complete history
-      const messages = this.conversationMemory.buildContextMessages(sessionId);
+      const messages =
+        await this.conversationMemory.buildContextMessages(sessionId);
 
       logger.debug("Retrieved conversation history", {
         sessionId,
@@ -4566,6 +4671,14 @@ export class NeuroLink {
    * Clear conversation history for a specific session (public API)
    */
   async clearConversationSession(sessionId: string): Promise<boolean> {
+    // First ensure memory is initialized
+    const initId = `clear-session-init-${Date.now()}`;
+    await this.initializeConversationMemoryForGeneration(
+      initId,
+      Date.now(),
+      process.hrtime.bigint(),
+    );
+
     if (!this.conversationMemory) {
       throw new Error("Conversation memory is not enabled");
     }
@@ -4577,6 +4690,14 @@ export class NeuroLink {
    * Clear all conversation history (public API)
    */
   async clearAllConversations(): Promise<void> {
+     // First ensure memory is initialized
+    const initId = `clear-all-init-${Date.now()}`;
+    await this.initializeConversationMemoryForGeneration(
+      initId,
+      Date.now(),
+      process.hrtime.bigint(),
+    );
+
     if (!this.conversationMemory) {
       throw new Error("Conversation memory is not enabled");
     }
@@ -4957,6 +5078,69 @@ export class NeuroLink {
         `[NeuroLink] Failed to unregister external MCP tool ${toolName} from registry:`,
         error,
       );
+    }
+  }
+
+  /**
+   * Lazily initialize conversation memory when needed
+   * This is called the first time a generate or stream operation is performed
+   */
+  private async lazyInitializeConversationMemory(
+    generateInternalId: string,
+    generateInternalStartTime: number,
+    generateInternalHrTimeStart: bigint,
+  ): Promise<void> {
+    try {
+      // Import the integration module
+      const { initializeConversationMemory } = await import(
+        "./core/conversationMemoryInitializer.js"
+      );
+
+      // Use the integration module to create the appropriate memory manager
+      const memoryManagerCreateStartTime = process.hrtime.bigint();
+      const memoryManager = await initializeConversationMemory(
+        this.conversationMemoryConfig,
+      );
+      // Assign to conversationMemory with proper type to handle both memory manager types
+      this.conversationMemory = memoryManager;
+
+      const memoryManagerCreateEndTime = process.hrtime.bigint();
+      const memoryManagerCreateDurationNs =
+        memoryManagerCreateEndTime - memoryManagerCreateStartTime;
+
+      logger.info(`[NeuroLink] ✅ LOG_POINT_G004_MEMORY_LAZY_INIT_SUCCESS`, {
+        logPoint: "G004_MEMORY_LAZY_INIT_SUCCESS",
+        generateInternalId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - generateInternalStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - generateInternalHrTimeStart
+        ).toString(),
+        memoryManagerCreateDurationNs: memoryManagerCreateDurationNs.toString(),
+        memoryManagerCreateDurationMs:
+          Number(memoryManagerCreateDurationNs) / 1000000,
+        storageType: process.env.STORAGE_TYPE || "memory",
+        message:
+          "Lazy conversation memory initialization completed successfully",
+      });
+
+      // Reset the lazy init flag since we've now initialized
+      this.conversationMemoryNeedsInit = false;
+    } catch (error) {
+      logger.error(`[NeuroLink] ❌ LOG_POINT_G005_MEMORY_LAZY_INIT_ERROR`, {
+        logPoint: "G005_MEMORY_LAZY_INIT_ERROR",
+        generateInternalId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - generateInternalStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - generateInternalHrTimeStart
+        ).toString(),
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorStack: error instanceof Error ? error.stack : undefined,
+        message: "Lazy conversation memory initialization failed",
+      });
+      throw error;
     }
   }
 
