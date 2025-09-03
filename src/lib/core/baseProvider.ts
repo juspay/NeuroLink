@@ -234,6 +234,8 @@ export abstract class BaseProvider implements AIProvider {
   /**
    * Text generation method - implements AIProvider interface
    * Tools are always available unless explicitly disabled
+   * IMPLEMENTATION NOTE: Uses streamText() under the hood and accumulates results
+   * for consistency and better performance
    */
   async generate(
     optionsOrPrompt: TextGenerationOptions | string,
@@ -247,8 +249,9 @@ export abstract class BaseProvider implements AIProvider {
     const startTime = Date.now();
 
     try {
-      // Import generateText dynamically to avoid circular dependencies
-      const { generateText } = await import("ai");
+      // Import streamText dynamically to avoid circular dependencies
+      // Using streamText instead of generateText for unified implementation
+      const { streamText } = await import("ai");
 
       // Get ALL available tools (direct + MCP + external from options)
       const shouldUseTools = !options.disableTools && this.supportsTools();
@@ -273,7 +276,8 @@ export abstract class BaseProvider implements AIProvider {
       // Build proper message array with conversation history
       const messages = buildMessagesArray(options);
 
-      const result = await generateText({
+      // Use streamText and accumulate results instead of generateText
+      const streamResult = await streamText({
         model,
         messages: messages,
         tools,
@@ -283,42 +287,36 @@ export abstract class BaseProvider implements AIProvider {
         maxTokens: options.maxTokens || 8192,
       });
 
+      // Accumulate the streamed content
+      let accumulatedContent = "";
+
+      // Wait for the stream to complete and accumulate content
+      for await (const chunk of streamResult.textStream) {
+        accumulatedContent += chunk;
+      }
+      // Get the final result - this should include usage, toolCalls, etc.
+      const usage = await streamResult.usage;
+      const toolCalls = await streamResult.toolCalls;
+      const toolResults = await streamResult.toolResults;
       const responseTime = Date.now() - startTime;
 
+      // Create a result object compatible with generateText format
+      const result = {
+        text: accumulatedContent,
+        usage: usage,
+        toolCalls: toolCalls,
+        toolResults: toolResults,
+        steps: (streamResult as unknown as { steps?: unknown[] }).steps, // Include steps for tool execution tracking
+      };
+
       try {
-        // Calculate actual cost based on token usage and provider configuration
-        const calculateActualCost = (): number => {
-          try {
-            const costInfo = modelConfig.getCostInfo(
-              this.providerName,
-              this.modelName,
-            );
-            if (!costInfo) {
-              return 0; // No cost info available
-            }
-
-            const promptTokens = result.usage?.promptTokens || 0;
-            const completionTokens = result.usage?.completionTokens || 0;
-
-            // Calculate cost per 1K tokens
-            const inputCost = (promptTokens / 1000) * costInfo.input;
-            const outputCost = (completionTokens / 1000) * costInfo.output;
-
-            return inputCost + outputCost;
-          } catch (error) {
-            logger.debug(
-              `Cost calculation failed for ${this.providerName}:`,
-              error,
-            );
-            return 0; // Fallback to 0 on any error
-          }
-        };
-
-        const actualCost = calculateActualCost();
+        const actualCost = await this.calculateActualCost(
+          usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        );
 
         recordProviderPerformanceFromMetrics(this.providerName, {
           responseTime,
-          tokensGenerated: result.usage?.totalTokens || 0,
+          tokensGenerated: usage?.totalTokens || 0,
           cost: actualCost,
           success: true,
         });
@@ -327,7 +325,7 @@ export abstract class BaseProvider implements AIProvider {
         const optimizedProvider = getPerformanceOptimizedProvider("speed");
         logger.debug(`🚀 Performance recorded for ${this.providerName}:`, {
           responseTime: `${responseTime}ms`,
-          tokens: result.usage?.totalTokens || 0,
+          tokens: usage?.totalTokens || 0,
           estimatedCost: `$${actualCost.toFixed(6)}`,
           recommendedSpeedProvider: optimizedProvider?.provider || "none",
         });
@@ -340,14 +338,10 @@ export abstract class BaseProvider implements AIProvider {
       const toolsUsed: string[] = [];
 
       // First check direct tool calls (fallback)
-      if (result.toolCalls && result.toolCalls.length > 0) {
+      if (toolCalls && toolCalls.length > 0) {
         toolsUsed.push(
-          ...result.toolCalls.map((tc) => {
-            return (
-              ((tc as UnknownRecord).toolName as string) ||
-              ((tc as UnknownRecord).name as string) ||
-              "unknown"
-            );
+          ...toolCalls.map((tc) => {
+            return tc.toolName || "unknown";
           }),
         );
       }
@@ -461,23 +455,14 @@ export abstract class BaseProvider implements AIProvider {
         },
         provider: this.providerName,
         model: this.modelName,
-        toolCalls: result.toolCalls
-          ? result.toolCalls.map((tc) => ({
-              toolCallId:
-                ((tc as UnknownRecord).toolCallId as string) ||
-                ((tc as UnknownRecord).id as string) ||
-                "unknown",
-              toolName:
-                ((tc as UnknownRecord).toolName as string) ||
-                ((tc as UnknownRecord).name as string) ||
-                "unknown",
-              args:
-                ((tc as UnknownRecord).args as StandardRecord) ||
-                ((tc as UnknownRecord).parameters as StandardRecord) ||
-                {},
+        toolCalls: toolCalls
+          ? toolCalls.map((tc) => ({
+              toolCallId: tc.toolCallId || "unknown",
+              toolName: tc.toolName || "unknown",
+              args: tc.args || {},
             }))
           : [],
-        toolResults: result.toolResults as ToolResult[],
+        toolResults: (toolResults as ToolResult[]) || [],
         toolsUsed: uniqueToolsUsed,
         toolExecutions, // ✅ Add extracted tool executions
         availableTools: Object.keys(tools).map((name) => {
@@ -949,6 +934,37 @@ export abstract class BaseProvider implements AIProvider {
     );
 
     return tools;
+  }
+
+  /**
+   * Calculate actual cost based on token usage and provider configuration
+   */
+  private async calculateActualCost(usage: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  }): Promise<number> {
+    try {
+      const costInfo = modelConfig.getCostInfo(
+        this.providerName,
+        this.modelName,
+      );
+      if (!costInfo) {
+        return 0; // No cost info available
+      }
+
+      const promptTokens = usage?.promptTokens || 0;
+      const completionTokens = usage?.completionTokens || 0;
+
+      // Calculate cost per 1K tokens
+      const inputCost = (promptTokens / 1000) * costInfo.input;
+      const outputCost = (completionTokens / 1000) * costInfo.output;
+
+      return inputCost + outputCost;
+    } catch (error) {
+      logger.debug(`Cost calculation failed for ${this.providerName}:`, error);
+      return 0; // Fallback to 0 on any error
+    }
   }
 
   /**
