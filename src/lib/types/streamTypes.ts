@@ -4,7 +4,7 @@ import type { AIProviderName, ProviderConfig } from "./providers.js";
 import type { AnalyticsData, TokenUsage } from "./analytics.js";
 import type { EvaluationData } from "./evaluation.js";
 import type { UnknownRecord, JsonValue } from "./common.js";
-import type { ChatMessage } from "./conversationTypes.js";
+import type { ChatMessage } from "./conversation.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 
 /**

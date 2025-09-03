@@ -9,7 +9,7 @@ import type { JsonValue } from "../types/common.js";
 import type {
   ChatMessage,
   ConversationMemoryConfig,
-} from "../types/conversationTypes.js";
+} from "../types/conversation.js";
 import type { TokenUsage, AnalyticsData } from "../types/analytics.js";
 import type { EvaluationData } from "../index.js";
 

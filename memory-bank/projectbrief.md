@@ -43,6 +43,7 @@ The project has achieved **Phase 1 MCP Foundation completion** with 27/27 tests 
 - **Professional CLI Tool**: Complete command-line interface (19/19 tests passing)
 - **Visual Content Ecosystem**: Professional screenshots, videos, documentation
 - **Multi-Provider Support**: OpenAI, AWS Bedrock, Google Vertex AI fully functional
+- **Redis Storage Support**: Persistent conversation memory with Redis backend
 - **Demo Applications**: Working Express.js server with real API integration
 - **NPM Package**: Production-ready package with automated publishing workflow
 

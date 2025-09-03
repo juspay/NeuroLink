@@ -136,3 +136,43 @@ export class ConversationMemoryError extends Error {
     this.name = "ConversationMemoryError";
   }
 }
+
+/**
+ * Session identifier for Redis storage operations
+ */
+export type SessionIdentifier = {
+  sessionId: string;
+  userId?: string;
+};
+
+/**
+ * Redis storage configuration
+ */
+export type RedisStorageConfig = {
+  /** Redis host (default: 'localhost') */
+  host?: string;
+
+  /** Redis port (default: 6379) */
+  port?: number;
+
+  /** Redis password (optional) */
+  password?: string;
+
+  /** Redis database number (default: 0) */
+  db?: number;
+
+  /** Key prefix for Redis keys (default: 'neurolink:conversation:') */
+  keyPrefix?: string;
+
+  /** Time-to-live in seconds (default: 86400, 24 hours) */
+  ttl?: number;
+
+  /** Additional Redis connection options */
+  connectionOptions?: {
+    connectTimeout?: number;
+    lazyConnect?: boolean;
+    retryDelayOnFailover?: number;
+    maxRetriesPerRequest?: number;
+    [key: string]: string | number | boolean | undefined;
+  };
+};

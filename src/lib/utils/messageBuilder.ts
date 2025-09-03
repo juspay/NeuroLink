@@ -3,10 +3,10 @@
  * Centralized logic for building message arrays from TextGenerationOptions
  */
 
-import type { ChatMessage } from "../types/conversationTypes.js";
+import type { ChatMessage } from "../types/conversation.js";
 import type { TextGenerationOptions } from "../types/index.js";
 import type { StreamOptions } from "../types/streamTypes.js";
-import { CONVERSATION_INSTRUCTIONS } from "../config/conversationMemoryConfig.js";
+import { CONVERSATION_INSTRUCTIONS } from "../config/conversationMemory.js";
 
 /**
  * Build a properly formatted message array for AI providers

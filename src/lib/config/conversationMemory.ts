@@ -3,7 +3,7 @@
  * Provides default values for conversation memory feature with environment variable support
  */
 
-import type { ConversationMemoryConfig } from "../types/conversationTypes.js";
+import type { ConversationMemoryConfig } from "../types/conversation.js";
 
 /**
  * Default maximum number of turns per session

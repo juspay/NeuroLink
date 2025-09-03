@@ -6,13 +6,13 @@
 import type {
   ConversationMemoryConfig,
   ChatMessage,
-} from "../types/conversationTypes.js";
+} from "../types/conversation.js";
 import type { ConversationMemoryManager } from "../core/conversationMemoryManager.js";
 import type {
   TextGenerationOptions,
   TextGenerationResult,
 } from "../types/index.js";
-import { getConversationMemoryDefaults } from "../config/conversationMemoryConfig.js";
+import { getConversationMemoryDefaults } from "../config/conversationMemory.js";
 import { logger } from "./logger.js";
 
 /**
@@ -48,7 +48,7 @@ export async function getConversationMessages(
 
   try {
     // Remove duplicate summarization logic - it should be handled in ConversationMemoryManager
-    const messages = conversationMemory.buildContextMessages(sessionId);
+    const messages = await conversationMemory.buildContextMessages(sessionId);
     logger.debug("Conversation messages retrieved", {
       sessionId,
       messageCount: messages.length,

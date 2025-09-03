@@ -7,10 +7,7 @@ import type {
 import type { AIProviderName } from "./providers.js";
 import type { AnalyticsData, TokenUsage } from "./analytics.js";
 import type { EvaluationData } from "./evaluation.js";
-import type {
-  ChatMessage,
-  ConversationMemoryConfig,
-} from "./conversationTypes.js";
+import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type { JsonValue } from "./common.js";
 
