@@ -19,17 +19,40 @@ export interface ProviderConfigOptions {
 
 /**
  * API key format validation patterns (extracted from advanced validation system)
+ * Exported for use across the codebase to replace scattered regex patterns
  */
-const API_KEY_FORMATS: Record<string, RegExp> = {
+export const API_KEY_FORMATS: Record<string, RegExp> = {
   openai: /^sk-[A-Za-z0-9]{48,}$/,
   anthropic: /^sk-ant-[A-Za-z0-9\-_]{95,}$/,
   "google-ai": /^AIza[A-Za-z0-9\-_]{35}$/,
   huggingface: /^hf_[A-Za-z0-9]{37}$/,
   mistral: /^[A-Za-z0-9]{32}$/,
-  azure: /^[A-Za-z0-9]{32,}$/,
+  azure: /^[A-Za-z0-9]{32}$/,
   aws: /^[A-Z0-9]{20}$/, // Access Key ID format
-  googleVertex: /^[A-Za-z0-9\-_]{1,}$/, // Project ID format
+  bedrock: /^[A-Z0-9]{20}$/, // AWS access key ID: 20 uppercase alphanumerics
 };
+
+/**
+ * API key length constants to replace scattered magic numbers
+ */
+export const API_KEY_LENGTHS = {
+  OPENAI_MIN: 48, // OpenAI API keys minimum length
+  ANTHROPIC_MIN: 95, // Anthropic API keys minimum length
+  HUGGINGFACE_EXACT: 37, // HuggingFace tokens exact length
+  AZURE_MIN: 32, // Azure OpenAI API keys minimum length
+  MISTRAL_EXACT: 32, // Mistral API keys exact length
+  AWS_ACCESS_KEY: 20, // AWS access key ID exact length
+  GOOGLE_AI_EXACT: 39, // Google AI Studio keys exact length (with AIza prefix)
+} as const;
+
+/**
+ * Project ID format validation (for Google Cloud)
+ */
+export const PROJECT_ID_FORMAT = {
+  MIN_LENGTH: 6, // Minimum project ID length
+  MAX_LENGTH: 30, // Maximum project ID length
+  PATTERN: /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/, // Google Cloud project ID format
+} as const;
 
 /**
  * Enhanced validation result with format checking

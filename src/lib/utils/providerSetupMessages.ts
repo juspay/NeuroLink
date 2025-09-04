@@ -3,6 +3,13 @@
  * Provides detailed setup instructions for AI providers
  */
 
+import {
+  OpenAIModels,
+  GoogleAIModels,
+  AnthropicModels,
+  APIVersions,
+} from "../core/types.js";
+
 /**
  * Generate enhanced error message with setup instructions
  */
@@ -16,7 +23,7 @@ export function getProviderSetupMessage(
       envVars: [
         'OPENAI_API_KEY="sk-proj-your-openai-api-key"',
         "# Optional:",
-        'OPENAI_MODEL="gpt-4o"',
+        `OPENAI_MODEL="${OpenAIModels.GPT_4O}"`,
         'OPENAI_BASE_URL="https://api.openai.com"',
       ],
     },
@@ -25,7 +32,7 @@ export function getProviderSetupMessage(
       envVars: [
         'ANTHROPIC_API_KEY="sk-ant-api03-your-anthropic-key"',
         "# Optional:",
-        'ANTHROPIC_MODEL="claude-3-5-sonnet-20241022"',
+        `ANTHROPIC_MODEL="${AnthropicModels.CLAUDE_3_5_SONNET}"`,
       ],
     },
     "google-ai": {
@@ -33,7 +40,7 @@ export function getProviderSetupMessage(
       envVars: [
         'GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"',
         "# Optional:",
-        'GOOGLE_AI_MODEL="gemini-2.5-pro"',
+        `GOOGLE_AI_MODEL="${GoogleAIModels.GEMINI_2_5_PRO}"`,
       ],
     },
     vertex: {
@@ -43,7 +50,7 @@ export function getProviderSetupMessage(
         'GOOGLE_VERTEX_PROJECT="your-gcp-project-id"',
         'GOOGLE_VERTEX_LOCATION="us-central1"',
         "# Optional:",
-        'VERTEX_MODEL="gemini-2.5-pro"',
+        `VERTEX_MODEL="${GoogleAIModels.GEMINI_2_5_PRO}"`,
       ],
     },
     bedrock: {
@@ -66,8 +73,8 @@ export function getProviderSetupMessage(
         'AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"',
         'AZURE_OPENAI_DEPLOYMENT_ID="your-deployment-name"',
         "# Optional:",
-        'AZURE_MODEL="gpt-4o"',
-        'AZURE_API_VERSION="2024-02-15-preview"',
+        `AZURE_MODEL="${OpenAIModels.GPT_4O}"`,
+        `AZURE_API_VERSION="${APIVersions.AZURE_STABLE}"`,
       ],
     },
     huggingface: {

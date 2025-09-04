@@ -7,6 +7,11 @@ import { logger } from "./logger.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { AIProviderName, ProviderError } from "../types/index.js";
 import { ProviderHealthChecker } from "./providerHealth.js";
+import {
+  API_KEY_FORMATS,
+  API_KEY_LENGTHS,
+  PROJECT_ID_FORMAT,
+} from "./providerConfig.js";
 
 /**
  * Get the best available provider based on real-time availability checks
@@ -172,16 +177,6 @@ export interface EnvVarValidationResult {
 }
 
 /**
- * Google Cloud Project ID validation regex
- * Format requirements:
- * - Must start with a lowercase letter
- * - Can contain lowercase letters, numbers, and hyphens
- * - Must end with a lowercase letter or number
- * - Total length must be 6-30 characters
- */
-const GOOGLE_CLOUD_PROJECT_ID_REGEX = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
-
-/**
  * Validate environment variable values for a provider
  * Addresses GitHub Copilot comment about adding environment variable validation
  * @param provider - Provider name to validate
@@ -222,7 +217,7 @@ export function validateProviderEnvVars(
       break;
 
     case "azure":
-    case "azureOpenai":
+    case "azureopenai":
       validateAzureCredentials(result);
       break;
 
@@ -313,7 +308,7 @@ function validateVertexCredentials(result: EnvVarValidationResult): void {
 
   if (!projectId) {
     result.missingVars.push("GOOGLE_CLOUD_PROJECT_ID (or variant)");
-  } else if (!GOOGLE_CLOUD_PROJECT_ID_REGEX.test(projectId)) {
+  } else if (!PROJECT_ID_FORMAT.PATTERN.test(projectId)) {
     result.invalidVars.push(
       "Project ID format invalid (must be 6-30 lowercase letters, digits, hyphens)",
     );
@@ -341,9 +336,9 @@ function validateOpenAICredentials(result: EnvVarValidationResult): void {
 
   if (!apiKey) {
     result.missingVars.push("OPENAI_API_KEY");
-  } else if (!/^sk-[A-Za-z0-9]{48,}$/.test(apiKey)) {
+  } else if (!API_KEY_FORMATS.openai.test(apiKey)) {
     result.invalidVars.push(
-      "OPENAI_API_KEY (should start with 'sk-' followed by 48+ characters)",
+      `OPENAI_API_KEY (should start with 'sk-' followed by ${API_KEY_LENGTHS.OPENAI_MIN}+ characters)`,
     );
   }
 }
@@ -356,9 +351,9 @@ function validateAnthropicCredentials(result: EnvVarValidationResult): void {
 
   if (!apiKey) {
     result.missingVars.push("ANTHROPIC_API_KEY");
-  } else if (!/^sk-ant-[A-Za-z0-9-_]{95,}$/.test(apiKey)) {
+  } else if (!API_KEY_FORMATS.anthropic.test(apiKey)) {
     result.invalidVars.push(
-      "ANTHROPIC_API_KEY (should start with 'sk-ant-' followed by 95+ characters)",
+      `ANTHROPIC_API_KEY (should start with 'sk-ant-' followed by ${API_KEY_LENGTHS.ANTHROPIC_MIN}+ characters)`,
     );
   }
 }
@@ -372,9 +367,9 @@ function validateAzureCredentials(result: EnvVarValidationResult): void {
 
   if (!apiKey) {
     result.missingVars.push("AZURE_OPENAI_API_KEY");
-  } else if (!/^[a-f0-9]{32}$/.test(apiKey)) {
+  } else if (!API_KEY_FORMATS.azure.test(apiKey)) {
     result.invalidVars.push(
-      "AZURE_OPENAI_API_KEY (should be 32 hexadecimal characters)",
+      `AZURE_OPENAI_API_KEY (should be at least ${API_KEY_LENGTHS.AZURE_MIN} alphanumeric characters)`,
     );
   }
 
@@ -398,9 +393,9 @@ function validateGoogleAICredentials(result: EnvVarValidationResult): void {
     result.missingVars.push(
       "GOOGLE_AI_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY)",
     );
-  } else if (!/^[A-Za-z0-9_-]{39}$/.test(apiKey)) {
+  } else if (!API_KEY_FORMATS["google-ai"].test(apiKey)) {
     result.invalidVars.push(
-      "GOOGLE_AI_API_KEY (should be 39 alphanumeric characters with dashes/underscores)",
+      `GOOGLE_AI_API_KEY (should be ${API_KEY_LENGTHS.GOOGLE_AI_EXACT} alphanumeric characters with dashes/underscores)`,
     );
   }
 }
@@ -413,9 +408,9 @@ function validateHuggingFaceCredentials(result: EnvVarValidationResult): void {
 
   if (!apiKey) {
     result.missingVars.push("HUGGINGFACE_API_KEY (or HF_TOKEN)");
-  } else if (!/^hf_[A-Za-z0-9]{37}$/.test(apiKey)) {
+  } else if (!API_KEY_FORMATS.huggingface.test(apiKey)) {
     result.invalidVars.push(
-      "HUGGINGFACE_API_KEY (should start with 'hf_' followed by 37 characters)",
+      `HUGGINGFACE_API_KEY (should start with 'hf_' followed by ${API_KEY_LENGTHS.HUGGINGFACE_EXACT} characters)`,
     );
   }
 }
@@ -428,9 +423,9 @@ function validateMistralCredentials(result: EnvVarValidationResult): void {
 
   if (!apiKey) {
     result.missingVars.push("MISTRAL_API_KEY");
-  } else if (!/^[A-Za-z0-9]{32,}$/.test(apiKey)) {
+  } else if (!API_KEY_FORMATS.mistral.test(apiKey)) {
     result.invalidVars.push(
-      "MISTRAL_API_KEY (should be 32+ alphanumeric characters)",
+      `MISTRAL_API_KEY (should be ${API_KEY_LENGTHS.MISTRAL_EXACT} alphanumeric characters)`,
     );
   }
 }
@@ -495,7 +490,7 @@ export function hasProviderEnvVars(provider: string): boolean {
       return !!process.env.ANTHROPIC_API_KEY;
 
     case "azure":
-    case "azureOpenai":
+    case "azureopenai":
       return !!process.env.AZURE_OPENAI_API_KEY;
 
     case "google-ai":

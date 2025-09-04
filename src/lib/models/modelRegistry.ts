@@ -4,7 +4,13 @@
  * Part of Phase 4.1 - Models Command System
  */
 
-import { AIProviderName } from "../types/index.js";
+import {
+  AIProviderName,
+  OpenAIModels,
+  GoogleAIModels,
+  AnthropicModels,
+  DEFAULT_MODEL_ALIASES,
+} from "../core/types.js";
 import type { JsonValue } from "../types/common.js";
 
 /**
@@ -109,8 +115,8 @@ export interface ModelSearchResult {
  */
 export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   // OpenAI Models
-  "gpt-4o": {
-    id: "gpt-4o",
+  [OpenAIModels.GPT_4O]: {
+    id: OpenAIModels.GPT_4O,
     name: "GPT-4 Omni",
     provider: AIProviderName.OPENAI,
     description: "Most capable OpenAI model with vision and advanced reasoning",
@@ -154,8 +160,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     category: "general",
   },
 
-  "gpt-4o-mini": {
-    id: "gpt-4o-mini",
+  [OpenAIModels.GPT_4O_MINI]: {
+    id: OpenAIModels.GPT_4O_MINI,
     name: "GPT-4 Omni Mini",
     provider: AIProviderName.OPENAI,
     description: "Fast and cost-effective model with strong performance",
@@ -200,8 +206,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
 
   // Google AI Studio Models
-  "gemini-2.5-pro": {
-    id: "gemini-2.5-pro",
+  [GoogleAIModels.GEMINI_2_5_PRO]: {
+    id: GoogleAIModels.GEMINI_2_5_PRO,
     name: "Gemini 2.5 Pro",
     provider: AIProviderName.GOOGLE_AI,
     description:
@@ -246,8 +252,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     category: "reasoning",
   },
 
-  "gemini-2.5-flash": {
-    id: "gemini-2.5-flash",
+  [GoogleAIModels.GEMINI_2_5_FLASH]: {
+    id: GoogleAIModels.GEMINI_2_5_FLASH,
     name: "Gemini 2.5 Flash",
     provider: AIProviderName.GOOGLE_AI,
     description: "Fast and efficient multimodal model with large context",
@@ -292,8 +298,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
   },
 
   // Anthropic Models
-  "claude-3-5-sonnet-20241022": {
-    id: "claude-3-5-sonnet-20241022",
+  [AnthropicModels.CLAUDE_3_5_SONNET]: {
+    id: AnthropicModels.CLAUDE_3_5_SONNET,
     name: "Claude 3.5 Sonnet",
     provider: AIProviderName.ANTHROPIC,
     description:
@@ -343,8 +349,8 @@ export const MODEL_REGISTRY: Record<string, ModelInfo> = {
     category: "coding",
   },
 
-  "claude-3-5-haiku-20241022": {
-    id: "claude-3-5-haiku-20241022",
+  [AnthropicModels.CLAUDE_3_5_HAIKU]: {
+    id: AnthropicModels.CLAUDE_3_5_HAIKU,
     name: "Claude 3.5 Haiku",
     provider: AIProviderName.ANTHROPIC,
     description: "Fast and efficient Claude model for quick tasks",
@@ -493,40 +499,67 @@ Object.values(MODEL_REGISTRY).forEach((model) => {
   });
 });
 
-// Add common aliases
-Object.assign(MODEL_ALIASES, {
-  latest: "gpt-4o", // Default latest model
-  fastest: "gpt-4o-mini",
-  cheapest: "gemini-2.5-flash",
-  "best-coding": "claude-3-5-sonnet-20241022",
-  "best-analysis": "gemini-2.5-pro",
-  "best-creative": "claude-3-5-sonnet-20241022",
-  "best-value": "gemini-2.5-flash",
-  local: "llama3.2:latest",
+// Pull canonical alias recommendations from core/types
+Object.entries(DEFAULT_MODEL_ALIASES).forEach(([k, v]) => {
+  MODEL_ALIASES[k.toLowerCase().replace(/_/g, "-")] = v;
 });
+
+MODEL_ALIASES.local = "llama3.2:latest";
 
 /**
  * Use case to model mappings
  */
 export const USE_CASE_RECOMMENDATIONS: Record<string, string[]> = {
-  coding: ["claude-3-5-sonnet-20241022", "gpt-4o", "gemini-2.5-pro"],
-  creative: ["claude-3-5-sonnet-20241022", "gpt-4o", "gemini-2.5-pro"],
-  analysis: ["gemini-2.5-pro", "claude-3-5-sonnet-20241022", "gpt-4o"],
+  coding: [
+    AnthropicModels.CLAUDE_3_5_SONNET,
+    OpenAIModels.GPT_4O,
+    GoogleAIModels.GEMINI_2_5_PRO,
+  ],
+  creative: [
+    AnthropicModels.CLAUDE_3_5_SONNET,
+    OpenAIModels.GPT_4O,
+    GoogleAIModels.GEMINI_2_5_PRO,
+  ],
+  analysis: [
+    GoogleAIModels.GEMINI_2_5_PRO,
+    AnthropicModels.CLAUDE_3_5_SONNET,
+    OpenAIModels.GPT_4O,
+  ],
   conversation: [
-    "gpt-4o",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
+    OpenAIModels.GPT_4O,
+    AnthropicModels.CLAUDE_3_5_SONNET,
+    AnthropicModels.CLAUDE_3_5_HAIKU,
   ],
-  reasoning: ["claude-3-5-sonnet-20241022", "gemini-2.5-pro", "gpt-4o"],
-  translation: ["gemini-2.5-pro", "gpt-4o", "claude-3-5-haiku-20241022"],
+  reasoning: [
+    AnthropicModels.CLAUDE_3_5_SONNET,
+    GoogleAIModels.GEMINI_2_5_PRO,
+    OpenAIModels.GPT_4O,
+  ],
+  translation: [
+    GoogleAIModels.GEMINI_2_5_PRO,
+    OpenAIModels.GPT_4O,
+    AnthropicModels.CLAUDE_3_5_HAIKU,
+  ],
   summarization: [
-    "gemini-2.5-flash",
-    "gpt-4o-mini",
-    "claude-3-5-haiku-20241022",
+    GoogleAIModels.GEMINI_2_5_FLASH,
+    OpenAIModels.GPT_4O_MINI,
+    AnthropicModels.CLAUDE_3_5_HAIKU,
   ],
-  "cost-effective": ["gemini-2.5-flash", "gpt-4o-mini", "mistral-small-latest"],
-  "high-quality": ["claude-3-5-sonnet-20241022", "gpt-4o", "gemini-2.5-pro"],
-  fast: ["gpt-4o-mini", "gemini-2.5-flash", "claude-3-5-haiku-20241022"],
+  "cost-effective": [
+    GoogleAIModels.GEMINI_2_5_FLASH,
+    OpenAIModels.GPT_4O_MINI,
+    "mistral-small-latest",
+  ],
+  "high-quality": [
+    AnthropicModels.CLAUDE_3_5_SONNET,
+    OpenAIModels.GPT_4O,
+    GoogleAIModels.GEMINI_2_5_PRO,
+  ],
+  fast: [
+    OpenAIModels.GPT_4O_MINI,
+    GoogleAIModels.GEMINI_2_5_FLASH,
+    AnthropicModels.CLAUDE_3_5_HAIKU,
+  ],
 };
 
 /**
