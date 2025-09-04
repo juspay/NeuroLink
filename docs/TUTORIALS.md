@@ -250,6 +250,62 @@ if (
 }
 ```
 
+## 💬 Building a Conversational Agent
+
+NeuroLink can maintain a stateful conversation history, making it easy to build conversational agents and chatbots. By enabling context summarization, NeuroLink will automatically manage the conversation's context, summarizing it when it grows too long.
+
+### Step 1: Enable Context Summarization
+
+To enable this feature, simply call the `enableContextSummarization()` method on your `NeuroLink` instance.
+
+```javascript
+const { NeuroLink } = require("@juspay/neurolink");
+
+const neurolink = new NeuroLink();
+neurolink.enableContextSummarization();
+
+console.log("Conversational agent ready. I will remember our conversation.");
+```
+
+### Step 2: Simulate a Conversation
+
+Now, you can interact with the agent by calling `generate()` multiple times. The agent will remember the context of previous turns.
+
+```javascript
+async function haveConversation() {
+  const prompts = [
+    "My name is Alex.",
+    "I live in San Francisco.",
+    "What is my name and where do I live?",
+  ];
+
+  for (const prompt of prompts) {
+    console.log(`\n> User: ${prompt}`);
+    const result = await neurolink.generate({
+      input: { text: prompt },
+    });
+    console.log(`> Agent: ${result.content}`);
+  }
+}
+
+haveConversation();
+```
+
+### Expected Output
+
+The agent will correctly recall the information provided in earlier prompts, demonstrating its stateful nature.
+
+```
+> User: My name is Alex.
+> Agent: It's nice to meet you, Alex.
+
+> User: I live in San Francisco.
+> Agent: San Francisco is a beautiful city.
+
+> User: What is my name and where do I live?
+> Agent: Your name is Alex and you live in San Francisco.
+```
+
 ## 📋 Implementation Checklist
 
 ### ✅ Basic Setup

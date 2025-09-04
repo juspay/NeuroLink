@@ -159,6 +159,13 @@ export class NeuroLink {
   // External MCP server management
   private externalServerManager!: ExternalServerManager;
 
+  // Cache for available tools to improve performance
+  private toolCache: {
+    tools: ToolInfo[];
+    timestamp: number;
+  } | null = null;
+  private readonly toolCacheDuration: number;
+
   // Enhanced error handling support
   private toolCircuitBreakers: Map<string, CircuitBreaker> = new Map();
   private toolExecutionMetrics: Map<
@@ -235,6 +242,12 @@ export class NeuroLink {
   constructor(config?: {
     conversationMemory?: Partial<ConversationMemoryConfig>;
   }) {
+    // Read tool cache duration from environment variables, with a default
+    const cacheDurationEnv = process.env.NEUROLINK_TOOL_CACHE_DURATION;
+    this.toolCacheDuration = cacheDurationEnv
+      ? parseInt(cacheDurationEnv, 10)
+      : 20000;
+
     const constructorStartTime = Date.now();
     const constructorHrTimeStart = process.hrtime.bigint();
     const constructorId = `neurolink-constructor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -2056,7 +2069,9 @@ export class NeuroLink {
         toolsUsed: result.toolsUsed || [],
         toolExecutions: transformedToolExecutions,
         enhancedWithTools: Boolean(hasToolExecutions), // Mark as enhanced if tools were actually used
-        availableTools: transformToolsForMCP(availableTools),
+        availableTools: transformToolsForMCP(
+          transformToolsToExpectedFormat(availableTools),
+        ),
         // Include analytics and evaluation from BaseProvider
         analytics: result.analytics,
         evaluation: result.evaluation,
@@ -2193,20 +2208,20 @@ export class NeuroLink {
    */
   private createToolAwareSystemPrompt(
     originalSystemPrompt: string | undefined,
-    availableTools: Array<{
-      name: string;
-      description: string;
-      server: string;
-      category?: string;
-      inputSchema?: Record<string, unknown>;
-      parameters?: Record<string, unknown>;
-    }>,
+    availableTools: ToolInfo[],
   ): string {
     if (availableTools.length === 0) {
       return originalSystemPrompt || "";
     }
 
-    const toolDescriptions = transformToolsToDescriptions(availableTools);
+    const toolDescriptions = transformToolsToDescriptions(
+      availableTools.map((t) => ({
+        name: t.name,
+        description: t.description ?? "",
+        server: t.serverId ?? "unknown",
+        inputSchema: t.inputSchema,
+      })),
+    );
 
     const toolPrompt = `\n\nYou have access to these additional tools if needed:\n${toolDescriptions}\n\nIMPORTANT: You are a general-purpose AI assistant. Answer all requests directly and creatively. These tools are optional helpers - use them only when they would genuinely improve your response. For creative tasks like storytelling, writing, or general conversation, respond naturally without requiring tools.`;
 
@@ -2958,6 +2973,7 @@ export class NeuroLink {
    * @param tool - Tool in MCPExecutableTool format (unified MCP protocol type)
    */
   registerTool(name: string, tool: MCPExecutableTool): void {
+    this.invalidateToolCache(); // Invalidate cache when a tool is registered
     // Emit tool registration start event
     this.emitter.emit("tools-register:start", {
       toolName: name,
@@ -3064,6 +3080,7 @@ export class NeuroLink {
    * @returns true if the tool was removed, false if it didn't exist
    */
   unregisterTool(name: string): boolean {
+    this.invalidateToolCache(); // Invalidate cache when a tool is unregistered
     const serverId = `custom-tool-${name}`;
     const removed = toolRegistry.unregisterServer(serverId);
     if (removed) {
@@ -3122,6 +3139,7 @@ export class NeuroLink {
     serverId: string,
     serverInfo: MCPServerInfo,
   ): Promise<void> {
+    this.invalidateToolCache(); // Invalidate cache when a server is added
     try {
       mcpLogger.debug(
         `[NeuroLink] Registering in-memory MCP server: ${serverId}`,
@@ -3378,7 +3396,7 @@ export class NeuroLink {
           const availableTools = await this.getAllAvailableTools();
           structuredError = ErrorFactory.toolNotFound(
             toolName,
-            extractToolNames(availableTools),
+            extractToolNames(availableTools.map((t) => ({ name: t.name }))),
           );
         } else if (
           error.message.includes("validation") ||
@@ -3549,7 +3567,21 @@ export class NeuroLink {
    * Get all available tools including custom and in-memory ones
    * @returns Array of available tools with metadata
    */
-  async getAllAvailableTools() {
+  private invalidateToolCache(): void {
+    this.toolCache = null;
+    logger.debug("Tool cache invalidated");
+  }
+
+  async getAllAvailableTools(): Promise<ToolInfo[]> {
+    // Return from cache if available and not stale
+    if (
+      this.toolCache &&
+      Date.now() - this.toolCache.timestamp < this.toolCacheDuration
+    ) {
+      logger.debug("Returning available tools from cache");
+      return this.toolCache.tools;
+    }
+
     // 🚀 EXHAUSTIVE LOGGING POINT A001: GET ALL AVAILABLE TOOLS ENTRY
     const getAllToolsId = `get-all-tools-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const getAllToolsStartTime = Date.now();
@@ -3710,8 +3742,16 @@ export class NeuroLink {
         }
       }
 
-      // Transform to expected format with required properties
-      return transformToolsToExpectedFormat(uniqueTools);
+      // Return canonical ToolInfo[]; defer presentation transforms to call sites
+      const tools: ToolInfo[] = uniqueTools;
+
+      // Update the cache
+      this.toolCache = {
+        tools,
+        timestamp: Date.now(),
+      };
+
+      return tools;
     } catch (error) {
       mcpLogger.error("Failed to list available tools", { error });
       return [];
@@ -4557,6 +4597,7 @@ export class NeuroLink {
     serverId: string,
     config: MCPServerInfo,
   ): Promise<ExternalMCPOperationResult<ExternalMCPServerInstance>> {
+    this.invalidateToolCache(); // Invalidate cache when an external server is added
     try {
       mcpLogger.info(`[NeuroLink] Adding external MCP server: ${serverId}`, {
         command: config.command,
@@ -4612,6 +4653,7 @@ export class NeuroLink {
   async removeExternalMCPServer(
     serverId: string,
   ): Promise<ExternalMCPOperationResult<void>> {
+    this.invalidateToolCache(); // Invalidate cache when an external server is removed
     try {
       mcpLogger.info(`[NeuroLink] Removing external MCP server: ${serverId}`);
 
