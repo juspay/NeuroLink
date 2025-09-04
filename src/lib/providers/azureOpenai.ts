@@ -1,7 +1,8 @@
 import { createAzure } from "@ai-sdk/azure";
 import { streamText, type LanguageModelV1 } from "ai";
 import { BaseProvider } from "../core/baseProvider.js";
-import type { AIProviderName } from "../types/index.js";
+import type { AIProviderName } from "../core/types.js";
+import { APIVersions } from "../core/types.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
@@ -35,7 +36,7 @@ export class AzureOpenAIProvider extends BaseProvider {
       process.env.AZURE_OPENAI_DEPLOYMENT ||
       process.env.AZURE_OPENAI_DEPLOYMENT_ID ||
       "gpt-4o";
-    this.apiVersion = process.env.AZURE_API_VERSION || "2024-10-01-preview";
+    this.apiVersion = process.env.AZURE_API_VERSION || APIVersions.AZURE_LATEST;
 
     // Configuration validation - now using consolidated utility
     if (!this.apiKey) {

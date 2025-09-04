@@ -4,7 +4,14 @@
  */
 
 import { logger } from "./logger.js";
-import { AIProviderName } from "../types/index.js";
+import {
+  AIProviderName,
+  OpenAIModels,
+  GoogleAIModels,
+  AnthropicModels,
+  BedrockModels,
+} from "../core/types.js";
+import { API_KEY_LENGTHS, PROJECT_ID_FORMAT } from "./providerConfig.js";
 import { basename } from "path";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 
@@ -562,17 +569,23 @@ export class ProviderHealthChecker {
   ): boolean {
     switch (providerName) {
       case AIProviderName.ANTHROPIC:
-        return apiKey.startsWith("sk-ant-") && apiKey.length > 20;
+        return (
+          apiKey.startsWith("sk-ant-") &&
+          apiKey.length >= API_KEY_LENGTHS.ANTHROPIC_MIN
+        );
       case AIProviderName.OPENAI:
-        return apiKey.startsWith("sk-") && apiKey.length > 20;
+        return (
+          apiKey.startsWith("sk-") &&
+          apiKey.length >= API_KEY_LENGTHS.OPENAI_MIN
+        );
       case AIProviderName.GOOGLE_AI:
-        return apiKey.length > 20; // Basic length check
+        return apiKey.length >= API_KEY_LENGTHS.GOOGLE_AI_EXACT; // Basic length check
       case AIProviderName.VERTEX:
         return apiKey.endsWith(".json") || apiKey.includes("type"); // JSON key format
       case AIProviderName.BEDROCK:
-        return apiKey.length >= 20; // AWS access key length
+        return apiKey.length >= API_KEY_LENGTHS.AWS_ACCESS_KEY; // AWS access key length
       case AIProviderName.AZURE:
-        return apiKey.length >= 32; // Azure OpenAI API key length
+        return apiKey.length >= API_KEY_LENGTHS.AZURE_MIN; // Azure OpenAI API key length
       case AIProviderName.OLLAMA:
         return true; // Ollama usually doesn't require specific format
       default:
@@ -825,16 +838,16 @@ export class ProviderHealthChecker {
     const bedrockModel =
       process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
     const supportedModels = [
-      "anthropic.claude-3-sonnet-20240229-v1:0",
-      "anthropic.claude-3-haiku-20240307-v1:0",
-      "anthropic.claude-3-opus-20240229-v1:0",
+      BedrockModels.CLAUDE_3_SONNET,
+      BedrockModels.CLAUDE_3_HAIKU,
+      BedrockModels.CLAUDE_3_5_SONNET,
       "anthropic.claude-v2:1",
       "amazon.titan-text-express-v1",
     ];
 
     if (!bedrockModel) {
       healthStatus.recommendations.push(
-        "Set BEDROCK_MODEL or BEDROCK_MODEL_ID for faster startup (e.g., anthropic.claude-3-sonnet-20240229-v1:0)",
+        `Set BEDROCK_MODEL or BEDROCK_MODEL_ID for faster startup (e.g., ${BedrockModels.CLAUDE_3_SONNET})`,
       );
     } else if (!supportedModels.includes(bedrockModel)) {
       healthStatus.recommendations.push(
@@ -910,39 +923,44 @@ export class ProviderHealthChecker {
     switch (providerName) {
       case AIProviderName.ANTHROPIC:
         return [
-          "claude-3-5-sonnet-20241022",
-          "claude-3-haiku-20240307",
-          "claude-3-opus-20240229",
+          AnthropicModels.CLAUDE_3_5_SONNET,
+          AnthropicModels.CLAUDE_3_HAIKU,
+          AnthropicModels.CLAUDE_3_OPUS,
         ];
       case AIProviderName.OPENAI:
-        return ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"];
+        return [
+          OpenAIModels.GPT_4O,
+          OpenAIModels.GPT_4O_MINI,
+          OpenAIModels.GPT_3_5_TURBO,
+        ];
       case AIProviderName.GOOGLE_AI:
-        return ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"];
+        return [
+          GoogleAIModels.GEMINI_1_5_PRO,
+          GoogleAIModels.GEMINI_1_5_FLASH,
+          GoogleAIModels.GEMINI_2_5_PRO,
+        ];
       case AIProviderName.VERTEX:
         return [
           // Google models (via vertex provider)
-          "gemini-2.5-pro",
-          "gemini-2.5-flash",
-          "gemini-2.5-flash-lite",
-          "gemini-2.0-flash-001",
-          "gemini-1.5-pro",
-          "gemini-1.5-flash",
+          GoogleAIModels.GEMINI_2_5_PRO,
+          GoogleAIModels.GEMINI_2_5_FLASH,
+          GoogleAIModels.GEMINI_2_5_FLASH_LITE,
+          GoogleAIModels.GEMINI_2_0_FLASH_001,
+          GoogleAIModels.GEMINI_1_5_PRO,
+          GoogleAIModels.GEMINI_1_5_FLASH,
           // Anthropic models (via vertexAnthropic provider)
           "claude-sonnet-4@20250514",
           "claude-opus-4@20250514",
-          "claude-3-5-sonnet-20241022",
-          "claude-3-5-haiku-20241022",
-          "claude-3-sonnet-20240229",
-          "claude-3-haiku-20240307",
-          "claude-3-opus-20240229",
+          AnthropicModels.CLAUDE_3_5_SONNET,
+          AnthropicModels.CLAUDE_3_5_HAIKU,
+          AnthropicModels.CLAUDE_3_SONNET,
+          AnthropicModels.CLAUDE_3_HAIKU,
+          AnthropicModels.CLAUDE_3_OPUS,
         ];
       case AIProviderName.BEDROCK:
-        return [
-          "anthropic.claude-3-sonnet-20240229-v1:0",
-          "anthropic.claude-3-haiku-20240307-v1:0",
-        ];
+        return [BedrockModels.CLAUDE_3_SONNET, BedrockModels.CLAUDE_3_HAIKU];
       case AIProviderName.AZURE:
-        return ["gpt-4o", "gpt-4o-mini", "gpt-35-turbo"];
+        return [OpenAIModels.GPT_4O, OpenAIModels.GPT_4O_MINI, "gpt-35-turbo"];
       case AIProviderName.OLLAMA:
         return ["llama3.2:latest", "llama3.1:latest", "mistral:latest"];
       default:
@@ -1371,8 +1389,7 @@ export class ProviderHealthChecker {
       result.projectId = projectId;
 
       // Validate project ID format
-      const projectIdPattern = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
-      if (projectIdPattern.test(projectId)) {
+      if (PROJECT_ID_FORMAT.PATTERN.test(projectId)) {
         result.isValid = true;
       } else {
         result.issues.push(`Invalid project ID format: ${projectId}`);

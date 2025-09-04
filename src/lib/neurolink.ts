@@ -25,6 +25,19 @@ import { AIProviderFactory } from "./core/factory.js";
 
 import { mcpLogger } from "./utils/logger.js";
 import { SYSTEM_LIMITS } from "./core/constants.js";
+import {
+  NANOSECOND_TO_MS_DIVISOR,
+  MCP_TIMEOUTS,
+  SERVER_CONFIG,
+  TOOL_TIMEOUTS,
+  RETRY_ATTEMPTS,
+  RETRY_DELAYS,
+  CIRCUIT_BREAKER,
+  CIRCUIT_BREAKER_RESET_MS,
+  MEMORY_THRESHOLDS,
+  PROVIDER_TIMEOUTS,
+  PERFORMANCE_THRESHOLDS,
+} from "./constants/index.js";
 import pLimit from "p-limit";
 import { toolRegistry } from "./mcp/toolRegistry.js";
 import { logger } from "./utils/logger.js";
@@ -334,7 +347,8 @@ export class NeuroLink {
             process.hrtime.bigint() - constructorHrTimeStart
           ).toString(),
           registrySetupDurationNs: registrySetupDurationNs.toString(),
-          registrySetupDurationMs: Number(registrySetupDurationNs) / 1000000,
+          registrySetupDurationMs:
+            Number(registrySetupDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           enableManualMCP: false,
           message:
             "ProviderRegistry configured successfully with security settings",
@@ -356,7 +370,8 @@ export class NeuroLink {
             process.hrtime.bigint() - constructorHrTimeStart
           ).toString(),
           registrySetupDurationNs: registrySetupDurationNs.toString(),
-          registrySetupDurationMs: Number(registrySetupDurationNs) / 1000000,
+          registrySetupDurationMs:
+            Number(registrySetupDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           error: error instanceof Error ? error.message : String(error),
           errorName: error instanceof Error ? error.name : "UnknownError",
           errorStack: error instanceof Error ? error.stack : undefined,
@@ -420,11 +435,12 @@ export class NeuroLink {
             process.hrtime.bigint() - constructorHrTimeStart
           ).toString(),
           memoryInitDurationNs: memoryInitDurationNs.toString(),
-          memoryInitDurationMs: Number(memoryInitDurationNs) / 1000000,
+          memoryInitDurationMs:
+            Number(memoryInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           memoryManagerCreateDurationNs:
             memoryManagerCreateDurationNs.toString(),
           memoryManagerCreateDurationMs:
-            Number(memoryManagerCreateDurationNs) / 1000000,
+            Number(memoryManagerCreateDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           finalMemoryConfig: {
             maxSessions: memoryConfig.maxSessions,
             maxTurnsPerSession: memoryConfig.maxTurnsPerSession,
@@ -446,7 +462,8 @@ export class NeuroLink {
             process.hrtime.bigint() - constructorHrTimeStart
           ).toString(),
           memoryInitDurationNs: memoryInitDurationNs.toString(),
-          memoryInitDurationMs: Number(memoryInitDurationNs) / 1000000,
+          memoryInitDurationMs:
+            Number(memoryInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           error: error instanceof Error ? error.message : String(error),
           errorName: error instanceof Error ? error.name : "UnknownError",
           errorStack: error instanceof Error ? error.stack : undefined,
@@ -496,8 +513,8 @@ export class NeuroLink {
       elapsedNs: (process.hrtime.bigint() - constructorHrTimeStart).toString(),
       externalServerInitStartTimeNs: externalServerInitStartTime.toString(),
       serverManagerConfig: {
-        maxServers: 20,
-        defaultTimeout: 15000,
+        maxServers: SERVER_CONFIG.MAX_MCP_SERVERS,
+        defaultTimeout: MCP_TIMEOUTS.EXTERNAL_SERVER_STARTUP_MS,
         enableAutoRestart: true,
         enablePerformanceMonitoring: true,
       },
@@ -536,7 +553,7 @@ export class NeuroLink {
           ).toString(),
           externalServerInitDurationNs: externalServerInitDurationNs.toString(),
           externalServerInitDurationMs:
-            Number(externalServerInitDurationNs) / 1000000,
+            Number(externalServerInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           hasExternalServerManager: !!this.externalServerManager,
           message: "External server manager initialized successfully",
         },
@@ -562,7 +579,7 @@ export class NeuroLink {
         ).toString(),
         externalServerInitDurationNs: externalServerInitDurationNs.toString(),
         externalServerInitDurationMs:
-          Number(externalServerInitDurationNs) / 1000000,
+          Number(externalServerInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         error: error instanceof Error ? error.message : String(error),
         errorName: error instanceof Error ? error.name : "UnknownError",
         errorStack: error instanceof Error ? error.stack : undefined,
@@ -661,7 +678,7 @@ export class NeuroLink {
       elapsedNs: (process.hrtime.bigint() - constructorHrTimeStart).toString(),
       eventHandlerSetupDurationNs: eventHandlerSetupDurationNs.toString(),
       eventHandlerSetupDurationMs:
-        Number(eventHandlerSetupDurationNs) / 1000000,
+        Number(eventHandlerSetupDurationNs) / NANOSECOND_TO_MS_DIVISOR,
       eventHandlersCount: 5,
       eventHandlerTypes: [
         "connected",
@@ -690,7 +707,8 @@ export class NeuroLink {
       constructorId,
       timestamp: new Date().toISOString(),
       constructorDurationNs: constructorDurationNs.toString(),
-      constructorDurationMs: Number(constructorDurationNs) / 1000000,
+      constructorDurationMs:
+        Number(constructorDurationNs) / NANOSECOND_TO_MS_DIVISOR,
       totalElapsedMs: Date.now() - constructorStartTime,
       finalState: {
         hasConversationMemory: !!this.conversationMemory,
@@ -831,7 +849,7 @@ export class NeuroLink {
         elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
         performanceImportDurationNs: performanceImportDurationNs.toString(),
         performanceImportDurationMs:
-          Number(performanceImportDurationNs) / 1000000,
+          Number(performanceImportDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         hasMemoryManager: !!MemoryManager,
         message: "MemoryManager imported successfully",
       });
@@ -849,7 +867,7 @@ export class NeuroLink {
         elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
         performanceImportDurationNs: performanceImportDurationNs.toString(),
         performanceImportDurationMs:
-          Number(performanceImportDurationNs) / 1000000,
+          Number(performanceImportDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         error: error instanceof Error ? error.message : String(error),
         errorName: error instanceof Error ? error.name : "UnknownError",
         message:
@@ -916,7 +934,7 @@ export class NeuroLink {
     mcpInitHrTimeStart: bigint,
   ): Promise<void> {
     const toolRegistryStartTime = process.hrtime.bigint();
-    const initTimeout = 3000;
+    const initTimeout = MCP_TIMEOUTS.INITIALIZATION_MS;
 
     logger.debug(`[NeuroLink] ⏱️ LOG_POINT_M007_TOOL_REGISTRY_TIMEOUT_SETUP`, {
       logPoint: "M007_TOOL_REGISTRY_TIMEOUT_SETUP",
@@ -950,7 +968,8 @@ export class NeuroLink {
       elapsedMs: Date.now() - mcpInitStartTime,
       elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
       toolRegistryDurationNs: toolRegistryDurationNs.toString(),
-      toolRegistryDurationMs: Number(toolRegistryDurationNs) / 1000000,
+      toolRegistryDurationMs:
+        Number(toolRegistryDurationNs) / NANOSECOND_TO_MS_DIVISOR,
       message: "Tool registry initialization completed within timeout",
     });
   }
@@ -987,7 +1006,8 @@ export class NeuroLink {
       elapsedMs: Date.now() - mcpInitStartTime,
       elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
       providerRegistryDurationNs: providerRegistryDurationNs.toString(),
-      providerRegistryDurationMs: Number(providerRegistryDurationNs) / 1000000,
+      providerRegistryDurationMs:
+        Number(providerRegistryDurationNs) / NANOSECOND_TO_MS_DIVISOR,
       message: "Provider registry registration completed successfully",
     });
   }
@@ -1026,7 +1046,8 @@ export class NeuroLink {
         elapsedMs: Date.now() - mcpInitStartTime,
         elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
         directToolsDurationNs: directToolsDurationNs.toString(),
-        directToolsDurationMs: Number(directToolsDurationNs) / 1000000,
+        directToolsDurationMs:
+          Number(directToolsDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         serverId: "neurolink-direct",
         message: "Direct tools server registered successfully",
       });
@@ -1048,7 +1069,8 @@ export class NeuroLink {
         elapsedMs: Date.now() - mcpInitStartTime,
         elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
         directToolsDurationNs: directToolsDurationNs.toString(),
-        directToolsDurationMs: Number(directToolsDurationNs) / 1000000,
+        directToolsDurationMs:
+          Number(directToolsDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         error: error instanceof Error ? error.message : String(error),
         errorName: error instanceof Error ? error.name : "UnknownError",
         errorStack: error instanceof Error ? error.stack : undefined,
@@ -1099,7 +1121,8 @@ export class NeuroLink {
         elapsedMs: Date.now() - mcpInitStartTime,
         elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
         mcpConfigDurationNs: mcpConfigDurationNs.toString(),
-        mcpConfigDurationMs: Number(mcpConfigDurationNs) / 1000000,
+        mcpConfigDurationMs:
+          Number(mcpConfigDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         serversLoaded: configResult.serversLoaded,
         errorsCount: configResult.errors.length,
         configResult: {
@@ -1158,7 +1181,7 @@ export class NeuroLink {
       memoryUsed: `${memoryDelta}MB`,
     });
 
-    if (memoryDelta > 30) {
+    if (memoryDelta > MEMORY_THRESHOLDS.MODERATE_USAGE_MB) {
       mcpLogger.debug(
         "💡 Memory cleanup suggestion: MCP initialization used significant memory. Consider calling MemoryManager.forceGC() after heavy operations.",
       );
@@ -1630,7 +1653,7 @@ export class NeuroLink {
           ).toString(),
           conversationMemoryDurationNs: conversationMemoryDurationNs.toString(),
           conversationMemoryDurationMs:
-            Number(conversationMemoryDurationNs) / 1000000,
+            Number(conversationMemoryDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           message: "Conversation memory initialization completed successfully",
         },
       );
@@ -1700,7 +1723,7 @@ export class NeuroLink {
     generateInternalHrTimeStart: bigint,
     functionTag: string,
   ): Promise<TextGenerationResult | null> {
-    const maxMcpRetries = 2;
+    const maxMcpRetries = RETRY_ATTEMPTS.QUICK;
     const mcpRetryLoopStartTime = process.hrtime.bigint();
 
     logger.debug(`[NeuroLink] 🔄 LOG_POINT_G006_MCP_RETRY_LOOP_START`, {
@@ -1755,7 +1778,8 @@ export class NeuroLink {
             process.hrtime.bigint() - generateInternalHrTimeStart
           ).toString(),
           mcpAttemptDurationNs: mcpAttemptDurationNs.toString(),
-          mcpAttemptDurationMs: Number(mcpAttemptDurationNs) / 1000000,
+          mcpAttemptDurationMs:
+            Number(mcpAttemptDurationNs) / NANOSECOND_TO_MS_DIVISOR,
           currentAttempt: attempt,
           resultAnalysis: {
             hasResult: !!mcpResult,
@@ -1905,7 +1929,8 @@ export class NeuroLink {
         elapsedMs: Date.now() - tryMCPStartTime,
         elapsedNs: (process.hrtime.bigint() - tryMCPHrTimeStart).toString(),
         mcpInitCheckDurationNs: mcpInitCheckDurationNs.toString(),
-        mcpInitCheckDurationMs: Number(mcpInitCheckDurationNs) / 1000000,
+        mcpInitCheckDurationMs:
+          Number(mcpInitCheckDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         mcpInitializedAfter: this.mcpInitialized,
         initializationSuccessful: this.mcpInitialized,
         message: "MCP initialization check completed",
@@ -2528,7 +2553,8 @@ export class NeuroLink {
         elapsedMs: Date.now() - startTime,
         elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
         validationDurationNs: validationDurationNs.toString(),
-        validationDurationMs: Number(validationDurationNs) / 1000000,
+        validationDurationMs:
+          Number(validationDurationNs) / NANOSECOND_TO_MS_DIVISOR,
         validationError:
           "Stream options must include either input.text or input.audio",
         message:
@@ -2550,7 +2576,8 @@ export class NeuroLink {
       elapsedMs: Date.now() - startTime,
       elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
       validationDurationNs: validationDurationNs.toString(),
-      validationDurationMs: Number(validationDurationNs) / 1000000,
+      validationDurationMs:
+        Number(validationDurationNs) / NANOSECOND_TO_MS_DIVISOR,
       inputTextValid: hasText,
       inputAudioPresent: hasAudio,
       inputTextLength: hasText ? options.input!.text!.length : 0,
@@ -3214,9 +3241,9 @@ export class NeuroLink {
 
     // Set default options
     const finalOptions = {
-      timeout: options?.timeout || 30000, // 30 second default timeout
-      maxRetries: options?.maxRetries || 2, // Default 2 retries for retriable errors
-      retryDelayMs: options?.retryDelayMs || 1000, // 1 second delay between retries
+      timeout: options?.timeout || TOOL_TIMEOUTS.EXECUTION_DEFAULT_MS, // 30 second default timeout
+      maxRetries: options?.maxRetries || RETRY_ATTEMPTS.DEFAULT, // Default 2 retries for retriable errors
+      retryDelayMs: options?.retryDelayMs || RETRY_DELAYS.BASE_MS, // 1 second delay between retries
     };
 
     // Track memory usage for tool execution
@@ -3225,7 +3252,13 @@ export class NeuroLink {
 
     // Get or create circuit breaker for this tool
     if (!this.toolCircuitBreakers.has(toolName)) {
-      this.toolCircuitBreakers.set(toolName, new CircuitBreaker(5, 60000)); // 5 failures, 1 minute timeout
+      this.toolCircuitBreakers.set(
+        toolName,
+        new CircuitBreaker(
+          CIRCUIT_BREAKER.FAILURE_THRESHOLD,
+          CIRCUIT_BREAKER_RESET_MS,
+        ),
+      );
     }
     const circuitBreaker = this.toolCircuitBreakers.get(toolName);
 
@@ -3665,12 +3698,12 @@ export class NeuroLink {
       const endMemory = MemoryManager.getMemoryUsageMB();
       const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
 
-      if (memoryDelta > 10) {
+      if (memoryDelta > MEMORY_THRESHOLDS.LOW_USAGE_MB) {
         mcpLogger.debug(
           `🔍 Tool listing used ${memoryDelta}MB memory (large tool registry detected)`,
         );
         // Optimized collection patterns should reduce memory usage significantly
-        if (uniqueTools.length > 100) {
+        if (uniqueTools.length > PERFORMANCE_THRESHOLDS.LARGE_TOOL_COLLECTION) {
           mcpLogger.debug(
             "💡 Tool collection optimized for large sets. Memory usage reduced through efficient object reuse.",
           );
@@ -3757,7 +3790,7 @@ export class NeuroLink {
             try {
               const response = await fetch("http://localhost:11434/api/tags", {
                 method: "GET",
-                signal: AbortSignal.timeout(2000),
+                signal: AbortSignal.timeout(PROVIDER_TIMEOUTS.AUTH_MS),
               });
 
               if (!response.ok) {
@@ -4304,7 +4337,13 @@ export class NeuroLink {
   resetToolCircuitBreaker(toolName: string): void {
     if (this.toolCircuitBreakers.has(toolName)) {
       // Create a new circuit breaker (effectively resets it)
-      this.toolCircuitBreakers.set(toolName, new CircuitBreaker(5, 60000));
+      this.toolCircuitBreakers.set(
+        toolName,
+        new CircuitBreaker(
+          CIRCUIT_BREAKER.FAILURE_THRESHOLD,
+          CIRCUIT_BREAKER_RESET_MS,
+        ),
+      );
       mcpLogger.info(`Circuit breaker reset for tool: ${toolName}`);
     }
   }
