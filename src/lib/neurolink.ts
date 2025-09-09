@@ -1286,7 +1286,7 @@ export class NeuroLink {
       }
     }
 
-    // Convert to TextGenerationOptions using factory utilities
+    // 🔧 CRITICAL FIX: Convert to TextGenerationOptions while preserving the input object for multimodal support
     const baseOptions: TextGenerationOptions = {
       prompt: options.input.text,
       provider: options.provider as AIProviderName,
@@ -1300,6 +1300,7 @@ export class NeuroLink {
       context: options.context as Record<string, JsonValue> | undefined,
       evaluationDomain: options.evaluationDomain,
       toolUsageContext: options.toolUsageContext,
+      input: options.input, // This includes text, images, and content arrays
     };
 
     // Apply factory enhancement using centralized utilities
@@ -2403,13 +2404,17 @@ export class NeuroLink {
       const { stream: mcpStream, provider: providerName } =
         await this.createMCPStream(enhancedOptions);
 
-        // Create a wrapper around the stream that accumulates content
+      // Create a wrapper around the stream that accumulates content
       let accumulatedContent = "";
 
       const processedStream = (async function* (self: NeuroLink) {
         try {
           for await (const chunk of mcpStream) {
-            if (chunk && "content" in chunk && typeof chunk.content === "string") {
+            if (
+              chunk &&
+              "content" in chunk &&
+              typeof chunk.content === "string"
+            ) {
               accumulatedContent += chunk.content;
               // Emit chunk event for compatibility
               self.emitter.emit("response:chunk", chunk.content);
@@ -2817,7 +2822,11 @@ export class NeuroLink {
     const fallbackProcessedStream = (async function* (self: NeuroLink) {
       try {
         for await (const chunk of fallbackStreamResult.stream) {
-          if (chunk && "content" in chunk && typeof chunk.content === "string") {
+          if (
+            chunk &&
+            "content" in chunk &&
+            typeof chunk.content === "string"
+          ) {
             fallbackAccumulatedContent += chunk.content;
             // Emit chunk event
             self.emitter.emit("response:chunk", chunk.content);
@@ -4690,7 +4699,7 @@ export class NeuroLink {
    * Clear all conversation history (public API)
    */
   async clearAllConversations(): Promise<void> {
-     // First ensure memory is initialized
+    // First ensure memory is initialized
     const initId = `clear-all-init-${Date.now()}`;
     await this.initializeConversationMemoryForGeneration(
       initId,

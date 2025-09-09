@@ -5,6 +5,7 @@ import type {
   StandardRecord,
 } from "../types/typeAliases.js";
 import type { Tool, LanguageModelV1 } from "ai";
+import { generateText } from "ai";
 import type {
   AIProvider,
   TextGenerationOptions,
@@ -21,13 +22,17 @@ import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue, JsonObject, UnknownRecord } from "../types/common.js";
 import type { ToolResult, ToolArgs } from "../types/tools.js";
+import type { TextContent, ImageContent } from "../types/content.js";
 import { logger } from "../utils/logger.js";
 import { DEFAULT_MAX_STEPS, STEP_LIMITS } from "../core/constants.js";
 import { directAgentTools } from "../agent/directTools.js";
 import { getSafeMaxTokens } from "../utils/tokenLimits.js";
 import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
-import { buildMessagesArray } from "../utils/messageBuilder.js";
+import {
+  buildMessagesArray,
+  buildMultimodalMessagesArray,
+} from "../utils/messageBuilder.js";
 import type { NeuroLink } from "../neurolink.js";
 import { getKeysAsString, getKeyCount } from "../utils/transformationUtils.js";
 import {
@@ -43,6 +48,28 @@ import {
 import { modelConfig } from "./modelConfiguration.js";
 
 // Provider types moved to ../types/providers.js
+
+/**
+ * Multimodal input type for options that may contain images or content arrays
+ */
+type MultimodalInput = {
+  text: string;
+  images?: Array<Buffer | string>;
+  content?: Array<TextContent | ImageContent>;
+};
+
+/**
+ * Tool call object interface for type-safe access to tool call properties
+ */
+interface ToolCallObject extends UnknownRecord {
+  toolName?: string;
+  name?: string;
+  toolCallId?: string;
+  id?: string;
+  args?: UnknownRecord;
+  arguments?: UnknownRecord;
+  parameters?: UnknownRecord;
+}
 
 /**
  * Abstract base class for all AI providers
@@ -246,7 +273,7 @@ export abstract class BaseProvider implements AIProvider {
     try {
       // Import streamText dynamically to avoid circular dependencies
       // Using streamText instead of generateText for unified implementation
-      const { streamText } = await import("ai");
+      // const { streamText } = await import("ai");
 
       // Get ALL available tools (direct + MCP + external from options)
       const shouldUseTools = !options.disableTools && this.supportsTools();
@@ -296,12 +323,90 @@ export abstract class BaseProvider implements AIProvider {
       const model = await this.getAISDKModelWithMiddleware(options);
 
       // Build proper message array with conversation history
-      const messages = buildMessagesArray(options);
+      // Check if this is a multimodal request (images or content present)
+      let messages;
 
-      // Use streamText and accumulate results instead of generateText
-      const streamResult = await streamText({
+      // Type guard to check if options has multimodal input
+      const hasMultimodalInput = (opts: TextGenerationOptions): boolean => {
+        const input = opts.input as MultimodalInput | undefined;
+        const hasImages = !!input?.images?.length;
+        const hasContent = !!input?.content?.length;
+
+        return hasImages || hasContent;
+      };
+
+      if (hasMultimodalInput(options)) {
+        if (process.env.NEUROLINK_DEBUG === "true") {
+          logger.info(
+            "🖼️ [MULTIMODAL-REQUEST] Detected multimodal input, using multimodal message builder",
+          );
+        }
+
+        // This is a multimodal request - use multimodal message builder
+        // Convert TextGenerationOptions to GenerateOptions format for multimodal processing
+        const input = options.input as MultimodalInput | undefined;
+        const multimodalOptions = {
+          input: {
+            text: options.prompt || options.input?.text || "",
+            images: input?.images,
+            content: input?.content,
+          },
+          provider: options.provider,
+          model: options.model,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+          systemPrompt: options.systemPrompt,
+          enableAnalytics: options.enableAnalytics,
+          enableEvaluation: options.enableEvaluation,
+          context: options.context,
+        };
+
+        messages = await buildMultimodalMessagesArray(
+          multimodalOptions,
+          this.providerName,
+          this.modelName,
+        );
+      } else {
+        if (process.env.NEUROLINK_DEBUG === "true") {
+          logger.info(
+            "📝 [TEXT-ONLY-REQUEST] No multimodal input detected, using standard message builder",
+          );
+        }
+
+        // Standard text-only request
+        messages = buildMessagesArray(options);
+      }
+
+      // Convert messages to Vercel AI SDK format
+      const aiSDKMessages = messages.map((msg) => {
+        if (typeof msg.content === "string") {
+          // Simple text content
+          return {
+            role: msg.role,
+            content: msg.content,
+          };
+        } else {
+          // Multimodal content array - convert to Vercel AI SDK format
+          // The Vercel AI SDK expects content to be in a specific format
+          return {
+            role: msg.role,
+            content: msg.content.map((item) => {
+              if (item.type === "text") {
+                return { type: "text", text: item.text || "" };
+              } else if (item.type === "image") {
+                return { type: "image", image: item.image || "" };
+              }
+              return item;
+            }),
+          };
+        }
+      });
+
+      const generateResult = await generateText({
         model,
-        messages: messages,
+        messages: aiSDKMessages as Parameters<
+          typeof generateText
+        >[0]["messages"],
         tools,
         maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
         toolChoice: shouldUseTools ? "auto" : "none",
@@ -309,35 +414,12 @@ export abstract class BaseProvider implements AIProvider {
         maxTokens: options.maxTokens, // No default limit - unlimited unless specified
       });
 
-      // Accumulate the streamed content
-      let accumulatedContent = "";
-
-      // Wait for the stream to complete and accumulate content
-      try {
-        for await (const chunk of streamResult.textStream) {
-          accumulatedContent += chunk;
-        }
-      } catch (streamError) {
-        logger.error(
-          `Error reading text stream for ${this.providerName}:`,
-          streamError,
-        );
-        throw streamError;
-      }
-      // Get the final result - this should include usage, toolCalls, etc.
-      const usage = await streamResult.usage;
-      const toolCalls = await streamResult.toolCalls;
-      const toolResults = await streamResult.toolResults;
       const responseTime = Date.now() - startTime;
 
-      // Create a result object compatible with generateText format
-      const result = {
-        text: accumulatedContent,
-        usage: usage,
-        toolCalls: toolCalls,
-        toolResults: toolResults,
-        steps: (streamResult as unknown as { steps?: unknown[] }).steps, // Include steps for tool execution tracking
-      };
+      // Extract properties from generateResult
+      const usage = generateResult.usage;
+      const toolCalls = generateResult.toolCalls;
+      const toolResults = generateResult.toolResults;
 
       try {
         const actualCost = await this.calculateActualCost(
@@ -370,22 +452,22 @@ export abstract class BaseProvider implements AIProvider {
       // First check direct tool calls (fallback)
       if (toolCalls && toolCalls.length > 0) {
         toolsUsed.push(
-          ...toolCalls.map((tc) => {
-            return tc.toolName || "unknown";
+          ...toolCalls.map((tc: ToolCallObject) => {
+            return tc.toolName || tc.name || "unknown";
           }),
         );
       }
 
       // Then check steps for tool calls (primary source for multi-step)
       if (
-        (result as unknown as AISDKGenerateResult).steps &&
-        Array.isArray((result as unknown as AISDKGenerateResult).steps)
+        (generateResult as unknown as AISDKGenerateResult).steps &&
+        Array.isArray((generateResult as unknown as AISDKGenerateResult).steps)
       ) {
-        for (const step of (result as unknown as AISDKGenerateResult).steps ||
-          []) {
+        for (const step of (generateResult as unknown as AISDKGenerateResult)
+          .steps || []) {
           if (step?.toolCalls && Array.isArray(step.toolCalls)) {
             toolsUsed.push(
-              ...step.toolCalls.map((tc) => {
+              ...step.toolCalls.map((tc: ToolCallObject) => {
                 return tc.toolName || tc.name || "unknown";
               }),
             );
@@ -408,11 +490,11 @@ export abstract class BaseProvider implements AIProvider {
 
       // Extract tool executions from AI SDK result steps
       if (
-        (result as unknown as AISDKGenerateResult).steps &&
-        Array.isArray((result as unknown as AISDKGenerateResult).steps)
+        (generateResult as unknown as AISDKGenerateResult).steps &&
+        Array.isArray((generateResult as unknown as AISDKGenerateResult).steps)
       ) {
-        for (const step of (result as unknown as AISDKGenerateResult).steps ||
-          []) {
+        for (const step of (generateResult as unknown as AISDKGenerateResult)
+          .steps || []) {
           // First, collect tool calls and their arguments
           if (step?.toolCalls && Array.isArray(step.toolCalls)) {
             for (const toolCall of step.toolCalls) {
@@ -477,16 +559,16 @@ export abstract class BaseProvider implements AIProvider {
 
       // Format the result with tool executions included
       const enhancedResult: EnhancedGenerateResult = {
-        content: result.text,
+        content: generateResult.text,
         usage: {
-          input: result.usage?.promptTokens || 0,
-          output: result.usage?.completionTokens || 0,
-          total: result.usage?.totalTokens || 0,
+          input: generateResult.usage?.promptTokens || 0,
+          output: generateResult.usage?.completionTokens || 0,
+          total: generateResult.usage?.totalTokens || 0,
         },
         provider: this.providerName,
         model: this.modelName,
         toolCalls: toolCalls
-          ? toolCalls.map((tc) => ({
+          ? toolCalls.map((tc: ToolCallObject) => ({
               toolCallId: tc.toolCallId || "unknown",
               toolName: tc.toolName || "unknown",
               args: tc.args || {},
@@ -1337,13 +1419,25 @@ export abstract class BaseProvider implements AIProvider {
       optionsOrPrompt.maxTokens,
     );
 
-    return {
+    // CRITICAL FIX: Preserve the entire input object for multimodal support
+    // This ensures images and content arrays are not lost during normalization
+    const normalizedOptions: TextGenerationOptions = {
       ...optionsOrPrompt,
       prompt,
       provider: providerName,
       model: modelName,
       maxTokens: safeMaxTokens,
     };
+
+    // Ensure input object is preserved if it exists (for multimodal support)
+    if (optionsOrPrompt.input) {
+      normalizedOptions.input = {
+        ...optionsOrPrompt.input,
+        text: prompt, // Ensure text is consistent
+      };
+    }
+
+    return normalizedOptions;
   }
 
   protected normalizeStreamOptions(

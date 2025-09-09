@@ -5,6 +5,7 @@ import type { AnalyticsData, TokenUsage } from "./analytics.js";
 import type { EvaluationData } from "./evaluation.js";
 import type { UnknownRecord, JsonValue } from "./common.js";
 import type { ChatMessage } from "./conversation.js";
+import type { TextContent, ImageContent } from "./content.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 
 /**
@@ -133,8 +134,13 @@ export interface AudioChunk {
   encoding: PCMEncoding; // 'PCM16LE'
 }
 
-export type StreamOptions = {
-  input: { text?: string; audio?: AudioInputSpec }; // text and/or audio input
+export interface StreamOptions {
+  input: {
+    text: string;
+    audio?: AudioInputSpec;
+    images?: Array<Buffer | string>; // Simple image support
+    content?: Array<TextContent | ImageContent>; // Advanced multimodal content
+  };
   output?: {
     format?: "text" | "structured" | "json";
     streaming?: {
@@ -194,7 +200,7 @@ export type StreamOptions = {
 
   // NEW: Middleware related config
   middleware?: MiddlewareFactoryOptions;
-};
+}
 
 /**
  * Stream function result type - Primary output format for streaming

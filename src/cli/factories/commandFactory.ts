@@ -32,8 +32,6 @@ import { logger } from "../../lib/utils/logger.js";
 import fs from "fs";
 import { handleSetup } from "../commands/setup.js";
 
-// Use specific command interfaces from cli.ts instead of universal interface
-
 /**
  * CLI Command Factory for generate commands
  */
@@ -61,6 +59,12 @@ export class CLICommandFactory {
       default: "auto",
       description: "AI provider to use (auto-selects best available)",
       alias: "p",
+    },
+    image: {
+      type: "string" as const,
+      description:
+        "Add image file for multimodal analysis (can be used multiple times)",
+      alias: "i",
     },
     model: {
       type: "string" as const,
@@ -197,6 +201,22 @@ export class CLICommandFactory {
       ...this.commonOptions,
       ...additionalOptions,
     });
+  }
+
+  // Helper method to process CLI images with smart auto-detection
+  private static processCliImages(
+    images?: string | string[],
+  ): Array<Buffer | string> | undefined {
+    if (!images) {
+      return undefined;
+    }
+
+    const imagePaths = Array.isArray(images) ? images : [images];
+
+    // Return as-is - let the smart message builder handle URL vs file detection
+    // URLs will be detected and appended to prompt text
+    // File paths will be converted to base64 by the message builder
+    return imagePaths;
   }
 
   // Helper method to process common options
@@ -1210,8 +1230,15 @@ export class CLICommandFactory {
         });
       }
 
+      // Process CLI images if provided
+      const imageBuffers = CLICommandFactory.processCliImages(
+        argv.image as string | string[] | undefined,
+      );
+
       const result = await sdk.generate({
-        input: { text: inputText },
+        input: imageBuffers
+          ? { text: inputText, images: imageBuffers }
+          : { text: inputText },
         provider: enhancedOptions.provider,
         model: enhancedOptions.model,
         temperature: enhancedOptions.temperature,
@@ -1474,8 +1501,15 @@ export class CLICommandFactory {
         ? { ...contextMetadata, sessionId }
         : contextMetadata;
 
+      // Process CLI images if provided
+      const imageBuffers = CLICommandFactory.processCliImages(
+        argv.image as string | string[] | undefined,
+      );
+
       const stream = await sdk.stream({
-        input: { text: inputText },
+        input: imageBuffers
+          ? { text: inputText, images: imageBuffers }
+          : { text: inputText },
         provider: enhancedOptions.provider,
         model: enhancedOptions.model,
         temperature: enhancedOptions.temperature,

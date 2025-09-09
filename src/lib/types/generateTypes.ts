@@ -10,13 +10,18 @@ import type { EvaluationData } from "./evaluation.js";
 import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type { JsonValue } from "./common.js";
+import type { TextContent, ImageContent } from "./content.js";
 
 /**
  * Generate function options type - Primary method for content generation
- * Future-ready for multi-modal capabilities while maintaining text focus
+ * Supports multimodal content while maintaining backward compatibility
  */
 export type GenerateOptions = {
-  input: { text: string }; // Current scope: text input
+  input: {
+    text: string;
+    images?: Array<Buffer | string>; // Simple image support
+    content?: Array<TextContent | ImageContent>; // Advanced multimodal content
+  };
   output?: { format?: "text" | "structured" | "json" }; // Future extensible
 
   // Core options (inherited from TextGenerationOptions)
