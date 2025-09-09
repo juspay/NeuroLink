@@ -13,6 +13,7 @@ import type {
 import { MiddlewareRegistry } from "./registry.js";
 import { createAnalyticsMiddleware } from "./builtin/analytics.js";
 import { createGuardrailsMiddleware } from "./builtin/guardrails.js";
+import { createAutoEvaluationMiddleware } from "./builtin/autoEvaluation.js";
 import { logger } from "../utils/logger.js";
 import type { JsonValue } from "../types/common.js";
 
@@ -42,23 +43,36 @@ export class MiddlewareFactory {
     > = {
       analytics: createAnalyticsMiddleware,
       guardrails: createGuardrailsMiddleware,
+      autoEvaluation: createAutoEvaluationMiddleware,
     };
 
     // Register built-in presets
     this.registerPreset({
       name: "default",
-      description: "Default preset with analytics enabled.",
-      config: { analytics: { enabled: true } },
+      description: "Default preset with auto-evaluation for quality assurance.",
+      config: { autoEvaluation: { enabled: true } },
     });
     this.registerPreset({
       name: "all",
       description: "Enables all available middleware.",
-      config: { analytics: { enabled: true }, guardrails: { enabled: true } },
+      config: {
+        analytics: { enabled: true },
+        guardrails: { enabled: true },
+        autoEvaluation: { enabled: true },
+      },
     });
     this.registerPreset({
       name: "security",
       description: "Focuses on security with guardrails.",
       config: { guardrails: { enabled: true } },
+    });
+    this.registerPreset({
+      name: "quality",
+      description: "Ensures quality with auto-evaluation and guardrails.",
+      config: {
+        guardrails: { enabled: true },
+        autoEvaluation: { enabled: true },
+      },
     });
 
     // Register custom middleware if provided
@@ -183,6 +197,7 @@ export class MiddlewareFactory {
     > = {
       analytics: createAnalyticsMiddleware,
       guardrails: createGuardrailsMiddleware,
+      autoEvaluation: createAutoEvaluationMiddleware,
     };
     return builtInMiddlewareCreators[id];
   }

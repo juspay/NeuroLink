@@ -10,6 +10,7 @@ export interface NeuroLinkConfig {
   providers?: Record<string, ProviderConfig>;
   performance?: PerformanceConfig;
   analytics?: AnalyticsConfig;
+  evaluation?: EvaluationConfig;
   tools?: ToolConfig;
   lastUpdated?: number;
   configVersion?: string;
@@ -97,6 +98,20 @@ export interface AnalyticsConfig {
     days?: number;
     maxEntries?: number;
   };
+}
+
+/**
+ * Evaluation configuration
+ */
+export interface EvaluationConfig {
+  enabled?: boolean;
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  maxRetries?: number;
+  timeout?: number;
+  autoRetry?: boolean;
+  strictMode?: boolean;
 }
 
 /**
@@ -193,6 +208,14 @@ export const DEFAULT_CONFIG: NeuroLinkConfig = {
       days: 30,
       maxEntries: 10000,
     },
+  },
+  evaluation: {
+    enabled: true,
+    provider: "auto",
+    model: "auto",
+    temperature: 0.3,
+    maxRetries: 3,
+    timeout: 30000,
   },
   tools: {
     disableBuiltinTools: false,

@@ -66,6 +66,11 @@ export type {
 } from "./types/middlewareTypes.js";
 export { MiddlewareFactory } from "./middleware/factory.js";
 
+// Auto-evaluation exports
+export { createAutoEvaluationMiddleware } from "./middleware/builtin/autoEvaluation.js";
+export type { AutoEvaluationConfig } from "./evaluation/autoEvaluationConfig.js";
+export { DEFAULT_AUTO_EVALUATION_CONFIG } from "./evaluation/autoEvaluationConfig.js";
+
 // Version
 export const VERSION = "1.0.0";
 

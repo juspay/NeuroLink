@@ -109,6 +109,18 @@ export type GenerateResult = {
   analytics?: AnalyticsData;
   evaluation?: EvaluationData;
 
+  // Auto-evaluation metadata
+  autoEvaluationMetadata?: {
+    performed: boolean;
+    finalScore?: number;
+    attempts?: number;
+    duration?: number;
+    improvement?: number;
+    success?: boolean;
+    error?: boolean;
+    errorMessage?: string;
+  };
+
   // Factory enhancement metadata
   factoryMetadata?: {
     enhancementApplied: boolean;
