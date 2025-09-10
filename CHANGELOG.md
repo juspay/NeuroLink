@@ -1,3 +1,9 @@
+## [7.37.0](https://github.com/juspay/neurolink/compare/v7.36.0...v7.37.0) (2025-09-10)
+
+### Features
+
+- **(sdk):** Add advanced orchestration of model and providers BZ-43839 ([840d697](https://github.com/juspay/neurolink/commit/840d697aa6ef3e5e4c511a9482fc7e80006d2534))
+
 ## [7.36.0](https://github.com/juspay/neurolink/compare/v7.35.0...v7.36.0) (2025-09-10)
 
 ### Features
