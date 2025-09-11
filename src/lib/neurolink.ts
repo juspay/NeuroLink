@@ -27,8 +27,6 @@ import { mcpLogger } from "./utils/logger.js";
 import { SYSTEM_LIMITS } from "./core/constants.js";
 import {
   NANOSECOND_TO_MS_DIVISOR,
-  MCP_TIMEOUTS,
-  SERVER_CONFIG,
   TOOL_TIMEOUTS,
   RETRY_ATTEMPTS,
   RETRY_DELAYS,
@@ -59,6 +57,12 @@ import type {
   MCPServerCategory,
 } from "./types/mcpTypes.js";
 import type { ToolInfo } from "./mcp/contracts/mcpContract.js";
+import type {
+  NeuroLinkEvents,
+  TypedEventEmitter,
+  ToolExecutionContext,
+  ToolExecutionSummary,
+} from "./types/common.js";
 import {
   createCustomToolServerInfo,
   detectCategory,
@@ -151,12 +155,14 @@ export interface MCPStatus {
 }
 
 import { isNonNullObject } from "./utils/typeUtils.js";
+import { isZodSchema } from "./utils/schemaConversion.js";
 
 // Core types imported from "./types/index.js"
 
 export class NeuroLink {
   private mcpInitialized = false;
-  private emitter = new EventEmitter();
+  private emitter =
+    new EventEmitter() as unknown as TypedEventEmitter<NeuroLinkEvents>;
 
   private autoDiscoveredServerInfos: MCPServerInfo[] = [];
   // External MCP server management
@@ -181,6 +187,10 @@ export class NeuroLink {
       lastExecutionTime: number;
     }
   > = new Map();
+
+  private currentStreamToolExecutions: ToolExecutionContext[] = [];
+  private toolExecutionHistory: ToolExecutionSummary[] = [];
+  private activeToolExecutions: Map<string, ToolExecutionContext> = new Map();
 
   /**
    * Helper method to emit tool end event in a consistent way
@@ -225,6 +235,12 @@ export class NeuroLink {
   private enableOrchestration: boolean;
 
   /**
+   * Context storage for tool execution
+   * This context will be merged with any runtime context passed by the AI model
+   */
+  private toolExecutionContext?: Record<string, unknown>;
+
+  /**
    * Creates a new NeuroLink instance for AI text generation with MCP tool integration.
    *
    * @param config - Optional configuration object
@@ -262,6 +278,9 @@ export class NeuroLink {
     conversationMemory?: Partial<ConversationMemoryConfig>;
     enableOrchestration?: boolean;
   }) {
+    // Initialize orchestration setting
+    this.enableOrchestration = config?.enableOrchestration ?? false;
+
     // Read tool cache duration from environment variables, with a default
     const cacheDurationEnv = process.env.NEUROLINK_TOOL_CACHE_DURATION;
     this.toolCacheDuration = cacheDurationEnv
@@ -272,15 +291,6 @@ export class NeuroLink {
     const constructorHrTimeStart = process.hrtime.bigint();
     const constructorId = `neurolink-constructor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Initialize orchestration setting
-    this.enableOrchestration = config?.enableOrchestration ?? false;
-
-    this.logConstructorStart(
-      constructorId,
-      constructorStartTime,
-      constructorHrTimeStart,
-      config,
-    );
     this.initializeProviderRegistry(
       constructorId,
       constructorStartTime,
@@ -302,44 +312,6 @@ export class NeuroLink {
       constructorStartTime,
       constructorHrTimeStart,
     );
-  }
-
-  /**
-   * Log constructor start with comprehensive environment analysis
-   */
-  private logConstructorStart(
-    constructorId: string,
-    constructorStartTime: number,
-    constructorHrTimeStart: bigint,
-    config?: { conversationMemory?: Partial<ConversationMemoryConfig> },
-  ): void {
-    logger.debug(`[NeuroLink] 🏗️ LOG_POINT_C001_CONSTRUCTOR_START`, {
-      logPoint: "C001_CONSTRUCTOR_START",
-      constructorId,
-      timestamp: new Date().toISOString(),
-      constructorStartTime,
-      constructorHrTimeStart: constructorHrTimeStart.toString(),
-      hasConfig: !!config,
-      configType: typeof config,
-      configKeys: config ? Object.keys(config) : [],
-      configSize: config ? JSON.stringify(config).length : 0,
-      hasConversationMemoryConfig: !!config?.conversationMemory,
-      conversationMemoryEnabled: config?.conversationMemory?.enabled || false,
-      conversationMemoryKeys: config?.conversationMemory
-        ? Object.keys(config.conversationMemory)
-        : [],
-      nodeVersion: process.version,
-      platform: process.platform,
-      arch: process.arch,
-      nodeEnv: process.env.NODE_ENV || "UNKNOWN",
-      memoryUsage: process.memoryUsage(),
-      cpuUsage: process.cpuUsage(),
-      uptime: process.uptime(),
-      pid: process.pid,
-      ppid: process.ppid,
-      message:
-        "NeuroLink constructor initialization starting with comprehensive environment analysis",
-    });
   }
 
   /**
@@ -366,57 +338,7 @@ export class NeuroLink {
       },
     );
 
-    try {
-      ProviderRegistry.setOptions({ enableManualMCP: false });
-      const registrySetupEndTime = process.hrtime.bigint();
-      const registrySetupDurationNs =
-        registrySetupEndTime - registrySetupStartTime;
-
-      logger.debug(
-        `[NeuroLink] ✅ LOG_POINT_C003_PROVIDER_REGISTRY_SETUP_SUCCESS`,
-        {
-          logPoint: "C003_PROVIDER_REGISTRY_SETUP_SUCCESS",
-          constructorId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - constructorStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - constructorHrTimeStart
-          ).toString(),
-          registrySetupDurationNs: registrySetupDurationNs.toString(),
-          registrySetupDurationMs:
-            Number(registrySetupDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-          enableManualMCP: false,
-          message:
-            "ProviderRegistry configured successfully with security settings",
-        },
-      );
-    } catch (error) {
-      const registrySetupErrorTime = process.hrtime.bigint();
-      const registrySetupDurationNs =
-        registrySetupErrorTime - registrySetupStartTime;
-
-      logger.error(
-        `[NeuroLink] ❌ LOG_POINT_C004_PROVIDER_REGISTRY_SETUP_ERROR`,
-        {
-          logPoint: "C004_PROVIDER_REGISTRY_SETUP_ERROR",
-          constructorId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - constructorStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - constructorHrTimeStart
-          ).toString(),
-          registrySetupDurationNs: registrySetupDurationNs.toString(),
-          registrySetupDurationMs:
-            Number(registrySetupDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-          error: error instanceof Error ? error.message : String(error),
-          errorName: error instanceof Error ? error.name : "UnknownError",
-          errorStack: error instanceof Error ? error.stack : undefined,
-          message:
-            "ProviderRegistry setup failed - critical initialization error",
-        },
-      );
-      throw error;
-    }
+    ProviderRegistry.setOptions({ enableManualMCP: false });
   }
 
   /**
@@ -432,23 +354,6 @@ export class NeuroLink {
   ): void {
     if (config?.conversationMemory?.enabled) {
       const memoryInitStartTime = process.hrtime.bigint();
-      logger.debug(`[NeuroLink] 🧠 LOG_POINT_C005_MEMORY_INIT_START`, {
-        logPoint: "C005_MEMORY_INIT_START",
-        constructorId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - constructorStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - constructorHrTimeStart
-        ).toString(),
-        memoryInitStartTimeNs: memoryInitStartTime.toString(),
-        memoryConfig: {
-          enabled: config.conversationMemory.enabled,
-          maxSessions: config.conversationMemory.maxSessions,
-          maxTurnsPerSession: config.conversationMemory.maxTurnsPerSession,
-          keys: Object.keys(config.conversationMemory),
-        },
-        message: "Conversation memory initialization flag set for lazy loading",
-      });
 
       // Store config for later use and set flag for lazy initialization
       this.conversationMemoryConfig = config;
@@ -506,24 +411,6 @@ export class NeuroLink {
     constructorHrTimeStart: bigint,
   ): void {
     const externalServerInitStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 🌐 LOG_POINT_C009_EXTERNAL_SERVER_INIT_START`, {
-      logPoint: "C009_EXTERNAL_SERVER_INIT_START",
-      constructorId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - constructorStartTime,
-      elapsedNs: (process.hrtime.bigint() - constructorHrTimeStart).toString(),
-      externalServerInitStartTimeNs: externalServerInitStartTime.toString(),
-      serverManagerConfig: {
-        maxServers: SERVER_CONFIG.MAX_MCP_SERVERS,
-        defaultTimeout: MCP_TIMEOUTS.EXTERNAL_SERVER_STARTUP_MS,
-        enableAutoRestart: true,
-        enablePerformanceMonitoring: true,
-      },
-      registryIntegrationConfig: {
-        enableMainRegistryIntegration: true,
-      },
-      message: "Starting external server manager initialization",
-    });
 
     try {
       this.externalServerManager = new ExternalServerManager(
@@ -560,11 +447,7 @@ export class NeuroLink {
         },
       );
 
-      this.setupExternalServerEventHandlers(
-        constructorId,
-        constructorStartTime,
-        constructorHrTimeStart,
-      );
+      this.setupExternalServerEventHandlers(constructorId);
     } catch (error) {
       const externalServerInitErrorTime = process.hrtime.bigint();
       const externalServerInitDurationNs =
@@ -593,22 +476,7 @@ export class NeuroLink {
   /**
    * Setup event handlers for external server manager
    */
-  private setupExternalServerEventHandlers(
-    constructorId: string,
-    constructorStartTime: number,
-    constructorHrTimeStart: bigint,
-  ): void {
-    const eventHandlerSetupStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 🔗 LOG_POINT_C011_EVENT_HANDLER_SETUP_START`, {
-      logPoint: "C011_EVENT_HANDLER_SETUP_START",
-      constructorId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - constructorStartTime,
-      elapsedNs: (process.hrtime.bigint() - constructorHrTimeStart).toString(),
-      eventHandlerSetupStartTimeNs: eventHandlerSetupStartTime.toString(),
-      message: "Setting up external server event handlers",
-    });
-
+  private setupExternalServerEventHandlers(constructorId: string): void {
     this.externalServerManager.on("connected", (event) => {
       logger.debug(`[NeuroLink] 🔗 EXTERNAL_SERVER_EVENT_CONNECTED`, {
         constructorId,
@@ -666,30 +534,6 @@ export class NeuroLink {
       this.emitter.emit("externalMCP:toolRemoved", event);
       this.unregisterExternalMCPToolFromRegistry(event.toolName);
     });
-
-    const eventHandlerSetupEndTime = process.hrtime.bigint();
-    const eventHandlerSetupDurationNs =
-      eventHandlerSetupEndTime - eventHandlerSetupStartTime;
-
-    logger.debug(`[NeuroLink] ✅ LOG_POINT_C012_EVENT_HANDLER_SETUP_SUCCESS`, {
-      logPoint: "C012_EVENT_HANDLER_SETUP_SUCCESS",
-      constructorId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - constructorStartTime,
-      elapsedNs: (process.hrtime.bigint() - constructorHrTimeStart).toString(),
-      eventHandlerSetupDurationNs: eventHandlerSetupDurationNs.toString(),
-      eventHandlerSetupDurationMs:
-        Number(eventHandlerSetupDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-      eventHandlersCount: 5,
-      eventHandlerTypes: [
-        "connected",
-        "disconnected",
-        "failed",
-        "toolDiscovered",
-        "toolRemoved",
-      ],
-      message: "Event handlers set up successfully",
-    });
   }
 
   /**
@@ -703,7 +547,7 @@ export class NeuroLink {
     const constructorEndTime = process.hrtime.bigint();
     const constructorDurationNs = constructorEndTime - constructorHrTimeStart;
 
-    logger.info(`[NeuroLink] 🏁 LOG_POINT_C014_CONSTRUCTOR_COMPLETE`, {
+    logger.debug(`🏁 LOG_POINT_C014_CONSTRUCTOR_COMPLETE`, {
       logPoint: "C014_CONSTRUCTOR_COMPLETE",
       constructorId,
       timestamp: new Date().toISOString(),
@@ -735,17 +579,6 @@ export class NeuroLink {
     const mcpInitStartTime = Date.now();
     const mcpInitHrTimeStart = process.hrtime.bigint();
 
-    this.logMCPInitStart(mcpInitId, mcpInitStartTime, mcpInitHrTimeStart);
-
-    if (this.mcpInitialized) {
-      this.logMCPAlreadyInitialized(
-        mcpInitId,
-        mcpInitStartTime,
-        mcpInitHrTimeStart,
-      );
-      return;
-    }
-
     const MemoryManager = await this.importPerformanceManager(
       mcpInitId,
       mcpInitStartTime,
@@ -765,53 +598,23 @@ export class NeuroLink {
       this.mcpInitialized = true;
       this.logMCPInitComplete(startMemory, MemoryManager, mcpInitStartTime);
     } catch (error) {
+      const initializationTime = Date.now() - mcpInitStartTime;
+      const initializationTimeNs = process.hrtime.bigint() - mcpInitHrTimeStart;
+
       mcpLogger.warn("[NeuroLink] MCP initialization failed", {
+        mcpInitId,
         error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorStack: error instanceof Error ? error.stack : undefined,
+        initializationTime,
+        initializationTimeNs: initializationTimeNs.toString(),
+        initializationPhase: "performMCPInitialization",
+        memoryUsage: process.memoryUsage(),
+        timestamp: new Date().toISOString(),
+        gracefulDegradation: true,
       });
       // Continue without MCP - graceful degradation
     }
-  }
-
-  /**
-   * Log MCP initialization start
-   */
-  private logMCPInitStart(
-    mcpInitId: string,
-    mcpInitStartTime: number,
-    mcpInitHrTimeStart: bigint,
-  ): void {
-    logger.debug(`[NeuroLink] 🔧 LOG_POINT_M001_MCP_INIT_ENTRY`, {
-      logPoint: "M001_MCP_INIT_ENTRY",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      mcpInitStartTime,
-      mcpInitHrTimeStart: mcpInitHrTimeStart.toString(),
-      mcpInitialized: this.mcpInitialized,
-      hasExternalServerManager: !!this.externalServerManager,
-      memoryUsage: process.memoryUsage(),
-      cpuUsage: process.cpuUsage(),
-      message:
-        "MCP initialization entry point - checking if already initialized",
-    });
-  }
-
-  /**
-   * Log MCP already initialized
-   */
-  private logMCPAlreadyInitialized(
-    mcpInitId: string,
-    mcpInitStartTime: number,
-    mcpInitHrTimeStart: bigint,
-  ): void {
-    logger.debug(`[NeuroLink] ✅ LOG_POINT_M002_MCP_ALREADY_INITIALIZED`, {
-      logPoint: "M002_MCP_ALREADY_INITIALIZED",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      mcpInitialized: this.mcpInitialized,
-      message: "MCP already initialized - skipping initialization",
-    });
   }
 
   /**
@@ -825,35 +628,10 @@ export class NeuroLink {
     typeof import("./utils/performance.js").MemoryManager | undefined
   > {
     const performanceImportStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 📊 LOG_POINT_M003_PERFORMANCE_IMPORT_START`, {
-      logPoint: "M003_PERFORMANCE_IMPORT_START",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      performanceImportStartTimeNs: performanceImportStartTime.toString(),
-      message: "Starting MemoryManager import for performance tracking",
-    });
 
     try {
       const moduleImport = await import("./utils/performance.js");
       const MemoryManager = moduleImport.MemoryManager;
-      const performanceImportEndTime = process.hrtime.bigint();
-      const performanceImportDurationNs =
-        performanceImportEndTime - performanceImportStartTime;
-
-      logger.debug(`[NeuroLink] ✅ LOG_POINT_M004_PERFORMANCE_IMPORT_SUCCESS`, {
-        logPoint: "M004_PERFORMANCE_IMPORT_SUCCESS",
-        mcpInitId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - mcpInitStartTime,
-        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-        performanceImportDurationNs: performanceImportDurationNs.toString(),
-        performanceImportDurationMs:
-          Number(performanceImportDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-        hasMemoryManager: !!MemoryManager,
-        message: "MemoryManager imported successfully",
-      });
       return MemoryManager;
     } catch (error) {
       const performanceImportErrorTime = process.hrtime.bigint();
@@ -904,50 +682,21 @@ export class NeuroLink {
 
     mcpLogger.debug("[NeuroLink] Starting isolated MCP initialization...");
 
-    await this.initializeToolRegistryInternal(
-      mcpInitId,
-      mcpInitStartTime,
-      mcpInitHrTimeStart,
-    );
-    await this.initializeProviderRegistryInternal(
-      mcpInitId,
-      mcpInitStartTime,
-      mcpInitHrTimeStart,
-    );
+    await this.initializeToolRegistryInternal();
+    await this.initializeProviderRegistryInternal();
     await this.registerDirectToolsServerInternal(
       mcpInitId,
       mcpInitStartTime,
       mcpInitHrTimeStart,
     );
-    await this.loadMCPConfigurationInternal(
-      mcpInitId,
-      mcpInitStartTime,
-      mcpInitHrTimeStart,
-    );
+    await this.loadMCPConfigurationInternal();
   }
 
   /**
    * Initialize tool registry with timeout protection
    */
-  private async initializeToolRegistryInternal(
-    mcpInitId: string,
-    mcpInitStartTime: number,
-    mcpInitHrTimeStart: bigint,
-  ): Promise<void> {
-    const toolRegistryStartTime = process.hrtime.bigint();
-    const initTimeout = MCP_TIMEOUTS.INITIALIZATION_MS;
-
-    logger.debug(`[NeuroLink] ⏱️ LOG_POINT_M007_TOOL_REGISTRY_TIMEOUT_SETUP`, {
-      logPoint: "M007_TOOL_REGISTRY_TIMEOUT_SETUP",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      toolRegistryStartTimeNs: toolRegistryStartTime.toString(),
-      initTimeoutMs: initTimeout,
-      message:
-        "Setting up tool registry initialization with timeout protection",
-    });
+  private async initializeToolRegistryInternal(): Promise<void> {
+    const initTimeout = 3000;
 
     await Promise.race([
       Promise.resolve(),
@@ -958,59 +707,13 @@ export class NeuroLink {
         );
       }),
     ]);
-
-    const toolRegistryEndTime = process.hrtime.bigint();
-    const toolRegistryDurationNs = toolRegistryEndTime - toolRegistryStartTime;
-
-    logger.debug(`[NeuroLink] ✅ LOG_POINT_M008_TOOL_REGISTRY_SUCCESS`, {
-      logPoint: "M008_TOOL_REGISTRY_SUCCESS",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      toolRegistryDurationNs: toolRegistryDurationNs.toString(),
-      toolRegistryDurationMs:
-        Number(toolRegistryDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-      message: "Tool registry initialization completed within timeout",
-    });
   }
 
   /**
    * Initialize provider registry
    */
-  private async initializeProviderRegistryInternal(
-    mcpInitId: string,
-    mcpInitStartTime: number,
-    mcpInitHrTimeStart: bigint,
-  ): Promise<void> {
-    const providerRegistryStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 🏭 LOG_POINT_M009_PROVIDER_REGISTRY_START`, {
-      logPoint: "M009_PROVIDER_REGISTRY_START",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      providerRegistryStartTimeNs: providerRegistryStartTime.toString(),
-      message: "Starting provider registry registration with lazy loading",
-    });
-
+  private async initializeProviderRegistryInternal(): Promise<void> {
     await ProviderRegistry.registerAllProviders();
-
-    const providerRegistryEndTime = process.hrtime.bigint();
-    const providerRegistryDurationNs =
-      providerRegistryEndTime - providerRegistryStartTime;
-
-    logger.debug(`[NeuroLink] ✅ LOG_POINT_M010_PROVIDER_REGISTRY_SUCCESS`, {
-      logPoint: "M010_PROVIDER_REGISTRY_SUCCESS",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      providerRegistryDurationNs: providerRegistryDurationNs.toString(),
-      providerRegistryDurationMs:
-        Number(providerRegistryDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-      message: "Provider registry registration completed successfully",
-    });
   }
 
   /**
@@ -1022,43 +725,25 @@ export class NeuroLink {
     mcpInitHrTimeStart: bigint,
   ): Promise<void> {
     const directToolsStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 🛠️ LOG_POINT_M011_DIRECT_TOOLS_START`, {
-      logPoint: "M011_DIRECT_TOOLS_START",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      directToolsStartTimeNs: directToolsStartTime.toString(),
-      serverId: "neurolink-direct",
-      message: "Starting direct tools server registration",
-    });
 
     try {
-      await toolRegistry.registerServer("neurolink-direct", directToolsServer);
+      if (process.env.NEUROLINK_DISABLE_DIRECT_TOOLS === "true") {
+        mcpLogger.debug(
+          "Direct tools server are disabled via environment variable.",
+        );
+      } else {
+        await toolRegistry.registerServer(
+          "neurolink-direct",
+          directToolsServer,
+        );
 
-      const directToolsSuccessTime = process.hrtime.bigint();
-      const directToolsDurationNs =
-        directToolsSuccessTime - directToolsStartTime;
-
-      logger.debug(`[NeuroLink] ✅ LOG_POINT_M012_DIRECT_TOOLS_SUCCESS`, {
-        logPoint: "M012_DIRECT_TOOLS_SUCCESS",
-        mcpInitId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - mcpInitStartTime,
-        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-        directToolsDurationNs: directToolsDurationNs.toString(),
-        directToolsDurationMs:
-          Number(directToolsDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-        serverId: "neurolink-direct",
-        message: "Direct tools server registered successfully",
-      });
-
-      mcpLogger.debug(
-        "[NeuroLink] Direct tools server registered successfully",
-        {
-          serverId: "neurolink-direct",
-        },
-      );
+        mcpLogger.debug(
+          "[NeuroLink] Direct tools server registered successfully",
+          {
+            serverId: "neurolink-direct",
+          },
+        );
+      }
     } catch (error) {
       const directToolsErrorTime = process.hrtime.bigint();
       const directToolsDurationNs = directToolsErrorTime - directToolsStartTime;
@@ -1088,53 +773,13 @@ export class NeuroLink {
   /**
    * Load MCP configuration from .mcp-config.json with parallel loading for improved performance
    */
-  private async loadMCPConfigurationInternal(
-    mcpInitId: string,
-    mcpInitStartTime: number,
-    mcpInitHrTimeStart: bigint,
-  ): Promise<void> {
-    const mcpConfigStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 📄 LOG_POINT_M014_MCP_CONFIG_START`, {
-      logPoint: "M014_MCP_CONFIG_START",
-      mcpInitId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - mcpInitStartTime,
-      elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-      mcpConfigStartTimeNs: mcpConfigStartTime.toString(),
-      hasExternalServerManager: !!this.externalServerManager,
-      message: "Starting MCP configuration loading from .mcp-config.json",
-    });
-
+  private async loadMCPConfigurationInternal(): Promise<void> {
     try {
       const configResult =
         await this.externalServerManager.loadMCPConfiguration(
           undefined, // Use default config path
           { parallel: true }, // Enable parallel loading
         );
-
-      const mcpConfigSuccessTime = process.hrtime.bigint();
-      const mcpConfigDurationNs = mcpConfigSuccessTime - mcpConfigStartTime;
-
-      logger.debug(`[NeuroLink] ✅ LOG_POINT_M015_MCP_CONFIG_SUCCESS`, {
-        logPoint: "M015_MCP_CONFIG_SUCCESS",
-        mcpInitId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - mcpInitStartTime,
-        elapsedNs: (process.hrtime.bigint() - mcpInitHrTimeStart).toString(),
-        mcpConfigDurationNs: mcpConfigDurationNs.toString(),
-        mcpConfigDurationMs:
-          Number(mcpConfigDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-        serversLoaded: configResult.serversLoaded,
-        errorsCount: configResult.errors.length,
-        configResult: {
-          serversLoaded: configResult.serversLoaded,
-          errors: configResult.errors.map((err: unknown) => ({
-            message: err instanceof Error ? err.message : String(err),
-            name: err instanceof Error ? err.name : "UnknownError",
-          })),
-        },
-        message: "MCP configuration loaded successfully",
-      });
 
       mcpLogger.debug("[NeuroLink] MCP configuration loaded successfully", {
         serversLoaded: configResult.serversLoaded,
@@ -1212,13 +857,13 @@ export class NeuroLink {
 
       // Compute classification once to avoid duplicate calls
       const classification = BinaryTaskClassifier.classify(options.input.text);
-      
+
       // Use the model router to get the optimal route
       const route = ModelRouter.route(options.input.text);
 
       // Validate that the routed provider is available and configured
       const isProviderAvailable = await this.hasProviderEnvVars(route.provider);
-      
+
       if (!isProviderAvailable && route.provider !== "ollama") {
         logger.debug("Orchestration provider validation failed", {
           taskType: classification.type,
@@ -1249,9 +894,27 @@ export class NeuroLink {
             return {}; // Return empty object to preserve existing fallback behavior
           }
 
-          const { models } = await response.json();
-          const modelIsAvailable = models.some(
-            (m: { name: string }) => m.name === (route.model || "llama3.2:latest"),
+          const responseData = await response.json();
+          const models = responseData?.models;
+
+          // Runtime-safe guard: ensure models is an array with valid objects
+          if (!Array.isArray(models)) {
+            logger.warn("Ollama API returned invalid models format", {
+              responseData,
+              modelsType: typeof models,
+            });
+            return {}; // Return empty object for fallback behavior
+          }
+
+          // Filter and validate models before comparison
+          const validModels = models.filter(
+            (m): m is { name: string } =>
+              m && typeof m === "object" && typeof m.name === "string",
+          );
+
+          const targetModel = route.model || "llama3.2:latest";
+          const modelIsAvailable = validModels.some(
+            (m) => m.name === targetModel,
           );
 
           if (!modelIsAvailable) {
@@ -1269,7 +932,10 @@ export class NeuroLink {
             taskType: classification.type,
             routedProvider: route.provider,
             routedModel: route.model,
-            reason: error instanceof Error ? error.message : "Ollama service check failed",
+            reason:
+              error instanceof Error
+                ? error.message
+                : "Ollama service check failed",
             orchestrationTime: `${Date.now() - startTime}ms`,
           });
           return {}; // Return empty object to preserve existing fallback behavior
@@ -1326,13 +992,13 @@ export class NeuroLink {
 
       // Compute classification once to avoid duplicate calls
       const classification = BinaryTaskClassifier.classify(options.input.text);
-      
+
       // Use the model router to get the optimal route
       const route = ModelRouter.route(options.input.text);
 
       // Validate that the routed provider is available and configured
       const isProviderAvailable = await this.hasProviderEnvVars(route.provider);
-      
+
       if (!isProviderAvailable && route.provider !== "ollama") {
         logger.debug("Stream orchestration provider validation failed", {
           taskType: classification.type,
@@ -1363,9 +1029,27 @@ export class NeuroLink {
             return {}; // Return empty object to preserve existing fallback behavior
           }
 
-          const { models } = await response.json();
-          const modelIsAvailable = models.some(
-            (m: { name: string }) => m.name === (route.model || "llama3.2:latest"),
+          const responseData = await response.json();
+          const models = responseData?.models;
+
+          // Runtime-safe guard: ensure models is an array with valid objects
+          if (!Array.isArray(models)) {
+            logger.warn("Ollama API returned invalid models format in stream", {
+              responseData,
+              modelsType: typeof models,
+            });
+            return {}; // Return empty object for fallback behavior
+          }
+
+          // Filter and validate models before comparison
+          const validModels = models.filter(
+            (m): m is { name: string } =>
+              m && typeof m === "object" && typeof m.name === "string",
+          );
+
+          const targetModel = route.model || "llama3.2:latest";
+          const modelIsAvailable = validModels.some(
+            (m) => m.name === targetModel,
           );
 
           if (!modelIsAvailable) {
@@ -1383,7 +1067,10 @@ export class NeuroLink {
             taskType: classification.type,
             routedProvider: route.provider,
             routedModel: route.model,
-            reason: error instanceof Error ? error.message : "Ollama service check failed",
+            reason:
+              error instanceof Error
+                ? error.message
+                : "Ollama service check failed",
             orchestrationTime: `${Date.now() - startTime}ms`,
           });
           return {}; // Return empty object to preserve existing fallback behavior
@@ -1778,57 +1465,6 @@ export class NeuroLink {
     options: TextGenerationOptions,
     functionTag: string,
   ): void {
-    logger.debug(`[NeuroLink] 🎯 LOG_POINT_G001_GENERATE_INTERNAL_START`, {
-      logPoint: "G001_GENERATE_INTERNAL_START",
-      generateInternalId,
-      timestamp: new Date().toISOString(),
-      generateInternalStartTime,
-      generateInternalHrTimeStart: generateInternalHrTimeStart.toString(),
-      inputAnalysis: {
-        provider: options.provider || "auto",
-        providerType: typeof options.provider,
-        isAutoProvider: options.provider === "auto" || !options.provider,
-        model: options.model || "NOT_SET",
-        modelType: typeof options.model,
-        temperature: options.temperature,
-        temperatureType: typeof options.temperature,
-        maxTokens: options.maxTokens,
-        maxTokensType: typeof options.maxTokens,
-        promptLength: options.prompt?.length || 0,
-        promptPreview: options.prompt?.substring(0, 200) || "NO_PROMPT",
-        hasSystemPrompt: !!options.systemPrompt,
-        systemPromptLength: options.systemPrompt?.length || 0,
-        disableTools: options.disableTools || false,
-        enableAnalytics: options.enableAnalytics || false,
-        enableEvaluation: options.enableEvaluation || false,
-        hasContext: !!options.context,
-        contextKeys: options.context ? Object.keys(options.context) : [],
-        evaluationDomain: options.evaluationDomain || "NOT_SET",
-        toolUsageContext: options.toolUsageContext || "NOT_SET",
-      },
-      instanceState: {
-        hasConversationMemory: !!this.conversationMemory,
-        conversationMemoryType:
-          this.conversationMemory?.constructor?.name || "NOT_SET",
-        mcpInitialized: this.mcpInitialized,
-        hasProviderRegistry: !!AIProviderFactory,
-        providerRegistrySize: 0,
-        hasToolRegistry: !!toolRegistry,
-        toolRegistrySize: 0,
-        hasExternalServerManager: !!this.externalServerManager,
-      },
-      environmentContext: {
-        nodeVersion: process.version,
-        platform: process.platform,
-        arch: process.arch,
-        memoryUsage: process.memoryUsage(),
-        cpuUsage: process.cpuUsage(),
-        uptime: process.uptime(),
-      },
-      message:
-        "Starting generateTextInternal with comprehensive input analysis",
-    });
-
     logger.debug(`[${functionTag}] Starting generation`, {
       provider: options.provider || "auto",
       promptLength: options.prompt?.length || 0,
@@ -1857,20 +1493,6 @@ export class NeuroLink {
     generateInternalHrTimeStart: bigint,
   ): Promise<void> {
     const conversationMemoryStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 🧠 LOG_POINT_G002_CONVERSATION_MEMORY_CHECK`, {
-      logPoint: "G002_CONVERSATION_MEMORY_CHECK",
-      generateInternalId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - generateInternalStartTime,
-      elapsedNs: (
-        process.hrtime.bigint() - generateInternalHrTimeStart
-      ).toString(),
-      conversationMemoryStartTimeNs: conversationMemoryStartTime.toString(),
-      hasConversationMemory: !!this.conversationMemory,
-      needsLazyInit: this.conversationMemoryNeedsInit,
-      hasConfig: !!this.conversationMemoryConfig,
-      message: "Checking conversation memory initialization requirement",
-    });
 
     // Handle lazy initialization if needed
     if (this.conversationMemoryNeedsInit && this.conversationMemoryConfig) {
@@ -1932,36 +1554,6 @@ export class NeuroLink {
     generateInternalHrTimeStart: bigint,
     functionTag: string,
   ): Promise<TextGenerationResult | null> {
-    const mcpDecisionStartTime = process.hrtime.bigint();
-    logger.debug(`[NeuroLink] 🔧 LOG_POINT_G005_MCP_DECISION_CHECK`, {
-      logPoint: "G005_MCP_DECISION_CHECK",
-      generateInternalId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - generateInternalStartTime,
-      elapsedNs: (
-        process.hrtime.bigint() - generateInternalHrTimeStart
-      ).toString(),
-      mcpDecisionStartTimeNs: mcpDecisionStartTime.toString(),
-      mcpDecisionFactors: {
-        disableTools: options.disableTools || false,
-        toolsEnabled: !options.disableTools,
-        mcpInitialized: this.mcpInitialized,
-        hasExternalServerManager: !!this.externalServerManager,
-        hasToolRegistry: !!toolRegistry,
-        toolRegistrySize: 0,
-        shouldTryMCP: !options.disableTools,
-      },
-      mcpReadinessAnalysis: {
-        mcpAvailable: !options.disableTools && this.mcpInitialized,
-        componentsReady: {
-          externalServerManager: !!this.externalServerManager,
-          toolRegistry: !!toolRegistry,
-          providerRegistry: !!AIProviderFactory,
-        },
-      },
-      message: "Analyzing MCP generation eligibility and readiness",
-    });
-
     if (!options.disableTools) {
       return await this.performMCPGenerationRetries(
         options,
@@ -1986,83 +1578,14 @@ export class NeuroLink {
     functionTag: string,
   ): Promise<TextGenerationResult | null> {
     const maxMcpRetries = RETRY_ATTEMPTS.QUICK;
-    const mcpRetryLoopStartTime = process.hrtime.bigint();
-
-    logger.debug(`[NeuroLink] 🔄 LOG_POINT_G006_MCP_RETRY_LOOP_START`, {
-      logPoint: "G006_MCP_RETRY_LOOP_START",
-      generateInternalId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - generateInternalStartTime,
-      elapsedNs: (
-        process.hrtime.bigint() - generateInternalHrTimeStart
-      ).toString(),
-      mcpRetryLoopStartTimeNs: mcpRetryLoopStartTime.toString(),
-      maxMcpRetries,
-      totalPossibleAttempts: maxMcpRetries + 1,
-      message: "Starting MCP generation retry loop with failure tolerance",
-    });
 
     const maxAttempts = maxMcpRetries + 1;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const mcpAttemptStartTime = process.hrtime.bigint();
-        logger.debug(`[NeuroLink] 🎯 LOG_POINT_G007_MCP_ATTEMPT_START`, {
-          logPoint: "G007_MCP_ATTEMPT_START",
-          generateInternalId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - generateInternalStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - generateInternalHrTimeStart
-          ).toString(),
-          mcpAttemptStartTimeNs: mcpAttemptStartTime.toString(),
-          currentAttempt: attempt,
-          maxAttempts,
-          isFirstAttempt: attempt === 1,
-          isLastAttempt: attempt === maxAttempts,
-          attemptType: attempt === 1 ? "INITIAL" : "RETRY",
-          message: `Attempting MCP generation (attempt ${attempt}/${maxAttempts})`,
-        });
-
         logger.debug(
           `[${functionTag}] Attempting MCP generation (attempt ${attempt}/${maxAttempts})...`,
         );
         const mcpResult = await this.tryMCPGeneration(options);
-
-        const mcpAttemptEndTime = process.hrtime.bigint();
-        const mcpAttemptDurationNs = mcpAttemptEndTime - mcpAttemptStartTime;
-
-        logger.debug(`[NeuroLink] 📊 LOG_POINT_G008_MCP_ATTEMPT_RESULT`, {
-          logPoint: "G008_MCP_ATTEMPT_RESULT",
-          generateInternalId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - generateInternalStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - generateInternalHrTimeStart
-          ).toString(),
-          mcpAttemptDurationNs: mcpAttemptDurationNs.toString(),
-          mcpAttemptDurationMs:
-            Number(mcpAttemptDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-          currentAttempt: attempt,
-          resultAnalysis: {
-            hasResult: !!mcpResult,
-            resultType: typeof mcpResult,
-            hasContent: !!(mcpResult && mcpResult.content),
-            contentLength: mcpResult?.content?.length || 0,
-            contentPreview:
-              mcpResult?.content?.substring(0, 200) || "NO_CONTENT",
-            hasToolExecutions: !!(
-              mcpResult &&
-              mcpResult.toolExecutions &&
-              mcpResult.toolExecutions.length > 0
-            ),
-            toolExecutionsCount: mcpResult?.toolExecutions?.length || 0,
-            toolsUsedCount: mcpResult?.toolsUsed?.length || 0,
-            provider: mcpResult?.provider || "NOT_SET",
-            responseTime: mcpResult?.responseTime || 0,
-            enhancedWithTools: mcpResult?.enhancedWithTools || false,
-          },
-          message: `MCP generation attempt ${attempt} completed - analyzing result`,
-        });
 
         if (
           mcpResult &&
@@ -2124,79 +1647,9 @@ export class NeuroLink {
     const tryMCPHrTimeStart = process.hrtime.bigint();
     const functionTag = "NeuroLink.tryMCPGeneration";
 
-    logger.debug(`[NeuroLink] 🚀 LOG_POINT_T001_TRY_MCP_START`, {
-      logPoint: "T001_TRY_MCP_START",
-      tryMCPId,
-      timestamp: new Date().toISOString(),
-      tryMCPStartTime,
-      tryMCPHrTimeStart: tryMCPHrTimeStart.toString(),
-
-      // 📊 Input options analysis
-      optionsAnalysis: {
-        provider: options.provider || "auto",
-        isAutoProvider: options.provider === "auto" || !options.provider,
-        model: options.model || "NOT_SET",
-        promptLength: options.prompt?.length || 0,
-        promptPreview: options.prompt?.substring(0, 150) || "NO_PROMPT",
-        hasSystemPrompt: !!options.systemPrompt,
-        systemPromptLength: options.systemPrompt?.length || 0,
-        disableTools: options.disableTools || false,
-        enableAnalytics: options.enableAnalytics || false,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-      },
-
-      // 🔧 MCP state analysis
-      mcpStateAnalysis: {
-        mcpInitialized: this.mcpInitialized,
-        hasExternalServerManager: !!this.externalServerManager,
-        hasToolRegistry: !!toolRegistry,
-        toolRegistrySize: 0, // Not accessible as size property
-        hasProviderRegistry: !!AIProviderFactory,
-        providerRegistrySize: 0, // Not accessible as size property
-      },
-
-      message:
-        "Starting MCP-enhanced generation attempt with comprehensive analysis",
-    });
-
     try {
-      // 🚀 EXHAUSTIVE LOGGING POINT T002: MCP INITIALIZATION CHECK
-      const mcpInitCheckStartTime = process.hrtime.bigint();
-      logger.debug(`[NeuroLink] 🔧 LOG_POINT_T002_MCP_INIT_CHECK`, {
-        logPoint: "T002_MCP_INIT_CHECK",
-        tryMCPId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - tryMCPStartTime,
-        elapsedNs: (process.hrtime.bigint() - tryMCPHrTimeStart).toString(),
-        mcpInitCheckStartTimeNs: mcpInitCheckStartTime.toString(),
-        mcpInitializedBefore: this.mcpInitialized,
-        needsInitialization: !this.mcpInitialized,
-        message: "Checking MCP initialization status before generation",
-      });
-
-      // Initialize MCP only when tools are enabled
-      if (!options.disableTools) {
-        await this.initializeMCP();
-      }
-
-      const mcpInitCheckEndTime = process.hrtime.bigint();
-      const mcpInitCheckDurationNs =
-        mcpInitCheckEndTime - mcpInitCheckStartTime;
-
-      logger.debug(`[NeuroLink] ✅ LOG_POINT_T003_MCP_INIT_CHECK_COMPLETE`, {
-        logPoint: "T003_MCP_INIT_CHECK_COMPLETE",
-        tryMCPId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - tryMCPStartTime,
-        elapsedNs: (process.hrtime.bigint() - tryMCPHrTimeStart).toString(),
-        mcpInitCheckDurationNs: mcpInitCheckDurationNs.toString(),
-        mcpInitCheckDurationMs:
-          Number(mcpInitCheckDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-        mcpInitializedAfter: this.mcpInitialized,
-        initializationSuccessful: this.mcpInitialized,
-        message: "MCP initialization check completed",
-      });
+      // Initialize MCP if needed
+      await this.initializeMCP();
 
       if (!this.mcpInitialized) {
         logger.warn(`[NeuroLink] ⚠️ LOG_POINT_T004_MCP_NOT_AVAILABLE`, {
@@ -2228,12 +1681,34 @@ export class NeuroLink {
 
       // Get available tools
       const availableTools = await this.getAllAvailableTools();
+      const targetTool = availableTools.find(
+        (t) =>
+          t.name.includes("SuccessRateSRByTime") ||
+          t.name.includes("juspay-analytics"),
+      );
+      logger.debug("Available tools for AI prompt generation", {
+        toolsCount: availableTools.length,
+        toolNames: availableTools.map((t) => t.name),
+        hasTargetTool: !!targetTool,
+        targetToolDetails: targetTool
+          ? {
+              name: targetTool.name,
+              description: targetTool.description,
+              server: targetTool.server,
+            }
+          : null,
+      });
 
       // Create tool-aware system prompt
       const enhancedSystemPrompt = this.createToolAwareSystemPrompt(
         options.systemPrompt,
         availableTools,
       );
+      logger.debug("Tool-aware system prompt created", {
+        originalPromptLength: options.systemPrompt?.length || 0,
+        enhancedPromptLength: enhancedSystemPrompt.length,
+        enhancedPromptPreview: enhancedSystemPrompt.substring(0, 500) + "...",
+      });
 
       // Get conversation messages for context
       const conversationMessages = await getConversationMessages(
@@ -2358,14 +1833,20 @@ export class NeuroLink {
       options.provider === "auto" ? undefined : options.provider;
 
     // Check for orchestrated preferred provider in context
-    const preferredOrchestrated = 
-      options.context && typeof options.context === 'object' && '__orchestratedPreferredProvider' in options.context
-        ? (options.context as { __orchestratedPreferredProvider?: string }).__orchestratedPreferredProvider
+    const preferredOrchestrated =
+      options.context &&
+      typeof options.context === "object" &&
+      "__orchestratedPreferredProvider" in options.context
+        ? (options.context as { __orchestratedPreferredProvider?: string })
+            .__orchestratedPreferredProvider
         : undefined;
 
     // Build provider list with orchestrated preference first, then fallback to full list
     const tryProviders = preferredOrchestrated
-      ? [preferredOrchestrated, ...providerPriority.filter((p) => p !== preferredOrchestrated)]
+      ? [
+          preferredOrchestrated,
+          ...providerPriority.filter((p) => p !== preferredOrchestrated),
+        ]
       : requestedProvider
         ? [requestedProvider]
         : providerPriority;
@@ -2468,7 +1949,20 @@ export class NeuroLink {
     originalSystemPrompt: string | undefined,
     availableTools: ToolInfo[],
   ): string {
+    // AI prompt generation with tool analysis and structured logging
+    const promptGenerationData = {
+      originalPromptLength: originalSystemPrompt?.length || 0,
+      availableToolsCount: availableTools.length,
+      hasOriginalPrompt: !!originalSystemPrompt,
+    };
+
+    logger.debug(
+      "AI prompt generation with tool schemas",
+      promptGenerationData,
+    );
+
     if (availableTools.length === 0) {
+      logger.debug("No tools available - returning original prompt");
       return originalSystemPrompt || "";
     }
 
@@ -2481,9 +1975,31 @@ export class NeuroLink {
       })),
     );
 
+    const transformationResult = {
+      toolDescriptionsLength: toolDescriptions.length,
+      toolDescriptionsCharCount: toolDescriptions.length,
+      hasDescriptions: toolDescriptions.length > 0,
+    };
+
+    logger.debug(
+      "Tool descriptions transformation completed",
+      transformationResult,
+    );
+
     const toolPrompt = `\n\nYou have access to these additional tools if needed:\n${toolDescriptions}\n\nIMPORTANT: You are a general-purpose AI assistant. Answer all requests directly and creatively. These tools are optional helpers - use them only when they would genuinely improve your response. For creative tasks like storytelling, writing, or general conversation, respond naturally without requiring tools.`;
 
-    return (originalSystemPrompt || "") + toolPrompt;
+    const finalPrompt = (originalSystemPrompt || "") + toolPrompt;
+
+    const finalPromptData = {
+      originalPromptLength: originalSystemPrompt?.length || 0,
+      toolPromptLength: toolPrompt.length,
+      finalPromptLength: finalPrompt.length,
+      promptEnhanced: toolPrompt.length > 0,
+    };
+
+    logger.debug("AI prompt generation completed", finalPromptData);
+
+    return finalPrompt;
   }
 
   /**
@@ -2510,39 +2026,6 @@ export class NeuroLink {
       });
       return { toolResults: [], enhancedPrompt: prompt };
     }
-  }
-
-  /**
-   * Enhance prompt with tool results (domain-agnostic)
-   */
-  private enhancePromptWithToolResults(
-    prompt: string,
-    toolResults: unknown[],
-  ): string {
-    if (toolResults.length === 0) {
-      return prompt;
-    }
-
-    let enhancedPrompt = prompt;
-
-    for (const result of toolResults) {
-      if (result && typeof result === "object") {
-        enhancedPrompt += `\n\nTool Results:\n`;
-
-        // Handle structured result generically
-        try {
-          const resultStr =
-            typeof result === "string"
-              ? result
-              : JSON.stringify(result, null, 2);
-          enhancedPrompt += resultStr + "\n";
-        } catch {
-          enhancedPrompt += "Tool execution completed\n";
-        }
-      }
-    }
-
-    return enhancedPrompt;
   }
 
   /**
@@ -2632,21 +2115,10 @@ export class NeuroLink {
   async stream(options: StreamOptions): Promise<StreamResult> {
     const startTime = Date.now();
     const hrTimeStart = process.hrtime.bigint();
-    const functionTag = "NeuroLink.stream";
     const streamId = `neurolink-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const journeyStartTime = new Date().toISOString();
     const originalPrompt = options.input.text; // Store the original prompt for memory storage
 
-    this.logStreamEntryPoint(
-      streamId,
-      journeyStartTime,
-      functionTag,
-      startTime,
-      hrTimeStart,
-      options,
-    );
-    this.logPerformanceBaseline(streamId, startTime, hrTimeStart);
-    await this.validateStreamInput(options, streamId, startTime, hrTimeStart);
+    await this.validateStreamInput(options);
     this.emitStreamStartEvents(options, startTime);
 
     let enhancedOptions: StreamOptions;
@@ -2671,7 +2143,8 @@ export class NeuroLink {
       // Apply orchestration if enabled and no specific provider/model requested
       if (this.enableOrchestration && !options.provider && !options.model) {
         try {
-          const orchestratedOptions = await this.applyStreamOrchestration(options);
+          const orchestratedOptions =
+            await this.applyStreamOrchestration(options);
           logger.debug("Stream orchestration applied", {
             originalProvider: options.provider || "auto",
             orchestratedProvider: orchestratedOptions.provider,
@@ -2682,10 +2155,13 @@ export class NeuroLink {
           // Use orchestrated options
           Object.assign(options, orchestratedOptions);
         } catch (error) {
-          logger.warn("Stream orchestration failed, continuing with original options", {
-            error: error instanceof Error ? error.message : String(error),
-            originalProvider: options.provider || "auto",
-          });
+          logger.warn(
+            "Stream orchestration failed, continuing with original options",
+            {
+              error: error instanceof Error ? error.message : String(error),
+              originalProvider: options.provider || "auto",
+            },
+          );
           // Continue with original options if orchestration fails
         }
       }
@@ -2776,113 +2252,19 @@ export class NeuroLink {
   }
 
   /**
-   * Log stream entry point with comprehensive analysis
-   */
-  private logStreamEntryPoint(
-    streamId: string,
-    journeyStartTime: string,
-    functionTag: string,
-    startTime: number,
-    hrTimeStart: bigint,
-    options: StreamOptions,
-  ): void {
-    logger.debug(`[NeuroLink] 🎯 LOG_POINT_001_STREAM_ENTRY_START`, {
-      logPoint: "001_STREAM_ENTRY_START",
-      streamId,
-      timestamp: journeyStartTime,
-      functionTag,
-      startTime,
-      hrTimeStart: hrTimeStart.toString(),
-      nodeVersion: process.version,
-      platform: process.platform,
-      arch: process.arch,
-      memoryUsage: process.memoryUsage(),
-      cpuUsage: process.cpuUsage(),
-      hasOptions: !!options,
-      optionsType: typeof options,
-      optionsKeys: options ? Object.keys(options) : [],
-      optionsSize: options ? JSON.stringify(options).length : 0,
-      hasInput: !!options?.input,
-      inputType: typeof options?.input,
-      inputKeys: options?.input ? Object.keys(options.input) : [],
-      hasInputText: !!options?.input?.text,
-      inputTextType: typeof options?.input?.text,
-      inputTextLength: options?.input?.text?.length || 0,
-      inputTextPreview: options?.input?.text?.substring(0, 200) || "NO_TEXT",
-      hasProvider: !!options?.provider,
-      providerValue: options?.provider || "NOT_SET",
-      isAutoProvider: options?.provider === "auto" || !options?.provider,
-      hasModel: !!options?.model,
-      modelValue: options?.model || "NOT_SET",
-      message:
-        "EXHAUSTIVE NeuroLink main stream method entry point with comprehensive environment analysis",
-    });
-  }
-
-  /**
-   * Log performance baseline
-   */
-  private logPerformanceBaseline(
-    streamId: string,
-    startTime: number,
-    hrTimeStart: bigint,
-  ): void {
-    const memoryBaseline = process.memoryUsage();
-    const cpuBaseline = process.cpuUsage();
-    logger.debug(`[NeuroLink] 🎯 LOG_POINT_002_PERFORMANCE_BASELINE`, {
-      logPoint: "002_PERFORMANCE_BASELINE",
-      streamId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - startTime,
-      elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
-      memoryBaseline: {
-        rss: memoryBaseline.rss,
-        heapTotal: memoryBaseline.heapTotal,
-        heapUsed: memoryBaseline.heapUsed,
-        external: memoryBaseline.external,
-        arrayBuffers: memoryBaseline.arrayBuffers,
-      },
-      cpuBaseline: {
-        user: cpuBaseline.user,
-        system: cpuBaseline.system,
-      },
-      gcStats: global.gc
-        ? (() => {
-            try {
-              global.gc();
-              return process.memoryUsage();
-            } catch {
-              return null;
-            }
-          })()
-        : null,
-      message: "Performance baseline metrics captured for stream processing",
-    });
-  }
-
-  /**
    * Validate stream input with comprehensive error reporting
    */
-  private async validateStreamInput(
-    options: StreamOptions,
-    streamId: string,
-    startTime: number,
-    hrTimeStart: bigint,
-  ): Promise<void> {
+  private async validateStreamInput(options: StreamOptions): Promise<void> {
     const validationStartTime = process.hrtime.bigint();
     logger.debug(`[NeuroLink] 🎯 LOG_POINT_003_VALIDATION_START`, {
       logPoint: "003_VALIDATION_START",
-      streamId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - startTime,
-      elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
       validationStartTimeNs: validationStartTime.toString(),
       message: "Starting comprehensive input validation process",
     });
 
     const hasText =
       typeof options?.input?.text === "string" &&
-      options.input!.text!.trim().length > 0;
+      options.input.text.trim().length > 0;
     // Accept audio when frames are present; sampleRateHz is optional (defaults applied later)
     const hasAudio = !!(
       options?.input?.audio &&
@@ -2893,49 +2275,10 @@ export class NeuroLink {
     );
 
     if (!hasText && !hasAudio) {
-      const validationFailTime = process.hrtime.bigint();
-      const validationDurationNs = validationFailTime - validationStartTime;
-
-      logger.debug(`[NeuroLink] 💥 LOG_POINT_005_VALIDATION_FAILED`, {
-        logPoint: "005_VALIDATION_FAILED",
-        streamId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - startTime,
-        elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
-        validationDurationNs: validationDurationNs.toString(),
-        validationDurationMs:
-          Number(validationDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-        validationError:
-          "Stream options must include either input.text or input.audio",
-        message:
-          "EXHAUSTIVE validation failure analysis with character-level debugging",
-      });
-
       throw new Error(
         "Stream options must include either input.text or input.audio",
       );
     }
-
-    const validationSuccessTime = process.hrtime.bigint();
-    const validationDurationNs = validationSuccessTime - validationStartTime;
-
-    logger.debug(`[NeuroLink] ✅ LOG_POINT_006_VALIDATION_SUCCESS`, {
-      logPoint: "006_VALIDATION_SUCCESS",
-      streamId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - startTime,
-      elapsedNs: (process.hrtime.bigint() - hrTimeStart).toString(),
-      validationDurationNs: validationDurationNs.toString(),
-      validationDurationMs:
-        Number(validationDurationNs) / NANOSECOND_TO_MS_DIVISOR,
-      inputTextValid: hasText,
-      inputAudioPresent: hasAudio,
-      inputTextLength: hasText ? options.input!.text!.length : 0,
-      inputTextTrimmedLength: hasText ? options.input!.text!.trim().length : 0,
-      inputTextPreview: hasText ? options.input!.text!.substring(0, 100) : "",
-      message:
-        "EXHAUSTIVE validation success - proceeding with stream processing",
-    });
   }
 
   /**
@@ -2952,7 +2295,7 @@ export class NeuroLink {
     this.emitter.emit("response:start");
     this.emitter.emit(
       "message",
-      `Starting ${options.provider || "auto"} stream...`
+      `Starting ${options.provider || "auto"} stream...`,
     );
   }
 
@@ -3360,6 +2703,167 @@ export class NeuroLink {
   }
 
   // ========================================
+  // ENHANCED: Tool Event Emission API
+  // ========================================
+
+  // TODO: Add ToolExecutionEvent utility methods in future version
+  // Will provide structured event format for consistent tool event processing
+
+  /**
+   * Emit tool start event with execution tracking
+   * @param toolName - Name of the tool being executed
+   * @param input - Input parameters for the tool
+   * @param startTime - Timestamp when execution started
+   * @returns executionId for tracking this specific execution
+   */
+  emitToolStart(
+    toolName: string,
+    input: unknown,
+    startTime: number = Date.now(),
+  ): string {
+    const executionId = `${toolName}-${startTime}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create execution context for tracking
+    const context: ToolExecutionContext = {
+      executionId,
+      tool: toolName,
+      startTime,
+      metadata: {
+        inputType: typeof input,
+        hasInput: input !== undefined && input !== null,
+      },
+    };
+
+    // Store in active executions
+    this.activeToolExecutions.set(executionId, context);
+    this.currentStreamToolExecutions.push(context);
+
+    // Emit event (NeuroLinkEvents format for compatibility)
+    this.emitter.emit("tool:start", {
+      tool: toolName,
+      input,
+      timestamp: startTime,
+      executionId,
+    });
+
+    logger.debug(`tool:start emitted for ${toolName}`, {
+      toolName,
+      executionId,
+      timestamp: startTime,
+      inputProvided: input !== undefined,
+    });
+
+    return executionId;
+  }
+
+  /**
+   * Emit tool end event with execution summary
+   * @param toolName - Name of the tool that finished
+   * @param result - Result from the tool execution
+   * @param error - Error message if execution failed
+   * @param startTime - When execution started
+   * @param endTime - When execution finished
+   * @param executionId - Optional execution ID for tracking
+   */
+  emitToolEnd(
+    toolName: string,
+    result?: unknown,
+    error?: string,
+    startTime?: number,
+    endTime: number = Date.now(),
+    executionId?: string,
+  ): void {
+    const actualStartTime = startTime || endTime - 1000; // Fallback if no start time
+    const duration = endTime - actualStartTime;
+    const success = !error;
+
+    // Find execution context or create fallback
+    let context: ToolExecutionContext | undefined;
+    if (executionId) {
+      context = this.activeToolExecutions.get(executionId);
+    } else {
+      // Find by tool name (fallback for executions without ID tracking)
+      context = Array.from(this.activeToolExecutions.values()).find(
+        (ctx) => ctx.tool === toolName && !ctx.endTime,
+      );
+    }
+
+    const finalExecutionId =
+      executionId ||
+      context?.executionId ||
+      `${toolName}-${actualStartTime}-fallback-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Update execution context
+    if (context) {
+      context.endTime = endTime;
+      context.result = result;
+      context.error = error;
+      this.activeToolExecutions.delete(context.executionId);
+    }
+
+    // Create execution summary
+    const summary: ToolExecutionSummary = {
+      tool: toolName,
+      startTime: actualStartTime,
+      endTime,
+      duration,
+      success,
+      result,
+      error,
+      executionId: finalExecutionId,
+      metadata: {
+        toolCategory: "custom", // Default, can be overridden
+      },
+    };
+
+    // Store in history
+    this.toolExecutionHistory.push(summary);
+
+    // Emit event (NeuroLinkEvents format for compatibility)
+    this.emitter.emit("tool:end", {
+      tool: toolName,
+      result,
+      error,
+      timestamp: endTime,
+      duration,
+      executionId: finalExecutionId,
+    });
+
+    logger.debug(`tool:end emitted for ${toolName}`, {
+      toolName,
+      executionId: finalExecutionId,
+      duration,
+      success,
+      hasResult: result !== undefined,
+      hasError: !!error,
+    });
+  }
+
+  /**
+   * Get current tool execution contexts for stream metadata
+   */
+  getCurrentToolExecutions(): ToolExecutionContext[] {
+    return [...this.currentStreamToolExecutions];
+  }
+
+  /**
+   * Get tool execution history
+   */
+  getToolExecutionHistory(): ToolExecutionSummary[] {
+    return [...this.toolExecutionHistory];
+  }
+
+  /**
+   * Clear current stream tool executions (called at stream start)
+   */
+  clearCurrentStreamExecutions(): void {
+    this.currentStreamToolExecutions = [];
+  }
+
+  // TODO: Add getToolExecutionEvents() method in future version
+  // Will return properly formatted ToolExecutionEvent objects for structured event processing
+
+  // ========================================
   // Tool Registration API
   // ========================================
 
@@ -3377,7 +2881,6 @@ export class NeuroLink {
     });
 
     try {
-      // --- Start: Enhanced Validation Logic with FlexibleToolValidator ---
       if (!name || typeof name !== "string") {
         throw new Error("Invalid tool name");
       }
@@ -3388,50 +2891,46 @@ export class NeuroLink {
         throw new Error(`Tool '${name}' must have an execute method.`);
       }
 
-      // Use FlexibleToolValidator for consistent validation across SDK and toolRegistry
-      try {
-        const flexibleValidatorModule = require("./mcp/flexibleToolValidator.js");
-        const FlexibleToolValidator =
-          flexibleValidatorModule.FlexibleToolValidator;
-
-        // Use the same validation logic as toolRegistry (static method)
-        const validationResult = FlexibleToolValidator.validateToolName(name);
-        if (!validationResult.isValid) {
-          throw new Error(`Tool validation failed: ${validationResult.error}`);
-        }
-      } catch (error) {
-        // If FlexibleToolValidator import fails, use basic safety checks
-        logger.warn(
-          "FlexibleToolValidator not available, using basic validation",
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-        );
-
-        // Basic safety checks to prevent obvious issues
-        if (name.trim() === "") {
-          throw new Error("Tool name cannot be empty");
-        }
-        if (name.length > 100) {
-          throw new Error("Tool name is too long (maximum 100 characters)");
-        }
-        // eslint-disable-next-line no-control-regex
-        if (/[\x00-\x1F\x7F]/.test(name)) {
-          throw new Error("Tool name contains invalid control characters");
-        }
+      if (name.trim() === "") {
+        throw new Error("Tool name cannot be empty");
       }
-      // --- End: Enhanced Validation Logic ---
+      if (name.length > 100) {
+        throw new Error("Tool name is too long (maximum 100 characters)");
+      }
+      // eslint-disable-next-line no-control-regex
+      if (/[\x00-\x1F\x7F]/.test(name)) {
+        throw new Error("Tool name contains invalid control characters");
+      }
 
-      // Tool object validation is now handled by FlexibleToolValidator above
       // Proceed with tool registration since validation passed
 
+      // Convert tool to proper MCPExecutableTool format with schema conversion
+      const convertedTool: MCPExecutableTool = {
+        name: tool.name || name,
+        description: tool.description || name,
+        execute: tool.execute,
+        inputSchema: (() => {
+          // Check if tool has 'parameters' field (SDK SimpleTool format)
+          if ("parameters" in tool && tool.parameters) {
+            if (isZodSchema(tool.parameters)) {
+              return tool.parameters as object;
+            }
+            // If it's already a JSON Schema object, return as-is
+            if (typeof tool.parameters === "object") {
+              return tool.parameters as object;
+            }
+          }
+          // Fall back to existing inputSchema or empty object
+          const fallbackSchema = tool.inputSchema || {};
+          return fallbackSchema;
+        })(),
+      };
+
       // SMART DEFAULTS: Use utility to eliminate boilerplate creation
-      const mcpServerInfo = createCustomToolServerInfo(name, tool);
+      const mcpServerInfo = createCustomToolServerInfo(name, convertedTool);
 
       // Register with toolRegistry using MCPServerInfo directly
       toolRegistry.registerServer(mcpServerInfo);
-
-      logger.info(`Registered custom tool: ${name}`);
 
       // Emit tool registration success event
       this.emitter.emit("tools-register:end", {
@@ -3443,6 +2942,40 @@ export class NeuroLink {
       logger.error(`Failed to register tool ${name}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Set the context that will be passed to tools during execution
+   * This context will be merged with any runtime context passed by the AI model
+   * @param context - Context object containing session info, tokens, shop data, etc.
+   */
+  setToolContext(context: Record<string, unknown>): void {
+    this.toolExecutionContext = { ...context };
+
+    logger.debug("Tool execution context updated", {
+      sessionId: context.sessionId,
+      contextKeys: Object.keys(context),
+      hasJuspayToken: !!context.juspayToken,
+      hasShopId: !!context.shopId,
+    });
+  }
+
+  /**
+   * Get the current tool execution context
+   * @returns Current context or undefined if not set
+   */
+  getToolContext(): Record<string, unknown> | undefined {
+    return this.toolExecutionContext
+      ? { ...this.toolExecutionContext }
+      : undefined;
+  }
+
+  /**
+   * Clear the tool execution context
+   */
+  clearToolContext(): void {
+    this.toolExecutionContext = undefined;
+    logger.debug("Tool execution context cleared");
   }
 
   /**
@@ -3497,26 +3030,77 @@ export class NeuroLink {
     const toolMap = new Map<string, MCPExecutableTool>();
 
     for (const tool of customTools) {
+      const effectiveSchema = tool.inputSchema || tool.parameters;
+      logger.debug(`Processing tool schema for Claude`, {
+        toolName: tool.name,
+        hasDescription: !!tool.description,
+        description: tool.description,
+        hasParameters: !!tool.parameters,
+        parametersType: typeof tool.parameters,
+        parametersKeys:
+          tool.parameters && typeof tool.parameters === "object"
+            ? Object.keys(tool.parameters)
+            : "NOT_OBJECT",
+        hasInputSchema: !!tool.inputSchema,
+        inputSchemaType: typeof tool.inputSchema,
+        inputSchemaKeys:
+          tool.inputSchema && typeof tool.inputSchema === "object"
+            ? Object.keys(tool.inputSchema)
+            : "NOT_OBJECT",
+        hasEffectiveSchema: !!effectiveSchema,
+        effectiveSchemaType: typeof effectiveSchema,
+        effectiveSchemaHasProperties: !!(
+          effectiveSchema as Record<string, unknown>
+        )?.properties,
+        effectiveSchemaHasRequired: !!(
+          effectiveSchema as Record<string, unknown>
+        )?.required,
+        originalInputSchema: tool.inputSchema,
+        phase: "AFTER_SCHEMA_FIX",
+        timestamp: Date.now(),
+      });
+
       // Return MCPServerInfo.tools format directly - no conversion needed
       toolMap.set(tool.name, {
         name: tool.name,
         description: tool.description || "",
-        inputSchema: {},
+        inputSchema: tool.inputSchema || tool.parameters || {},
         execute: async (params: unknown, context?: unknown) => {
-          // Type guard to ensure context is compatible with ExecutionContext
-          const executionContext =
+          // CONTEXT MERGING: Combine all available contexts for maximum information
+          const storedContext = this.toolExecutionContext || {};
+          const runtimeContext =
             context && isNonNullObject(context)
-              ? (context as {
-                  sessionId?: string;
-                  userId?: string;
-                  [key: string]: unknown;
-                })
-              : undefined;
+              ? (context as Record<string, unknown>)
+              : {};
+
+          // Merge contexts with runtime context taking precedence
+          // This ensures we have the richest possible context for tool execution
+          const executionContext = {
+            ...storedContext, // Base context from setToolContext (session, tokens, etc.)
+            ...runtimeContext, // Runtime context from AI model (if any)
+            // Ensure we always have at least a sessionId for tracing
+            sessionId:
+              runtimeContext.sessionId ||
+              storedContext.sessionId ||
+              `fallback-${Date.now()}`,
+          };
+
+          // Enhanced logging for context debugging
+          logger.debug("Tool execution context merged", {
+            toolName: tool.name,
+            storedContextKeys: Object.keys(storedContext),
+            runtimeContextKeys: Object.keys(runtimeContext),
+            finalContextKeys: Object.keys(executionContext),
+            hasJuspayToken: !!(executionContext as Record<string, unknown>)
+              .juspayToken,
+            hasShopId: !!(executionContext as Record<string, unknown>).shopId,
+            sessionId: executionContext.sessionId,
+          });
 
           return await toolRegistry.executeTool(
             tool.name,
             params,
-            executionContext,
+            executionContext as Record<string, unknown>,
           );
         },
       });
@@ -3619,7 +3203,7 @@ export class NeuroLink {
    * Supports both custom tools and MCP server tools with timeout, retry, and circuit breaker patterns
    * @param toolName - Name of the tool to execute
    * @param params - Parameters to pass to the tool
-   * @param options - Execution options
+   * @param options - Execution options including optional authentication context
    * @returns Tool execution result
    */
   async executeTool<T = unknown>(
@@ -3629,6 +3213,12 @@ export class NeuroLink {
       timeout?: number;
       maxRetries?: number;
       retryDelayMs?: number;
+      authContext?: {
+        userId?: string;
+        sessionId?: string;
+        user?: Record<string, unknown>;
+        [key: string]: unknown;
+      };
     },
   ): Promise<T> {
     const functionTag = "NeuroLink.executeTool";
@@ -3640,6 +3230,32 @@ export class NeuroLink {
       params: isNonNullObject(params)
         ? transformParamsForLogging(params)
         : params,
+      hasExternalManager: !!this.externalServerManager,
+    });
+
+    // 🔧 PARAMETER TRACE: Log tool execution details for debugging
+    logger.debug(`Tool execution detailed analysis`, {
+      toolName,
+      executionStartTime,
+      paramsAnalysis: {
+        type: typeof params,
+        isNull: params === null,
+        isUndefined: params === undefined,
+        isEmpty:
+          params &&
+          typeof params === "object" &&
+          Object.keys(params as object).length === 0,
+        keys:
+          params && typeof params === "object"
+            ? Object.keys(params as object)
+            : "NOT_OBJECT",
+        keysLength:
+          params && typeof params === "object"
+            ? Object.keys(params as object).length
+            : 0,
+      },
+      isTargetTool: toolName === "juspay-analytics_SuccessRateSRByTime",
+      options,
       hasExternalManager: !!this.externalServerManager,
     });
 
@@ -3658,6 +3274,7 @@ export class NeuroLink {
       timeout: options?.timeout || TOOL_TIMEOUTS.EXECUTION_DEFAULT_MS, // 30 second default timeout
       maxRetries: options?.maxRetries || RETRY_ATTEMPTS.DEFAULT, // Default 2 retries for retriable errors
       retryDelayMs: options?.retryDelayMs || RETRY_DELAYS.BASE_MS, // 1 second delay between retries
+      authContext: options?.authContext, // Pass through authentication context
     };
 
     // Track memory usage for tool execution
@@ -3857,7 +3474,17 @@ export class NeuroLink {
   private async executeToolInternal<T = unknown>(
     toolName: string,
     params: unknown,
-    options: { timeout: number; maxRetries: number; retryDelayMs: number },
+    options: {
+      timeout: number;
+      maxRetries: number;
+      retryDelayMs: number;
+      authContext?: {
+        userId?: string;
+        sessionId?: string;
+        user?: Record<string, unknown>;
+        [key: string]: unknown;
+      };
+    },
   ): Promise<T> {
     const functionTag = "NeuroLink.executeToolInternal";
 
@@ -3910,12 +3537,20 @@ export class NeuroLink {
       }
     }
 
-    // If not found in custom tools, in-memory servers, or external servers, try unified registry
     try {
+      const storedContext = this.toolExecutionContext || {};
+      const passedAuthContext = options.authContext || {};
+
       const context = {
-        sessionId: `neurolink-tool-${Date.now()}`,
-        userId: "neurolink-user",
+        ...storedContext,
+        ...passedAuthContext,
       };
+
+      logger.debug(`[Using merged context for unified registry tool:`, {
+        toolName,
+        storedContextKeys: Object.keys(storedContext),
+        finalContextKeys: Object.keys(context),
+      });
 
       const result = (await toolRegistry.executeTool(
         toolName,
@@ -3938,7 +3573,6 @@ export class NeuroLink {
 
       return result;
     } catch (error) {
-      // ADD: Emergency error event emission (fallback)
       const errorToEmit =
         error instanceof Error ? error : new Error(String(error));
       this.emitter.emit("error", errorToEmit);
@@ -4014,36 +3648,9 @@ export class NeuroLink {
     const { MemoryManager } = await import("./utils/performance.js");
     const startMemory = MemoryManager.getMemoryUsageMB();
 
-    logger.debug(`[NeuroLink] 📊 LOG_POINT_A002_MEMORY_BASELINE`, {
-      logPoint: "A002_MEMORY_BASELINE",
-      getAllToolsId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - getAllToolsStartTime,
-      elapsedNs: (process.hrtime.bigint() - getAllToolsHrTimeStart).toString(),
-      memoryBaseline: startMemory,
-      heapUsed: startMemory.heapUsed,
-      heapTotal: startMemory.heapTotal,
-      external: startMemory.external,
-      message: "Established memory baseline before tool enumeration",
-    });
-
     try {
       // Optimized: Collect all tools with minimal object creation
       const allTools = new Map<string, ToolInfo>();
-
-      // 🚀 EXHAUSTIVE LOGGING POINT A003: MCP TOOLS COLLECTION START
-      const mcpToolsStartTime = process.hrtime.bigint();
-      logger.debug(`[NeuroLink] 🔧 LOG_POINT_A003_MCP_TOOLS_START`, {
-        logPoint: "A003_MCP_TOOLS_START",
-        getAllToolsId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - getAllToolsStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - getAllToolsHrTimeStart
-        ).toString(),
-        mcpToolsStartTimeNs: mcpToolsStartTime.toString(),
-        message: "Starting MCP server tools collection",
-      });
 
       // 1. Add MCP server tools (built-in direct tools)
       const mcpToolsRaw = await toolRegistry.listTools();
@@ -4233,10 +3840,30 @@ export class NeuroLink {
                 throw new Error("Ollama service not responding");
               }
 
-              const { models } = await response.json();
+              const responseData = await response.json();
+              const models = responseData?.models;
               const defaultOllamaModel = "llama3.2:latest";
-              const modelIsAvailable = models.some(
-                (m: UnknownRecord) => m.name === defaultOllamaModel,
+
+              // Runtime-safe guard: ensure models is an array with valid objects
+              if (!Array.isArray(models)) {
+                logger.warn(
+                  "Ollama API returned invalid models format in testProvider",
+                  {
+                    responseData,
+                    modelsType: typeof models,
+                  },
+                );
+                throw new Error("Invalid models format from Ollama API");
+              }
+
+              // Filter and validate models before comparison
+              const validModels = models.filter(
+                (m): m is { name: string } =>
+                  m && typeof m === "object" && typeof m.name === "string",
+              );
+
+              const modelIsAvailable = validModels.some(
+                (m) => m.name === defaultOllamaModel,
               );
 
               if (modelIsAvailable) {

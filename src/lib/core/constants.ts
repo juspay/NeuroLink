@@ -6,13 +6,13 @@
 // Core AI Generation Defaults
 export const DEFAULT_MAX_TOKENS = undefined; // Unlimited by default - let providers decide their own limits
 export const DEFAULT_TEMPERATURE = 0.7;
-export const DEFAULT_TIMEOUT = 30000;
-export const DEFAULT_MAX_STEPS = 5; // Default multi-turn tool execution steps
+export const DEFAULT_TIMEOUT = 60000;
+export const DEFAULT_MAX_STEPS = 200;
 
 // Step execution limits
 export const STEP_LIMITS = {
   min: 1,
-  max: 20,
+  max: 500,
   default: DEFAULT_MAX_STEPS,
 };
 
@@ -38,69 +38,41 @@ export const PROVIDER_CONFIG = {
   },
 };
 
-// Provider-specific maxTokens limits (discovered through testing)
+// Provider-specific maxTokens limits
 export const PROVIDER_MAX_TOKENS = {
   anthropic: {
-    "claude-3-haiku-20240307": 4096,
-    "claude-3-5-sonnet-20241022": 4096,
-    "claude-3-opus-20240229": 4096,
-    "claude-3-5-sonnet-20240620": 4096,
-    default: 4096, // Conservative default for Anthropic
+    default: 64000,
   },
   openai: {
-    "gpt-4o": 16384,
-    "gpt-4o-mini": 16384,
-    "gpt-3.5-turbo": 4096,
-    "gpt-4": 8192,
-    "gpt-4-turbo": 4096,
-    default: 8192, // OpenAI generally supports higher limits
+    default: 500000,
   },
   "google-ai": {
-    "gemini-1.5-pro": 8192,
-    "gemini-1.5-flash": 8192,
-    "gemini-2.5-pro": 8192,
-    "gemini-2.5-flash": 8192,
-    "gemini-pro": 4096,
-    default: 4096, // Conservative default due to 500 errors at high limits
+    default: 64000,
   },
   vertex: {
-    "gemini-1.5-pro": 8192,
-    "gemini-1.5-flash": 8192,
-    "gemini-2.5-pro": 8192,
-    "gemini-2.5-flash": 8192,
-    "claude-4.0-sonnet": 4096,
-    default: 4096,
+    default: 64000,
   },
   bedrock: {
-    "anthropic.claude-3-sonnet-20240229-v1:0": 4096,
-    "anthropic.claude-3-haiku-20240307-v1:0": 4096,
-    "anthropic.claude-3-5-sonnet-20240620-v1:0": 4096,
-    default: 4096,
+    default: 64000,
   },
   azure: {
-    "gpt-4o": 16384,
-    "gpt-4o-mini": 16384,
-    "gpt-4.1": 16384,
-    "gpt-3.5-turbo": 4096,
-    "gpt-4": 8192,
-    "gpt-4-turbo": 4096,
-    default: 8192, // Azure OpenAI generally supports similar limits to OpenAI
+    default: 64000,
   },
   ollama: {
-    default: 8192, // Ollama typically supports higher limits
+    default: 64000,
   },
   litellm: {
-    default: 4096, // Conservative default
+    default: 500000,
   },
-  default: 4096, // Safe default across all providers
+  default: 64000,
 };
 
 // CLI Validation Limits
 export const CLI_LIMITS = {
   maxTokens: {
     min: 1,
-    max: 50000,
-    default: undefined, // No default limit - unlimited by default
+    max: 64000,
+    default: DEFAULT_MAX_TOKENS,
   },
   temperature: {
     min: 0,

@@ -134,7 +134,10 @@ describe("LiteLLMProvider", () => {
   it("should return available models list", async () => {
     const provider = new LiteLLMProvider();
     // Mock the fetchModelsFromAPI method to return a predictable list
-    vi.spyOn(provider as any, "fetchModelsFromAPI").mockResolvedValue([
+    vi.spyOn(
+      provider as unknown as { fetchModelsFromAPI: () => Promise<string[]> },
+      "fetchModelsFromAPI",
+    ).mockResolvedValue([
       "openai/gpt-4o",
       "anthropic/claude-3-5-sonnet",
       "google/gemini-pro",

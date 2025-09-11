@@ -3,7 +3,7 @@
  * Centralizes commonly used complex types to improve readability and maintainability
  */
 
-import type { ZodType, ZodTypeDef } from "zod";
+import type { ZodTypeAny } from "zod";
 import type { Schema } from "ai";
 import type { JsonValue, JsonObject } from "./common.js";
 
@@ -14,8 +14,9 @@ import type { JsonValue, JsonObject } from "./common.js";
 /**
  * Type alias for complex Zod schema type to improve readability
  * Used across providers and validation systems
+ * Using ZodTypeAny to prevent infinite type recursion in zod-to-json-schema
  */
-export type ZodUnknownSchema = ZodType<unknown, ZodTypeDef, unknown>;
+export type ZodUnknownSchema = ZodTypeAny;
 
 /**
  * Union type for schema validation (Zod or AI SDK schema)

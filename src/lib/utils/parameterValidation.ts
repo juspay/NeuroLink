@@ -11,10 +11,7 @@ import type {
 import type { TextGenerationOptions } from "../types/index.js";
 import type { StreamOptions } from "../types/streamTypes.js";
 import type { GenerateOptions } from "../types/generateTypes.js";
-import type {
-  NeuroLinkMCPTool,
-  NeuroLinkExecutionContext,
-} from "../mcp/factory.js";
+import type { NeuroLinkMCPTool } from "../mcp/factory.js";
 import { SYSTEM_LIMITS } from "../core/constants.js";
 import { isNonNullObject } from "./typeUtils.js";
 
@@ -355,39 +352,16 @@ export function validateMCPTool(tool: unknown): ValidationResult {
     errors.push(execError);
   }
 
-  // Additional MCP-specific validation
-  if (mcpTool.execute) {
-    try {
-      // Test execute function with mock data
-      const mockParams = {};
-      const mockContext: NeuroLinkExecutionContext = {
-        sessionId: "validation-test",
-        userId: "validation-user",
-      };
-
-      const result = mcpTool.execute(mockParams, mockContext);
-      const returnsPromise =
-        result && typeof result === "object" && "then" in result;
-
-      if (!returnsPromise) {
-        errors.push(
-          new ValidationError(
-            "Execute function must return a Promise",
-            "execute",
-            "NOT_PROMISE",
-            [
-              "Ensure function returns a Promise<ToolResult>",
-              "Use async/await pattern",
-              "Return a result object with success property",
-            ],
-          ),
-        );
-      }
-    } catch (error) {
-      warnings.push(
-        `Execute function validation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  // Simplified validation - just check if execute is a function
+  if (mcpTool.execute && typeof mcpTool.execute !== "function") {
+    errors.push(
+      new ValidationError(
+        "Execute must be a function",
+        "execute",
+        "INVALID_TYPE",
+        ["Provide a function for the execute property"],
+      ),
+    );
   }
 
   // Check optional properties
@@ -472,7 +446,7 @@ export function validateTextGenerationOptions(
     opts.maxTokens,
     "maxTokens",
     1,
-    200000,
+    128000,
   );
   if (tokensError) {
     errors.push(tokensError);
@@ -564,7 +538,7 @@ export function validateStreamOptions(options: unknown): ValidationResult {
     opts.maxTokens,
     "maxTokens",
     1,
-    200000,
+    128000,
   );
   if (tokensError) {
     errors.push(tokensError);
@@ -625,7 +599,7 @@ export function validateGenerateOptions(options: unknown): ValidationResult {
     opts.maxTokens,
     "maxTokens",
     1,
-    200000,
+    128000,
   );
   if (tokensError) {
     errors.push(tokensError);

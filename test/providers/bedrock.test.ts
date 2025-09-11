@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { AmazonBedrockProvider as BedrockProvider } from "../../src/lib/providers/amazonBedrock.js";
 import { TimeoutError } from "../../src/lib/utils/timeout.js";
 import { AIProviderName } from "../../src/lib/types/index.js";
-import { BedrockRuntimeClient, ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime";
+import { ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime";
 
 // Mock the external dependencies
 vi.mock("ai", async (importOriginal) => {
@@ -28,7 +28,7 @@ vi.mock("@aws-sdk/client-bedrock-runtime", () => {
     send: mockSend,
   }));
   class ConverseStreamCommand {
-    constructor(public input: any) {}
+    constructor(public input: Record<string, unknown>) {}
   }
   return {
     BedrockRuntimeClient,
@@ -83,19 +83,25 @@ describe("BedrockProvider", () => {
   it("should handle rate limit errors", () => {
     const error = new Error("ThrottlingException");
     const handledError = provider.handleProviderError(error);
-    expect(handledError.message).toContain("AWS Bedrock error: ThrottlingException");
+    expect(handledError.message).toContain(
+      "AWS Bedrock error: ThrottlingException",
+    );
   });
 
   it("should handle model not found errors", () => {
     const error = new Error("ValidationException: The model is not supported");
     const handledError = provider.handleProviderError(error);
-    expect(handledError.message).toContain("AWS Bedrock validation error: ValidationException: The model is not supported");
+    expect(handledError.message).toContain(
+      "AWS Bedrock validation error: ValidationException: The model is not supported",
+    );
   });
 
   it("should handle timeout errors", () => {
     const timeoutError = new TimeoutError("Request timed out", 5000);
     const handledError = provider.handleProviderError(timeoutError);
-    expect(handledError.message).toContain("AWS Bedrock error: Request timed out");
+    expect(handledError.message).toContain(
+      "AWS Bedrock error: Request timed out",
+    );
   });
 
   it("should handle unknown errors", () => {
@@ -126,8 +132,11 @@ describe("BedrockProvider", () => {
       await provider.stream({ input: { text: "Hello" } });
 
       expect(mockSend).toHaveBeenCalledWith(expect.any(ConverseStreamCommand));
-      const commandInstance = (mockSend.mock.calls[0][0] as any);
-      expect(commandInstance.input.modelId).toBe("anthropic.claude-3-sonnet-20240229-v1:0");
+      const commandInstance = mockSend.mock
+        .calls[0][0] as ConverseStreamCommand;
+      expect(commandInstance.input.modelId).toBe(
+        "anthropic.claude-3-sonnet-20240229-v1:0",
+      );
       expect(commandInstance.input.messages).toEqual([
         { role: "user", content: [{ text: "Hello" }] },
       ]);

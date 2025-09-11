@@ -58,11 +58,8 @@ export class MCPToolRegistry extends MCPRegistry {
 
   constructor() {
     super();
-    // 🔧 CONDITIONAL: Only auto-register direct tools if not disabled via configuration
     if (!shouldDisableBuiltinTools()) {
       this.registerDirectTools();
-    } else {
-      registryLogger.debug("Built-in direct tools disabled via configuration");
     }
   }
 
@@ -171,7 +168,6 @@ export class MCPToolRegistry extends MCPRegistry {
       _finalContext = serverConfigOrContext as ExecutionContext | undefined;
     }
     const serverId = serverInfo.id;
-    registryLogger.info(`Registering MCPServerInfo directly: ${serverId}`);
 
     // Use MCPServerInfo.tools array directly - ZERO conversions!
     const toolsObject: Record<string, ToolImplementation> = {};
@@ -209,11 +205,6 @@ export class MCPToolRegistry extends MCPRegistry {
 
     // Use MCPServerInfo.tools array directly - ZERO conversions!
     const tools = serverInfo.tools;
-    registryLogger.debug(
-      `Registering ${tools.length} tools for server ${serverId}:`,
-      tools.map((t) => t.name),
-    );
-
     for (const tool of tools) {
       // For custom tools, use just the tool name to avoid redundant serverId.toolName format
       // For other tools, use fully-qualified serverId.toolName to avoid collisions
@@ -250,10 +241,7 @@ export class MCPToolRegistry extends MCPRegistry {
         }),
       });
 
-      registryLogger.debug(
-        `Registered tool '${tool.name}' with execute function:`,
-        typeof tool.execute,
-      );
+      // Tool registered successfully
     }
 
     // Store MCPServerInfo directly - NO recreation needed!
@@ -309,10 +297,20 @@ export class MCPToolRegistry extends MCPRegistry {
     const startTime = Date.now();
 
     try {
-      registryLogger.info(`Executing tool: ${toolName}`);
+      registryLogger.info(
+        `🔧 [TOOL_EXECUTION] Starting execution: ${toolName}`,
+      );
+      registryLogger.info(
+        `🔧 [TOOL_EXECUTION] Starting execution: ${toolName}`,
+        { args, context },
+      );
 
       // Try to find the tool by fully-qualified name first
       let tool = this.tools.get(toolName);
+      registryLogger.info(
+        `🔍 [TOOL_LOOKUP] Direct lookup result for '${toolName}':`,
+        !!tool,
+      );
 
       // If not found, search for tool by name across all entries (for backward compatibility)
       let toolId = toolName;

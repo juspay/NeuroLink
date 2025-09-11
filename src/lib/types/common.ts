@@ -134,3 +134,131 @@ export function toErrorInfo(error: unknown): ErrorInfo {
     message: getErrorMessage(error),
   };
 }
+
+/**
+ * NeuroLink Native Event System Types
+ */
+
+/**
+ * Tool execution event for real-time streaming
+ */
+export interface ToolExecutionEvent {
+  type: "tool:start" | "tool:end";
+  tool: string;
+  input?: unknown;
+  result?: unknown;
+  error?: string;
+  timestamp: number;
+  duration?: number;
+  executionId: string;
+}
+
+/**
+ * Tool execution summary for completed executions
+ */
+export interface ToolExecutionSummary {
+  tool: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  success: boolean;
+  result?: unknown;
+  error?: string;
+  executionId: string;
+  metadata?: {
+    serverId?: string;
+    toolCategory?: "direct" | "custom" | "mcp";
+    isExternal?: boolean;
+  };
+}
+
+/**
+ * Stream event types for real-time communication
+ */
+export interface StreamEvent {
+  type: "stream:chunk" | "stream:complete" | "stream:error";
+  content?: string;
+  metadata?: JsonObject;
+  timestamp: number;
+}
+
+/**
+ * Enhanced NeuroLink event types
+ * Flexible interface to support both typed and legacy event patterns
+ */
+export interface NeuroLinkEvents {
+  // Core tool events
+  "tool:start": unknown;
+  "tool:end": unknown;
+
+  // Stream events
+  "stream:start": unknown;
+  "stream:end": unknown;
+  "stream:chunk": unknown;
+  "stream:complete": unknown;
+  "stream:error": unknown;
+
+  // Generation events
+  "generation:start": unknown;
+  "generation:end": unknown;
+
+  // Response events
+  "response:start": unknown;
+  "response:end": unknown;
+
+  // External MCP events
+  "externalMCP:serverConnected": unknown;
+  "externalMCP:serverDisconnected": unknown;
+  "externalMCP:serverFailed": unknown;
+  "externalMCP:toolDiscovered": unknown;
+  "externalMCP:toolRemoved": unknown;
+  "externalMCP:serverAdded": unknown;
+  "externalMCP:serverRemoved": unknown;
+
+  // Tool registration events
+  "tools-register:start": unknown;
+  "tools-register:end": unknown;
+
+  // General events
+  connected: unknown;
+  message: unknown;
+  error: unknown;
+  log: unknown;
+
+  // Allow any additional event for flexibility
+  [key: string]: unknown;
+}
+
+/**
+ * TypeScript utility for typed EventEmitter
+ * Flexible interface to support both typed and legacy event patterns
+ */
+export interface TypedEventEmitter<TEvents extends Record<string, unknown>> {
+  on<K extends keyof TEvents>(
+    event: K,
+    listener: (...args: unknown[]) => void,
+  ): this;
+  emit<K extends keyof TEvents>(event: K, ...args: unknown[]): boolean;
+  off<K extends keyof TEvents>(
+    event: K,
+    listener: (...args: unknown[]) => void,
+  ): this;
+  removeAllListeners<K extends keyof TEvents>(event?: K): this;
+  listenerCount<K extends keyof TEvents>(event: K): number;
+  listeners<K extends keyof TEvents>(
+    event: K,
+  ): Array<(...args: unknown[]) => void>;
+}
+
+/**
+ * Tool execution context for tracking
+ */
+export interface ToolExecutionContext {
+  executionId: string;
+  tool: string;
+  startTime: number;
+  endTime?: number;
+  result?: unknown;
+  error?: string;
+  metadata?: JsonObject;
+}

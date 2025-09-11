@@ -30,8 +30,8 @@ import type { JsonValue } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import { logger } from "../utils/logger.js";
 import type { DocumentType } from "@smithy/types";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import type { ZodType } from "zod";
+import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
+import type { ZodUnknownSchema } from "../types/typeAliases.js";
 
 interface BedrockToolUse {
   toolUseId: string;
@@ -710,10 +710,9 @@ export class AmazonBedrockProvider extends BaseProvider {
           // Check if it's a Zod schema
           if ("_def" in tool.parameters) {
             // It's a Zod schema, convert to JSON schema
-            schema = zodToJsonSchema(tool.parameters as ZodType) as Record<
-              string,
-              unknown
-            >;
+            schema = convertZodToJsonSchema(
+              tool.parameters as ZodUnknownSchema,
+            ) as Record<string, unknown>;
           } else {
             // It's already a plain object schema
             schema = tool.parameters as Record<string, unknown>;

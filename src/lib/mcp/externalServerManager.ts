@@ -172,9 +172,9 @@ export class ExternalServerManager extends EventEmitter {
       logLevel: config.logLevel ?? "info",
     };
 
-    // Enable main tool registry integration by default
+    // Disable main tool registry integration by default to prevent automatic tool execution
     this.enableMainRegistryIntegration =
-      options.enableMainRegistryIntegration ?? true;
+      options.enableMainRegistryIntegration ?? false;
 
     // Initialize tool discovery service
     this.toolDiscovery = new ToolDiscoveryService();

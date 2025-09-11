@@ -15,7 +15,8 @@
     "allowJs": true,
     "checkJs": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "downlevelIteration": true
   },
   "include": ["src/cli/**/*.ts", "src/lib/**/*.ts"],
   "exclude": ["node_modules", "dist"]

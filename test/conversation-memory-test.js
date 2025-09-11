@@ -655,10 +655,10 @@ async function runConversationMemoryTest() {
         );
       });
 
-    // =================================================================
-    // TEST 13: Conversation Memory Disabled Error Handling
-    // =================================================================
-    console.log("\n📋 TEST 13: Conversation Memory Disabled Error Handling");
+      // =================================================================
+      // TEST 13: Conversation Memory Disabled Error Handling
+      // =================================================================
+      console.log("\n📋 TEST 13: Conversation Memory Disabled Error Handling");
       console.log("-".repeat(40));
 
       // Create a new NeuroLink instance without conversation memory
@@ -685,10 +685,10 @@ async function runConversationMemoryTest() {
         );
       }
 
-    // =================================================================
-    // TEST 14: Stream History Retrieval Test
-    // =================================================================
-    console.log("\n📋 TEST 14: Stream History Retrieval Test");
+      // =================================================================
+      // TEST 14: Stream History Retrieval Test
+      // =================================================================
+      console.log("\n📋 TEST 14: Stream History Retrieval Test");
       console.log("-".repeat(40));
 
       // Create fresh NeuroLink instance with higher turn limit for stream testing

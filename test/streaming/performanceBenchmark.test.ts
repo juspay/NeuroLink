@@ -41,13 +41,17 @@ describe("Streaming Performance Benchmarking", () => {
 
             const result = await sdk.stream({
               input: { text: "Write a 100-word story about space" },
-              provider: provider as UnknownRecord,
+              provider: provider as string,
               disableTools: true,
               maxTokens: 200,
             });
 
             for await (const chunk of result.stream) {
-              if (chunk.content && !firstTokenTime) {
+              if (
+                "content" in chunk &&
+                typeof chunk.content === "string" &&
+                !firstTokenTime
+              ) {
                 firstTokenTime = Date.now();
                 break; // We only need the first token
               }
@@ -101,13 +105,13 @@ describe("Streaming Performance Benchmarking", () => {
               input: {
                 text: "Write a detailed 200-word explanation of artificial intelligence",
               },
-              provider: provider as UnknownRecord,
+              provider: provider as string,
               disableTools: true,
               maxTokens: 400,
             });
 
             for await (const chunk of result.stream) {
-              if (chunk.content) {
+              if ("content" in chunk && typeof chunk.content === "string") {
                 tokenCount++;
                 fullContent += chunk.content;
               }
@@ -168,13 +172,13 @@ describe("Streaming Performance Benchmarking", () => {
 
         const streamResult = await sdk.stream({
           input: { text: prompt },
-          provider: provider as UnknownRecord,
+          provider: provider as string,
           disableTools: true,
           maxTokens: 300,
         });
 
         for await (const chunk of streamResult.stream) {
-          if (chunk.content) {
+          if ("content" in chunk && typeof chunk.content === "string") {
             if (!streamFirstToken) {
               streamFirstToken = Date.now() - streamStartTime;
             }
@@ -188,7 +192,7 @@ describe("Streaming Performance Benchmarking", () => {
         const generateStartTime = Date.now();
         const generateResult = await sdk.generate({
           input: { text: prompt },
-          provider: provider as UnknownRecord,
+          provider: provider as string,
           disableTools: true,
           maxTokens: 300,
         });
@@ -239,13 +243,13 @@ describe("Streaming Performance Benchmarking", () => {
           input: {
             text: "Write a comprehensive 500-word essay about the history and future of space exploration",
           },
-          provider: provider as UnknownRecord,
+          provider: provider as string,
           disableTools: true,
           maxTokens: 1000,
         });
 
         for await (const chunk of result.stream) {
-          if (chunk.content) {
+          if ("content" in chunk && typeof chunk.content === "string") {
             chunkCount++;
             totalContent += chunk.content;
 
@@ -312,13 +316,13 @@ describe("Streaming Performance Benchmarking", () => {
 
           const result = await sdk.stream({
             input: { text: prompt },
-            provider: provider as UnknownRecord,
+            provider: provider as string,
             disableTools: true,
             maxTokens: 100,
           });
 
           for await (const chunk of result.stream) {
-            if (chunk.content) {
+            if ("content" in chunk && typeof chunk.content === "string") {
               if (!firstTokenTime) {
                 firstTokenTime = Date.now() - streamStartTime;
               }

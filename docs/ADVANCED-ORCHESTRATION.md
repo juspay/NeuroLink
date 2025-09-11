@@ -218,7 +218,7 @@ AI Generation
 ```typescript
 // Enable debug logging to see orchestration decisions
 import { logger } from "@juspay/neurolink";
-logger.setLogLevel('debug');
+logger.setLogLevel("debug");
 
 const result = await neurolink.generate({
   input: { text: "Complex analysis request" },
@@ -231,6 +231,7 @@ const result = await neurolink.generate({
 ```
 
 Alternative: Set environment variable before running your application:
+
 ```bash
 NEUROLINK_DEBUG=true node your-app.js
 ```
@@ -378,7 +379,7 @@ console.log(`Total time: ${Date.now() - startTime}ms`);
 ```typescript
 // Enable detailed orchestration logging
 import { logger } from "@juspay/neurolink";
-logger.setLogLevel('debug');
+logger.setLogLevel("debug");
 
 const result = await neurolink.generate({
   input: { text: "debug this request" },

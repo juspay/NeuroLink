@@ -19,6 +19,10 @@ import {
   validateToolName,
   validateToolDescription,
 } from "../utils/parameterValidation.js";
+import {
+  convertZodToJsonSchema,
+  isZodSchema,
+} from "../utils/schemaConversion.js";
 
 /**
  * Configuration constants for tool validation
@@ -184,7 +188,9 @@ export function createMCPServerFromTools(
     mcpTools.push({
       name,
       description: tool.description || name,
-      inputSchema: {},
+      inputSchema: tool.parameters
+        ? convertSchemaToJsonSchema(tool.parameters)
+        : {},
     });
   }
 
@@ -200,6 +206,23 @@ export function createMCPServerFromTools(
     isBuiltIn: metadata?.category === "built-in",
     isCustomTool: false,
   });
+}
+
+/**
+ * Helper to convert schema parameters to JSON Schema format
+ */
+function convertSchemaToJsonSchema(schema: unknown): object {
+  if (isZodSchema(schema)) {
+    return convertZodToJsonSchema(schema as ZodUnknownSchema);
+  }
+
+  // If it's already a JSON Schema object, return as-is
+  if (schema && typeof schema === "object") {
+    return schema as object;
+  }
+
+  // Return empty object if no schema
+  return {};
 }
 
 /**

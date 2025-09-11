@@ -112,3 +112,4 @@ test-directTools-temp/
 site/
 _site/
 quality-metrics.json
+.claude/settings.local.json

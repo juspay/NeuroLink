@@ -30,24 +30,24 @@ export function redactPrompt(
   options: PromptRedactionOptions = {},
 ): string {
   const opts = { ...DEFAULT_REDACTION_OPTIONS, ...options };
-  
-  if (!prompt || typeof prompt !== 'string') {
-    return '[INVALID_PROMPT]';
+
+  if (!prompt || typeof prompt !== "string") {
+    return "[INVALID_PROMPT]";
   }
 
   const wordCount = prompt.trim().split(/\s+/).length;
   let redacted = prompt.substring(0, opts.maxLength);
-  
+
   // Add ellipsis if truncated
   if (prompt.length > opts.maxLength) {
     redacted = redacted.substring(0, opts.maxLength - 3) + "...";
   }
-  
+
   // Optionally append word count
   if (opts.showWordCount) {
     redacted += ` [${wordCount} words]`;
   }
-  
+
   return redacted;
 }
 
@@ -58,13 +58,13 @@ export function createSafeMask(
   prompt: string,
   _maskLength: number = 20,
 ): string {
-  if (!prompt || typeof prompt !== 'string') {
-    return '[INVALID_PROMPT]';
+  if (!prompt || typeof prompt !== "string") {
+    return "[INVALID_PROMPT]";
   }
-  
+
   const wordCount = prompt.trim().split(/\s+/).length;
   const charCount = prompt.length;
-  
+
   return `[REDACTED: ${charCount} chars, ${wordCount} words]`;
 }
 

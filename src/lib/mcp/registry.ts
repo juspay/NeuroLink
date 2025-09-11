@@ -40,7 +40,7 @@ export class MCPRegistry implements McpRegistry {
    */
   register(plugin: DiscoveredMcp): void {
     this.plugins.set(plugin.metadata.name, plugin);
-    registryLogger.info(`Registered plugin: ${plugin.metadata.name}`);
+    registryLogger.debug(`Registered plugin: ${plugin.metadata.name}`);
   }
 
   /**
@@ -49,7 +49,7 @@ export class MCPRegistry implements McpRegistry {
   unregister(name: string): boolean {
     const removed = this.plugins.delete(name);
     if (removed) {
-      registryLogger.info(`Unregistered plugin: ${name}`);
+      registryLogger.debug(`Unregistered plugin: ${name}`);
     }
     return removed;
   }

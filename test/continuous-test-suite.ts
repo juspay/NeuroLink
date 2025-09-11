@@ -1104,7 +1104,9 @@ async function testSDKBusinessTools(): Promise<boolean> {
 
     let streamContent = "";
     for await (const chunk of streamResult.stream) {
-      streamContent += chunk.content;
+      if ("content" in chunk && typeof chunk.content === "string") {
+        streamContent += chunk.content;
+      }
     }
 
     const streamFoundData = businessData.filter((data) =>

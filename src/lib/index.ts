@@ -52,7 +52,8 @@ export { dynamicModelProvider } from "./core/dynamicModels.js";
 export type { DynamicModelConfig, ModelRegistry } from "./types/modelTypes.js";
 
 // Main NeuroLink wrapper class and diagnostic types
-export { NeuroLink } from "./neurolink.js";
+import { NeuroLink } from "./neurolink.js";
+export { NeuroLink };
 export type { ProviderStatus, MCPStatus } from "./neurolink.js";
 export type { MCPServerInfo } from "./types/mcpTypes.js";
 
@@ -233,9 +234,9 @@ export type {
  * ```
  */
 export async function generateText(
-  options: import("./types/index.js").TextGenerationOptions,
-): Promise<import("./types/index.js").TextGenerationResult> {
-  // Import neurolink instance to avoid circular dependencies
-  const { neurolink } = await import("./neurolink.js");
+  options: import("./core/types.js").TextGenerationOptions,
+): Promise<import("./core/types.js").TextGenerationResult> {
+  // Create instance on-demand without auto-instantiation
+  const neurolink = new NeuroLink();
   return await neurolink.generateText(options);
 }

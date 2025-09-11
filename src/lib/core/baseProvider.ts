@@ -4,7 +4,7 @@ import type {
   ValidationSchema,
   StandardRecord,
 } from "../types/typeAliases.js";
-import type { Tool, LanguageModelV1 } from "ai";
+import type { Tool, LanguageModelV1, CoreMessage } from "ai";
 import { generateText } from "ai";
 import type {
   AIProvider,
@@ -41,6 +41,7 @@ import {
   ValidationError,
   createValidationSummary,
 } from "../utils/parameterValidation.js";
+import { convertJsonSchemaToZod } from "../utils/schemaConversion.js";
 import {
   recordProviderPerformanceFromMetrics,
   getPerformanceOptimizedProvider,
@@ -130,25 +131,58 @@ export abstract class BaseProvider implements AIProvider {
   ): Promise<StreamResult> {
     const options = this.normalizeStreamOptions(optionsOrPrompt);
 
+    logger.info(`Starting stream`, {
+      provider: this.providerName,
+      hasTools: !options.disableTools && this.supportsTools(),
+      disableTools: !!options.disableTools,
+      supportsTools: this.supportsTools(),
+      inputLength: options.input?.text?.length || 0,
+      maxTokens: options.maxTokens,
+      temperature: options.temperature,
+      timestamp: Date.now(),
+    });
+
     // CRITICAL FIX: Always prefer real streaming over fake streaming
     // Try real streaming first, use fake streaming only as fallback
     try {
+      logger.debug(`Attempting real streaming`, {
+        provider: this.providerName,
+        timestamp: Date.now(),
+      });
+
       const realStreamResult = await this.executeStream(
         options,
         analysisSchema,
       );
+
+      logger.info(`Real streaming succeeded`, {
+        provider: this.providerName,
+        timestamp: Date.now(),
+      });
 
       // If real streaming succeeds, return it (with tools support via Vercel AI SDK)
       return realStreamResult;
     } catch (realStreamError) {
       logger.warn(
         `Real streaming failed for ${this.providerName}, falling back to fake streaming:`,
-        realStreamError,
+        {
+          error:
+            realStreamError instanceof Error
+              ? realStreamError.message
+              : String(realStreamError),
+          timestamp: Date.now(),
+        },
       );
 
       // Fallback to fake streaming only if real streaming fails AND tools are enabled
       if (!options.disableTools && this.supportsTools()) {
         try {
+          logger.info(`Starting fake streaming with tools`, {
+            provider: this.providerName,
+            supportsTools: this.supportsTools(),
+            timestamp: Date.now(),
+          });
+
           // Convert stream options to text generation options
           const textOptions: TextGenerationOptions = {
             prompt: options.input?.text || "",
@@ -167,7 +201,22 @@ export abstract class BaseProvider implements AIProvider {
             context: options.context as Record<string, JsonValue> | undefined,
           };
 
+          logger.debug(`Calling generate for fake streaming`, {
+            provider: this.providerName,
+            maxSteps: textOptions.maxSteps,
+            disableTools: textOptions.disableTools,
+            timestamp: Date.now(),
+          });
+
           const result = await this.generate(textOptions, analysisSchema);
+
+          logger.info(`Generate completed for fake streaming`, {
+            provider: this.providerName,
+            hasContent: !!result?.content,
+            contentLength: result?.content?.length || 0,
+            toolsUsed: result?.toolsUsed?.length || 0,
+            timestamp: Date.now(),
+          });
 
           // Create a synthetic stream from the generate result that simulates progressive delivery
           return {
@@ -254,6 +303,437 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
+   * Prepare generation context including tools and model
+   */
+  private async prepareGenerationContext(
+    options: TextGenerationOptions,
+  ): Promise<{
+    tools: Record<string, Tool>;
+    model: LanguageModelV1;
+  }> {
+    const shouldUseTools = !options.disableTools && this.supportsTools();
+    const baseTools = shouldUseTools ? await this.getAllTools() : {};
+    const tools = shouldUseTools
+      ? {
+          ...baseTools,
+          ...(options.tools || {}),
+        }
+      : {};
+
+    logger.debug(`Final tools prepared for AI`, {
+      provider: this.providerName,
+      directTools: getKeyCount(baseTools),
+      directToolNames: getKeysAsString(baseTools),
+      externalTools: getKeyCount(options.tools || {}),
+      externalToolNames: getKeysAsString(options.tools || {}),
+      totalTools: getKeyCount(tools),
+      totalToolNames: getKeysAsString(tools),
+      shouldUseTools,
+      timestamp: Date.now(),
+    });
+
+    const model = await this.getAISDKModelWithMiddleware(options);
+    return { tools, model };
+  }
+
+  /**
+   * Build messages array for generation
+   */
+  private async buildMessages(
+    options: TextGenerationOptions,
+  ): Promise<CoreMessage[]> {
+    const hasMultimodalInput = (opts: TextGenerationOptions): boolean => {
+      const input = opts.input as MultimodalInput | undefined;
+      const hasImages = !!input?.images?.length;
+      const hasContent = !!input?.content?.length;
+      return hasImages || hasContent;
+    };
+
+    let messages;
+    if (hasMultimodalInput(options)) {
+      if (process.env.NEUROLINK_DEBUG === "true") {
+        logger.debug(
+          "Detected multimodal input, using multimodal message builder",
+        );
+      }
+
+      const input = options.input as MultimodalInput | undefined;
+      const multimodalOptions = {
+        input: {
+          text: options.prompt || options.input?.text || "",
+          images: input?.images,
+          content: input?.content,
+        },
+        provider: options.provider,
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        systemPrompt: options.systemPrompt,
+        enableAnalytics: options.enableAnalytics,
+        enableEvaluation: options.enableEvaluation,
+        context: options.context,
+      };
+
+      messages = await buildMultimodalMessagesArray(
+        multimodalOptions,
+        this.providerName,
+        this.modelName,
+      );
+    } else {
+      if (process.env.NEUROLINK_DEBUG === "true") {
+        logger.debug(
+          "No multimodal input detected, using standard message builder",
+        );
+      }
+      messages = buildMessagesArray(options);
+    }
+
+    // Convert messages to Vercel AI SDK format
+    return messages.map((msg) => {
+      if (typeof msg.content === "string") {
+        return {
+          role: msg.role as "user" | "assistant" | "system",
+          content: msg.content,
+        } as CoreMessage;
+      } else {
+        return {
+          role: msg.role as "user" | "assistant" | "system",
+          content: msg.content.map((item) => {
+            if (item.type === "text") {
+              return { type: "text", text: item.text || "" };
+            } else if (item.type === "image") {
+              return { type: "image", image: item.image || "" };
+            }
+            return item;
+          }),
+        } as CoreMessage;
+      }
+    });
+  }
+
+  /**
+   * Execute the generation with AI SDK
+   */
+  private async executeGeneration(
+    model: LanguageModelV1,
+    messages: CoreMessage[],
+    tools: Record<string, Tool>,
+    options: TextGenerationOptions,
+  ): Promise<Awaited<ReturnType<typeof generateText>>> {
+    const shouldUseTools = !options.disableTools && this.supportsTools();
+
+    return await generateText({
+      model,
+      messages,
+      tools,
+      maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
+      toolChoice: shouldUseTools ? "auto" : "none",
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+    });
+  }
+
+  /**
+   * Log generation completion information
+   */
+  private logGenerationComplete(
+    generateResult: Awaited<ReturnType<typeof generateText>>,
+  ): void {
+    logger.debug(`generateText completed`, {
+      provider: this.providerName,
+      model: this.modelName,
+      responseLength: generateResult.text?.length || 0,
+      toolResultsCount: generateResult.toolResults?.length || 0,
+      finishReason: generateResult.finishReason,
+      usage: generateResult.usage,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Record performance metrics
+   */
+  private async recordPerformanceMetrics(
+    usage:
+      | { promptTokens: number; completionTokens: number; totalTokens: number }
+      | undefined,
+    responseTime: number,
+  ): Promise<void> {
+    try {
+      const actualCost = await this.calculateActualCost(
+        usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      );
+
+      recordProviderPerformanceFromMetrics(this.providerName, {
+        responseTime,
+        tokensGenerated: usage?.totalTokens || 0,
+        cost: actualCost,
+        success: true,
+      });
+
+      const optimizedProvider = getPerformanceOptimizedProvider("speed");
+      logger.debug(`🚀 Performance recorded for ${this.providerName}:`, {
+        responseTime: `${responseTime}ms`,
+        tokens: usage?.totalTokens || 0,
+        estimatedCost: `$${actualCost.toFixed(6)}`,
+        recommendedSpeedProvider: optimizedProvider?.provider || "none",
+      });
+    } catch (perfError) {
+      logger.warn("⚠️ Performance recording failed:", perfError);
+    }
+  }
+
+  /**
+   * Extract tool information from generation result
+   */
+  private extractToolInformation(
+    generateResult: Awaited<ReturnType<typeof generateText>>,
+  ): {
+    toolsUsed: string[];
+    toolExecutions: Array<{
+      name: string;
+      input: StandardRecord;
+      output: unknown;
+    }>;
+  } {
+    const toolsUsed: string[] = [];
+    const toolExecutions: Array<{
+      name: string;
+      input: StandardRecord;
+      output: unknown;
+    }> = [];
+
+    // Extract tool names from tool calls
+    if (generateResult.toolCalls && generateResult.toolCalls.length > 0) {
+      toolsUsed.push(
+        ...generateResult.toolCalls.map((tc: ToolCallObject) => {
+          return tc.toolName || tc.name || "unknown";
+        }),
+      );
+    }
+
+    // Extract from steps
+    if (
+      (generateResult as unknown as AISDKGenerateResult).steps &&
+      Array.isArray((generateResult as unknown as AISDKGenerateResult).steps)
+    ) {
+      const toolCallArgsMap = new Map<string, StandardRecord>();
+
+      for (const step of (generateResult as unknown as AISDKGenerateResult)
+        .steps || []) {
+        // Collect tool calls and their arguments
+        if (step?.toolCalls && Array.isArray(step.toolCalls)) {
+          for (const toolCall of step.toolCalls) {
+            const tcRecord = toolCall as UnknownRecord;
+            const toolName =
+              (tcRecord.toolName as string) ||
+              (tcRecord.name as string) ||
+              "unknown";
+            const toolId =
+              (tcRecord.toolCallId as string) ||
+              (tcRecord.id as string) ||
+              toolName;
+
+            toolsUsed.push(toolName);
+
+            let callArgs: StandardRecord = {};
+            if (tcRecord.args) {
+              callArgs = tcRecord.args as StandardRecord;
+            } else if (tcRecord.arguments) {
+              callArgs = tcRecord.arguments as StandardRecord;
+            } else if (tcRecord.parameters) {
+              callArgs = tcRecord.parameters as StandardRecord;
+            }
+
+            toolCallArgsMap.set(toolId, callArgs);
+            toolCallArgsMap.set(toolName, callArgs);
+          }
+        }
+
+        // Process tool results
+        if (step?.toolResults && Array.isArray(step.toolResults)) {
+          for (const toolResult of step.toolResults) {
+            const trRecord = toolResult as UnknownRecord;
+            const toolName = (trRecord.toolName as string) || "unknown";
+            const toolId =
+              (trRecord.toolCallId as string) || (trRecord.id as string);
+
+            let toolArgs: StandardRecord = {};
+            if (trRecord.args) {
+              toolArgs = trRecord.args as StandardRecord;
+            } else if (trRecord.arguments) {
+              toolArgs = trRecord.arguments as StandardRecord;
+            } else if (trRecord.parameters) {
+              toolArgs = trRecord.parameters as StandardRecord;
+            } else if (trRecord.input) {
+              toolArgs = trRecord.input as StandardRecord;
+            } else {
+              toolArgs = toolCallArgsMap.get(toolId || toolName) || {};
+            }
+
+            toolExecutions.push({
+              name: toolName,
+              input: toolArgs,
+              output: (trRecord.result as unknown) || "success",
+            });
+          }
+        }
+      }
+    }
+
+    return { toolsUsed: [...new Set(toolsUsed)], toolExecutions };
+  }
+
+  /**
+   * Format the enhanced result
+   */
+  private formatEnhancedResult(
+    generateResult: Awaited<ReturnType<typeof generateText>>,
+    tools: Record<string, Tool>,
+    toolsUsed: string[],
+    toolExecutions: Array<{
+      name: string;
+      input: StandardRecord;
+      output: unknown;
+    }>,
+  ): EnhancedGenerateResult {
+    return {
+      content: generateResult.text,
+      usage: {
+        input: generateResult.usage?.promptTokens || 0,
+        output: generateResult.usage?.completionTokens || 0,
+        total: generateResult.usage?.totalTokens || 0,
+      },
+      provider: this.providerName,
+      model: this.modelName,
+      toolCalls: generateResult.toolCalls
+        ? generateResult.toolCalls.map((tc: ToolCallObject) => ({
+            toolCallId: tc.toolCallId || "unknown",
+            toolName: tc.toolName || "unknown",
+            args: tc.args || {},
+          }))
+        : [],
+      toolResults: (generateResult.toolResults as ToolResult[]) || [],
+      toolsUsed,
+      toolExecutions,
+      availableTools: Object.keys(tools).map((name) => {
+        const tool = tools[name] as ExtendedTool;
+        return {
+          name,
+          description: tool.description || "No description available",
+          parameters: tool.parameters || {},
+          server: tool.serverId || "direct",
+        };
+      }),
+    };
+  }
+
+  /**
+   * Analyze AI response structure and log detailed debugging information
+   * Extracted from generate method to reduce complexity
+   */
+  private analyzeAIResponse(result: Record<string, unknown>): void {
+    // 🔧 NEUROLINK RAW AI RESPONSE TRACE: Log everything about the raw AI response before parameter extraction
+    logger.debug("NeuroLink Raw AI Response Analysis", {
+      provider: this.providerName,
+      model: this.modelName,
+      responseTextLength: (result.text as string)?.length || 0,
+      responsePreview: (result.text as string)?.substring(0, 500) + "...",
+      finishReason: result.finishReason,
+      usage: result.usage,
+    });
+
+    // 🔧 NEUROLINK TOOL CALLS ANALYSIS: Analyze raw tool calls structure
+    const toolCallsAnalysis = {
+      hasToolCalls: !!result.toolCalls,
+      toolCallsLength: (result.toolCalls as unknown[])?.length || 0,
+      toolCalls:
+        (result.toolCalls as unknown[])?.map((toolCall, index) => {
+          const tcRecord = toolCall as Record<string, unknown>;
+          const toolName = tcRecord.toolName || tcRecord.name || "unknown";
+          const isTargetTool =
+            toolName.toString().includes("SuccessRateSRByTime") ||
+            toolName.toString().includes("juspay-analytics");
+          return {
+            index: index + 1,
+            toolName,
+            toolId: tcRecord.toolCallId || tcRecord.id || "none",
+            hasArgs: !!tcRecord.args,
+            argsKeys:
+              tcRecord.args && typeof tcRecord.args === "object"
+                ? Object.keys(tcRecord.args as Record<string, unknown>)
+                : [],
+            isTargetTool,
+            ...(isTargetTool && {
+              targetToolDetails: {
+                argsType: typeof tcRecord.args,
+                startTime:
+                  (tcRecord.args as Record<string, unknown>)?.startTime ||
+                  "MISSING",
+                endTime:
+                  (tcRecord.args as Record<string, unknown>)?.endTime ||
+                  "MISSING",
+              },
+            }),
+          };
+        }) || [],
+    };
+    logger.debug("Tool Calls Analysis", toolCallsAnalysis);
+
+    // 🔧 NEUROLINK STEPS ANALYSIS: Analyze steps structure (AI SDK multi-step format)
+    const steps = result.steps;
+    const stepsAnalysis = {
+      hasSteps: !!steps,
+      stepsLength: Array.isArray(steps) ? steps.length : 0,
+      steps: Array.isArray(steps)
+        ? steps.map((step, stepIndex) => ({
+            stepIndex: stepIndex + 1,
+            hasToolCalls: !!step.toolCalls,
+            toolCallsLength: step.toolCalls?.length || 0,
+            hasToolResults: !!step.toolResults,
+            toolResultsLength: step.toolResults?.length || 0,
+            targetToolsInStep:
+              step.toolCalls
+                ?.filter((tc: Record<string, unknown>) => {
+                  const toolName = tc.toolName || tc.name || "unknown";
+                  return (
+                    toolName.toString().includes("SuccessRateSRByTime") ||
+                    toolName.toString().includes("juspay-analytics")
+                  );
+                })
+                .map((tc: Record<string, unknown>) => ({
+                  toolName: tc.toolName || tc.name,
+                  hasArgs: !!tc.args,
+                  argsKeys:
+                    tc.args && typeof tc.args === "object"
+                      ? Object.keys(tc.args as Record<string, unknown>)
+                      : [],
+                  startTime: (tc.args as Record<string, unknown>)?.startTime,
+                  endTime: (tc.args as Record<string, unknown>)?.endTime,
+                })) || [],
+          }))
+        : [],
+    };
+    logger.debug("[BaseProvider] Steps Analysis", stepsAnalysis);
+
+    // 🔧 NEUROLINK TOOL RESULTS ANALYSIS: Analyze top-level tool results
+    const toolResultsAnalysis = {
+      hasToolResults: !!result.toolResults,
+      toolResultsLength: (result.toolResults as unknown[])?.length || 0,
+      toolResults:
+        (result.toolResults as unknown[])?.map((toolResult, index) => ({
+          index: index + 1,
+          toolName:
+            (toolResult as Record<string, unknown>).toolName || "unknown",
+          hasResult: !!(toolResult as Record<string, unknown>).result,
+          hasError: !!(toolResult as Record<string, unknown>).error,
+        })) || [],
+    };
+    logger.debug("[BaseProvider] Tool Results Analysis", toolResultsAnalysis);
+    logger.debug("[BaseProvider] NeuroLink Raw AI Response Analysis Complete");
+  }
+
+  /**
    * Text generation method - implements AIProvider interface
    * Tools are always available unless explicitly disabled
    * IMPLEMENTATION NOTE: Uses streamText() under the hood and accumulates results
@@ -264,331 +744,36 @@ export abstract class BaseProvider implements AIProvider {
     _analysisSchema?: ValidationSchema,
   ): Promise<EnhancedGenerateResult | null> {
     const options = this.normalizeTextOptions(optionsOrPrompt);
-
-    // Validate options before proceeding
     this.validateOptions(options);
-
     const startTime = Date.now();
 
     try {
-      // Import streamText dynamically to avoid circular dependencies
-      // Using streamText instead of generateText for unified implementation
-      // const { streamText } = await import("ai");
-
-      // Get ALL available tools (direct + MCP + external from options)
-      const shouldUseTools = !options.disableTools && this.supportsTools();
-      const baseTools = shouldUseTools ? await this.getAllTools() : {};
-      const tools = shouldUseTools
-        ? {
-            ...baseTools,
-            ...(options.tools || {}), // Include external tools passed from NeuroLink
-          }
-        : {};
-
-      // DEBUG: Log detailed tool information for generate
-      logger.debug("BaseProvider Generate - Tool Loading Debug", {
-        provider: this.providerName,
-        shouldUseTools,
-        baseToolsProvided: !!baseTools,
-        baseToolCount: baseTools ? Object.keys(baseTools).length : 0,
-        finalToolCount: tools ? Object.keys(tools).length : 0,
-        toolNames: tools ? Object.keys(tools).slice(0, 10) : [],
-        disableTools: options.disableTools,
-        supportsTools: this.supportsTools(),
-        externalToolsCount: options.tools
-          ? Object.keys(options.tools).length
-          : 0,
-      });
-
-      if (tools && Object.keys(tools).length > 0) {
-        logger.debug("BaseProvider Generate - First 5 Tools Detail", {
-          provider: this.providerName,
-          tools: Object.keys(tools)
-            .slice(0, 5)
-            .map((name) => ({
-              name,
-              description: tools[name]?.description?.substring(0, 100),
-            })),
-        });
-      }
-      logger.debug(`[BaseProvider.generate] Tools for ${this.providerName}:`, {
-        directTools: getKeyCount(baseTools),
-        directToolNames: getKeysAsString(baseTools),
-        externalTools: getKeyCount(options.tools || {}),
-        externalToolNames: getKeysAsString(options.tools || {}),
-        totalTools: getKeyCount(tools),
-        totalToolNames: getKeysAsString(tools),
-      });
-
-      const model = await this.getAISDKModelWithMiddleware(options);
-
-      // Build proper message array with conversation history
-      // Check if this is a multimodal request (images or content present)
-      let messages;
-
-      // Type guard to check if options has multimodal input
-      const hasMultimodalInput = (opts: TextGenerationOptions): boolean => {
-        const input = opts.input as MultimodalInput | undefined;
-        const hasImages = !!input?.images?.length;
-        const hasContent = !!input?.content?.length;
-
-        return hasImages || hasContent;
-      };
-
-      if (hasMultimodalInput(options)) {
-        if (process.env.NEUROLINK_DEBUG === "true") {
-          logger.info(
-            "🖼️ [MULTIMODAL-REQUEST] Detected multimodal input, using multimodal message builder",
-          );
-        }
-
-        // This is a multimodal request - use multimodal message builder
-        // Convert TextGenerationOptions to GenerateOptions format for multimodal processing
-        const input = options.input as MultimodalInput | undefined;
-        const multimodalOptions = {
-          input: {
-            text: options.prompt || options.input?.text || "",
-            images: input?.images,
-            content: input?.content,
-          },
-          provider: options.provider,
-          model: options.model,
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          systemPrompt: options.systemPrompt,
-          enableAnalytics: options.enableAnalytics,
-          enableEvaluation: options.enableEvaluation,
-          context: options.context,
-        };
-
-        messages = await buildMultimodalMessagesArray(
-          multimodalOptions,
-          this.providerName,
-          this.modelName,
-        );
-      } else {
-        if (process.env.NEUROLINK_DEBUG === "true") {
-          logger.info(
-            "📝 [TEXT-ONLY-REQUEST] No multimodal input detected, using standard message builder",
-          );
-        }
-
-        // Standard text-only request
-        messages = buildMessagesArray(options);
-      }
-
-      // Convert messages to Vercel AI SDK format
-      const aiSDKMessages = messages.map((msg) => {
-        if (typeof msg.content === "string") {
-          // Simple text content
-          return {
-            role: msg.role,
-            content: msg.content,
-          };
-        } else {
-          // Multimodal content array - convert to Vercel AI SDK format
-          // The Vercel AI SDK expects content to be in a specific format
-          return {
-            role: msg.role,
-            content: msg.content.map((item) => {
-              if (item.type === "text") {
-                return { type: "text", text: item.text || "" };
-              } else if (item.type === "image") {
-                return { type: "image", image: item.image || "" };
-              }
-              return item;
-            }),
-          };
-        }
-      });
-
-      const generateResult = await generateText({
+      const { tools, model } = await this.prepareGenerationContext(options);
+      const messages = await this.buildMessages(options);
+      const generateResult = await this.executeGeneration(
         model,
-        messages: aiSDKMessages as Parameters<
-          typeof generateText
-        >[0]["messages"],
+        messages,
         tools,
-        maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
-        toolChoice: shouldUseTools ? "auto" : "none",
-        temperature: options.temperature,
-        maxTokens: options.maxTokens, // No default limit - unlimited unless specified
-      });
+        options,
+      );
+
+      this.analyzeAIResponse(
+        generateResult as unknown as Record<string, unknown>,
+      );
+      this.logGenerationComplete(generateResult);
 
       const responseTime = Date.now() - startTime;
+      await this.recordPerformanceMetrics(generateResult.usage, responseTime);
 
-      // Extract properties from generateResult
-      const usage = generateResult.usage;
-      const toolCalls = generateResult.toolCalls;
-      const toolResults = generateResult.toolResults;
+      const { toolsUsed, toolExecutions } =
+        this.extractToolInformation(generateResult);
+      const enhancedResult = this.formatEnhancedResult(
+        generateResult,
+        tools,
+        toolsUsed,
+        toolExecutions,
+      );
 
-      try {
-        const actualCost = await this.calculateActualCost(
-          usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-        );
-
-        recordProviderPerformanceFromMetrics(this.providerName, {
-          responseTime,
-          tokensGenerated: usage?.totalTokens || 0,
-          cost: actualCost,
-          success: true,
-        });
-
-        // Show what the system learned (updated to include cost)
-        const optimizedProvider = getPerformanceOptimizedProvider("speed");
-        logger.debug(`🚀 Performance recorded for ${this.providerName}:`, {
-          responseTime: `${responseTime}ms`,
-          tokens: usage?.totalTokens || 0,
-          estimatedCost: `$${actualCost.toFixed(6)}`,
-          recommendedSpeedProvider: optimizedProvider?.provider || "none",
-        });
-      } catch (perfError) {
-        logger.warn("⚠️ Performance recording failed:", perfError);
-      }
-
-      // Extract tool names from tool calls for tracking
-      // AI SDK puts tool calls in steps array for multi-step generation
-      const toolsUsed: string[] = [];
-
-      // First check direct tool calls (fallback)
-      if (toolCalls && toolCalls.length > 0) {
-        toolsUsed.push(
-          ...toolCalls.map((tc: ToolCallObject) => {
-            return tc.toolName || tc.name || "unknown";
-          }),
-        );
-      }
-
-      // Then check steps for tool calls (primary source for multi-step)
-      if (
-        (generateResult as unknown as AISDKGenerateResult).steps &&
-        Array.isArray((generateResult as unknown as AISDKGenerateResult).steps)
-      ) {
-        for (const step of (generateResult as unknown as AISDKGenerateResult)
-          .steps || []) {
-          if (step?.toolCalls && Array.isArray(step.toolCalls)) {
-            toolsUsed.push(
-              ...step.toolCalls.map((tc: ToolCallObject) => {
-                return tc.toolName || tc.name || "unknown";
-              }),
-            );
-          }
-        }
-      }
-
-      // Remove duplicates
-      const uniqueToolsUsed = [...new Set(toolsUsed)];
-
-      // ✅ Extract tool executions from AI SDK result
-      const toolExecutions: Array<{
-        name: string;
-        input: StandardRecord;
-        output: unknown;
-      }> = [];
-
-      // Create a map of tool calls to their arguments for matching with results
-      const toolCallArgsMap = new Map<string, StandardRecord>();
-
-      // Extract tool executions from AI SDK result steps
-      if (
-        (generateResult as unknown as AISDKGenerateResult).steps &&
-        Array.isArray((generateResult as unknown as AISDKGenerateResult).steps)
-      ) {
-        for (const step of (generateResult as unknown as AISDKGenerateResult)
-          .steps || []) {
-          // First, collect tool calls and their arguments
-          if (step?.toolCalls && Array.isArray(step.toolCalls)) {
-            for (const toolCall of step.toolCalls) {
-              const tcRecord = toolCall as UnknownRecord;
-              const toolName =
-                (tcRecord.toolName as string) ||
-                (tcRecord.name as string) ||
-                "unknown";
-              const toolId =
-                (tcRecord.toolCallId as string) ||
-                (tcRecord.id as string) ||
-                toolName;
-
-              // Extract arguments from tool call
-              let callArgs: StandardRecord = {};
-              if (tcRecord.args) {
-                callArgs = tcRecord.args as StandardRecord;
-              } else if (tcRecord.arguments) {
-                callArgs = tcRecord.arguments as StandardRecord;
-              } else if (tcRecord.parameters) {
-                callArgs = tcRecord.parameters as StandardRecord;
-              }
-
-              toolCallArgsMap.set(toolId, callArgs);
-              toolCallArgsMap.set(toolName, callArgs); // Also map by name as fallback
-            }
-          }
-
-          // Then, process tool results and match with call arguments
-          if (step?.toolResults && Array.isArray(step.toolResults)) {
-            for (const toolResult of step.toolResults) {
-              const trRecord = toolResult as UnknownRecord;
-              const toolName = (trRecord.toolName as string) || "unknown";
-              const toolId =
-                (trRecord.toolCallId as string) || (trRecord.id as string);
-
-              // Try to get arguments from the tool result first
-              let toolArgs: StandardRecord = {};
-
-              if (trRecord.args) {
-                toolArgs = trRecord.args as StandardRecord;
-              } else if (trRecord.arguments) {
-                toolArgs = trRecord.arguments as StandardRecord;
-              } else if (trRecord.parameters) {
-                toolArgs = trRecord.parameters as StandardRecord;
-              } else if (trRecord.input) {
-                toolArgs = trRecord.input as StandardRecord;
-              } else {
-                // Fallback: get arguments from the corresponding tool call
-                toolArgs = toolCallArgsMap.get(toolId || toolName) || {};
-              }
-
-              toolExecutions.push({
-                name: toolName,
-                input: toolArgs,
-                output: (trRecord.result as unknown) || "success",
-              });
-            }
-          }
-        }
-      }
-
-      // Format the result with tool executions included
-      const enhancedResult: EnhancedGenerateResult = {
-        content: generateResult.text,
-        usage: {
-          input: generateResult.usage?.promptTokens || 0,
-          output: generateResult.usage?.completionTokens || 0,
-          total: generateResult.usage?.totalTokens || 0,
-        },
-        provider: this.providerName,
-        model: this.modelName,
-        toolCalls: toolCalls
-          ? toolCalls.map((tc: ToolCallObject) => ({
-              toolCallId: tc.toolCallId || "unknown",
-              toolName: tc.toolName || "unknown",
-              args: tc.args || {},
-            }))
-          : [],
-        toolResults: (toolResults as ToolResult[]) || [],
-        toolsUsed: uniqueToolsUsed,
-        toolExecutions, // ✅ Add extracted tool executions
-        availableTools: Object.keys(tools).map((name) => {
-          const tool = tools[name] as ExtendedTool;
-          return {
-            name,
-            description: tool.description || "No description available",
-            parameters: tool.parameters || {},
-            server: tool.serverId || "direct",
-          };
-        }),
-      };
-
-      // Enhanced result with analytics and evaluation
       return await this.enhanceResult(enhancedResult, options, startTime);
     } catch (error) {
       logger.error(`Generate failed for ${this.providerName}:`, error);
@@ -613,14 +798,15 @@ export abstract class BaseProvider implements AIProvider {
   async generateText(
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult> {
-    // Validate required parameters for backward compatibility
+    // Validate required parameters for backward compatibility - support both prompt and input.text
+    const promptText = options.prompt || options.input?.text;
     if (
-      !options.prompt ||
-      typeof options.prompt !== "string" ||
-      options.prompt.trim() === ""
+      !promptText ||
+      typeof promptText !== "string" ||
+      promptText.trim() === ""
     ) {
       throw new Error(
-        "GenerateText options must include prompt as a non-empty string",
+        "GenerateText options must include prompt or input.text as a non-empty string",
       );
     }
 
@@ -801,6 +987,7 @@ export abstract class BaseProvider implements AIProvider {
 
   /**
    * Convert tool execution result from MCP format to standard format
+   * Handles tool failures gracefully to prevent stream termination
    */
   private async convertToolResult(result: unknown): Promise<unknown> {
     // Handle MCP-style results
@@ -813,11 +1000,27 @@ export abstract class BaseProvider implements AIProvider {
       if (mcpResult.success) {
         return mcpResult.data;
       } else {
+        // Instead of throwing, return a structured error result
+        // This prevents tool failures from terminating streams
         const errorMsg =
           typeof mcpResult.error === "string"
             ? mcpResult.error
             : "Tool execution failed";
-        throw new Error(errorMsg);
+
+        // Log the error for debugging but don't throw
+        logger.warn(`Tool execution failed: ${errorMsg}`);
+
+        // Return error as structured data that can be processed by the AI
+        return {
+          isError: true,
+          error: errorMsg,
+          content: [
+            {
+              type: "text",
+              text: `Tool execution failed: ${errorMsg}`,
+            },
+          ],
+        };
       }
     }
     return result;
@@ -832,6 +1035,7 @@ export abstract class BaseProvider implements AIProvider {
       execute: (params: ToolArgs) => Promise<unknown>;
       description?: string;
       parameters?: unknown;
+      inputSchema?: unknown;
     },
   ): Promise<Tool | null> {
     try {
@@ -841,20 +1045,259 @@ export abstract class BaseProvider implements AIProvider {
       const { tool: createAISDKTool } = await import("ai");
       const { z } = await import("zod");
 
+      let finalSchema: z.ZodSchema;
+      const schemaSource = toolInfo.parameters || toolInfo.inputSchema;
+
+      if (this.isZodSchema(schemaSource)) {
+        finalSchema = schemaSource as z.ZodSchema;
+        logger.debug(
+          `[BaseProvider] ${toolName}: Using existing Zod schema from ${toolInfo.parameters ? "parameters" : "inputSchema"} field`,
+        );
+      } else if (schemaSource && typeof schemaSource === "object") {
+        logger.debug(
+          `[BaseProvider] ${toolName}: Converting JSON Schema to Zod from ${toolInfo.parameters ? "parameters" : "inputSchema"} field`,
+        );
+        finalSchema = convertJsonSchemaToZod(
+          schemaSource as Record<string, unknown>,
+        );
+      } else {
+        finalSchema = z.object({});
+        logger.debug(
+          `[BaseProvider] ${toolName}: No schema found, using empty object`,
+        );
+      }
+
       return createAISDKTool({
         description: toolInfo.description || `Tool ${toolName}`,
-        parameters: this.isZodSchema(toolInfo.parameters)
-          ? (toolInfo.parameters as z.ZodSchema)
-          : z.object({}),
+        parameters: finalSchema,
         execute: async (params) => {
-          const result = await toolInfo.execute(params as ToolArgs);
-          return await this.convertToolResult(result);
+          const startTime = Date.now();
+          let executionId: string | undefined;
+
+          if (this.neurolink?.emitToolStart) {
+            executionId = this.neurolink.emitToolStart(
+              toolName,
+              params,
+              startTime,
+            );
+            logger.debug(
+              `Custom tool:start emitted via NeuroLink for ${toolName}`,
+              {
+                toolName,
+                executionId,
+                input: params,
+                hasNativeEmission: true,
+              },
+            );
+          }
+
+          try {
+            // 🔧 PARAMETER FLOW TRACING - Before NeuroLink executeTool call
+            logger.debug(
+              `About to call NeuroLink executeTool for ${toolName}`,
+              {
+                toolName,
+                paramsBeforeExecution: {
+                  type: typeof params,
+                  isNull: params === null,
+                  isUndefined: params === undefined,
+                  isEmpty:
+                    params &&
+                    typeof params === "object" &&
+                    Object.keys(params as object).length === 0,
+                  keys:
+                    params && typeof params === "object"
+                      ? Object.keys(params as object)
+                      : "NOT_OBJECT",
+                  keysLength:
+                    params && typeof params === "object"
+                      ? Object.keys(params as object).length
+                      : 0,
+                },
+                executorInfo: {
+                  hasExecutor: typeof toolInfo.execute === "function",
+                  executorType: typeof toolInfo.execute,
+                },
+                timestamp: Date.now(),
+                phase: "BEFORE_NEUROLINK_EXECUTE",
+              },
+            );
+
+            const result = await toolInfo.execute(params as ToolArgs);
+
+            // 🔧 PARAMETER FLOW TRACING - After NeuroLink executeTool call
+            logger.debug(`NeuroLink executeTool completed for ${toolName}`, {
+              toolName,
+              resultInfo: {
+                type: typeof result,
+                isNull: result === null,
+                isUndefined: result === undefined,
+                hasError:
+                  result && typeof result === "object" && "error" in result,
+              },
+              timestamp: Date.now(),
+              phase: "AFTER_NEUROLINK_EXECUTE",
+            });
+
+            const convertedResult = await this.convertToolResult(result);
+            const endTime = Date.now();
+
+            // 🔧 NATIVE NEUROLINK EVENT EMISSION - Tool End (Success)
+            if (this.neurolink?.emitToolEnd) {
+              this.neurolink.emitToolEnd(
+                toolName,
+                convertedResult,
+                undefined, // no error
+                startTime,
+                endTime,
+                executionId,
+              );
+              logger.debug(
+                `Custom tool:end emitted via NeuroLink for ${toolName}`,
+                {
+                  toolName,
+                  executionId,
+                  duration: endTime - startTime,
+                  hasResult: convertedResult !== undefined,
+                  hasNativeEmission: true,
+                },
+              );
+            }
+
+            return convertedResult;
+          } catch (error) {
+            const endTime = Date.now();
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+
+            // 🔧 NATIVE NEUROLINK EVENT EMISSION - Tool End (Error)
+            if (this.neurolink?.emitToolEnd) {
+              this.neurolink.emitToolEnd(
+                toolName,
+                undefined, // no result
+                errorMsg,
+                startTime,
+                endTime,
+                executionId,
+              );
+              logger.info(
+                `Custom tool:end error emitted via NeuroLink for ${toolName}`,
+                {
+                  toolName,
+                  executionId,
+                  duration: endTime - startTime,
+                  error: errorMsg,
+                  hasNativeEmission: true,
+                },
+              );
+            }
+            throw error;
+          }
         },
       });
     } catch (toolCreationError) {
       logger.error(`Failed to create tool: ${toolName}`, toolCreationError);
       return null;
     }
+  }
+
+  /**
+   * Process direct tools with event emission wrapping
+   */
+  private async processDirectTools(tools: Record<string, Tool>): Promise<void> {
+    if (!this.directTools || Object.keys(this.directTools).length === 0) {
+      return;
+    }
+
+    logger.debug(
+      `Loading ${Object.keys(this.directTools).length} direct tools with event emission`,
+    );
+
+    for (const [toolName, directTool] of Object.entries(this.directTools)) {
+      logger.debug(`Processing direct tool: ${toolName}`, {
+        toolName,
+        hasExecute:
+          directTool &&
+          typeof directTool === "object" &&
+          "execute" in directTool,
+        hasDescription:
+          directTool &&
+          typeof directTool === "object" &&
+          "description" in directTool,
+      });
+
+      // Wrap the direct tool's execute function with event emission
+      if (
+        directTool &&
+        typeof directTool === "object" &&
+        "execute" in directTool
+      ) {
+        const originalExecute = (
+          directTool as { execute: (params: unknown) => Promise<unknown> }
+        ).execute;
+
+        // Create a new tool with wrapped execute function
+        tools[toolName] = {
+          ...(directTool as Tool),
+          execute: async (params: unknown) => {
+            // 🔧 EMIT TOOL START EVENT - Bedrock-compatible format
+            if (this.neurolink?.getEventEmitter) {
+              const emitter = this.neurolink.getEventEmitter();
+              emitter.emit("tool:start", { tool: toolName, input: params });
+              logger.debug(`Direct tool:start event emitted for ${toolName}`, {
+                toolName,
+                input: params,
+                hasEmitter: !!emitter,
+              });
+            }
+
+            try {
+              const result = await originalExecute(params);
+
+              // 🔧 EMIT TOOL END EVENT - Bedrock-compatible format
+              if (this.neurolink?.getEventEmitter) {
+                const emitter = this.neurolink.getEventEmitter();
+                emitter.emit("tool:end", { tool: toolName, result });
+                logger.debug(`Direct tool:end event emitted for ${toolName}`, {
+                  toolName,
+                  result:
+                    typeof result === "string"
+                      ? result.substring(0, 100)
+                      : JSON.stringify(result).substring(0, 100),
+                  hasEmitter: !!emitter,
+                });
+              }
+
+              return result;
+            } catch (error) {
+              // 🔧 EMIT TOOL END EVENT FOR ERROR - Bedrock-compatible format
+              if (this.neurolink?.getEventEmitter) {
+                const emitter = this.neurolink.getEventEmitter();
+                const errorMsg =
+                  error instanceof Error ? error.message : String(error);
+                emitter.emit("tool:end", { tool: toolName, error: errorMsg });
+                logger.debug(
+                  `Direct tool:end error event emitted for ${toolName}`,
+                  {
+                    toolName,
+                    error: errorMsg,
+                    hasEmitter: !!emitter,
+                  },
+                );
+              }
+              throw error;
+            }
+          },
+        } as Tool;
+      } else {
+        // Fallback: include tool as-is if it doesn't have execute function
+        tools[toolName] = directTool as Tool;
+      }
+    }
+
+    logger.debug(`Direct tools processing complete`, {
+      directToolsProcessed: Object.keys(this.directTools).length,
+    });
   }
 
   /**
@@ -870,7 +1313,7 @@ export abstract class BaseProvider implements AIProvider {
     );
 
     for (const [toolName, toolDef] of this.customTools.entries()) {
-      logger.debug(`[BaseProvider] Processing custom tool: ${toolName}`, {
+      logger.debug(`Processing custom tool: ${toolName}`, {
         toolDef: typeof toolDef,
         hasExecute:
           toolDef && typeof toolDef === "object" && "execute" in toolDef,
@@ -888,6 +1331,7 @@ export abstract class BaseProvider implements AIProvider {
             execute: (params: ToolArgs) => Promise<unknown>;
             description?: string;
             parameters?: unknown;
+            inputSchema?: unknown; // Support MCPExecutableTool format
           },
         );
         if (tool) {
@@ -918,27 +1362,119 @@ export abstract class BaseProvider implements AIProvider {
 
       return createAISDKTool({
         description: tool.description || `External MCP tool ${tool.name}`,
-        parameters: await this.convertMCPSchemaToZod(tool.inputSchema),
+        parameters: this.createPermissiveZodSchema(),
         execute: async (params) => {
-          logger.debug(
-            `[BaseProvider] Executing external MCP tool: ${tool.name}`,
-            { params },
-          );
+          logger.debug(`Executing external MCP tool: ${tool.name}`, {
+            toolName: tool.name,
+            serverId: tool.serverId,
+            params: JSON.stringify(params),
+            paramsType: typeof params,
+            hasNeurolink: !!this.neurolink,
+            hasExecuteFunction:
+              this.neurolink &&
+              typeof this.neurolink.executeExternalMCPTool === "function",
+            timestamp: Date.now(),
+          });
+
+          // 🔧 EMIT TOOL START EVENT - Bedrock-compatible format
+          if (this.neurolink?.getEventEmitter) {
+            const emitter = this.neurolink.getEventEmitter();
+            emitter.emit("tool:start", { tool: tool.name, input: params });
+            logger.debug(`tool:start event emitted for ${tool.name}`, {
+              toolName: tool.name,
+              input: params,
+              hasEmitter: !!emitter,
+            });
+          }
 
           // Execute via NeuroLink's direct tool execution
           if (
             this.neurolink &&
             typeof this.neurolink.executeExternalMCPTool === "function"
           ) {
-            return await this.neurolink.executeExternalMCPTool(
-              tool.serverId || "unknown",
-              tool.name,
-              params as JsonObject,
-            );
+            try {
+              const result = await this.neurolink.executeExternalMCPTool(
+                tool.serverId || "unknown",
+                tool.name,
+                params as JsonObject,
+              );
+
+              // 🔧 EMIT TOOL END EVENT - Bedrock-compatible format
+              if (this.neurolink?.getEventEmitter) {
+                const emitter = this.neurolink.getEventEmitter();
+                emitter.emit("tool:end", { tool: tool.name, result });
+                logger.debug(`tool:end event emitted for ${tool.name}`, {
+                  toolName: tool.name,
+                  result:
+                    typeof result === "string"
+                      ? result.substring(0, 100)
+                      : JSON.stringify(result).substring(0, 100),
+                  hasEmitter: !!emitter,
+                });
+              }
+
+              logger.debug(`External MCP tool executed: ${tool.name}`, {
+                toolName: tool.name,
+                result:
+                  typeof result === "string"
+                    ? result.substring(0, 200)
+                    : JSON.stringify(result).substring(0, 200),
+                resultType: typeof result,
+                timestamp: Date.now(),
+              });
+
+              return result;
+            } catch (mcpError) {
+              // 🔧 EMIT TOOL END EVENT FOR ERROR - Bedrock-compatible format
+              if (this.neurolink?.getEventEmitter) {
+                const emitter = this.neurolink.getEventEmitter();
+                const errorMsg =
+                  mcpError instanceof Error
+                    ? mcpError.message
+                    : String(mcpError);
+                emitter.emit("tool:end", { tool: tool.name, error: errorMsg });
+                logger.debug(`tool:end error event emitted for ${tool.name}`, {
+                  toolName: tool.name,
+                  error: errorMsg,
+                  hasEmitter: !!emitter,
+                });
+              }
+
+              logger.error(`External MCP tool failed: ${tool.name}`, {
+                toolName: tool.name,
+                serverId: tool.serverId,
+                error:
+                  mcpError instanceof Error
+                    ? mcpError.message
+                    : String(mcpError),
+                errorStack:
+                  mcpError instanceof Error ? mcpError.stack : undefined,
+                params: JSON.stringify(params),
+                timestamp: Date.now(),
+              });
+              throw mcpError;
+            }
           } else {
-            throw new Error(
-              `Cannot execute external MCP tool: NeuroLink executeExternalMCPTool not available`,
-            );
+            const error = `Cannot execute external MCP tool: NeuroLink executeExternalMCPTool not available`;
+
+            // 🔧 EMIT TOOL END EVENT FOR ERROR - Bedrock-compatible format
+            if (this.neurolink?.getEventEmitter) {
+              const emitter = this.neurolink.getEventEmitter();
+              emitter.emit("tool:end", { tool: tool.name, error });
+              logger.debug(`tool:end error event emitted for ${tool.name}`, {
+                toolName: tool.name,
+                error,
+                hasEmitter: !!emitter,
+              });
+            }
+
+            logger.error(`${error}`, {
+              toolName: tool.name,
+              hasNeurolink: !!this.neurolink,
+              neurolinkType: typeof this.neurolink,
+              timestamp: Date.now(),
+            });
+            throw new Error(error);
           }
         },
       });
@@ -1023,9 +1559,11 @@ export abstract class BaseProvider implements AIProvider {
    * MCP tools are added when available (without blocking)
    */
   protected async getAllTools(): Promise<Record<string, Tool>> {
-    const tools: Record<string, Tool> = {
-      ...this.directTools, // Always include direct tools
-    };
+    // Start with wrapped direct tools that emit events
+    const tools: Record<string, Tool> = {};
+
+    // Wrap direct tools with event emission
+    await this.processDirectTools(tools);
 
     logger.debug(`[BaseProvider] getAllTools called for ${this.providerName}`, {
       neurolinkAvailable: !!this.neurolink,
@@ -1080,90 +1618,15 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * Convert MCP JSON Schema to Zod schema for AI SDK tools
-   * Handles common MCP schema patterns safely
+   * Create a permissive Zod schema that accepts all parameters as-is
    */
-  private async convertMCPSchemaToZod(
-    inputSchema?: StandardRecord,
-  ): Promise<ZodUnknownSchema> {
-    const { z } = await import("zod");
-
-    if (!inputSchema || typeof inputSchema !== "object") {
-      return z.object({});
-    }
-
-    try {
-      const schema = inputSchema as StandardRecord;
-      const zodFields: Record<string, ZodUnknownSchema> = {};
-
-      // Handle JSON Schema properties
-      if (schema.properties && typeof schema.properties === "object") {
-        const required = new Set(
-          Array.isArray(schema.required) ? schema.required : [],
-        );
-
-        for (const [propName, propDef] of Object.entries(schema.properties)) {
-          const prop = propDef as StandardRecord;
-          let zodType: ZodUnknownSchema;
-
-          // Convert based on JSON Schema type
-          switch (prop.type) {
-            case "string":
-              zodType = z.string();
-              if (prop.description && typeof prop.description === "string") {
-                zodType = zodType.describe(prop.description);
-              }
-              break;
-            case "number":
-            case "integer":
-              zodType = z.number();
-              if (prop.description && typeof prop.description === "string") {
-                zodType = zodType.describe(prop.description);
-              }
-              break;
-            case "boolean":
-              zodType = z.boolean();
-              if (prop.description && typeof prop.description === "string") {
-                zodType = zodType.describe(prop.description);
-              }
-              break;
-            case "array":
-              zodType = z.array(z.unknown());
-              if (prop.description && typeof prop.description === "string") {
-                zodType = zodType.describe(prop.description);
-              }
-              break;
-            case "object":
-              zodType = z.object({});
-              if (prop.description && typeof prop.description === "string") {
-                zodType = zodType.describe(prop.description);
-              }
-              break;
-            default:
-              // Unknown type, use string as fallback
-              zodType = z.string();
-              if (prop.description && typeof prop.description === "string") {
-                zodType = zodType.describe(prop.description);
-              }
-          }
-
-          // Make optional if not required
-          if (!required.has(propName)) {
-            zodType = zodType.optional();
-          }
-
-          zodFields[propName] = zodType;
-        }
-      }
-
-      return getKeyCount(zodFields) > 0 ? z.object(zodFields) : z.object({});
-    } catch (error) {
-      logger.warn(
-        `Failed to convert MCP schema to Zod, using empty schema:`,
-        error,
-      );
-      return z.object({});
-    }
+  private createPermissiveZodSchema(): ZodUnknownSchema {
+    // Create a permissive record that accepts any object structure
+    // This allows all parameters to pass through without validation issues
+    return z.record(z.unknown()).transform((data: Record<string, unknown>) => {
+      // Return the data as-is to preserve all parameter information
+      return data;
+    });
   }
 
   /**

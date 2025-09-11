@@ -356,7 +356,7 @@ export class GoogleVertexProvider extends BaseProvider {
   }
 
   /**
-   * Initialize model creation logging and tracking
+   * Initialize model creation tracking
    */
   private initializeModelCreationLogging(): {
     modelCreationId: string;
@@ -368,44 +368,6 @@ export class GoogleVertexProvider extends BaseProvider {
     const modelCreationStartTime = Date.now();
     const modelCreationHrTimeStart = process.hrtime.bigint();
     const modelName = this.modelName || getDefaultVertexModel();
-
-    logger.debug(
-      `[GoogleVertexProvider] 🏭 LOG_POINT_V001_MODEL_CREATION_START`,
-      {
-        logPoint: "V001_MODEL_CREATION_START",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        modelCreationStartTime,
-        modelCreationHrTimeStart: modelCreationHrTimeStart.toString(),
-        requestedModel: this.modelName,
-        resolvedModel: modelName,
-        defaultModel: getDefaultVertexModel(),
-        projectId: this.projectId,
-        location: this.location,
-
-        // Environment analysis for network issues
-        environmentAnalysis: {
-          httpProxy:
-            process.env.HTTP_PROXY || process.env.http_proxy || "NOT_SET",
-          httpsProxy:
-            process.env.HTTPS_PROXY || process.env.https_proxy || "NOT_SET",
-          googleAppCreds:
-            process.env.GOOGLE_APPLICATION_CREDENTIALS || "NOT_SET",
-          googleServiceKey: process.env.GOOGLE_SERVICE_ACCOUNT_KEY
-            ? "SET"
-            : "NOT_SET",
-          nodeVersion: process.version,
-          platform: process.platform,
-          arch: process.arch,
-        },
-
-        // Memory and performance baseline
-        memoryUsage: process.memoryUsage(),
-        cpuUsage: process.cpuUsage(),
-        message:
-          "Starting model creation with comprehensive environment analysis",
-      },
-    );
 
     return {
       modelCreationId,
@@ -424,47 +386,11 @@ export class GoogleVertexProvider extends BaseProvider {
     modelCreationStartTime: number,
     modelCreationHrTimeStart: bigint,
   ): Promise<LanguageModelV1 | null> {
-    const anthropicCheckStartTime = process.hrtime.bigint();
     const isAnthropic = isAnthropicModel(modelName);
-
-    logger.debug(`[GoogleVertexProvider] 🤖 LOG_POINT_V002_ANTHROPIC_CHECK`, {
-      logPoint: "V002_ANTHROPIC_CHECK",
-      modelCreationId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - modelCreationStartTime,
-      elapsedNs: (
-        process.hrtime.bigint() - modelCreationHrTimeStart
-      ).toString(),
-      anthropicCheckStartTimeNs: anthropicCheckStartTime.toString(),
-      modelName,
-      isAnthropicModel: isAnthropic,
-      modelNameLowerCase: modelName.toLowerCase(),
-      containsClaude: modelName.toLowerCase().includes("claude"),
-      anthropicModelPatterns: ["claude"],
-      message: "Checking if model is Anthropic-based",
-    });
 
     if (!isAnthropic) {
       return null;
     }
-
-    const anthropicModelStartTime = process.hrtime.bigint();
-    logger.debug(
-      `[GoogleVertexProvider] 🧠 LOG_POINT_V003_ANTHROPIC_MODEL_START`,
-      {
-        logPoint: "V003_ANTHROPIC_MODEL_START",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - modelCreationStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - modelCreationHrTimeStart
-        ).toString(),
-        anthropicModelStartTimeNs: anthropicModelStartTime.toString(),
-        modelName,
-        hasAnthropicSupport: hasAnthropicSupport(),
-        message: "Creating Anthropic model using vertexAnthropic provider",
-      },
-    );
 
     logger.debug("Creating Anthropic model using vertexAnthropic provider", {
       modelName,
@@ -481,63 +407,11 @@ export class GoogleVertexProvider extends BaseProvider {
       const anthropicModel = await this.createAnthropicModel(modelName);
 
       if (anthropicModel) {
-        const anthropicModelSuccessTime = process.hrtime.bigint();
-        const anthropicModelDurationNs =
-          anthropicModelSuccessTime - anthropicModelStartTime;
-
-        logger.debug(
-          `[GoogleVertexProvider] ✅ LOG_POINT_V004_ANTHROPIC_MODEL_SUCCESS`,
-          {
-            logPoint: "V004_ANTHROPIC_MODEL_SUCCESS",
-            modelCreationId,
-            timestamp: new Date().toISOString(),
-            elapsedMs: Date.now() - modelCreationStartTime,
-            elapsedNs: (
-              process.hrtime.bigint() - modelCreationHrTimeStart
-            ).toString(),
-            anthropicModelDurationNs: anthropicModelDurationNs.toString(),
-            anthropicModelDurationMs:
-              Number(anthropicModelDurationNs) / 1000000,
-            modelName,
-            hasAnthropicModel: !!anthropicModel,
-            anthropicModelType: typeof anthropicModel,
-            memoryUsageAfterAnthropicCreation: process.memoryUsage(),
-            message: "Anthropic model created successfully via vertexAnthropic",
-          },
-        );
-
         return anthropicModel;
       }
 
-      // Anthropic model creation returned null
-      const anthropicModelNullTime = process.hrtime.bigint();
-      const anthropicModelDurationNs =
-        anthropicModelNullTime - anthropicModelStartTime;
-
-      logger.warn(
-        `[GoogleVertexProvider] ⚠️ LOG_POINT_V005_ANTHROPIC_MODEL_NULL`,
-        {
-          logPoint: "V005_ANTHROPIC_MODEL_NULL",
-          modelCreationId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - modelCreationStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - modelCreationHrTimeStart
-          ).toString(),
-          anthropicModelDurationNs: anthropicModelDurationNs.toString(),
-          anthropicModelDurationMs: Number(anthropicModelDurationNs) / 1000000,
-          modelName,
-          hasAnthropicModel: false,
-          fallbackToGoogle: true,
-          message:
-            "Anthropic model creation returned null - falling back to Google model",
-        },
-      );
+      // Anthropic model creation returned null, falling back to Google model
     } catch (error) {
-      const anthropicModelErrorTime = process.hrtime.bigint();
-      const anthropicModelDurationNs =
-        anthropicModelErrorTime - anthropicModelStartTime;
-
       logger.error(
         `[GoogleVertexProvider] ❌ LOG_POINT_V006_ANTHROPIC_MODEL_ERROR`,
         {
@@ -548,8 +422,6 @@ export class GoogleVertexProvider extends BaseProvider {
           elapsedNs: (
             process.hrtime.bigint() - modelCreationHrTimeStart
           ).toString(),
-          anthropicModelDurationNs: anthropicModelDurationNs.toString(),
-          anthropicModelDurationMs: Number(anthropicModelDurationNs) / 1000000,
           modelName,
           error: error instanceof Error ? error.message : String(error),
           errorName: error instanceof Error ? error.name : "UnknownError",
@@ -576,28 +448,7 @@ export class GoogleVertexProvider extends BaseProvider {
     modelCreationId: string,
     modelCreationStartTime: number,
     modelCreationHrTimeStart: bigint,
-    isAnthropic: boolean,
   ): Promise<LanguageModelV1> {
-    const googleModelStartTime = process.hrtime.bigint();
-    logger.debug(
-      `[GoogleVertexProvider] 🌐 LOG_POINT_V007_GOOGLE_MODEL_START`,
-      {
-        logPoint: "V007_GOOGLE_MODEL_START",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - modelCreationStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - modelCreationHrTimeStart
-        ).toString(),
-        googleModelStartTimeNs: googleModelStartTime.toString(),
-        modelName,
-        projectId: this.projectId,
-        location: this.location,
-        reason: isAnthropic ? "ANTHROPIC_FALLBACK" : "DIRECT_GOOGLE_MODEL",
-        message: "Creating fresh Google Vertex model with current settings",
-      },
-    );
-
     logger.debug("Creating Google Vertex model", {
       modelName,
       project: this.projectId,
@@ -946,280 +797,28 @@ export class GoogleVertexProvider extends BaseProvider {
       modelCreationId,
       modelCreationStartTime,
       modelCreationHrTimeStart,
-      isAnthropicModel(modelName),
     );
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools
 
   /**
-   * Log stream execution start with comprehensive analysis
+   * Validate stream options
    */
-  private logStreamExecutionStart(
-    streamExecutionId: string,
-    streamExecutionStartTime: number,
-    streamExecutionHrTimeStart: bigint,
-    functionTag: string,
-    options: StreamOptions,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
-  ): void {
-    logger.info(
-      `[GoogleVertexProvider] 🎬 LOG_POINT_S001_STREAM_EXECUTION_START`,
-      {
-        logPoint: "S001_STREAM_EXECUTION_START",
-        streamExecutionId,
-        timestamp: new Date().toISOString(),
-        streamExecutionStartTime,
-        streamExecutionHrTimeStart: streamExecutionHrTimeStart.toString(),
-        functionTag,
-
-        // Input analysis
-        inputAnalysis: {
-          hasOptions: !!options,
-          optionsType: typeof options,
-          optionsKeys: options ? Object.keys(options) : [],
-          hasInputText: !!options?.input?.text,
-          inputTextLength: options?.input?.text?.length || 0,
-          inputTextPreview:
-            options?.input?.text?.substring(0, 200) || "NO_TEXT",
-          hasAnalysisSchema: !!analysisSchema,
-          schemaType: analysisSchema ? typeof analysisSchema : "NO_SCHEMA",
-          disableTools: options?.disableTools || false,
-          temperature: options?.temperature,
-          maxTokens: options?.maxTokens,
-        },
-
-        // Provider context
-        providerContext: {
-          modelName: this.modelName,
-          providerName: this.providerName,
-          projectId: this.projectId,
-          location: this.location,
-          defaultTimeout: this.defaultTimeout,
-        },
-
-        // Network environment
-        networkEnvironment: {
-          httpProxy:
-            process.env.HTTP_PROXY || process.env.http_proxy || "NOT_SET",
-          httpsProxy:
-            process.env.HTTPS_PROXY || process.env.https_proxy || "NOT_SET",
-          googleAppCreds:
-            process.env.GOOGLE_APPLICATION_CREDENTIALS || "NOT_SET",
-          hasGoogleServiceKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-          expectedEndpoint: `https://${this.location}-aiplatform.googleapis.com`,
-          proxyConfigured: !!(
-            process.env.HTTP_PROXY ||
-            process.env.HTTPS_PROXY ||
-            process.env.http_proxy ||
-            process.env.https_proxy
-          ),
-        },
-
-        // Performance baseline
-        memoryUsage: process.memoryUsage(),
-        cpuUsage: process.cpuUsage(),
-        message: "Stream execution starting with comprehensive analysis",
-      },
-    );
-  }
-
-  /**
-   * Log timeout setup process
-   */
-  private logTimeoutSetup(
-    streamExecutionId: string,
-    streamExecutionStartTime: number,
-    streamExecutionHrTimeStart: bigint,
-    timeoutSetupStartTime: bigint,
-    timeout: number,
-  ): void {
-    logger.debug(`[GoogleVertexProvider] ⏰ LOG_POINT_S002_TIMEOUT_SETUP`, {
-      logPoint: "S002_TIMEOUT_SETUP",
-      streamExecutionId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - streamExecutionStartTime,
-      elapsedNs: (
-        process.hrtime.bigint() - streamExecutionHrTimeStart
-      ).toString(),
-      timeoutSetupStartTimeNs: timeoutSetupStartTime.toString(),
-      timeout,
-      providerName: this.providerName,
-      streamType: "stream",
-      message: "Setting up timeout controller for stream execution",
-    });
-  }
-
-  /**
-   * Log successful timeout setup
-   */
-  private logTimeoutSetupSuccess(
-    streamExecutionId: string,
-    streamExecutionStartTime: number,
-    streamExecutionHrTimeStart: bigint,
-    timeoutSetupStartTime: bigint,
-    timeoutController: unknown,
-    timeout: number,
-  ): void {
-    const timeoutSetupEndTime = process.hrtime.bigint();
-    const timeoutSetupDurationNs = timeoutSetupEndTime - timeoutSetupStartTime;
-
-    logger.debug(
-      `[GoogleVertexProvider] ✅ LOG_POINT_S003_TIMEOUT_SETUP_SUCCESS`,
-      {
-        logPoint: "S003_TIMEOUT_SETUP_SUCCESS",
-        streamExecutionId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - streamExecutionStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - streamExecutionHrTimeStart
-        ).toString(),
-        timeoutSetupDurationNs: timeoutSetupDurationNs.toString(),
-        timeoutSetupDurationMs: Number(timeoutSetupDurationNs) / 1000000,
-        hasTimeoutController: !!timeoutController,
-        timeoutValue: timeout,
-        message: "Timeout controller setup completed",
-      },
-    );
-  }
-
-  /**
-   * Log and perform stream options validation
-   */
-  private logAndValidateStreamOptions(
-    streamExecutionId: string,
-    streamExecutionStartTime: number,
-    streamExecutionHrTimeStart: bigint,
-    options: StreamOptions,
-  ): void {
-    const validationStartTime = process.hrtime.bigint();
-    logger.debug(`[GoogleVertexProvider] ✔️ LOG_POINT_S004_VALIDATION_START`, {
-      logPoint: "S004_VALIDATION_START",
-      streamExecutionId,
-      timestamp: new Date().toISOString(),
-      elapsedMs: Date.now() - streamExecutionStartTime,
-      elapsedNs: (
-        process.hrtime.bigint() - streamExecutionHrTimeStart
-      ).toString(),
-      validationStartTimeNs: validationStartTime.toString(),
-      message: "Starting stream options validation",
-    });
-
+  private validateStreamOptionsOnly(options: StreamOptions): void {
     this.validateStreamOptions(options);
-
-    const validationEndTime = process.hrtime.bigint();
-    const validationDurationNs = validationEndTime - validationStartTime;
-
-    logger.debug(
-      `[GoogleVertexProvider] ✅ LOG_POINT_S005_VALIDATION_SUCCESS`,
-      {
-        logPoint: "S005_VALIDATION_SUCCESS",
-        streamExecutionId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - streamExecutionStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - streamExecutionHrTimeStart
-        ).toString(),
-        validationDurationNs: validationDurationNs.toString(),
-        validationDurationMs: Number(validationDurationNs) / 1000000,
-        message: "Stream options validation successful",
-      },
-    );
   }
 
-  /**
-   * Log start of message building process
-   */
-  private logMessageBuildStart(
-    streamExecutionId: string,
-    streamExecutionStartTime: number,
-    streamExecutionHrTimeStart: bigint,
-  ): bigint {
-    const messagesBuildStartTime = process.hrtime.bigint();
-    logger.debug(
-      `[GoogleVertexProvider] 📝 LOG_POINT_S006_MESSAGES_BUILD_START`,
-      {
-        logPoint: "S006_MESSAGES_BUILD_START",
-        streamExecutionId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - streamExecutionStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - streamExecutionHrTimeStart
-        ).toString(),
-        messagesBuildStartTimeNs: messagesBuildStartTime.toString(),
-        message: "Starting message array building",
-      },
-    );
-    return messagesBuildStartTime;
-  }
-
-  /**
-   * Log successful message building
-   */
-  private logMessageBuildSuccess(
-    streamExecutionId: string,
-    streamExecutionStartTime: number,
-    streamExecutionHrTimeStart: bigint,
-    messagesBuildStartTime: bigint,
-    messages: unknown,
-  ): void {
-    const messagesBuildEndTime = process.hrtime.bigint();
-    const messagesBuildDurationNs =
-      messagesBuildEndTime - messagesBuildStartTime;
-
-    logger.debug(
-      `[GoogleVertexProvider] ✅ LOG_POINT_S007_MESSAGES_BUILD_SUCCESS`,
-      {
-        logPoint: "S007_MESSAGES_BUILD_SUCCESS",
-        streamExecutionId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - streamExecutionStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - streamExecutionHrTimeStart
-        ).toString(),
-        messagesBuildDurationNs: messagesBuildDurationNs.toString(),
-        messagesBuildDurationMs: Number(messagesBuildDurationNs) / 1000000,
-        messagesCount: Array.isArray(messages) ? messages.length : 0,
-        messagesType: typeof messages,
-        hasMessages: !!messages,
-        message: "Message array built successfully",
-      },
-    );
-  }
-
-  /* eslint-disable-next-line max-lines-per-function */
   protected async executeStream(
     options: StreamOptions,
     analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<StreamResult> {
     // Initialize stream execution tracking
-    const streamExecutionId = `vertex-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    const streamExecutionStartTime = Date.now();
-    const streamExecutionHrTimeStart = process.hrtime.bigint();
     const functionTag = "GoogleVertexProvider.executeStream";
     let chunkCount = 0;
 
-    // Log stream execution start
-    this.logStreamExecutionStart(
-      streamExecutionId,
-      streamExecutionStartTime,
-      streamExecutionHrTimeStart,
-      functionTag,
-      options,
-      analysisSchema,
-    );
-
     // Setup timeout controller
-    const timeoutSetupStartTime = process.hrtime.bigint();
     const timeout = this.getTimeout(options);
-
-    this.logTimeoutSetup(
-      streamExecutionId,
-      streamExecutionStartTime,
-      streamExecutionHrTimeStart,
-      timeoutSetupStartTime,
-      timeout,
-    );
 
     const timeoutController = createTimeoutController(
       timeout,
@@ -1227,153 +826,18 @@ export class GoogleVertexProvider extends BaseProvider {
       "stream",
     );
 
-    this.logTimeoutSetupSuccess(
-      streamExecutionId,
-      streamExecutionStartTime,
-      streamExecutionHrTimeStart,
-      timeoutSetupStartTime,
-      timeoutController,
-      timeout,
-    );
-
     try {
-      // Validate stream options with logging
-      this.logAndValidateStreamOptions(
-        streamExecutionId,
-        streamExecutionStartTime,
-        streamExecutionHrTimeStart,
-        options,
-      );
-
-      // Build messages with logging
-      const messagesBuildStartTime = this.logMessageBuildStart(
-        streamExecutionId,
-        streamExecutionStartTime,
-        streamExecutionHrTimeStart,
-      );
+      // Validate stream options
+      this.validateStreamOptionsOnly(options);
 
       // Build message array from options
       const messages = buildMessagesArray(options);
 
-      this.logMessageBuildSuccess(
-        streamExecutionId,
-        streamExecutionStartTime,
-        streamExecutionHrTimeStart,
-        messagesBuildStartTime,
-        messages,
-      );
-
-      // Log stream request details
-      logger.debug(
-        `[GoogleVertexProvider] 🚀 LOG_POINT_S008_STREAM_REQUEST_DETAILS`,
-        {
-          logPoint: "S008_STREAM_REQUEST_DETAILS",
-          streamExecutionId,
-          streamRequestDetails: {
-            modelName: this.modelName,
-            promptLength:
-              typeof options.input?.text === "string"
-                ? options.input.text.length
-                : 0,
-            hasSchema: !!analysisSchema,
-            messagesCount: Array.isArray(messages) ? messages.length : 0,
-            temperature: options?.temperature,
-            maxTokens: options?.maxTokens,
-            disableTools: options?.disableTools || false,
-          },
-          message: "Starting comprehensive stream request processing",
-        },
-      );
-
-      // 🚀 EXHAUSTIVE LOGGING POINT S009: MODEL CREATION FOR STREAM
-      const modelCreationStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] 🏭 LOG_POINT_S009_MODEL_CREATION_FOR_STREAM`,
-        {
-          logPoint: "S009_MODEL_CREATION_FOR_STREAM",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          modelCreationStartTimeNs: modelCreationStartTime.toString(),
-          requestedModel: this.modelName,
-          message:
-            "Starting model creation for stream execution (this will include network setup)",
-        },
-      );
-
       const model = await this.getModel(); // This is where network connection happens!
-
-      const modelCreationEndTime = process.hrtime.bigint();
-      const modelCreationDurationNs =
-        modelCreationEndTime - modelCreationStartTime;
-
-      logger.info(
-        `[GoogleVertexProvider] ✅ LOG_POINT_S010_MODEL_CREATION_SUCCESS`,
-        {
-          logPoint: "S010_MODEL_CREATION_SUCCESS",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          modelCreationDurationNs: modelCreationDurationNs.toString(),
-          modelCreationDurationMs: Number(modelCreationDurationNs) / 1000000,
-          hasModel: !!model,
-          modelType: typeof model,
-          message:
-            "Model creation completed successfully - network connection established",
-        },
-      );
-
-      // 🚀 EXHAUSTIVE LOGGING POINT S011: TOOLS SETUP FOR STREAMING
-      const toolsSetupStartTime = process.hrtime.bigint();
-      logger.debug(
-        `[GoogleVertexProvider] 🛠️ LOG_POINT_S011_TOOLS_SETUP_START`,
-        {
-          logPoint: "S011_TOOLS_SETUP_START",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          toolsSetupStartTimeNs: toolsSetupStartTime.toString(),
-          disableTools: options?.disableTools || false,
-          supportsTools: this.supportsTools(),
-          message: "Setting up tools for streaming",
-        },
-      );
 
       // Get all available tools (direct + MCP + external) for streaming
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const tools = shouldUseTools ? await this.getAllTools() : {};
-
-      const toolsSetupEndTime = process.hrtime.bigint();
-      const toolsSetupDurationNs = toolsSetupEndTime - toolsSetupStartTime;
-
-      logger.debug(
-        `[GoogleVertexProvider] ✅ LOG_POINT_S012_TOOLS_SETUP_SUCCESS`,
-        {
-          logPoint: "S012_TOOLS_SETUP_SUCCESS",
-          streamExecutionId,
-          timestamp: new Date().toISOString(),
-          elapsedMs: Date.now() - streamExecutionStartTime,
-          elapsedNs: (
-            process.hrtime.bigint() - streamExecutionHrTimeStart
-          ).toString(),
-          toolsSetupDurationNs: toolsSetupDurationNs.toString(),
-          toolsSetupDurationMs: Number(toolsSetupDurationNs) / 1000000,
-          shouldUseTools,
-          toolCount: Object.keys(tools).length,
-          toolNames: Object.keys(tools),
-          hasTools: Object.keys(tools).length > 0,
-          message: "Tools setup completed for streaming",
-        },
-      );
 
       logger.debug(`${functionTag}: Tools for streaming`, {
         shouldUseTools,
@@ -1397,7 +861,6 @@ export class GoogleVertexProvider extends BaseProvider {
         messages: messages,
         temperature: options.temperature,
         ...(maxTokens && { maxTokens }),
-        // Add tools support for streaming
         ...(shouldUseTools &&
           Object.keys(tools).length > 0 && {
             tools,
@@ -1752,8 +1215,13 @@ export class GoogleVertexProvider extends BaseProvider {
         supportedRegions: [
           "us-central1",
           "us-east4",
+          "us-east5",
+          "us-west1",
+          "us-west4",
           "europe-west1",
+          "europe-west4",
           "asia-southeast1",
+          "asia-northeast1",
         ],
         solution: "Set GOOGLE_CLOUD_LOCATION to a supported region",
       });
@@ -2031,6 +1499,7 @@ export class GoogleVertexProvider extends BaseProvider {
     const supportedRegions = [
       "us-central1",
       "us-east4",
+      "us-east5",
       "us-west1",
       "us-west4",
       "europe-west1",

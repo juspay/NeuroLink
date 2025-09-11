@@ -1,6 +1,6 @@
 import type { CommandModule, Argv } from "yargs";
 import { globalSession } from "../../lib/session/globalSessionState.js";
-import type { UnknownRecord, JsonValue } from "../../lib/types/common.js";
+import type { JsonValue } from "../../lib/types/common.js";
 import type { ConversationMemoryConfig } from "../../lib/types/conversation.js";
 import type {
   BaseCommandArgs,
@@ -1133,7 +1133,7 @@ export class CLICommandFactory {
 
       // Process context if provided
       let inputText = argv.input as string;
-      let contextMetadata: UnknownRecord | undefined;
+      let contextMetadata: Partial<BaseContext> | undefined;
 
       if (options.context && options.contextConfig) {
         const processedContextResult = ContextFactory.processContext(
@@ -1148,7 +1148,9 @@ export class CLICommandFactory {
 
         // Add context metadata for analytics
         contextMetadata = {
-          ...ContextFactory.extractAnalyticsContext(options.context),
+          ...ContextFactory.extractAnalyticsContext(
+            options.context as BaseContext,
+          ),
           contextMode: processedContextResult.config.mode,
           contextTruncated: processedContextResult.metadata.truncated,
         };
@@ -1244,7 +1246,9 @@ export class CLICommandFactory {
         temperature: enhancedOptions.temperature,
         maxTokens: enhancedOptions.maxTokens,
         systemPrompt: enhancedOptions.systemPrompt,
-        timeout: enhancedOptions.timeout,
+        timeout: enhancedOptions.timeout
+          ? enhancedOptions.timeout * 1000
+          : undefined,
         disableTools: enhancedOptions.disableTools,
         enableAnalytics: enhancedOptions.enableAnalytics,
         enableEvaluation: enhancedOptions.enableEvaluation,
@@ -1303,6 +1307,375 @@ export class CLICommandFactory {
         spinner.fail();
       }
       handleError(error as Error, "Generation");
+    }
+  }
+
+  /**
+   * Process context for streaming
+   */
+  private static async processStreamContext(
+    argv: StreamCommandArgs,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): Promise<{
+    inputText: string;
+    contextMetadata: Partial<BaseContext> | undefined;
+  }> {
+    let inputText = argv.input as string;
+    let contextMetadata: Partial<BaseContext> | undefined;
+
+    if (options.context && options.contextConfig) {
+      const processedContextResult = ContextFactory.processContext(
+        options.context as BaseContext,
+        options.contextConfig,
+      );
+
+      // Integrate context into prompt if configured
+      if (processedContextResult.processedContext) {
+        inputText = processedContextResult.processedContext + inputText;
+      }
+
+      // Add context metadata for analytics
+      contextMetadata = {
+        ...ContextFactory.extractAnalyticsContext(
+          options.context as BaseContext,
+        ),
+        contextMode: processedContextResult.config.mode,
+        contextTruncated: processedContextResult.metadata.truncated,
+      };
+
+      if (options.debug) {
+        logger.debug("Context processed for streaming:", {
+          mode: processedContextResult.config.mode,
+          truncated: processedContextResult.metadata.truncated,
+          processingTime: processedContextResult.metadata.processingTime,
+        });
+      }
+    }
+
+    return { inputText, contextMetadata };
+  }
+
+  /**
+   * Execute dry-run streaming simulation
+   */
+  private static async executeDryRunStream(
+    options: BaseCommandArgs & Record<string, unknown>,
+    contextMetadata: Partial<BaseContext> | undefined,
+  ): Promise<void> {
+    if (!options.quiet) {
+      logger.always(chalk.blue("🔄 Dry-run streaming..."));
+    }
+
+    // Simulate streaming output
+    const chunks = [
+      "Mock ",
+      "streaming ",
+      "response ",
+      "for ",
+      "testing ",
+      "purposes",
+    ];
+    let fullContent = "";
+
+    for (const chunk of chunks) {
+      process.stdout.write(chunk);
+      fullContent += chunk;
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate streaming delay
+    }
+
+    if (!options.quiet) {
+      process.stdout.write("\n");
+    }
+
+    // Mock analytics and evaluation for dry-run
+    if (options.enableAnalytics) {
+      const mockAnalytics: AnalyticsData = {
+        provider: (options.provider as string) || "auto",
+        model: (options.model as string) || "test-model",
+        requestDuration: 300,
+        tokenUsage: {
+          input: 10,
+          output: 15,
+          total: 25,
+        },
+        timestamp: new Date().toISOString(),
+        context: contextMetadata as JsonValue,
+      };
+
+      const mockGenerateResult: GenerateResult = {
+        success: true,
+        content: fullContent,
+        analytics: mockAnalytics,
+        model: mockAnalytics.model,
+        toolsUsed: [],
+      };
+
+      const analyticsDisplay =
+        this.formatAnalyticsForTextMode(mockGenerateResult);
+      logger.always(analyticsDisplay);
+    }
+
+    if (options.enableEvaluation) {
+      logger.always(chalk.blue("\n📊 Response Evaluation (Dry-run):"));
+      logger.always(`   Relevance: 8/10`);
+      logger.always(`   Accuracy: 9/10`);
+      logger.always(`   Completeness: 8/10`);
+      logger.always(`   Overall: 8.3/10`);
+      logger.always(`   Reasoning: Test evaluation response`);
+    }
+
+    if (options.output) {
+      fs.writeFileSync(options.output as string, fullContent);
+      if (!options.quiet) {
+        logger.always(`\nOutput saved to ${options.output}`);
+      }
+    }
+
+    if (options.debug) {
+      logger.debug(
+        "\n" + chalk.yellow("Debug Information (Dry-run Streaming):"),
+      );
+      logger.debug("Provider:", options.provider || "auto");
+      logger.debug("Model:", options.model || "test-model");
+      logger.debug("Mode: DRY-RUN (no actual API calls made)");
+    }
+
+    if (!globalSession.getCurrentSessionId()) {
+      process.exit(0);
+    }
+  }
+
+  /**
+   * Execute real streaming with timeout handling
+   */
+  private static async executeRealStream(
+    argv: StreamCommandArgs,
+    options: BaseCommandArgs & Record<string, unknown>,
+    inputText: string,
+    contextMetadata: Partial<BaseContext> | undefined,
+  ): Promise<string> {
+    const sdk = globalSession.getOrCreateNeuroLink();
+    const sessionVariables = globalSession.getSessionVariables();
+    const enhancedOptions = { ...options, ...sessionVariables };
+    const sessionId = globalSession.getCurrentSessionId();
+    const context = sessionId
+      ? { ...contextMetadata, sessionId }
+      : contextMetadata;
+
+    // Process CLI images if provided
+    const imageBuffers = CLICommandFactory.processCliImages(
+      argv.image as string | string[] | undefined,
+    );
+
+    const stream = await sdk.stream({
+      input: imageBuffers
+        ? { text: inputText, images: imageBuffers }
+        : { text: inputText },
+      provider: enhancedOptions.provider as string | undefined,
+      model: enhancedOptions.model as string | undefined,
+      temperature: enhancedOptions.temperature as number | undefined,
+      maxTokens: enhancedOptions.maxTokens as number | undefined,
+      systemPrompt: enhancedOptions.systemPrompt as string | undefined,
+      timeout: enhancedOptions.timeout
+        ? (enhancedOptions.timeout as number) * 1000
+        : undefined,
+      disableTools: enhancedOptions.disableTools as boolean | undefined,
+      enableAnalytics: enhancedOptions.enableAnalytics as boolean | undefined,
+      enableEvaluation: enhancedOptions.enableEvaluation as boolean | undefined,
+      evaluationDomain: enhancedOptions.evaluationDomain as string | undefined,
+      toolUsageContext: enhancedOptions.toolUsageContext as string | undefined,
+      context: context,
+      factoryConfig: enhancedOptions.domain
+        ? {
+            domainType: enhancedOptions.domain as string,
+            enhancementType: "domain-configuration",
+            validateDomainData: true,
+          }
+        : undefined,
+    });
+
+    const fullContent = await this.processStreamWithTimeout(stream, options);
+
+    await this.displayStreamResults(stream, fullContent, options);
+
+    return fullContent;
+  }
+
+  /**
+   * Process stream with timeout handling
+   */
+  private static async processStreamWithTimeout(
+    stream: { stream: AsyncIterable<{ content: string } | { type: "audio" }> },
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): Promise<string> {
+    let fullContent = "";
+    let contentReceived = false;
+    const abortController = new AbortController();
+
+    // Create timeout promise for stream consumption (30 seconds)
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const timeoutId = setTimeout(() => {
+        if (!contentReceived) {
+          const timeoutError = new Error(
+            "\n❌ Stream timeout - no content received within 30 seconds\n" +
+              "This usually indicates authentication or network issues\n\n" +
+              "🔧 Try these steps:\n" +
+              "1. Check your provider credentials are configured correctly\n" +
+              `2. Test generate mode: neurolink generate "test" --provider ${options.provider}\n` +
+              `3. Use debug mode: neurolink stream "test" --provider ${options.provider} --debug`,
+          );
+          reject(timeoutError);
+        }
+      }, 30000);
+
+      // Clean up timeout when aborted
+      abortController.signal.addEventListener("abort", () => {
+        clearTimeout(timeoutId);
+      });
+    });
+
+    try {
+      // Process the stream with timeout handling
+      const streamIterator = stream.stream[Symbol.asyncIterator]();
+      let timeoutActive = true;
+
+      while (true) {
+        let nextResult;
+
+        if (timeoutActive && !contentReceived) {
+          // Race between next chunk and timeout for first chunk only
+          nextResult = await Promise.race([
+            streamIterator.next(),
+            timeoutPromise,
+          ]);
+        } else {
+          // No timeout for subsequent chunks
+          nextResult = await streamIterator.next();
+        }
+
+        if (nextResult.done) {
+          break;
+        }
+
+        if (!contentReceived) {
+          contentReceived = true;
+          timeoutActive = false;
+          abortController.abort(); // Cancel timeout
+        }
+
+        if (options.delay && (options.delay as number) > 0) {
+          // Demo mode - add delay between chunks
+          await new Promise((resolve) =>
+            setTimeout(resolve, options.delay as number),
+          );
+        }
+
+        const evt: unknown = nextResult.value;
+        const isText = (o: unknown): o is { content: string } =>
+          !!o &&
+          typeof o === "object" &&
+          typeof (o as Record<string, unknown>).content === "string";
+        const isAudio = (o: unknown): o is { type: "audio" } =>
+          !!o &&
+          typeof o === "object" &&
+          (o as Record<string, unknown>).type === "audio";
+
+        if (isText(evt)) {
+          process.stdout.write(evt.content);
+          fullContent += evt.content;
+        } else if (isAudio(evt)) {
+          if (options.debug && !options.quiet) {
+            process.stdout.write("[audio-chunk]");
+          }
+        }
+      }
+    } catch (error) {
+      abortController.abort(); // Clean up timeout
+      throw error;
+    }
+
+    if (!contentReceived) {
+      throw new Error(
+        "\n❌ No content received from stream\n" +
+          "Check your credentials and provider configuration",
+      );
+    }
+
+    if (!options.quiet) {
+      process.stdout.write("\n");
+    }
+
+    return fullContent;
+  }
+
+  /**
+   * Display analytics and evaluation results
+   */
+  private static async displayStreamResults(
+    stream: {
+      analytics?: unknown;
+      evaluation?: unknown;
+      model?: string;
+      toolCalls?: Array<{ toolName: string }>;
+    },
+    fullContent: string,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): Promise<void> {
+    // Display analytics after streaming
+    if (options.enableAnalytics && stream.analytics) {
+      const resolvedAnalytics = await (stream.analytics instanceof Promise
+        ? stream.analytics
+        : Promise.resolve(stream.analytics));
+      const streamAnalytics = {
+        success: true,
+        content: fullContent,
+        analytics: resolvedAnalytics,
+        model: stream.model,
+        toolsUsed: stream.toolCalls?.map((tc) => tc.toolName) || [],
+      };
+      const analyticsDisplay = this.formatAnalyticsForTextMode(
+        streamAnalytics as unknown as GenerateResult,
+      );
+      logger.always(analyticsDisplay);
+    }
+
+    // Display evaluation after streaming
+    if (options.enableEvaluation && stream.evaluation) {
+      const resolvedEvaluation = await (stream.evaluation instanceof Promise
+        ? stream.evaluation
+        : Promise.resolve(stream.evaluation));
+      logger.always(chalk.blue("\n📊 Response Evaluation:"));
+      logger.always(`   Relevance: ${resolvedEvaluation.relevance}/10`);
+      logger.always(`   Accuracy: ${resolvedEvaluation.accuracy}/10`);
+      logger.always(`   Completeness: ${resolvedEvaluation.completeness}/10`);
+      logger.always(`   Overall: ${resolvedEvaluation.overall}/10`);
+      if (resolvedEvaluation.reasoning) {
+        logger.always(`   Reasoning: ${resolvedEvaluation.reasoning}`);
+      }
+    }
+  }
+
+  /**
+   * Handle stream output file writing and debug output
+   */
+  private static async handleStreamOutput(
+    options: BaseCommandArgs & Record<string, unknown>,
+    fullContent: string,
+  ): Promise<void> {
+    // Handle output file if specified
+    if (options.output) {
+      fs.writeFileSync(options.output as string, fullContent);
+      if (!options.quiet) {
+        logger.always(`\nOutput saved to ${options.output}`);
+      }
+    }
+
+    // Debug output for streaming
+    if (options.debug) {
+      await this.logStreamDebugInfo({
+        provider: options.provider as string,
+        model: options.model as string,
+      });
     }
   }
 
@@ -1377,304 +1750,25 @@ export class CLICommandFactory {
         await new Promise((resolve) => setTimeout(resolve, options.delay));
       }
 
-      // Process context if provided (same as generate command)
-      let inputText = argv.input as string;
-      let contextMetadata: UnknownRecord | undefined;
-
-      if (options.context && options.contextConfig) {
-        const processedContextResult = ContextFactory.processContext(
-          options.context,
-          options.contextConfig,
-        );
-
-        // Integrate context into prompt if configured
-        if (processedContextResult.processedContext) {
-          inputText = processedContextResult.processedContext + inputText;
-        }
-
-        // Add context metadata for analytics
-        contextMetadata = {
-          ...ContextFactory.extractAnalyticsContext(options.context),
-          contextMode: processedContextResult.config.mode,
-          contextTruncated: processedContextResult.metadata.truncated,
-        };
-
-        if (options.debug) {
-          logger.debug("Context processed for streaming:", {
-            mode: processedContextResult.config.mode,
-            truncated: processedContextResult.metadata.truncated,
-            processingTime: processedContextResult.metadata.processingTime,
-          });
-        }
-      }
+      const { inputText, contextMetadata } = await this.processStreamContext(
+        argv,
+        options,
+      );
 
       // Handle dry-run mode for testing
       if (options.dryRun) {
-        if (!options.quiet) {
-          logger.always(chalk.blue("🔄 Dry-run streaming..."));
-        }
-
-        // Simulate streaming output
-        const chunks = [
-          "Mock ",
-          "streaming ",
-          "response ",
-          "for ",
-          "testing ",
-          "purposes",
-        ];
-        let fullContent = "";
-
-        for (const chunk of chunks) {
-          process.stdout.write(chunk);
-          fullContent += chunk;
-          await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate streaming delay
-        }
-
-        if (!options.quiet) {
-          process.stdout.write("\n");
-        }
-
-        // Mock analytics and evaluation for dry-run
-        if (options.enableAnalytics) {
-          const mockAnalytics: AnalyticsData = {
-            provider: options.provider || "auto",
-            model: options.model || "test-model",
-            requestDuration: 300,
-            tokenUsage: {
-              input: 10,
-              output: 15,
-              total: 25,
-            },
-            timestamp: new Date().toISOString(),
-            context: contextMetadata as JsonValue,
-          };
-
-          const mockGenerateResult: GenerateResult = {
-            success: true,
-            content: fullContent,
-            analytics: mockAnalytics,
-            model: mockAnalytics.model,
-            toolsUsed: [],
-          };
-
-          const analyticsDisplay =
-            this.formatAnalyticsForTextMode(mockGenerateResult);
-          logger.always(analyticsDisplay);
-        }
-
-        if (options.enableEvaluation) {
-          logger.always(chalk.blue("\n📊 Response Evaluation (Dry-run):"));
-          logger.always(`   Relevance: 8/10`);
-          logger.always(`   Accuracy: 9/10`);
-          logger.always(`   Completeness: 8/10`);
-          logger.always(`   Overall: 8.3/10`);
-          logger.always(`   Reasoning: Test evaluation response`);
-        }
-
-        if (options.output) {
-          fs.writeFileSync(options.output, fullContent);
-          if (!options.quiet) {
-            logger.always(`\nOutput saved to ${options.output}`);
-          }
-        }
-
-        if (options.debug) {
-          logger.debug(
-            "\n" + chalk.yellow("Debug Information (Dry-run Streaming):"),
-          );
-          logger.debug("Provider:", options.provider || "auto");
-          logger.debug("Model:", options.model || "test-model");
-          logger.debug("Mode: DRY-RUN (no actual API calls made)");
-        }
-
-        if (!globalSession.getCurrentSessionId()) {
-          process.exit(0);
-        }
+        await this.executeDryRunStream(options, contextMetadata);
+        return;
       }
 
-      const sdk = globalSession.getOrCreateNeuroLink();
-      const sessionVariables = globalSession.getSessionVariables();
-      const enhancedOptions = { ...options, ...sessionVariables };
-      const sessionId = globalSession.getCurrentSessionId();
-      const context = sessionId
-        ? { ...contextMetadata, sessionId }
-        : contextMetadata;
-
-      // Process CLI images if provided
-      const imageBuffers = CLICommandFactory.processCliImages(
-        argv.image as string | string[] | undefined,
+      const fullContent = await this.executeRealStream(
+        argv,
+        options,
+        inputText,
+        contextMetadata,
       );
 
-      const stream = await sdk.stream({
-        input: imageBuffers
-          ? { text: inputText, images: imageBuffers }
-          : { text: inputText },
-        provider: enhancedOptions.provider,
-        model: enhancedOptions.model,
-        temperature: enhancedOptions.temperature,
-        maxTokens: enhancedOptions.maxTokens,
-        systemPrompt: enhancedOptions.systemPrompt,
-        timeout: enhancedOptions.timeout,
-        disableTools: enhancedOptions.disableTools,
-        enableAnalytics: enhancedOptions.enableAnalytics,
-        enableEvaluation: enhancedOptions.enableEvaluation,
-        evaluationDomain: enhancedOptions.evaluationDomain as
-          | string
-          | undefined,
-        toolUsageContext: enhancedOptions.toolUsageContext as
-          | string
-          | undefined,
-        context: context,
-        factoryConfig: enhancedOptions.domain
-          ? {
-              domainType: enhancedOptions.domain,
-              enhancementType: "domain-configuration",
-              validateDomainData: true,
-            }
-          : undefined,
-      });
-
-      let fullContent = "";
-      let contentReceived = false;
-      const abortController = new AbortController();
-
-      // Create timeout promise for stream consumption (30 seconds)
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        const timeoutId = setTimeout(() => {
-          if (!contentReceived) {
-            const timeoutError = new Error(
-              "\n❌ Stream timeout - no content received within 30 seconds\n" +
-                "This usually indicates authentication or network issues\n\n" +
-                "🔧 Try these steps:\n" +
-                "1. Check your provider credentials are configured correctly\n" +
-                `2. Test generate mode: neurolink generate "test" --provider ${options.provider}\n` +
-                `3. Use debug mode: neurolink stream "test" --provider ${options.provider} --debug`,
-            );
-            reject(timeoutError);
-          }
-        }, 30000);
-
-        // Clean up timeout when aborted
-        abortController.signal.addEventListener("abort", () => {
-          clearTimeout(timeoutId);
-        });
-      });
-
-      try {
-        // Process the stream with timeout handling
-        const streamIterator = stream.stream[Symbol.asyncIterator]();
-        let timeoutActive = true;
-
-        while (true) {
-          let nextResult;
-
-          if (timeoutActive && !contentReceived) {
-            // Race between next chunk and timeout for first chunk only
-            nextResult = await Promise.race([
-              streamIterator.next(),
-              timeoutPromise,
-            ]);
-          } else {
-            // No timeout for subsequent chunks
-            nextResult = await streamIterator.next();
-          }
-
-          if (nextResult.done) {
-            break;
-          }
-
-          if (!contentReceived) {
-            contentReceived = true;
-            timeoutActive = false;
-            abortController.abort(); // Cancel timeout
-          }
-
-          if (options.delay && options.delay > 0) {
-            // Demo mode - add delay between chunks
-            await new Promise((resolve) => setTimeout(resolve, options.delay));
-          }
-
-          const evt: unknown = nextResult.value;
-          const isText = (o: unknown): o is { content: string } =>
-            !!o &&
-            typeof o === "object" &&
-            typeof (o as Record<string, unknown>).content === "string";
-          const isAudio = (o: unknown): o is { type: "audio" } =>
-            !!o &&
-            typeof o === "object" &&
-            (o as Record<string, unknown>).type === "audio";
-
-          if (isText(evt)) {
-            process.stdout.write(evt.content);
-            fullContent += evt.content;
-          } else if (isAudio(evt)) {
-            if (options.debug && !options.quiet) {
-              process.stdout.write("[audio-chunk]");
-            }
-          }
-        }
-      } catch (error) {
-        abortController.abort(); // Clean up timeout
-        throw error;
-      }
-
-      if (!contentReceived) {
-        throw new Error(
-          "\n❌ No content received from stream\n" +
-            "Check your credentials and provider configuration",
-        );
-      }
-
-      if (!options.quiet) {
-        process.stdout.write("\n");
-      }
-
-      // 🔧 NEW: Display analytics and evaluation after streaming (similar to generate command)
-      if (options.enableAnalytics && stream.analytics) {
-        const resolvedAnalytics = await (stream.analytics instanceof Promise
-          ? stream.analytics
-          : Promise.resolve(stream.analytics));
-        const streamAnalytics = {
-          success: true,
-          content: fullContent,
-          analytics: resolvedAnalytics,
-          model: stream.model,
-          toolsUsed: stream.toolCalls?.map((tc) => tc.toolName) || [],
-        };
-        const analyticsDisplay = this.formatAnalyticsForTextMode(
-          streamAnalytics as unknown as GenerateResult,
-        );
-        logger.always(analyticsDisplay);
-      }
-
-      // 🔧 NEW: Display evaluation after streaming
-      if (options.enableEvaluation && stream.evaluation) {
-        const resolvedEvaluation = await (stream.evaluation instanceof Promise
-          ? stream.evaluation
-          : Promise.resolve(stream.evaluation));
-        logger.always(chalk.blue("\n📊 Response Evaluation:"));
-        logger.always(`   Relevance: ${resolvedEvaluation.relevance}/10`);
-        logger.always(`   Accuracy: ${resolvedEvaluation.accuracy}/10`);
-        logger.always(`   Completeness: ${resolvedEvaluation.completeness}/10`);
-        logger.always(`   Overall: ${resolvedEvaluation.overall}/10`);
-        if (resolvedEvaluation.reasoning) {
-          logger.always(`   Reasoning: ${resolvedEvaluation.reasoning}`);
-        }
-      }
-
-      // Handle output file if specified
-      if (options.output) {
-        fs.writeFileSync(options.output, fullContent);
-        if (!options.quiet) {
-          logger.always(`\nOutput saved to ${options.output}`);
-        }
-      }
-
-      // 🔧 NEW: Debug output for streaming (similar to generate command)
-      if (options.debug) {
-        await this.logStreamDebugInfo(stream);
-      }
+      await this.handleStreamOutput(options, fullContent);
 
       if (!globalSession.getCurrentSessionId()) {
         process.exit(0);
@@ -1751,11 +1845,11 @@ export class CLICommandFactory {
 
           // Process context for each batch item
           let inputText = prompts[i];
-          let contextMetadata: UnknownRecord | undefined;
+          let contextMetadata: Partial<BaseContext> | undefined;
 
           if (options.context && options.contextConfig) {
             const processedContextResult = ContextFactory.processContext(
-              options.context,
+              options.context as BaseContext,
               options.contextConfig,
             );
 
@@ -1764,7 +1858,9 @@ export class CLICommandFactory {
             }
 
             contextMetadata = {
-              ...ContextFactory.extractAnalyticsContext(options.context),
+              ...ContextFactory.extractAnalyticsContext(
+                options.context as BaseContext,
+              ),
               contextMode: processedContextResult.config.mode,
               contextTruncated: processedContextResult.metadata.truncated,
               batchIndex: i,
@@ -1782,7 +1878,9 @@ export class CLICommandFactory {
             temperature: enhancedOptions.temperature,
             maxTokens: enhancedOptions.maxTokens,
             systemPrompt: enhancedOptions.systemPrompt,
-            timeout: enhancedOptions.timeout,
+            timeout: enhancedOptions.timeout
+              ? enhancedOptions.timeout * 1000
+              : undefined,
             disableTools: enhancedOptions.disableTools,
             evaluationDomain: enhancedOptions.evaluationDomain as
               | string
@@ -2093,7 +2191,13 @@ export class CLICommandFactory {
         await sdk.clearAllConversations();
         success = true;
       } else {
-        success = await sdk.clearConversationSession(argv.sessionId!);
+        // sessionId is guaranteed to exist when isAllSessions is false
+        if (!argv.sessionId) {
+          throw new Error(
+            "Session ID is required for clearing specific session",
+          );
+        }
+        success = await sdk.clearConversationSession(argv.sessionId);
       }
 
       if (spinner) {

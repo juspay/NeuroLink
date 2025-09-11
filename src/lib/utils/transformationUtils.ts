@@ -5,6 +5,7 @@
 
 import type { UnknownRecord } from "../types/common.js";
 import type { StandardRecord, StringArray } from "../types/typeAliases.js";
+import { logger } from "./logger.js";
 
 // ============================================================================
 // TOOL EXECUTION TRANSFORMATIONS
@@ -61,12 +62,50 @@ export function transformToolExecutions(toolExecutions?: unknown[]): Array<{
       toolName = `tool_execution_${index}`;
     }
 
+    // Enhanced tool parameter extraction with structured logging
+    const parameterExtractionData = {
+      executionIndex: index,
+      toolNameExtracted: toolName,
+      primarySources: {
+        hasInput: !!teRecord.input,
+        hasParameters: !!teRecord.parameters,
+        hasArgs: !!teRecord.args,
+        inputType: typeof teRecord.input,
+        parametersType: typeof teRecord.parameters,
+        argsType: typeof teRecord.args,
+      },
+      rawRecordKeys: Object.keys(teRecord),
+    };
+
+    logger.debug(
+      "[TransformationUtils] Tool parameter extraction analysis",
+      parameterExtractionData,
+    );
+
     // Enhanced input extraction
     let input =
       (teRecord.input as StandardRecord) ||
       (teRecord.parameters as StandardRecord) ||
       (teRecord.args as StandardRecord) ||
       {};
+
+    const primaryExtractionResult = {
+      keysCount: Object.keys(input).length,
+      keys: Object.keys(input),
+      extractionSuccessful: Object.keys(input).length > 0,
+      extractionSource: teRecord.input
+        ? "input"
+        : teRecord.parameters
+          ? "parameters"
+          : teRecord.args
+            ? "args"
+            : "empty",
+    };
+
+    logger.debug(
+      "[TransformationUtils] Primary parameter extraction result",
+      primaryExtractionResult,
+    );
 
     // Extract input from nested toolCall if available
     if (
@@ -75,12 +114,101 @@ export function transformToolExecutions(toolExecutions?: unknown[]): Array<{
       typeof teRecord.toolCall === "object"
     ) {
       const toolCall = teRecord.toolCall as UnknownRecord;
+
+      const nestedExtractionData = {
+        reason: "Primary extraction failed, checking nested toolCall",
+        nestedSources: {
+          hasInput: !!toolCall.input,
+          hasParameters: !!toolCall.parameters,
+          hasArgs: !!toolCall.args,
+        },
+        toolCallKeys: Object.keys(toolCall),
+      };
+
+      logger.debug(
+        "[TransformationUtils] Nested parameter extraction attempt",
+        nestedExtractionData,
+      );
+
       input =
         (toolCall.input as StandardRecord) ||
         (toolCall.parameters as StandardRecord) ||
         (toolCall.args as StandardRecord) ||
         {};
+
+      const nestedExtractionResult = {
+        keysCount: Object.keys(input).length,
+        keys: Object.keys(input),
+        extractionSuccessful: Object.keys(input).length > 0,
+        extractionSource: toolCall.input
+          ? "toolCall.input"
+          : toolCall.parameters
+            ? "toolCall.parameters"
+            : toolCall.args
+              ? "toolCall.args"
+              : "empty",
+      };
+
+      logger.debug(
+        "[TransformationUtils] Nested parameter extraction result",
+        nestedExtractionResult,
+      );
     }
+
+    // Target tool parameter analysis for critical tools
+    if (
+      toolName &&
+      (toolName.includes("SuccessRateSRByTime") ||
+        toolName.includes("juspay-analytics"))
+    ) {
+      const targetToolAnalysis = {
+        toolName,
+        inputKeys: Object.keys(input),
+        keysCount: Object.keys(input).length,
+        hasStartTime: "startTime" in input,
+        hasEndTime: "endTime" in input,
+        startTimeValue: input.startTime || "MISSING",
+        endTimeValue: input.endTime || "MISSING",
+        extractionStatus:
+          Object.keys(input).length === 0 ? "FAILED" : "SUCCESS",
+      };
+
+      logger.debug(
+        "[TransformationUtils] Target tool parameter analysis",
+        targetToolAnalysis,
+      );
+
+      if (Object.keys(input).length === 0) {
+        logger.error(
+          "[TransformationUtils] Critical: Target tool parameter extraction failed",
+          {
+            toolName,
+            reason:
+              "Both primary and nested extraction returned empty parameters",
+            impact: "AI response did not contain expected parameter structure",
+          },
+        );
+      }
+    }
+
+    // Final parameter extraction summary
+    const finalExtractionSummary = {
+      toolName,
+      inputKeysCount: Object.keys(input).length,
+      inputKeys: Object.keys(input),
+      hasParameters: Object.keys(input).length > 0,
+      duration:
+        (teRecord.duration as number) ??
+        (teRecord.executionTime as number) ??
+        (teRecord.responseTime as number) ??
+        0,
+      hasOutput: !!(teRecord.output || teRecord.result || teRecord.response),
+    };
+
+    logger.debug(
+      "[TransformationUtils] Final parameter extraction result",
+      finalExtractionSummary,
+    );
 
     // Enhanced output extraction with success indication
     const output =
@@ -237,15 +365,67 @@ export function transformAvailableTools(
 
   return availableTools.map((tool) => {
     const toolRecord = tool as UnknownRecord;
+
+    let extractedParameters: StandardRecord = {};
+
+    const inputSchema = toolRecord.inputSchema as StandardRecord;
+    const directParameters = toolRecord.parameters as StandardRecord;
+    const fallbackSchema = toolRecord.schema as StandardRecord;
+
+    if (inputSchema && typeof inputSchema === "object") {
+      if (inputSchema.$ref && inputSchema.definitions) {
+        const definitions = inputSchema.definitions as StandardRecord;
+        const refValue = inputSchema.$ref;
+
+        if (typeof refValue === "string") {
+          const refKey = refValue.replace("#/definitions/", "");
+
+          if (definitions[refKey] && typeof definitions[refKey] === "object") {
+            const resolvedSchema = definitions[refKey] as StandardRecord;
+
+            extractedParameters = {
+              type: resolvedSchema.type || "object",
+              properties: resolvedSchema.properties || {},
+              required: resolvedSchema.required || [],
+              ...resolvedSchema, // Include all schema metadata
+            };
+          }
+        }
+      } else if (inputSchema.properties) {
+        extractedParameters = {
+          type: inputSchema.type || "object",
+          properties: inputSchema.properties,
+          required: inputSchema.required || [],
+          ...inputSchema,
+        };
+      } else if (inputSchema.type === "object") {
+        extractedParameters = inputSchema;
+      } else {
+        extractedParameters = inputSchema;
+      }
+    } else if (directParameters && typeof directParameters === "object") {
+      extractedParameters = directParameters;
+    } else if (fallbackSchema && typeof fallbackSchema === "object") {
+      extractedParameters = fallbackSchema;
+    }
+
+    if (!extractedParameters || typeof extractedParameters !== "object") {
+      extractedParameters = {};
+    }
+
+    if (
+      extractedParameters &&
+      !extractedParameters.type &&
+      extractedParameters.properties
+    ) {
+      extractedParameters.type = "object";
+    }
+
     return {
       name: tool.name || "",
       description: tool.description || "",
       server: tool.server || "",
-      parameters:
-        (toolRecord.inputSchema as StandardRecord) ||
-        (toolRecord.parameters as StandardRecord) ||
-        (toolRecord.schema as StandardRecord) ||
-        {},
+      parameters: extractedParameters,
     };
   });
 }
@@ -358,7 +538,10 @@ export function transformSchemaToParameterDescription(schema: {
     .map(([key, value]: [string, unknown]) => {
       const typedValue = value as StandardRecord;
       const required = requiredParams.has(key) ? " (required)" : "";
-      return `  - ${key}: ${typedValue.type || "unknown"}${required}`;
+      const description = typedValue.description
+        ? ` - ${typedValue.description}`
+        : "";
+      return `  - ${key}: ${typedValue.type || "unknown"}${required}${description}`;
     })
     .join("\n");
 }

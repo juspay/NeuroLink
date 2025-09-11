@@ -1,12 +1,18 @@
 import type { Tool } from "ai";
 import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
-import type { AIProviderName, ProviderConfig } from "./providers.js";
-import type { AnalyticsData, TokenUsage } from "./analytics.js";
-import type { EvaluationData } from "./evaluation.js";
-import type { UnknownRecord, JsonValue } from "./common.js";
-import type { ChatMessage } from "./conversation.js";
+import type { ProviderConfig } from "./providers.js";
 import type { TextContent, ImageContent } from "./content.js";
-import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
+import type { AIProviderName, AnalyticsData } from "../core/types.js";
+import type { TokenUsage } from "./analytics.js";
+import type { EvaluationData } from "../index.js";
+import type {
+  UnknownRecord,
+  JsonValue,
+  ToolExecutionEvent,
+  ToolExecutionSummary,
+} from "./common.js";
+import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
+import type { ChatMessage } from "./conversation.js";
 
 /**
  * Progress tracking and metadata for streaming operations
@@ -225,6 +231,11 @@ export type StreamResult = {
   toolCalls?: ToolCall[]; // Tool calls made during generation
   toolResults?: ToolResult[]; // Results from tool execution
 
+  // ENHANCED: Native NeuroLink tool event system
+  toolEvents?: AsyncIterable<ToolExecutionEvent>; // Real-time tool events generator
+  toolExecutions?: ToolExecutionSummary[]; // Final summary of all tool executions
+  toolsUsed?: string[]; // List of tools used during generation
+
   // Stream metadata
   metadata?: {
     streamId?: string;
@@ -233,6 +244,10 @@ export type StreamResult = {
     estimatedDuration?: number;
     responseTime?: number;
     fallback?: boolean;
+    // Enhanced with tool metadata
+    totalToolExecutions?: number;
+    toolExecutionTime?: number;
+    hasToolErrors?: boolean;
   };
 
   // Analytics and evaluation (available after stream completion)

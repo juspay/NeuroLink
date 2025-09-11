@@ -5,7 +5,10 @@
 
 import { logger } from "./logger.js";
 import { BinaryTaskClassifier } from "./taskClassifier.js";
-import type { TaskType, TaskClassification } from "../types/taskClassificationTypes.js";
+import type {
+  TaskType,
+  TaskClassification,
+} from "../types/taskClassificationTypes.js";
 import { redactForRouting } from "./promptRedaction.js";
 
 export interface ModelRoute {
@@ -150,17 +153,26 @@ export class ModelRouter {
 
     // Adjust confidence based on prompt characteristics
     if (taskType === "fast" && prompt.length < 30) {
-      confidence = Math.min(ROUTING_CONFIG.maxRouteConfidence, confidence + ROUTING_CONFIG.confidenceBoost);
+      confidence = Math.min(
+        ROUTING_CONFIG.maxRouteConfidence,
+        confidence + ROUTING_CONFIG.confidenceBoost,
+      );
       reasons.push("very short prompt");
     }
 
     if (taskType === "reasoning" && prompt.length > 150) {
-      confidence = Math.min(ROUTING_CONFIG.maxRouteConfidence, confidence + ROUTING_CONFIG.confidenceBoost);
+      confidence = Math.min(
+        ROUTING_CONFIG.maxRouteConfidence,
+        confidence + ROUTING_CONFIG.confidenceBoost,
+      );
       reasons.push("detailed prompt");
     }
 
     // Ensure final confidence is within configured bounds
-    confidence = Math.max(ROUTING_CONFIG.minRouteConfidence, Math.min(ROUTING_CONFIG.maxRouteConfidence, confidence));
+    confidence = Math.max(
+      ROUTING_CONFIG.minRouteConfidence,
+      Math.min(ROUTING_CONFIG.maxRouteConfidence, confidence),
+    );
 
     // 5. Create route result
     const route: ModelRoute = {
@@ -219,7 +231,13 @@ export class ModelRouter {
       provider: fallbackConfig.provider,
       model: fallbackConfig.model,
       reasoning: `fallback from ${primaryRoute.provider}/${primaryRoute.model}`,
-      confidence: Math.max(ROUTING_CONFIG.minRouteConfidence, Math.min(ROUTING_CONFIG.maxRouteConfidence, primaryRoute.confidence - 0.2)),
+      confidence: Math.max(
+        ROUTING_CONFIG.minRouteConfidence,
+        Math.min(
+          ROUTING_CONFIG.maxRouteConfidence,
+          primaryRoute.confidence - 0.2,
+        ),
+      ),
     };
 
     logger.debug("Fallback route selected", {
