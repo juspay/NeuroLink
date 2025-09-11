@@ -10,7 +10,7 @@ import {
   GoogleAIModels,
   AnthropicModels,
   BedrockModels,
-} from "../core/types.js";
+} from "../types/providers.js";
 import { API_KEY_LENGTHS, PROJECT_ID_FORMAT } from "./providerConfig.js";
 import { basename } from "path";
 import { createProxyFetch } from "../proxy/proxyFetch.js";

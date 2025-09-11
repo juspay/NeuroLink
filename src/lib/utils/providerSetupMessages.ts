@@ -8,7 +8,7 @@ import {
   GoogleAIModels,
   AnthropicModels,
   APIVersions,
-} from "../core/types.js";
+} from "../types/providers.js";
 
 /**
  * Generate enhanced error message with setup instructions

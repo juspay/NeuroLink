@@ -1,7 +1,5 @@
-import {
-  AIProviderName,
-  type TextGenerationOptions,
-} from "../../lib/core/types.js";
+import { AIProviderName } from "../../lib/types/providers.js";
+import type { TextGenerationOptions } from "../../lib/types/generateTypes.js";
 
 /**
  * Defines the schema for a session variable or a generation option.

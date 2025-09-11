@@ -12,7 +12,7 @@ import type { RedisConversationMemoryManager } from "../core/redisConversationMe
 import type {
   TextGenerationOptions,
   TextGenerationResult,
-} from "../core/types.js";
+} from "../types/generateTypes.js";
 import { getConversationMemoryDefaults } from "../config/conversationMemory.js";
 import { logger } from "./logger.js";
 

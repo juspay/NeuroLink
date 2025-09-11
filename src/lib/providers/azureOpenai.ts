@@ -1,8 +1,8 @@
 import { createAzure } from "@ai-sdk/azure";
 import { streamText, type LanguageModelV1 } from "ai";
 import { BaseProvider } from "../core/baseProvider.js";
-import type { AIProviderName } from "../core/types.js";
-import { APIVersions } from "../core/types.js";
+import { APIVersions } from "../types/providers.js";
+import type { AIProviderName } from "../types/providers.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
