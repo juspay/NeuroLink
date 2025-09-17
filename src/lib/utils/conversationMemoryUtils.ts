@@ -14,6 +14,7 @@ import type {
 } from "../types/index.js";
 import { getConversationMemoryDefaults } from "../config/conversationMemory.js";
 import { logger } from "./logger.js";
+import { createRedisClient, getNormalizedConfig } from "./redis.js";
 
 /**
  * Apply conversation memory defaults to user configuration
@@ -106,5 +107,52 @@ export async function storeConversationTurn(
       userId,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+/**
+ * Check if Redis is available for conversation memory
+ */
+export async function checkRedisAvailability(): Promise<boolean> {
+  let testClient = null;
+
+  try {
+    const testConfig = getNormalizedConfig({
+      host: process.env.REDIS_HOST,
+      port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : undefined,
+      password: process.env.REDIS_PASSWORD,
+      db: process.env.REDIS_DB ? Number(process.env.REDIS_DB) : undefined,
+      keyPrefix: process.env.REDIS_KEY_PREFIX,
+      ttl: process.env.REDIS_TTL ? Number(process.env.REDIS_TTL) : undefined,
+      connectionOptions: {
+        connectTimeout: 5000,
+        maxRetriesPerRequest: 1,
+        retryDelayOnFailover: 100,
+      },
+    });
+
+    // Test Redis connection
+    testClient = await createRedisClient(testConfig);
+    await testClient.ping();
+
+    logger.debug("Redis connection test successful");
+    return true;
+  } catch (error) {
+    logger.debug("Redis connection test failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  } finally {
+    if (testClient) {
+      try {
+        await testClient.quit();
+        logger.debug("Redis test client disconnected successfully");
+      } catch (quitError) {
+        logger.debug("Error during Redis test client disconnect", {
+          error:
+            quitError instanceof Error ? quitError.message : String(quitError),
+        });
+      }
+    }
   }
 }

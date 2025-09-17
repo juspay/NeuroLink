@@ -69,10 +69,112 @@
 - **Error Recovery**: Graceful handling of setup failures with clear resolution steps
 - **Configuration Management**: Atomic .env updates with existing content preservation
 - **Cross-Platform**: Works on Windows, macOS, and Linux with consistent experience
->>>>>>> Stashed changes
+
 # Active Context
 
-## 🚀 **CURRENT STATUS: INTERACTIVE PROVIDER SETUP FRAMEWORK IMPLEMENTED** (2025-01-09)
+## 🚀 **CURRENT STATUS: REDIS DETECTION SOCKET LEAK FIXES IMPLEMENTED** (2025-09-18)
+
+### **🏆 MAJOR ACHIEVEMENT: PRODUCTION-READY REDIS DETECTION**
+- **Primary Objective**: ✅ Fix Redis detection socket leaks and implement proper error handling with clean API design
+- **Implementation**: Complete refactoring of Redis detection with try/finally blocks, deprecated function removal, and clean codebase
+- **Technical Impact**: 
+  - Socket leaks: Fixed with proper client lifecycle management
+  - Error handling: Silent debug-level logging prevents noise
+  - API design: Non-deprecated function returns boolean, avoids side effects
+  - Code quality: Removed excessive comments and unused functions
+- **Status**: ✅ **PRODUCTION READY** - Clean, robust Redis detection without resource leaks
+
+### **✅ Redis Detection Improvements Complete**
+**Files Enhanced:**
+- **Core Utility**: `src/lib/utils/conversationMemoryUtils.ts` - Implemented `checkRedisAvailability()` with proper try/finally cleanup
+- **CLI Integration**: `src/cli/factories/commandFactory.ts` - Updated to use non-deprecated API and manual STORAGE_TYPE setting
+- **Cleanup**: Removed deprecated `checkAndEnableRedisForConversationMemory()` function and excessive comments
+
+### **🎯 Technical Excellence Features**
+1. **Socket Leak Prevention**: Proper try/finally ensures `quit()` only called if client successfully created
+2. **Silent Error Handling**: All Redis detection errors logged at debug level to avoid user noise
+3. **Safe Client Lifecycle**: Comprehensive error catching for both connection and cleanup phases
+4. **No Side Effects**: `checkRedisAvailability()` returns boolean, caller sets STORAGE_TYPE manually
+5. **Clean Codebase**: Minimal comments, no deprecated functions, TypeScript compliant
+6. **Graceful Fallbacks**: Automatic fallback to memory storage when Redis unavailable
+
+### **Architecture Improvements**
+- **Non-Breaking Changes**: All existing functionality preserved
+- **TypeScript Compliance**: No deprecation warnings, follows best practices  
+- **Resource Management**: Zero socket leaks with proper cleanup guarantees
+- **Error Suppression**: Detection failures don't pollute user output
+- **Clean API Design**: Boolean return pattern avoids environment mutation side effects
+- **Production Ready**: Robust error handling suitable for enterprise deployment
+
+### **Usage Examples (Enhanced)**
+```bash
+# Default - auto-detects Redis with robust error handling
+pnpm cli loop
+# Shows: ✅ Using Redis for persistent conversation memory (if available)
+# Silent fallback to memory if Redis unavailable
+
+# Disable auto-detection  
+pnpm cli loop --no-auto-redis
+# Uses memory storage, skips Redis detection entirely
+
+# Debug mode shows Redis detection details
+pnpm cli loop --debug
+# Shows: Redis connection test successful/failed with details
+```
+
+---
+
+## 🚀 **PREVIOUS STATUS: AUTO-REDIS DETECTION FOR LOOP SESSIONS IMPLEMENTED** (2025-09-18)
+
+### **🏆 MAJOR ACHIEVEMENT: INTELLIGENT CONVERSATION MEMORY STORAGE**
+- **Primary Objective**: ✅ Enable automatic Redis detection and usage for loop sessions to provide persistent conversation memory
+- **Implementation**: Smart auto-detection system that automatically uses Redis when available, falls back gracefully to memory storage
+- **Developer Impact**: 
+  - Setup complexity: Manual Redis configuration → Automatic detection
+  - Persistence: Memory-only sessions → Persistent conversations across restarts
+  - User experience: No configuration required → "Just works" with Redis
+- **Status**: ✅ **PRODUCTION READY** - Auto-Redis detection operational for loop sessions
+
+### **✅ Auto-Redis Detection Framework Complete**
+**Files Enhanced:**
+- **Redis Detection Logic**: Enhanced `checkAndEnableRedisForConversationMemory()` in `src/lib/utils/conversationMemoryUtils.ts` with direct imports and clean error handling
+- **Loop Command Enhancement**: Modified `src/cli/factories/commandFactory.ts` with improved error handling and default quiet mode
+- **CLI Integration**: Added `--auto-redis` (default: true) and `--no-auto-redis` options following standard yargs patterns
+
+### **🎯 Intelligent Storage Management Features (Enhanced)**
+1. **Clean Separation of Concerns**: Utility function focuses on Redis testing, CLI handles user interaction
+2. **Direct Import Architecture**: No dynamic imports - cleaner, more reliable Redis utility integration
+3. **Proper Error Propagation**: Utility function throws errors, CLI handles them with appropriate user feedback
+4. **Smart Default Behavior**: CLI defaults to quiet mode for cleaner user experience
+5. **Context-Aware Logging**: Success messages only when Redis detected AND not in quiet mode
+6. **Debug-Friendly**: Comprehensive debug logging available when `--debug` flag used
+
+### **Technical Excellence (Improved)**
+- **Clean Architecture**: Direct imports instead of dynamic imports for better reliability
+- **Error Handling**: Proper try-catch structure with meaningful error propagation
+- **User Experience**: Quiet by default with success feedback only when appropriate
+- **Performance**: Immediate imports, no runtime module loading overhead
+- **Maintainability**: Clear separation between utility logic and CLI presentation logic
+- **Zero Configuration**: Works out of the box with default Redis setup (localhost:6379)
+
+### **Usage Examples**
+```bash
+# Default - auto-detects Redis
+pnpm cli loop
+# Shows: ✅ Using Redis for persistent conversation memory (if available)
+
+# Disable auto-detection  
+pnpm cli loop --no-auto-redis
+# Uses memory storage, skips Redis detection
+
+# No conversation memory (Redis logic skipped entirely)
+pnpm cli loop --no-enable-conversation-memory
+# No Redis detection since memory not enabled
+```
+
+---
+
+## 🚀 **PREVIOUS STATUS: INTERACTIVE PROVIDER SETUP FRAMEWORK IMPLEMENTED** (2025-01-09)
 
 ### **🏆 MAJOR ACHIEVEMENT: ENTERPRISE-GRADE DEVELOPER EXPERIENCE**
 - **Primary Objective**: ✅ Transform NeuroLink setup from manual environment configuration to guided interactive wizard
@@ -213,7 +315,7 @@
 - **Error Recovery**: Graceful handling of setup failures with clear resolution steps
 - **Configuration Management**: Atomic .env updates with existing content preservation
 - **Cross-Platform**: Works on Windows, macOS, and Linux with consistent experience
->>>>>>> Stashed changes
+
 ## 🚀 **CURRENT STATUS: PHASE 1 MCP PARALLEL LOADING IMPLEMENTED** (2025-01-09)
 
 ### **✅ Phase 1 Parallel Loading Complete**
