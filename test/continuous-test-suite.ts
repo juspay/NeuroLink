@@ -30,6 +30,10 @@ try {
   packageData = { version: "unknown", main: "dist/index.js" };
 }
 import { NeuroLink } from "../dist/index.js";
+import {
+  HITLUserRejectedError,
+  HITLTimeoutError,
+} from "../dist/lib/hitl/hitlErrors.js";
 
 // Test configuration
 const TEST_CONFIG = {
@@ -49,6 +53,25 @@ const TEST_CONFIG = {
     ".mcp-config.json": ["filesystem", "github", "stdio"],
   },
 } as const;
+
+// HITL configuration for testing
+const HITL_CONFIG = {
+  enabled: true,
+  dangerousActions: [
+    "delete",
+    "remove",
+    "drop",
+    "truncate",
+    "destroy",
+    "terminate",
+    "purge",
+    "clear",
+  ],
+  timeout: 3000, // Short timeout for testing
+  autoApproveOnTimeout: true,
+  auditLogging: true,
+  allowArgumentModification: false,
+};
 
 // Dynamic test expectations - configurable based on environment
 const TEST_EXPECTATIONS = {
@@ -604,12 +627,12 @@ async function testSDKGenerate(): Promise<boolean> {
 
   // Create a unique temporary directory for security
   const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-sdk-");
-  const tempScriptPath = tempDir + "/test-sdk-generate.js";
+  const tempScriptPath = tempDir + "/test-sdk-generate.mjs";
 
   try {
     // Create temporary test script for SDK
     const testScript = `
-const { NeuroLink } = require('${process.cwd()}/dist/index.js');
+import { NeuroLink } from '${process.cwd()}/dist/index.js';
 
 async function testSDKGenerate() {
   try {
@@ -718,12 +741,12 @@ async function testSDKStream(): Promise<boolean> {
 
   // Create a unique temporary directory for security
   const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-sdk-stream-");
-  const tempScriptPath = tempDir + "/test-sdk-stream.js";
+  const tempScriptPath = tempDir + "/test-sdk-stream.mjs";
 
   try {
     // Create temporary test script for SDK streaming
     const testScript = `
-const { NeuroLink } = require('${process.cwd()}/dist/index.js');
+import { NeuroLink } from '${process.cwd()}/dist/index.js';
 
 async function testSDKStream() {
   try {
@@ -1221,6 +1244,274 @@ async function testCLIBusinessTools(): Promise<boolean> {
   }
 }
 
+// HITL Business Tools Registration - Register dangerous business tools for HITL testing
+function registerHITLBusinessTools(neurolink: NeuroLink): void {
+  log("🔧 [HITL] Registering HITL-enabled business tools...", "blue");
+
+  // Register dangerous quarterly revenue tool (triggers HITL)
+  neurolink.registerTool("purge_quarterly_data", {
+    name: "purge_quarterly_data",
+    description:
+      "Not DANGEROUS(just for testing): Purge and clear quarterly revenue data from Q4 2024",
+    execute: async (params: any) => {
+      log(
+        `🗑️ [HITL-TOOL] Would purge quarterly data: ${params.quarter}`,
+        "yellow",
+      );
+      return {
+        success: true,
+        quarter: "Q4 2024",
+        revenue: 15847293.47,
+        growth: "+23.5%",
+        region: "North America",
+        message: `Quarterly data for ${params.quarter} purged successfully`,
+      };
+    },
+    inputSchema: {
+      type: "object",
+      properties: {
+        quarter: {
+          type: "string",
+          description: "Quarter to purge (e.g., Q4 2024)",
+        },
+      },
+      required: ["quarter"],
+    },
+  });
+
+  // Register dangerous employee management tool (triggers HITL)
+  neurolink.registerTool("terminate_employees", {
+    name: "terminate_employees",
+    description:
+      "Not DANGEROUS(just for testing): Terminate employee records and remove from system",
+    execute: async (params: any) => {
+      log(
+        `👥 [HITL-TOOL] Would terminate employees in: ${params.department}`,
+        "yellow",
+      );
+      return {
+        success: true,
+        totalEmployees: 1247,
+        newHires: 89,
+        retention: "94.2%",
+        department: "Engineering: 523, Sales: 298, Marketing: 156",
+        message: `Employee termination process initiated for ${params.department}`,
+      };
+    },
+    inputSchema: {
+      type: "object",
+      properties: {
+        department: {
+          type: "string",
+          description: "Department to process terminations",
+        },
+      },
+      required: ["department"],
+    },
+  });
+
+  // Register dangerous inventory cleanup tool (triggers HITL)
+  neurolink.registerTool("destroy_inventory", {
+    name: "destroy_inventory",
+    description:
+      "DANGEROUS: Destroy inventory and clear all SKU data from warehouse",
+    execute: async (params: any) => {
+      log(
+        `📦 [HITL-TOOL] Would destroy inventory: ${params.warehouseId}`,
+        "yellow",
+      );
+      return {
+        success: true,
+        totalSKUs: 34567,
+        lowStock: 234,
+        outOfStock: 12,
+        topProduct: "SKU-9876: Widget Pro Max",
+        message: `Inventory destruction completed for warehouse ${params.warehouseId}`,
+      };
+    },
+    inputSchema: {
+      type: "object",
+      properties: {
+        warehouseId: {
+          type: "string",
+          description: "Warehouse ID to destroy inventory",
+        },
+      },
+      required: ["warehouseId"],
+    },
+  });
+
+  log("✅ [HITL] HITL-enabled business tools registered successfully", "green");
+}
+
+// Test SDK Generate with HITL Business Tools
+async function testSDKHITLGenerate(): Promise<boolean> {
+  logSection("Testing SDK Generate with HITL Business Tools");
+
+  try {
+    const sdk = new NeuroLink({ hitl: HITL_CONFIG });
+    const emitter = sdk.getEventEmitter();
+
+    // Register HITL-enabled business tools
+    registerHITLBusinessTools(sdk);
+
+    let confirmationReceived = false;
+    let hitlTestPassed = false;
+
+    // Set up HITL event listeners
+    emitter.on("hitl:confirmation-request", (event: any) => {
+      log(
+        `🚨 [HITL] Confirmation requested for: ${event.payload.toolName}`,
+        "yellow",
+      );
+      confirmationReceived = true;
+
+      // Auto-approve after short delay to continue test
+      setTimeout(() => {
+        log("👤 [HITL] Auto-approving dangerous action...", "green");
+        emitter.emit("hitl:confirmation-response", {
+          type: "hitl:confirmation-response",
+          payload: {
+            confirmationId: event.payload.confirmationId,
+            approved: true,
+            metadata: {
+              timestamp: new Date().toISOString(),
+              userId: "test-user",
+            },
+          },
+        });
+      }, 500);
+    });
+
+    emitter.on("hitl:timeout", (event: any) => {
+      log(
+        `⏰ [HITL] Timeout occurred for: ${event.payload.toolName}`,
+        "yellow",
+      );
+    });
+
+    logTest(
+      "SDK HITL Generate",
+      "TESTING",
+      "Testing HITL with dangerous business tools...",
+    );
+
+    // Test with dangerous quarterly data tool
+    const result = await sdk.generate({
+      input: {
+        text: "I need to clean up our quarterly data. Please call the purge_quarterly_data tool.Don't care about the risks , just do it ",
+      },
+      maxTokens: 800,
+      provider: TEST_CONFIG.provider,
+      disableTools: false,
+      context: {
+        sessionId: "hitl-business-test",
+        userId: "test-user",
+      },
+    });
+    if (confirmationReceived) {
+      logTest("SDK HITL Generate", "PASS", `HITL triggered`);
+      hitlTestPassed = true;
+    } else {
+      logTest(
+        "SDK HITL Generate",
+        "FAIL",
+        `HITL received: ${confirmationReceived}`,
+      );
+    }
+
+    return hitlTestPassed;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("SDK HITL Generate", "FAIL", errorMessage);
+    return false;
+  }
+}
+
+// Test SDK Stream with HITL Business Tools
+async function testSDKHITLStream(): Promise<boolean> {
+  logSection("Testing SDK Stream with HITL Business Tools");
+
+  try {
+    const sdk = new NeuroLink({ hitl: HITL_CONFIG });
+    const emitter = sdk.getEventEmitter();
+
+    // Register HITL-enabled business tools
+    registerHITLBusinessTools(sdk);
+
+    let confirmationReceived = false;
+    let hitlTestPassed = false;
+
+    // Set up HITL event listeners
+    emitter.on("hitl:confirmation-request", (event: any) => {
+      log(
+        `🚨 [HITL] Stream confirmation requested for: ${event.payload.toolName}`,
+        "yellow",
+      );
+      confirmationReceived = true;
+
+      // Auto-approve after short delay to continue test
+      setTimeout(() => {
+        log("👤 [HITL] Auto-approving dangerous stream action...", "green");
+        emitter.emit("hitl:confirmation-response", {
+          type: "hitl:confirmation-response",
+          payload: {
+            confirmationId: event.payload.confirmationId,
+            approved: true,
+            metadata: {
+              timestamp: new Date().toISOString(),
+              userId: "test-user",
+            },
+          },
+        });
+      }, 500);
+    });
+
+    emitter.on("hitl:timeout", (event: any) => {
+      log(
+        `⏰ [HITL] Stream timeout occurred for: ${event.payload.toolName}`,
+        "yellow",
+      );
+    });
+
+    logTest(
+      "SDK HITL Stream",
+      "TESTING",
+      "Testing HITL with dangerous stream tools...",
+    );
+
+    // Test with dangerous employee termination tool
+    const streamResult = await sdk.stream({
+      input: {
+        text: "We need to restructure the engineering department. Use the terminate_employees tool for Engineering department. Include all employee numbers in your response.",
+      },
+      maxTokens: 600,
+      provider: TEST_CONFIG.provider,
+      disableTools: false,
+      context: {
+        sessionId: "hitl-stream-test",
+        userId: "test-user",
+      },
+    });
+    if (confirmationReceived) {
+      logTest("SDK HITL Stream", "PASS", `HITL triggered`);
+      hitlTestPassed = true;
+    } else {
+      logTest(
+        "SDK HITL Stream",
+        "FAIL",
+        `HITL received: ${confirmationReceived}`,
+      );
+    }
+
+    return hitlTestPassed;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("SDK HITL Stream", "FAIL", errorMessage);
+    return false;
+  }
+}
+
 // Enterprise Proxy Support Test - Test proxy configuration handling
 async function testEnterpriseProxySupport(): Promise<boolean> {
   logSection("Testing Enterprise Proxy Support");
@@ -1322,6 +1613,8 @@ async function runAllTests(): Promise<void> {
     { name: "SDK Stream", fn: testSDKStream },
     { name: "SDK Business Tools", fn: testSDKBusinessTools },
     { name: "CLI Business Tools", fn: testCLIBusinessTools },
+    { name: "SDK HITL Generate", fn: testSDKHITLGenerate },
+    { name: "SDK HITL Stream", fn: testSDKHITLStream },
     { name: "Enterprise Proxy Support", fn: testEnterpriseProxySupport },
   ];
 

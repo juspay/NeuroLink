@@ -125,7 +125,9 @@ async function environmentSetupExample() {
       isConfigured = !!process.env[provider.envVar];
     }
 
-    if (!isConfigured) {continue;}
+    if (!isConfigured) {
+      continue;
+    }
 
     const providerKey = provider.name.toLowerCase().replace(/\s+/g, "-");
     const providerId = providerIdMap[providerKey];

@@ -21,6 +21,10 @@ import type {
 import { HITLTimeoutError, HITLConfigurationError } from "./hitlErrors.js";
 import { logger } from "../utils/logger.js";
 
+// Default configuration constants
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
+const DEFAULT_ALLOW_MODIFICATION = false;
+
 /**
  * HITLManager - Central orchestrator for Human-in-the-Loop safety mechanisms
  *
@@ -58,9 +62,9 @@ export class HITLManager extends EventEmitter {
     const configWithDefaults: HITLConfig = {
       enabled: config.enabled,
       dangerousActions: config.dangerousActions,
-      timeout: config.timeout ?? 30000, // Default: 30 seconds
+      timeout: config.timeout ?? DEFAULT_TIMEOUT, // Default: 30 seconds
       confirmationMethod: config.confirmationMethod ?? "event", // Default: "event"
-      allowArgumentModification: config.allowArgumentModification ?? true, // Default: true
+      allowArgumentModification: config.allowArgumentModification ?? DEFAULT_ALLOW_MODIFICATION, // Default: true
       autoApproveOnTimeout: config.autoApproveOnTimeout ?? false, // Default: false (safe)
       auditLogging: config.auditLogging ?? false, // Default: false
       customRules: config.customRules ?? [], // Default: empty array
@@ -192,8 +196,8 @@ export class HITLManager extends EventEmitter {
             userId: context?.userId,
             dangerousKeywords: this.getTriggeredKeywords(toolName, arguments_),
           },
-          timeoutMs: this.config.timeout!,
-          allowModification: this.config.allowArgumentModification!,
+          timeoutMs: this.config.timeout ?? DEFAULT_TIMEOUT,
+          allowModification: this.config.allowArgumentModification ?? DEFAULT_ALLOW_MODIFICATION,
         },
       };
 
@@ -312,7 +316,7 @@ export class HITLManager extends EventEmitter {
       this.logAuditEvent("confirmation-timeout", {
         confirmationId,
         toolName: request.toolName,
-        timeout: this.config.timeout!,
+        timeout: this.config.timeout ?? DEFAULT_TIMEOUT,
         arguments: request.arguments,
         autoApproved: shouldAutoApprove,
       });
@@ -324,7 +328,7 @@ export class HITLManager extends EventEmitter {
       payload: {
         confirmationId,
         toolName: request.toolName,
-        timeout: this.config.timeout!,
+        timeout: this.config.timeout ?? DEFAULT_TIMEOUT,
       },
     };
 
@@ -368,7 +372,7 @@ export class HITLManager extends EventEmitter {
         new HITLTimeoutError(
           `Confirmation timeout for tool: ${request.toolName}`,
           confirmationId,
-          this.config.timeout!,
+          this.config.timeout ?? DEFAULT_TIMEOUT,
         ),
       );
     }
