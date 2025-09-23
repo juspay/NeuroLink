@@ -13,8 +13,8 @@ import type {
 import { MiddlewareRegistry } from "./registry.js";
 import { createAnalyticsMiddleware } from "./builtin/analytics.js";
 import { createGuardrailsMiddleware } from "./builtin/guardrails.js";
+import { createAutoEvaluationMiddleware } from "./builtin/autoEvaluation.js";
 import { logger } from "../utils/logger.js";
-import type { JsonValue } from "../types/common.js";
 
 /**
  * Middleware factory for creating and applying middleware chains.
@@ -38,10 +38,11 @@ export class MiddlewareFactory {
     // Register built-in middleware creators
     const builtInMiddlewareCreators: Record<
       string,
-      (config?: Record<string, JsonValue>) => NeuroLinkMiddleware
+      (config?: Record<string, unknown>) => NeuroLinkMiddleware
     > = {
       analytics: createAnalyticsMiddleware,
       guardrails: createGuardrailsMiddleware,
+      autoEvaluation: createAutoEvaluationMiddleware,
     };
 
     // Register built-in presets
@@ -75,6 +76,10 @@ export class MiddlewareFactory {
       if (!this.registry.has(middlewareId)) {
         const creator = builtInMiddlewareCreators[middlewareId];
         const config = options.middlewareConfig?.[middlewareId]?.config;
+        logger.debug(
+          `Registering built-in middleware '${middlewareId}'`,
+          config,
+        );
         this.registry.register(creator(config));
       }
     }
@@ -127,6 +132,7 @@ export class MiddlewareFactory {
 
       // Re-register middleware with the correct configuration for this call
       for (const [id, config] of Object.entries(middlewareConfig)) {
+        logger.debug(`Configuring middleware '${id}'`, { config });
         if (config.enabled && this.registry.has(id)) {
           const creator = this.getCreator(id);
           if (creator) {
@@ -181,11 +187,13 @@ export class MiddlewareFactory {
   private getCreator(id: string) {
     const builtInMiddlewareCreators: Record<
       string,
-      (config?: Record<string, JsonValue>) => NeuroLinkMiddleware
+      (config?: Record<string, unknown>) => NeuroLinkMiddleware
     > = {
       analytics: createAnalyticsMiddleware,
       guardrails: createGuardrailsMiddleware,
+      autoEvaluation: createAutoEvaluationMiddleware,
     };
+    logger.debug("Getting creator for middleware ID:", id);
     return builtInMiddlewareCreators[id];
   }
 
