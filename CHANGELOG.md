@@ -1,3 +1,9 @@
+## [7.46.0](https://github.com/juspay/neurolink/compare/v7.45.0...v7.46.0) (2025-09-24)
+
+### Features
+
+- **(auto-evaluation):** added auto evaluation for LLM response ([6f23fae](https://github.com/juspay/neurolink/commit/6f23fae5cacb1c0686257cc7ed547be675b68b23))
+
 ## [7.45.0](https://github.com/juspay/neurolink/compare/v7.44.0...v7.45.0) (2025-09-24)
 
 ### Features
