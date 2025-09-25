@@ -37,7 +37,7 @@ import {
   PERFORMANCE_THRESHOLDS,
 } from "./constants/index.js";
 import pLimit from "p-limit";
-import { toolRegistry } from "./mcp/toolRegistry.js";
+import { MCPToolRegistry } from "./mcp/toolRegistry.js";
 import { logger } from "./utils/logger.js";
 import { getBestProvider } from "./utils/providerUtils.js";
 import { ProviderRegistry } from "./factories/providerRegistry.js";
@@ -168,6 +168,8 @@ export class NeuroLink {
   private emitter =
     new EventEmitter() as unknown as TypedEventEmitter<NeuroLinkEvents>;
 
+  private toolRegistry: MCPToolRegistry;
+
   private autoDiscoveredServerInfos: MCPServerInfo[] = [];
   // External MCP server management
   private externalServerManager!: ExternalServerManager;
@@ -283,9 +285,7 @@ export class NeuroLink {
       return null;
     }
 
-    this.mem0Instance = await initializeMem0(
-      this.mem0Config,
-    );
+    this.mem0Instance = await initializeMem0(this.mem0Config);
     return this.mem0Instance;
   }
   /**
@@ -308,6 +308,7 @@ export class NeuroLink {
    * @param config.hitl.dangerousActions - Keywords that trigger confirmation (default: ['delete', 'remove', 'drop'])
    * @param config.hitl.timeout - Confirmation timeout in milliseconds (default: 30000)
    * @param config.hitl.allowArgumentModification - Allow users to modify tool parameters (default: true)
+   * @param config.toolRegistry - Optional tool registry instance for advanced use cases (default: new MCPToolRegistry())
    *
    * @example
    * ```typescript
@@ -348,7 +349,10 @@ export class NeuroLink {
     conversationMemory?: Partial<ConversationMemoryConfig>;
     enableOrchestration?: boolean;
     hitl?: HITLConfig;
+    toolRegistry?: MCPToolRegistry;
   }) {
+    this.toolRegistry = config?.toolRegistry || new MCPToolRegistry();
+
     // Initialize orchestration setting
     this.enableOrchestration = config?.enableOrchestration ?? false;
 
@@ -521,7 +525,7 @@ export class NeuroLink {
         this.hitlManager = new HITLManager(config.hitl);
 
         // Inject HITL manager into tool registry
-        toolRegistry.setHITLManager(this.hitlManager);
+        this.toolRegistry.setHITLManager(this.hitlManager);
 
         // Inject HITL manager into external server manager
         this.externalServerManager.setHITLManager(this.hitlManager);
@@ -602,7 +606,10 @@ export class NeuroLink {
   }
 
   /** Format memory context for prompt inclusion */
-  private formatMemoryContext(memoryContext: string, currentInput: string): string {
+  private formatMemoryContext(
+    memoryContext: string,
+    currentInput: string,
+  ): string {
     return `Context from previous conversations:
   ${memoryContext}
 
@@ -979,7 +986,7 @@ export class NeuroLink {
           "Direct tools server are disabled via environment variable.",
         );
       } else {
-        await toolRegistry.registerServer(
+        await this.toolRegistry.registerServer(
           "neurolink-direct",
           directToolsServer,
         );
@@ -1976,7 +1983,7 @@ export class NeuroLink {
           mcpInitialized: this.mcpInitialized,
           mcpComponents: {
             hasExternalServerManager: !!this.externalServerManager,
-            hasToolRegistry: !!toolRegistry,
+            hasToolRegistry: !!this.toolRegistry,
             hasProviderRegistry: !!AIProviderFactory,
           },
           fallbackReason: "MCP_NOT_INITIALIZED",
@@ -3316,7 +3323,7 @@ export class NeuroLink {
       const mcpServerInfo = createCustomToolServerInfo(name, convertedTool);
 
       // Register with toolRegistry using MCPServerInfo directly
-      toolRegistry.registerServer(mcpServerInfo);
+      this.toolRegistry.registerServer(mcpServerInfo);
 
       // Emit tool registration success event
       this.emitter.emit("tools-register:end", {
@@ -3397,7 +3404,7 @@ export class NeuroLink {
   unregisterTool(name: string): boolean {
     this.invalidateToolCache(); // Invalidate cache when a tool is unregistered
     const serverId = `custom-tool-${name}`;
-    const removed = toolRegistry.unregisterServer(serverId);
+    const removed = this.toolRegistry.unregisterServer(serverId);
     if (removed) {
       logger.info(`Unregistered custom tool: ${name}`);
     }
@@ -3410,7 +3417,7 @@ export class NeuroLink {
    */
   getCustomTools(): Map<string, MCPExecutableTool> {
     // Get tools from toolRegistry with smart category detection
-    const customTools = toolRegistry.getToolsByCategory(
+    const customTools = this.toolRegistry.getToolsByCategory(
       detectCategory({ isCustomTool: true }),
     );
     const toolMap = new Map<string, MCPExecutableTool>();
@@ -3483,7 +3490,7 @@ export class NeuroLink {
             sessionId: executionContext.sessionId,
           });
 
-          return await toolRegistry.executeTool(
+          return await this.toolRegistry.executeTool(
             tool.name,
             params,
             executionContext as Record<string, unknown>,
@@ -3517,7 +3524,7 @@ export class NeuroLink {
       }
 
       // ZERO CONVERSIONS: Pass MCPServerInfo directly to toolRegistry
-      await toolRegistry.registerServer(serverInfo);
+      await this.toolRegistry.registerServer(serverInfo);
 
       mcpLogger.info(
         `[NeuroLink] Successfully registered in-memory server: ${serverId}`,
@@ -3542,7 +3549,7 @@ export class NeuroLink {
    */
   getInMemoryServers(): Map<string, MCPServerInfo> {
     // Get in-memory servers from toolRegistry
-    const serverInfos = toolRegistry.getBuiltInServerInfos();
+    const serverInfos = this.toolRegistry.getBuiltInServerInfos();
     const serverMap = new Map<string, MCPServerInfo>();
 
     for (const serverInfo of serverInfos) {
@@ -3566,7 +3573,7 @@ export class NeuroLink {
    */
   getInMemoryServerInfos(): MCPServerInfo[] {
     // Get in-memory servers from centralized tool registry
-    const allServers = toolRegistry.getBuiltInServerInfos();
+    const allServers = this.toolRegistry.getBuiltInServerInfos();
     return allServers.filter(
       (server) =>
         detectCategory({
@@ -3938,7 +3945,7 @@ export class NeuroLink {
         finalContextKeys: Object.keys(context),
       });
 
-      const result = (await toolRegistry.executeTool(
+      const result = (await this.toolRegistry.executeTool(
         toolName,
         params,
         context,
@@ -4012,9 +4019,9 @@ export class NeuroLink {
 
       // 🔧 Tool registry state
       toolRegistryState: {
-        hasToolRegistry: !!toolRegistry,
+        hasToolRegistry: !!this.toolRegistry,
         toolRegistrySize: 0, // Not accessible as size property
-        toolRegistryType: toolRegistry?.constructor?.name || "NOT_SET",
+        toolRegistryType: this.toolRegistry?.constructor?.name || "NOT_SET",
         hasExternalServerManager: !!this.externalServerManager,
         externalServerManagerType:
           this.externalServerManager?.constructor?.name || "NOT_SET",
@@ -4039,7 +4046,7 @@ export class NeuroLink {
       const allTools = new Map<string, ToolInfo>();
 
       // 1. Add MCP server tools (built-in direct tools)
-      const mcpToolsRaw = await toolRegistry.listTools();
+      const mcpToolsRaw = await this.toolRegistry.listTools();
       for (const tool of mcpToolsRaw) {
         if (!allTools.has(tool.name)) {
           const optimizedTool = optimizeToolForCollection(tool, {
@@ -4051,7 +4058,7 @@ export class NeuroLink {
       }
 
       // 2. Add custom tools from this NeuroLink instance
-      const customToolsRaw = toolRegistry.getToolsByCategory(
+      const customToolsRaw = this.toolRegistry.getToolsByCategory(
         detectCategory({ isCustomTool: true }),
       );
       for (const tool of customToolsRaw) {
@@ -4070,7 +4077,8 @@ export class NeuroLink {
       }
 
       // 3. Add tools from in-memory MCP servers
-      const inMemoryToolsRaw = toolRegistry.getToolsByCategory("in-memory");
+      const inMemoryToolsRaw =
+        this.toolRegistry.getToolsByCategory("in-memory");
       for (const tool of inMemoryToolsRaw) {
         if (!allTools.has(tool.name)) {
           const optimizedTool = optimizeToolForCollection(tool, {
@@ -4417,7 +4425,7 @@ export class NeuroLink {
       await this.initializeMCP();
 
       // Get built-in tools
-      const allTools = await toolRegistry.listTools();
+      const allTools = await this.toolRegistry.listTools();
 
       // Get external MCP server statistics
       const externalStats = this.externalServerManager.getStatistics();
@@ -4425,7 +4433,7 @@ export class NeuroLink {
       // DIRECT RETURNS - ZERO conversion
       const externalMCPServers = this.externalServerManager.listServers();
       const inMemoryServerInfos = this.getInMemoryServerInfos();
-      const builtInServerInfos = toolRegistry.getBuiltInServerInfos();
+      const builtInServerInfos = this.toolRegistry.getBuiltInServerInfos();
       const autoDiscoveredServerInfos = this.getAutoDiscoveredServerInfos();
 
       // Calculate totals
@@ -4447,7 +4455,7 @@ export class NeuroLink {
         autoDiscoveredCount: autoDiscoveredServerInfos.length,
         totalTools,
         autoDiscoveredServers: autoDiscoveredServerInfos,
-        customToolsCount: toolRegistry.getToolsByCategory(
+        customToolsCount: this.toolRegistry.getToolsByCategory(
           detectCategory({ isCustomTool: true }),
         ).length,
         inMemoryServersCount: inMemoryServerInfos.length,
@@ -4464,7 +4472,7 @@ export class NeuroLink {
         autoDiscoveredCount: 0,
         totalTools: 0,
         autoDiscoveredServers: [],
-        customToolsCount: toolRegistry.getToolsByCategory(
+        customToolsCount: this.toolRegistry.getToolsByCategory(
           detectCategory({ isCustomTool: true }),
         ).length,
         inMemoryServersCount: 0,
@@ -4486,7 +4494,7 @@ export class NeuroLink {
     return [
       ...this.externalServerManager.listServers(), // Direct return
       ...this.getInMemoryServerInfos(), // Direct return
-      ...toolRegistry.getBuiltInServerInfos(), // Direct return
+      ...this.toolRegistry.getBuiltInServerInfos(), // Direct return
       ...this.getAutoDiscoveredServerInfos(), // Direct return
     ];
   }
@@ -4500,7 +4508,7 @@ export class NeuroLink {
     try {
       // Test built-in tools
       if (serverId === "neurolink-direct") {
-        const tools = await toolRegistry.listTools();
+        const tools = await this.toolRegistry.listTools();
         return tools.length > 0;
       }
 
@@ -4855,7 +4863,7 @@ export class NeuroLink {
     let healthyCount = 0;
 
     // Get all tool names from toolRegistry
-    const allTools = await toolRegistry.listTools();
+    const allTools = await this.toolRegistry.listTools();
     const allToolNames = new Set(allTools.map((tool) => tool.name));
 
     for (const toolName of allToolNames) {
@@ -5466,7 +5474,7 @@ export class NeuroLink {
       const externalTools = this.externalServerManager.getServerTools(serverId);
 
       for (const tool of externalTools) {
-        toolRegistry.removeTool(tool.name);
+        this.toolRegistry.removeTool(tool.name);
         mcpLogger.debug(
           `[NeuroLink] Unregistered external MCP tool from main registry: ${tool.name}`,
         );
@@ -5484,7 +5492,7 @@ export class NeuroLink {
    */
   private unregisterExternalMCPToolFromRegistry(toolName: string): void {
     try {
-      toolRegistry.removeTool(toolName);
+      this.toolRegistry.removeTool(toolName);
       mcpLogger.debug(
         `[NeuroLink] Unregistered external MCP tool from main registry: ${toolName}`,
       );
@@ -5567,7 +5575,7 @@ export class NeuroLink {
       const externalTools = this.externalServerManager.getAllTools();
 
       for (const tool of externalTools) {
-        toolRegistry.removeTool(tool.name);
+        this.toolRegistry.removeTool(tool.name);
       }
 
       mcpLogger.debug(

@@ -248,7 +248,7 @@ export class ProviderRegistry {
           const { AmazonSageMakerProvider } = await import(
             "../providers/amazonSagemaker.js"
           );
-          return new AmazonSageMakerProvider(modelName, region);
+          return new AmazonSageMakerProvider(modelName, undefined, region);
         },
         process.env.SAGEMAKER_MODEL || "sagemaker-model",
         ["sagemaker", "aws-sagemaker"],
