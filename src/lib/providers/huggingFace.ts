@@ -178,6 +178,7 @@ export class HuggingFaceProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[HuggingFaceProvider] Failed to store tool executions",

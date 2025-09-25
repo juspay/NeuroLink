@@ -73,6 +73,7 @@ export async function storeConversationTurn(
   conversationMemory: ConversationMemoryManager | undefined,
   originalOptions: TextGenerationOptions,
   result: TextGenerationResult,
+  startTimeStamp?: Date | undefined,
 ): Promise<void> {
   if (!conversationMemory || !originalOptions.context) {
     return;
@@ -93,6 +94,7 @@ export async function storeConversationTurn(
       userId,
       originalOptions.originalPrompt || originalOptions.prompt || "",
       result.content,
+      startTimeStamp,
     );
 
     logger.debug("Conversation turn stored", {

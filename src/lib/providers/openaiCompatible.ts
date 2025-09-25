@@ -242,6 +242,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[OpenAiCompatibleProvider] Failed to store tool executions",

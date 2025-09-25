@@ -1746,6 +1746,7 @@ export class NeuroLink {
           this.conversationMemory,
           options,
           mcpResult,
+          new Date(generateInternalStartTime),
         );
         this.emitter.emit("response:end", mcpResult.content || "");
         return mcpResult;
@@ -1758,6 +1759,7 @@ export class NeuroLink {
         this.conversationMemory,
         options,
         directResult,
+        new Date(generateInternalStartTime),
       );
       this.emitter.emit("response:end", directResult.content || "");
       this.emitter.emit("message", `Text generation completed successfully`);
@@ -2566,6 +2568,7 @@ export class NeuroLink {
                   ?.userId as string,
                 originalPrompt ?? "",
                 accumulatedContent,
+                new Date(startTime),
               );
               logger.debug("Stream conversation turn stored", {
                 sessionId: (enhancedOptions.context as Record<string, unknown>)
@@ -2883,6 +2886,7 @@ export class NeuroLink {
               userId || (options.context?.userId as string),
               originalPrompt ?? "",
               fallbackAccumulatedContent,
+              new Date(startTime),
             );
             logger.debug("Fallback stream conversation turn stored", {
               sessionId: sessionId || options.context?.sessionId,
@@ -5061,6 +5065,7 @@ export class NeuroLink {
    * @param userId - User identifier (optional)
    * @param toolCalls - Array of tool calls
    * @param toolResults - Array of tool results
+   * @param currentTime - Date when the tool execution occurred (optional)
    * @returns Promise resolving when storage is complete
    */
   async storeToolExecutions(
@@ -5078,6 +5083,7 @@ export class NeuroLink {
       error?: string;
       [key: string]: unknown;
     }>,
+    currentTime?: Date,
   ): Promise<void> {
     // Check if tools are not empty
     const hasToolData =
@@ -5103,6 +5109,7 @@ export class NeuroLink {
         userId,
         toolCalls,
         toolResults,
+        currentTime,
       );
     } catch (error) {
       logger.warn("Failed to store tool executions", {

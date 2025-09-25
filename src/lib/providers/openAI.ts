@@ -383,6 +383,7 @@ export class OpenAIProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn("[OpenAIProvider] Failed to store tool executions", {
               provider: this.providerName,

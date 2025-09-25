@@ -127,6 +127,7 @@ export async function storeConversationTurn(
     | undefined,
   originalOptions: TextGenerationOptions,
   result: TextGenerationResult,
+  startTimeStamp?: Date | undefined,
 ): Promise<void> {
   logger.debug("[conversationMemoryUtils] storeConversationTurn called", {
     hasMemory: !!conversationMemory,
@@ -178,6 +179,7 @@ export async function storeConversationTurn(
       userId,
       userMessage,
       aiResponse,
+      startTimeStamp,
     );
 
     logger.debug(

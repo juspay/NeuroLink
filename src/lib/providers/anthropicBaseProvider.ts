@@ -113,6 +113,7 @@ export class AnthropicProviderV2 extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[AnthropicBaseProvider] Failed to store tool executions",

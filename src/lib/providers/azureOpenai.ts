@@ -208,6 +208,7 @@ export class AzureOpenAIProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[AzureOpenaiProvider] Failed to store tool executions",

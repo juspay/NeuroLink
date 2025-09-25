@@ -97,6 +97,7 @@ export class MistralProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn("[MistralProvider] Failed to store tool executions", {
               provider: this.providerName,

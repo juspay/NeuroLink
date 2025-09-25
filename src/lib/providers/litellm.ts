@@ -191,6 +191,7 @@ export class LiteLLMProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn("LiteLLMProvider] Failed to store tool executions", {
               provider: this.providerName,

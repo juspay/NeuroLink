@@ -216,6 +216,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[GoogleAiStudioProvider] Failed to store tool executions",

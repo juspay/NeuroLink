@@ -434,14 +434,17 @@ export abstract class BaseProvider implements AIProvider {
         logger.info("Tool execution completed", { toolResults, toolCalls });
 
         // Handle tool execution storage
-        this.handleToolExecutionStorage(toolCalls, toolResults, options).catch(
-          (error: unknown) => {
-            logger.warn("[BaseProvider] Failed to store tool executions", {
-              provider: this.providerName,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          },
-        );
+        this.handleToolExecutionStorage(
+          toolCalls,
+          toolResults,
+          options,
+          new Date(),
+        ).catch((error: unknown) => {
+          logger.warn("[BaseProvider] Failed to store tool executions", {
+            provider: this.providerName,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
       },
     });
   }
@@ -2133,6 +2136,7 @@ export abstract class BaseProvider implements AIProvider {
     toolCalls: unknown[],
     toolResults: unknown[],
     options: TextGenerationOptions | StreamOptions,
+    currentTime: Date,
   ): Promise<void> {
     // Check if tools are not empty
     const hasToolData =
@@ -2172,6 +2176,7 @@ export abstract class BaseProvider implements AIProvider {
           error?: string;
           [key: string]: unknown;
         }>,
+        currentTime,
       );
     } catch (error) {
       logger.warn("[BaseProvider] Failed to store tool executions", {

@@ -955,6 +955,7 @@ export class GoogleVertexProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[GoogleVertexProvider] Failed to store tool executions",
