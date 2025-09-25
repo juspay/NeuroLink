@@ -94,11 +94,41 @@ export class OpenAIProvider extends BaseProvider {
       );
     }
 
-    if (message.includes("rate limit")) {
+    if (
+      message.includes("rate limit") ||
+      message.includes("rate_limit_exceeded") ||
+      message.includes("429")
+    ) {
       return new Error("OpenAI rate limit exceeded. Please try again later.");
     }
 
-    return new Error(`OpenAI error: ${message}`);
+    // Handle connection errors
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      return new Error(
+        "OpenAI API connection error. Please check your internet connection and try again.",
+      );
+    }
+
+    // Handle server errors
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
+    ) {
+      return new Error(
+        "OpenAI API server error. Please try again in a few moments.",
+      );
+    }
+
+    return new Error(`OpenAI Error: ${message}`);
   }
 
   /**

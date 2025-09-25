@@ -420,6 +420,30 @@ export class GoogleVertexProvider extends BaseProvider {
         ? errorRecord.message
         : "Unknown error occurred";
 
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      return new Error(
+        "Google Vertex AI API connection error. Please check your internet connection and try again.",
+      );
+    }
+
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
+    ) {
+      return new Error(
+        "Google Vertex AI API server error. Please try again in a few moments.",
+      );
+    }
+
     if (message.includes("PERMISSION_DENIED")) {
       return new Error(
         `❌ Google Vertex AI Permission Denied\n\nYour Google Cloud credentials don't have permission to access Vertex AI.\n\nRequired Steps:\n1. Ensure your service account has Vertex AI User role\n2. Check if Vertex AI API is enabled in your project\n3. Verify your project ID is correct\n4. Confirm your location/region has Vertex AI available`,

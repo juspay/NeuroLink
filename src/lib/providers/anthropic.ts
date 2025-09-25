@@ -85,13 +85,15 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     const errorRecord = error as UnknownRecord;
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error";
 
     // Handle API key errors
     if (
-      (typeof errorRecord?.message === "string" &&
-        errorRecord.message.includes("API_KEY_INVALID")) ||
-      (typeof errorRecord?.message === "string" &&
-        errorRecord.message.includes("Invalid API key"))
+      message.includes("API_KEY_INVALID") ||
+      message.includes("Invalid API key")
     ) {
       return new Error(
         "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable.",
@@ -100,10 +102,9 @@ export class AnthropicProvider extends BaseProvider {
 
     // Handle rate limiting errors
     if (
-      typeof errorRecord?.message === "string" &&
-      (errorRecord.message.includes("rate limit") ||
-        errorRecord.message.includes("too_many_requests") ||
-        errorRecord.message.includes("429"))
+      message.includes("rate limit") ||
+      message.includes("too_many_requests") ||
+      message.includes("429")
     ) {
       return new Error(
         "Anthropic rate limit exceeded. Please try again later.",
@@ -112,12 +113,11 @@ export class AnthropicProvider extends BaseProvider {
 
     // Handle connection errors
     if (
-      typeof errorRecord?.message === "string" &&
-      (errorRecord.message.includes("ECONNRESET") ||
-        errorRecord.message.includes("ENOTFOUND") ||
-        errorRecord.message.includes("ECONNREFUSED") ||
-        errorRecord.message.includes("network") ||
-        errorRecord.message.includes("connection"))
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
     ) {
       return new Error(
         "Anthropic API connection error. Please check your internet connection and try again.",
@@ -126,23 +126,18 @@ export class AnthropicProvider extends BaseProvider {
 
     // Handle server errors
     if (
-      typeof errorRecord?.message === "string" &&
-      (errorRecord.message.includes("500") ||
-        errorRecord.message.includes("502") ||
-        errorRecord.message.includes("503") ||
-        errorRecord.message.includes("504") ||
-        errorRecord.message.includes("server error"))
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
     ) {
       return new Error(
         "Anthropic API server error. Please try again in a few moments.",
       );
     }
 
-    const message =
-      typeof errorRecord?.message === "string"
-        ? errorRecord.message
-        : "Unknown error";
-    return new Error(`Anthropic error: ${message}`);
+    return new Error(`Anthropic Error: ${message}`);
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools

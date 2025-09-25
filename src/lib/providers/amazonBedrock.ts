@@ -160,6 +160,40 @@ export class AmazonBedrockProvider extends BaseProvider {
 
     const errorMessage = error instanceof Error ? error.message : String(error);
 
+    if (
+      errorMessage.includes("rate limit") ||
+      errorMessage.includes("throttling") ||
+      errorMessage.includes("429")
+    ) {
+      return new Error(
+        "Amazon Bedrock rate limit exceeded. Please try again later.",
+      );
+    }
+
+    if (
+      errorMessage.includes("ECONNRESET") ||
+      errorMessage.includes("ENOTFOUND") ||
+      errorMessage.includes("ECONNREFUSED") ||
+      errorMessage.includes("network") ||
+      errorMessage.includes("connection")
+    ) {
+      return new Error(
+        "Amazon Bedrock API connection error. Please check your internet connection and try again.",
+      );
+    }
+
+    if (
+      errorMessage.includes("500") ||
+      errorMessage.includes("502") ||
+      errorMessage.includes("503") ||
+      errorMessage.includes("504") ||
+      errorMessage.includes("server error")
+    ) {
+      return new Error(
+        "Amazon Bedrock API server error. Please try again in a few moments.",
+      );
+    }
+
     if (errorMessage.includes("InvalidRequestException")) {
       return new Error(
         `❌ Amazon Bedrock Request Error\n\nThe request was invalid: ${errorMessage}\n\n🔧 Common Solutions:\n1. Check your model ID format\n2. Verify your request parameters\n3. Ensure your AWS account has Bedrock access`,

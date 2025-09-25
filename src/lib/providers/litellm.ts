@@ -102,57 +102,55 @@ export class LiteLLMProvider extends BaseProvider {
       return new Error(`LiteLLM request timed out: ${error.message}`);
     }
 
-    // Check for timeout by error name and message as fallback
     const errorRecord = error as UnknownRecord;
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error";
+
     if (
-      errorRecord?.name === "TimeoutError" ||
-      (typeof errorRecord?.message === "string" &&
-        errorRecord.message.includes("Timeout"))
+      message.includes("ECONNREFUSED") ||
+      message.includes("Failed to fetch") ||
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND")
     ) {
       return new Error(
-        `LiteLLM request timed out: ${errorRecord?.message || "Unknown timeout"}`,
+        `LiteLLM proxy server not available. Please start the LiteLLM proxy server at ${
+          process.env.LITELLM_BASE_URL || "http://localhost:4000"
+        }`,
       );
     }
-    if (typeof errorRecord?.message === "string") {
-      if (
-        errorRecord.message.includes("ECONNREFUSED") ||
-        errorRecord.message.includes("Failed to fetch")
-      ) {
-        return new Error(
-          "LiteLLM proxy server not available. Please start the LiteLLM proxy server at " +
-            `${process.env.LITELLM_BASE_URL || "http://localhost:4000"}`,
-        );
-      }
 
-      if (
-        errorRecord.message.includes("API_KEY_INVALID") ||
-        errorRecord.message.includes("Invalid API key")
-      ) {
-        return new Error(
-          "Invalid LiteLLM configuration. Please check your LITELLM_API_KEY environment variable.",
-        );
-      }
-
-      if (errorRecord.message.includes("rate limit")) {
-        return new Error(
-          "LiteLLM rate limit exceeded. Please try again later.",
-        );
-      }
-
-      if (
-        errorRecord.message.includes("model") &&
-        errorRecord.message.includes("not found")
-      ) {
-        return new Error(
-          `Model '${this.modelName}' not available in LiteLLM proxy. ` +
-            "Please check your LiteLLM configuration and ensure the model is configured.",
-        );
-      }
+    if (
+      message.includes("API_KEY_INVALID") ||
+      message.includes("Invalid API key")
+    ) {
+      return new Error(
+        "Invalid LiteLLM configuration. Please check your LITELLM_API_KEY environment variable.",
+      );
     }
 
-    return new Error(
-      `LiteLLM error: ${errorRecord?.message || "Unknown error"}`,
-    );
+    if (
+      message.includes("rate limit") ||
+      message.includes("rate_limit_exceeded") ||
+      message.includes("429")
+    ) {
+      return new Error("LiteLLM rate limit exceeded. Please try again later.");
+    }
+
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
+    ) {
+      return new Error(
+        "LiteLLM proxy server error. Please check the proxy server logs for more details.",
+      );
+    }
+
+    return new Error(`LiteLLM Error: ${message}`);
   }
 
   /**

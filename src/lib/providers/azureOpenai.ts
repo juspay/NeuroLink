@@ -79,18 +79,52 @@ export class AzureOpenAIProvider extends BaseProvider {
 
   protected handleProviderError(error: unknown): Error {
     const errorObj = error as UnknownRecord;
-    if (
-      errorObj?.message &&
-      typeof errorObj.message === "string" &&
-      errorObj.message.includes("401")
-    ) {
-      return new Error("Invalid Azure OpenAI API key or endpoint.");
-    }
     const message =
       errorObj?.message && typeof errorObj.message === "string"
         ? errorObj.message
         : "Unknown error";
-    return new Error(`Azure OpenAI error: ${message}`);
+
+    if (message.includes("401")) {
+      return new Error("Invalid Azure OpenAI API key or endpoint.");
+    }
+
+    if (
+      message.includes("rate limit") ||
+      message.includes("rate_limit_exceeded") ||
+      message.includes("429")
+    ) {
+      return new Error(
+        "Azure OpenAI rate limit exceeded. Please try again later.",
+      );
+    }
+
+    // Handle connection errors
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      return new Error(
+        "Azure OpenAI API connection error. Please check your internet connection and try again.",
+      );
+    }
+
+    // Handle server errors
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
+    ) {
+      return new Error(
+        "Azure OpenAI API server error. Please try again in a few moments.",
+      );
+    }
+
+    return new Error(`Azure OpenAI Error: ${message}`);
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools

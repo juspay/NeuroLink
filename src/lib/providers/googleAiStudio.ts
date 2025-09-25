@@ -74,29 +74,48 @@ export class GoogleAIStudioProvider extends BaseProvider {
     }
 
     const errorRecord = error as UnknownRecord;
-    if (
-      typeof errorRecord?.message === "string" &&
-      errorRecord.message.includes("API_KEY_INVALID")
-    ) {
+    const message =
+      typeof errorRecord?.message === "string"
+        ? errorRecord.message
+        : "Unknown error";
+
+    if (message.includes("API_KEY_INVALID")) {
       return new Error(
         "Invalid Google AI API key. Please check your GOOGLE_AI_API_KEY environment variable.",
       );
     }
 
-    if (
-      typeof errorRecord?.message === "string" &&
-      errorRecord.message.includes("RATE_LIMIT_EXCEEDED")
-    ) {
+    if (message.includes("RATE_LIMIT_EXCEEDED")) {
       return new Error(
         "Google AI rate limit exceeded. Please try again later.",
       );
     }
 
-    const message =
-      typeof errorRecord?.message === "string"
-        ? errorRecord.message
-        : "Unknown error";
-    return new Error(`Google AI error: ${message}`);
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      return new Error(
+        "Google AI API connection error. Please check your internet connection and try again.",
+      );
+    }
+
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
+    ) {
+      return new Error(
+        "Google AI API server error. Please try again in a few moments.",
+      );
+    }
+
+    return new Error(`Google AI Error: ${message}`);
   }
   // executeGenerate removed - BaseProvider handles all generation with tools
   protected async executeStream(

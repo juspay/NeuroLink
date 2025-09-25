@@ -170,11 +170,45 @@ export class MistralProvider extends BaseProvider {
       );
     }
 
-    if (message.includes("rate limit")) {
+    if (
+      message.includes("rate limit") ||
+      message.includes("rate_limit_exceeded") ||
+      message.includes("429")
+    ) {
       return new Error("Mistral rate limit exceeded. Please try again later.");
     }
 
-    return new Error(`Mistral error: ${message}`);
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      return new Error(
+        "Mistral API connection error. Please check your internet connection and try again.",
+      );
+    }
+
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error")
+    ) {
+      return new Error(
+        "Mistral API server error. Please try again in a few moments.",
+      );
+    }
+
+    if (message.includes("model") && message.includes("not found")) {
+      return new Error(
+        `Mistral model '${this.modelName}' not found.\n\nSuggestions:\n1. Check model name spelling\n2. Ensure you have access to the model`,
+      );
+    }
+
+    return new Error(`Mistral Error: ${message}`);
   }
 
   /**
