@@ -1,3 +1,93 @@
+## [7.47.2](https://github.com/juspay/neurolink/compare/v7.47.1...v7.47.2) (2025-09-26)
+
+### Bug Fixes
+
+- **(timestamp):** Incorrect timestamps being stored in redis ([2d66232](https://github.com/juspay/neurolink/commit/2d6623275bc4c1f5986957d476ddcf3933ba61e4))
+
+## [7.47.1](https://github.com/juspay/neurolink/compare/v7.47.0...v7.47.1) (2025-09-26)
+
+### Bug Fixes
+
+- **(tools):** Unregistered tools getting called ([45fd67a](https://github.com/juspay/neurolink/commit/45fd67af418b5e458ce6a261a7891234a8d489b8))
+
+## [7.47.0](https://github.com/juspay/neurolink/compare/v7.46.0...v7.47.0) (2025-09-25)
+
+### Features
+
+- **(chat):** Implement multimodal UI and extend SDK support ([12a2f59](https://github.com/juspay/neurolink/commit/12a2f59c4826e82ab1feb1347d08980682748ad2))
+
+## [7.46.0](https://github.com/juspay/neurolink/compare/v7.45.0...v7.46.0) (2025-09-24)
+
+### Features
+
+- **(auto-evaluation):** added auto evaluation for LLM response ([6f23fae](https://github.com/juspay/neurolink/commit/6f23fae5cacb1c0686257cc7ed547be675b68b23))
+
+## [7.45.0](https://github.com/juspay/neurolink/compare/v7.44.0...v7.45.0) (2025-09-24)
+
+### Features
+
+- **(provider):** Add support to provide region while streaming or generating for few providers ([a0a5bed](https://github.com/juspay/neurolink/commit/a0a5bed2bba4118dde149713708e36d4d29e1aae))
+
+## [7.44.0](https://github.com/juspay/neurolink/compare/v7.43.0...v7.44.0) (2025-09-24)
+
+### Features
+
+- **(sdk):** Integrate mem0 for better context ([78edf08](https://github.com/juspay/neurolink/commit/78edf08467432988c968eb06f510f0198b253665))
+
+## [7.43.0](https://github.com/juspay/neurolink/compare/v7.42.0...v7.43.0) (2025-09-23)
+
+### Features
+
+- **(cli):** auto-detect and enable redis support in loop conversation memory ([b7b5514](https://github.com/juspay/neurolink/commit/b7b55149eb49a9f0ffa2a257c96d869b0da59eeb))
+
+## [7.42.0](https://github.com/juspay/neurolink/compare/v7.41.4...v7.42.0) (2025-09-23)
+
+### Features
+
+- **(middleware):** robust bad word filtering in guardrails and correct stream usage ([d396797](https://github.com/juspay/neurolink/commit/d396797640832a373b386a7c550ec406e129d2d2))
+
+## [7.41.4](https://github.com/juspay/neurolink/compare/v7.41.3...v7.41.4) (2025-09-21)
+
+### Bug Fixes
+
+- **(types):** expose core SDK types for external developer integration ([66199c9](https://github.com/juspay/neurolink/commit/66199c9fb579f1aaab929ca987ac028eafa61a46))
+
+## [7.41.3](https://github.com/juspay/neurolink/compare/v7.41.2...v7.41.3) (2025-09-20)
+
+## [7.41.2](https://github.com/juspay/neurolink/compare/v7.41.1...v7.41.2) (2025-09-20)
+
+## [7.41.1](https://github.com/juspay/neurolink/compare/v7.41.0...v7.41.1) (2025-09-20)
+
+## [7.41.0](https://github.com/juspay/neurolink/compare/v7.40.1...v7.41.0) (2025-09-20)
+
+### Features
+
+- **(test):** Added tests for hitl ([5ab1885](https://github.com/juspay/neurolink/commit/5ab1885eb8788dd499cda94c67d1791e7dd9b90f))
+
+## [7.40.1](https://github.com/juspay/neurolink/compare/v7.40.0...v7.40.1) (2025-09-17)
+
+### Bug Fixes
+
+- **(title):** Update system prompt to generate better title ([9d0e5b8](https://github.com/juspay/neurolink/commit/9d0e5b85a11f2cfe67942f7db407193842f8b93f))
+
+## [7.40.0](https://github.com/juspay/neurolink/compare/v7.39.0...v7.40.0) (2025-09-17)
+
+### Features
+
+- **(envsetup):** Added env setup test ([d08917e](https://github.com/juspay/neurolink/commit/d08917e69675aedd468c25697250c24fbfa21372))
+
+## [7.39.0](https://github.com/juspay/neurolink/compare/v7.38.1...v7.39.0) (2025-09-16)
+
+### Features
+
+- **(hitl):** Implemented human in the loop for sdk ([1a66f53](https://github.com/juspay/neurolink/commit/1a66f533d4d92fb33d203947a4c6648a72db631c))
+
+## [7.38.1](https://github.com/juspay/neurolink/compare/v7.38.0...v7.38.1) (2025-09-16)
+
+### Bug Fixes
+
+- **(tool):** Openai provider's no of tool to pass ([8804d56](https://github.com/juspay/neurolink/commit/8804d5643672823d8e4684ecc622684935c3bdfe))
+
 ## [7.38.0](https://github.com/juspay/neurolink/compare/v7.37.1...v7.38.0) (2025-09-14)
 
 ### Features
@@ -797,21 +887,18 @@ Co-authored-by: sachin.sharma <sachin.sharma@juspay.in>
 ### 🎯 Major Feature: Dynamic Model Configuration System
 
 - **⚡ Revolutionary Model Management**: Introduced dynamic model configuration system replacing static enums
-
   - **Self-Updating Models**: New models automatically available without code updates
   - **Cost Optimization**: Automatic selection of cheapest models for tasks
   - **Smart Resolution**: Fuzzy matching, aliases, and capability-based search
   - **Multi-Source Loading**: Configuration from API → GitHub → local with fallback
 
 - **💰 Cost Intelligence**: Built-in cost optimization and model selection algorithms
-
   - **Current Leader**: Gemini 2.0 Flash at $0.000075/1K input tokens
   - **Capability Mapping**: Find models by features (functionCalling, vision, code-execution)
   - **Real-Time Pricing**: Always current model costs and performance data
   - **Budget Controls**: Maximum price filtering and cost-aware selection
 
 - **🔧 Production-Ready Infrastructure**: Complete system with validation and monitoring
-
   - **Model Configuration Server**: REST API with search capabilities (`scripts/model-server.js`)
   - **Zod Schema Validation**: Type-safe runtime configuration validation
   - **Comprehensive Testing**: Full test suite for all dynamic model functionality
@@ -863,19 +950,16 @@ Co-authored-by: sachin.sharma <sachin.sharma@juspay.in>
 ### Bug Fixes - MCP System Restoration
 
 - **🔧 Fixed Built-in Tool Loading**: Resolved critical circular dependency issues preventing default tools from loading
-
   - **Root Cause**: Circular dependency between `config.ts` and `unified-registry.ts` preventing proper initialization
   - **Solution**: Implemented dynamic imports and restructured initialization chain
   - **Result**: Built-in tools restored from 0 → 3 tools (100% recovery rate)
 
 - **⏰ Fixed Time Tool Functionality**: Time tool now properly available and returns accurate real-time data
-
   - Fixed tool registration and execution pathway
   - Proper timezone handling and formatting
   - Verified accuracy against system time
 
 - **🔍 Enhanced External Tool Discovery**: 58+ external MCP tools now discoverable via comprehensive auto-discovery
-
   - Auto-discovery across VS Code, Claude Desktop, Cursor, Windsurf
   - Proper placeholder system for lazy activation
   - Unified registry integration
@@ -930,7 +1014,6 @@ Co-authored-by: sachin.sharma <sachin.sharma@juspay.in>
 ### Features
 
 - **🛠️ Enhanced CLI with Ollama Commands**: New Ollama-specific management commands
-
   - `neurolink ollama list-models` - List installed local models
   - `neurolink ollama pull <model>` - Download models locally
   - `neurolink ollama remove <model>` - Remove installed models
@@ -1011,14 +1094,12 @@ neurolink generate-text "test" --debug
 ### Patch Changes
 
 - **🔧 Production-Ready CLI Logging System**: Fixed critical logging system for clean production output
-
   - **Issue**: CLI showed excessive debug output during normal operation, breaking demo presentations
   - **Root Cause**: Mixed console.log statements bypassed conditional logger system
   - **Solution**: Systematic replacement of all console.log with logger.debug across codebase
   - **Impact**: **Clean CLI output by default** with conditional debug available via `NEUROLINK_DEBUG=true`
 
 - **🔄 Enhanced Provider Fallback Logic**: Fixed incomplete provider fallback coverage
-
   - **Issue**: Provider fallback only attempted 4 of 6 providers (missing Anthropic & Azure)
   - **Root Cause**: Incomplete provider array in NeuroLink class fallback logic
   - **Solution**: Updated to include all 6 providers: `['openai', 'vertex', 'bedrock', 'anthropic', 'azure', 'google-ai']`
@@ -1062,7 +1143,6 @@ NEUROLINK_DEBUG=true node dist/cli/cli/index.js generate-text "test" --max-token
 ### Patch Changes
 
 - **🔧 Critical CLI Dependency Fix**: Removed peer dependencies to ensure zero-friction CLI usage
-
   - **Issue**: CLI commands failed when provider-specific SDK packages were peer dependencies
   - **Root Cause**: `npx` doesn't install peer dependencies, causing missing module errors
   - **Solution**: Moved ALL AI provider SDKs to regular dependencies

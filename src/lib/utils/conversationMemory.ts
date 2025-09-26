@@ -12,7 +12,7 @@ import type { RedisConversationMemoryManager } from "../core/redisConversationMe
 import type {
   TextGenerationOptions,
   TextGenerationResult,
-} from "../core/types.js";
+} from "../types/generateTypes.js";
 import { getConversationMemoryDefaults } from "../config/conversationMemory.js";
 import { logger } from "./logger.js";
 
@@ -127,6 +127,7 @@ export async function storeConversationTurn(
     | undefined,
   originalOptions: TextGenerationOptions,
   result: TextGenerationResult,
+  startTimeStamp?: Date | undefined,
 ): Promise<void> {
   logger.debug("[conversationMemoryUtils] storeConversationTurn called", {
     hasMemory: !!conversationMemory,
@@ -178,6 +179,7 @@ export async function storeConversationTurn(
       userId,
       userMessage,
       aiResponse,
+      startTimeStamp,
     );
 
     logger.debug(

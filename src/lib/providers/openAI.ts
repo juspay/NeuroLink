@@ -313,8 +313,8 @@ export class OpenAIProvider extends BaseProvider {
       // OpenAI-specific fix: Validate tools format and filter out problematic ones
       let tools = this.validateAndFilterToolsForOpenAI(allTools);
 
-      // OpenAI has limits on the number of tools per request - limit to 3 tools max for testing
-      const MAX_TOOLS = 3;
+      // OpenAI max tools limit - configurable via environment variable
+      const MAX_TOOLS = parseInt(process.env.OPENAI_MAX_TOOLS || "150", 10);
       if (Object.keys(tools).length > MAX_TOOLS) {
         logger.warn(
           `OpenAI: Too many tools (${Object.keys(tools).length}), limiting to ${MAX_TOOLS} tools`,
@@ -364,8 +364,9 @@ export class OpenAIProvider extends BaseProvider {
             : "no-tools",
       });
 
+      const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
       const result = await streamText({
-        model: this.model,
+        model,
         messages: messages,
         temperature: options.temperature,
         maxTokens: options.maxTokens, // No default limit - unlimited unless specified
@@ -382,6 +383,7 @@ export class OpenAIProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn("[OpenAIProvider] Failed to store tool executions", {
               provider: this.providerName,

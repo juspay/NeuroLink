@@ -4,6 +4,7 @@ import type { ZodUnknownSchema } from "../types/typeAliases.js";
 import type { AIProviderName } from "../types/index.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
+import type { ModelsResponse } from "../types/providers.js";
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
@@ -49,17 +50,7 @@ const getDefaultOpenAICompatibleModel = (): string | undefined => {
   return process.env.OPENAI_COMPATIBLE_MODEL || undefined;
 };
 
-/**
- * Interface for OpenAI-compatible models endpoint response
- */
-interface ModelsResponse {
-  data: Array<{
-    id: string;
-    object: string;
-    created?: number;
-    owned_by?: string;
-  }>;
-}
+// ModelsResponse type now imported from ../types/providerSpecific.js
 
 /**
  * OpenAI Compatible Provider - BaseProvider Implementation
@@ -236,7 +227,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
     );
 
     try {
-      const model = await this.getAISDKModel();
+      const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
       const result = streamText({
         model,
         prompt: options.input.text,
@@ -251,6 +242,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[OpenAiCompatibleProvider] Failed to store tool executions",

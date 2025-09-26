@@ -59,6 +59,8 @@ export enum OpenAIModels {
   GPT_4O = "gpt-4o",
   GPT_4O_MINI = "gpt-4o-mini",
   GPT_3_5_TURBO = "gpt-3.5-turbo",
+  O1_PREVIEW = "o1-preview",
+  O1_MINI = "o1-mini",
 }
 
 /**
@@ -121,6 +123,29 @@ export enum AnthropicModels {
   CLAUDE_3_SONNET = "claude-3-sonnet-20240229",
   CLAUDE_3_OPUS = "claude-3-opus-20240229",
   CLAUDE_3_HAIKU = "claude-3-haiku-20240307",
+}
+
+/**
+ * API Versions for various providers
+ */
+export enum APIVersions {
+  // Azure OpenAI API versions
+  AZURE_LATEST = "2025-04-01-preview",
+  AZURE_STABLE = "2024-10-21",
+  AZURE_LEGACY = "2023-12-01-preview",
+
+  // OpenAI API versions
+  OPENAI_CURRENT = "v1",
+  OPENAI_BETA = "v1-beta",
+
+  // Google AI API versions
+  GOOGLE_AI_CURRENT = "v1",
+  GOOGLE_AI_BETA = "v1beta",
+
+  // Anthropic API versions
+  ANTHROPIC_CURRENT = "2023-06-01",
+
+  // Other provider versions can be added here
 }
 
 /**
@@ -334,7 +359,7 @@ export type ProviderCapabilities = {
 /**
  * Provider configuration specifying provider and its available models (from core types)
  */
-export type ProviderConfig = {
+export type AIModelProviderConfig = {
   provider: AIProviderName;
   models: SupportedModelName[];
 };
@@ -533,10 +558,185 @@ export type AISDKGenerateResult = GenerateResult & {
   [key: string]: unknown;
 };
 
+// ============================================================================
+// Provider-Specific Type Definitions
+// ============================================================================
+
+// ============================================================================
+// Amazon Bedrock Provider Types
+// ============================================================================
+
+/**
+ * Bedrock tool usage structure
+ */
+export type BedrockToolUse = {
+  toolUseId: string;
+  name: string;
+  input: Record<string, unknown>;
+};
+
+/**
+ * Bedrock tool result structure
+ */
+export type BedrockToolResult = {
+  toolUseId: string;
+  content: Array<{ text: string }>;
+  status: string;
+};
+
+/**
+ * Bedrock content block structure
+ */
+export type BedrockContentBlock = {
+  text?: string;
+  toolUse?: BedrockToolUse;
+  toolResult?: BedrockToolResult;
+};
+
+/**
+ * Bedrock message structure
+ */
+export type BedrockMessage = {
+  role: "user" | "assistant";
+  content: BedrockContentBlock[];
+};
+
+// ============================================================================
+// Google AI Studio Provider Types (Live API)
+// ============================================================================
+
+/**
+ * Google AI Live media configuration
+ */
+export type GenAILiveMedia = {
+  data: string;
+  mimeType: string;
+};
+
+/**
+ * Live server message inline data
+ */
+export type LiveServerMessagePartInlineData = {
+  data?: string;
+};
+
+/**
+ * Live server message model turn
+ */
+export type LiveServerMessageModelTurn = {
+  parts?: Array<{ inlineData?: LiveServerMessagePartInlineData }>;
+};
+
+/**
+ * Live server content structure
+ */
+export type LiveServerContent = {
+  modelTurn?: LiveServerMessageModelTurn;
+  interrupted?: boolean;
+};
+
+/**
+ * Live server message structure
+ */
+export type LiveServerMessage = {
+  serverContent?: LiveServerContent;
+};
+
+/**
+ * Live connection callbacks
+ */
+export type LiveConnectCallbacks = {
+  onopen?: () => void;
+  onmessage?: (message: LiveServerMessage) => void;
+  onerror?: (e: { message?: string }) => void;
+  onclose?: (e: { code?: number; reason?: string }) => void;
+};
+
+/**
+ * Live connection configuration
+ */
+export type LiveConnectConfig = {
+  model: string;
+  callbacks: LiveConnectCallbacks;
+  config: {
+    responseModalities: string[];
+    speechConfig: {
+      voiceConfig: { prebuiltVoiceConfig: { voiceName: string } };
+    };
+  };
+};
+
+/**
+ * Google AI Live session interface
+ */
+export type GenAILiveSession = {
+  sendRealtimeInput?: (payload: {
+    media?: GenAILiveMedia;
+    event?: string;
+  }) => Promise<void> | void;
+  sendInput?: (payload: {
+    event?: string;
+    media?: GenAILiveMedia;
+  }) => Promise<void> | void;
+  close?: (code?: number, reason?: string) => Promise<void> | void;
+};
+
+/**
+ * Google AI client interface
+ */
+export type GenAIClient = {
+  live: { connect: (config: LiveConnectConfig) => Promise<GenAILiveSession> };
+};
+
+/**
+ * Google GenAI constructor type
+ */
+export type GoogleGenAIClass = new (cfg: { apiKey: string }) => GenAIClient;
+
+// ============================================================================
+// OpenAI Compatible Provider Types
+// ============================================================================
+
+/**
+ * OpenAI-compatible models endpoint response structure
+ */
+export type ModelsResponse = {
+  data: Array<{
+    id: string;
+    object: string;
+    created?: number;
+    owned_by?: string;
+  }>;
+};
+
+/**
+ * Default model aliases for easy reference
+ */
+export const DEFAULT_MODEL_ALIASES = {
+  // Latest recommended models per provider
+  LATEST_OPENAI: OpenAIModels.GPT_4O,
+  FASTEST_OPENAI: OpenAIModels.GPT_4O_MINI,
+  LATEST_ANTHROPIC: AnthropicModels.CLAUDE_3_5_SONNET,
+  FASTEST_ANTHROPIC: AnthropicModels.CLAUDE_3_5_HAIKU,
+  LATEST_GOOGLE: GoogleAIModels.GEMINI_2_5_PRO,
+  FASTEST_GOOGLE: GoogleAIModels.GEMINI_2_5_FLASH,
+
+  // Best models by use case
+  BEST_CODING: AnthropicModels.CLAUDE_3_5_SONNET,
+  BEST_ANALYSIS: GoogleAIModels.GEMINI_2_5_PRO,
+  BEST_CREATIVE: AnthropicModels.CLAUDE_3_5_SONNET,
+  BEST_VALUE: GoogleAIModels.GEMINI_2_5_FLASH,
+} as const;
+
+/**
+ * @deprecated Use DEFAULT_MODEL_ALIASES instead. Will be removed in future version.
+ */
+export const ModelAliases = DEFAULT_MODEL_ALIASES;
+
 /**
  * Default provider configurations
  */
-export const DEFAULT_PROVIDER_CONFIGS: ProviderConfig[] = [
+export const DEFAULT_PROVIDER_CONFIGS: AIModelProviderConfig[] = [
   {
     provider: AIProviderName.BEDROCK,
     models: [BedrockModels.CLAUDE_3_7_SONNET, BedrockModels.CLAUDE_3_5_SONNET],

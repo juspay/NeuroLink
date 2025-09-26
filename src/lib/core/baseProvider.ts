@@ -434,14 +434,17 @@ export abstract class BaseProvider implements AIProvider {
         logger.info("Tool execution completed", { toolResults, toolCalls });
 
         // Handle tool execution storage
-        this.handleToolExecutionStorage(toolCalls, toolResults, options).catch(
-          (error: unknown) => {
-            logger.warn("[BaseProvider] Failed to store tool executions", {
-              provider: this.providerName,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          },
-        );
+        this.handleToolExecutionStorage(
+          toolCalls,
+          toolResults,
+          options,
+          new Date(),
+        ).catch((error: unknown) => {
+          logger.warn("[BaseProvider] Failed to store tool executions", {
+            provider: this.providerName,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
       },
     });
   }
@@ -889,13 +892,32 @@ export abstract class BaseProvider implements AIProvider {
     // Get the base model
     const baseModel = await this.getAISDKModel();
 
+    logger.debug(`Retrieved base model for ${this.providerName}`, {
+      provider: this.providerName,
+      model: this.modelName,
+      hasMiddlewareConfig: !!this.middlewareOptions,
+      timestamp: Date.now(),
+    });
+
     // Check if middleware should be applied
     const middlewareOptions = this.extractMiddlewareOptions(options);
+
+    logger.debug(`Middleware extraction result`, {
+      provider: this.providerName,
+      model: this.modelName,
+      middlewareOptions,
+    });
+
     if (!middlewareOptions) {
       return baseModel;
     }
 
     try {
+      logger.debug(`Applying middleware to ${this.providerName} model`, {
+        provider: this.providerName,
+        model: this.modelName,
+        middlewareOptions,
+      });
       // Create a new factory instance with the specified options
       const factory = new MiddlewareFactory(middlewareOptions);
 
@@ -2114,6 +2136,7 @@ export abstract class BaseProvider implements AIProvider {
     toolCalls: unknown[],
     toolResults: unknown[],
     options: TextGenerationOptions | StreamOptions,
+    currentTime: Date,
   ): Promise<void> {
     // Check if tools are not empty
     const hasToolData =
@@ -2153,6 +2176,7 @@ export abstract class BaseProvider implements AIProvider {
           error?: string;
           [key: string]: unknown;
         }>,
+        currentTime,
       );
     } catch (error) {
       logger.warn("[BaseProvider] Failed to store tool executions", {

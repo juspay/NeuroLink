@@ -36,6 +36,10 @@ export type EvaluationData = {
   terminologyAccuracy?: number;
   toolEffectiveness?: number;
 
+  // Raw Response
+  responseContent?: string; // Full text of the AI response
+  queryContent?: string; // Full text of the user query
+
   // Advanced insights
   isOffTopic: boolean; // True if response significantly deviates from query/domain
   alertSeverity: AlertSeverity; // Quality alert level

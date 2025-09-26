@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { AmazonSageMakerProvider } from "../../src/lib/providers/amazonSagemaker.js";
-import { AIProviderName } from "../../src/lib/core/types.js";
+import { AIProviderName } from "../../src/lib/types/providers.js";
 
 describe("AmazonSageMakerProvider", () => {
   beforeAll(() => {

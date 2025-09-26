@@ -9,6 +9,11 @@ import type {
   AudioChunk,
 } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
+import type {
+  LiveServerMessage,
+  GenAIClient,
+  GoogleGenAIClass,
+} from "../types/providers.js";
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
@@ -21,57 +26,15 @@ import {
 } from "../types/errors.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
-import { buildMessagesArray } from "../utils/messageBuilder.js";
+import {
+  buildMessagesArray,
+  buildMultimodalMessagesArray,
+  convertToCoreMessages,
+} from "../utils/messageBuilder.js";
 
-// Interfaces setup
-interface GenAILiveMedia {
-  data: string;
-  mimeType: string;
-}
-interface LiveServerMessagePartInlineData {
-  data?: string;
-}
-interface LiveServerMessageModelTurn {
-  parts?: Array<{ inlineData?: LiveServerMessagePartInlineData }>;
-}
-interface LiveServerContent {
-  modelTurn?: LiveServerMessageModelTurn;
-  interrupted?: boolean;
-}
-interface LiveServerMessage {
-  serverContent?: LiveServerContent;
-}
-interface LiveConnectCallbacks {
-  onopen?: () => void;
-  onmessage?: (message: LiveServerMessage) => void;
-  onerror?: (e: { message?: string }) => void;
-  onclose?: (e: { code?: number; reason?: string }) => void;
-}
-interface LiveConnectConfig {
-  model: string;
-  callbacks: LiveConnectCallbacks;
-  config: {
-    responseModalities: string[];
-    speechConfig: {
-      voiceConfig: { prebuiltVoiceConfig: { voiceName: string } };
-    };
-  };
-}
-interface GenAILiveSession {
-  sendRealtimeInput?: (payload: {
-    media?: GenAILiveMedia;
-    event?: string;
-  }) => Promise<void> | void;
-  sendInput?: (payload: {
-    event?: string;
-    media?: GenAILiveMedia;
-  }) => Promise<void> | void;
-  close?: (code?: number, reason?: string) => Promise<void> | void;
-}
-interface GenAIClient {
-  live: { connect: (config: LiveConnectConfig) => Promise<GenAILiveSession> };
-}
-type GoogleGenAIClass = new (cfg: { apiKey: string }) => GenAIClient;
+// Google AI Live API types now imported from ../types/providerSpecific.js
+
+// Import proper types for multimodal message handling
 
 // Create Google GenAI client
 async function createGoogleGenAIClient(apiKey: string): Promise<GenAIClient> {
@@ -176,8 +139,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
       process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
     }
 
-    const google = createGoogleGenerativeAI({ apiKey });
-    const model = google(this.modelName);
+    const model = await this.getAISDKModelWithMiddleware(options);
 
     const timeout = this.getTimeout(options);
     const timeoutController = createTimeoutController(
@@ -191,8 +153,54 @@ export class GoogleAIStudioProvider extends BaseProvider {
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const tools = shouldUseTools ? await this.getAllTools() : {};
 
-      // Build message array from options
-      const messages = buildMessagesArray(options);
+      // Build message array from options with multimodal support
+      const hasMultimodalInput = !!(
+        options.input?.images?.length || options.input?.content?.length
+      );
+
+      let messages;
+      if (hasMultimodalInput) {
+        logger.debug(
+          `Google AI Studio: Detected multimodal input, using multimodal message builder`,
+          {
+            hasImages: !!options.input?.images?.length,
+            imageCount: options.input?.images?.length || 0,
+            hasContent: !!options.input?.content?.length,
+            contentCount: options.input?.content?.length || 0,
+          },
+        );
+
+        // Create multimodal options for buildMultimodalMessagesArray
+        const multimodalOptions = {
+          input: {
+            text: options.input?.text || "",
+            images: options.input?.images,
+            content: options.input?.content,
+          },
+          systemPrompt: options.systemPrompt,
+          conversationHistory: options.conversationMessages,
+          provider: this.providerName,
+          model: this.modelName,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+          enableAnalytics: options.enableAnalytics,
+          enableEvaluation: options.enableEvaluation,
+          context: options.context,
+        };
+
+        const mm = await buildMultimodalMessagesArray(
+          multimodalOptions,
+          this.providerName,
+          this.modelName,
+        );
+        // Convert multimodal messages to Vercel AI SDK format (CoreMessage[])
+        messages = convertToCoreMessages(mm);
+      } else {
+        logger.debug(
+          `Google AI Studio: Text-only input, using standard message builder`,
+        );
+        messages = buildMessagesArray(options);
+      }
 
       const result = await streamText({
         model,
@@ -208,6 +216,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[GoogleAiStudioProvider] Failed to store tool executions",

@@ -10,7 +10,7 @@ import {
   GoogleAIModels,
   AnthropicModels,
   DEFAULT_MODEL_ALIASES,
-} from "../core/types.js";
+} from "../types/providers.js";
 import type { JsonValue } from "../types/common.js";
 
 /**

@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest";
 import { BaseProvider } from "../src/lib/core/baseProvider.js";
-import { AIProviderName } from "../src/lib/core/types.js";
-import type {
-  EnhancedGenerateResult,
-  TextGenerationOptions,
-} from "../src/lib/core/types.js";
+import { AIProviderName } from "../src/lib/types/providers.js";
 import type { LanguageModelV1, LanguageModelV1Middleware } from "ai";
 import type {
   MiddlewareFactoryOptions,

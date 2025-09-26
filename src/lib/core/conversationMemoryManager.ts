@@ -59,6 +59,7 @@ export class ConversationMemoryManager {
     userId: string | undefined,
     userMessage: string,
     aiResponse: string,
+    _startTimeStamp: Date | undefined,
   ): Promise<void> {
     await this.ensureInitialized();
 

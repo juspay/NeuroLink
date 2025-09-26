@@ -37,7 +37,7 @@ import {
   PERFORMANCE_THRESHOLDS,
 } from "./constants/index.js";
 import pLimit from "p-limit";
-import { toolRegistry } from "./mcp/toolRegistry.js";
+import { MCPToolRegistry } from "./mcp/toolRegistry.js";
 import { logger } from "./utils/logger.js";
 import { getBestProvider } from "./utils/providerUtils.js";
 import { ProviderRegistry } from "./factories/providerRegistry.js";
@@ -115,16 +115,20 @@ import {
   storeConversationTurn,
 } from "./utils/conversationMemory.js";
 import { ExternalServerManager } from "./mcp/externalServerManager.js";
+import type { HITLConfig } from "./hitl/types.js";
+import { HITLManager } from "./hitl/hitlManager.js";
 import type {
   ExternalMCPServerInstance,
   ExternalMCPOperationResult,
   ExternalMCPToolInfo,
 } from "./types/externalMcp.js";
+import type { ConfirmationResponseEvent } from "./hitl/types.js";
 // Import direct tools server for automatic registration
 import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
 // Import orchestration components
 import { ModelRouter } from "./utils/modelRouter.js";
 import { BinaryTaskClassifier } from "./utils/taskClassifier.js";
+import type { MemoryConfig } from "mem0ai/oss";
 
 // Provider and MCP diagnostic types
 export interface ProviderStatus {
@@ -163,6 +167,8 @@ export class NeuroLink {
   private mcpInitialized = false;
   private emitter =
     new EventEmitter() as unknown as TypedEventEmitter<NeuroLinkEvents>;
+
+  private toolRegistry: MCPToolRegistry;
 
   private autoDiscoveredServerInfos: MCPServerInfo[] = [];
   // External MCP server management
@@ -234,6 +240,54 @@ export class NeuroLink {
   // Add orchestration property
   private enableOrchestration: boolean;
 
+  // HITL (Human-in-the-Loop) support
+  private hitlManager?: HITLManager;
+
+  // Mem0 memory instance and config for conversation context
+  private mem0Instance?:
+    | import("./memory/mem0Initializer.js").Mem0Memory
+    | null;
+  private mem0Config?: MemoryConfig;
+
+  /**
+   * Simple sync config setup for mem0
+   */
+  private initializeMem0Config(): boolean {
+    const config = this.conversationMemoryConfig?.conversationMemory;
+    if (!config?.mem0Enabled) {
+      return false;
+    }
+
+    this.mem0Config = config.mem0Config;
+    return true;
+  }
+
+  /**
+   * Async initialization called during generate/stream
+   */
+  private async ensureMem0Ready(): Promise<
+    import("./memory/mem0Initializer.js").Mem0Memory | null
+  > {
+    if (this.mem0Instance !== undefined) {
+      return this.mem0Instance;
+    }
+
+    if (!this.initializeMem0Config()) {
+      this.mem0Instance = null;
+      return null;
+    }
+
+    // Import and initialize from separate file
+    const { initializeMem0 } = await import("./memory/mem0Initializer.js");
+
+    if (!this.mem0Config) {
+      this.mem0Instance = null;
+      return null;
+    }
+
+    this.mem0Instance = await initializeMem0(this.mem0Config);
+    return this.mem0Instance;
+  }
   /**
    * Context storage for tool execution
    * This context will be merged with any runtime context passed by the AI model
@@ -249,6 +303,12 @@ export class NeuroLink {
    * @param config.conversationMemory.maxSessions - Maximum number of concurrent sessions (default: 100)
    * @param config.conversationMemory.maxTurnsPerSession - Maximum conversation turns per session (default: 50)
    * @param config.enableOrchestration - Whether to enable smart model orchestration (default: false)
+   * @param config.hitl - Configuration for Human-in-the-Loop safety features
+   * @param config.hitl.enabled - Whether to enable HITL tool confirmation (default: false)
+   * @param config.hitl.dangerousActions - Keywords that trigger confirmation (default: ['delete', 'remove', 'drop'])
+   * @param config.hitl.timeout - Confirmation timeout in milliseconds (default: 30000)
+   * @param config.hitl.allowArgumentModification - Allow users to modify tool parameters (default: true)
+   * @param config.toolRegistry - Optional tool registry instance for advanced use cases (default: new MCPToolRegistry())
    *
    * @example
    * ```typescript
@@ -268,16 +328,31 @@ export class NeuroLink {
    * const neurolink = new NeuroLink({
    *   enableOrchestration: true
    * });
+   *
+   * // With HITL safety features
+   * const neurolink = new NeuroLink({
+   *   hitl: {
+   *     enabled: true,
+   *     dangerousActions: ['delete', 'remove', 'drop', 'truncate'],
+   *     timeout: 30000,
+   *     allowArgumentModification: true
+   *   }
+   * });
    * ```
    *
    * @throws {Error} When provider registry setup fails
    * @throws {Error} When conversation memory initialization fails (if enabled)
    * @throws {Error} When external server manager initialization fails
+   * @throws {Error} When HITL configuration is invalid (if enabled)
    */
   constructor(config?: {
     conversationMemory?: Partial<ConversationMemoryConfig>;
     enableOrchestration?: boolean;
+    hitl?: HITLConfig;
+    toolRegistry?: MCPToolRegistry;
   }) {
+    this.toolRegistry = config?.toolRegistry || new MCPToolRegistry();
+
     // Initialize orchestration setting
     this.enableOrchestration = config?.enableOrchestration ?? false;
 
@@ -303,6 +378,12 @@ export class NeuroLink {
       constructorHrTimeStart,
     );
     this.initializeExternalServerManager(
+      constructorId,
+      constructorStartTime,
+      constructorHrTimeStart,
+    );
+    this.initializeHITL(
+      config,
       constructorId,
       constructorStartTime,
       constructorHrTimeStart,
@@ -400,6 +481,179 @@ export class NeuroLink {
         message: "Conversation memory not enabled - skipping initialization",
       });
     }
+  }
+
+  /**
+   * Initialize HITL (Human-in-the-Loop) if enabled
+   */
+  private initializeHITL(
+    config:
+      | {
+          conversationMemory?: Partial<ConversationMemoryConfig>;
+          enableOrchestration?: boolean;
+          hitl?: HITLConfig;
+        }
+      | undefined,
+    constructorId: string,
+    constructorStartTime: number,
+    constructorHrTimeStart: bigint,
+  ): void {
+    if (config?.hitl?.enabled) {
+      const hitlInitStartTime = process.hrtime.bigint();
+      logger.debug(`[NeuroLink] 🛡️ LOG_POINT_C015_HITL_INIT_START`, {
+        logPoint: "C015_HITL_INIT_START",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        hitlInitStartTimeNs: hitlInitStartTime.toString(),
+        hitlConfig: {
+          enabled: config.hitl.enabled,
+          dangerousActions: config.hitl.dangerousActions || [],
+          timeout: config.hitl.timeout || 30000,
+          allowArgumentModification:
+            config.hitl.allowArgumentModification ?? true,
+          auditLogging: config.hitl.auditLogging ?? false,
+        },
+        message: "Starting HITL (Human-in-the-Loop) initialization",
+      });
+
+      try {
+        // Initialize HITL manager
+        this.hitlManager = new HITLManager(config.hitl);
+
+        // Inject HITL manager into tool registry
+        this.toolRegistry.setHITLManager(this.hitlManager);
+
+        // Inject HITL manager into external server manager
+        this.externalServerManager.setHITLManager(this.hitlManager);
+
+        // Set up HITL event forwarding to main emitter
+        this.setupHITLEventForwarding();
+
+        const hitlInitEndTime = process.hrtime.bigint();
+        const hitlInitDurationNs = hitlInitEndTime - hitlInitStartTime;
+
+        logger.debug(`[NeuroLink] ✅ LOG_POINT_C016_HITL_INIT_SUCCESS`, {
+          logPoint: "C016_HITL_INIT_SUCCESS",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          hitlInitDurationNs: hitlInitDurationNs.toString(),
+          hitlInitDurationMs:
+            Number(hitlInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
+          hasHitlManager: !!this.hitlManager,
+          message: "HITL (Human-in-the-Loop) initialized successfully",
+        });
+
+        logger.info(`[NeuroLink] HITL safety features enabled`, {
+          dangerousActions: config.hitl.dangerousActions?.length || 0,
+          timeout: config.hitl.timeout || 30000,
+          allowArgumentModification:
+            config.hitl.allowArgumentModification ?? true,
+          auditLogging: config.hitl.auditLogging ?? false,
+        });
+      } catch (error) {
+        const hitlInitErrorTime = process.hrtime.bigint();
+        const hitlInitDurationNs = hitlInitErrorTime - hitlInitStartTime;
+
+        logger.error(`[NeuroLink] ❌ LOG_POINT_C017_HITL_INIT_ERROR`, {
+          logPoint: "C017_HITL_INIT_ERROR",
+          constructorId,
+          timestamp: new Date().toISOString(),
+          elapsedMs: Date.now() - constructorStartTime,
+          elapsedNs: (
+            process.hrtime.bigint() - constructorHrTimeStart
+          ).toString(),
+          hitlInitDurationNs: hitlInitDurationNs.toString(),
+          hitlInitDurationMs:
+            Number(hitlInitDurationNs) / NANOSECOND_TO_MS_DIVISOR,
+          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorStack: error instanceof Error ? error.stack : undefined,
+          message: "HITL (Human-in-the-Loop) initialization failed",
+        });
+        throw error;
+      }
+    } else {
+      logger.debug(`[NeuroLink] 🚫 LOG_POINT_C018_HITL_DISABLED`, {
+        logPoint: "C018_HITL_DISABLED",
+        constructorId,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - constructorStartTime,
+        elapsedNs: (
+          process.hrtime.bigint() - constructorHrTimeStart
+        ).toString(),
+        hasConfig: !!config,
+        hasHitlConfig: !!config?.hitl,
+        hitlEnabled: config?.hitl?.enabled || false,
+        reason: !config
+          ? "NO_CONFIG"
+          : !config.hitl
+            ? "NO_HITL_CONFIG"
+            : !config.hitl.enabled
+              ? "HITL_DISABLED"
+              : "UNKNOWN",
+        message:
+          "HITL (Human-in-the-Loop) not enabled - skipping initialization",
+      });
+    }
+  }
+
+  /** Format memory context for prompt inclusion */
+  private formatMemoryContext(
+    memoryContext: string,
+    currentInput: string,
+  ): string {
+    return `Context from previous conversations:
+  ${memoryContext}
+
+  Current user's request: ${currentInput}`;
+  }
+
+  /**
+   * Set up HITL event forwarding to main emitter
+   */
+  private setupHITLEventForwarding(): void {
+    if (!this.hitlManager) {
+      return;
+    }
+
+    // Forward HITL confirmation requests to main emitter
+    this.hitlManager.on("hitl:confirmation-request", (event) => {
+      logger.debug("Forwarding HITL confirmation request", {
+        confirmationId: event.payload?.confirmationId,
+        toolName: event.payload?.toolName,
+      });
+      this.emitter.emit("hitl:confirmation-request", event);
+    });
+
+    // Forward HITL timeout events to main emitter
+    this.hitlManager.on("hitl:timeout", (event) => {
+      logger.debug("Forwarding HITL timeout event", {
+        confirmationId: event.payload?.confirmationId,
+        toolName: event.payload?.toolName,
+      });
+      this.emitter.emit("hitl:timeout", event);
+    });
+
+    // Listen for confirmation responses from main emitter and forward to HITL manager
+    this.emitter.on("hitl:confirmation-response", (event) => {
+      const typedEvent = event as ConfirmationResponseEvent;
+      logger.debug("Received HITL confirmation response", {
+        confirmationId: typedEvent.payload?.confirmationId,
+        approved: typedEvent.payload?.approved,
+      });
+      // Forward to HITL manager
+      this.hitlManager?.emit("hitl:confirmation-response", typedEvent);
+    });
+
+    logger.debug("HITL event forwarding configured successfully");
   }
 
   /**
@@ -732,7 +986,7 @@ export class NeuroLink {
           "Direct tools server are disabled via environment variable.",
         );
       } else {
-        await toolRegistry.registerServer(
+        await this.toolRegistry.registerServer(
           "neurolink-direct",
           directToolsServer,
         );
@@ -1186,6 +1440,39 @@ export class NeuroLink {
       throw new Error("Input text is required and must be a non-empty string");
     }
 
+    if (
+      this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+      options.context?.userId
+    ) {
+      try {
+        const mem0 = await this.ensureMem0Ready();
+        if (!mem0) {
+          logger.debug(
+            "Mem0 not available, continuing without memory retrieval",
+          );
+        } else {
+          const memories = await mem0.search(options.input.text, {
+            userId: options.context.userId as string,
+            limit: 5,
+          });
+
+          if (memories?.results?.length > 0) {
+            // Enhance the input with memory context
+            const memoryContext = memories.results
+              .map((m) => m.memory)
+              .join("\n");
+
+            options.input.text = this.formatMemoryContext(
+              memoryContext,
+              options.input.text,
+            );
+          }
+        }
+      } catch (error) {
+        logger.warn("Mem0 memory retrieval failed:", error);
+      }
+    }
+
     const startTime = Date.now();
 
     // Apply orchestration if enabled and no specific provider/model requested
@@ -1254,6 +1541,7 @@ export class NeuroLink {
       evaluationDomain: options.evaluationDomain,
       toolUsageContext: options.toolUsageContext,
       input: options.input, // This includes text, images, and content arrays
+      region: options.region,
     };
 
     // Apply factory enhancement using centralized utilities
@@ -1353,6 +1641,40 @@ export class NeuroLink {
         : undefined,
     };
 
+    if (
+      this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+      options.context?.userId &&
+      generateResult.content
+    ) {
+      // Non-blocking memory storage - run in background
+      setImmediate(async () => {
+        try {
+          const mem0 = await this.ensureMem0Ready();
+          if (mem0) {
+            // Store complete conversation turn (user + AI messages)
+            const conversationTurn = [
+              { role: "user", content: options.input.text },
+              { role: "system", content: generateResult.content },
+            ];
+
+            await mem0.add(JSON.stringify(conversationTurn), {
+              userId: options.context?.userId as string,
+              metadata: {
+                timestamp: new Date().toISOString(),
+                provider: generateResult.provider,
+                model: generateResult.model,
+                type: "conversation_turn",
+                async_mode: true,
+              },
+            });
+          }
+        } catch (error) {
+          // Non-blocking: Log error but don't fail the generation
+          logger.warn("Mem0 memory storage failed:", error);
+        }
+      });
+    }
+
     return generateResult;
   }
 
@@ -1424,6 +1746,7 @@ export class NeuroLink {
           this.conversationMemory,
           options,
           mcpResult,
+          new Date(generateInternalStartTime),
         );
         this.emitter.emit("response:end", mcpResult.content || "");
         return mcpResult;
@@ -1436,6 +1759,7 @@ export class NeuroLink {
         this.conversationMemory,
         options,
         directResult,
+        new Date(generateInternalStartTime),
       );
       this.emitter.emit("response:end", directResult.content || "");
       this.emitter.emit("message", `Text generation completed successfully`);
@@ -1661,7 +1985,7 @@ export class NeuroLink {
           mcpInitialized: this.mcpInitialized,
           mcpComponents: {
             hasExternalServerManager: !!this.externalServerManager,
-            hasToolRegistry: !!toolRegistry,
+            hasToolRegistry: !!this.toolRegistry,
             hasProviderRegistry: !!AIProviderFactory,
           },
           fallbackReason: "MCP_NOT_INITIALIZED",
@@ -1722,6 +2046,7 @@ export class NeuroLink {
         options.model,
         !options.disableTools, // Pass disableTools as inverse of enableMCP
         this as unknown as UnknownRecord, // Pass SDK instance
+        options.region, // Pass region parameter
       );
 
       // ADD: Emit connection events for all providers (Bedrock-compatible)
@@ -1876,6 +2201,7 @@ export class NeuroLink {
           options.model,
           !options.disableTools, // Pass disableTools as inverse of enableMCP
           this as unknown as UnknownRecord, // Pass SDK instance
+          options.region,
         );
 
         // ADD: Emit connection events for successful provider creation (Bedrock-compatible)
@@ -2140,6 +2466,41 @@ export class NeuroLink {
       await this.initializeMCP();
       const _originalPrompt = options.input.text;
 
+      if (
+        this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+        options.context?.userId
+      ) {
+        try {
+          const mem0 = await this.ensureMem0Ready();
+          if (!mem0) {
+            // Continue without memories if mem0 is not available
+            logger.debug(
+              "Mem0 not available, continuing without memory retrieval",
+            );
+          } else {
+            const memories = await mem0.search(options.input.text, {
+              userId: options.context.userId as string,
+              limit: 5,
+            });
+
+            if (memories?.results?.length > 0) {
+              // Enhance the input with memory context
+              const memoryContext = memories.results
+                .map((m) => m.memory)
+                .join("\n");
+
+              options.input.text = this.formatMemoryContext(
+                memoryContext,
+                options.input.text,
+              );
+            }
+          }
+        } catch (error) {
+          // Non-blocking: Log error but continue with streaming
+          logger.warn("Mem0 memory retrieval failed:", error);
+        }
+      }
+
       // Apply orchestration if enabled and no specific provider/model requested
       if (this.enableOrchestration && !options.provider && !options.model) {
         try {
@@ -2207,6 +2568,7 @@ export class NeuroLink {
                   ?.userId as string,
                 originalPrompt ?? "",
                 accumulatedContent,
+                new Date(startTime),
               );
               logger.debug("Stream conversation turn stored", {
                 sessionId: (enhancedOptions.context as Record<string, unknown>)
@@ -2219,6 +2581,39 @@ export class NeuroLink {
                 error: error instanceof Error ? error.message : String(error),
               });
             }
+          }
+
+          if (
+            self.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+            enhancedOptions.context?.userId &&
+            accumulatedContent.trim()
+          ) {
+            // Non-blocking memory storage - run in background
+            setImmediate(async () => {
+              try {
+                const mem0 = await self.ensureMem0Ready();
+                if (mem0) {
+                  // Store complete conversation turn (user + AI messages)
+                  const conversationTurn = [
+                    { role: "user", content: originalPrompt },
+                    { role: "system", content: accumulatedContent.trim() },
+                  ];
+
+                  await mem0.add(JSON.stringify(conversationTurn), {
+                    userId: enhancedOptions.context?.userId as string,
+                    metadata: {
+                      timestamp: new Date().toISOString(),
+                      type: "conversation_turn_stream",
+                      userMessage: originalPrompt,
+                      async_mode: true,
+                      aiResponse: accumulatedContent.trim(),
+                    },
+                  });
+                }
+              } catch (error) {
+                logger.warn("Mem0 memory storage failed:", error);
+              }
+            });
           }
         }
       })(this);
@@ -2315,6 +2710,7 @@ export class NeuroLink {
       options.model,
       !options.disableTools, // Pass disableTools as inverse of enableMCP
       this as unknown as UnknownRecord, // Pass SDK instance
+      options.region, // Pass region parameter
     );
 
     // Enable tool execution for the provider using BaseProvider method
@@ -2490,6 +2886,7 @@ export class NeuroLink {
               userId || (options.context?.userId as string),
               originalPrompt ?? "",
               fallbackAccumulatedContent,
+              new Date(startTime),
             );
             logger.debug("Fallback stream conversation turn stored", {
               sessionId: sessionId || options.context?.sessionId,
@@ -2930,7 +3327,7 @@ export class NeuroLink {
       const mcpServerInfo = createCustomToolServerInfo(name, convertedTool);
 
       // Register with toolRegistry using MCPServerInfo directly
-      toolRegistry.registerServer(mcpServerInfo);
+      this.toolRegistry.registerServer(mcpServerInfo);
 
       // Emit tool registration success event
       this.emitter.emit("tools-register:end", {
@@ -3011,7 +3408,7 @@ export class NeuroLink {
   unregisterTool(name: string): boolean {
     this.invalidateToolCache(); // Invalidate cache when a tool is unregistered
     const serverId = `custom-tool-${name}`;
-    const removed = toolRegistry.unregisterServer(serverId);
+    const removed = this.toolRegistry.unregisterServer(serverId);
     if (removed) {
       logger.info(`Unregistered custom tool: ${name}`);
     }
@@ -3024,7 +3421,7 @@ export class NeuroLink {
    */
   getCustomTools(): Map<string, MCPExecutableTool> {
     // Get tools from toolRegistry with smart category detection
-    const customTools = toolRegistry.getToolsByCategory(
+    const customTools = this.toolRegistry.getToolsByCategory(
       detectCategory({ isCustomTool: true }),
     );
     const toolMap = new Map<string, MCPExecutableTool>();
@@ -3097,7 +3494,7 @@ export class NeuroLink {
             sessionId: executionContext.sessionId,
           });
 
-          return await toolRegistry.executeTool(
+          return await this.toolRegistry.executeTool(
             tool.name,
             params,
             executionContext as Record<string, unknown>,
@@ -3131,7 +3528,7 @@ export class NeuroLink {
       }
 
       // ZERO CONVERSIONS: Pass MCPServerInfo directly to toolRegistry
-      await toolRegistry.registerServer(serverInfo);
+      await this.toolRegistry.registerServer(serverInfo);
 
       mcpLogger.info(
         `[NeuroLink] Successfully registered in-memory server: ${serverId}`,
@@ -3156,7 +3553,7 @@ export class NeuroLink {
    */
   getInMemoryServers(): Map<string, MCPServerInfo> {
     // Get in-memory servers from toolRegistry
-    const serverInfos = toolRegistry.getBuiltInServerInfos();
+    const serverInfos = this.toolRegistry.getBuiltInServerInfos();
     const serverMap = new Map<string, MCPServerInfo>();
 
     for (const serverInfo of serverInfos) {
@@ -3180,7 +3577,7 @@ export class NeuroLink {
    */
   getInMemoryServerInfos(): MCPServerInfo[] {
     // Get in-memory servers from centralized tool registry
-    const allServers = toolRegistry.getBuiltInServerInfos();
+    const allServers = this.toolRegistry.getBuiltInServerInfos();
     return allServers.filter(
       (server) =>
         detectCategory({
@@ -3552,7 +3949,7 @@ export class NeuroLink {
         finalContextKeys: Object.keys(context),
       });
 
-      const result = (await toolRegistry.executeTool(
+      const result = (await this.toolRegistry.executeTool(
         toolName,
         params,
         context,
@@ -3626,9 +4023,9 @@ export class NeuroLink {
 
       // 🔧 Tool registry state
       toolRegistryState: {
-        hasToolRegistry: !!toolRegistry,
+        hasToolRegistry: !!this.toolRegistry,
         toolRegistrySize: 0, // Not accessible as size property
-        toolRegistryType: toolRegistry?.constructor?.name || "NOT_SET",
+        toolRegistryType: this.toolRegistry?.constructor?.name || "NOT_SET",
         hasExternalServerManager: !!this.externalServerManager,
         externalServerManagerType:
           this.externalServerManager?.constructor?.name || "NOT_SET",
@@ -3653,7 +4050,7 @@ export class NeuroLink {
       const allTools = new Map<string, ToolInfo>();
 
       // 1. Add MCP server tools (built-in direct tools)
-      const mcpToolsRaw = await toolRegistry.listTools();
+      const mcpToolsRaw = await this.toolRegistry.listTools();
       for (const tool of mcpToolsRaw) {
         if (!allTools.has(tool.name)) {
           const optimizedTool = optimizeToolForCollection(tool, {
@@ -3665,7 +4062,7 @@ export class NeuroLink {
       }
 
       // 2. Add custom tools from this NeuroLink instance
-      const customToolsRaw = toolRegistry.getToolsByCategory(
+      const customToolsRaw = this.toolRegistry.getToolsByCategory(
         detectCategory({ isCustomTool: true }),
       );
       for (const tool of customToolsRaw) {
@@ -3684,7 +4081,8 @@ export class NeuroLink {
       }
 
       // 3. Add tools from in-memory MCP servers
-      const inMemoryToolsRaw = toolRegistry.getToolsByCategory("in-memory");
+      const inMemoryToolsRaw =
+        this.toolRegistry.getToolsByCategory("in-memory");
       for (const tool of inMemoryToolsRaw) {
         if (!allTools.has(tool.name)) {
           const optimizedTool = optimizeToolForCollection(tool, {
@@ -4031,7 +4429,7 @@ export class NeuroLink {
       await this.initializeMCP();
 
       // Get built-in tools
-      const allTools = await toolRegistry.listTools();
+      const allTools = await this.toolRegistry.listTools();
 
       // Get external MCP server statistics
       const externalStats = this.externalServerManager.getStatistics();
@@ -4039,7 +4437,7 @@ export class NeuroLink {
       // DIRECT RETURNS - ZERO conversion
       const externalMCPServers = this.externalServerManager.listServers();
       const inMemoryServerInfos = this.getInMemoryServerInfos();
-      const builtInServerInfos = toolRegistry.getBuiltInServerInfos();
+      const builtInServerInfos = this.toolRegistry.getBuiltInServerInfos();
       const autoDiscoveredServerInfos = this.getAutoDiscoveredServerInfos();
 
       // Calculate totals
@@ -4061,7 +4459,7 @@ export class NeuroLink {
         autoDiscoveredCount: autoDiscoveredServerInfos.length,
         totalTools,
         autoDiscoveredServers: autoDiscoveredServerInfos,
-        customToolsCount: toolRegistry.getToolsByCategory(
+        customToolsCount: this.toolRegistry.getToolsByCategory(
           detectCategory({ isCustomTool: true }),
         ).length,
         inMemoryServersCount: inMemoryServerInfos.length,
@@ -4078,7 +4476,7 @@ export class NeuroLink {
         autoDiscoveredCount: 0,
         totalTools: 0,
         autoDiscoveredServers: [],
-        customToolsCount: toolRegistry.getToolsByCategory(
+        customToolsCount: this.toolRegistry.getToolsByCategory(
           detectCategory({ isCustomTool: true }),
         ).length,
         inMemoryServersCount: 0,
@@ -4100,7 +4498,7 @@ export class NeuroLink {
     return [
       ...this.externalServerManager.listServers(), // Direct return
       ...this.getInMemoryServerInfos(), // Direct return
-      ...toolRegistry.getBuiltInServerInfos(), // Direct return
+      ...this.toolRegistry.getBuiltInServerInfos(), // Direct return
       ...this.getAutoDiscoveredServerInfos(), // Direct return
     ];
   }
@@ -4114,7 +4512,7 @@ export class NeuroLink {
     try {
       // Test built-in tools
       if (serverId === "neurolink-direct") {
-        const tools = await toolRegistry.listTools();
+        const tools = await this.toolRegistry.listTools();
         return tools.length > 0;
       }
 
@@ -4469,7 +4867,7 @@ export class NeuroLink {
     let healthyCount = 0;
 
     // Get all tool names from toolRegistry
-    const allTools = await toolRegistry.listTools();
+    const allTools = await this.toolRegistry.listTools();
     const allToolNames = new Set(allTools.map((tool) => tool.name));
 
     for (const toolName of allToolNames) {
@@ -4667,6 +5065,7 @@ export class NeuroLink {
    * @param userId - User identifier (optional)
    * @param toolCalls - Array of tool calls
    * @param toolResults - Array of tool results
+   * @param currentTime - Date when the tool execution occurred (optional)
    * @returns Promise resolving when storage is complete
    */
   async storeToolExecutions(
@@ -4684,6 +5083,7 @@ export class NeuroLink {
       error?: string;
       [key: string]: unknown;
     }>,
+    currentTime?: Date,
   ): Promise<void> {
     // Check if tools are not empty
     const hasToolData =
@@ -4709,6 +5109,7 @@ export class NeuroLink {
         userId,
         toolCalls,
         toolResults,
+        currentTime,
       );
     } catch (error) {
       logger.warn("Failed to store tool executions", {
@@ -5080,7 +5481,7 @@ export class NeuroLink {
       const externalTools = this.externalServerManager.getServerTools(serverId);
 
       for (const tool of externalTools) {
-        toolRegistry.removeTool(tool.name);
+        this.toolRegistry.removeTool(tool.name);
         mcpLogger.debug(
           `[NeuroLink] Unregistered external MCP tool from main registry: ${tool.name}`,
         );
@@ -5098,7 +5499,7 @@ export class NeuroLink {
    */
   private unregisterExternalMCPToolFromRegistry(toolName: string): void {
     try {
-      toolRegistry.removeTool(toolName);
+      this.toolRegistry.removeTool(toolName);
       mcpLogger.debug(
         `[NeuroLink] Unregistered external MCP tool from main registry: ${toolName}`,
       );
@@ -5181,7 +5582,7 @@ export class NeuroLink {
       const externalTools = this.externalServerManager.getAllTools();
 
       for (const tool of externalTools) {
-        toolRegistry.removeTool(tool.name);
+        this.toolRegistry.removeTool(tool.name);
       }
 
       mcpLogger.debug(

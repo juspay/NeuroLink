@@ -1,8 +1,8 @@
 import { createAzure } from "@ai-sdk/azure";
 import { streamText, type LanguageModelV1 } from "ai";
 import { BaseProvider } from "../core/baseProvider.js";
-import type { AIProviderName } from "../core/types.js";
-import { APIVersions } from "../core/types.js";
+import { APIVersions } from "../types/providers.js";
+import type { AIProviderName } from "../types/providers.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
@@ -12,7 +12,11 @@ import {
   createAzureEndpointConfig,
 } from "../utils/providerConfig.js";
 import { logger } from "../utils/logger.js";
-import { buildMessagesArray } from "../utils/messageBuilder.js";
+import {
+  buildMessagesArray,
+  buildMultimodalMessagesArray,
+  convertToCoreMessages,
+} from "../utils/messageBuilder.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 
@@ -138,11 +142,58 @@ export class AzureOpenAIProvider extends BaseProvider {
         });
       }
 
-      // Build message array from options
-      const messages = buildMessagesArray(options);
+      // Build message array from options with multimodal support
+      const hasMultimodalInput = !!(
+        options.input?.images?.length || options.input?.content?.length
+      );
 
+      let messages;
+      if (hasMultimodalInput) {
+        logger.debug(
+          `Azure OpenAI: Detected multimodal input, using multimodal message builder`,
+          {
+            hasImages: !!options.input?.images?.length,
+            imageCount: options.input?.images?.length || 0,
+            hasContent: !!options.input?.content?.length,
+            contentCount: options.input?.content?.length || 0,
+          },
+        );
+
+        // Create multimodal options for buildMultimodalMessagesArray
+        const multimodalOptions = {
+          input: {
+            text: options.input?.text || "",
+            images: options.input?.images,
+            content: options.input?.content,
+          },
+          systemPrompt: options.systemPrompt,
+          conversationHistory: options.conversationMessages,
+          provider: this.providerName,
+          model: this.modelName,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+          enableAnalytics: options.enableAnalytics,
+          enableEvaluation: options.enableEvaluation,
+          context: options.context,
+        };
+
+        const mm = await buildMultimodalMessagesArray(
+          multimodalOptions,
+          this.providerName,
+          this.modelName,
+        );
+        // Convert multimodal messages to Vercel AI SDK format (CoreMessage[])
+        messages = convertToCoreMessages(mm);
+      } else {
+        logger.debug(
+          `Azure OpenAI: Text-only input, using standard message builder`,
+        );
+        messages = buildMessagesArray(options);
+      }
+
+      const model = await this.getAISDKModelWithMiddleware(options);
       const stream = await streamText({
-        model: this.azureProvider(this.deployment),
+        model,
         messages: messages,
         ...(options.maxTokens !== null && options.maxTokens !== undefined
           ? { maxTokens: options.maxTokens }
@@ -157,6 +208,7 @@ export class AzureOpenAIProvider extends BaseProvider {
             toolCalls,
             toolResults,
             options,
+            new Date(),
           ).catch((error: unknown) => {
             logger.warn(
               "[AzureOpenaiProvider] Failed to store tool executions",

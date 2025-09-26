@@ -31,6 +31,7 @@ import chalk from "chalk";
 import { logger } from "../../lib/utils/logger.js";
 import fs from "fs";
 import { handleSetup } from "../commands/setup.js";
+import { checkRedisAvailability } from "../../lib/utils/conversationMemoryUtils.js";
 
 /**
  * CLI Command Factory for generate commands
@@ -176,7 +177,7 @@ export class CLICommandFactory {
     quiet: {
       type: "boolean" as const,
       alias: "q",
-      default: false,
+      default: true,
       description: "Suppress non-essential output",
     },
     noColor: {
@@ -900,22 +901,32 @@ export class CLICommandFactory {
       command: "loop",
       describe: "Start an interactive loop session",
       builder: (yargs) =>
-        yargs
-          .option("enable-conversation-memory", {
+        this.buildOptions(yargs, {
+          "enable-conversation-memory": {
             type: "boolean",
             description: "Enable conversation memory for the loop session",
-            default: false,
-          })
-          .option("max-sessions", {
+            default: true,
+          },
+          "max-sessions": {
             type: "number",
             description: "Maximum number of conversation sessions to keep",
             default: 50,
-          })
-          .option("max-turns-per-session", {
+          },
+          "max-turns-per-session": {
             type: "number",
             description: "Maximum turns per conversation session",
             default: 20,
-          })
+          },
+          "auto-redis": {
+            type: "boolean",
+            description: "Automatically use Redis if available",
+            default: true,
+          },
+        })
+          .example(
+            "$0 loop --no-auto-redis",
+            "Start loop with memory storage only",
+          )
           .example("$0 loop", "Start interactive session")
           .example(
             "$0 loop --enable-conversation-memory",
@@ -931,10 +942,36 @@ export class CLICommandFactory {
 
         let conversationMemoryConfig: ConversationMemoryConfig | undefined;
 
-        const { enableConversationMemory, maxSessions, maxTurnsPerSession } =
-          argv;
+        const {
+          enableConversationMemory,
+          maxSessions,
+          maxTurnsPerSession,
+          autoRedis,
+        } = argv;
 
         if (enableConversationMemory) {
+          let storageType = "memory";
+
+          if (autoRedis) {
+            const isRedisAvailable = await checkRedisAvailability();
+            if (isRedisAvailable) {
+              storageType = "redis";
+              if (!argv.quiet) {
+                logger.always(
+                  chalk.green(
+                    "✅ Using Redis for persistent conversation memory",
+                  ),
+                );
+              }
+            } else if (argv.debug) {
+              logger.debug("Redis not available, using in-memory storage");
+            }
+          } else if (argv.debug) {
+            logger.debug("Auto-Redis disabled, using in-memory storage");
+          }
+
+          process.env.STORAGE_TYPE = storageType;
+
           conversationMemoryConfig = {
             enabled: true,
             maxSessions: maxSessions as number,

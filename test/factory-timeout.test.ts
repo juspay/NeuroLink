@@ -3,7 +3,7 @@ import { AIProviderFactory } from "../src/lib/core/factory.js";
 import { dynamicModelProvider } from "../src/lib/core/dynamicModels.js";
 import { logger } from "../src/lib/utils/logger.js";
 import { ProviderFactory } from "../src/lib/factories/providerFactory.js";
-import type { AIProvider } from "../src/lib/core/types.js";
+import type { AIProvider } from "../src/lib/types/providers.js";
 
 // Mock dependencies
 vi.mock("../src/lib/core/dynamicModels.js");
@@ -18,9 +18,8 @@ describe("AIProviderFactory Timeout Handling", () => {
     // Add default stub for ProviderFactory.createProvider so tests don't return undefined
     const mockPF = vi.mocked(ProviderFactory);
     mockPF.createProvider.mockResolvedValue({
-      provider: "mock-provider",
-      model: "mock-model",
       generate: vi.fn(),
+      gen: vi.fn(),
       stream: vi.fn(),
       setupToolExecutor: vi.fn(),
     } as AIProvider);

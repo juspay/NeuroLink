@@ -1,5 +1,7 @@
 import type { LanguageModelV1Middleware } from "ai";
 import type { JsonValue } from "../types/common.js";
+import type { EvaluationData } from "./evaluation.js";
+import type { GetPromptFunction } from "./evaluationTypes.js";
 
 /**
  * Metadata interface for NeuroLink middleware
@@ -36,7 +38,7 @@ export interface MiddlewareConfig {
   /** Whether the middleware is enabled */
   enabled?: boolean;
   /** Middleware-specific configuration */
-  config?: Record<string, JsonValue>;
+  config?: Record<string, unknown>;
   /** Conditions under which to apply this middleware */
   conditions?: MiddlewareConditions;
 }
@@ -124,7 +126,8 @@ export type BuiltInMiddlewareType =
   | "caching"
   | "rateLimit"
   | "retry"
-  | "timeout";
+  | "timeout"
+  | "autoEvaluation";
 
 /**
  * Middleware preset configurations
@@ -161,4 +164,31 @@ export interface MiddlewareFactoryOptions {
     /** Whether to collect execution statistics */
     collectStats?: boolean;
   };
+}
+
+/**
+ * Configuration for the Auto-Evaluation Middleware.
+ */
+export interface AutoEvaluationConfig {
+  /** The minimum score (1-10) for a response to be considered passing. */
+  threshold?: number;
+  /** The maximum number of retry attempts before failing. */
+  maxRetries?: number;
+  /** The model to use for the LLM-as-judge evaluation. */
+  evaluationModel?: string;
+  /**
+   * If true, the middleware will wait for the evaluation to complete before returning.
+   * If the evaluation fails, it will throw an error. Defaults to true.
+   */
+  blocking?: boolean;
+  /** A callback function to be invoked with the evaluation result. */
+  onEvaluationComplete?: (evaluation: EvaluationData) => void | Promise<void>;
+  /** The score below which a response is considered off-topic. */
+  offTopicThreshold?: number;
+  /** The score below which a failing response is considered a high severity alert. */
+  highSeverityThreshold?: number;
+
+  promptGenerator?: GetPromptFunction;
+
+  provider?: string;
 }

@@ -3,13 +3,15 @@ import { AIProviderFactory } from "../src/lib/core/factory.js";
 import { ProviderFactory } from "../src/lib/factories/providerFactory.js";
 import { ProviderRegistry } from "../src/lib/factories/providerRegistry.js";
 import { logger } from "../src/lib/utils/logger.js";
-import type { AIProvider } from "../src/lib/core/types.js";
+import type { AIProvider } from "../src/lib/types/providers.js";
 import type {
   StreamOptions,
   StreamResult,
 } from "../src/lib/types/streamTypes.js";
-import type { TextGenerationOptions } from "../src/lib/core/types.js";
-import type { EnhancedGenerateResult } from "../src/lib/core/types.js";
+import type {
+  TextGenerationOptions,
+  EnhancedGenerateResult,
+} from "../src/lib/types/generateTypes.js";
 import type { ValidationSchema } from "../src/lib/types/typeAliases.js";
 
 // Mock dependencies
@@ -34,9 +36,9 @@ describe("AIProviderFactory Edge Cases", () => {
         provider: "mock",
         model: "mock-model",
         usage: {
-          inputTokens: 20,
-          outputTokens: 30,
-          totalTokens: 50,
+          input: 20,
+          output: 30,
+          total: 50,
         },
       };
     }
@@ -50,9 +52,9 @@ describe("AIProviderFactory Edge Cases", () => {
         provider: "mock",
         model: "mock-model",
         usage: {
-          inputTokens: 20,
-          outputTokens: 30,
-          totalTokens: 50,
+          input: 20,
+          output: 30,
+          total: 50,
         },
       };
     }
@@ -90,9 +92,9 @@ describe("AIProviderFactory Edge Cases", () => {
         provider: "fallback",
         model: "fallback-model",
         usage: {
-          inputTokens: 10,
-          outputTokens: 20,
-          totalTokens: 30,
+          input: 10,
+          output: 20,
+          total: 30,
         },
       };
     }
@@ -106,9 +108,9 @@ describe("AIProviderFactory Edge Cases", () => {
         provider: "fallback",
         model: "fallback-model",
         usage: {
-          inputTokens: 10,
-          outputTokens: 20,
-          totalTokens: 30,
+          input: 10,
+          output: 20,
+          total: 30,
         },
       };
     }

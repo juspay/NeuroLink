@@ -41,15 +41,17 @@ interface PendingToolExecution {
     toolCallId?: string;
     toolName?: string;
     args?: Record<string, unknown>;
+    timestamp?: Date; // Individual timestamp for each tool call
     [key: string]: unknown;
   }>;
   toolResults: Array<{
     toolCallId?: string;
     result?: unknown;
     error?: string;
+    timestamp?: Date; // Individual timestamp for each tool result
     [key: string]: unknown;
   }>;
-  timestamp: number;
+  timestamp: number; // Overall timestamp for the execution batch
 }
 
 export class RedisConversationMemoryManager {
@@ -270,6 +272,7 @@ export class RedisConversationMemoryManager {
       error?: string;
       [key: string]: unknown;
     }>,
+    currentTime?: Date,
   ): Promise<void> {
     logger.debug(
       "[RedisConversationMemoryManager] Storing tool execution temporarily",
@@ -287,8 +290,14 @@ export class RedisConversationMemoryManager {
 
       // Store tool execution data temporarily to prevent race conditions
       const pendingData: PendingToolExecution = {
-        toolCalls: toolCalls || [],
-        toolResults: toolResults || [],
+        toolCalls: (toolCalls || []).map((call) => ({
+          ...call,
+          timestamp: currentTime,
+        })),
+        toolResults: (toolResults || []).map((result) => ({
+          ...result,
+          timestamp: currentTime,
+        })),
         timestamp: Date.now(),
       };
 
@@ -352,6 +361,7 @@ export class RedisConversationMemoryManager {
     userId: string | undefined,
     userMessage: string,
     aiResponse: string,
+    startTimeStamp: Date | undefined,
   ): Promise<void> {
     logger.debug("[RedisConversationMemoryManager] Storing conversation turn", {
       sessionId,
@@ -468,8 +478,8 @@ export class RedisConversationMemoryManager {
           title: "New Conversation", // Temporary title until generated
           sessionId,
           userId: normalizedUserId,
-          createdAt: currentTime,
-          updatedAt: currentTime,
+          createdAt: startTimeStamp?.toISOString() || currentTime,
+          updatedAt: startTimeStamp?.toISOString() || currentTime,
           messages: [],
         };
       } else {
@@ -487,7 +497,7 @@ export class RedisConversationMemoryManager {
       // Add new messages to conversation history with new format
       const userMsg: ChatMessage = {
         id: this.generateMessageId(conversation),
-        timestamp: this.generateTimestamp(),
+        timestamp: startTimeStamp?.toISOString() || this.generateTimestamp(),
         role: "user",
         content: userMessage,
       };
@@ -887,16 +897,17 @@ export class RedisConversationMemoryManager {
         conversationMemory: { enabled: false },
       });
 
-      const titlePrompt = `Generate a short, descriptive title (5-8 words maximum) for a conversation that starts with this user message. The title should capture the main topic or intent. Only return the title, nothing else.
+      const titlePrompt = `Generate a clear, concise, and descriptive title (5–8 words maximum) for a conversation based on the following user message. 
+The title must meaningfully reflect the topic or intent of the message. 
+Do not output anything unrelated, vague, or generic. 
+Do not say you cannot create a title. Always return a valid title.
 
-User message: "${userMessage}"
-
-Title:`;
+User message: "${userMessage}`;
 
       const result = await titleGenerator.generate({
         input: { text: titlePrompt },
         provider: this.config.summarizationProvider || "vertex",
-        model: this.config.summarizationModel || "gemini-2.5-flashb",
+        model: this.config.summarizationModel || "gemini-2.5-flash",
         disableTools: false,
       });
 
@@ -1261,7 +1272,8 @@ Title:`;
 
       const toolCallMessage: ChatMessage = {
         id: this.generateMessageId(conversation),
-        timestamp: this.generateTimestamp(),
+        timestamp:
+          toolCall.timestamp?.toISOString() || this.generateTimestamp(),
         role: "tool_call",
         content: "", // Can be empty for tool calls
         tool: toolName,
@@ -1282,7 +1294,8 @@ Title:`;
 
       const toolResultMessage: ChatMessage = {
         id: this.generateMessageId(conversation),
-        timestamp: this.generateTimestamp(),
+        timestamp:
+          toolResult.timestamp?.toISOString() || this.generateTimestamp(),
         role: "tool_result",
         content: "", // Can be empty for tool results
         tool: toolName, // Now correctly extracted from tool call mapping

@@ -13,7 +13,7 @@ export { AIProviderFactory };
 export type {
   AIProvider,
   AIProviderName,
-  ProviderConfig,
+  AIModelProviderConfig,
   StreamingOptions,
   ProviderAttempt,
   SupportedModelName,
@@ -234,8 +234,8 @@ export type {
  * ```
  */
 export async function generateText(
-  options: import("./core/types.js").TextGenerationOptions,
-): Promise<import("./core/types.js").TextGenerationResult> {
+  options: import("./types/index.js").TextGenerationOptions,
+): Promise<import("./types/index.js").TextGenerationResult> {
   // Create instance on-demand without auto-instantiation
   const neurolink = new NeuroLink();
   return await neurolink.generateText(options);
