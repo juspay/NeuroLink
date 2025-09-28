@@ -15,7 +15,10 @@ import type {
 import { SageMakerRuntimeClient } from "./client.js";
 import { handleSageMakerError } from "./errors.js";
 import { estimateTokenUsage, createSageMakerStream } from "./streaming.js";
-import type { SageMakerConfig, SageMakerModelConfig } from "./types.js";
+import type {
+  SageMakerConfig,
+  SageMakerModelConfig,
+} from "../../types/providers.js";
 import type { ConnectivityResult } from "../../types/typeAliases.js";
 import { createAdaptiveSemaphore } from "./adaptive-semaphore.js";
 import { logger } from "../../utils/logger.js";

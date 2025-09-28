@@ -6,21 +6,10 @@
  */
 
 import { logger } from "../../utils/logger.js";
-
-export interface AdaptiveSemaphoreConfig {
-  initialConcurrency: number;
-  maxConcurrency: number;
-  minConcurrency: number;
-}
-
-export interface AdaptiveSemaphoreMetrics {
-  activeRequests: number;
-  currentConcurrency: number;
-  completedCount: number;
-  errorCount: number;
-  averageResponseTime: number;
-  waitingCount: number;
-}
+import type {
+  AdaptiveSemaphoreConfig,
+  AdaptiveSemaphoreMetrics,
+} from "../../types/providers.js";
 
 /**
  * Adaptive semaphore that automatically adjusts concurrency based on performance metrics

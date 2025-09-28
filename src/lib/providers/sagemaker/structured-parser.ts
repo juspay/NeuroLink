@@ -5,7 +5,7 @@
  * responses from SageMaker endpoints with real-time validation.
  */
 
-import type { SageMakerStructuredOutput } from "./types.js";
+import type { SageMakerStructuredOutput } from "../../types/providers.js";
 import { logger } from "../../utils/logger.js";
 import {
   type BracketCountingState,

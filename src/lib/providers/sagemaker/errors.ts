@@ -5,7 +5,10 @@
  * and user-friendly error messages for SageMaker operations.
  */
 
-import type { SageMakerErrorCode, SageMakerErrorInfo } from "./types.js";
+import type {
+  SageMakerErrorCode,
+  SageMakerErrorInfo,
+} from "../../types/providers.js";
 import type { UnknownRecord } from "../../types/common.js";
 import {
   ERROR_MESSAGE_TEMPLATES,

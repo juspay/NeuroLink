@@ -10,7 +10,7 @@ import type {
   SageMakerUsage,
   SageMakerStreamingToolCall,
   SageMakerStructuredOutput,
-} from "./types.js";
+} from "../../types/providers.js";
 import { isNonNullObject } from "../../utils/typeUtils.js";
 import {
   createStructuredOutputParser,

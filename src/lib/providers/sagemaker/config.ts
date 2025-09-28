@@ -6,7 +6,10 @@
  */
 
 import { z } from "zod";
-import type { SageMakerConfig, SageMakerModelConfig } from "./types.js";
+import type {
+  SageMakerConfig,
+  SageMakerModelConfig,
+} from "../../types/providers.js";
 import { logger } from "../../utils/logger.js";
 
 /**

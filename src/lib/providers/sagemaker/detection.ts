@@ -9,7 +9,7 @@ import type {
   SageMakerConfig,
   SageMakerModelConfig,
   InvokeEndpointResponse,
-} from "./types.js";
+} from "../../types/providers.js";
 import { SageMakerRuntimeClient } from "./client.js";
 import { logger } from "../../utils/logger.js";
 

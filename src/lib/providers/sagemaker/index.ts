@@ -60,7 +60,7 @@ export type {
   ModelDeploymentConfig,
   EndpointMetrics,
   CostEstimate,
-} from "./types.js";
+} from "../../types/providers.js";
 
 /**
  * Factory function to create a SageMaker Provider

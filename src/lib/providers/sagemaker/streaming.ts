@@ -10,7 +10,7 @@ import type {
   SageMakerStreamChunk,
   SageMakerUsage,
   SageMakerConfig,
-} from "./types.js";
+} from "../../types/providers.js";
 import { handleSageMakerError, SageMakerError } from "./errors.js";
 import { logger } from "../../utils/logger.js";
 import {

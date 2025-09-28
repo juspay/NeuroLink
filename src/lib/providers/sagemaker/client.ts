@@ -19,7 +19,7 @@ import type {
   SageMakerConfig,
   InvokeEndpointParams,
   InvokeEndpointResponse,
-} from "./types.js";
+} from "../../types/providers.js";
 import {
   handleSageMakerError,
   SageMakerError,
