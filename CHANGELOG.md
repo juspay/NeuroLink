@@ -1,3 +1,9 @@
+## [7.48.0](https://github.com/juspay/neurolink/compare/v7.47.3...v7.48.0) (2025-09-30)
+
+### Features
+
+- **(cli):** add command history support on up/down ([5aa3c2d](https://github.com/juspay/neurolink/commit/5aa3c2db04714019b34af0fd69106a8fd21ac252))
+
 ## [7.47.3](https://github.com/juspay/neurolink/compare/v7.47.2...v7.47.3) (2025-09-26)
 
 ## [7.47.2](https://github.com/juspay/neurolink/compare/v7.47.1...v7.47.2) (2025-09-26)
