@@ -7,924 +7,118 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)](https://www.typescriptlang.org/)
 [![CI](https://github.com/juspay/neurolink/workflows/CI/badge.svg)](https://github.com/juspay/neurolink/actions)
 
-> **Enterprise AI Development Platform** with universal provider support, factory pattern architecture, and **access to 100+ AI models** through LiteLLM integration. Production-ready with TypeScript support.
+Enterprise AI development platform with unified provider access, production-ready tooling, and an opinionated factory architecture. NeuroLink ships as both a TypeScript SDK and a professional CLI so teams can build, operate, and iterate on AI features quickly.
 
-**NeuroLink** is an Enterprise AI Development Platform that unifies **12 major AI providers** with intelligent fallback and built-in tool support. Available as both a **programmatic SDK** and **professional CLI tool**. Features LiteLLM integration for **100+ models**, plus 6 core tools working across all providers. Extracted from production use at Juspay.
+## What's New (Q4 2025)
 
-## 🎉 **NEW: LiteLLM Integration - Access 100+ AI Models**
+- **Human-in-the-loop workflows** – Pause generation for user approval/input before tool execution or continuing. → [`docs/features/hitl.md`](docs/features/hitl.md)
+- **Guardrails middleware** – Block PII, profanity, and unsafe content with built-in content filtering. → [`docs/features/guardrails.md`](docs/features/guardrails.md)
+- **Context summarization** – Automatic conversation compression for long-running sessions with memory. → [`docs/features/context-summarization.md`](docs/features/context-summarization.md)
+- **Redis conversation export** – Export full session history as JSON for analytics and debugging. → [`docs/features/conversation-history.md`](docs/features/conversation-history.md)
 
-**NeuroLink now supports LiteLLM**, providing unified access to **100+ AI models** from all major providers through a single interface:
+> **Q3 highlights** (multimodal chat, auto-evaluation, loop sessions, orchestration) are now in [Platform Capabilities](#platform-capabilities-at-a-glance) below.
 
-- **🔄 Universal Access**: OpenAI, Anthropic, Google, Mistral, Meta, and more
-- **🎯 Unified Interface**: OpenAI-compatible API for all models
-- **💰 Cost Optimization**: Automatic routing to cost-effective models
-- **⚡ Load Balancing**: Automatic failover and load distribution
-- **📊 Analytics**: Built-in usage tracking and monitoring
-
-```bash
-# Quick start with LiteLLM
-pip install litellm && litellm --port 4000
-
-# Use any of 100+ models through one interface
-npx @juspay/neurolink generate "Hello" --provider litellm --model "openai/gpt-4o"
-npx @juspay/neurolink generate "Hello" --provider litellm --model "anthropic/claude-3-5-sonnet"
-npx @juspay/neurolink generate "Hello" --provider litellm --model "google/gemini-2.0-flash"
-```
-
-**[📖 Complete LiteLLM Integration Guide](./docs/LITELLM-INTEGRATION.md)** - Setup, configuration, and 100+ model access
-
-## 🎉 **NEW: SageMaker Integration - Deploy Your Custom AI Models**
-
-**NeuroLink now supports Amazon SageMaker**, enabling you to deploy and use your own custom trained models through NeuroLink's unified interface:
-
-- **🏗️ Custom Model Hosting** - Deploy your fine-tuned models on AWS infrastructure
-- **💰 Cost Control** - Pay only for inference usage with auto-scaling capabilities
-- **🔒 Enterprise Security** - Full control over model infrastructure and data privacy
-- **⚡ Performance** - Dedicated compute resources with predictable latency
-- **📊 Monitoring** - Built-in CloudWatch metrics and logging
+## Get Started in Two Steps
 
 ```bash
-# Quick start with SageMaker
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
+# 1. Run the interactive setup wizard (select providers, validate keys)
+pnpm dlx @juspay/neurolink setup
 
-# Use your custom deployed models
-npx @juspay/neurolink generate "Analyze this data" --provider sagemaker
-npx @juspay/neurolink sagemaker status  # Check endpoint health
-npx @juspay/neurolink sagemaker benchmark my-endpoint  # Performance testing
+# 2. Start generating with automatic provider selection
+npx @juspay/neurolink generate "Write a launch plan for multimodal chat"
 ```
 
-**[📖 Complete SageMaker Integration Guide](./docs/SAGEMAKER-INTEGRATION.md)** - Setup, deployment, and custom model access
-
-## 🚀 Enterprise Platform Features
-
-- **🏭 Factory Pattern Architecture** - Unified provider management through BaseProvider inheritance
-- **🔧 Tools-First Design** - All providers include built-in tool support without additional configuration
-- **🔗 LiteLLM Integration** - **100+ models** from all major providers through unified interface
-- **🏢 Enterprise Proxy Support** - Comprehensive corporate proxy support with MCP compatibility
-- **🏗️ Enterprise Architecture** - Production-ready with clean abstractions
-- **🔄 Configuration Management** - Flexible provider configuration with automatic backups
-- **✅ Type Safety** - Industry-standard TypeScript interfaces
-- **⚡ Performance** - Fast response times with streaming support and 68% improved status checks
-- **🛡️ Error Recovery** - Graceful failures with provider fallback and retry logic
-- **📊 Analytics & Evaluation** - Built-in usage tracking and AI-powered quality assessment
-- **🎯 Real-time Event Monitoring** - EventEmitter integration for progress tracking and debugging
-- **🔧 External MCP Integration** - Model Context Protocol with 6 built-in tools + full external MCP server support
-- **🚀 Lighthouse Integration** - Unified tool registration API supporting both object and array formats for seamless Lighthouse tool import
-
----
-
-## 🚀 Quick Start
-
-### 🎉 **NEW: Revolutionary Interactive Setup** - Transform Your Developer Experience!
-
-**🚀 BREAKTHROUGH: Setup in 2-3 minutes (vs 15+ minutes manual setup)**
-
-```bash
-# 🎯 **MAIN SETUP WIZARD** - Beautiful guided experience
-pnpm cli setup
-
-# ✨ **REVOLUTIONARY FEATURES:**
-# 🎨 Beautiful ASCII art welcome screen
-# 📊 Interactive provider comparison table
-# ⚡ Real-time credential validation with format checking
-# 🔄 Atomic .env file management (preserves existing content)
-# 🧠 Smart recommendations (Google AI free tier, OpenAI for pro users)
-# 🛡️ Cross-platform compatibility with graceful error recovery
-# 📈 90% reduction in setup errors vs manual configuration
-
-# 🚀 **INSTANT PRODUCTIVITY** - Use any AI provider immediately:
-npx @juspay/neurolink generate "Hello, AI"    # Auto-selects best provider
-npx @juspay/neurolink gen "Write code"        # Shortest form
-npx @juspay/neurolink stream "Tell a story"   # Real-time streaming
-npx @juspay/neurolink status                  # Check all providers
-```
-
-**🎯 Why This Changes Everything:**
-
-- **⏱️ Time Savings**: 15+ minutes → 2-3 minutes (83% faster)
-- **🛡️ Error Reduction**: 90% fewer credential/configuration errors
-- **🎨 Professional UX**: Beautiful terminal interface with colors and animations
-- **🔍 Smart Validation**: Real-time API key format checking and endpoint testing
-- **🔄 Safe Management**: Preserves existing .env content, creates backups automatically
-- **🧠 Intelligent Guidance**: Context-aware recommendations based on use case
-
-> **Developer Feedback**: _"Setup went from the most frustrating part to the most delightful part of using NeuroLink"_
-
-### Provider-Specific Setup (if you prefer targeted setup)
-
-```bash
-# Setup individual providers with guided wizards
-npx @juspay/neurolink setup --provider google-ai    # Free tier, perfect for beginners
-or pnpm cli setup-google-ai
-
-npx @juspay/neurolink setup --provider openai       # Industry standard, professional use
-or pnpm cli setup-openai
-
-npx @juspay/neurolink setup --provider anthropic    # Advanced reasoning, safety-focused
-or pnpm cli setup-anthropic
-
-npx @juspay/neurolink setup --provider azure        # Enterprise features, compliance
-or pnpm cli setup-azure
-
-npx @juspay/neurolink setup --provider bedrock      # AWS ecosystem integration
-or pnpm cli setup-bedrock
-
-npx @juspay/neurolink setup --provider huggingface  # Open source models, 100k+ options
-or pnpm cli setup-huggingface
-
-pnpm cli setup-gcp # For using Vertex
-# Check setup status anytime
-npx @juspay/neurolink setup --status
-npx @juspay/neurolink setup --list  # View all available providers
-```
-
-### Alternative: Manual Setup (Advanced Users)
-
-```bash
-# Option 1: LiteLLM - Access 100+ models through one interface
-pip install litellm && litellm --port 4000
-export LITELLM_BASE_URL="http://localhost:4000"
-export LITELLM_API_KEY="sk-anything"
-
-# Use any of 100+ models
-npx @juspay/neurolink generate "Hello, AI" --provider litellm --model "openai/gpt-4o"
-npx @juspay/neurolink generate "Hello, AI" --provider litellm --model "anthropic/claude-3-5-sonnet"
-
-# Option 2: OpenAI Compatible - Use any OpenAI-compatible endpoint with auto-discovery
-export OPENAI_COMPATIBLE_BASE_URL="https://api.openrouter.ai/api/v1"
-export OPENAI_COMPATIBLE_API_KEY="sk-or-v1-your-api-key"
-# Auto-discovers available models via /v1/models endpoint
-npx @juspay/neurolink generate "Hello, AI" --provider openai-compatible
-
-# Or specify a model explicitly
-export OPENAI_COMPATIBLE_MODEL="claude-3-5-sonnet"
-npx @juspay/neurolink generate "Hello, AI" --provider openai-compatible
-
-# Option 3: Direct Provider - Quick setup with Google AI Studio (free tier)
-export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
-npx @juspay/neurolink generate "Hello, AI" --provider google-ai
-
-# Option 4: Amazon SageMaker - Use your custom deployed models
-export AWS_ACCESS_KEY_ID="your-access-key"
-export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export SAGEMAKER_DEFAULT_ENDPOINT="your-endpoint-name"
-npx @juspay/neurolink generate "Hello, AI" --provider sagemaker
-```
-
-```bash
-# SDK Installation for using in your typescript projects
-npm install @juspay/neurolink
-
-# 🆕 NEW: External MCP Server Integration Quick Test
-node -e "
-const { NeuroLink } = require('@juspay/neurolink');
-(async () => {
-  const neurolink = new NeuroLink();
-
-  // Add external filesystem MCP server
-  await neurolink.addExternalMCPServer('filesystem', {
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
-    transport: 'stdio'
-  });
-
-  // External tools automatically available in generate()
-  const result = await neurolink.generate({
-    input: { text: 'List files in the current directory' }
-  });
-  console.log('🎉 External MCP integration working!');
-  console.log(result.content);
-})();
-"
-```
-
-### Basic Usage
-
-```typescript
-import { NeuroLink } from "@juspay/neurolink";
-
-// Auto-select best available provider
-const neurolink = new NeuroLink();
-const autoResult = await neurolink.generate({
-  input: { text: "Write a business email" },
-  provider: "google-ai", // or let it auto-select
-  timeout: "30s",
-});
-
-console.log(autoResult.content);
-console.log(`Used: ${autoResult.provider}`);
-```
-
-### Conversation Memory
-
-NeuroLink supports automatic conversation history management that maintains context across multiple turns within sessions. This enables AI to remember previous interactions and provide contextually aware responses. Session-based memory isolation ensures privacy between different conversations.
-
-```typescript
-// Enable conversation memory with configurable limits
-const neurolink = new NeuroLink({
-  conversationMemory: {
-    enabled: true,
-    maxSessions: 50, // Keep last 50 sessions
-    maxTurnsPerSession: 20, // Keep last 20 turns per session
-  },
-});
-```
-
-#### 🔗 CLI-SDK Consistency (NEW! ✨)
-
-Method aliases that match CLI command names:
-
-```typescript
-// The following methods are equivalent:
-const result1 = await provider.generate({ input: { text: "Hello" } }); // Original
-const result2 = await provider.gen({ input: { text: "Hello" } }); // Matches CLI 'gen'
-
-// Use whichever style you prefer:
-const provider = createBestAIProvider();
-
-// Detailed method name
-const story = await provider.generate({
-  input: { text: "Write a short story about AI" },
-  maxTokens: 200,
-});
-
-// CLI-style method names
-const poem = await provider.generate({ input: { text: "Write a poem" } });
-const joke = await provider.gen({ input: { text: "Tell me a joke" } });
-```
-
-### Enhanced Features
-
-#### CLI with Analytics & Evaluation
-
-```bash
-# Basic AI generation with auto-provider selection
-npx @juspay/neurolink generate "Write a business email"
-
-# LiteLLM with specific model
-npx @juspay/neurolink generate "Write code" --provider litellm --model "anthropic/claude-3-5-sonnet"
-
-# With analytics and evaluation
-npx @juspay/neurolink generate "Write a proposal" --enable-analytics --enable-evaluation --debug
-
-# Streaming with tools (default behavior)
-npx @juspay/neurolink stream "What time is it and write a file with the current date"
-```
-
-#### SDK and Enhancement Features
-
-```typescript
-import { NeuroLink } from "@juspay/neurolink";
-
-// Enhanced generation with analytics
-const neurolink = new NeuroLink();
-const result = await neurolink.generate({
-  input: { text: "Write a business proposal" },
-  enableAnalytics: true, // Get usage & cost data
-  enableEvaluation: true, // Get AI quality scores
-  context: { project: "Q1-sales" },
-});
-
-console.log("📊 Usage:", result.analytics);
-console.log("⭐ Quality:", result.evaluation);
-console.log("Response:", result.content);
-```
-
-### Environment Setup
-
-```bash
-# Create .env file (automatically loaded by CLI)
-echo 'OPENAI_API_KEY="sk-your-openai-key"' > .env
-echo 'GOOGLE_AI_API_KEY="AIza-your-google-ai-key"' >> .env
-echo 'AWS_ACCESS_KEY_ID="your-aws-access-key"' >> .env
-
-# 🆕 NEW: Google Vertex AI for Websearch Tool
-echo 'GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"' >> .env
-echo 'GOOGLE_VERTEX_PROJECT="your-gcp-project-id"' >> .env
-echo 'GOOGLE_VERTEX_LOCATION="us-central1"' >> .env
-
-# Test configuration
-npx @juspay/neurolink status
-
-# SDK Env Provider Check - Advanced provider testing with fallback detection
-pnpm run test:providers
-```
-
-#### 🔍 SDK Env Provider Check Output
-
-```bash
-# Example output:
-✅ Google AI: Working (197 tokens)
-⚠️  OpenAI: Failed (Fallback to google-ai)
-⚠️  AWS Bedrock: Failed (Fallback to google-ai)
-```
-
-### JSON Format Support (Complete)
-
-NeuroLink provides comprehensive JSON input/output support for both CLI and SDK:
-
-```bash
-# CLI JSON Output - Structured data for scripts
-npx @juspay/neurolink generate "Summary of AI trends" --format json
-npx @juspay/neurolink gen "Create a user profile" --format json --provider google-ai
-
-# Example JSON Output:
-{
-  "content": "AI trends include increased automation...",
-  "provider": "google-ai",
-  "model": "gemini-2.5-flash",
-  "usage": {
-    "promptTokens": 15,
-    "completionTokens": 127,
-    "totalTokens": 142
-  },
-  "responseTime": 1234
-}
-```
-
-```typescript
-// SDK JSON Input/Output - Full TypeScript support
-import { createBestAIProvider } from "@juspay/neurolink";
-
-const provider = createBestAIProvider();
-
-// Structured input
-const result = await provider.generate({
-  input: { text: "Create a product specification" },
-  schema: {
-    type: "object",
-    properties: {
-      name: { type: "string" },
-      price: { type: "number" },
-      features: { type: "array", items: { type: "string" } },
-    },
-  },
-});
-
-// Access structured response
-const productData = JSON.parse(result.content);
-console.log(productData.name, productData.price, productData.features);
-```
-
-**📖 [Complete Setup Guide](./docs/CONFIGURATION.md)** - All providers with detailed instructions
-
-## 🔍 **NEW: Websearch Tool with Google Vertex AI Grounding**
-
-**NeuroLink now includes a powerful websearch tool** that uses Google's native search grounding technology for real-time web information:
-
-- **🔍 Native Google Search** - Uses Google's search grounding via Vertex AI
-- **🎯 Real-time Results** - Access current web information during AI conversations
-- **🔒 Credential Protection** - Only activates when Google Vertex AI credentials are properly configured
-
-### Quick Setup & Test
-
-```bash
-# 1. Build the project first
-pnpm run build
-
-# 2. Set up environment variables (see detailed setup below)
-cp .env.example .env
-# Edit .env with your Google Vertex AI credentials
-
-# 3. Test the websearch tool directly
-node test-websearch-grounding.j
-```
-
-### Complete Google Vertex AI Setup
-
-#### Configure Environment Variables
-
-```bash
-# Add to your .env file
-GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/to/neurolink-service-account.json"
-GOOGLE_VERTEX_PROJECT="YOUR-PROJECT-ID"
-GOOGLE_VERTEX_LOCATION="us-central1"
-```
-
-#### Step 3: Test the Setup
-
-````bash
-# Build the project first
-pnpm run build
-
-# Run the dedicated test script
-node test-websearch-grounding.js
-
-### Using the Websearch Tool
-
-#### CLI Usage (Works with All Providers)
-
-# With specific providers - websearch works across all providers
-npx @juspay/neurolink generate "Weather in Tokyo now" --provider vertex
-
-**Note:** The websearch tool gracefully handles missing credentials - it only activates when valid Google Vertex AI credentials are configured. Without proper credentials, other tools continue to work normally and AI responses fall back to training data.
-
-## ✨ Key Features
-
-- 🔗 **LiteLLM Integration** - **Access 100+ AI models** from all major providers through unified interface
-- 🔍 **Smart Model Auto-Discovery** - OpenAI Compatible provider automatically detects available models via `/v1/models` endpoint
-- 🏭 **Factory Pattern Architecture** - Unified provider management with BaseProvider inheritance
-- 🔧 **Tools-First Design** - All providers automatically include 7 direct tools (getCurrentTime, readFile, listDirectory, calculateMath, writeFile, searchFiles, websearchGrounding)
-- 🔄 **12 AI Providers** - OpenAI, Bedrock, Vertex AI, Google AI Studio, Anthropic, Azure, **LiteLLM**, **OpenAI Compatible**, Hugging Face, Ollama, Mistral AI, **SageMaker**
-- 💰 **Cost Optimization** - Automatic selection of cheapest models and LiteLLM routing
-- ⚡ **Automatic Fallback** - Never fail when providers are down, intelligent provider switching
-- 🖥️ **CLI + SDK** - Use from command line or integrate programmatically with TypeScript support
-- 🛡️ **Production Ready** - Enterprise-grade error handling, performance optimization, extracted from production
-- 🏢 **Enterprise Proxy Support** - Comprehensive corporate proxy support with zero configuration
-- ✅ **External MCP Integration** - Model Context Protocol with built-in tools + full external MCP server support
-- 🔍 **Smart Model Resolution** - Fuzzy matching, aliases, and capability-based search across all providers
-- 🏠 **Local AI Support** - Run completely offline with Ollama or through LiteLLM proxy
-- 🌍 **Universal Model Access** - Direct providers + 100,000+ models via Hugging Face + 100+ models via LiteLLM
-- 🧠 **Automatic Context Summarization** - Stateful, long-running conversations with automatic history summarization.
-- 📊 **Analytics & Evaluation** - Built-in usage tracking and AI-powered quality assessment
-
-## 🛠️ External MCP Integration Status ✅ **PRODUCTION READY**
-
-| Component              | Status         | Description                                                      |
-| ---------------------- | -------------- | ---------------------------------------------------------------- |
-| Built-in Tools         | ✅ **Working** | 6 core tools fully functional across all providers               |
-| SDK Custom Tools       | ✅ **Working** | Register custom tools programmatically                           |
-| **External MCP Tools** | ✅ **Working** | **Full external MCP server support with dynamic tool discovery** |
-| Tool Execution         | ✅ **Working** | Real-time AI tool calling with all tool types                    |
-| **Streaming Support**  | ✅ **Working** | **External MCP tools work with streaming generation**            |
-| **Multi-Provider**     | ✅ **Working** | **External tools work across all AI providers**                  |
-| **CLI Integration**    | ✅ **READY**   | **Production-ready with external MCP support**                   |
-
-### ✅ External MCP Integration Demo
-
-```bash
-# Test built-in tools (works immediately)
-npx @juspay/neurolink generate "What time is it?" --debug
-
-# 🆕 NEW: External MCP server integration (SDK)
-import { NeuroLink } from '@juspay/neurolink';
-
-const neurolink = new NeuroLink();
-
-// Add external MCP server (e.g., Bitbucket)
-await neurolink.addExternalMCPServer('bitbucket', {
-  command: 'npx',
-  args: ['-y', '@nexus2520/bitbucket-mcp-server'],
-  transport: 'stdio',
-  env: {
-    BITBUCKET_USERNAME: process.env.BITBUCKET_USERNAME,
-    BITBUCKET_TOKEN: process.env.BITBUCKET_TOKEN,
-    BITBUCKET_BASE_URL: 'https://bitbucket.example.com'
-  }
-});
-
-// Use external MCP tools in generation
-const result = await neurolink.generate({
-  input: { text: 'Get pull request #123 details from the main repository' },
-  disableTools: false // External MCP tools automatically available
-});
-
-# Discover available MCP servers
-npx @juspay/neurolink mcp discover --format table
-````
-
-### 🔧 SDK Custom Tool Registration (NEW!)
-
-Register your own tools programmatically with the SDK:
-
-```typescript
-import { NeuroLink } from "@juspay/neurolink";
-const neurolink = new NeuroLink();
-
-// Register a simple tool
-neurolink.registerTool("weatherLookup", {
-  description: "Get current weather for a city",
-  parameters: z.object({
-    city: z.string().describe("City name"),
-    units: z.enum(["celsius", "fahrenheit"]).optional(),
-  }),
-  execute: async ({ city, units = "celsius" }) => {
-    // Your implementation here
-    return {
-      city,
-      temperature: 22,
-      units,
-      condition: "sunny",
-    };
-  },
-});
-
-// Use it in generation
-const result = await neurolink.generate({
-  input: { text: "What's the weather in London?" },
-  provider: "google-ai",
-});
-
-// Register multiple tools - Object format (existing)
-neurolink.registerTools({
-  stockPrice: {
-    description: "Get stock price",
-    execute: async () => ({ price: 150.25 }),
-  },
-  calculator: {
-    description: "Calculate math",
-    execute: async () => ({ result: 42 }),
-  },
-});
-
-// Register multiple tools - Array format (Lighthouse compatible)
-neurolink.registerTools([
-  {
-    name: "lighthouseTool1",
-    tool: {
-      description: "Lighthouse analytics tool",
-      parameters: z.object({
-        merchantId: z.string(),
-        dateRange: z.string().optional(),
-      }),
-      execute: async ({ merchantId, dateRange }) => {
-        // Lighthouse tool implementation with Zod schema
-        return { data: "analytics result" };
-      },
-    },
-  },
-  {
-    name: "lighthouseTool2",
-    tool: {
-      description: "Payment processing tool",
-      execute: async () => ({ status: "processed" }),
-    },
-  },
-]);
-```
-
-## 💰 Smart Model Selection
-
-NeuroLink features intelligent model selection and cost optimization:
-
-### Cost Optimization Features
-
-- **💰 Automatic Cost Optimization**: Selects cheapest models for simple tasks
-- **🔄 LiteLLM Model Routing**: Access 100+ models with automatic load balancing
-- **🔍 Capability-Based Selection**: Find models with specific features (vision, function calling)
-- **⚡ Intelligent Fallback**: Seamless switching when providers fail
-
-```bash
-# Cost optimization - automatically use cheapest model
-npx @juspay/neurolink generate "Hello" --optimize-cost
-
-# LiteLLM specific model selection
-npx @juspay/neurolink generate "Complex analysis" --provider litellm --model "anthropic/claude-3-5-sonnet"
-
-# Auto-select best available provider
-npx @juspay/neurolink generate "Write code" # Automatically chooses optimal provider
-```
-
-## ✨ Interactive Loop Mode
-
-NeuroLink features a powerful **interactive loop mode** that transforms the CLI into a persistent, stateful session. This allows you to run multiple commands, set session-wide variables, and maintain conversation history without restarting.
-
-### Start the Loop
-
-```bash
-npx @juspay/neurolink loop
-```
-
-### Example Session
-
-```bash
-# Start the interactive session
-$ npx @juspay/neurolink loop
-
-neurolink » set provider google-ai
-✓ provider set to google-ai
-
-neurolink » set temperature 0.8
-✓ temperature set to 0.8
-
-neurolink » generate "Tell me a fun fact about space"
-The quietest place on Earth is an anechoic chamber at Microsoft's headquarters in Redmond, Washington. The background noise is so low that it's measured in negative decibels, and you can hear your own heartbeat.
-
-# Exit the session
-neurolink » exit
-```
-
-### Conversation Memory in Loop Mode
-
-Start the loop with conversation memory to have the AI remember the context of your previous commands.
+Need a persistent workspace? Launch loop mode:
 
 ```bash
 npx @juspay/neurolink loop --enable-conversation-memory
 ```
 
-## 💻 Essential Examples
+Skip the wizard and configure manually? See [`docs/getting-started/provider-setup.md`](docs/getting-started/provider-setup.md).
 
-### CLI Commands
+## CLI & SDK Essentials
+
+`neurolink` CLI mirrors the SDK so teams can script experiments and codify them later.
 
 ```bash
-# Text generation with automatic MCP tool detection (default)
-npx @juspay/neurolink generate "What time is it?"
+# Discover available providers and models
+npx @juspay/neurolink status
+npx @juspay/neurolink models list --provider google-ai
 
-# Alternative short form
-npx @juspay/neurolink gen "What time is it?"
+# Route to a specific provider/model
+npx @juspay/neurolink generate "Summarize customer feedback" \
+  --provider azure --model gpt-4o-mini
 
-# Disable tools for training-data-only responses
-npx @juspay/neurolink generate "What time is it?" --disable-tools
-
-# With custom timeout for complex prompts
-npx @juspay/neurolink generate "Explain quantum computing in detail" --timeout 1m
-
-# Real-time streaming with agent support (default)
-npx @juspay/neurolink stream "What time is it?"
-
-# Streaming without tools (traditional mode)
-npx @juspay/neurolink stream "Tell me a story" --disable-tools
-
-# Streaming with extended timeout
-npx @juspay/neurolink stream "Write a long story" --timeout 5m
-
-# Provider diagnostics
-npx @juspay/neurolink status --verbose
-
-# Batch processing
-echo -e "Write a haiku\nExplain gravity" > prompts.txt
-npx @juspay/neurolink batch prompts.txt --output results.json
-
-# Batch with custom timeout per request
-npx @juspay/neurolink batch prompts.txt --timeout 45s --output results.json
+# Turn on analytics + evaluation for observability
+npx @juspay/neurolink generate "Draft release notes" \
+  --enable-analytics --enable-evaluation --format json
 ```
-
-### SDK Integration
 
 ```typescript
-// SvelteKit API route with timeout handling
-export const POST: RequestHandler = async ({ request }) => {
-  const { message } = await request.json();
-  const provider = createBestAIProvider();
+import { NeuroLink } from "@juspay/neurolink";
 
-  try {
-    // NEW: Primary streaming method (recommended)
-    const result = await provider.stream({
-      input: { text: message },
-      timeout: "2m", // 2 minutes for streaming
-    });
+const neurolink = new NeuroLink({
+  conversationMemory: {
+    enabled: true,
+    store: "redis",
+  },
+  enableOrchestration: true,
+});
 
-    // Process stream
-    for await (const chunk of result.stream) {
-      // Handle streaming content
-      console.log(chunk.content);
-    }
+const result = await neurolink.generate({
+  input: {
+    text: "Create a multimodal onboarding script",
+    images: ["./diagrams/architecture.png"],
+  },
+  enableEvaluation: true,
+  region: "us-east-1",
+});
 
-    // LEGACY: Backward compatibility (still works)
-    const legacyResult = await provider.stream({ input: { text:
-      prompt: message,
-      timeout: "2m", // 2 minutes for streaming
-    });
-    return new Response(result.toReadableStream());
-  } catch (error) {
-    if (error.name === "TimeoutError") {
-      return new Response("Request timed out", { status: 408 });
-    }
-    throw error;
-  }
-};
-
-// Next.js API route with timeout
-export async function POST(request: NextRequest) {
-  const { prompt } = await request.json();
-  const provider = createBestAIProvider();
-
-  const result = await provider.generate({
-    prompt,
-    timeout: process.env.AI_TIMEOUT || "30s", // Configurable timeout
-  });
-
-  return NextResponse.json({ text: result.content });
-}
+console.log(result.content);
+console.log(result.evaluation?.overallScore);
 ```
 
-## 🎬 See It In Action
+Full command and API breakdown lives in [`docs/cli/commands.md`](docs/cli/commands.md) and [`docs/sdk/api-reference.md`](docs/sdk/api-reference.md).
 
-**No installation required!** Experience NeuroLink through comprehensive visual documentation:
+## Platform Capabilities at a Glance
 
-### 📱 Interactive Web Demo
+| Capability               | Highlights                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| **Provider unification** | 12+ providers with automatic fallback, cost-aware routing, provider orchestration (Q3).       |
+| **Multimodal pipeline**  | Stream images + text across providers with local/remote assets (Q3 2025).                     |
+| **Quality & governance** | Auto-evaluation engine (Q3), guardrails middleware (Q4), HITL workflows (Q4), audit logging.  |
+| **Memory & context**     | Conversation memory, Mem0 integration, Redis history export (Q4), context summarization (Q4). |
+| **CLI tooling**          | Loop sessions (Q3), setup wizard, config validation, Redis auto-detect, JSON output.          |
+| **Enterprise ops**       | Proxy support, regional routing (Q3), telemetry hooks, configuration management.              |
+| **Tool ecosystem**       | MCP auto discovery, LiteLLM hub access, SageMaker custom deployment, web search.              |
 
-```bash
-cd neurolink-demo && node server.js
-# Visit http://localhost:9876 for live demo
-```
+## Documentation Map
 
-- **Real AI Integration**: All 9 providers functional with live generation
-- **Complete Use Cases**: Business, creative, and developer scenarios
-- **Performance Metrics**: Live provider analytics and response times
-- **Privacy Options**: Test local AI with Ollama
+| Area            | When to Use                                     | Link                                                             |
+| --------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| Getting started | Install, configure, run first prompt            | [`docs/getting-started/index.md`](docs/getting-started/index.md) |
+| Feature guides  | Understand new functionality front-to-back      | [`docs/features/index.md`](docs/features/index.md)               |
+| CLI reference   | Command syntax, flags, loop sessions            | [`docs/cli/index.md`](docs/cli/index.md)                         |
+| SDK reference   | Classes, methods, options                       | [`docs/sdk/index.md`](docs/sdk/index.md)                         |
+| Integrations    | LiteLLM, SageMaker, MCP, Mem0                   | [`docs/LITELLM-INTEGRATION.md`](docs/LITELLM-INTEGRATION.md)     |
+| Operations      | Configuration, troubleshooting, provider matrix | [`docs/reference/index.md`](docs/reference/index.md)             |
+| Visual demos    | Screens, GIFs, interactive tours                | [`docs/demos/index.md`](docs/demos/index.md)                     |
 
-### 🖥️ CLI Demonstrations
+## Integrations
 
-- **[CLI Help & Commands](./docs/visual-content/cli-videos/cli-01-cli-help.mp4)** - Complete command reference
-- **[Provider Status Check](./docs/visual-content/cli-videos/cli-02-provider-status.mp4)** - Connectivity verification (now with authentication and model availability checks)
-- **[Text Generation](./docs/visual-content/cli-videos/cli-03-text-generation.mp4)** - Real AI content creation
+- **LiteLLM 100+ model hub** – Unified access to third-party models via LiteLLM routing. → [`docs/LITELLM-INTEGRATION.md`](docs/LITELLM-INTEGRATION.md)
+- **Amazon SageMaker** – Deploy and call custom endpoints directly from NeuroLink CLI/SDK. → [`docs/SAGEMAKER-INTEGRATION.md`](docs/SAGEMAKER-INTEGRATION.md)
+- **Mem0 conversational memory** – Persistent semantic memory with vector store support. → [`docs/MEM0_INTEGRATION.md`](docs/MEM0_INTEGRATION.md)
+- **Enterprise proxy & security** – Configure outbound policies and compliance posture. → [`docs/ENTERPRISE-PROXY-SETUP.md`](docs/ENTERPRISE-PROXY-SETUP.md)
+- **Configuration automation** – Manage environments, regions, and credentials safely. → [`docs/CONFIGURATION-MANAGEMENT.md`](docs/CONFIGURATION-MANAGEMENT.md)
+- **MCP tool ecosystem** – Auto-discover Model Context Protocol tools and extend workflows. → [`docs/advanced/mcp-integration.md`](docs/advanced/mcp-integration.md)
 
-### 🌐 Web Interface Videos
+## Contributing & Support
 
-- **[Business Use Cases](./neurolink-demo/videos/business-use-cases.mp4)** - Professional applications
-- **[Developer Tools](./neurolink-demo/videos/developer-tools.mp4)** - Code generation and APIs
-- **[Creative Tools](./neurolink-demo/videos/creative-tools.mp4)** - Content creation
-
-**[📖 Complete Visual Documentation](./docs/VISUAL-DEMOS.md)** - All screenshots and videos
-
-## 📚 Documentation
-
-### Getting Started
-
-- **[🔧 Provider Setup](./docs/PROVIDER-CONFIGURATION.md)** - Complete environment configuration
-- **[🖥️ CLI Guide](./docs/CLI-GUIDE.md)** - All commands and options
-- **[🏗️ SDK Integration](./docs/FRAMEWORK-INTEGRATION.md)** - Next.js, SvelteKit, React
-- **[⚙️ Environment Variables](./docs/ENVIRONMENT-VARIABLES.md)** - Full configuration guide
-
-### Advanced Features
-
-- **[🏭 Factory Pattern Migration](./docs/FACTORY-PATTERN-MIGRATION.md)** - Guide to the new unified provider architecture
-- **[🔄 MCP Foundation](./docs/MCP-FOUNDATION.md)** - Model Context Protocol architecture
-- **[⚡ Dynamic Models](./docs/DYNAMIC-MODELS.md)** - Self-updating model configurations and cost optimization
-- **[🧠 AI Analysis Tools](./docs/AI-ANALYSIS-TOOLS.md)** - Usage optimization and benchmarking
-- **[🛠️ AI Workflow Tools](./docs/AI-WORKFLOW-TOOLS.md)** - Development lifecycle assistance
-- **[🎬 Visual Demos](./docs/VISUAL-DEMOS.md)** - Screenshots and videos
-
-### Reference
-
-- **[📚 API Reference](./docs/API-REFERENCE.md)** - Complete TypeScript API
-- **[🔗 Framework Integration](./docs/FRAMEWORK-INTEGRATION.md)** - SvelteKit, Next.js, Express.js
-
-## 🏗️ Supported Providers & Models
-
-| Provider                    | Models                             | Auth Method        | Free Tier | Tool Support | Key Benefit                      |
-| --------------------------- | ---------------------------------- | ------------------ | --------- | ------------ | -------------------------------- |
-| **🔗 LiteLLM** 🆕           | **100+ Models** (All Providers)    | Proxy Server       | Varies    | ✅ Full      | **Universal Access**             |
-| **🔗 OpenAI Compatible** 🆕 | **Any OpenAI-compatible endpoint** | API Key + Base URL | Varies    | ✅ Full      | **Auto-Discovery + Flexibility** |
-| **Google AI Studio**        | Gemini 2.5 Flash/Pro               | API Key            | ✅        | ✅ Full      | Free Tier Available              |
-| **OpenAI**                  | GPT-4o, GPT-4o-mini                | API Key            | ❌        | ✅ Full      | Industry Standard                |
-| **Anthropic**               | Claude 3.5 Sonnet                  | API Key            | ❌        | ✅ Full      | Advanced Reasoning               |
-| **Amazon Bedrock**          | Claude 3.5/3.7 Sonnet              | AWS Credentials    | ❌        | ✅ Full\*    | Enterprise Scale                 |
-| **Google Vertex AI**        | Gemini 2.5 Flash                   | Service Account    | ❌        | ✅ Full      | Enterprise Google                |
-| **Azure OpenAI**            | GPT-4, GPT-3.5                     | API Key + Endpoint | ❌        | ✅ Full      | Microsoft Ecosystem              |
-| **Ollama** 🆕               | Llama 3.2, Gemma, Mistral (Local)  | None (Local)       | ✅        | ⚠️ Partial   | Complete Privacy                 |
-| **Hugging Face** 🆕         | 100,000+ open source models        | API Key            | ✅        | ⚠️ Partial   | Open Source                      |
-| **Mistral AI** 🆕           | Tiny, Small, Medium, Large         | API Key            | ✅        | ✅ Full      | European/GDPR                    |
-| **Amazon SageMaker** 🆕     | Custom Models (Your Endpoints)     | AWS Credentials    | ❌        | ✅ Full      | Custom Model Hosting             |
-
-**Tool Support Legend:**
-
-- ✅ Full: All tools working correctly
-- ⚠️ Partial: Tools visible but may not execute properly
-- ❌ Limited: Issues with model or configuration
-- \* Bedrock requires valid AWS credentials, Ollama requires specific models like gemma3n for tool support
-
-**✨ Auto-Selection**: NeuroLink automatically chooses the best available provider based on speed, reliability, and configuration.
-
-### 🔍 Smart Model Auto-Discovery (OpenAI Compatible)
-
-The OpenAI Compatible provider includes intelligent model discovery that automatically detects available models from any endpoint:
-
-```bash
-# Setup - no model specified
-export OPENAI_COMPATIBLE_BASE_URL="https://api.your-endpoint.ai/v1"
-export OPENAI_COMPATIBLE_API_KEY="your-api-key"
-
-# Auto-discovers and uses first available model
-npx @juspay/neurolink generate "Hello!" --provider openai-compatible
-# → 🔍 Auto-discovered model: claude-sonnet-4 from 3 available models
-
-# Or specify explicitly to skip discovery
-export OPENAI_COMPATIBLE_MODEL="gemini-2.5-pro"
-npx @juspay/neurolink generate "Hello!" --provider openai-compatible
-```
-
-**How it works:**
-
-- Queries `/v1/models` endpoint to discover available models
-- Automatically selects the first available model when none specified
-- Falls back gracefully if discovery fails
-- Works with any OpenAI-compatible service (OpenRouter, vLLM, LiteLLM, etc.)
-
-## 🎯 Production Features
-
-### Enterprise-Grade Reliability
-
-- **Automatic Failover**: Seamless provider switching on failures
-- **Error Recovery**: Comprehensive error handling and logging
-- **Performance Monitoring**: Built-in analytics and metrics
-- **Type Safety**: Full TypeScript support with IntelliSense
-
-### AI Platform Capabilities
-
-- **MCP Foundation**: Universal AI development platform with 10+ specialized tools
-- **Analysis Tools**: Usage optimization, performance benchmarking, parameter tuning
-- **Workflow Tools**: Test generation, code refactoring, documentation, debugging
-- **Extensibility**: Connect external tools and services via MCP protocol
-- **🆕 Dynamic Server Management**: Programmatically add MCP servers at runtime
-
-### 🔧 External MCP Server Management ✅ **AVAILABLE NOW**
-
-**External MCP integration is now production-ready:**
-
-- ✅ 6 built-in tools working across all providers
-- ✅ SDK custom tool registration
-- ✅ **External MCP server management** (add, remove, list, test servers)
-- ✅ **Dynamic tool discovery** (automatic tool registration from external servers)
-- ✅ **Multi-provider support** (external tools work with all AI providers)
-- ✅ **Streaming integration** (external tools work with real-time streaming)
-- ✅ **Enhanced tool tracking** (proper parameter extraction and execution logging)
-
-```typescript
-// Complete external MCP server API
-const neurolink = new NeuroLink();
-
-// Server management
-await neurolink.addExternalMCPServer(serverId, config);
-await neurolink.removeExternalMCPServer(serverId);
-const servers = neurolink.listExternalMCPServers();
-const server = neurolink.getExternalMCPServer(serverId);
-
-// Tool management
-const tools = neurolink.getExternalMCPTools();
-const serverTools = neurolink.getExternalMCPServerTools(serverId);
-
-// Direct tool execution
-const result = await neurolink.executeExternalMCPTool(
-  serverId,
-  toolName,
-  params,
-);
-
-// Statistics and monitoring
-const stats = neurolink.getExternalMCPStatistics();
-await neurolink.shutdownExternalMCPServers();
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for details.
-
-### Development Setup
-
-```bash
-git clone https://github.com/juspay/neurolink
-cd neurolink
-pnpm install
-npx husky install          # Setup git hooks for build rule enforcement
-pnpm setup:complete        # One-command setup with all automation
-pnpm test:adaptive         # Intelligent testing
-pnpm build:complete       # Full build pipeline
-```
-
-### Enterprise Developer Experience
-
-NeuroLink features **enterprise-grade build rule enforcement** with comprehensive quality validation:
-
-```bash
-# Quality & Validation (required for all commits)
-pnpm run validate:all      # Run all validation checks
-pnpm run validate:security # Security scanning with gitleaks
-pnpm run validate:env      # Environment consistency checks
-pnpm run quality:metrics   # Generate quality score report
-
-# Development Workflow
-pnpm run check:all         # Pre-commit validation simulation
-pnpm run format           # Auto-fix code formatting
-pnpm run lint             # ESLint validation with zero-error tolerance
-
-# Environment & Setup (2-minute initialization)
-pnpm setup:complete        # Complete project setup
-pnpm env:setup             # Safe .env configuration
-pnpm env:backup            # Environment backup
-
-# Testing (60-80% faster)
-pnpm test:adaptive         # Intelligent test selection
-pnpm test:providers        # AI provider validation
-
-# Documentation & Content
-pnpm docs:sync             # Cross-file documentation sync
-pnpm content:generate      # Automated content creation
-
-# Build & Deployment
-pnpm build:complete        # 7-phase enterprise pipeline
-pnpm dev:health            # System health monitoring
-```
-
-**Build Rule Enforcement:** All commits automatically validated with pre-commit hooks. See [Contributing Guidelines](./CONTRIBUTING.md) for complete requirements.
-
-**[📖 Complete Automation Guide](./docs/CLI-GUIDE.md)** - All 72+ commands and automation features
-
-## 📄 License
-
-MIT © [Juspay Technologies](https://juspay.in)
-
-## 🔗 Related Projects
-
-- [Vercel AI SDK](https://github.com/vercel/ai) - Underlying provider implementations
-- [SvelteKit](https://kit.svelte.dev) - Web framework used in this project
-- [Model Context Protocol](https://modelcontextprotocol.io) - Tool integration standard
+- Bug reports and feature requests → [GitHub Issues](https://github.com/juspay/neurolink/issues)
+- Development workflow, testing, and pull request guidelines → [`docs/development/contributing.md`](docs/development/contributing.md)
+- Documentation improvements → open a PR referencing the [documentation matrix](docs/tracking/FEATURE-DOC-MATRIX.md).
 
 ---
 
-<p align="center">
-  <strong>Built with ❤️ by <a href="https://juspay.in">Juspay Technologies</a></strong>
-</p>
+NeuroLink is built with ❤️ by Juspay. Contributions, questions, and production feedback are always welcome.

@@ -1,17 +1,18 @@
 name: Deploy Documentation
 
 on:
+  workflow_dispatch:
   push:
     branches: [release]
     paths:
-      - "docs/**"
+      - "**/*.md"
       - "mkdocs.yml"
       - "requirements.txt"
       - ".github/workflows/docs.yml"
   pull_request:
     branches: [release]
     paths:
-      - "docs/**"
+      - "**/*.md"
       - "mkdocs.yml"
       - "requirements.txt"
       - ".github/workflows/docs.yml"

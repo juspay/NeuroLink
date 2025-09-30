@@ -87,3 +87,9 @@ const factory = new MiddlewareFactory({
 ```
 
 This new, streamlined approach provides a clean and scalable way to add safety and other enhancements to your AI models within the NeuroLink ecosystem.
+
+---
+
+## See Also
+
+For configuration examples, best practices, and troubleshooting, see the [Guardrails Middleware Feature Guide](features/guardrails.md).

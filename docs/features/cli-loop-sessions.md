@@ -1,0 +1,119 @@
+# CLI Loop Sessions
+
+`neurolink loop` delivers a persistent CLI workspace so you can explore prompts, tweak parameters, and inspect state without restarting the CLI. Session variables, Redis-backed history, and built-in help turn the CLI into a playground for prompt engineering and operator runbooks.
+
+## Why Loop Mode
+
+- **Stateful sessions** – keep provider/model/temperature context between commands.
+- **Memory on demand** – enable in-memory or Redis-backed conversation history per session.
+- **Fast iteration** – reuse the entire command surface (`generate`, `stream`, `memory`, etc.) without leaving the loop.
+- **Guided UX** – ASCII banner, inline help, and validation for every session variable.
+
+## Starting a Session
+
+```bash
+# Default: in-memory session variables, Redis auto-detected when available
+npx @juspay/neurolink loop
+
+# Disable Redis auto-detection and stay in-memory
+npx @juspay/neurolink loop --no-auto-redis
+
+# Turn off memory entirely (prompt-by-prompt mode)
+npx @juspay/neurolink loop --enable-conversation-memory=false
+
+# Custom retention limits
+npx @juspay/neurolink loop --max-sessions 100 --max-turns-per-session 50
+```
+
+When conversation memory is enabled, the CLI prints the generated session ID so you can export transcripts later via `neurolink memory history <id>`.
+
+## Session Commands
+
+Inside the loop prompt (`⎔ neurolink »`) you can manage context without leaving the session:
+
+| Command                | Purpose                                                 | Example                  |
+| ---------------------- | ------------------------------------------------------- | ------------------------ |
+| `help`                 | Show loop-specific commands plus full CLI help.         | `help`                   |
+| `set <key> <value>`    | Persist a generation option (validated against schema). | `set provider google-ai` |
+| `get <key>`            | Inspect the current value.                              | `get provider`           |
+| `unset <key>`          | Remove a single session variable.                       | `unset temperature`      |
+| `show`                 | List all session variables.                             | `show`                   |
+| `clear`                | Reset every session variable.                           | `clear`                  |
+| `exit` / `quit` / `:q` | Leave loop mode.                                        | `exit`                   |
+
+### Common Variables
+
+- `provider` – any provider except `auto` (set `set provider google-ai`).
+- `model` – model slug from `models list` (`set model gemini-2.5-pro`).
+- `temperature` – floating point number (`set temperature 0.6`).
+- `enableEvaluation` / `enableAnalytics` – toggles for observability (`set enableEvaluation true`).
+- `context` – JSON-encoded metadata (`set context {"userId":"42"}`).
+- `NEUROLINK_EVALUATION_THRESHOLD` – dynamic quality gate (`set NEUROLINK_EVALUATION_THRESHOLD 8`).
+
+> Type `set help` in the loop to view every available key and its validation rules.
+
+## Using CLI Commands in Loop Mode
+
+Anything you can run outside the loop works inside it:
+
+```
+⎔ neurolink » generate Draft changelog from sprint notes --enableEvaluation
+⎔ neurolink » stream Walk through the attached design --image ./ui.png
+⎔ neurolink » status --verbose
+⎔ neurolink » models list --capability vision
+```
+
+Errors are handled gracefully; parsing issues surface inline without closing the loop.
+
+## Conversation Memory & Redis Auto-Detect
+
+- By default the loop enables conversation memory (`--enable-conversation-memory=true`).
+- `--auto-redis` probes for a reachable Redis instance using existing environment variables (`REDIS_URL`, etc.).
+- When Redis is available you’ll see `✅ Using Redis for persistent conversation memory` in the banner.
+- History is segmented by generated session IDs and stored with tool transcripts.
+
+Manage history with standard CLI commands (inside or outside loop):
+
+```bash
+# Overview of stored sessions
+npx @juspay/neurolink memory stats
+
+# Export a specific transcript as JSON
+npx @juspay/neurolink memory history NL_r1bd2 --format json > transcript.json
+
+# Clear loop history
+npx @juspay/neurolink memory clear NL_r1bd2
+```
+
+## Best Practices
+
+- Commit to a provider/model via `set` at the start of a session to avoid noisy auto-routing during experiments.
+- Use `set enableAnalytics true` and `set enableEvaluation true` to apply observability globally.
+- Combine with the interactive setup wizard (`neurolink setup --list`) to configure credentials mid-session.
+- If you switch projects, run `clear` or start a new loop to avoid leaking context.
+
+## Troubleshooting
+
+| Symptom                            | Resolution                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `A loop session is already active` | Use `exit` in the existing session or close the terminal tab before starting a new one. |
+| Redis warning but memory disabled  | Ensure Redis credentials are valid or run with `--no-auto-redis`.                       |
+| Session variable rejected          | Run `set help` to check allowed values; booleans must be `true`/`false`.                |
+| Commands exit unexpectedly         | Upgrade to CLI `>=7.47.0` so the session-aware error handler is included.               |
+
+## Related Features
+
+**Q4 2025 Features:**
+
+- [Redis Conversation Export](conversation-history.md) – Export loop session history as JSON for analytics
+
+**Q3 2025 Features:**
+
+- [Multimodal Chat](multimodal-chat.md) – Use images in loop sessions
+- [Auto Evaluation](auto-evaluation.md) – Enable quality scoring with `set enableEvaluation true`
+
+**Documentation:**
+
+- [CLI Commands](../cli/commands.md) – Complete command reference
+- [Conversation Memory](../CONVERSATION-MEMORY.md) – Memory system deep dive
+- [Mem0 Integration](../MEM0_INTEGRATION.md) – Semantic memory with vectors

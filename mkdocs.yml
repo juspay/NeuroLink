@@ -129,6 +129,16 @@ nav:
       - Installation: getting-started/installation.md
       - Provider Setup: getting-started/provider-setup.md
       - Environment Variables: getting-started/environment-variables.md
+  - Feature Guides:
+      - features/index.md
+      - Human-in-the-Loop (HITL): features/hitl.md
+      - Guardrails Middleware: features/guardrails.md
+      - Redis Conversation Export: features/conversation-history.md
+      - Multimodal Chat Experiences: features/multimodal-chat.md
+      - Auto Evaluation Engine: features/auto-evaluation.md
+      - CLI Loop Sessions: features/cli-loop-sessions.md
+      - Regional Streaming Controls: features/regional-streaming.md
+      - Provider Orchestration Brain: features/provider-orchestration.md
   - CLI Guide:
       - cli/index.md
       - Commands Reference: cli/commands.md
@@ -139,13 +149,23 @@ nav:
       - API Reference: sdk/api-reference.md
       - Framework Integration: sdk/framework-integration.md
       - Custom Tools: sdk/custom-tools.md
-  - Advanced Features:
-      - advanced/index.md
+  - Integrations & Platforms:
+      - LITELLM Integration: LITELLM-INTEGRATION.md
+      - SageMaker Integration: SAGEMAKER-INTEGRATION.md
       - MCP Integration: advanced/mcp-integration.md
+      - Mem0 Conversational Memory: MEM0_INTEGRATION.md
+      - Enterprise Proxy Setup: ENTERPRISE-PROXY-SETUP.md
+      - Configuration Management: CONFIGURATION-MANAGEMENT.md
+  - Architecture & Advanced:
+      - advanced/index.md
+      - Advanced Orchestration: ADVANCED-ORCHESTRATION.md
+      - AI Orchestration Guide: AI-ORCHESTRATION-GUIDE.md
       - Analytics & Evaluation: advanced/analytics.md
-      - Factory Patterns: advanced/factory-patterns.md
       - Dynamic Models: advanced/dynamic-models.md
-      - Streaming: advanced/streaming.md
+      - Factory Pattern Architecture: FACTORY-PATTERN-ARCHITECTURE.md
+      - Conversation Memory Deep Dive: CONVERSATION-MEMORY.md
+      - Streaming Pipeline: advanced/streaming.md
+      - Error Handling: ERROR-HANDLING.md
   - Examples & Tutorials:
       - examples/index.md
       - Basic Usage: examples/basic-usage.md
@@ -157,18 +177,20 @@ nav:
       - Screenshots: demos/screenshots.md
       - Videos: demos/videos.md
       - Interactive Demo: demos/interactive.md
+  - Operations & Reference:
+      - reference/index.md
+      - Configuration Reference: reference/configuration.md
+      - Provider Comparison: reference/provider-comparison.md
+      - Troubleshooting: reference/troubleshooting.md
+      - FAQ: reference/faq.md
+      - Documentation Matrix: tracking/FEATURE-DOC-MATRIX.md
+      - Migration Guide: guides/migration-guide.md
   - Development:
       - development/index.md
       - Contributing: development/contributing.md
       - Testing: development/testing.md
-      - Architecture: development/architecture.md
+      - Architecture Notes: development/architecture.md
       - Factory Pattern Migration: development/factory-migration.md
-  - Reference:
-      - reference/index.md
-      - Troubleshooting: reference/troubleshooting.md
-      - Configuration: reference/configuration.md
-      - Provider Comparison: reference/provider-comparison.md
-      - FAQ: reference/faq.md
 
 # Social links and extras
 extra:

@@ -14,8 +14,8 @@
 
 ---
 
-**Version**: v1.7.1
-**Last Updated**: January 7, 2025
+**Version**: v7.47.0
+**Last Updated**: September 26, 2025
 
 ---
 
@@ -23,12 +23,48 @@
 
 This guide helps diagnose and resolve common issues with NeuroLink, including AI provider connectivity, MCP integration, CLI usage problems, and the new generate function migration.
 
+## 🚀 New in v7.47 – Quick Fixes
+
+| Symptom                                | Resolution                                                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Image not found` when using `--image` | Provide an absolute path or run the command from the directory containing the asset. URLs must be HTTPS.                       |
+| `Evaluation model not configured`      | Set `NEUROLINK_EVALUATION_PROVIDER`/`NEUROLINK_EVALUATION_MODEL`, or disable `--enableEvaluation` until credentials are added. |
+| `Redis connection failed` in loop mode | Export `REDIS_URL` before running `neurolink loop` or start the session with `--no-auto-redis`.                                |
+| `Model not available in region`        | Confirm the model supports the requested region and update `AWS_REGION` / `GOOGLE_VERTEX_LOCATION` accordingly.                |
+| CLI exits after error inside loop      | Upgrade to `@juspay/neurolink@>=7.47.0` and restart the loop; new builds catch errors without exiting.                         |
+
+## 🆕 Q4 2025 Features – Common Issues
+
+### Human-in-the-Loop (HITL)
+
+| Issue                                   | Solution                                                                                                  |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Tool executes without asking permission | Add `requiresConfirmation: true` to tool definition → See [HITL Guide](features/hitl.md#configuration)    |
+| Confirmation dialog doesn't appear      | Handle `USER_CONFIRMATION_REQUIRED` error in your UI → See [HITL Guide](features/hitl.md#troubleshooting) |
+| Permission flag not resetting           | Call `setUserConfirmation(false)` after tool execution → See [HITL Guide](features/hitl.md#how-it-works)  |
+
+### Guardrails Middleware
+
+| Issue                      | Solution                                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Content not being filtered | Ensure `preset: "security"` is set in middleware config → See [Guardrails Guide](features/guardrails.md#quick-start) |
+| Too many false positives   | Review bad word list, remove common words → See [Guardrails Guide](features/guardrails.md#best-practices)            |
+| Model-based filter is slow | Switch to `gpt-4o-mini` for faster filtering → See [Guardrails Guide](features/guardrails.md#troubleshooting)        |
+
+### Redis Conversation Export
+
+| Issue                                        | Solution                                                                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Export returns empty history                 | Verify Redis connection and session ID exists → See [Conversation History Guide](features/conversation-history.md#troubleshooting)          |
+| `exportConversationHistory` method not found | Ensure `conversationMemory.store: "redis"` is configured → See [Conversation History Guide](features/conversation-history.md#configuration) |
+| Missing metadata in export                   | Set `includeMetadata: true` in export options → See [Conversation History Guide](features/conversation-history.md#advanced-usage)           |
+
 ## 🎯 **Generate Function Migration Issues**
 
 ### **Migration Questions**
 
 **Q: Should I update my existing code to use the new `generate()` API?**
-A: Optional. Your existing legacy `generate()` code continues working unchanged. Prefer the new `generate()` API for new projects.
+A: Optional. Your existing legacy `generate()` code continues working unchanged. Prefer the new `stream()` API for new projects.
 
 **Q: What's the difference between the new `generate()` and the legacy `generate()`?**
 A: The new `generate()` has a more extensible interface for future multi‑modal features. Both produce identical results for text generation today.
@@ -1064,7 +1100,6 @@ curl -I --proxy $HTTPS_PROXY https://api.openai.com
 **Solutions**:
 
 1. **Contact IT team** for allowlist:
-
    - `generativelanguage.googleapis.com` (Google AI)
    - `api.anthropic.com` (Anthropic)
    - `api.openai.com` (OpenAI)

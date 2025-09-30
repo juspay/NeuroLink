@@ -238,3 +238,9 @@ A: Not automatically - each risky action requires fresh permission for maximum s
 5. **Monitor and improve** - Adjust based on real-world usage
 
 Remember: HITL is about making AI assistance safer and more trustworthy, not about slowing it down. Users will appreciate having control over important decisions!
+
+---
+
+## See Also
+
+For a quick-start guide with SDK examples and troubleshooting, see the [HITL Feature Guide](features/hitl.md).

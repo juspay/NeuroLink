@@ -139,6 +139,77 @@ export LITELLM_BASE_URL="http://localhost:4000"
 export LITELLM_API_KEY="sk-anything" # Can be any string for local proxy
 ```
 
+### **Evaluation & Analytics Controls**
+
+Fine-tune the auto-evaluation middleware and analytics collectors:
+
+```bash
+# Minimum passing score (1-10)
+export NEUROLINK_EVALUATION_THRESHOLD=7
+
+# Judge provider/model (defaults shown below)
+export NEUROLINK_EVALUATION_PROVIDER="google-ai"
+export NEUROLINK_EVALUATION_MODEL="gemini-2.5-flash"
+
+# Guardrails
+export NEUROLINK_EVALUATION_RETRY_ATTEMPTS=2
+export NEUROLINK_EVALUATION_TIMEOUT=15000  # milliseconds
+export NEUROLINK_EVALUATION_PREFER_CHEAP=true
+
+# Guardrails Middleware (content filtering)
+export NEUROLINK_MIDDLEWARE_PRESET="security"  # Enables guardrails
+```
+
+Analytics collection is controlled per call (`--enableAnalytics` or `enableAnalytics: true`).
+
+For content filtering and safety checks, see the [Guardrails Middleware Guide](features/guardrails.md).
+
+### **Conversation Memory & Redis**
+
+Loop sessions and the SDK can persist history in Redis automatically. Provide a connection string and NeuroLink will auto-detect it when `--auto-redis` is enabled.
+
+```bash
+export REDIS_URL="redis://localhost:6379"
+export REDIS_TLS_URL="rediss://example.upstash.io:6379"  # TLS endpoint
+
+# Optional namespace separation
+export NEUROLINK_REDIS_NAMESPACE="neurolink"
+
+# Conversation memory settings
+export NEUROLINK_MEMORY_ENABLED="true"
+export NEUROLINK_MEMORY_STORE="redis"  # Required for history export
+```
+
+To export conversation history as JSON for analytics, see the [Redis Conversation Export Guide](features/conversation-history.md).
+
+### **Mem0 Semantic Memory**
+
+Mem0 integrates long-term, vector-backed memory. Configure it once and then enable via SDK options:
+
+```bash
+export MEM0_API_KEY="sk_mem0_key"
+export MEM0_BASE_URL="https://api.mem0.ai"
+export MEM0_VECTOR_STORE="qdrant"
+```
+
+Consult [`docs/MEM0_INTEGRATION.md`](MEM0_INTEGRATION.md) for vector store specifics and SDK examples.
+
+### **Regional Routing**
+
+Set region-specific variables to control latency and compliance.
+
+```bash
+# AWS Bedrock / SageMaker
+export AWS_REGION="eu-central-1"
+
+# Google Vertex AI
+export GOOGLE_VERTEX_PROJECT="your-gcp-project"
+export GOOGLE_VERTEX_LOCATION="asia-northeast1"
+
+# Azure OpenAI (region encoded in endpoint)
+export AZURE_OPENAI_ENDPOINT="https://my-region.openai.azure.com/"
+```
+
 ### **Amazon SageMaker Configuration (Custom Models)**
 
 Deploy and use your own custom-trained models on AWS.

@@ -263,6 +263,7 @@ Fixes #123
 2. **Show examples** - Every feature needs examples
 3. **Explain why** - Not just what, but why
 4. **Test code snippets** - Ensure examples actually work
+5. **Update the matrix** - Mark coverage in `docs/tracking/FEATURE-DOC-MATRIX.md` when new user-facing work lands.
 
 ### Documentation Structure
 

@@ -14,8 +14,10 @@
 
 ---
 
-**Version**: v1.8.0
-**Last Updated**: January 9, 2025
+**Version**: v7.47.0
+**Last Updated**: September 26, 2025
+
+> Looking for the full configuration story? Start with [`docs/CONFIGURATION.md`](../CONFIGURATION.md) for detailed environment variable explanations, evaluation toggles, and regional routing notes. This reference focuses on quick lookup tables.
 
 ---
 

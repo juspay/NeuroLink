@@ -44,6 +44,15 @@ Presets are pre-defined configurations for common use cases. You can use a prese
 - **`all`**: Enables all available built-in middleware, including analytics and guardrails.
 - **`security`**: Focuses on security and includes the `guardrails` middleware.
 
+### Built-in Middleware
+
+NeuroLink ships with several production-ready middleware:
+
+- **Analytics** (`analytics`) - Track usage metrics, token counts, and performance
+- **Guardrails** (`guardrails`) - Content filtering and safety checks → See [Guardrails Middleware Guide](features/guardrails.md)
+
+For detailed configuration and usage of each middleware, see the [Feature Guides](features/index.md).
+
 ### Custom Middleware
 
 You can easily create and register your own custom middleware to extend the functionality of the system. See the [Custom Middleware Guide](./CUSTOM-MIDDLEWARE-GUIDE.md) for more details.
