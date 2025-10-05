@@ -586,7 +586,7 @@ const providerStatusGauge = new Gauge({
 });
 
 const responseTimeHistogram = new Histogram({
-  name: "neurolink_provider_response_time_ms",
+  name: "neurolink_provider_responseTimeMs",
   help: "Provider response time in milliseconds",
   labelNames: ["provider"],
   buckets: [100, 500, 1000, 2000, 5000, 10000],
@@ -649,7 +649,7 @@ app.listen(9100, () => console.log("Metrics server running on :9100"));
         "type": "heatmap",
         "targets": [
           {
-            "expr": "rate(neurolink_provider_response_time_ms_bucket[5m])",
+            "expr": "rate(neurolink_provider_responseTimeMs_bucket[5m])",
             "legendFormat": "{{provider}}"
           }
         ]

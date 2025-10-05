@@ -1202,7 +1202,7 @@ class EnterpriseStreamingMonitor {
       `neurolink_streaming_queue_size ${dashboard.rateLimiting.stats.queuedRequests}`,
     );
     metrics.push(
-      `neurolink_streaming_response_time_ms ${dashboard.system.performance.averageResponseTime}`,
+      `neurolink_streaming_responseTimeMs ${dashboard.system.performance.averageResponseTime}`,
     );
     metrics.push(
       `neurolink_streaming_error_rate ${dashboard.system.performance.errorRate}`,

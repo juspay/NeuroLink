@@ -99,7 +99,7 @@ export const register = new Registry();
 
 // Request counters
 export const aiRequestsTotal = new Counter({
-  name: "ai_requests_total",
+  name: "aiRequestsTotal",
   help: "Total AI requests",
   labelNames: ["provider", "model", "status"],
   registers: [register],
@@ -116,7 +116,7 @@ export const aiRequestDuration = new Histogram({
 
 // Token usage counter
 export const aiTokensUsed = new Counter({
-  name: "ai_tokens_used_total",
+  name: "aiTokensUsedTotal",
   help: "Total tokens consumed",
   labelNames: ["provider", "model", "type"],
   registers: [register],
@@ -249,7 +249,7 @@ app.get("/metrics", async (req, res) => {
         "title": "Requests Per Second",
         "targets": [
           {
-            "expr": "rate(ai_requests_total[5m])",
+            "expr": "rate(aiRequestsTotal[5m])",
             "legendFormat": "{{provider}} - {{model}}"
           }
         ],
@@ -289,7 +289,7 @@ app.get("/metrics", async (req, res) => {
         "title": "Token Usage",
         "targets": [
           {
-            "expr": "rate(ai_tokens_used_total[5m])",
+            "expr": "rate(aiTokensUsedTotal[5m])",
             "legendFormat": "{{provider}} - {{type}}"
           }
         ],
@@ -305,7 +305,7 @@ app.get("/metrics", async (req, res) => {
 **1. Request Rate**
 
 ```promql
-rate(ai_requests_total[5m])
+rate(aiRequestsTotal[5m])
 ```
 
 **2. P95 Latency**
@@ -317,7 +317,7 @@ histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[5m]))
 **3. Success Rate**
 
 ```promql
-sum(rate(ai_requests_total{status="success"}[5m])) / sum(rate(ai_requests_total[5m])) * 100
+sum(rate(aiRequestsTotal{status="success"}[5m])) / sum(rate(aiRequestsTotal[5m])) * 100
 ```
 
 **4. Cost Per Hour**
@@ -329,7 +329,7 @@ rate(ai_cost_total_usd[1h]) * 3600
 **5. Tokens Per Request**
 
 ```promql
-rate(ai_tokens_used_total[5m]) / rate(ai_requests_total[5m])
+rate(aiTokensUsedTotal[5m]) / rate(aiRequestsTotal[5m])
 ```
 
 ---

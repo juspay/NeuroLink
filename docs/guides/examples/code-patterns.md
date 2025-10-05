@@ -733,7 +733,7 @@ class MetricsMiddleware {
 
   constructor() {
     this.requestCounter = new Counter({
-      name: "ai_requests_total",
+      name: "aiRequestsTotal",
       help: "Total AI requests",
       labelNames: ["status"],
     });

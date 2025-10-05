@@ -723,7 +723,7 @@ export const httpRequestsTotal = new Counter({
 });
 
 export const aiRequestsTotal = new Counter({
-  name: "ai_requests_total",
+  name: "aiRequestsTotal",
   help: "Total AI requests",
   labelNames: ["provider", "model"],
   registers: [register],
@@ -737,7 +737,7 @@ export const aiRequestDuration = new Histogram({
 });
 
 export const aiTokensUsed = new Counter({
-  name: "ai_tokens_used_total",
+  name: "aiTokensUsedTotal",
   help: "Total AI tokens used",
   labelNames: ["provider", "model"],
   registers: [register],

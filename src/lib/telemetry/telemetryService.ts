@@ -113,38 +113,38 @@ export class TelemetryService {
       return;
     }
 
-    this.aiRequestCounter = this.meter.createCounter("ai_requests_total", {
+    this.aiRequestCounter = this.meter.createCounter("aiRequestsTotal", {
       description: "Total number of AI requests",
     });
 
     this.aiRequestDuration = this.meter.createHistogram(
-      "ai_request_duration_ms",
+      "aiRequestDurationMs",
       {
         description: "AI request duration in milliseconds",
       },
     );
 
-    this.aiTokensUsed = this.meter.createCounter("ai_tokens_used_total", {
+    this.aiTokensUsed = this.meter.createCounter("aiTokensUsedTotal", {
       description: "Total number of AI tokens used",
     });
 
     this.aiProviderErrors = this.meter.createCounter(
-      "ai_provider_errors_total",
+      "aiProviderErrorsTotal",
       {
         description: "Total number of AI provider errors",
       },
     );
 
-    this.mcpToolCalls = this.meter.createCounter("mcp_tool_calls_total", {
+    this.mcpToolCalls = this.meter.createCounter("mcpToolCallsTotal", {
       description: "Total number of MCP tool calls",
     });
 
-    this.connectionCounter = this.meter.createCounter("connections_total", {
+    this.connectionCounter = this.meter.createCounter("connectionsTotal", {
       description: "Total number of connections",
     });
 
     this.responseTimeHistogram = this.meter.createHistogram(
-      "response_time_ms",
+      "responseTimeMs",
       {
         description: "Response time in milliseconds",
       },
