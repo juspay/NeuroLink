@@ -122,11 +122,18 @@ export class ProviderRegistry {
       // Register Azure OpenAI provider
       ProviderFactory.registerProvider(
         AIProviderName.AZURE,
-        async (modelName?: string) => {
+        async (
+          modelName?: string,
+          _providerName?: string,
+          sdk?: UnknownRecord,
+        ) => {
           const { AzureOpenAIProvider } = await import(
             "../providers/azureOpenai.js"
           );
-          return new AzureOpenAIProvider(modelName);
+          return new AzureOpenAIProvider(
+            modelName,
+            sdk as NeuroLink | undefined,
+          );
         },
         process.env.AZURE_MODEL ||
           process.env.AZURE_OPENAI_MODEL ||
