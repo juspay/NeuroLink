@@ -4,7 +4,13 @@
  */
 
 import { z } from "zod";
-import type { Result, JsonValue, ErrorInfo } from "./common.js";
+import type {
+  ErrorInfo,
+  JsonObject,
+  JsonValue,
+  Result,
+  UnknownRecord,
+} from "./common.js";
 import type { StandardRecord, ZodUnknownSchema } from "./typeAliases.js";
 
 /**
@@ -205,6 +211,68 @@ export type ToolMetadata = {
 };
 
 /**
+ * Tool call object type for type-safe access to tool call properties
+ */
+export type ToolCallObject = UnknownRecord & {
+  toolName?: string;
+  name?: string;
+  toolCallId?: string;
+  id?: string;
+  args?: UnknownRecord;
+  arguments?: UnknownRecord;
+};
+
+/**
+ * Tool execution context for tracking
+ */
+export type ToolExecutionContext = {
+  executionId: string;
+  tool: string;
+  startTime: number;
+  endTime?: number;
+  result?: unknown;
+  error?: string;
+  metadata?: JsonObject;
+};
+
+/**
+ * NeuroLink Native Event System Types
+ */
+
+/**
+ * Tool execution event for real-time streaming
+ */
+export type ToolExecutionEvent = {
+  type: "tool:start" | "tool:end";
+  tool: string;
+  input?: unknown;
+  result?: unknown;
+  error?: string;
+  timestamp: number;
+  duration?: number;
+  executionId: string;
+};
+
+/**
+ * Tool execution summary for completed executions
+ */
+export type ToolExecutionSummary = {
+  tool: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+  success: boolean;
+  result?: unknown;
+  error?: string;
+  executionId: string;
+  metadata?: {
+    serverId?: string;
+    toolCategory?: "direct" | "custom" | "mcp";
+    isExternal?: boolean;
+  };
+};
+
+/**
  * Tool definition type
  */
 export type ToolDefinition<TArgs = ToolArgs, TResult = JsonValue> = {
@@ -247,6 +315,28 @@ export type ToolExecution = {
   params: ToolArgs;
   result: ToolResult;
   executionTime: number;
+  timestamp: number;
+};
+
+/**
+ * Pending tool execution type for Redis memory manager
+ * Temporary storage for tool execution data to avoid race conditions
+ */
+export type PendingToolExecution = {
+  toolCalls: Array<{
+    toolCallId?: string;
+    toolName?: string;
+    args?: Record<string, unknown>;
+    timestamp?: Date;
+    [key: string]: unknown;
+  }>;
+  toolResults: Array<{
+    toolCallId?: string;
+    result?: unknown;
+    error?: string;
+    timestamp?: Date;
+    [key: string]: unknown;
+  }>;
   timestamp: number;
 };
 

@@ -13,6 +13,7 @@ import type {
   RedisConversationObject,
 } from "../types/conversation.js";
 import { ConversationMemoryError } from "../types/conversation.js";
+import type { PendingToolExecution } from "../types/tools.js";
 import {
   DEFAULT_MAX_SESSIONS,
   MESSAGES_PER_TURN,
@@ -33,26 +34,6 @@ import {
  * Redis-based implementation of the ConversationMemoryManager
  * Uses the same interface but stores data in Redis
  */
-/**
- * Temporary storage for tool execution data to avoid race conditions
- */
-interface PendingToolExecution {
-  toolCalls: Array<{
-    toolCallId?: string;
-    toolName?: string;
-    args?: Record<string, unknown>;
-    timestamp?: Date; // Individual timestamp for each tool call
-    [key: string]: unknown;
-  }>;
-  toolResults: Array<{
-    toolCallId?: string;
-    result?: unknown;
-    error?: string;
-    timestamp?: Date; // Individual timestamp for each tool result
-    [key: string]: unknown;
-  }>;
-  timestamp: number; // Overall timestamp for the execution batch
-}
 
 export class RedisConversationMemoryManager {
   public config: ConversationMemoryConfig;

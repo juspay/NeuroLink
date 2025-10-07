@@ -7,20 +7,20 @@ import type { ToolExecution } from "./tools.js";
  * Represents the analysis of the user's query intent.
  * This provides a basic understanding of what the user is trying to achieve.
  */
-export interface QueryIntentAnalysis {
+export type QueryIntentAnalysis = {
   /** The type of query, e.g., asking a question or giving a command. */
   type: "question" | "command" | "greeting" | "unknown";
   /** The estimated complexity of the query. */
   complexity: "low" | "medium" | "high";
   /** Whether the query likely required the use of tools to be answered correctly. */
   shouldHaveUsedTools: boolean;
-}
+};
 
 /**
  * Represents a single turn in an enhanced conversation history,
  * including tool executions and evaluations for richer context.
  */
-export interface EnhancedConversationTurn {
+export type EnhancedConversationTurn = {
   /** The role of the speaker, either 'user' or 'assistant'. */
   role: "user" | "assistant";
   /** The content of the message. */
@@ -31,13 +31,13 @@ export interface EnhancedConversationTurn {
   toolExecutions?: ToolExecution[];
   /** The evaluation result for this turn, if applicable. */
   evaluation?: EvaluationResult;
-}
+};
 
 /**
  * Contains all the rich context needed for a thorough, RAGAS-style evaluation.
  * This object is constructed by the `ContextBuilder` and used by the `RAGASEvaluator`.
  */
-export interface EnhancedEvaluationContext {
+export type EnhancedEvaluationContext = {
   /** The original user query. */
   userQuery: string;
   /** An analysis of the user's query intent. */
@@ -72,12 +72,12 @@ export interface EnhancedEvaluationContext {
   previousEvaluations?: EvaluationResult[];
   /** The current attempt number for this evaluation (1-based). */
   attemptNumber: number;
-}
+};
 
 /**
  * Represents the result of a single evaluation attempt, based on RAGAS principles.
  */
-export interface EvaluationResult {
+export type EvaluationResult = {
   /** The final, overall score for the response, typically from 1 to 10. */
   finalScore: number;
 
@@ -103,12 +103,12 @@ export interface EvaluationResult {
   evaluationTime: number;
   /** The attempt number for this evaluation. */
   attemptNumber: number;
-}
+};
 
 /**
  * Provides detailed information when a response fails quality assurance checks.
  */
-export interface QualityErrorDetails {
+export type QualityErrorDetails = {
   /** The history of all evaluation attempts for this response. */
   evaluationHistory: EvaluationResult[];
   /** The final score of the last attempt. */
@@ -117,12 +117,12 @@ export interface QualityErrorDetails {
   attempts: number;
   /** A summary message of the failure. */
   message: string;
-}
+};
 
 /**
  * Configuration for the main `Evaluator` class.
  */
-export interface EvaluationConfig {
+export type EvaluationConfig = {
   /** The minimum score (1-10) for a response to be considered passing. */
   threshold?: number;
   /** The evaluation strategy to use. Currently only 'ragas' is supported. */
@@ -147,7 +147,7 @@ export interface EvaluationConfig {
   highSeverityThreshold?: number;
   /** An optional function to generate custom evaluation prompts. */
   promptGenerator?: GetPromptFunction;
-}
+};
 
 /**
  * A function that generates the main body of an evaluation prompt.

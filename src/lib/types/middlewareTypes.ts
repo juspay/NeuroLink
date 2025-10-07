@@ -4,10 +4,10 @@ import type { EvaluationData } from "./evaluation.js";
 import type { GetPromptFunction } from "./evaluationTypes.js";
 
 /**
- * Metadata interface for NeuroLink middleware
+ * Metadata type for NeuroLink middleware
  * Provides additional information about middleware without affecting execution
  */
-export interface NeuroLinkMiddlewareMetadata {
+export type NeuroLinkMiddlewareMetadata = {
   /** Unique identifier for the middleware */
   id: string;
   /** Human-readable name */
@@ -20,33 +20,33 @@ export interface NeuroLinkMiddlewareMetadata {
   defaultEnabled?: boolean;
   /** Configuration schema for the middleware */
   configSchema?: Record<string, unknown>;
-}
+};
 
 /**
  * NeuroLink middleware with metadata
  * Combines standard AI SDK middleware with NeuroLink-specific metadata
  */
-export interface NeuroLinkMiddleware extends LanguageModelV1Middleware {
+export type NeuroLinkMiddleware = LanguageModelV1Middleware & {
   /** Middleware metadata */
   readonly metadata: NeuroLinkMiddlewareMetadata;
-}
+};
 
 /**
  * Middleware configuration options
  */
-export interface MiddlewareConfig {
+export type MiddlewareConfig = {
   /** Whether the middleware is enabled */
   enabled?: boolean;
   /** Middleware-specific configuration */
   config?: Record<string, unknown>;
   /** Conditions under which to apply this middleware */
   conditions?: MiddlewareConditions;
-}
+};
 
 /**
  * Conditions for applying middleware
  */
-export interface MiddlewareConditions {
+export type MiddlewareConditions = {
   /** Apply only to specific providers */
   providers?: string[];
   /** Apply only to specific models */
@@ -55,12 +55,12 @@ export interface MiddlewareConditions {
   options?: Record<string, unknown>;
   /** Custom condition function */
   custom?: (context: MiddlewareContext) => boolean;
-}
+};
 
 /**
  * Context passed to middleware for decision making
  */
-export interface MiddlewareContext {
+export type MiddlewareContext = {
   /** Provider name */
   provider: string;
   /** Model name */
@@ -74,24 +74,24 @@ export interface MiddlewareContext {
   };
   /** Additional metadata */
   metadata?: Record<string, JsonValue>;
-}
+};
 
 /**
  * Middleware registration options
  */
-export interface MiddlewareRegistrationOptions {
+export type MiddlewareRegistrationOptions = {
   /** Whether to replace existing middleware with same ID */
   replace?: boolean;
   /** Whether to enable the middleware by default */
   defaultEnabled?: boolean;
   /** Global configuration for the middleware */
   globalConfig?: Record<string, JsonValue>;
-}
+};
 
 /**
  * Middleware execution result
  */
-export interface MiddlewareExecutionResult {
+export type MiddlewareExecutionResult = {
   /** Whether the middleware was applied */
   applied: boolean;
   /** Execution time in milliseconds */
@@ -100,12 +100,12 @@ export interface MiddlewareExecutionResult {
   error?: Error;
   /** Additional metadata from the middleware */
   metadata?: Record<string, JsonValue>;
-}
+};
 
 /**
  * Middleware chain execution statistics
  */
-export interface MiddlewareChainStats {
+export type MiddlewareChainStats = {
   /** Total number of middleware in the chain */
   totalMiddleware: number;
   /** Number of middleware that were applied */
@@ -114,7 +114,7 @@ export interface MiddlewareChainStats {
   totalExecutionTime: number;
   /** Individual middleware execution results */
   results: Record<string, MiddlewareExecutionResult>;
-}
+};
 
 /**
  * Built-in middleware types
@@ -132,19 +132,19 @@ export type BuiltInMiddlewareType =
 /**
  * Middleware preset configurations
  */
-export interface MiddlewarePreset {
+export type MiddlewarePreset = {
   /** Preset name */
   name: string;
   /** Description of the preset */
   description: string;
   /** Middleware configurations in the preset */
   config: Record<string, MiddlewareConfig>;
-}
+};
 
 /**
  * Factory options for middleware
  */
-export interface MiddlewareFactoryOptions {
+export type MiddlewareFactoryOptions = {
   /** Custom middleware to register on initialization */
   middleware?: NeuroLinkMiddleware[];
   /** Enable specific middleware */
@@ -164,12 +164,12 @@ export interface MiddlewareFactoryOptions {
     /** Whether to collect execution statistics */
     collectStats?: boolean;
   };
-}
+};
 
 /**
  * Configuration for the Auto-Evaluation Middleware.
  */
-export interface AutoEvaluationConfig {
+export type AutoEvaluationConfig = {
   /** The minimum score (1-10) for a response to be considered passing. */
   threshold?: number;
   /** The maximum number of retry attempts before failing. */
@@ -191,4 +191,76 @@ export interface AutoEvaluationConfig {
   promptGenerator?: GetPromptFunction;
 
   provider?: string;
-}
+};
+
+/**
+ * Middleware factory configuration options
+ */
+export type MiddlewareFactoryConfig = {
+  enabled: boolean;
+  type: string;
+  priority?: number;
+  config?: Record<string, unknown>;
+};
+
+/**
+ * Middleware registry entry
+ */
+export type MiddlewareRegistryEntry = {
+  name: string;
+  factory: MiddlewareFactory;
+  defaultConfig: Record<string, unknown>;
+  description?: string;
+  version?: string;
+};
+
+/**
+ * Middleware factory function type
+ */
+export type MiddlewareFactory = (
+  config: Record<string, unknown>,
+) => LanguageModelV1Middleware;
+
+/**
+ * Middleware validation result
+ */
+export type MiddlewareValidationResult = {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+};
+
+/**
+ * Middleware execution context
+ */
+export type MiddlewareExecutionContext = {
+  requestId: string;
+  timestamp: number;
+  provider: string;
+  model: string;
+  userId?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Middleware performance metrics
+ */
+export type MiddlewareMetrics = {
+  name: string;
+  executionTime: number;
+  status: "success" | "error" | "skipped";
+  error?: string;
+  inputSize: number;
+  outputSize: number;
+};
+
+/**
+ * Middleware chain configuration
+ */
+export type MiddlewareChainConfig = {
+  middlewares: MiddlewareFactoryConfig[];
+  errorHandling: "continue" | "stop" | "rollback";
+  timeout?: number;
+  retries?: number;
+};

@@ -68,50 +68,62 @@ export type Content = TextContent | ImageContent | CSVContent | PDFContent;
 /**
  * Vision capability information for providers
  */
-export interface VisionCapability {
+export type VisionCapability = {
   provider: string;
   supportedModels: string[];
   maxImageSize?: number; // in bytes
   supportedFormats: string[];
   maxImagesPerRequest?: number;
-}
+};
 
 /**
  * Provider-specific image format requirements
  */
-export interface ProviderImageFormat {
+export type ProviderImageFormat = {
   provider: string;
   format: "data_uri" | "base64" | "inline_data" | "source";
   requiresPrefix?: boolean;
   mimeTypeField?: string;
   dataField?: string;
-}
+};
 
 /**
  * Image processing result
  */
-export interface ProcessedImage {
+export type ProcessedImage = {
   data: string;
   mediaType: string;
   size: number;
   format: "data_uri" | "base64" | "inline_data" | "source";
-}
+};
 
 /**
  * Multimodal message structure for provider adapters
  */
-export interface MultimodalMessage {
+export type MultimodalMessage = {
   role: "user" | "assistant" | "system";
   content: Content[];
-}
+};
+
+/**
+ * Multimodal input type for options that may contain images or content arrays
+ */
+export type MultimodalInput = {
+  text: string;
+  images?: Array<Buffer | string>;
+  content?: Array<TextContent | ImageContent>;
+  csvFiles?: Array<Buffer | string>;
+  pdfFiles?: Array<Buffer | string>;
+  files?: Array<Buffer | string>;
+};
 
 /**
  * Provider-specific multimodal payload
  */
-export interface ProviderMultimodalPayload {
+export type ProviderMultimodalPayload = {
   provider: string;
   model: string;
   messages?: MultimodalMessage[];
   contents?: unknown[]; // Google AI format
   [key: string]: unknown; // Allow provider-specific fields
-}
+};

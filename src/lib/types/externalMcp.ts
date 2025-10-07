@@ -16,7 +16,7 @@ export type MCPTransportType = "stdio" | "sse" | "websocket";
 /**
  * External MCP server configuration for process spawning
  */
-export interface ExternalMCPServerConfig {
+export type ExternalMCPServerConfig = {
   /** Unique identifier for the server */
   id: string;
 
@@ -52,12 +52,12 @@ export interface ExternalMCPServerConfig {
 
   /** Additional metadata */
   metadata?: Record<string, JsonValue>;
-}
+};
 
 /**
  * Runtime state of an external MCP server instance
  */
-export interface ExternalMCPServerInstance {
+export type ExternalMCPServerInstance = {
   /** Server configuration */
   config: ExternalMCPServerConfig;
 
@@ -116,7 +116,7 @@ export interface ExternalMCPServerInstance {
     averageResponseTime: number;
     lastResponseTime: number;
   };
-}
+};
 
 /**
  * External MCP server status states
@@ -134,7 +134,7 @@ export type ExternalMCPServerStatus =
 /**
  * Tool information from external MCP server
  */
-export interface ExternalMCPToolInfo {
+export type ExternalMCPToolInfo = {
   /** Tool name */
   name: string;
 
@@ -164,12 +164,12 @@ export interface ExternalMCPToolInfo {
     averageExecutionTime: number;
     lastExecutionTime: number;
   };
-}
+};
 
 /**
  * External MCP server health status
  */
-export interface ExternalMCPServerHealth {
+export type ExternalMCPServerHealth = {
   /** Server ID */
   serverId: string;
 
@@ -198,12 +198,12 @@ export interface ExternalMCPServerHealth {
     cpuUsage?: number;
     averageResponseTime: number;
   };
-}
+};
 
 /**
  * External MCP server configuration validation result
  */
-export interface ExternalMCPConfigValidation {
+export type ExternalMCPConfigValidation = {
   /** Whether the configuration is valid */
   isValid: boolean;
 
@@ -215,12 +215,12 @@ export interface ExternalMCPConfigValidation {
 
   /** Suggestions for improvement */
   suggestions: string[];
-}
+};
 
 /**
  * External MCP server operation result
  */
-export interface ExternalMCPOperationResult<T = unknown> {
+export type ExternalMCPOperationResult<T = unknown> = {
   /** Whether the operation was successful */
   success: boolean;
 
@@ -242,12 +242,12 @@ export interface ExternalMCPOperationResult<T = unknown> {
     operation: string;
     [key: string]: JsonValue;
   };
-}
+};
 
 /**
  * External MCP tool execution context
  */
-export interface ExternalMCPToolContext {
+export type ExternalMCPToolContext = {
   /** Execution session ID */
   sessionId: string;
 
@@ -265,12 +265,12 @@ export interface ExternalMCPToolContext {
 
   /** Additional context data */
   metadata?: Record<string, JsonValue>;
-}
+};
 
 /**
  * External MCP tool execution result
  */
-export interface ExternalMCPToolResult {
+export type ExternalMCPToolResult = {
   /** Whether the execution was successful */
   success: boolean;
 
@@ -290,12 +290,12 @@ export interface ExternalMCPToolResult {
     timestamp: number;
     [key: string]: JsonValue;
   };
-}
+};
 
 /**
  * External MCP server events
  */
-export interface ExternalMCPServerEvents {
+export type ExternalMCPServerEvents = {
   /** Server status changed */
   statusChanged: {
     serverId: string;
@@ -346,12 +346,12 @@ export interface ExternalMCPServerEvents {
     health: ExternalMCPServerHealth;
     timestamp: Date;
   };
-}
+};
 
 /**
  * External MCP manager configuration
  */
-export interface ExternalMCPManagerConfig {
+export type ExternalMCPManagerConfig = {
   /** Maximum number of concurrent servers */
   maxServers?: number;
 
@@ -375,6 +375,6 @@ export interface ExternalMCPManagerConfig {
 
   /** Log level for external MCP operations */
   logLevel?: "debug" | "info" | "warn" | "error";
-}
+};
 
 // Note: In Phase 2, these interfaces will be consolidated into MCPServerInfo

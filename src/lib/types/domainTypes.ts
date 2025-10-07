@@ -19,9 +19,9 @@ export type DomainType =
   | "generic";
 
 /**
- * Domain evaluation criteria interface
+ * Domain evaluation criteria type
  */
-export interface DomainEvaluationCriteria {
+export type DomainEvaluationCriteria = {
   accuracyWeight: number;
   completenessWeight: number;
   relevanceWeight: number;
@@ -29,12 +29,12 @@ export interface DomainEvaluationCriteria {
   domainSpecificRules: string[];
   failurePatterns: string[];
   successPatterns: string[];
-}
+};
 
 /**
- * Domain configuration interface
+ * Domain configuration type
  */
-export interface DomainConfig {
+export type DomainConfig = {
   domainType: DomainType;
   domainName: string;
   description: string;
@@ -45,33 +45,33 @@ export interface DomainConfig {
     createdAt: number;
     updatedAt: number;
   };
-}
+};
 
 /**
  * Domain template for factory registration
  */
-export interface DomainTemplate {
+export type DomainTemplate = {
   domainType: DomainType;
   template: Partial<DomainConfig>;
   isDefault?: boolean;
-}
+};
 
 /**
  * Domain validation rule
  */
-export interface DomainValidationRule {
+export type DomainValidationRule = {
   ruleName: string;
   ruleType: "required" | "pattern" | "range" | "custom";
   validation: (value: unknown) => boolean;
   errorMessage: string;
-}
+};
 
 /**
  * Domain configuration options for factory
  */
-export interface DomainConfigOptions {
+export type DomainConfigOptions = {
   domainType: DomainType;
   customConfig?: Partial<DomainConfig>;
   validateDomainData?: boolean;
   includeDefaults?: boolean;
-}
+};

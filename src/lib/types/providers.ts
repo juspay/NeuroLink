@@ -13,13 +13,9 @@ import type {
 import type { StreamOptions, StreamResult } from "./streamTypes.js";
 import type { ExternalMCPToolInfo } from "./externalMcp.js";
 
-/**
- * Generic AI SDK model interface
- */
-export type AISDKModel = {
-  // This will be refined based on actual AI SDK types
-  [key: string]: unknown;
-};
+// ============================================================================
+// ENUMS
+// ============================================================================
 
 /**
  * Supported AI Provider Names
@@ -147,6 +143,18 @@ export enum APIVersions {
 
   // Other provider versions can be added here
 }
+
+// ============================================================================
+// TYPE ALIASES
+// ============================================================================
+
+/**
+ * Generic AI SDK model interface
+ */
+export type AISDKModel = {
+  // This will be refined based on actual AI SDK types
+  [key: string]: unknown;
+};
 
 /**
  * Union type of all supported model names
@@ -377,7 +385,23 @@ export type IndividualProviderConfig = {
 };
 
 /**
- * AI Provider interface with flexible parameter support (converted from interface)
+ * Configuration options for provider validation
+ */
+export type ProviderConfigOptions = {
+  providerName: string;
+  envVarName: string;
+  setupUrl: string;
+  description: string;
+  instructions: string[];
+  fallbackEnvVars?: string[]; // For providers with multiple possible env vars
+};
+
+// ============================================================================
+// CORE PROVIDER INTERFACES
+// ============================================================================
+
+/**
+ * AI Provider type with flexible parameter support
  */
 export type AIProvider = {
   // Primary streaming method
@@ -426,70 +450,6 @@ export type ProviderCreationError = {
   provider: string;
   details?: Record<string, unknown>;
 };
-
-/**
- * Amazon Bedrock specific types
- */
-export namespace BedrockTypes {
-  export interface Client {
-    // Based on AWS SDK Bedrock types
-    send(command: unknown): Promise<unknown>;
-    config: {
-      region?: string;
-      credentials?: unknown;
-    };
-  }
-
-  export interface InvokeModelCommand {
-    // Based on AWS SDK types
-    input: {
-      modelId: string;
-      body: string;
-      contentType?: string;
-    };
-  }
-}
-
-/**
- * Mistral specific types
- */
-export namespace MistralTypes {
-  export interface Client {
-    // Based on Mistral SDK types
-    chat?: {
-      complete?: (options: unknown) => Promise<unknown>;
-      stream?: (options: unknown) => AsyncIterable<unknown>;
-    };
-  }
-}
-
-/**
- * OpenTelemetry specific types (for telemetry service)
- */
-export namespace TelemetryTypes {
-  export interface Meter {
-    createCounter(name: string, options?: unknown): Counter;
-    createHistogram(name: string, options?: unknown): Histogram;
-  }
-
-  export interface Tracer {
-    startSpan(name: string, options?: unknown): Span;
-  }
-
-  export interface Counter {
-    add(value: number, attributes?: UnknownRecord): void;
-  }
-
-  export interface Histogram {
-    record(value: number, attributes?: UnknownRecord): void;
-  }
-
-  export interface Span {
-    end(): void;
-    setStatus(status: unknown): void;
-    recordException(exception: unknown): void;
-  }
-}
 
 /**
  * Provider factory function type
@@ -1252,8 +1212,8 @@ export type EndpointMetrics = {
   memoryUtilization?: number;
   /** Instance count */
   instanceCount: number;
-  /** Timestamp of metrics */
-  timestamp: string; // ISO 8601 date string
+  /** Timestamp of metrics as ISO 8601 date string */
+  timestamp: string;
 };
 
 /**
@@ -1316,3 +1276,77 @@ export type SageMakerGenerateResult = {
   toolCalls?: SageMakerToolCall[];
   object?: unknown;
 };
+
+// ============================================================================
+// Provider-Specific Namespace Types (Using Interfaces for Declaration Merging)
+// ============================================================================
+//
+// Note: The following namespace exports use `interface` instead of `type` to enable
+// TypeScript declaration merging. This allows downstream consumers to augment these
+// interfaces with additional properties or methods while maintaining type safety.
+// Declaration merging is not possible with type aliases, making interfaces the
+// preferred choice for extensible provider-specific type definitions.
+
+/**
+ * Amazon Bedrock specific types
+ */
+export namespace BedrockTypes {
+  export interface Client {
+    // Based on AWS SDK Bedrock types
+    send(command: unknown): Promise<unknown>;
+    config: {
+      region?: string;
+      credentials?: unknown;
+    };
+  }
+
+  export interface InvokeModelCommand {
+    // Based on AWS SDK types
+    input: {
+      modelId: string;
+      body: string;
+      contentType?: string;
+    };
+  }
+}
+
+/**
+ * Mistral specific types
+ */
+export namespace MistralTypes {
+  export interface Client {
+    // Based on Mistral SDK types
+    chat?: {
+      complete?: (options: unknown) => Promise<unknown>;
+      stream?: (options: unknown) => AsyncIterable<unknown>;
+    };
+  }
+}
+
+/**
+ * OpenTelemetry specific types (for telemetry service)
+ */
+export namespace TelemetryTypes {
+  export interface Meter {
+    createCounter(name: string, options?: unknown): Counter;
+    createHistogram(name: string, options?: unknown): Histogram;
+  }
+
+  export interface Tracer {
+    startSpan(name: string, options?: unknown): Span;
+  }
+
+  export interface Counter {
+    add(value: number, attributes?: UnknownRecord): void;
+  }
+
+  export interface Histogram {
+    record(value: number, attributes?: UnknownRecord): void;
+  }
+
+  export interface Span {
+    end(): void;
+    setStatus(status: unknown): void;
+    recordException(exception: unknown): void;
+  }
+}

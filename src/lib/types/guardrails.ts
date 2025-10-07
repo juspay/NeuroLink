@@ -3,7 +3,7 @@ import type { LanguageModelV1 } from "ai";
 /**
  * Result from precall evaluation of user input
  */
-export interface PrecallEvaluationResult {
+export type PrecallEvaluationResult = {
   overall: "safe" | "unsafe" | "suspicious" | "inappropriate";
   safetyScore: number;
   appropriatenessScore: number;
@@ -21,7 +21,7 @@ export interface PrecallEvaluationResult {
   }[];
   suggestedAction: "allow" | "block" | "sanitize" | "warn";
   reasoning?: string;
-}
+};
 
 export type IssueCategory =
   | "explicit_content"
@@ -37,22 +37,22 @@ export type EvaluationAction = "allow" | "block" | "sanitize" | "warn";
 
 export type SafetyStatus = "safe" | "unsafe" | "suspicious" | "inappropriate";
 
-export interface EvaluationActions {
+export type EvaluationActions = {
   onUnsafe?: "block" | "sanitize" | "warn" | "log";
   onInappropriate?: "block" | "sanitize" | "warn" | "log";
   onSuspicious?: "warn" | "log" | "allow";
-}
+};
 
-export interface EvaluationThresholds {
+export type EvaluationThresholds = {
   safetyScore?: number;
   appropriatenessScore?: number;
   confidenceLevel?: number;
-}
+};
 
 /**
  * Configuration for precall evaluation using AI models
  */
-export interface PrecallEvaluationConfig {
+export type PrecallEvaluationConfig = {
   enabled?: boolean;
   provider?: string;
   evaluationModel?: string;
@@ -83,9 +83,9 @@ export interface PrecallEvaluationConfig {
    * - '[FILTERED]'
    */
   replacementText?: string;
-}
+};
 
-export interface BadWordsConfig {
+export type BadWordsConfig = {
   enabled?: boolean;
   list?: string[];
   regexPatterns?: string[];
@@ -100,29 +100,29 @@ export interface BadWordsConfig {
    * - '[FILTERED]'
    */
   replacementText?: string;
-}
+};
 
-export interface ModelFilterConfig {
+export type ModelFilterConfig = {
   enabled?: boolean;
   filterModel?: LanguageModelV1;
-}
+};
 
 /**
  * Configuration for the Guardrails middleware
  */
-export interface GuardrailsMiddlewareConfig {
+export type GuardrailsMiddlewareConfig = {
   badWords?: BadWordsConfig;
   modelFilter?: ModelFilterConfig;
   precallEvaluation?: PrecallEvaluationConfig;
-}
+};
 
-export interface EvaluationActionResult {
+export type EvaluationActionResult = {
   shouldBlock: boolean;
   sanitizedInput?: string;
-}
+};
 
-export interface EvaluationIssue {
+export type EvaluationIssue = {
   category: IssueCategory;
   severity: IssueSeverity;
   description: string;
-}
+};

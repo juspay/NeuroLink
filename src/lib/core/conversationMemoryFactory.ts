@@ -7,14 +7,10 @@ import type {
   ConversationMemoryConfig,
   RedisStorageConfig,
 } from "../types/conversation.js";
+import type { StorageType } from "../types/common.js";
 import { ConversationMemoryManager } from "./conversationMemoryManager.js";
 import { RedisConversationMemoryManager } from "./redisConversationMemoryManager.js";
 import { logger } from "../utils/logger.js";
-
-/**
- * Configuration for memory storage type
- */
-export type StorageType = "memory" | "redis";
 
 /**
  * Creates a conversation memory manager based on configuration

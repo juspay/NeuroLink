@@ -6,13 +6,13 @@
 import type { MemoryConfig } from "mem0ai/oss";
 
 /**
- * Mem0 configuration interface matching mem0ai/oss MemoryConfig structure
+ * Mem0 configuration type matching mem0ai/oss MemoryConfig structure
  */
 
 /**
  * Configuration for conversation memory feature
  */
-export interface ConversationMemoryConfig {
+export type ConversationMemoryConfig = {
   /** Enable conversation memory feature */
   enabled: boolean;
 
@@ -42,12 +42,12 @@ export interface ConversationMemoryConfig {
 
   /** Configuration for mem0 integration */
   mem0Config?: MemoryConfig;
-}
+};
 /**
  * Complete memory for a conversation session
  * ULTRA-OPTIMIZED: Direct ChatMessage[] storage - zero conversion overhead
  */
-export interface SessionMemory {
+export type SessionMemory = {
   /** Unique session identifier */
   sessionId: string;
 
@@ -77,23 +77,23 @@ export interface SessionMemory {
     /** Custom data specific to the organization */
     customData?: Record<string, unknown>;
   };
-}
+};
 
 /**
  * Statistics about conversation memory usage (simplified for pure in-memory storage)
  */
-export interface ConversationMemoryStats {
+export type ConversationMemoryStats = {
   /** Total number of active sessions */
   totalSessions: number;
 
   /** Total number of conversation turns across all sessions */
   totalTurns: number;
-}
+};
 
 /**
  * Chat message format for conversation history
  */
-export interface ChatMessage {
+export type ChatMessage = {
   /** Role/type of the message */
   role: "user" | "assistant" | "system" | "tool_call" | "tool_result";
 
@@ -120,34 +120,34 @@ export interface ChatMessage {
     type?: string;
     error?: string;
   };
-}
+};
 
 /**
  * Content format for multimodal messages (used internally)
  */
-export interface MessageContent {
+export type MessageContent = {
   type: string;
   text?: string;
   image?: string;
   mimeType?: string;
   [key: string]: unknown; // Index signature for compatibility with Vercel AI SDK
-}
+};
 
 /**
  * Extended chat message for multimodal support (internal use)
  */
-export interface MultimodalChatMessage {
+export type MultimodalChatMessage = {
   /** Role of the message sender */
   role: "user" | "assistant" | "system";
 
   /** Content of the message - can be text or multimodal content array */
   content: string | MessageContent[];
-}
+};
 
 /**
  * Events emitted by conversation memory system
  */
-export interface ConversationMemoryEvents {
+export type ConversationMemoryEvents = {
   /** Emitted when a new session is created */
   "session:created": {
     sessionId: string;
@@ -175,7 +175,7 @@ export interface ConversationMemoryEvents {
     turnsIncluded: number;
     timestamp: number;
   };
-}
+};
 
 /**
  * Error types specific to conversation memory
@@ -199,7 +199,7 @@ export class ConversationMemoryError extends Error {
  * NeuroLink initialization options
  * Configuration for creating NeuroLink instances with conversation memory
  */
-export interface NeurolinkOptions {
+export type NeurolinkOptions = {
   /** Conversation memory configuration */
   conversationMemory?: ConversationMemoryConfig;
 
@@ -208,7 +208,7 @@ export interface NeurolinkOptions {
 
   /** Observability configuration */
   observability?: import("./observability.js").ObservabilityConfig;
-}
+};
 
 /**
  * Session identifier for Redis storage operations
@@ -222,18 +222,18 @@ export type SessionIdentifier = {
  * Lightweight session metadata for efficient session listing
  * Contains only essential information without heavy message arrays
  */
-export interface SessionMetadata {
+export type SessionMetadata = {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
-}
+};
 
 /**
  * Base conversation metadata (shared fields across all conversation types)
  * Contains essential conversation information without heavy data arrays
  */
-export interface ConversationBase {
+export type ConversationBase = {
   /** Unique conversation identifier (UUID v4) */
   id: string;
 
@@ -251,22 +251,22 @@ export interface ConversationBase {
 
   /** When this conversation was last updated */
   updatedAt: string;
-}
+};
 
 /**
  * Redis conversation storage object format
  * Contains conversation metadata and full message history
  */
-export interface RedisConversationObject extends ConversationBase {
+export type RedisConversationObject = ConversationBase & {
   /** Array of conversation messages */
   messages: ChatMessage[];
-}
+};
 
 /**
  * Full conversation data for session restoration and manipulation
  * Extends Redis storage object with additional loop mode metadata
  */
-export interface ConversationData extends RedisConversationObject {
+export type ConversationData = RedisConversationObject & {
   /** Optional metadata for session variables and other loop mode data */
   metadata?: {
     /** Session variables set during loop mode */
@@ -276,13 +276,13 @@ export interface ConversationData extends RedisConversationObject {
     /** Additional metadata can be added here */
     [key: string]: unknown;
   };
-}
+};
 
 /**
  * Conversation summary for listing and selection
  * Contains conversation preview information without heavy message arrays
  */
-export interface ConversationSummary extends ConversationBase {
+export type ConversationSummary = ConversationBase & {
   /** First message preview (for conversation preview) */
   firstMessage: {
     content: string;
@@ -300,7 +300,7 @@ export interface ConversationSummary extends ConversationBase {
 
   /** Human-readable time since last update (e.g., "2 hours ago") */
   duration: string;
-}
+};
 
 /**
  * Redis storage configuration

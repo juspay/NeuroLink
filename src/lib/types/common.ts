@@ -18,6 +18,11 @@ export type UnknownRecord = Record<string, unknown>;
 export type UnknownArray = unknown[];
 
 /**
+ * Storage type for conversation memory factory
+ */
+export type StorageType = "memory" | "redis";
+
+/**
  * JSON-serializable value type
  */
 export type JsonValue =
@@ -28,37 +33,37 @@ export type JsonValue =
   | JsonObject
   | JsonArray;
 
-export interface JsonObject {
+export type JsonObject = {
   [key: string]: JsonValue;
-}
+};
 
-export interface JsonArray extends Array<JsonValue> {}
+export type JsonArray = JsonValue[];
 
 /**
  * Type-safe error handling
  */
-export interface ErrorInfo {
+export type ErrorInfo = {
   message: string;
   code?: string | number;
   stack?: string;
   cause?: unknown;
-}
+};
 
 /**
  * Generic success/error result type
  */
-export interface Result<T = unknown, E = ErrorInfo> {
+export type Result<T = unknown, E = ErrorInfo> = {
   success: boolean;
   data?: T;
   error?: E;
-}
+};
 
 /**
  * Function parameter type for dynamic functions
  */
-export interface FunctionParameters {
+export type FunctionParameters = {
   [key: string]: unknown;
-}
+};
 
 /**
  * Generic async function type
@@ -136,57 +141,20 @@ export function toErrorInfo(error: unknown): ErrorInfo {
 }
 
 /**
- * NeuroLink Native Event System Types
- */
-
-/**
- * Tool execution event for real-time streaming
- */
-export interface ToolExecutionEvent {
-  type: "tool:start" | "tool:end";
-  tool: string;
-  input?: unknown;
-  result?: unknown;
-  error?: string;
-  timestamp: number;
-  duration?: number;
-  executionId: string;
-}
-
-/**
- * Tool execution summary for completed executions
- */
-export interface ToolExecutionSummary {
-  tool: string;
-  startTime: number;
-  endTime: number;
-  duration: number;
-  success: boolean;
-  result?: unknown;
-  error?: string;
-  executionId: string;
-  metadata?: {
-    serverId?: string;
-    toolCategory?: "direct" | "custom" | "mcp";
-    isExternal?: boolean;
-  };
-}
-
-/**
  * Stream event types for real-time communication
  */
-export interface StreamEvent {
+export type StreamEvent = {
   type: "stream:chunk" | "stream:complete" | "stream:error";
   content?: string;
   metadata?: JsonObject;
   timestamp: number;
-}
+};
 
 /**
  * Enhanced NeuroLink event types
- * Flexible interface to support both typed and legacy event patterns
+ * Flexible type to support both typed and legacy event patterns
  */
-export interface NeuroLinkEvents {
+export type NeuroLinkEvents = {
   // Core tool events
   "tool:start": unknown;
   "tool:end": unknown;
@@ -227,7 +195,7 @@ export interface NeuroLinkEvents {
 
   // Allow any additional event for flexibility
   [key: string]: unknown;
-}
+};
 
 /**
  * TypeScript utility for typed EventEmitter
@@ -248,17 +216,4 @@ export interface TypedEventEmitter<TEvents extends Record<string, unknown>> {
   listeners<K extends keyof TEvents>(
     event: K,
   ): Array<(...args: unknown[]) => void>;
-}
-
-/**
- * Tool execution context for tracking
- */
-export interface ToolExecutionContext {
-  executionId: string;
-  tool: string;
-  startTime: number;
-  endTime?: number;
-  result?: unknown;
-  error?: string;
-  metadata?: JsonObject;
 }

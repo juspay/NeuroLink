@@ -57,16 +57,15 @@ import type {
   MCPServerCategory,
 } from "./types/mcpTypes.js";
 import type { ToolInfo } from "./types/tools.js";
-import type {
-  NeuroLinkEvents,
-  TypedEventEmitter,
-  ToolExecutionContext,
-  ToolExecutionSummary,
-} from "./types/common.js";
+import type { NeuroLinkEvents, TypedEventEmitter } from "./types/common.js";
 import {
   createCustomToolServerInfo,
   detectCategory,
 } from "./utils/mcpDefaults.js";
+import type {
+  ToolExecutionContext,
+  ToolExecutionSummary,
+} from "./types/tools.js";
 import type { JsonValue, JsonObject, UnknownRecord } from "./types/common.js";
 import type {
   ToolExecutionResult,

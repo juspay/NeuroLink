@@ -30,12 +30,9 @@ export type {
 
 // Event system types - PRIORITY 2
 export type {
-  ToolExecutionEvent,
-  ToolExecutionSummary,
   TypedEventEmitter,
   NeuroLinkEvents,
   StreamEvent,
-  ToolExecutionContext,
   AsyncFunction,
   SyncFunction,
   AnyFunction,
@@ -67,6 +64,9 @@ export type {
   AvailableTool,
   ToolExecution,
   BaseToolArgs,
+  ToolExecutionEvent,
+  ToolExecutionSummary,
+  ToolExecutionContext,
   ToolExecutionMetadata,
   ToolParameterSchema,
   ZodUnknownSchema,

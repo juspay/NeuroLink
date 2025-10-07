@@ -5,17 +5,8 @@
  * Enhanced with format validation and advanced error classification
  */
 
-/**
- * Configuration options for provider validation
- */
-export interface ProviderConfigOptions {
-  providerName: string;
-  envVarName: string;
-  setupUrl: string;
-  description: string;
-  instructions: string[];
-  fallbackEnvVars?: string[]; // For providers with multiple possible env vars
-}
+import type { APIValidationResult } from "../types/utilities.js";
+import type { ProviderConfigOptions } from "../types/providers.js";
 
 /**
  * API key format validation patterns (extracted from advanced validation system)
@@ -55,17 +46,6 @@ export const PROJECT_ID_FORMAT = {
 } as const;
 
 /**
- * Enhanced validation result with format checking
- */
-export interface ValidationResult {
-  isValid: boolean;
-  apiKey: string;
-  formatValid?: boolean;
-  errorType?: "missing" | "format" | "config";
-  error?: string;
-}
-
-/**
  * Validates API key format for a specific provider
  * @param providerKey Provider identifier (e.g., 'openai', 'anthropic')
  * @param apiKey The API key to validate
@@ -92,7 +72,7 @@ export function validateApiKeyFormat(
 export function validateApiKeyEnhanced(
   config: ProviderConfigOptions,
   enableFormatValidation: boolean = false,
-): ValidationResult {
+): APIValidationResult {
   // Check primary environment variable
   let apiKey = process.env[config.envVarName];
 

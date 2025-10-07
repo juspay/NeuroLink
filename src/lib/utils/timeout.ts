@@ -5,6 +5,8 @@
  * Supports multiple time formats: milliseconds, seconds, minutes, hours.
  */
 
+import type { TimeoutConfig, TimeoutResult } from "../types/utilities.js";
+
 /**
  * Custom error class for timeout operations
  */
@@ -171,25 +173,6 @@ export function createTimeoutPromise(
       (timer as NodeJS.Timeout).unref();
     }
   });
-}
-
-// Consolidated timeout utilities - interfaces from timeout-manager.ts
-export interface TimeoutConfig {
-  operation: string;
-  timeout?: number | string;
-  gracefulShutdown?: boolean;
-  retryOnTimeout?: boolean;
-  maxRetries?: number;
-  abortSignal?: AbortSignal;
-}
-
-export interface TimeoutResult<T> {
-  success: boolean;
-  data?: T;
-  error?: Error;
-  timedOut: boolean;
-  executionTime: number;
-  retriesUsed: number;
 }
 
 /**

@@ -21,8 +21,8 @@ import { MiddlewareFactory } from "../middleware/factory.js";
 import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue, JsonObject, UnknownRecord } from "../types/common.js";
-import type { ToolResult, ToolArgs } from "../types/tools.js";
-import type { TextContent, ImageContent } from "../types/content.js";
+import type { ToolArgs, ToolCallObject, ToolResult } from "../types/tools.js";
+import type { MultimodalInput } from "../types/content.js";
 import { logger } from "../utils/logger.js";
 import { DEFAULT_MAX_STEPS, STEP_LIMITS } from "../core/constants.js";
 import { directAgentTools } from "../agent/directTools.js";
@@ -49,33 +49,6 @@ import {
   getPerformanceOptimizedProvider,
 } from "./evaluationProviders.js";
 import { modelConfig } from "./modelConfiguration.js";
-
-// Provider types moved to ../types/providers.js
-
-/**
- * Multimodal input type for options that may contain images, CSV files, PDF files, or content arrays
- */
-type MultimodalInput = {
-  text: string;
-  images?: Array<Buffer | string>;
-  content?: Array<TextContent | ImageContent>;
-  csvFiles?: Array<Buffer | string>;
-  pdfFiles?: Array<Buffer | string>;
-  files?: Array<Buffer | string>;
-};
-
-/**
- * Tool call object interface for type-safe access to tool call properties
- */
-interface ToolCallObject extends UnknownRecord {
-  toolName?: string;
-  name?: string;
-  toolCallId?: string;
-  id?: string;
-  args?: UnknownRecord;
-  arguments?: UnknownRecord;
-  parameters?: UnknownRecord;
-}
 
 /**
  * Abstract base class for all AI providers

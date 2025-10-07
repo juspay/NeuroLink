@@ -7,9 +7,9 @@ import type { JsonValue, JsonObject } from "./common.js";
 import type { ExecutionContext } from "../types/tools.js";
 
 /**
- * Base context interface for all AI operations
+ * Base context type for all AI operations
  */
-export interface BaseContext {
+export type BaseContext = {
   // Core identification
   userId?: string;
   sessionId?: string;
@@ -34,7 +34,7 @@ export interface BaseContext {
 
   // Index signature for flexible access
   [key: string]: unknown;
-}
+};
 
 /**
  * Context integration mode types
@@ -50,19 +50,19 @@ type ContextIntegrationMode =
 /**
  * Context configuration for AI generation
  */
-export interface ContextConfig {
+export type ContextConfig = {
   mode: ContextIntegrationMode;
   includeInPrompt?: boolean;
   includeInAnalytics?: boolean;
   includeInEvaluation?: boolean;
   template?: string; // Custom template for context integration
   maxLength?: number; // Maximum context length to include
-}
+};
 
 /**
  * Context processing result
  */
-interface ProcessedContext {
+type ProcessedContext = {
   originalContext: BaseContext;
   processedContext: string | null;
   config: ContextConfig;
@@ -72,13 +72,13 @@ interface ProcessedContext {
     template: string;
     mode: ContextIntegrationMode;
   };
-}
+};
 
 /**
  * Configuration for framework fields exclusion
  * Can be customized per application or environment
  */
-export interface FrameworkFieldsConfig {
+export type FrameworkFieldsConfig = {
   // Default framework fields to exclude from custom data
   defaultFields: string[];
 
@@ -90,7 +90,7 @@ export interface FrameworkFieldsConfig {
 
   // Include normally excluded fields
   includeFields?: string[];
-}
+};
 
 /**
  * Factory for context processing
@@ -449,11 +449,11 @@ function _isValidContext(value: unknown): value is BaseContext {
  * Replaces hardcoded business context with generic domain context
  */
 
-interface ContextConversionOptions {
+type ContextConversionOptions = {
   preserveLegacyFields?: boolean;
   validateDomainData?: boolean;
   includeMetadata?: boolean;
-}
+};
 
 export class ContextConverter {
   /**

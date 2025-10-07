@@ -2,15 +2,15 @@ import type { Tool } from "ai";
 import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
 import type { AIModelProviderConfig } from "./providers.js";
 import type { TextContent, ImageContent } from "./content.js";
-import type { AIProviderName, AnalyticsData } from "../types/index.js";
-import type { TokenUsage } from "./analytics.js";
-import type { EvaluationData } from "../index.js";
 import type {
-  UnknownRecord,
-  JsonValue,
+  AIProviderName,
+  AnalyticsData,
   ToolExecutionEvent,
   ToolExecutionSummary,
-} from "./common.js";
+} from "../types/index.js";
+import type { TokenUsage } from "./analytics.js";
+import type { EvaluationData } from "../index.js";
+import type { UnknownRecord, JsonValue } from "./common.js";
 import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
 import type { ChatMessage } from "./conversation.js";
 
@@ -126,21 +126,21 @@ export type StreamAnalyticsData = {
  */
 export type PCMEncoding = "PCM16LE";
 
-export interface AudioInputSpec {
+export type AudioInputSpec = {
   frames: AsyncIterable<Buffer>; // PCM16LE mono frames (20–60ms recommended)
   sampleRateHz?: number; // default: 16000
   encoding?: PCMEncoding; // default: 'PCM16LE'
   channels?: 1; // Phase 1: mono
-}
+};
 
-export interface AudioChunk {
+export type AudioChunk = {
   data: Buffer;
   sampleRateHz: number; // Gemini typically 24000 on output
   channels: number; // 1
   encoding: PCMEncoding; // 'PCM16LE'
-}
+};
 
-export interface StreamOptions {
+export type StreamOptions = {
   input: {
     text: string;
     audio?: AudioInputSpec;
@@ -217,7 +217,7 @@ export interface StreamOptions {
 
   // NEW: Middleware related config
   middleware?: MiddlewareFactoryOptions;
-}
+};
 
 /**
  * Stream function result type - Primary output format for streaming
