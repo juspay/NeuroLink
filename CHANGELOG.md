@@ -1,3 +1,10 @@
+## [7.51.0](https://github.com/juspay/neurolink/compare/v7.50.0...v7.51.0) (2025-10-12)
+
+### Features
+
+- **(multimodal):** add comprehensive PDF file support with native document processing ([52abf1a](https://github.com/juspay/neurolink/commit/52abf1a85d3a1d9de819919eec1d0ffea3007702))
+- **(multimodal):** add comprehensive PDF file support with native document processing ([020e15a](https://github.com/juspay/neurolink/commit/020e15af0bb46a2b827bb4853baafba5da03cad2))
+
 ## [7.50.0](https://github.com/juspay/neurolink/compare/v7.49.0...v7.50.0) (2025-10-08)
 
 ### Features
