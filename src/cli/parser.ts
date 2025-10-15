@@ -194,5 +194,8 @@ export function initializeCliParser() {
 
       // Setup Commands - Using SetupCommandFactory
       .command(SetupCommandFactory.createSetupCommands())
+
+      // TTS Command Group - Using CLICommandFactory
+      .command(CLICommandFactory.createTTSCommands())
   ); // Close the main return statement
 }

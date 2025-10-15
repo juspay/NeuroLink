@@ -750,8 +750,11 @@ async function testSDKGenerate(): Promise<boolean> {
   try {
     // Create temporary test script for SDK
     const sdkOptions = buildBaseSDKOptions();
+    const neurolinkModulePath = JSON.stringify(
+      `${process.cwd()}/dist/index.js`,
+    );
     const testScript = `
-import { NeuroLink } from '${process.cwd()}/dist/index.js';
+import { NeuroLink } from ${neurolinkModulePath};
 
 async function testSDKGenerate() {
   const sdk = new NeuroLink();
@@ -884,8 +887,11 @@ async function testSDKStream(): Promise<boolean> {
   try {
     // Create temporary test script for SDK streaming
     const sdkOptions = buildBaseSDKOptions();
+    const neurolinkModulePath = JSON.stringify(
+      `${process.cwd()}/dist/index.js`,
+    );
     const testScript = `
-import { NeuroLink} from '${process.cwd()}/dist/index.js';
+import { NeuroLink} from ${neurolinkModulePath};
 
 async function testSDKStream() {
   console.log('[DEBUG] Creating NeuroLink instance...');
@@ -2059,8 +2065,11 @@ async function testSDKGenerateCSV(): Promise<boolean> {
     );
 
     const sdkOptions = buildBaseSDKOptions();
+    const neurolinkModulePath = JSON.stringify(
+      `${process.cwd()}/dist/index.js`,
+    );
     const testScript = `
-import { NeuroLink } from '${process.cwd()}/dist/index.js';
+import { NeuroLink } from ${neurolinkModulePath};
 
 async function testSDKGenerateCSV() {
   const sdk = new NeuroLink();
@@ -2160,8 +2169,11 @@ async function testSDKStreamCSV(): Promise<boolean> {
     fs.writeFileSync(csvPath, "month,revenue\nJan,50000\nFeb,55000\nMar,60000");
 
     const sdkOptions = buildBaseSDKOptions();
+    const neurolinkModulePath = JSON.stringify(
+      `${process.cwd()}/dist/index.js`,
+    );
     const testScript = `
-import { NeuroLink } from '${process.cwd()}/dist/index.js';
+import { NeuroLink } from ${neurolinkModulePath};
 
 async function testSDKStreamCSV() {
   const sdk = new NeuroLink();
@@ -2517,8 +2529,11 @@ async function testSDKGeneratePDF(): Promise<boolean> {
 
   try {
     const sdkOptions = buildBaseSDKOptions();
+    const neurolinkModulePath = JSON.stringify(
+      `${process.cwd()}/dist/index.js`,
+    );
     const testScript = `
-import { NeuroLink } from '${process.cwd()}/dist/index.js';
+import { NeuroLink } from ${neurolinkModulePath};
 
 async function testSDKGeneratePDF() {
   console.log('Step 1: Testing SDK generate with PDF file...');
@@ -2613,8 +2628,11 @@ async function testSDKStreamPDF(): Promise<boolean> {
 
   try {
     const sdkOptions = buildBaseSDKOptions();
+    const neurolinkModulePath = JSON.stringify(
+      `${process.cwd()}/dist/index.js`,
+    );
     const testScript = `
-import { NeuroLink } from '${process.cwd()}/dist/index.js';
+import { NeuroLink } from ${neurolinkModulePath};
 
 async function testSDKStreamPDF() {
   console.log('Step 1: Testing SDK stream with PDF file...');
@@ -2839,6 +2857,358 @@ async function testCLIStreamPDFAndCSV(): Promise<boolean> {
   }
 }
 
+/**
+ * Test SDK TTS Basic Generation
+ * Verifies that TTS can generate audio from text
+ */
+async function testSDKTTSGenerate(): Promise<boolean> {
+  logSection("Testing SDK TTS Generate");
+
+  if (!process.env.GOOGLE_TTS_API_KEY) {
+    logTest("SDK TTS Generate", "PASS", "Skipped - GOOGLE_TTS_API_KEY not set");
+    return true;
+  }
+
+  const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-sdk-tts-gen-");
+  const tempScriptPath = tempDir + "/test-sdk-tts-gen.mjs";
+
+  try {
+    const ttsModulePath = JSON.stringify(
+      `${process.cwd()}/dist/lib/tts/index.js`,
+    );
+    const testScript = `
+import { TTSService } from ${ttsModulePath};
+
+async function testSDKTTSGenerate() {
+  console.log('Step 1: Testing SDK TTS generation...');
+
+  const ttsService = new TTSService();
+
+  try {
+    const result = await ttsService.generateAudio({
+      text: 'Hello, this is a test of the TTS system.',
+      provider: 'gemini',
+      languageCode: 'en-US',
+      voiceName: 'en-US-Neural2-C',
+      audioEncoding: 'MP3',
+      play: false
+    });
+
+    if (!result.audioBuffer || result.audioBuffer.length === 0) {
+      console.log('SDK TTS Generate: FAIL - No audio buffer generated');
+      process.exit(1);
+    }
+
+    if (result.audioSize < 1000) {
+      console.log('SDK TTS Generate: FAIL - Audio buffer too small:', result.audioSize);
+      process.exit(1);
+    }
+
+    if (result.encoding !== 'MP3') {
+      console.log('SDK TTS Generate: FAIL - Wrong encoding:', result.encoding);
+      process.exit(1);
+    }
+
+    console.log('SDK TTS Generate: PASS - Generated', result.audioSize, 'bytes in', result.generationTime, 'ms');
+    process.exit(0);
+
+  } catch (error) {
+    console.error('SDK TTS Generate: FAIL -', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+testSDKTTSGenerate();
+`;
+
+    fs.writeFileSync(tempScriptPath, testScript);
+
+    const result = await runCommand("node", [tempScriptPath]);
+
+    if (result.success && result.stdout.includes("PASS")) {
+      logTest(
+        "SDK TTS Generate",
+        "PASS",
+        "Audio generated successfully with SDK",
+      );
+      return true;
+    } else {
+      logTest("SDK TTS Generate", "FAIL", result.stderr || result.stdout);
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("SDK TTS Generate", "FAIL", errorMessage);
+    return false;
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Test SDK TTS Voice Listing
+ * Verifies that TTS can fetch available voices
+ */
+async function testSDKTTSVoices(): Promise<boolean> {
+  logSection("Testing SDK TTS Voices");
+
+  if (!process.env.GOOGLE_TTS_API_KEY) {
+    logTest("SDK TTS Voices", "PASS", "Skipped - GOOGLE_TTS_API_KEY not set");
+    return true;
+  }
+
+  const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-sdk-tts-voices-");
+  const tempScriptPath = tempDir + "/test-sdk-tts-voices.mjs";
+
+  try {
+    const ttsModulePath = JSON.stringify(
+      `${process.cwd()}/dist/lib/tts/index.js`,
+    );
+    const testScript = `
+import { TTSService } from ${ttsModulePath};
+
+async function testSDKTTSVoices() {
+  console.log('Step 1: Testing SDK TTS voice listing...');
+
+  const ttsService = new TTSService();
+
+  try {
+    const voices = await ttsService.getAvailableVoices('en-US');
+
+    if (!voices || voices.length === 0) {
+      console.log('SDK TTS Voices: FAIL - No voices returned');
+      process.exit(1);
+    }
+
+    const hasNeural2 = voices.some(v => v.name.includes('Neural2'));
+    const hasWavenet = voices.some(v => v.name.includes('Wavenet'));
+
+    if (!hasNeural2 && !hasWavenet) {
+      console.log('SDK TTS Voices: FAIL - No Neural2 or Wavenet voices found');
+      process.exit(1);
+    }
+
+    console.log('SDK TTS Voices: PASS - Found', voices.length, 'voices');
+    process.exit(0);
+
+  } catch (error) {
+    console.error('SDK TTS Voices: FAIL -', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+testSDKTTSVoices();
+`;
+
+    fs.writeFileSync(tempScriptPath, testScript);
+
+    const result = await runCommand("node", [tempScriptPath]);
+
+    if (result.success && result.stdout.includes("PASS")) {
+      logTest("SDK TTS Voices", "PASS", "Voice listing successful");
+      return true;
+    } else {
+      logTest("SDK TTS Voices", "FAIL", result.stderr || result.stdout);
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("SDK TTS Voices", "FAIL", errorMessage);
+    return false;
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Test SDK TTS Multi-Format Generation
+ * Verifies TTS can generate different audio formats
+ */
+async function testSDKTTSFormats(): Promise<boolean> {
+  logSection("Testing SDK TTS Multiple Formats");
+
+  if (!process.env.GOOGLE_TTS_API_KEY) {
+    logTest("SDK TTS Formats", "PASS", "Skipped - GOOGLE_TTS_API_KEY not set");
+    return true;
+  }
+
+  const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-sdk-tts-formats-");
+  const tempScriptPath = tempDir + "/test-sdk-tts-formats.mjs";
+
+  try {
+    const ttsModulePath = JSON.stringify(
+      `${process.cwd()}/dist/lib/tts/index.js`,
+    );
+    const testScript = `
+import { TTSService } from ${ttsModulePath};
+
+async function testSDKTTSFormats() {
+  console.log('Step 1: Testing SDK TTS multiple formats...');
+
+  const ttsService = new TTSService();
+  const formats = ['MP3', 'WAV', 'OGG'];
+
+  try {
+    for (const format of formats) {
+      const result = await ttsService.generateAudio({
+        text: 'Testing format ' + format,
+        provider: 'gemini',
+        languageCode: 'en-US',
+        voiceName: 'en-US-Neural2-C',
+        audioEncoding: format,
+        play: false
+      });
+
+      if (!result.audioBuffer || result.audioBuffer.length === 0) {
+        console.log('SDK TTS Formats: FAIL - No audio for format', format);
+        process.exit(1);
+      }
+
+      if (result.encoding !== format) {
+        console.log('SDK TTS Formats: FAIL - Wrong encoding for', format, 'got', result.encoding);
+        process.exit(1);
+      }
+
+      console.log('  ✓', format, 'generated', result.audioSize, 'bytes');
+    }
+
+    console.log('SDK TTS Formats: PASS - All formats generated successfully');
+    process.exit(0);
+
+  } catch (error) {
+    console.error('SDK TTS Formats: FAIL -', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+testSDKTTSFormats();
+`;
+
+    fs.writeFileSync(tempScriptPath, testScript);
+
+    const result = await runCommand("node", [tempScriptPath]);
+
+    if (result.success && result.stdout.includes("PASS")) {
+      logTest(
+        "SDK TTS Formats",
+        "PASS",
+        "All audio formats generated successfully",
+      );
+      return true;
+    } else {
+      logTest("SDK TTS Formats", "FAIL", result.stderr || result.stdout);
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("SDK TTS Formats", "FAIL", errorMessage);
+    return false;
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
+ * Test SDK TTS Voice Customization
+ * Verifies TTS can customize voice parameters (rate, pitch)
+ */
+async function testSDKTTSCustomization(): Promise<boolean> {
+  logSection("Testing SDK TTS Voice Customization");
+
+  if (!process.env.GOOGLE_TTS_API_KEY) {
+    logTest(
+      "SDK TTS Customization",
+      "PASS",
+      "Skipped - GOOGLE_TTS_API_KEY not set",
+    );
+    return true;
+  }
+
+  const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-sdk-tts-custom-");
+  const tempScriptPath = tempDir + "/test-sdk-tts-custom.mjs";
+
+  try {
+    const ttsModulePath = JSON.stringify(
+      `${process.cwd()}/dist/lib/tts/index.js`,
+    );
+    const testScript = `
+import { TTSService } from ${ttsModulePath};
+
+async function testSDKTTSCustomization() {
+  console.log('Step 1: Testing SDK TTS voice customization...');
+
+  const ttsService = new TTSService();
+
+  try {
+    // Test with custom speaking rate and pitch
+    const result = await ttsService.generateAudio({
+      text: 'Testing customization with different rate and pitch',
+      provider: 'gemini',
+      languageCode: 'en-US',
+      voiceName: 'en-US-Neural2-C',
+      audioEncoding: 'MP3',
+      speakingRate: 0.8,
+      pitch: 5.0,
+      play: false
+    });
+
+    if (!result.audioBuffer || result.audioBuffer.length === 0) {
+      console.log('SDK TTS Customization: FAIL - No audio buffer generated');
+      process.exit(1);
+    }
+
+    console.log('SDK TTS Customization: PASS - Customized audio generated:', result.audioSize, 'bytes');
+    process.exit(0);
+
+  } catch (error) {
+    console.error('SDK TTS Customization: FAIL -', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+testSDKTTSCustomization();
+`;
+
+    fs.writeFileSync(tempScriptPath, testScript);
+
+    const result = await runCommand("node", [tempScriptPath]);
+
+    if (result.success && result.stdout.includes("PASS")) {
+      logTest(
+        "SDK TTS Customization",
+        "PASS",
+        "Voice customization successful",
+      );
+      return true;
+    } else {
+      logTest("SDK TTS Customization", "FAIL", result.stderr || result.stdout);
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("SDK TTS Customization", "FAIL", errorMessage);
+    return false;
+  } finally {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
 interface TestFunction {
   name: string;
   fn: () => Promise<boolean>;
@@ -2939,6 +3309,10 @@ async function runAllTests(): Promise<void> {
     },
     { name: "SDK Generate PDF", fn: testSDKGeneratePDF },
     { name: "SDK Stream PDF", fn: testSDKStreamPDF },
+    { name: "SDK TTS Generate", fn: testSDKTTSGenerate },
+    { name: "SDK TTS Voices", fn: testSDKTTSVoices },
+    { name: "SDK TTS Formats", fn: testSDKTTSFormats },
+    { name: "SDK TTS Customization", fn: testSDKTTSCustomization },
     { name: "CLI Generate", fn: testCLIGenerate },
     { name: "CLI Stream", fn: testCLIStream },
     { name: "SDK Generate", fn: testSDKGenerate },

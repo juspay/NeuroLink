@@ -27,6 +27,7 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 - **CSV File Support** – Attach CSV files to prompts for AI-powered data analysis with auto-detection. → [CSV Guide](docs/features/multimodal-chat.md#csv-file-support)
 - **PDF File Support** – Process PDF documents with native visual analysis for Vertex AI, Anthropic, Bedrock, AI Studio. → [PDF Guide](docs/features/pdf-support.md)
+- **Text-to-Speech (TTS)** – Generate natural speech with Google Cloud TTS. 50+ voices, 10+ languages, cross-platform playback. → [TTS Guide](docs/features/tts-support.md)
 - **LiteLLM Integration** – Access 100+ AI models from all major providers through unified interface. → [Setup Guide](docs/LITELLM-INTEGRATION.md)
 - **SageMaker Integration** – Deploy and use custom trained models on AWS infrastructure. → [Setup Guide](docs/SAGEMAKER-INTEGRATION.md)
 - **Human-in-the-loop workflows** – Pause generation for user approval/input before tool execution. → [HITL Guide](docs/features/hitl.md)

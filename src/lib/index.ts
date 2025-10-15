@@ -203,6 +203,57 @@ export type {
 } from "./mcp/index.js";
 
 // ============================================================================
+// TTS SDK - Text-to-Speech
+// ============================================================================
+
+/**
+ * TTS (Text-to-Speech) SDK
+ *
+ * Comprehensive text-to-speech functionality via Google Cloud Text-to-Speech
+ * with cross-platform audio playback support.
+ *
+ * @example
+ * ```typescript
+ * import { TTSService, createTTSService } from '@juspay/neurolink';
+ *
+ * // Create TTS service
+ * const tts = createTTSService(process.env.GOOGLE_TTS_API_KEY);
+ *
+ * // Generate and optionally play audio
+ * const response = await tts.generateAudio({
+ *   text: "Hello, this is text-to-speech!",
+ *   provider: "gemini",
+ *   languageCode: "en-US",
+ *   voiceName: "en-US-Wavenet-D",
+ *   audioEncoding: "MP3",
+ *   speakingRate: 1.0,
+ *   pitch: 0.0,
+ *   play: true // On Windows, encoding auto-converts to WAV for playback
+ * });
+ *
+ * // Access the audio buffer and metadata
+ * console.log(`Audio size: ${response.audioSize} bytes`);
+ * console.log(`Generation time: ${response.generationTime}ms`);
+ * // Audio buffer available as: response.audioBuffer
+ * ```
+ */
+export {
+  TTSService,
+  GeminiTTSProvider,
+  CrossPlatformAudioPlayer,
+  createTTSService,
+  TTSError,
+} from "./tts/index.js";
+
+export type {
+  TTSInput,
+  TTSResponse,
+  TTSConfig,
+  VoiceOption,
+  AudioPlayer,
+} from "./tts/index.js";
+
+// ============================================================================
 // REAL-TIME SERVICES & TELEMETRY - Enterprise Platform Features
 // ============================================================================
 

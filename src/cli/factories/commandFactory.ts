@@ -29,6 +29,7 @@ import { ModelsCommandFactory } from "../commands/models.js";
 import { MCPCommandFactory } from "../commands/mcp.js";
 import { OllamaCommandFactory } from "./ollamaCommandFactory.js";
 import { SageMakerCommandFactory } from "./sagemakerCommandFactory.js";
+import { TTSCommandFactory } from "../commands/tts.js";
 import ora from "ora";
 import chalk from "chalk";
 import { logger } from "../../lib/utils/logger.js";
@@ -947,6 +948,13 @@ export class CLICommandFactory {
    */
   static createSageMakerCommands(): CommandModule {
     return SageMakerCommandFactory.createSageMakerCommands();
+  }
+
+  /**
+   * Create TTS commands
+   */
+  static createTTSCommands(): CommandModule {
+    return TTSCommandFactory.createTTSCommands();
   }
 
   /**
@@ -2512,7 +2520,7 @@ export class CLICommandFactory {
         '    prev="${COMP_WORDS[COMP_CWORD - 1]}"\n\n' +
         "    # Main commands\n" +
         "    if [[ ${COMP_CWORD} -eq 1 ]]; then\n" +
-        '        opts="generate gen stream batch provider status models mcp discover memory config get-best-provider completion"\n' +
+        '        opts="generate gen stream batch provider status models mcp discover memory config tts get-best-provider completion"\n' +
         '        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )\n' +
         "        return 0\n" +
         "    fi\n\n" +
@@ -2562,6 +2570,12 @@ export class CLICommandFactory {
         "                return 0\n" +
         "            fi\n" +
         "            ;;\n" +
+        "        tts)\n" +
+        "            if [[ ${COMP_CWORD} -eq 2 ]]; then\n" +
+        '                COMPREPLY=( $(compgen -W "generate voices" -- ${cur}) )\n' +
+        "                return 0\n" +
+        "            fi\n" +
+        "            ;;\n" +
         "        models)\n" +
         "            if [[ ${COMP_CWORD} -eq 2 ]]; then\n" +
         '                COMPREPLY=( $(compgen -W "list test" -- ${cur}) )\n' +
@@ -2608,7 +2622,7 @@ export class CLICommandFactory {
         "    complete -F _neurolink_completion neurolink\n" +
         "fi\n\n" +
         'echo "NeuroLink CLI completion script loaded successfully!"\n' +
-        'echo "Available commands: generate, stream, batch, provider, status, models, mcp, discover, config, get-best-provider, completion"';
+        'echo "Available commands: generate, stream, batch, provider, status, models, mcp, discover, config, tts, get-best-provider, completion"';
 
       // Handle output options
       if (argv.output) {
