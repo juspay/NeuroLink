@@ -29,6 +29,7 @@ import { ModelsCommandFactory } from "../commands/models.js";
 import { MCPCommandFactory } from "../commands/mcp.js";
 import { OllamaCommandFactory } from "./ollamaCommandFactory.js";
 import { SageMakerCommandFactory } from "./sagemakerCommandFactory.js";
+import { TTSCommandFactory } from "../commands/tts.js";
 import ora from "ora";
 import chalk from "chalk";
 import { logger } from "../../lib/utils/logger.js";
@@ -947,6 +948,13 @@ export class CLICommandFactory {
    */
   static createSageMakerCommands(): CommandModule {
     return SageMakerCommandFactory.createSageMakerCommands();
+  }
+
+  /**
+   * Create TTS commands
+   */
+  static createTTSCommands(): CommandModule {
+    return TTSCommandFactory.createTTSCommands();
   }
 
   /**
