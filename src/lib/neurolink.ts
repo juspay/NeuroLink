@@ -146,6 +146,8 @@ export interface NeurolinkConstructorConfig {
   toolRegistry?: MCPToolRegistry;
   observability?: ObservabilityConfig;
 }
+// Static import for mem0 initialization (prevents ESM bundling issues)
+import { initializeMem0, type Mem0Memory } from "./memory/mem0Initializer.js";
 
 // Provider and MCP diagnostic types
 export interface ProviderStatus {
@@ -261,9 +263,7 @@ export class NeuroLink {
   private hitlManager?: HITLManager;
 
   // Mem0 memory instance and config for conversation context
-  private mem0Instance?:
-    | import("./memory/mem0Initializer.js").Mem0Memory
-    | null;
+  private mem0Instance?: Mem0Memory | null;
   private mem0Config?: MemoryConfig;
 
   /**
@@ -282,9 +282,7 @@ export class NeuroLink {
   /**
    * Async initialization called during generate/stream
    */
-  private async ensureMem0Ready(): Promise<
-    import("./memory/mem0Initializer.js").Mem0Memory | null
-  > {
+  private async ensureMem0Ready(): Promise<Mem0Memory | null> {
     if (this.mem0Instance !== undefined) {
       return this.mem0Instance;
     }
@@ -293,9 +291,6 @@ export class NeuroLink {
       this.mem0Instance = null;
       return null;
     }
-
-    // Import and initialize from separate file
-    const { initializeMem0 } = await import("./memory/mem0Initializer.js");
 
     if (!this.mem0Config) {
       this.mem0Instance = null;

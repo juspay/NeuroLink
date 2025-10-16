@@ -174,7 +174,7 @@
     "inquirer": "^9.3.7",
     "json-schema-to-zod": "^2.6.1",
     "mathjs": "^14.7.0",
-    "mem0ai": "^2.1.38",
+    "mem0ai": "2.1.38",
     "nanoid": "^5.1.5",
     "ollama-ai-provider": "^1.2.0",
     "ora": "^7.0.1",
