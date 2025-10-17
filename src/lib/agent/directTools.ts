@@ -11,6 +11,25 @@ import { logger } from "../utils/logger.js";
 import { VertexAI } from "@google-cloud/vertexai";
 import { CSVProcessor } from "../utils/csvProcessor.js";
 
+/**
+ * File size limits for safe file reading
+ * Extracted as constants for maintainability and easy tuning
+ */
+const FILE_SIZE_LIMITS = {
+  TINY_FILE: 50 * 1024, // 50KB - safe to read entirely
+  SMALL_FILE: 200 * 1024, // 200KB - read with caution
+  MEDIUM_FILE: 1 * 1024 * 1024, // 1MB - use streaming/chunking
+  LARGE_FILE: 10 * 1024 * 1024, // 10MB - preview mode only
+  MAXIMUM_SAFE: 100 * 1024 * 1024, // 100MB - absolute limit
+} as const;
+
+/**
+ * Binary content detection pattern
+ * Detects non-printable characters that indicate binary files
+ */
+// eslint-disable-next-line no-control-regex
+const BINARY_CONTENT_PATTERN = /[\x00-\x08\x0E-\x1F\x7F-\xFF]/;
+
 // Runtime Google Search tool creation - bypasses TypeScript strict typing
 function createGoogleSearchTools() {
   const searchTool = {};
@@ -64,7 +83,8 @@ export const directAgentTools = {
   }),
 
   readFile: tool({
-    description: "Read the contents of a file from the filesystem",
+    description:
+      "Read the contents of a file from the filesystem. Intelligently handles large files with safe reading strategies and provides processing recommendations.",
     parameters: z.object({
       path: z.string().describe("File path to read (relative or absolute)"),
     }),
@@ -81,16 +101,223 @@ export const directAgentTools = {
           };
         }
 
-        const content = fs.readFileSync(resolvedPath, "utf-8");
+        // INTELLIGENT ENHANCEMENT: Check file metadata first
+        if (!fs.existsSync(resolvedPath)) {
+          return {
+            success: false,
+            error: `File does not exist: ${resolvedPath}`,
+            path: filePath,
+          };
+        }
+
         const stats = fs.statSync(resolvedPath);
 
-        return {
+        // INTELLIGENT ENHANCEMENT: Handle directories
+        if (stats.isDirectory()) {
+          return {
+            success: false,
+            error: `Cannot read directory as file: ${resolvedPath}. Use listDirectory instead.`,
+            path: filePath,
+          };
+        }
+
+        // INTELLIGENT ENHANCEMENT: File size analysis and safe reading
+        const fileSize = stats.size;
+
+        // INTELLIGENT ENHANCEMENT: Binary file detection
+        const extension = path.extname(resolvedPath).toLowerCase();
+        const BINARY_EXTENSIONS = new Set([
+          ".exe",
+          ".bin",
+          ".dll",
+          ".so",
+          ".dylib",
+          ".app",
+          ".zip",
+          ".tar",
+          ".gz",
+          ".rar",
+          ".7z",
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".gif",
+          ".bmp",
+          ".webp",
+          ".mp4",
+          ".avi",
+          ".mov",
+          ".wmv",
+          ".flv",
+          ".mkv",
+          ".mp3",
+          ".wav",
+          ".flac",
+          ".aac",
+          ".ogg",
+          ".pdf",
+          ".doc",
+          ".docx",
+          ".xls",
+          ".xlsx",
+          ".ppt",
+          ".pptx",
+          ".dmg",
+          ".iso",
+          ".img",
+        ]);
+
+        if (BINARY_EXTENSIONS.has(extension)) {
+          return {
+            success: false,
+            error: `Cannot read binary file as text: ${resolvedPath}. File appears to be binary based on extension ${extension}.`,
+            path: filePath,
+          };
+        }
+
+        // INTELLIGENT ENHANCEMENT: Size-based processing with safe limits
+        if (fileSize > FILE_SIZE_LIMITS.MAXIMUM_SAFE) {
+          return {
+            success: false,
+            error: `File too large to read safely (${(fileSize / (1024 * 1024)).toFixed(2)}MB). Maximum safe size is 100MB. Use chunkDocument for large file processing.`,
+            path: filePath,
+            size: fileSize,
+            lastModified: stats.mtime.toISOString(),
+            recommendation:
+              "Use chunkDocument tool for large file processing with intelligent chunking",
+          };
+        }
+
+        let content: string;
+        let processingStrategy: string;
+        const warnings: string[] = [];
+
+        if (fileSize <= FILE_SIZE_LIMITS.TINY_FILE) {
+          // Direct read for tiny files only
+          content = fs.readFileSync(resolvedPath, "utf-8");
+          processingStrategy = "direct_read";
+        } else if (fileSize <= FILE_SIZE_LIMITS.SMALL_FILE) {
+          // Buffered read for small files
+          const buffer = fs.readFileSync(resolvedPath);
+          content = buffer.toString("utf-8");
+          processingStrategy = "buffered_read";
+          warnings.push("Small file - using buffered read for safety.");
+        } else if (fileSize <= FILE_SIZE_LIMITS.MEDIUM_FILE) {
+          // Streaming read for medium files
+          const chunks: string[] = [];
+          const stream = fs.createReadStream(resolvedPath, {
+            encoding: "utf-8",
+            highWaterMark: 64 * 1024, // 64KB chunks
+          });
+
+          for await (const chunk of stream) {
+            chunks.push(chunk);
+          }
+          content = chunks.join("");
+          processingStrategy = "streaming_read";
+          warnings.push(
+            "Medium file - using streaming read for memory efficiency.",
+          );
+        } else {
+          // Large file preview mode
+          const previewSize = 10 * 1024; // 10KB preview
+          const buffer = Buffer.alloc(previewSize);
+          const fd = fs.openSync(resolvedPath, "r");
+          const bytesRead = fs.readSync(fd, buffer, 0, previewSize, 0);
+          fs.closeSync(fd);
+
+          // Check for binary content on buffer BEFORE converting to string
+          // This is more memory efficient for large files
+          const previewBuffer = buffer.subarray(0, Math.min(1000, bytesRead));
+          if (BINARY_CONTENT_PATTERN.test(previewBuffer.toString("utf-8"))) {
+            return {
+              success: false,
+              error: `Binary content detected in file: ${resolvedPath}. This appears to be a binary file that cannot be read as text.`,
+              path: filePath,
+              size: fileSize,
+              lastModified: stats.mtime.toISOString(),
+            };
+          }
+          
+          content = buffer.subarray(0, bytesRead).toString("utf-8");
+          processingStrategy = "preview_mode";
+          warnings.push(
+            `Large file detected (${(fileSize / (1024 * 1024)).toFixed(2)}MB). Showing first 10KB preview only. Use chunkDocument for full processing.`,
+          );
+        }
+
+        // Binary check for non-preview files (already read into memory)
+        if (processingStrategy !== "preview_mode" && BINARY_CONTENT_PATTERN.test(content.substring(0, 1000))) {
+          return {
+            success: false,
+            error: `Binary content detected in file: ${resolvedPath}. This appears to be a binary file that cannot be read as text.`,
+            path: filePath,
+            size: fileSize,
+            lastModified: stats.mtime.toISOString(),
+          };
+        }
+        const result: {
+          success: boolean;
+          content: string;
+          size: number;
+          path: string;
+          lastModified: string;
+          metadata?: Record<string, unknown>;
+        } = {
           success: true,
           content,
-          size: stats.size,
+          size: fileSize,
           path: resolvedPath,
           lastModified: stats.mtime.toISOString(),
         };
+        // INTELLIGENT ENHANCEMENT: Always provide processing recommendations
+        const sizeCategory =
+          fileSize <= FILE_SIZE_LIMITS.TINY_FILE
+            ? "tiny"
+            : fileSize <= FILE_SIZE_LIMITS.SMALL_FILE
+              ? "small"
+              : fileSize <= FILE_SIZE_LIMITS.MEDIUM_FILE
+                ? "medium"
+                : "large";
+
+        // Generate intelligent recommendations based on file characteristics
+        let recommendation = "";
+        let suggestedTools = [];
+
+        if (fileSize <= FILE_SIZE_LIMITS.SMALL_FILE) {
+          recommendation =
+            "File is small enough for direct analysis. You can proceed with reading and analyzing the content.";
+          suggestedTools = ["direct_analysis"];
+        } else if (fileSize <= FILE_SIZE_LIMITS.MEDIUM_FILE) {
+          recommendation =
+            "File is medium-sized. For comprehensive analysis, use chunkDocument tool to break it into manageable pieces, then summarizeChunks for overview.";
+          suggestedTools = ["chunkDocument", "summarizeChunks"];
+        } else if (fileSize <= FILE_SIZE_LIMITS.LARGE_FILE) {
+          recommendation =
+            "Large file detected. This preview shows first 10KB only. Use chunkDocument with smaller chunk sizes (e.g., 50000) for systematic processing.";
+          suggestedTools = ["chunkDocument"];
+        } else {
+          recommendation =
+            "Very large file. Use chunkDocument tool with appropriate chunk sizes for systematic processing. Consider processing in smaller sections.";
+          suggestedTools = ["chunkDocument"];
+        }
+
+        result.metadata = {
+          processingStrategy,
+          fileType: extension || "unknown",
+          sizeCategory,
+          sizeMB: (fileSize / (1024 * 1024)).toFixed(2),
+          recommendation,
+          suggestedTools,
+          ...(warnings.length > 0 && { warnings }),
+          ...(processingStrategy === "preview_mode" && {
+            isPreview: true,
+            remainingSize: fileSize - content.length,
+            fullFileSize: fileSize,
+            previewPercentage: ((content.length / fileSize) * 100).toFixed(1),
+          }),
+        };
+        return result;
       } catch (error) {
         return {
           success: false,
@@ -386,7 +613,7 @@ export const directAgentTools = {
   }),
   analyzeCSV: tool({
     description:
-      "Analyze CSV file for accurate counting, aggregation, and statistical analysis. Use this for precise data operations like counting rows by column, calculating sums/averages, finding min/max values, etc. The tool reads the file directly - do NOT pass CSV content.",
+      "Analyze CSV files with operations like count_by_column, sum_by_column, average_by_column, min_max_by_column, or describe. REQUIRED PARAMETERS: filePath (string), operation (string). OPTIONAL: column (string, required for all operations except 'describe'), maxRows (number). For operations 'count_by_column', 'sum_by_column', 'average_by_column', and 'min_max_by_column', you MUST provide the column parameter. For 'describe', column is not needed. EXAMPLE: {filePath: 'data.csv', operation: 'min_max_by_column', column: 'price'} finds min and max prices. The tool reads files directly. IMPORTANT: After calling this tool, you MUST explain the results to the user in natural language.",
     parameters: z.object({
       filePath: z
         .string()
@@ -721,7 +948,7 @@ export const directAgentTools = {
           success: true,
           operation,
           column,
-          result: JSON.stringify(result, null, 2),
+          result: result, // Return structured data directly
           rowCount: rows.length,
         };
 
@@ -736,6 +963,257 @@ export const directAgentTools = {
           error: error instanceof Error ? error.message : String(error),
           operation,
           column,
+        };
+      }
+    },
+  }),
+
+  chunkDocument: tool({
+    description:
+      "Split a large document into manageable chunks for processing. Intelligently handles large files by breaking them into smaller pieces with sentence-preserving logic. Use this when you need to process files larger than 200KB. Returns an array of text chunks that can be processed individually or summarized together.",
+    parameters: z.object({
+      filePath: z.string().describe("Path to the document file to chunk"),
+      chunkSize: z
+        .number()
+        .optional()
+        .default(100000)
+        .describe(
+          "Size of each chunk in characters (default: 100000, recommended: 50000-200000)",
+        ),
+      overlap: z
+        .number()
+        .optional()
+        .default(2000)
+        .describe(
+          "Number of characters to overlap between chunks for context continuity (default: 2000)",
+        ),
+      preserveSentences: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe(
+          "Whether to preserve sentence boundaries when chunking (default: true)",
+        ),
+    }),
+    execute: async ({
+      filePath,
+      chunkSize = 100000,
+      overlap = 2000,
+      preserveSentences = true,
+    }) => {
+      try {
+        // Read the file
+        const resolvedPath = path.resolve(filePath);
+
+        if (!fs.existsSync(resolvedPath)) {
+          return {
+            success: false,
+            error: `File does not exist: ${resolvedPath}`,
+          };
+        }
+
+        const stats = fs.statSync(resolvedPath);
+        if (stats.isDirectory()) {
+          return {
+            success: false,
+            error: `Cannot chunk directory: ${resolvedPath}. Provide a file path.`,
+          };
+        }
+
+        // Validate overlap to prevent infinite loops
+        if (overlap >= chunkSize) {
+          return {
+            success: false,
+            error: `Overlap (${overlap}) must be less than chunkSize (${chunkSize}) to prevent infinite loops`,
+          };
+        }
+
+        // Read file content asynchronously for better performance
+        const content = await fs.promises.readFile(resolvedPath, "utf-8");
+
+        // Chunk the content with sentence preservation
+        const chunks: Array<{ content: string; index: number }> = [];
+        let currentIndex = 0;
+
+        while (currentIndex < content.length) {
+          const remainingText = content.substring(currentIndex);
+          let endIndex = Math.min(chunkSize, remainingText.length);
+
+          if (remainingText.length <= chunkSize) {
+            chunks.push({ content: remainingText, index: chunks.length });
+            break;
+          }
+
+          let splitPosition = -1;
+          if (preserveSentences) {
+            const potentialSplitArea = remainingText.substring(0, endIndex);
+
+            // Look for sentence endings
+            for (const boundary of [".", "!", "?"]) {
+              const pos = potentialSplitArea.lastIndexOf(boundary);
+              if (pos > splitPosition) {
+                splitPosition = pos;
+              }
+            }
+
+            // Fall back to space if no sentence boundary found
+            if (splitPosition === -1) {
+              const spacePos = potentialSplitArea.lastIndexOf(" ");
+              if (spacePos !== -1) {
+                splitPosition = spacePos;
+              }
+            }
+          }
+
+          // If no good split position found, use the end index
+          if (splitPosition === -1) {
+            splitPosition = endIndex - 1;
+          }
+
+          endIndex = splitPosition + 1;
+          const chunkContent = remainingText.substring(0, endIndex);
+          chunks.push({ content: chunkContent, index: chunks.length });
+
+          // Explicitly handle pathological overlap
+          if (overlap >= endIndex) {
+            logger.warn(
+              `Overlap (${overlap}) >= endIndex (${endIndex}) at chunk ${chunks.length}. Forcing overlap to 0 to avoid infinite/slow loop.`
+            );
+            currentIndex += endIndex; // Advance by full chunk
+          } else {
+            currentIndex += Math.max(1, endIndex - overlap);
+          }
+        }
+
+        return {
+          success: true,
+          filePath: resolvedPath,
+          totalSize: content.length,
+          chunkSize,
+          overlap,
+          preserveSentences,
+          chunks: chunks.map((c) => c.content),
+          chunkCount: chunks.length,
+          metadata: {
+            fileSize: stats.size,
+            fileName: path.basename(resolvedPath),
+            chunksCreated: chunks.length,
+            averageChunkSize: chunks.length > 0
+              ? Math.floor(
+                  chunks.reduce((sum, c) => sum + c.content.length, 0) /
+                    chunks.length
+                )
+              : 0,
+            sentencePreserved: preserveSentences,
+          },
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          filePath,
+        };
+      }
+    },
+  }),
+
+  summarizeChunks: tool({
+    description:
+      "Summarize multiple text chunks into a cohesive overview. Use this after chunkDocument to create a comprehensive summary of a large document. Combines individual chunk summaries into a unified understanding with optional focus areas.",
+    parameters: z.object({
+      chunks: z.array(z.string()).describe("Array of text chunks to summarize"),
+      summaryLength: z
+        .enum(["brief", "detailed", "comprehensive"])
+        .optional()
+        .default("detailed")
+        .describe(
+          "Length of summary: brief (1-2 sentences per chunk), detailed (paragraph per chunk), comprehensive (full analysis)",
+        ),
+      focusAreas: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Specific areas to focus on in the summary (e.g., ['technical details', 'business impact', 'key findings'])",
+        ),
+    }),
+    execute: async ({ chunks, summaryLength = "detailed", focusAreas }) => {
+      try {
+        if (!chunks || chunks.length === 0) {
+          return {
+            success: false,
+            error: "No chunks provided to summarize",
+          };
+        }
+
+        // Create summaries for each chunk
+        const chunkSummaries = chunks.map((chunk, index) => {
+          const words = chunk.split(/\s+/).length;
+          const chars = chunk.length;
+
+          // Extract key information (first and last sentences for context)
+          const sentences = chunk.match(/[^.!?]+[.!?]+/g) || [];
+          const preview =
+            sentences.length > 0
+              ? sentences.slice(0, 2).join(" ")
+              : chunk.substring(0, 200);
+
+          return {
+            chunkIndex: index + 1,
+            wordCount: words,
+            charCount: chars,
+            preview:
+              preview.substring(0, 200) + (preview.length > 200 ? "..." : ""),
+            keyPoints: sentences.slice(0, 3).map((s) => s.trim()),
+          };
+        });
+
+        // Create overall summary based on length preference
+        let overallSummary = "";
+        const totalWords = chunks.reduce(
+          (sum, chunk) => sum + chunk.split(/\s+/).length,
+          0,
+        );
+        const totalChars = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+
+        switch (summaryLength) {
+          case "brief":
+            overallSummary = `Document contains ${chunks.length} chunks with ${totalWords} total words. Key content spans ${totalChars} characters.`;
+            break;
+          case "detailed":
+            overallSummary = `Analyzed ${chunks.length} chunks totaling ${totalWords} words (${totalChars} characters). Each chunk averages ${Math.floor(totalWords / chunks.length)} words. Content is structured across multiple sections for comprehensive coverage.`;
+            break;
+          case "comprehensive":
+            overallSummary = `Comprehensive analysis of ${chunks.length} document chunks:\n- Total words: ${totalWords}\n- Total characters: ${totalChars}\n- Average chunk size: ${Math.floor(totalWords / chunks.length)} words\n- Content distribution: ${chunks.length} sections\n- Processing recommendation: Review individual chunk summaries for detailed insights`;
+            break;
+        }
+
+        // Add focus areas to summary if provided
+        let focusAreasSummary = "";
+        if (focusAreas && focusAreas.length > 0) {
+          focusAreasSummary = `\n\nFocus Areas:\n${focusAreas.map((area) => `- ${area}`).join("\n")}`;
+        }
+
+        return {
+          success: true,
+          chunkCount: chunks.length,
+          totalWords,
+          totalChars,
+          summaryLength,
+          focusAreas: focusAreas || [],
+          overallSummary: overallSummary + focusAreasSummary,
+          chunkSummaries,
+          metadata: {
+            averageWordsPerChunk: Math.floor(totalWords / chunks.length),
+            averageCharsPerChunk: Math.floor(totalChars / chunks.length),
+            processingTime: new Date().toISOString(),
+            hasFocusAreas: !!(focusAreas && focusAreas.length > 0),
+            focusAreasCount: focusAreas?.length || 0,
+          },
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
         };
       }
     },

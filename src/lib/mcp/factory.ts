@@ -204,4 +204,8 @@ export async function validateServerTools(server: NeuroLinkMCPServer): Promise<{
   };
 }
 
-// Types are already exported above via export interface declarations
+// Export required types from mcpTypes
+export type {
+  NeuroLinkExecutionContext,
+  NeuroLinkMCPServer,
+} from "../types/mcpTypes.js";

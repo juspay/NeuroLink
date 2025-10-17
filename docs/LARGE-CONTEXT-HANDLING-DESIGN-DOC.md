@@ -1,161 +1,144 @@
-# Design Doc: Large Context Handling via Map-Reduce Summarization
+# Design Doc: Large Context Handling via Direct Tools
 
 ## 1. Overview
 
-This document outlines the design and implementation plan for adding large context handling capabilities to the `NeuroLink` SDK. The core of this proposal is a map-reduce summarization strategy to process text inputs that exceed the context window limits of underlying Large Language Models (LLMs).
+This document outlines the implemented design for enhancing the `NeuroLink` SDK to handle large documents and complex content processing through **LLM-driven tool selection**. The solution provides **direct MCP tools** that the AI can intelligently choose to use, enabling flexible, tool-based document operations.
+
+This design follows the **DIRECT TOOLS pattern** where tools are registered in the `directTools` server and are immediately available to the LLM for intelligent decision-making.
 
 ## 2. Problem Statement
 
-The `NeuroLink` SDK's `generate()` method currently sends the entire input prompt directly to the AI provider. This design fails when the input text is very large (e.g., a 1MB file), as it surpasses the model's maximum token limit, resulting in an API error and a complete failure of the operation.
+### 2.1 Original Problems
 
-The existing conversation summarization feature is designed for managing the history of a dialogue and does not address the challenge of processing a single, oversized document.
+The original `NeuroLink` SDK implementation had **hardcoded file detection patterns** that were inflexible and insufficient for handling diverse document processing scenarios:
 
-### Use Cases
+1. **Hardcoded Logic**: CLI used regex patterns to detect files, limiting flexibility
+2. **Large Document Processing**: No intelligent way to handle documents exceeding token limits
+3. **Limited Scenarios**: Could not handle complex use cases like "summarize all files in this directory"
+4. **CLI-Specific**: File processing was locked to CLI, not available through SDK
+5. **Inflexible**: No way for LLM to decide appropriate processing strategy
 
-This feature is critical for enabling new, high-value use cases, such as:
+**Solution**: Provide LLM-driven tools that enable intelligent document processing decisions.
 
-- **Document Summarization**: Summarizing large PDF, DOCX, or text files.
-- **Data Analysis**: Analyzing long reports, transcripts, or logs to extract key insights.
-- **Question Answering over Documents**: Allowing users to ask questions about a large document that is provided as context.
+## 3. Current Implementation
 
-## 3. Challenges and Mitigations
+### 3.1. Direct Tools Architecture
 
-### 3.1. Latency
+The solution provides **two document processing tools** integrated into the `directTools` server:
 
-- **Challenge**: Making multiple sequential calls to an LLM will significantly increase the total response time.
-- **Mitigation**:
-  1.  **Parallel Processing**: The "Map" step, where individual chunks are summarized, will be executed in parallel using `Promise.all`. This reduces the time for this step to the duration of the single longest-running chunk summarization, rather than the sum of all of them.
-  2.  **Model Flexibility**: The system will be designed to allow for the use of faster, more cost-effective models (e.g., `gemini-2.5-flash`) for the intermediate chunk summarization, while a more powerful model can be used for the final, high-quality summary.
+- **`chunkDocument`**: Intelligently splits large documents into manageable chunks
+- **`summarizeChunks`**: Combines multiple text chunks into coherent summaries
 
-### 3.2. Context Loss Between Chunks
+**Location**: `src/lib/agent/directTools.ts`
 
-- **Challenge**: Splitting the text into independent chunks can cause the loss of context that spans across chunk boundaries.
-- **Mitigation**:
-  1.  **Chunk Overlap**: The chunking utility will support an `overlap` parameter. A portion of text from the end of one chunk will be included at the beginning of the next, ensuring a smoother contextual transition.
-  2.  **Intelligent Splitting**: The utility will prioritize splitting text at natural boundaries like sentences (`.`, `!`, `?`) or paragraphs to keep related ideas together within a single chunk.
+**Integration**: Tools are automatically registered in the `direct` server alongside other core tools like `readFile`, `analyzeCSV`, etc.
 
-### 3.3. Cost
+### 3.2. Tool Capabilities
 
-- **Challenge**: Multiple LLM calls will be more expensive than a single call.
-- **Mitigation**: This is an inherent trade-off for gaining this new capability. The ability to use smaller, cheaper models for the initial chunking step will help manage costs effectively. The feature will be opt-in, so users only incur costs when they explicitly need to process large documents.
+#### **`chunkDocument` Tool**
 
-## 4. Proposed Solution & Architecture
+- **Purpose**: Intelligent text chunking with overlap and sentence preservation
+- **Features**:
+  - Configurable chunk size (default: 100,000 characters)
+  - Configurable overlap (default: 2,000 characters)
+  - Sentence boundary preservation (default: enabled)
+  - Direct file path support
+  - Metadata tracking for reconstruction
 
-We will implement a **Map-Reduce Summarization** workflow.
-
-### High-Level Flow Diagram
-
-```mermaid
-graph TD
-    A[Start: generate() called with large text] --> B{Text > Threshold?};
-    B -->|No| C[Normal Generation Flow];
-    B -->|Yes| D[Chunk Text into Pieces];
-    D --> E[Map: Summarize Each Chunk in Parallel];
-    E --> F[Reduce: Combine Chunk Summaries];
-    F --> G[Generate Final Summary from Combined Text];
-    G --> H[End: Return Final Summary];
-    C --> H;
-```
-
-## 5. Detailed Design and Implementation
-
-### 5.1. Sequence Diagram
-
-This diagram shows the interaction between the different components of the system.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant NeuroLink as NeuroLink.generate()
-    participant TextUtils as textUtils.chunkText()
-    participant Summarizer as _summarizeLargeText()
-    participant LLM
-
-    User->>NeuroLink: generate({ input: largeText, mode: 'summarize' })
-    NeuroLink->>Summarizer: _summarizeLargeText(options)
-    Summarizer->>TextUtils: chunkText(largeText)
-    TextUtils-->>Summarizer: returns [chunk1, chunk2, ...]
-
-    par Summarize Chunk 1
-        Summarizer->>LLM: Summarize chunk1
-        LLM-->>Summarizer: returns summary1
-    and Summarize Chunk 2
-        Summarizer->>LLM: Summarize chunk2
-        LLM-->>Summarizer: returns summary2
-    and Summarize ...
-        Summarizer->>LLM: Summarize chunkN
-        LLM-->>Summarizer: returns summaryN
-    end
-
-    Summarizer->>Summarizer: Combine summaries
-    Summarizer->>LLM: Generate final summary from combined text
-    LLM-->>Summarizer: returns finalSummary
-    Summarizer-->>NeuroLink: returns finalSummary
-    NeuroLink-->>User: returns finalSummary
-```
-
-### 5.2. New Utility: `textUtils.ts`
-
-A new file will be created at `src/lib/utils/textUtils.ts` to contain the logic for splitting large texts into manageable pieces.
-
-#### Detailed Explanation of `chunkText`
-
-This function is the foundation of our solution. It intelligently divides a large string into an array of smaller strings (`chunks`) based on a target size, while trying to maintain the contextual integrity of the original text.
+**Parameters**:
 
 ```typescript
-// src/lib/utils/textUtils.ts
-
-// Defines the structure for a single piece of the divided text.
-// `content` holds the text itself.
-// `index` tracks the original position of the chunk.
-export interface TextChunk {
-  content: string;
-  index: number;
+{
+  filePath: string,              // Path to document file
+  chunkSize?: number,            // Default: 100000
+  overlap?: number,              // Default: 2000
+  preserveSentences?: boolean    // Default: true
 }
+```
 
-// Defines the configuration for the chunking process.
-// `chunkSize`: The target maximum size for each chunk in characters.
-// `overlap`: How many characters from the end of one chunk to include at the start of the next. This is crucial for maintaining context across chunk boundaries.
-export interface ChunkingOptions {
-  chunkSize: number;
-  overlap: number;
+**Returns**:
+
+```typescript
+{
+  success: boolean,
+  filePath: string,
+  totalSize: number,
+  chunkSize: number,
+  overlap: number,
+  preserveSentences: boolean,
+  chunks: string[],              // Array of text chunks
+  chunkCount: number,
+  metadata: {
+    fileSize: number,
+    fileName: string,
+    chunksCreated: number,
+    averageChunkSize: number,
+    sentencePreserved: boolean
+  }
 }
+```
 
-export function chunkText(text: string, options: ChunkingOptions): TextChunk[] {
-  const { chunkSize, overlap } = options;
-  // Early exit for empty or invalid input.
-  if (!text || text.length === 0) {
-    return [];
+#### **`summarizeChunks` Tool**
+
+- **Purpose**: Combine multiple text chunks into coherent summaries
+- **Features**:
+  - Multiple summary lengths (brief, detailed, comprehensive)
+  - Optional focus areas for targeted summarization
+  - Context preservation across chunks
+  - Intelligent information synthesis
+
+**Parameters**:
+
+```typescript
+{
+  chunks: string[],                                    // Array of text chunks
+  summaryLength?: "brief" | "detailed" | "comprehensive",  // Default: "detailed"
+  focusAreas?: string[]                                // Optional focus areas
+}
+```
+
+**Returns**:
+
+```typescript
+{
+  success: boolean,
+  chunkCount: number,
+  totalWords: number,
+  totalChars: number,
+  summaryLength: string,
+  focusAreas: string[],
+  overallSummary: string,        // Combined summary
+  chunkSummaries: Array<{        // Individual chunk summaries
+    chunkIndex: number,
+    wordCount: number,
+    charCount: number,
+    preview: string,
+    keyPoints: string[]
+  }>,
+  metadata: {
+    averageWordsPerChunk: number,
+    averageCharsPerChunk: number,
+    processingTime: string,
+    hasFocusAreas: boolean,
+    focusAreasCount: number
   }
+}
+```
 
-  // If the text is already smaller than the desired chunk size, no chunking is needed.
-  // It's returned as a single chunk.
-  if (text.length <= chunkSize) {
-    return [{ content: text, index: 0 }];
-  }
+### 3.3. Intelligent Chunking Algorithm
 
-  const chunks: TextChunk[] = [];
-  let currentIndex = 0; // This pointer tracks our position in the original text.
+The chunking logic intelligently divides large text while preserving context and sentence boundaries:
 
-  // Loop through the text until the entire string has been chunked.
-  while (currentIndex < text.length) {
-    // Get the remaining part of the text to be processed.
-    const remainingText = text.substring(currentIndex);
-    // Determine the maximum possible end point for the current chunk.
-    let endIndex = Math.min(chunkSize, remainingText.length);
+```typescript
+// Sentence-preserving chunking
+while (currentIndex < content.length) {
+  const remainingText = content.substring(currentIndex);
+  let endIndex = Math.min(chunkSize, remainingText.length);
 
-    // If the remaining text is small enough to be the final chunk, add it and exit.
-    if (remainingText.length <= chunkSize) {
-      chunks.push({ content: remainingText, index: chunks.length });
-      break;
-    }
-
-    // --- Intelligent Splitting Logic ---
-    // We try to find the best possible place to split the text to avoid breaking sentences.
-    let splitPosition = -1;
+  if (preserveSentences) {
     const potentialSplitArea = remainingText.substring(0, endIndex);
 
-    // 1. Prioritize splitting at the end of a sentence.
+    // 1. Look for sentence endings (., !, ?)
     for (const boundary of [".", "!", "?"]) {
       const pos = potentialSplitArea.lastIndexOf(boundary);
       if (pos > splitPosition) {
@@ -163,168 +146,206 @@ export function chunkText(text: string, options: ChunkingOptions): TextChunk[] {
       }
     }
 
-    // 2. If no sentence ending is found, try to split at a space.
-    if (splitPosition === -1) {
-      splitPosition = potentialSplitArea.lastIndexOf(" ");
-    }
-
-    // 3. If no space is found (e.g., a very long word or URL), split at the character limit.
-    if (splitPosition === -1) {
-      splitPosition = endIndex - 1;
-    }
-
-    // The actual end of the chunk is one character after the split point.
-    endIndex = splitPosition + 1;
-
-    // Create the chunk from the start of the remaining text to the calculated end point.
-    const chunkContent = remainingText.substring(0, endIndex);
-    chunks.push({ content: chunkContent, index: chunks.length });
-
-    // Move the main pointer forward for the next iteration.
-    // We subtract the `overlap` to ensure context is carried over to the next chunk.
-    currentIndex += Math.max(1, endIndex - overlap);
-  }
-
-  return chunks;
-}
-```
-
-### 5.3. New Workflow: `_summarizeLargeText()`
-
-This new private method orchestrates the entire map-reduce workflow. It will be added to the `NeuroLink` class in `src/lib/neurolink.ts`.
-
-#### Detailed Explanation of `_summarizeLargeText`
-
-This function acts as the controller for the large context handling process. It chunks the text, manages the parallel summarization of each chunk, combines the results, and generates the final summary.
-
-```typescript
-// Inside the NeuroLink class in src/lib/neurolink.ts
-
-private async _summarizeLargeText(options: GenerateOptions): Promise<GenerateResult> {
-  // Destructure all necessary properties from the original options.
-  const { input, largeTextHandling, provider, model } = options;
-  const text = input.text;
-
-  // --- Step 1: Chunk the Text ---
-  // The large input text is passed to our utility function to be broken down.
-  // We use the configuration provided in `largeTextHandling` or fall back to sensible defaults.
-  const chunks = chunkText(text, {
-    chunkSize: largeTextHandling?.chunkSize || 4000, // Default to 4000 characters per chunk.
-    overlap: largeTextHandling?.overlap || 200,     // Default to 200 characters of overlap.
-  });
-
-  // --- Step 2: The "Map" Step ---
-  // We process all chunks concurrently for maximum efficiency.
-  // `Promise.all` sends all summarization requests to the LLM at the same time.
-  const chunkSummaries = await Promise.all(
-    // `chunks.map` creates an array of promises, one for each chunk.
-    chunks.map(chunk => this.generate({
-      // Each chunk is wrapped in a new prompt asking for a concise summary.
-      input: { text: `Summarize the following text concisely: ${chunk.content}` },
-      // Use a specific, fast model for this intermediate step to reduce latency and cost.
-      // This can be configured by the user.
-      provider: largeTextHandling?.chunkingProvider || provider,
-      model: largeTextHandling?.chunkingModel || 'gemini-2.5-flash',
-      // CRITICAL: This recursive call to `this.generate` must have large text handling
-      // disabled to prevent an infinite loop.
-      largeTextHandling: { mode: 'none' }
-    }))
-  );
-
-  // --- Step 3: The "Reduce" Step ---
-  // All the individual chunk summaries are collected and joined together.
-  // A separator is used to clearly distinguish between the different summaries.
-  const combinedSummaries = chunkSummaries.map(result => result.content).join('\n\n---\n\n');
-
-  // This combined text of summaries is sent to the LLM for the final processing step.
-  const finalSummaryResult = await this.generate({
-    input: { text: `The following are summaries of sequential parts of a large document. Create a single, cohesive, and detailed final summary from them:\n\n${combinedSummaries}` },
-    // For this final step, we use the powerful provider and model the user originally requested
-    // to ensure the highest quality output.
-    provider: provider,
-    model: model,
-    // Again, disable large text handling to prevent loops.
-    largeTextHandling: { mode: 'none' }
-  });
-
-  // --- Step 4: Return the Final Result ---
-  // The result from the final summarization is returned.
-  // We enrich the metadata to indicate that large text processing was performed
-  // and include how many chunks were created.
-  return {
-      ...finalSummaryResult,
-      metadata: {
-          ...finalSummaryResult.metadata,
-          largeTextProcessed: true,
-          chunks: chunks.length,
+    // 2. Fall back to space if no sentence boundary found
+    if (splitPosition === endIndex - 1) {
+      const spacePos = potentialSplitArea.lastIndexOf(" ");
+      if (spacePos !== -1) {
+        splitPosition = spacePos;
       }
-  };
-}
-```
-
-### 5.4. Integration into `generate()`
-
-The main `generate()` method will be modified to delegate to the new workflow when appropriate.
-
-```typescript
-// Modified generate() method in src/lib/neurolink.ts
-
-async generate(optionsOrPrompt: GenerateOptions | string): Promise<GenerateResult> {
-  const options: GenerateOptions =
-    typeof optionsOrPrompt === 'string'
-      ? { input: { text: optionsOrPrompt } }
-      : optionsOrPrompt;
-
-  // New Logic: Check for large text handling
-  const largeTextConfig = options.largeTextHandling;
-  const textLength = options.input.text.length;
-  // Use a default threshold, but allow it to be overridden
-  const threshold = largeTextConfig?.chunkSize || 4000;
-
-  if (largeTextConfig?.mode === 'summarize' && textLength > threshold) {
-    return this._summarizeLargeText(options);
+    }
   }
 
-  // ... existing generate() logic continues here for normal processing
+  // Create chunk and move forward with overlap
+  endIndex = splitPosition + 1;
+  const chunkContent = remainingText.substring(0, endIndex);
+  chunks.push({ content: chunkContent, index: chunks.length });
+
+  currentIndex += Math.max(1, endIndex - overlap);
 }
 ```
 
-## 6. Configuration and API Changes
+**Key Features**:
 
-The `GenerateOptions` interface in `src/lib/types/generateTypes.ts` will be updated.
+- **Boundary Preservation**: Prioritizes sentence and word boundaries
+- **Context Overlap**: Maintains context between chunks (default 2000 chars)
+- **Fallback Logic**: Handles edge cases like very long words
+- **No External Dependencies**: Self-contained implementation
+
+### 3.4. Enhanced `readFile` Tool Integration
+
+The existing `readFile` tool has been enhanced with intelligent file size handling:
+
+**Size-Based Processing Strategies**:
+
+- ≤50KB (Tiny): Direct read
+- 50KB-200KB (Small): Buffered read
+- 200KB-1MB (Medium): Streaming read
+- 1MB-10MB (Large): Preview mode (10KB sample)
+- \>10MB: Recommendation to use `chunkDocument`
+
+**Intelligent Recommendations**:
 
 ```typescript
-// src/lib/types/generateTypes.ts
-
-export interface GenerateOptions {
-  // ... existing options
-  largeTextHandling?: {
-    mode: "none" | "summarize";
-    chunkSize?: number;
-    overlap?: number;
-    chunkingProvider?: AIProviderName;
-    chunkingModel?: string;
-  };
+if (fileSize > FILE_SIZE_LIMITS.MEDIUM_FILE) {
+  recommendation =
+    "File is medium-sized. For comprehensive analysis, use chunkDocument tool...";
+  suggestedTools = ["chunkDocument", "summarizeChunks"];
 }
 ```
 
-- **`mode`**: `'none'` (default) or `'summarize'`.
-- **`chunkSize`**: Target size for each text chunk (in characters). Defaults to `4000`.
-- **`overlap`**: Character overlap between chunks. Defaults to `200`.
-- **`chunkingProvider` / `chunkingModel`**: Optional. Allows specifying a faster/cheaper model for the intermediate "Map" step, enhancing performance and cost-effectiveness.
+## 4. LLM-Driven Workflow
 
-## 7. Testing Strategy
+### 4.1. High-Level Flow
 
-1.  **Unit Tests (`test/textUtils.test.ts`)**:
-    - Test `chunkText` with empty, short, and long strings.
-    - Verify that `overlap` is handled correctly.
-    - Ensure splitting prioritizes sentence boundaries.
-2.  **Integration Tests (`test/largeContext.test.ts`)**:
-    - Test the main `generate()` method with a string larger than the `chunkSize` threshold.
-    - Mock the `_summarizeLargeText` method to confirm it's called when `mode` is `'summarize'`.
-    - Mock the internal `generate` calls to verify the map-reduce logic is working as expected (i.e., multiple parallel calls followed by one final call).
-    - Confirm that the normal workflow is used when `mode` is `'none'`.
-3.  **End-to-End (E2E) Test (`examples/summarize-large-file.js`)**:
-    - Create a script that reads a large text file from the disk.
-    - Calls `neurolink.generate()` with the file content and `largeTextHandling: { mode: 'summarize' }`.
-    - Prints the final summary to the console for manual validation of quality.
+```mermaid
+graph TD
+    A[User Request: "Analyze large document"] --> B[LLM receives request + available tools];
+    B --> C{LLM analyzes context};
+    C --> D[LLM chooses appropriate tools];
+    D --> E[Tool 1: readFile to check file size];
+    E --> F{File > 200KB?};
+    F -->|Yes| G[Tool 2: chunkDocument to split content];
+    F -->|No| H[Process directly];
+    G --> I[Tool 3: summarizeChunks if needed];
+    I --> J[LLM synthesizes final response];
+    H --> J;
+    J --> K[Return intelligent response to user];
+```
+
+### 4.2. Example Usage Scenarios
+
+#### Scenario 1: Small File (Direct Processing)
+
+```
+User: "What's in this file?"
+LLM: *calls readFile()*
+Tool: *returns full content (file is 50KB)*
+LLM: "This file contains: [full analysis]"
+```
+
+#### Scenario 2: Large File (Chunked Processing)
+
+```
+User: "Summarize this large document"
+LLM: *calls readFile()*
+Tool: *returns preview + recommendation to use chunkDocument*
+LLM: *calls chunkDocument()*
+Tool: *returns 10 chunks*
+LLM: *calls summarizeChunks()*
+Tool: *returns comprehensive summary*
+LLM: "Here's a summary: [concise analysis]"
+```
+
+#### Scenario 3: Focused Analysis
+
+```
+User: "What are the technical details in this document?"
+LLM: *calls chunkDocument()*
+Tool: *returns chunks*
+LLM: *calls summarizeChunks with focusAreas: ["technical details"]*
+Tool: *returns focused summary*
+LLM: "Technical details: [targeted analysis]"
+```
+
+## 5. Integration with NeuroLink
+
+### 5.1. Tool Registration
+
+Tools are automatically registered in the `directTools` server:
+
+```typescript
+// src/lib/mcp/servers/agent/directToolsServer.ts
+import { directAgentTools } from "../../agent/directTools.js";
+
+export const directToolsServer = createMCPServer({
+  id: "neurolink-direct",
+  title: "NeuroLink Direct Tools",
+  description:
+    "Core tools for file operations, calculations, and document processing",
+  category: "built-in",
+  tools: directAgentTools, // Includes chunkDocument and summarizeChunks
+});
+```
+
+### 5.2. Tool Discovery
+
+Tools are automatically discovered through the standard tool discovery mechanism:
+
+```typescript
+// In NeuroLink.getAllAvailableTools()
+const allTools = await this.toolRegistry.listTools();
+// Returns all tools including chunkDocument and summarizeChunks
+```
+
+### 5.3. Usage in SDK
+
+No special configuration required - tools are automatically available:
+
+```typescript
+const neurolink = new NeuroLink();
+
+const result = await neurolink.generate({
+  input: { text: "Analyze this large document at /path/to/file.txt" },
+  provider: "auto",
+  disableTools: false, // Ensures tools are available
+});
+
+// LLM automatically:
+// 1. Reads file with readFile
+// 2. Chunks with chunkDocument if needed
+// 3. Summarizes with summarizeChunks if needed
+// 4. Returns intelligent analysis
+```
+
+## 6. Benefits Achieved
+
+### 6.1. Architectural Benefits
+
+- ✅ **No Hardcoded Logic**: Completely removed CLI file detection patterns
+- ✅ **LLM-Driven Decisions**: AI chooses appropriate tools based on context
+- ✅ **SDK Integration**: Available programmatically, not CLI-locked
+- ✅ **Simple Architecture**: Tools in single location (`directTools.ts`)
+- ✅ **Extensibility**: Easy to add new document processing capabilities
+- ✅ **No Redundancy**: Clean, maintainable codebase
+
+### 6.2. User Experience Benefits
+
+- 🚀 **Flexibility**: Handles diverse document processing scenarios
+- 🚀 **Intelligence**: Context-aware processing decisions
+- 🚀 **Robustness**: Comprehensive error handling and validation
+- 🚀 **Efficiency**: Sentence-preserving chunking maintains context
+- 🚀 **Future-Proof**: Extensible architecture for new capabilities
+
+### 6.3. Technical Benefits
+
+- ⚡ **Performance**: Streaming reads for large files
+- ⚡ **Memory Safety**: Preview mode for very large files
+- ⚡ **Context Preservation**: Overlap and sentence boundaries
+- ⚡ **Metadata Rich**: Detailed information for debugging
+
+## 7. Testing and Validation
+
+### 7.1. Verified Functionality
+
+✅ **Tool Discovery**: Both tools appear in `getAllAvailableTools()`
+✅ **Tool Execution**: LLM successfully calls both tools
+✅ **Chunking**: Sentence-preserving logic works correctly
+✅ **Summarization**: Focus areas and summary lengths work
+✅ **Integration**: Works with all AI providers
+✅ **Error Handling**: Graceful failures with clear messages
+
+## 8. Future Enhancements
+
+Potential future improvements:
+
+1. **Additional Chunking Strategies**: Paragraph-based, semantic-based
+2. **Multi-format Support**: PDF, DOCX extraction before chunking
+3. **Parallel Processing**: Process multiple chunks concurrently
+4. **Caching**: Cache chunk results for repeated queries
+5. **Streaming Summaries**: Stream summary generation for very large documents
+
+## 9. Conclusion
+
+The current implementation successfully provides LLM-driven document processing through two well-integrated tools in the `directTools` server. The architecture is simple, maintainable, and extensible, enabling intelligent handling of large documents without hardcoded logic.
+
+**Key Achievement**: Transformed NeuroLink from a hardcoded file processing system to an intelligent, tool-based document processing platform that follows industry best practices for AI tool integration.

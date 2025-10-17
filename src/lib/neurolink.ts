@@ -62,6 +62,7 @@ import type {
 } from "./types/mcpTypes.js";
 import type { ToolInfo } from "./types/tools.js";
 import type { NeuroLinkEvents, TypedEventEmitter } from "./types/common.js";
+import { convertNeuroLinkServerToMCPServerInfo } from "./utils/serverConversion.js";
 import {
   createCustomToolServerInfo,
   detectCategory,
@@ -111,6 +112,7 @@ import type {
   ConversationMemoryConfig,
   ChatMessage,
 } from "./types/conversation.js";
+import { createToolAwarePrompt } from "./constants/systemPrompts.js";
 import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
 import { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
 import {
@@ -149,6 +151,31 @@ export class NeuroLink {
     new EventEmitter() as unknown as TypedEventEmitter<NeuroLinkEvents>;
 
   private toolRegistry: MCPToolRegistry;
+
+  /**
+   * Helper method to safely normalize tool schema using provider's method
+   * Eliminates duplicated type casting pattern
+   */
+  private normalizeToolSchemaWithProvider(
+    provider: unknown,
+    inputSchema: unknown,
+  ): Record<string, unknown> {
+    if (
+      typeof inputSchema === "object" &&
+      inputSchema !== null &&
+      !Array.isArray(inputSchema)
+    ) {
+      const providerWithNormalize = provider as unknown as {
+        normalizeToolSchema: (
+          schema: Record<string, unknown>,
+        ) => Record<string, unknown>;
+      };
+      return providerWithNormalize.normalizeToolSchema(
+        inputSchema as Record<string, unknown>,
+      );
+    }
+    return {};
+  }
 
   private autoDiscoveredServerInfos: MCPServerInfo[] = [];
   // External MCP server management
@@ -1050,7 +1077,7 @@ export class NeuroLink {
   }
 
   /**
-   * Register direct tools server
+   * Register the direct tools server with lazy loading
    */
   private async registerDirectToolsServerInternal(
     mcpInitId: string,
@@ -1062,18 +1089,53 @@ export class NeuroLink {
     try {
       if (process.env.NEUROLINK_DISABLE_DIRECT_TOOLS === "true") {
         mcpLogger.debug(
-          "Direct tools server are disabled via environment variable.",
+          "Direct tools server is disabled via environment variable.",
         );
       } else {
-        await this.toolRegistry.registerServer(
-          "neurolink-direct",
-          directToolsServer,
+        // Lazy load direct tools server only
+        const { directToolsServer } = await import(
+          "./mcp/servers/agent/directToolsServer.js"
         );
+
+        // Convert NeuroLinkMCPServer to MCPServerInfo format
+        const directToolsServerInfo =
+          convertNeuroLinkServerToMCPServerInfo(directToolsServer);
+
+        await this.toolRegistry.registerServer(directToolsServerInfo);
+
+        try {
+          const directResult = await this.externalServerManager.addServer(
+            directToolsServerInfo.id,
+            directToolsServerInfo,
+          );
+          if (!directResult.success) {
+            mcpLogger.warn(
+              "Failed to register direct tools server with external server manager",
+              {
+                error: directResult.error,
+                serverId: directToolsServerInfo.id,
+              },
+            );
+          } else {
+            mcpLogger.debug(
+              "Direct tools server registered with external server manager",
+              {
+                serverId: directToolsServerInfo.id,
+              },
+            );
+          }
+        } catch (error) {
+          mcpLogger.error(
+            "Error registering direct tools server with external server manager",
+            error,
+          );
+        }
 
         mcpLogger.debug(
           "[NeuroLink] Direct tools server registered successfully",
           {
-            serverId: "neurolink-direct",
+            serverId: directToolsServerInfo.id,
+            toolsCount: directToolsServerInfo.tools.length,
           },
         );
       }
@@ -2211,10 +2273,40 @@ export class NeuroLink {
         `${providerName} provider initialized successfully`,
       );
 
+      const allAvailableToolsMCP = await this.getAllAvailableTools();
+      const allToolsForProvider = new Map<string, MCPExecutableTool>();
+
+      for (const tool of allAvailableToolsMCP) {
+        const inputSchema = tool.inputSchema || {};
+        const validSchema = this.normalizeToolSchemaWithProvider(
+          provider,
+          inputSchema,
+        );
+
+        allToolsForProvider.set(tool.name, {
+          name: tool.name,
+          description: tool.description || "",
+          inputSchema: validSchema,
+          execute: async (params: unknown, context?: unknown) => {
+            mcpLogger.debug(
+              `[${functionTag}] AI model calling tool: ${tool.name}`,
+              {
+                toolName: tool.name,
+                serverId: tool.serverId,
+                hasParams: !!params,
+              },
+            );
+            return await this.executeTool(tool.name, params, {
+              authContext: context as Record<string, unknown>,
+            });
+          },
+        });
+      }
+
       // Enable tool execution for the provider using BaseProvider method
       provider.setupToolExecutor(
         {
-          customTools: this.getCustomTools(),
+          customTools: allToolsForProvider,
           executeTool: this.executeTool.bind(this),
         },
         functionTag,
@@ -2366,10 +2458,40 @@ export class NeuroLink {
           `${providerName} provider initialized successfully`,
         );
 
+        const allAvailableToolsDirect = await this.getAllAvailableTools();
+        const allToolsForProviderDirect = new Map<string, MCPExecutableTool>();
+
+        for (const tool of allAvailableToolsDirect) {
+          const inputSchema = tool.inputSchema || {};
+          const validSchema = this.normalizeToolSchemaWithProvider(
+            provider,
+            inputSchema,
+          );
+
+          allToolsForProviderDirect.set(tool.name, {
+            name: tool.name,
+            description: tool.description || "",
+            inputSchema: validSchema,
+            execute: async (params: unknown, context?: unknown) => {
+              mcpLogger.debug(
+                `[${functionTag}] AI model calling tool: ${tool.name}`,
+                {
+                  toolName: tool.name,
+                  serverId: tool.serverId,
+                  hasParams: !!params,
+                },
+              );
+              return await this.executeTool(tool.name, params, {
+                authContext: context as Record<string, unknown>,
+              });
+            },
+          });
+        }
+
         // Enable tool execution for direct provider generation using BaseProvider method
         provider.setupToolExecutor(
           {
-            customTools: this.getCustomTools(),
+            customTools: allToolsForProviderDirect,
             executeTool: this.executeTool.bind(this),
           },
           functionTag,
@@ -2467,15 +2589,15 @@ export class NeuroLink {
       transformationResult,
     );
 
-    const toolPrompt = `\n\nYou have access to these additional tools if needed:\n${toolDescriptions}\n\nIMPORTANT: You are a general-purpose AI assistant. Answer all requests directly and creatively. These tools are optional helpers - use them only when they would genuinely improve your response. For creative tasks like storytelling, writing, or general conversation, respond naturally without requiring tools.`;
-
-    const finalPrompt = (originalSystemPrompt || "") + toolPrompt;
+    const finalPrompt = createToolAwarePrompt(
+      toolDescriptions,
+      originalSystemPrompt,
+    );
 
     const finalPromptData = {
       originalPromptLength: originalSystemPrompt?.length || 0,
-      toolPromptLength: toolPrompt.length,
       finalPromptLength: finalPrompt.length,
-      promptEnhanced: toolPrompt.length > 0,
+      promptEnhanced: toolDescriptions.length > 0,
     };
 
     logger.debug("AI prompt generation completed", finalPromptData);
@@ -2872,10 +2994,40 @@ export class NeuroLink {
       options.region, // Pass region parameter
     );
 
+    const allAvailableToolsStream = await this.getAllAvailableTools();
+    const allToolsForProviderStream = new Map<string, MCPExecutableTool>();
+
+    for (const tool of allAvailableToolsStream) {
+      const inputSchema = tool.inputSchema || {};
+      const validSchema = this.normalizeToolSchemaWithProvider(
+        provider,
+        inputSchema,
+      );
+
+      allToolsForProviderStream.set(tool.name, {
+        name: tool.name,
+        description: tool.description || "",
+        inputSchema: validSchema,
+        execute: async (params: unknown, context?: unknown) => {
+          mcpLogger.debug(
+            `[NeuroLink.createMCPStream] AI model calling tool: ${tool.name}`,
+            {
+              toolName: tool.name,
+              serverId: tool.serverId,
+              hasParams: !!params,
+            },
+          );
+          return await this.executeTool(tool.name, params, {
+            authContext: context as Record<string, unknown>,
+          });
+        },
+      });
+    }
+
     // Enable tool execution for the provider using BaseProvider method
     provider.setupToolExecutor(
       {
-        customTools: this.getCustomTools(),
+        customTools: allToolsForProviderStream,
         executeTool: this.executeTool.bind(this),
       },
       "NeuroLink.createMCPStream",
@@ -3618,10 +3770,18 @@ export class NeuroLink {
       });
 
       // Return MCPServerInfo.tools format directly - no conversion needed
-      toolMap.set(tool.name, {
+      const toolObject: {
+        name: string;
+        description: string;
+        inputSchema: object | undefined;
+        execute: (params: unknown, context?: unknown) => Promise<unknown>;
+        serverId?: string;
+      } = {
         name: tool.name,
         description: tool.description || "",
-        inputSchema: tool.inputSchema || tool.parameters || {},
+        inputSchema: (tool.inputSchema || tool.parameters || {}) as
+          | object
+          | undefined,
         execute: async (params: unknown, context?: unknown) => {
           // CONTEXT MERGING: Combine all available contexts for maximum information
           const storedContext = this.toolExecutionContext || {};
@@ -3660,7 +3820,9 @@ export class NeuroLink {
             executionContext as Record<string, unknown>,
           );
         },
-      });
+      };
+
+      toolMap.set(tool.name, toolObject);
     }
 
     return toolMap;
@@ -4160,6 +4322,7 @@ export class NeuroLink {
   }
 
   async getAllAvailableTools(): Promise<ToolInfo[]> {
+    await this.initializeMCP();
     // Return from cache if available and not stale
     if (
       this.toolCache &&

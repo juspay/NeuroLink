@@ -22,6 +22,7 @@ import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { JsonValue, JsonObject, UnknownRecord } from "../types/common.js";
 import type { ToolArgs, ToolCallObject, ToolResult } from "../types/tools.js";
+import type { MCPExecutableTool } from "../types/mcpTypes.js";
 import type { MultimodalInput } from "../types/content.js";
 import { logger } from "../utils/logger.js";
 import { DEFAULT_MAX_STEPS, STEP_LIMITS } from "../core/constants.js";
@@ -36,6 +37,42 @@ import {
   buildMultimodalMessagesArray,
 } from "../utils/messageBuilder.js";
 import type { NeuroLink } from "../neurolink.js";
+import type { TypedEventEmitter, NeuroLinkEvents } from "../types/index.js";
+
+// Type guard for NeuroLink with event emitter
+interface NeuroLinkWithEventEmitter extends NeuroLink {
+  getEventEmitter(): TypedEventEmitter<NeuroLinkEvents>;
+}
+
+function hasEventEmitter(
+  neurolink: NeuroLink | undefined,
+): neurolink is NeuroLinkWithEventEmitter {
+  if (!neurolink || typeof neurolink !== "object") {
+    return false;
+  }
+
+  const typedNeurolink = neurolink as NeuroLinkWithEventEmitter;
+
+  // Check if getEventEmitter exists and is a function
+  if (typeof typedNeurolink.getEventEmitter !== "function") {
+    return false;
+  }
+
+  // Validate that calling getEventEmitter returns a valid event emitter
+  try {
+    const emitter = typedNeurolink.getEventEmitter();
+    // Check if the returned value has the emit method (basic EventEmitter interface)
+    return (
+      emitter !== null &&
+      emitter !== undefined &&
+      typeof emitter === "object" &&
+      typeof (emitter as { emit?: unknown }).emit === "function"
+    );
+  } catch {
+    // If getEventEmitter throws an error, it's not a valid event emitter
+    return false;
+  }
+}
 import { getKeysAsString, getKeyCount } from "../utils/transformationUtils.js";
 import {
   validateStreamOptions as validateStreamOpts,
@@ -65,7 +102,7 @@ export abstract class BaseProvider implements AIProvider {
     ? {}
     : directAgentTools;
   protected mcpTools?: Record<string, Tool>; // MCP tools loaded dynamically when available
-  protected customTools?: Map<string, unknown>; // Custom tools from registerTool()
+  protected customTools?: Map<string, MCPExecutableTool>; // Custom tools from registerTool()
   protected toolExecutor?: (
     toolName: string,
     params: unknown,
@@ -1287,7 +1324,7 @@ export abstract class BaseProvider implements AIProvider {
         ).execute;
 
         // Create a new tool with wrapped execute function
-        tools[toolName] = {
+        const toolWithSchema: Tool = {
           ...(directTool as Tool),
           execute: async (params: unknown) => {
             // 🔧 EMIT TOOL START EVENT - Bedrock-compatible format
@@ -1305,7 +1342,7 @@ export abstract class BaseProvider implements AIProvider {
               const result = await originalExecute(params);
 
               // 🔧 EMIT TOOL END EVENT - Bedrock-compatible format
-              if (this.neurolink?.getEventEmitter) {
+              if (hasEventEmitter(this.neurolink)) {
                 const emitter = this.neurolink.getEventEmitter();
                 emitter.emit("tool:end", { tool: toolName, result });
                 logger.debug(`Direct tool:end event emitted for ${toolName}`, {
@@ -1339,6 +1376,8 @@ export abstract class BaseProvider implements AIProvider {
             }
           },
         } as Tool;
+
+        tools[toolName] = toolWithSchema;
       } else {
         // Fallback: include tool as-is if it doesn't have execute function
         tools[toolName] = directTool as Tool;
@@ -1503,7 +1542,7 @@ export abstract class BaseProvider implements AIProvider {
               );
 
               // 🔧 EMIT TOOL END EVENT - Bedrock-compatible format
-              if (this.neurolink?.getEventEmitter) {
+              if (hasEventEmitter(this.neurolink)) {
                 const emitter = this.neurolink.getEventEmitter();
                 emitter.emit("tool:end", { tool: tool.name, result });
                 logger.debug(`tool:end event emitted for ${tool.name}`, {
@@ -1561,7 +1600,7 @@ export abstract class BaseProvider implements AIProvider {
             const error = `Cannot execute external MCP tool: NeuroLink executeExternalMCPTool not available`;
 
             // 🔧 EMIT TOOL END EVENT FOR ERROR - Bedrock-compatible format
-            if (this.neurolink?.getEventEmitter) {
+            if (hasEventEmitter(this.neurolink)) {
               const emitter = this.neurolink.getEventEmitter();
               emitter.emit("tool:end", { tool: tool.name, error });
               logger.debug(`tool:end error event emitted for ${tool.name}`, {
@@ -1735,6 +1774,61 @@ export abstract class BaseProvider implements AIProvider {
       // Return the data as-is to preserve all parameter information
       return data;
     });
+  }
+
+  /**
+   * Normalize tool schema for AI provider compatibility
+   * Ensures all schemas have proper structure that AI providers expect
+   *
+   * This function is used across all AI providers (not just Vertex AI) to ensure
+   * tool schemas are properly formatted with required fields.
+   *
+   * @param schema - JSON Schema object to normalize
+   * @returns Normalized schema compatible with AI providers
+   */
+  public normalizeToolSchema(
+    schema: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const normalized = { ...schema };
+
+    // AI providers require all function schemas to be of type "object"
+    if (!normalized.type) {
+      normalized.type = "object";
+      logger.debug("Added missing type field to schema", {
+        originalSchema: schema,
+        addedType: "object",
+      });
+    }
+
+    // Ensure properties exist for object types
+    if (normalized.type === "object" && !normalized.properties) {
+      normalized.properties = {};
+      logger.debug("Added missing properties field to object schema");
+    }
+
+    // Handle arrays properly
+    if (Array.isArray(normalized.properties)) {
+      normalized.properties = {};
+      logger.debug("Converted array properties to empty object");
+    }
+
+    // Ensure additionalProperties is boolean if present
+    if (
+      normalized.additionalProperties !== undefined &&
+      typeof normalized.additionalProperties !== "boolean"
+    ) {
+      normalized.additionalProperties = true;
+    }
+
+    // Ensure required is an array if present
+    if (
+      normalized.required !== undefined &&
+      !Array.isArray(normalized.required)
+    ) {
+      normalized.required = [];
+    }
+
+    return normalized;
   }
 
   /**
@@ -1940,7 +2034,7 @@ export abstract class BaseProvider implements AIProvider {
    */
   setupToolExecutor(
     sdk: {
-      customTools: Map<string, unknown>;
+      customTools: Map<string, MCPExecutableTool>;
       executeTool: (toolName: string, params: unknown) => Promise<unknown>;
     },
     functionTag: string,
