@@ -1,3 +1,9 @@
+## [7.51.3](https://github.com/juspay/neurolink/compare/v7.51.2...v7.51.3) (2025-10-23)
+
+### Bug Fixes
+
+- **(neurolink):** add Zod schema detection for inputSchema field in baseProvider ([5ad0c0a](https://github.com/juspay/neurolink/commit/5ad0c0a1750b92e0e4412243f5b872f30c258624))
+
 ## [7.51.2](https://github.com/juspay/neurolink/compare/v7.51.1...v7.51.2) (2025-10-14)
 
 ## [7.51.1](https://github.com/juspay/neurolink/compare/v7.51.0...v7.51.1) (2025-10-13)
