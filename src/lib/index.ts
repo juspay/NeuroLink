@@ -64,6 +64,8 @@ export type {
   OpenTelemetryConfig,
 } from "./types/observability.js";
 
+export { buildObservabilityConfigFromEnv } from "./utils/observabilityHelpers.js";
+
 import {
   initializeOpenTelemetry,
   shutdownOpenTelemetry,
