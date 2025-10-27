@@ -14,10 +14,7 @@ import type {
 } from "../types/conversation.js";
 import { ConversationMemoryError } from "../types/conversation.js";
 import type { PendingToolExecution } from "../types/tools.js";
-import {
-  DEFAULT_MAX_SESSIONS,
-  MESSAGES_PER_TURN,
-} from "../config/conversationMemory.js";
+import { MESSAGES_PER_TURN } from "../config/conversationMemory.js";
 import { logger } from "../utils/logger.js";
 import { NeuroLink } from "../neurolink.js";
 import {
@@ -548,9 +545,6 @@ export class RedisConversationMemoryManager {
       if (userId) {
         await this.addUserSession(userId, sessionId);
       }
-
-      // Enforce session limit
-      await this.enforceSessionLimit();
 
       logger.debug(
         "[RedisConversationMemoryManager] Successfully stored conversation turn",
@@ -1142,12 +1136,13 @@ User message: "${userMessage}`;
             results.push(metadata);
           } else {
             logger.debug(
-              "[RedisConversationMemoryManager] Empty or missing session metadata",
+              "[RedisConversationMemoryManager] Empty or missing session metadata - removing from user history",
               {
                 userId,
                 sessionId,
               },
             );
+            await this.removeUserSession(userId, sessionId);
           }
         } catch (sessionError) {
           logger.error(
@@ -1303,58 +1298,5 @@ User message: "${userMessage}`;
         totalMessages: conversation.messages.length,
       },
     );
-  }
-
-  /**
-   * Enforce session limit
-   *
-   * NOTE: This function is maintained only for backward compatibility with the
-   * in-memory implementation. In Redis, we do not actually delete sessions based on
-   * a global limit, as this could cause race conditions in a distributed environment.
-   * Each session is managed independently with its own TTL.
-   */
-  private async enforceSessionLimit(): Promise<void> {
-    logger.debug(
-      "[RedisConversationMemoryManager] Enforcing session limit (compatibility function)",
-    );
-
-    if (!this.redisClient) {
-      logger.debug(
-        "[RedisConversationMemoryManager] No Redis client, skipping session limit check",
-      );
-      return;
-    }
-
-    const maxSessions = this.config.maxSessions || DEFAULT_MAX_SESSIONS;
-    const pattern = `${this.redisConfig.keyPrefix}*`;
-
-    logger.debug("[RedisConversationMemoryManager] Listing all session keys", {
-      pattern,
-      maxSessions,
-    });
-
-    // Use SCAN instead of KEYS to avoid blocking the server
-    const keys = await scanKeys(this.redisClient, pattern);
-    logger.debug(
-      "[RedisConversationMemoryManager] Found existing sessions using SCAN",
-      {
-        sessionCount: keys.length,
-        maxSessions,
-        needsTrimming: keys.length > maxSessions,
-      },
-    );
-
-    // In the Redis implementation, we intentionally do not delete sessions based on a global limit.
-    // Each session is managed independently with its own TTL.
-    if (keys.length > maxSessions) {
-      logger.info(
-        "Redis session count exceeds limit, but not enforcing deletion",
-        {
-          currentCount: keys.length,
-          maxSessions,
-          reason: "Redis sessions are managed independently with TTL",
-        },
-      );
-    }
   }
 }

@@ -2751,24 +2751,68 @@ export class NeuroLink {
           }
         } finally {
           // Store memory after stream consumption is complete
-          if (self.conversationMemory) {
+          if (self.conversationMemory && enhancedOptions.context?.sessionId) {
+            const storageStartTime = Date.now();
+            const sessionId = (
+              enhancedOptions.context as Record<string, unknown>
+            )?.sessionId as string;
+            const userId = (enhancedOptions.context as Record<string, unknown>)
+              ?.userId as string;
+
             try {
+              self.emitter.emit("log-event", {
+                type: "log-event:storage:start",
+                data: {
+                  operation: "storeConversationTurn",
+                  sessionId,
+                  userId,
+                  timestamp: storageStartTime,
+                  source: "stream-finally-block",
+                  userInputLength: originalPrompt?.length ?? 0,
+                  responseLength: accumulatedContent.length,
+                },
+              });
+
               await self.conversationMemory.storeConversationTurn(
-                (enhancedOptions.context as Record<string, unknown>)
-                  ?.sessionId as string,
-                (enhancedOptions.context as Record<string, unknown>)
-                  ?.userId as string,
+                sessionId,
+                userId,
                 originalPrompt ?? "",
                 accumulatedContent,
                 new Date(startTime),
               );
+
+              self.emitter.emit("log-event", {
+                type: "log-event:storage:end",
+                data: {
+                  operation: "storeConversationTurn",
+                  sessionId,
+                  userId,
+                  timestamp: Date.now(),
+                  duration: Date.now() - storageStartTime,
+                  source: "stream-finally-block",
+                  success: true,
+                },
+              });
+
               logger.debug("Stream conversation turn stored", {
-                sessionId: (enhancedOptions.context as Record<string, unknown>)
-                  ?.sessionId,
+                sessionId,
                 userInputLength: originalPrompt?.length ?? 0,
                 responseLength: accumulatedContent.length,
               });
             } catch (error) {
+              self.emitter.emit("log-event", {
+                type: "log-event:storage:error",
+                data: {
+                  operation: "storeConversationTurn",
+                  sessionId,
+                  userId,
+                  timestamp: Date.now(),
+                  duration: Date.now() - storageStartTime,
+                  source: "stream-finally-block",
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              });
+
               logger.warn("Failed to store stream conversation turn", {
                 error: error instanceof Error ? error.message : String(error),
               });
@@ -3065,13 +3109,27 @@ export class NeuroLink {
         }
       } finally {
         // Store memory after fallback stream consumption is complete
-        if (self.conversationMemory) {
+        if (self.conversationMemory && enhancedOptions?.context?.sessionId) {
+          const storageStartTime = Date.now();
+          const sessionId = (
+            enhancedOptions?.context as Record<string, unknown>
+          )?.sessionId as string;
+          const userId = (enhancedOptions?.context as Record<string, unknown>)
+            ?.userId as string;
+
           try {
-            const sessionId = (
-              enhancedOptions?.context as Record<string, unknown>
-            )?.sessionId as string;
-            const userId = (enhancedOptions?.context as Record<string, unknown>)
-              ?.userId as string;
+            self.emitter.emit("log", {
+              type: "log-event:storage:start",
+              data: {
+                operation: "storeConversationTurn",
+                sessionId,
+                userId,
+                timestamp: storageStartTime,
+                source: "fallback-stream-finally-block",
+                userInputLength: originalPrompt?.length ?? 0,
+                responseLength: fallbackAccumulatedContent.length,
+              },
+            });
 
             await self.conversationMemory.storeConversationTurn(
               sessionId || (options.context?.sessionId as string),
@@ -3080,12 +3138,39 @@ export class NeuroLink {
               fallbackAccumulatedContent,
               new Date(startTime),
             );
+
+            self.emitter.emit("log", {
+              type: "log-event:storage:end",
+              data: {
+                operation: "storeConversationTurn",
+                sessionId,
+                userId,
+                timestamp: Date.now(),
+                duration: Date.now() - storageStartTime,
+                source: "fallback-stream-finally-block",
+                success: true,
+              },
+            });
+
             logger.debug("Fallback stream conversation turn stored", {
               sessionId: sessionId || options.context?.sessionId,
               userInputLength: originalPrompt?.length ?? 0,
               responseLength: fallbackAccumulatedContent.length,
             });
           } catch (error) {
+            self.emitter.emit("log-event", {
+              type: "log-event:storage:error",
+              data: {
+                operation: "storeConversationTurn",
+                sessionId,
+                userId,
+                timestamp: Date.now(),
+                duration: Date.now() - storageStartTime,
+                source: "fallback-stream-finally-block",
+                error: error instanceof Error ? error.message : String(error),
+              },
+            });
+
             logger.warn("Failed to store fallback stream conversation turn", {
               error: error instanceof Error ? error.message : String(error),
             });
