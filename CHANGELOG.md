@@ -1,3 +1,9 @@
+## [7.53.1](https://github.com/juspay/neurolink/compare/v7.53.0...v7.53.1) (2025-10-27)
+
+### Bug Fixes
+
+- **(redis):** Emit redis related info through events for logging ([3224075](https://github.com/juspay/neurolink/commit/3224075d86c97f4206855d485748a95d609256af))
+
 ## [7.53.0](https://github.com/juspay/neurolink/compare/v7.52.0...v7.53.0) (2025-10-26)
 
 ### Features
