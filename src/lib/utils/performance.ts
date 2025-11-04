@@ -3,21 +3,8 @@
  * Part of Sub-phase 3.3.1-3.3.2 optimization efforts
  */
 
+import type { PerformanceMetrics } from "../types/analytics.js";
 import { logger } from "./logger.js";
-
-export interface PerformanceMetrics {
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-  memoryStart: NodeJS.MemoryUsage;
-  memoryEnd?: NodeJS.MemoryUsage;
-  memoryDelta?: {
-    rss: number;
-    heapTotal: number;
-    heapUsed: number;
-    external: number;
-  };
-}
 
 /**
  * Performance measurement utility for tracking operations

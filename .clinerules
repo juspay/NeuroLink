@@ -12,7 +12,6 @@
 ---
 
 ## 🏗️ FACTORY-FIRST MCP ARCHITECTURE
-
 ### **MCP Foundation Pattern (CRITICAL)**
 ```typescript
 // Factory-First MCP Architecture
@@ -787,11 +786,94 @@ memory-bank/
 
 ## 💻 DEVELOPMENT STANDARDS
 
-### **TypeScript Conventions**
+### **TypeScript Type System Standards (MANDATORY)**
+
+**⚠️ CRITICAL: ALL CODING AGENTS MUST FOLLOW THESE RULES**
+
+#### **Rule 1: ALWAYS Use `type`, NEVER `interface`**
+
+```typescript
+// ✅ CORRECT - Use type aliases
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export type Config = {
+  timeout: number;
+  retries: number;
+};
+
+// ❌ FORBIDDEN - Never use interface
+export interface User {      // ❌ WILL BE REJECTED
+  id: string;
+  name: string;
+}
+
+export interface Config {    // ❌ WILL BE REJECTED
+  timeout: number;
+}
+```
+
+**Why type over interface?**
+- Consistent pattern across entire codebase
+- Better composability with unions and intersections
+- Clearer intent (type descriptions, not extensible contracts)
+- Simpler mental model for developers
+
+#### **Rule 2: All Types MUST Live in `src/lib/types/`**
+
+```
+src/lib/types/
+├── analytics.ts           # Analytics & performance types
+├── common.ts              # Shared common types
+├── providers.ts           # Provider-specific types
+├── tools.ts               # Tool & MCP types
+├── utilities.ts           # Utility function types
+├── generateTypes.ts       # Generation options types
+├── streamTypes.ts         # Streaming types
+└── modelTypes.ts          # Model configuration types
+```
+
+**Absolute rules:**
+- ✅ **Define types in:** `src/lib/types/`
+- ❌ **NEVER define types in:** `src/lib/core/`, `src/lib/utils/`, `src/lib/providers/`
+- ✅ **Implementation files:** ONLY import types, never define them
+- ✅ **Use relative imports:** `import type { X } from "../types/common.js"`
+- ❌ **NEVER use `$lib` aliases:** `import type { X } from "$lib/types/common.js"` is FORBIDDEN
+
+#### **Rule 3: Proper Import Patterns**
+
+```typescript
+// ✅ CORRECT - Relative imports with .js extension
+import type { TokenUsage } from "../types/analytics.js";
+import type { ProviderConfiguration } from "../types/providers.js";
+import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
+
+// ❌ WRONG - $lib aliases forbidden in implementations
+import type { TokenUsage } from "$lib/types/analytics.js";      // ❌ REJECTED
+import type { ProviderConfiguration } from "$lib/types/providers";  // ❌ Missing .js
+```
+
+#### **Rule 4: Pre-Commit Checklist**
+
+Before committing ANY code, verify:
+
+- [ ] **Zero `interface` declarations** (search for `export interface`)
+- [ ] **All types in `src/lib/types/`** (no types in core/utils/providers)
+- [ ] **Relative imports only** (no `$lib` in import paths)
+- [ ] **`.js` extensions** on all imports
+- [ ] **TypeScript compiles** (`pnpm run check`)
+- [ ] **Tests pass** (`pnpm run test`)
+
+**Enforcement:** PRs violating these rules will be automatically rejected.
+
+### **TypeScript Conventions (General)**
 - **Strict Checking**: Enabled throughout codebase
-- **Interface Exports**: All public APIs have explicit interfaces
 - **Import Extensions**: Use `.js` extension (ES modules)
 - **Documentation**: JSDoc for all public functions
+- **Naming**: PascalCase for types, camelCase for functions
 
 ### **CLI Design Principles**
 - **Professional UX**: yargs + ora + chalk for spinners and colors

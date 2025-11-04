@@ -8,9 +8,12 @@ import type {
   ValidationSchema,
   StringArray,
 } from "../types/typeAliases.js";
-import type { TextGenerationOptions } from "../types/index.js";
+import type { EnhancedValidationResult } from "../types/tools.js";
 import type { StreamOptions } from "../types/streamTypes.js";
-import type { GenerateOptions } from "../types/generateTypes.js";
+import type {
+  TextGenerationOptions,
+  GenerateOptions,
+} from "../types/generateTypes.js";
 import type { NeuroLinkMCPTool } from "../types/mcpTypes.js";
 import { SYSTEM_LIMITS } from "../core/constants.js";
 import { isNonNullObject } from "./typeUtils.js";
@@ -40,21 +43,6 @@ export class ValidationError extends Error {
     super(message);
     this.name = "ValidationError";
   }
-}
-
-/**
- * Result of a validation operation
- * Contains validation status, errors, warnings, and suggestions for improvement
- */
-export interface ValidationResult {
-  /** Whether the validation passed without errors */
-  isValid: boolean;
-  /** Array of validation errors that must be fixed */
-  errors: ValidationError[];
-  /** Array of warning messages that should be addressed */
-  warnings: string[];
-  /** Array of suggestions to improve the validated object */
-  suggestions: StringArray;
 }
 
 // ============================================================================
@@ -315,7 +303,7 @@ export function validateToolDescription(
 /**
  * Validate MCP tool structure comprehensively
  */
-export function validateMCPTool(tool: unknown): ValidationResult {
+export function validateMCPTool(tool: unknown): EnhancedValidationResult {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
   const suggestions: StringArray = [];
@@ -396,7 +384,7 @@ export function validateMCPTool(tool: unknown): ValidationResult {
  */
 export function validateTextGenerationOptions(
   options: unknown,
-): ValidationResult {
+): EnhancedValidationResult {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
   const suggestions: StringArray = [];
@@ -488,7 +476,9 @@ export function validateTextGenerationOptions(
 /**
  * Validate stream options
  */
-export function validateStreamOptions(options: unknown): ValidationResult {
+export function validateStreamOptions(
+  options: unknown,
+): EnhancedValidationResult {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
   const suggestions: StringArray = [];
@@ -550,7 +540,9 @@ export function validateStreamOptions(options: unknown): ValidationResult {
 /**
  * Validate generate options (unified interface)
  */
-export function validateGenerateOptions(options: unknown): ValidationResult {
+export function validateGenerateOptions(
+  options: unknown,
+): EnhancedValidationResult {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
   const suggestions: StringArray = [];
@@ -627,7 +619,7 @@ export function validateToolExecutionParams(
   toolName: string,
   params: unknown,
   expectedSchema?: ValidationSchema,
-): ValidationResult {
+): EnhancedValidationResult {
   const errors: ValidationError[] = [];
   const warnings: string[] = [];
   const suggestions: StringArray = [];
@@ -678,17 +670,17 @@ export function validateToolBatch(tools: Record<string, unknown>): {
   isValid: boolean;
   validTools: string[];
   invalidTools: string[];
-  results: Record<string, ValidationResult>;
+  results: Record<string, EnhancedValidationResult>;
 } {
   const validTools: string[] = [];
   const invalidTools: string[] = [];
-  const results: Record<string, ValidationResult> = {};
+  const results: Record<string, EnhancedValidationResult> = {};
 
   for (const [name, tool] of Object.entries(tools)) {
     const nameValidation = validateToolName(name);
     const toolValidation = validateMCPTool(tool);
 
-    const combinedResult: ValidationResult = {
+    const combinedResult: EnhancedValidationResult = {
       isValid: !nameValidation && toolValidation.isValid,
       errors: nameValidation
         ? [nameValidation, ...toolValidation.errors]
@@ -721,7 +713,9 @@ export function validateToolBatch(tools: Record<string, unknown>): {
 /**
  * Create a validation error summary for logging
  */
-export function createValidationSummary(result: ValidationResult): string {
+export function createValidationSummary(
+  result: EnhancedValidationResult,
+): string {
   const parts: string[] = [];
 
   if (result.errors.length > 0) {
@@ -742,6 +736,6 @@ export function createValidationSummary(result: ValidationResult): string {
 /**
  * Check if validation result has only warnings (no errors)
  */
-export function hasOnlyWarnings(result: ValidationResult): boolean {
+export function hasOnlyWarnings(result: EnhancedValidationResult): boolean {
   return result.errors.length === 0 && result.warnings.length > 0;
 }

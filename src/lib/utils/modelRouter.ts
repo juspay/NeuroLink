@@ -10,24 +10,7 @@ import type {
   TaskClassification,
 } from "../types/taskClassificationTypes.js";
 import { redactForRouting } from "./promptRedaction.js";
-
-export type ModelRoute = {
-  provider: string;
-  model: string;
-  reasoning: string;
-  confidence: number;
-};
-
-export type ModelRoutingOptions = {
-  /** Override the task classification */
-  forceTaskType?: TaskType;
-  /** Require specific performance characteristics */
-  requireFast?: boolean;
-  /** Require specific capability (reasoning, creativity, etc.) */
-  requireCapability?: string;
-  /** Fallback strategy if primary choice fails */
-  fallbackStrategy?: "fast" | "reasoning" | "auto";
-};
+import type { ModelRoute, ModelRoutingOptions } from "../types/modelTypes.js";
 
 /**
  * Routing configuration constants

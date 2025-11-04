@@ -11,7 +11,12 @@ import type {
   Result,
   UnknownRecord,
 } from "./common.js";
-import type { StandardRecord, ZodUnknownSchema } from "./typeAliases.js";
+import type {
+  StandardRecord,
+  StringArray,
+  ZodUnknownSchema,
+} from "./typeAliases.js";
+import type { ValidationError } from "../utils/parameterValidation.js";
 
 /**
  * Commonly used Zod schema type aliases for cleaner type declarations
@@ -389,6 +394,21 @@ export type ToolCallResult = {
   id?: string;
   result: ToolResult;
   formattedForAI: string;
+};
+
+/**
+ * Result of a validation operation
+ * Contains validation status, errors, warnings, and suggestions for improvement
+ */
+export type EnhancedValidationResult = {
+  /** Whether the validation passed without errors */
+  isValid: boolean;
+  /** Array of validation errors that must be fixed */
+  errors: ValidationError[];
+  /** Array of warning messages that should be addressed */
+  warnings: string[];
+  /** Array of suggestions to improve the validated object */
+  suggestions: StringArray;
 };
 
 /**

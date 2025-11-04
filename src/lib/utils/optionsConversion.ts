@@ -96,12 +96,6 @@ export function convertStreamToGenerateOptions(
 }
 
 /**
- * Create a unified options interface that works with both methods
- * Useful for factory utilities that need to work with either type
- */
-export type UnifiedOptions = GenerateOptions & StreamOptions;
-
-/**
  * Check if options object has factory configuration
  * Useful for determining if enhanced processing is needed
  */

@@ -201,19 +201,21 @@ export type NeuroLinkEvents = {
  * TypeScript utility for typed EventEmitter
  * Flexible interface to support both typed and legacy event patterns
  */
-export interface TypedEventEmitter<TEvents extends Record<string, unknown>> {
+export type TypedEventEmitter<TEvents extends Record<string, unknown>> = {
   on<K extends keyof TEvents>(
     event: K,
     listener: (...args: unknown[]) => void,
-  ): this;
+  ): TypedEventEmitter<TEvents>;
   emit<K extends keyof TEvents>(event: K, ...args: unknown[]): boolean;
   off<K extends keyof TEvents>(
     event: K,
     listener: (...args: unknown[]) => void,
-  ): this;
-  removeAllListeners<K extends keyof TEvents>(event?: K): this;
+  ): TypedEventEmitter<TEvents>;
+  removeAllListeners<K extends keyof TEvents>(
+    event?: K,
+  ): TypedEventEmitter<TEvents>;
   listenerCount<K extends keyof TEvents>(event: K): number;
   listeners<K extends keyof TEvents>(
     event: K,
   ): Array<(...args: unknown[]) => void>;
-}
+};

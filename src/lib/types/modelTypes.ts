@@ -6,6 +6,7 @@
 import { z } from "zod";
 import type { JsonValue } from "./common.js";
 import { AIProviderName } from "../constants/enums.js";
+import type { TaskType } from "./taskClassificationTypes.js";
 
 /**
  * Model performance tier definition
@@ -240,4 +241,22 @@ export type ModelComparison = {
     performance: Record<string, ModelInfo[]>;
     contextSize: { largest: ModelInfo; smallest: ModelInfo };
   };
+};
+
+export type ModelRoute = {
+  provider: string;
+  model: string;
+  reasoning: string;
+  confidence: number;
+};
+
+export type ModelRoutingOptions = {
+  /** Override the task classification */
+  forceTaskType?: TaskType;
+  /** Require specific performance characteristics */
+  requireFast?: boolean;
+  /** Require specific capability (reasoning, creativity, etc.) */
+  requireCapability?: string;
+  /** Fallback strategy if primary choice fails */
+  fallbackStrategy?: "fast" | "reasoning" | "auto";
 };

@@ -14,14 +14,7 @@
  * - Tabular data display
  */
 
-/**
- * Represents the available logging severity levels.
- * - debug: Detailed information for debugging purposes
- * - info: General information about system operation
- * - warn: Potential issues that don't prevent operation
- * - error: Critical issues that may cause failures
- */
-export type LogLevel = "debug" | "info" | "warn" | "error";
+import type { LogEntry, LogLevel } from "../types/utilities.js";
 
 // Pre-computed uppercase log levels for performance optimization
 const UPPERCASE_LOG_LEVELS: Record<LogLevel, string> = {
@@ -30,21 +23,6 @@ const UPPERCASE_LOG_LEVELS: Record<LogLevel, string> = {
   warn: "WARN",
   error: "ERROR",
 } as const;
-
-/**
- * Represents a single log entry in the logging system.
- * Each entry contains metadata about the log event along with the actual message.
- */
-interface LogEntry {
-  /** The severity level of the log entry */
-  level: LogLevel;
-  /** The text message to be logged */
-  message: string;
-  /** When the log entry was created */
-  timestamp: Date;
-  /** Optional additional data associated with the log entry (objects, arrays, etc.) */
-  data?: unknown;
-}
 
 class NeuroLinkLogger {
   private logLevel: LogLevel = "info";
@@ -422,6 +400,3 @@ export const LogLevels = {
   warn: "warn" as const,
   error: "error" as const,
 } as const;
-
-// Export types
-export type { LogEntry };

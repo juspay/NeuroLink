@@ -3,14 +3,7 @@
  * Provides consistent prompt masking across NeuroLink components
  */
 
-export interface PromptRedactionOptions {
-  /** Maximum length of redacted prompt */
-  maxLength?: number;
-  /** Whether to show word count */
-  showWordCount?: boolean;
-  /** Mask character to use for redaction */
-  maskChar?: string;
-}
+import type { PromptRedactionOptions } from "../types/utilities.js";
 
 /**
  * Default redaction options

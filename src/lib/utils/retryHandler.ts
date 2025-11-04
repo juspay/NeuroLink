@@ -5,6 +5,7 @@
 
 import { logger } from "./logger.js";
 import { SYSTEM_LIMITS } from "../core/constants.js";
+import type { RetryOptions } from "../types/utilities.js";
 
 /**
  * Calculate exponential backoff delay with jitter
@@ -34,15 +35,6 @@ export function calculateBackoffDelay(
     : 0;
 
   return cappedDelay + jitter;
-}
-
-export interface RetryOptions {
-  maxAttempts?: number;
-  initialDelay?: number;
-  maxDelay?: number;
-  backoffMultiplier?: number;
-  retryCondition?: (error: unknown) => boolean;
-  onRetry?: (attempt: number, error: unknown) => void;
 }
 
 /**

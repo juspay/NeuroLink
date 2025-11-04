@@ -9,73 +9,14 @@ import type {
   UnifiedGenerationOptions,
 } from "../types/generateTypes.js";
 import type { StreamOptions } from "../types/streamTypes.js";
-import type { ExecutionContext } from "../types/tools.js";
 import { ContextConverter } from "../types/contextTypes.js";
 import { logger } from "./logger.js";
-
-/**
- * Enhancement types for different optimization strategies
- */
-export type EnhancementType =
-  | "streaming-optimization"
-  | "mcp-integration"
-  | "legacy-migration"
-  | "context-conversion"
-  | "domain-configuration"
-  | "batch-parallel-enhancement"
-  | "batch-hybrid-enhancement"
-  | "batch-dependency-enhancement";
-
-/**
- * Enhancement options for modifying GenerateOptions
- */
-export interface EnhancementOptions {
-  enhancementType: EnhancementType;
-  streamingOptions?: {
-    enabled?: boolean;
-    chunkSize?: number;
-    bufferSize?: number;
-    enableProgress?: boolean;
-    preferStreaming?: boolean;
-  };
-  mcpOptions?: {
-    enableToolRegistry?: boolean;
-    contextAware?: boolean;
-    executionContext?: ExecutionContext;
-  };
-  legacyMigration?: {
-    legacyContext?: Record<string, unknown>;
-    domainType?: string;
-    preserveFields?: boolean;
-  };
-  domainConfiguration?: {
-    domainType: string;
-    keyTerms?: string[];
-    failurePatterns?: string[];
-    successPatterns?: string[];
-    evaluationCriteria?: Record<string, unknown>;
-  };
-  performance?: {
-    enableAnalytics?: boolean;
-    enableEvaluation?: boolean;
-    timeout?: number;
-  };
-}
-
-/**
- * Enhancement result with metadata
- */
-export interface EnhancementResult {
-  options: UnifiedGenerationOptions;
-  metadata: {
-    enhancementApplied: boolean;
-    enhancementType: EnhancementType;
-    processingTime: number;
-    configurationUsed: Record<string, unknown>;
-    warnings: string[];
-    recommendations: string[];
-  };
-}
+import type {
+  ConflictDetectionPlugin,
+  EnhancementOptions,
+  EnhancementResult,
+  EnhancementType,
+} from "../types/utilities.js";
 
 /**
  * Options Enhancement Utility Class
@@ -776,34 +717,6 @@ function analyzeEnhancementDependencies(
   }
 
   return independentGroups;
-}
-
-/**
- * Plugin-based conflict detection system
- * Extensible and configurable enhancement conflict resolution
- */
-export interface ConflictDetectionPlugin {
-  /** Plugin name for identification */
-  name: string;
-  /** Plugin version for compatibility checks */
-  version: string;
-  /** Check if two enhancement types conflict */
-  detectConflict(
-    enhancementA: EnhancementType,
-    enhancementB: EnhancementType,
-    optionsA?: EnhancementOptions,
-    optionsB?: EnhancementOptions,
-  ): boolean;
-  /** Get conflict severity (low, medium, high) */
-  getConflictSeverity?(
-    enhancementA: EnhancementType,
-    enhancementB: EnhancementType,
-  ): "low" | "medium" | "high";
-  /** Suggest resolution strategies */
-  suggestResolution?(
-    enhancementA: EnhancementType,
-    enhancementB: EnhancementType,
-  ): string[];
 }
 
 /**

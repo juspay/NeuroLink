@@ -4,7 +4,6 @@
  */
 
 import { createClient, type RedisClientOptions } from "redis";
-type RedisClient = ReturnType<typeof createClient>;
 import { logger } from "./logger.js";
 import type {
   ChatMessage,
@@ -13,6 +12,7 @@ import type {
 } from "../types/conversation.js";
 
 // Redis client type
+type RedisClient = ReturnType<typeof createClient>;
 
 /**
  * Creates a Redis client with the provided configuration

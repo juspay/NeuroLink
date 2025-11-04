@@ -3,41 +3,9 @@
  * Provides structured error management for tool execution and system operations
  */
 
+import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
+import type { StructuredError } from "../types/utilities.js";
 import { logger } from "./logger.js";
-
-// Error categories for proper handling
-export enum ErrorCategory {
-  VALIDATION = "validation",
-  TIMEOUT = "timeout",
-  NETWORK = "network",
-  RESOURCE = "resource",
-  PERMISSION = "permission",
-  CONFIGURATION = "configuration",
-  EXECUTION = "execution",
-  SYSTEM = "system",
-}
-
-// Error severity levels
-export enum ErrorSeverity {
-  LOW = "low",
-  MEDIUM = "medium",
-  HIGH = "high",
-  CRITICAL = "critical",
-}
-
-// Structured error interface
-export type StructuredError = {
-  code: string;
-  message: string;
-  category: ErrorCategory;
-  severity: ErrorSeverity;
-  retriable: boolean;
-  context?: Record<string, unknown>;
-  originalError?: Error;
-  timestamp: Date;
-  toolName?: string;
-  serverId?: string;
-};
 
 // Error codes for different scenarios
 export const ERROR_CODES = {

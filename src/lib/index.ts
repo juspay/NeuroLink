@@ -203,7 +203,7 @@ export type {
   ToolExecutionResult,
 } from "./types/tools.js";
 
-export type { LogLevel } from "./utils/logger.js";
+export type { LogLevel } from "./types/utilities.js";
 
 // ============================================================================
 // REAL-TIME SERVICES & TELEMETRY - Enterprise Platform Features
