@@ -1,3 +1,9 @@
+## [7.53.4](https://github.com/juspay/neurolink/compare/v7.53.3...v7.53.4) (2025-11-05)
+
+### Bug Fixes
+
+- **(sdk):** structured object response in generate function ([f16d597](https://github.com/juspay/neurolink/commit/f16d597f8e9a64f24a7a6ad5344c93add524c23d))
+
 ## [7.53.3](https://github.com/juspay/neurolink/compare/v7.53.2...v7.53.3) (2025-11-03)
 
 ## [7.53.2](https://github.com/juspay/neurolink/compare/v7.53.1...v7.53.2) (2025-10-28)
