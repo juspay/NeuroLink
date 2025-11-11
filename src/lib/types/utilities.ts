@@ -209,20 +209,63 @@ export type EnvVarValidationResult = {
 };
 
 /**
- * Interface for mem0 Memory instance methods based on actual mem0ai/oss API
+ * Interface for mem0 Memory instance methods based on mem0ai cloud API
  */
 export type Mem0Memory = {
   search(
     query: string,
-    config: { userId?: string; limit?: number },
-  ): Promise<{ results: Array<{ memory: string; id: string }> }>;
+    options?: {
+      user_id?: string;
+      agent_id?: string;
+      app_id?: string;
+      run_id?: string;
+      limit?: number;
+      threshold?: number;
+    },
+  ): Promise<
+    Array<{
+      id: string;
+      memory?: string;
+      user_id?: string;
+      metadata?: unknown;
+      created_at?: Date;
+      updated_at?: Date;
+      score?: number;
+    }>
+  >;
   add(
-    messages: string,
-    config: { userId?: string; metadata?: Record<string, unknown> },
-  ): Promise<{ results: Array<{ id: string; memory: string }> }>;
-  get(memoryId: string): Promise<{ id: string; memory: string } | null>;
-  update(memoryId: string, data: string): Promise<{ message: string }>;
+    messages: Array<{ role: "user" | "assistant"; content: string }>,
+    options?: {
+      user_id?: string;
+      agent_id?: string;
+      app_id?: string;
+      run_id?: string;
+      metadata?: Record<string, unknown>;
+      infer?: boolean;
+      async_mode?: boolean;
+    },
+  ): Promise<
+    Array<{
+      id: string;
+      memory?: string;
+      event?: string;
+      data?: unknown;
+    }>
+  >;
+  get(memoryId: string): Promise<{
+    id: string;
+    memory?: string;
+    user_id?: string;
+    created_at?: Date;
+    updated_at?: Date;
+  }>;
+  update(
+    memoryId: string,
+    data: { text?: string; metadata?: Record<string, unknown> },
+  ): Promise<Array<{ id: string; memory?: string }>>;
   delete(memoryId: string): Promise<{ message: string }>;
-  history(memoryId: string): Promise<unknown[]>;
-  reset(): Promise<void>;
+  getAll(options?: {
+    user_id?: string;
+    limit?: number;
+  }): Promise<Array<{ id: string; memory?: string }>>;
 };

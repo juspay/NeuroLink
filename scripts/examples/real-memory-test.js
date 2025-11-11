@@ -39,34 +39,13 @@ async function realMemoryTest() {
   console.log("🧠 Complete Memory Test - End-to-End Testing");
   console.log("=============================================\n");
  
+  // Mem0 Cloud API configuration
   const mem0Config = {
-    disableHistory: true,
-    version: "v1.1",
-    embedder: {
-      provider: "openai",
-      config: {
-        apiKey: process.env.OPENAI_API_KEY || "",
-        model: "text-embedding-3-small", 
-      },
-    },
-    vectorStore: {
-      provider: "qdrant",
-      config: {
-        collectionName: "brownmunde", 
-        dimension: 1536, 
-        url: "http://localhost:6333",
-        checkCompatibility: false, 
-      },
-    },
-    llm: {
-      provider: "google",
-      config: {
-        baseURL: "https://generativelanguage.googleapis.com",
-        apiKey: process.env.GEMINI_API_KEY || "",
-        model: "gemini-2.0-flash-exp" 
-      },
-    }
-};
+    apiKey: process.env.MEM0_API_KEY || "",
+    // Optional: Add organization and project IDs if using Mem0 cloud
+    // orgId: process.env.MEM0_ORG_ID,
+    // projectId: process.env.MEM0_PROJECT_ID,
+  };
 
    const conversationMemory = {
     enabled: true,
@@ -105,7 +84,7 @@ async function realMemoryTest() {
       provider: "vertex", // Use available provider
       context: {
         sessionId: "newusersessionidNo",
-        userId: "deepak_123"
+        userId: "deepak_1234"
       },
       model: "claude-sonnet-4@20250514",
       enableAnalytics: true 
@@ -150,7 +129,7 @@ async function realMemoryTest() {
       },
       context: {
         sessionId: "oldUserNewSessionId",
-        userId: "deepak_123"
+        userId: "deepak_1234"
       },
       provider: "vertex",
       model: "gemini-2.5-flash",
@@ -210,7 +189,7 @@ async function realMemoryTest() {
       },
       context: {
         sessionId: "bobFirstSession",
-        userId: "bob_456" // Different user ID
+        userId: "bob_4561" // Different user ID
       },
       provider: "vertex",
       model: "claude-sonnet-4@20250514",
@@ -254,7 +233,7 @@ async function realMemoryTest() {
       },
       context: {
         sessionId: "bobSecondSession", // Different session for Bob
-        userId: "bob_456" // Same user ID as Bob
+        userId: "bob_4561" // Same user ID as Bob
       },
       provider: "vertex",
       model: "claude-sonnet-4@20250514",
@@ -294,7 +273,7 @@ async function realMemoryTest() {
       },
       context: {
         sessionId: "aliceNewFrameworkSession", // New session for Alice
-        userId: "deepak_123" // Same user ID as Alice
+        userId: "deepak_1234" // Same user ID as Alice
       },
       provider: "vertex",
       model: "claude-sonnet-4@20250514",
@@ -338,7 +317,7 @@ async function realMemoryTest() {
       },
       context: {
         sessionId: "aliceStreamingSession",
-        userId: "deepak_123" // Same Alice user
+        userId: "deepak_1234" // Same Alice user
       },
       provider: "vertex",
       model: "gemini-2.5-flash",
@@ -402,7 +381,7 @@ async function realMemoryTest() {
       },
       context: {
         sessionId: "bobStreamingSession",
-        userId: "bob_456" // Bob's user ID
+        userId: "bob_4561" // Bob's user ID
       },
       provider: "vertex",
       model: "gemini-2.5-flash",
@@ -533,15 +512,14 @@ async function realMemoryTest() {
     
     console.log("\n🔧 Debugging Steps:");
     console.log("==================");
-    console.log("1. Check if Qdrant is running:");
-    console.log("   docker run -p 6333:6333 qdrant/qdrant");
-    console.log("   curl http://localhost:6333/health");
+    console.log("1. Verify Mem0 Cloud API key:");
+    console.log("   echo $MEM0_API_KEY");
     console.log("");
     console.log("2. Verify Google AI API key:");
     console.log("   echo $GOOGLE_AI_API_KEY");
     console.log("");
     console.log("3. Check environment variables:");
-    console.log("   env | grep -E '(GOOGLE|VERTEX|AI)'");
+    console.log("   env | grep -E '(GOOGLE|VERTEX|AI|MEM0)'");
     console.log("");
     console.log("4. Run with debug output:");
     console.log("   DEBUG=* node scripts/examples/real-memory-test.js");

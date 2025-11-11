@@ -133,7 +133,6 @@ import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
 // Import orchestration components
 import { ModelRouter } from "./utils/modelRouter.js";
 import { BinaryTaskClassifier } from "./utils/taskClassifier.js";
-import type { MemoryConfig } from "mem0ai/oss";
 import {
   initializeOpenTelemetry,
   shutdownOpenTelemetry,
@@ -142,6 +141,8 @@ import {
 } from "./services/server/ai/observability/instrumentation.js";
 import type { ObservabilityConfig } from "./types/observability.js";
 import type { NeurolinkConstructorConfig } from "./types/configTypes.js";
+// Static import for mem0 initialization (cloud API - no bundling issues!)
+import { initializeMem0, type Mem0Config } from "./memory/mem0Initializer.js";
 
 export class NeuroLink {
   private mcpInitialized = false;
@@ -225,7 +226,7 @@ export class NeuroLink {
 
   // Mem0 memory instance and config for conversation context
   private mem0Instance?: Mem0Memory | null;
-  private mem0Config?: MemoryConfig;
+  private mem0Config?: Mem0Config;
 
   /**
    * Simple sync config setup for mem0
@@ -252,9 +253,6 @@ export class NeuroLink {
       this.mem0Instance = null;
       return null;
     }
-
-    // Import and initialize from separate file
-    const { initializeMem0 } = await import("./memory/mem0Initializer.js");
 
     if (!this.mem0Config) {
       this.mem0Instance = null;
@@ -591,10 +589,11 @@ export class NeuroLink {
     memoryContext: string,
     currentInput: string,
   ): string {
-    return `Context from previous conversations:
-  ${memoryContext}
+    return `Here is some potentially relevant context from the user's past conversations:
 
-  Current user's request: ${currentInput}`;
+${memoryContext}
+
+User's current question: ${currentInput}`;
   }
 
   /**
@@ -1605,14 +1604,15 @@ export class NeuroLink {
           );
         } else {
           const memories = await mem0.search(options.input.text, {
-            userId: options.context.userId as string,
+            user_id: options.context.userId as string,
             limit: 5,
           });
 
-          if (memories?.results?.length > 0) {
+          if (memories && memories.length > 0) {
             // Enhance the input with memory context
-            const memoryContext = memories.results
-              .map((m) => m.memory)
+            const memoryContext = memories
+              .map((m) => m.memory || '')
+              .filter(Boolean)
               .join("\n");
 
             options.input.text = this.formatMemoryContext(
@@ -1808,19 +1808,20 @@ export class NeuroLink {
           if (mem0) {
             // Store complete conversation turn (user + AI messages)
             const conversationTurn = [
-              { role: "user", content: options.input.text },
-              { role: "system", content: generateResult.content },
+              { role: "user" as const, content: originalPrompt },
+              { role: "assistant" as const, content: generateResult.content },
             ];
 
-            await mem0.add(JSON.stringify(conversationTurn), {
-              userId: options.context?.userId as string,
+            await mem0.add(conversationTurn, {
+              user_id: options.context?.userId as string,
               metadata: {
                 timestamp: new Date().toISOString(),
                 provider: generateResult.provider,
                 model: generateResult.model,
                 type: "conversation_turn",
-                async_mode: true,
               },
+              infer: true,
+              async_mode: true,
             });
           }
         } catch (error) {
@@ -2634,14 +2635,15 @@ export class NeuroLink {
             );
           } else {
             const memories = await mem0.search(options.input.text, {
-              userId: options.context.userId as string,
+              user_id: options.context.userId as string,
               limit: 5,
             });
 
-            if (memories?.results?.length > 0) {
+            if (memories && memories.length > 0) {
               // Enhance the input with memory context
-              const memoryContext = memories.results
-                .map((m) => m.memory)
+              const memoryContext = memories
+                .map((m) => m.memory || '')
+                .filter(Boolean)
                 .join("\n");
 
               options.input.text = this.formatMemoryContext(
@@ -2754,19 +2756,20 @@ export class NeuroLink {
                 if (mem0) {
                   // Store complete conversation turn (user + AI messages)
                   const conversationTurn = [
-                    { role: "user", content: originalPrompt },
-                    { role: "system", content: accumulatedContent.trim() },
+                    { role: "user" as const, content: originalPrompt },
+                    { role: "assistant" as const, content: accumulatedContent.trim() },
                   ];
 
-                  await mem0.add(JSON.stringify(conversationTurn), {
-                    userId: enhancedOptions.context?.userId as string,
+                  await mem0.add(conversationTurn, {
+                    user_id: enhancedOptions.context?.userId as string,
                     metadata: {
                       timestamp: new Date().toISOString(),
                       type: "conversation_turn_stream",
                       userMessage: originalPrompt,
-                      async_mode: true,
                       aiResponse: accumulatedContent.trim(),
                     },
+                    infer: true,
+                    async_mode: true,
                   });
                 }
               } catch (error) {
