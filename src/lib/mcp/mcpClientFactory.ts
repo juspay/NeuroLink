@@ -35,9 +35,6 @@ export class MCPClientFactory {
   };
 
   private static readonly DEFAULT_CAPABILITIES: ClientCapabilities = {
-    tools: {},
-    resources: {},
-    prompts: {},
     sampling: {},
     roots: {
       listChanged: false,
