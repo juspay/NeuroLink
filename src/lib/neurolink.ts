@@ -139,6 +139,7 @@ import {
   shutdownOpenTelemetry,
   flushOpenTelemetry,
   getLangfuseHealthStatus,
+  setLangfuseContext,
 } from "./services/server/ai/observability/instrumentation.js";
 import type { ObservabilityConfig } from "./types/observability.js";
 import type { NeurolinkConstructorConfig } from "./types/configTypes.js";
@@ -226,6 +227,43 @@ export class NeuroLink {
   // Mem0 memory instance and config for conversation context
   private mem0Instance?: Mem0Memory | null;
   private mem0Config?: MemoryConfig;
+
+  /**
+   * Extract and set Langfuse context from options with proper async scoping
+   */
+  private async setLangfuseContextFromOptions<T>(
+    options: { context?: unknown },
+    callback: () => Promise<T>,
+  ): Promise<T> {
+    if (options.context && typeof options.context === "object" && options.context !== null) {
+      try {
+        const ctx = options.context as Record<string, unknown>;
+        if (ctx.userId || ctx.sessionId) {
+          return await new Promise<T>((resolve, reject) => {
+            setLangfuseContext(
+              {
+                userId: typeof ctx.userId === "string" ? ctx.userId : null,
+                sessionId: typeof ctx.sessionId === "string" ? ctx.sessionId : null,
+              },
+              async () => {
+                try {
+                  const result = await callback();
+                  resolve(result);
+                } catch (error) {
+                  reject(error);
+                }
+              },
+            );
+          });
+        }
+      } catch (error) {
+        logger.warn("Failed to set Langfuse context from options", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return await callback();
+  }
 
   /**
    * Simple sync config setup for mem0
@@ -797,7 +835,7 @@ export class NeuroLink {
           message: "Starting Langfuse observability initialization",
         });
 
-        // Initialize OpenTelemetry FIRST (required for Langfuse v4)
+        // Initialize OpenTelemetry (sets defaults from config)
         initializeOpenTelemetry(langfuseConfig);
 
         const healthStatus = getLangfuseHealthStatus();
@@ -1593,6 +1631,8 @@ export class NeuroLink {
       throw new Error("Input text is required and must be a non-empty string");
     }
 
+    // Set session and user IDs from context for Langfuse spans and execute with proper async scoping
+    return await this.setLangfuseContextFromOptions(options, async () => {
     if (
       this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
       options.context?.userId
@@ -1831,6 +1871,7 @@ export class NeuroLink {
     }
 
     return generateResult;
+    });
   }
 
   /**
@@ -2602,6 +2643,8 @@ export class NeuroLink {
     await this.validateStreamInput(options);
     this.emitStreamStartEvents(options, startTime);
 
+    // Set session and user IDs from context for Langfuse spans and execute with proper async scoping
+    return await this.setLangfuseContextFromOptions(options, async () => {
     let enhancedOptions: StreamOptions;
     let factoryResult: {
       hasStreamingConfig: boolean;
@@ -2803,6 +2846,7 @@ export class NeuroLink {
         undefined,
       );
     }
+    });
   }
 
   /**

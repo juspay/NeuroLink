@@ -71,6 +71,7 @@ import {
   shutdownOpenTelemetry,
   flushOpenTelemetry,
   getLangfuseHealthStatus,
+  setLangfuseContext,
 } from "./services/server/ai/observability/instrumentation.js";
 import {
   initializeTelemetry as init,
@@ -82,6 +83,7 @@ export {
   shutdownOpenTelemetry,
   flushOpenTelemetry,
   getLangfuseHealthStatus,
+  setLangfuseContext,
 };
 
 // Middleware exports

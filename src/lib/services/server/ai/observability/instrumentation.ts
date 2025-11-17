@@ -9,21 +9,56 @@
 
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { LangfuseSpanProcessor } from "@langfuse/otel";
+import type { Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 import { resourceFromAttributes } from "@opentelemetry/resources";
+import { AsyncLocalStorage } from "async_hooks";
 import { logger } from "../../../../utils/logger.js";
 import type { LangfuseConfig } from "../../../../types/observability.js";
 
 const LOG_PREFIX = "[OpenTelemetry]";
+
+type LangfuseContext = {
+  userId?: string | null;
+  sessionId?: string | null;
+};
+
+const contextStorage = new AsyncLocalStorage<LangfuseContext>();
 
 let tracerProvider: NodeTracerProvider | null = null;
 let langfuseProcessor: LangfuseSpanProcessor | null = null;
 let isInitialized = false;
 let isCredentialsValid = false;
 let currentConfig: LangfuseConfig | null = null;
+
+/**
+ * Span processor that enriches spans with user and session context from AsyncLocalStorage
+ */
+class ContextEnricher implements SpanProcessor {
+  onStart(span: Span): void {
+    const context = contextStorage.getStore();
+    const userId = context?.userId ?? currentConfig?.userId;
+    const sessionId = context?.sessionId ?? currentConfig?.sessionId;
+
+    if (userId) {
+      span.setAttribute("user.id", userId);
+    }
+    if (sessionId) {
+      span.setAttribute("session.id", sessionId);
+    }
+  }
+
+  onEnd(): void {}
+  shutdown(): Promise<void> {
+    return Promise.resolve();
+  }
+  forceFlush(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * Initialize OpenTelemetry with Langfuse span processor
@@ -60,7 +95,6 @@ export function initializeOpenTelemetry(config: LangfuseConfig): void {
     currentConfig = config;
     isCredentialsValid = true;
 
-    // Create Langfuse span processor with configuration
     langfuseProcessor = new LangfuseSpanProcessor({
       publicKey: config.publicKey,
       secretKey: config.secretKey,
@@ -69,22 +103,18 @@ export function initializeOpenTelemetry(config: LangfuseConfig): void {
       release: config.release || "v1.0.0",
     });
 
-    // Create resource with service metadata (v2.x API)
     const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: "neurolink",
       [ATTR_SERVICE_VERSION]: config.release || "v1.0.0",
       "deployment.environment": config.environment || "dev",
     });
 
-    // Initialize tracer provider with span processor and resource
     tracerProvider = new NodeTracerProvider({
       resource,
-      spanProcessors: [langfuseProcessor],
+      spanProcessors: [new ContextEnricher(), langfuseProcessor],
     });
 
-    // Register provider globally so Vercel AI SDK can use it
     tracerProvider.register();
-
     isInitialized = true;
 
     logger.info(`${LOG_PREFIX} Initialized with Langfuse span processor`, {
@@ -194,4 +224,41 @@ export function getLangfuseHealthStatus() {
         }
       : undefined,
   };
+}
+
+/**
+ * Set user and session context for Langfuse spans in the current async context
+ *
+ * Merges the provided context with existing AsyncLocalStorage context. If a callback is provided,
+ * the context is scoped to that callback execution. Without a callback, the context applies to
+ * the current execution context and its children.
+ *
+ * Uses AsyncLocalStorage to properly scope context per request, avoiding race conditions
+ * in concurrent scenarios.
+ *
+ * @param context - Object containing optional userId and/or sessionId to merge with existing context
+ * @param callback - Optional callback to run within the context scope. If omitted, context applies to current execution
+ */
+export async function setLangfuseContext(
+  context: {
+    userId?: string | null;
+    sessionId?: string | null;
+  },
+  callback?: () => void | Promise<void>,
+): Promise<void> {
+  const currentContext = contextStorage.getStore() || {};
+  const newContext: LangfuseContext = {
+    userId:
+      context.userId !== undefined ? context.userId : currentContext.userId,
+    sessionId:
+      context.sessionId !== undefined
+        ? context.sessionId
+        : currentContext.sessionId,
+  };
+
+  if (callback) {
+    return await contextStorage.run(newContext, callback);
+  } else {
+    contextStorage.enterWith(newContext);
+  }
 }

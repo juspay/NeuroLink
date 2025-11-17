@@ -25,6 +25,10 @@ export type LangfuseConfig = {
   environment?: string;
   /** Release/version identifier */
   release?: string;
+  /** Optional default user id to attach to spans */
+  userId?: string;
+  /** Optional default session id to attach to spans */
+  sessionId?: string;
 };
 
 /**
