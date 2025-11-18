@@ -272,6 +272,8 @@ export type StreamResult = {
     totalToolExecutions?: number;
     toolExecutionTime?: number;
     hasToolErrors?: boolean;
+    guardrailsBlocked?: boolean;
+    error?: string;
   };
 
   // Analytics and evaluation (available after stream completion)

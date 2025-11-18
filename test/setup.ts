@@ -30,6 +30,11 @@ vi.mock("ai", () => ({
   stream: vi.fn(),
   generate: vi.fn(),
   Output: { object: vi.fn() },
+  tool: vi.fn((config) => ({
+    description: config.description || "",
+    parameters: config.parameters || {},
+    execute: config.execute || vi.fn(),
+  })),
 }));
 
 // Mock all AI providers

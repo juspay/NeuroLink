@@ -2802,22 +2802,111 @@ Current user's request: ${currentInput}`;
         const { stream: mcpStream, provider: providerName } =
           await this.createMCPStream(enhancedOptions);
 
-        // Create a wrapper around the stream that accumulates content
         let accumulatedContent = "";
+        let chunkCount = 0;
+
+        const metadata = {
+          fallbackAttempted: false,
+          guardrailsBlocked: false,
+          error: undefined as string | undefined,
+        };
 
         const processedStream = (async function* (self: NeuroLink) {
           try {
             for await (const chunk of mcpStream) {
+              chunkCount++;
               if (
                 chunk &&
                 "content" in chunk &&
                 typeof chunk.content === "string"
               ) {
                 accumulatedContent += chunk.content;
-                // Emit chunk event for compatibility
                 self.emitter.emit("response:chunk", chunk.content);
               }
-              yield chunk; // Preserve original streaming behavior
+              yield chunk;
+            }
+
+            if (chunkCount === 0 && !metadata.fallbackAttempted) {
+              metadata.fallbackAttempted = true;
+              const errorMsg = "Stream completed with 0 chunks (possible guardrails block)";
+              metadata.error = errorMsg;
+
+              const fallbackRoute = ModelRouter.getFallbackRoute(
+                originalPrompt || enhancedOptions.input.text || "",
+                {
+                  provider: providerName,
+                  model: enhancedOptions.model || "gpt-4o",
+                  reasoning: "primary failed",
+                  confidence: 0.5,
+                },
+                { fallbackStrategy: "auto" },
+              );
+
+              logger.warn("Retrying with fallback provider", {
+                originalProvider: providerName,
+                fallbackProvider: fallbackRoute.provider,
+                reason: errorMsg,
+              });
+
+              try {
+                const fallbackProvider = await AIProviderFactory.createProvider(
+                  fallbackRoute.provider,
+                  fallbackRoute.model,
+                );
+
+                // Ensure fallback provider can execute tools
+                fallbackProvider.setupToolExecutor(
+                  {
+                    customTools: self.getCustomTools(),
+                    executeTool: self.executeTool.bind(self),
+                  },
+                  "NeuroLink.fallbackStream",
+                );
+
+                // Get conversation messages for context (same as primary stream)
+                const conversationMessages = await getConversationMessages(
+                  self.conversationMemory,
+                  {
+                    prompt: enhancedOptions.input.text,
+                    context: enhancedOptions.context as Record<string, unknown>,
+                  } as TextGenerationOptions,
+                );
+
+                const fallbackResult = await fallbackProvider.stream({
+                  ...enhancedOptions,
+                  model: fallbackRoute.model,
+                  conversationMessages,
+                });
+
+                let fallbackChunkCount = 0;
+                for await (const fallbackChunk of fallbackResult.stream) {
+                  fallbackChunkCount++;
+                  if (
+                    fallbackChunk &&
+                    "content" in fallbackChunk &&
+                    typeof fallbackChunk.content === "string"
+                  ) {
+                    accumulatedContent += fallbackChunk.content;
+                    self.emitter.emit("response:chunk", fallbackChunk.content);
+                  }
+                  yield fallbackChunk;
+                }
+
+                if (fallbackChunkCount === 0) {
+                  throw new Error(`Fallback provider ${fallbackRoute.provider} also returned 0 chunks`);
+                }
+
+                // Fallback succeeded - likely guardrails blocked primary
+                metadata.guardrailsBlocked = true;
+              } catch (fallbackError) {
+                const fallbackErrorMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+                metadata.error = `${errorMsg}; Fallback failed: ${fallbackErrorMsg}`;
+                logger.error("Fallback provider failed", {
+                  fallbackProvider: fallbackRoute.provider,
+                  error: fallbackErrorMsg,
+                });
+                throw fallbackError;
+              }
             }
           } finally {
             // Store memory after stream consumption is complete
@@ -2879,7 +2968,7 @@ Current user's request: ${currentInput}`;
           }
         })(this);
         const streamResult = await this.processStreamResult(
-          mcpStream,
+          processedStream,
           enhancedOptions,
           factoryResult,
         );
@@ -2893,7 +2982,9 @@ Current user's request: ${currentInput}`;
           startTime,
           responseTime,
           streamId,
-          fallback: false,
+          fallback: metadata.fallbackAttempted,
+          guardrailsBlocked: metadata.guardrailsBlocked,
+          error: metadata.error,
         });
       } catch (error) {
         return this.handleStreamError(
@@ -3081,6 +3172,8 @@ Current user's request: ${currentInput}`;
       responseTime: number;
       streamId: string;
       fallback?: boolean;
+      guardrailsBlocked?: boolean;
+      error?: string;
     },
   ): StreamResult {
     return {
@@ -3098,6 +3191,8 @@ Current user's request: ${currentInput}`;
         startTime: config.startTime,
         responseTime: config.responseTime,
         fallback: config.fallback || false,
+        guardrailsBlocked: config.guardrailsBlocked,
+        error: config.error,
       },
     };
   }

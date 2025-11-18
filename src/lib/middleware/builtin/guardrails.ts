@@ -101,9 +101,11 @@ export function createGuardrailsMiddleware(
       }
 
       const { stream, ...rest } = await doStream();
+      let hasYieldedChunks = false;
 
       const transformStream = new TransformStream({
         transform(chunk, controller) {
+          hasYieldedChunks = true;
           let filteredChunk = chunk;
           if (
             typeof filteredChunk === "object" &&
@@ -122,6 +124,13 @@ export function createGuardrailsMiddleware(
             }
           }
           controller.enqueue(filteredChunk);
+        },
+        flush() {
+          if (!hasYieldedChunks) {
+            logger.warn(
+              `[GuardrailsMiddleware] Stream ended without yielding any chunks`,
+            );
+          }
         },
       });
 
