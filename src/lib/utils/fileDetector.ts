@@ -4,7 +4,7 @@
  * Uses multi-strategy approach for reliable type identification
  */
 
-import { request } from "undici";
+import { request, getGlobalDispatcher, interceptors } from "undici";
 import { readFile, stat } from "fs/promises";
 import type {
   FileType,
@@ -209,10 +209,12 @@ export class FileDetector {
     const timeout = options?.timeout || 30000;
 
     const response = await request(url, {
+      dispatcher: getGlobalDispatcher().compose(
+        interceptors.redirect({ maxRedirections: 5 }),
+      ),
       method: "GET",
       headersTimeout: timeout,
       bodyTimeout: timeout,
-      maxRedirections: 5,
     });
 
     if (response.statusCode !== 200) {
@@ -374,10 +376,12 @@ class MimeTypeStrategy implements DetectionStrategy {
 
     try {
       const response = await request(input, {
+        dispatcher: getGlobalDispatcher().compose(
+          interceptors.redirect({ maxRedirections: 5 }),
+        ),
         method: "HEAD",
         headersTimeout: 5000,
         bodyTimeout: 5000,
-        maxRedirections: 5,
       });
       const contentType = (response.headers["content-type"] as string) || "";
       const type = this.mimeToFileType(contentType);

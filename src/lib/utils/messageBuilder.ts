@@ -21,7 +21,7 @@ import {
 import { logger } from "./logger.js";
 import { FileDetector } from "./fileDetector.js";
 import { PDFProcessor } from "./pdfProcessor.js";
-import { request } from "undici";
+import { request, getGlobalDispatcher, interceptors } from "undici";
 import { readFileSync, existsSync } from "fs";
 import type {
   CoreMessage,
@@ -746,10 +746,12 @@ function isInternetUrl(input: string): boolean {
 async function downloadImageFromUrl(url: string): Promise<string> {
   try {
     const response = await request(url, {
+      dispatcher: getGlobalDispatcher().compose(
+        interceptors.redirect({ maxRedirections: 5 }),
+      ),
       method: "GET",
       headersTimeout: 10000, // 10 second timeout for headers
-      bodyTimeout: 30000, // 30 second timeout for body
-      maxRedirections: 5,
+      bodyTimeout: 30000, // 30 second timeout for body,
     });
 
     if (response.statusCode !== 200) {

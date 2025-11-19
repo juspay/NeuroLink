@@ -235,7 +235,11 @@ export class NeuroLink {
     options: { context?: unknown },
     callback: () => Promise<T>,
   ): Promise<T> {
-    if (options.context && typeof options.context === "object" && options.context !== null) {
+    if (
+      options.context &&
+      typeof options.context === "object" &&
+      options.context !== null
+    ) {
       try {
         const ctx = options.context as Record<string, unknown>;
         if (ctx.userId || ctx.sessionId) {
@@ -243,7 +247,8 @@ export class NeuroLink {
             setLangfuseContext(
               {
                 userId: typeof ctx.userId === "string" ? ctx.userId : null,
-                sessionId: typeof ctx.sessionId === "string" ? ctx.sessionId : null,
+                sessionId:
+                  typeof ctx.sessionId === "string" ? ctx.sessionId : null,
               },
               async () => {
                 try {
@@ -1633,244 +1638,247 @@ export class NeuroLink {
 
     // Set session and user IDs from context for Langfuse spans and execute with proper async scoping
     return await this.setLangfuseContextFromOptions(options, async () => {
-    if (
-      this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-      options.context?.userId
-    ) {
-      try {
-        const mem0 = await this.ensureMem0Ready();
-        if (!mem0) {
-          logger.debug(
-            "Mem0 not available, continuing without memory retrieval",
-          );
-        } else {
-          const memories = await mem0.search(options.input.text, {
-            userId: options.context.userId as string,
-            limit: 5,
-          });
-
-          if (memories?.results?.length > 0) {
-            // Enhance the input with memory context
-            const memoryContext = memories.results
-              .map((m) => m.memory)
-              .join("\n");
-
-            options.input.text = this.formatMemoryContext(
-              memoryContext,
-              options.input.text,
-            );
-          }
-        }
-      } catch (error) {
-        logger.warn("Mem0 memory retrieval failed:", error);
-      }
-    }
-
-    const startTime = Date.now();
-
-    // Apply orchestration if enabled and no specific provider/model requested
-    if (this.enableOrchestration && !options.provider && !options.model) {
-      try {
-        const orchestratedOptions = await this.applyOrchestration(options);
-        logger.debug("Orchestration applied", {
-          originalProvider: options.provider || "auto",
-          orchestratedProvider: orchestratedOptions.provider,
-          orchestratedModel: orchestratedOptions.model,
-          prompt: options.input.text.substring(0, 100),
-        });
-
-        // Use orchestrated options
-        Object.assign(options, orchestratedOptions);
-      } catch (error) {
-        logger.warn("Orchestration failed, continuing with original options", {
-          error: error instanceof Error ? error.message : String(error),
-          originalProvider: options.provider || "auto",
-        });
-        // Continue with original options if orchestration fails
-      }
-    }
-
-    // Emit generation start event (NeuroLink format - keep existing)
-    this.emitter.emit("generation:start", {
-      provider: options.provider || "auto",
-      timestamp: startTime,
-    });
-
-    // ADD: Bedrock-compatible response:start event
-    this.emitter.emit("response:start");
-
-    // ADD: Bedrock-compatible message event
-    this.emitter.emit(
-      "message",
-      `Starting ${options.provider || "auto"} text generation...`,
-    );
-
-    // Process factory configuration
-    const factoryResult = processFactoryOptions(options);
-
-    // Validate factory configuration if present
-    if (factoryResult.hasFactoryConfig && options.factoryConfig) {
-      const validation = validateFactoryConfig(options.factoryConfig);
-      if (!validation.isValid) {
-        logger.warn("Invalid factory configuration detected", {
-          errors: validation.errors,
-        });
-        // Continue with warning rather than throwing - graceful degradation
-      }
-    }
-
-    // 🔧 CRITICAL FIX: Convert to TextGenerationOptions while preserving the input object for multimodal support
-    const baseOptions: TextGenerationOptions = {
-      prompt: options.input.text,
-      provider: options.provider as AIProviderName,
-      model: options.model,
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-      systemPrompt: options.systemPrompt,
-      schema: options.schema,
-      output: options.output,
-      disableTools: options.disableTools,
-      enableAnalytics: options.enableAnalytics,
-      enableEvaluation: options.enableEvaluation,
-      context: options.context as Record<string, JsonValue> | undefined,
-      evaluationDomain: options.evaluationDomain,
-      toolUsageContext: options.toolUsageContext,
-      input: options.input, // This includes text, images, and content arrays
-      region: options.region,
-    };
-
-    // Apply factory enhancement using centralized utilities
-    const textOptions = enhanceTextGenerationOptions(
-      baseOptions,
-      factoryResult,
-    );
-
-    // Pass conversation memory config if available
-    if (this.conversationMemory) {
-      textOptions.conversationMemoryConfig = this.conversationMemory.config;
-      // Include original prompt for context summarization
-      textOptions.originalPrompt = originalPrompt;
-    }
-
-    // Detect and execute domain-specific tools
-    const { toolResults, enhancedPrompt } = await this.detectAndExecuteTools(
-      textOptions.prompt || options.input.text,
-      factoryResult.domainType,
-    );
-
-    // Update prompt with tool results if available
-    if (enhancedPrompt !== textOptions.prompt) {
-      textOptions.prompt = enhancedPrompt;
-      logger.debug("Enhanced prompt with tool results", {
-        originalLength: options.input.text.length,
-        enhancedLength: enhancedPrompt.length,
-        toolResults: toolResults.length,
-      });
-    }
-
-    // Use redesigned generation logic
-    const textResult = await this.generateTextInternal(textOptions);
-
-    // Emit generation completion event (NeuroLink format - enhanced with content)
-    this.emitter.emit("generation:end", {
-      provider: textResult.provider,
-      responseTime: Date.now() - startTime,
-      toolsUsed: textResult.toolsUsed,
-      timestamp: Date.now(),
-      result: textResult, // Enhanced: include full result
-    });
-
-    // ADD: Bedrock-compatible response:end event with content
-    this.emitter.emit("response:end", textResult.content || "");
-
-    // ADD: Bedrock-compatible message event
-    this.emitter.emit(
-      "message",
-      `Generation completed in ${Date.now() - startTime}ms`,
-    );
-
-    // Convert back to GenerateResult
-    const generateResult: GenerateResult = {
-      content: textResult.content,
-      provider: textResult.provider,
-      model: textResult.model,
-      usage: textResult.usage
-        ? {
-            input: textResult.usage.input || 0,
-            output: textResult.usage.output || 0,
-            total: textResult.usage.total || 0,
-          }
-        : undefined,
-      responseTime: textResult.responseTime,
-      toolsUsed: textResult.toolsUsed,
-      toolExecutions: transformToolExecutions(textResult.toolExecutions),
-      enhancedWithTools: textResult.enhancedWithTools,
-      availableTools: transformAvailableTools(textResult.availableTools),
-      analytics: textResult.analytics,
-      evaluation: textResult.evaluation
-        ? {
-            ...textResult.evaluation,
-            isOffTopic:
-              ((textResult.evaluation as unknown as UnknownRecord)
-                .isOffTopic as boolean) ?? false,
-            alertSeverity:
-              ((textResult.evaluation as unknown as UnknownRecord)
-                .alertSeverity as "low" | "medium" | "high" | "none") ??
-              ("none" as const),
-            reasoning:
-              ((textResult.evaluation as unknown as UnknownRecord)
-                .reasoning as string) ?? "No evaluation provided",
-            evaluationModel:
-              ((textResult.evaluation as unknown as UnknownRecord)
-                .evaluationModel as string) ?? "unknown",
-            evaluationTime:
-              ((textResult.evaluation as unknown as UnknownRecord)
-                .evaluationTime as number) ?? Date.now(),
-            // Include evaluationDomain from original options
-            evaluationDomain:
-              ((textResult.evaluation as unknown as UnknownRecord)
-                .evaluationDomain as string) ??
-              textOptions.evaluationDomain ??
-              factoryResult.domainType,
-          }
-        : undefined,
-    };
-
-    if (
-      this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-      options.context?.userId &&
-      generateResult.content
-    ) {
-      // Non-blocking memory storage - run in background
-      setImmediate(async () => {
+      if (
+        this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+        options.context?.userId
+      ) {
         try {
           const mem0 = await this.ensureMem0Ready();
-          if (mem0) {
-            // Store complete conversation turn (user + AI messages)
-            const conversationTurn = [
-              { role: "user", content: options.input.text },
-              { role: "system", content: generateResult.content },
-            ];
-
-            await mem0.add(JSON.stringify(conversationTurn), {
-              userId: options.context?.userId as string,
-              metadata: {
-                timestamp: new Date().toISOString(),
-                provider: generateResult.provider,
-                model: generateResult.model,
-                type: "conversation_turn",
-                async_mode: true,
-              },
+          if (!mem0) {
+            logger.debug(
+              "Mem0 not available, continuing without memory retrieval",
+            );
+          } else {
+            const memories = await mem0.search(options.input.text, {
+              userId: options.context.userId as string,
+              limit: 5,
             });
+
+            if (memories?.results?.length > 0) {
+              // Enhance the input with memory context
+              const memoryContext = memories.results
+                .map((m) => m.memory)
+                .join("\n");
+
+              options.input.text = this.formatMemoryContext(
+                memoryContext,
+                options.input.text,
+              );
+            }
           }
         } catch (error) {
-          // Non-blocking: Log error but don't fail the generation
-          logger.warn("Mem0 memory storage failed:", error);
+          logger.warn("Mem0 memory retrieval failed:", error);
         }
-      });
-    }
+      }
 
-    return generateResult;
+      const startTime = Date.now();
+
+      // Apply orchestration if enabled and no specific provider/model requested
+      if (this.enableOrchestration && !options.provider && !options.model) {
+        try {
+          const orchestratedOptions = await this.applyOrchestration(options);
+          logger.debug("Orchestration applied", {
+            originalProvider: options.provider || "auto",
+            orchestratedProvider: orchestratedOptions.provider,
+            orchestratedModel: orchestratedOptions.model,
+            prompt: options.input.text.substring(0, 100),
+          });
+
+          // Use orchestrated options
+          Object.assign(options, orchestratedOptions);
+        } catch (error) {
+          logger.warn(
+            "Orchestration failed, continuing with original options",
+            {
+              error: error instanceof Error ? error.message : String(error),
+              originalProvider: options.provider || "auto",
+            },
+          );
+          // Continue with original options if orchestration fails
+        }
+      }
+
+      // Emit generation start event (NeuroLink format - keep existing)
+      this.emitter.emit("generation:start", {
+        provider: options.provider || "auto",
+        timestamp: startTime,
+      });
+
+      // ADD: Bedrock-compatible response:start event
+      this.emitter.emit("response:start");
+
+      // ADD: Bedrock-compatible message event
+      this.emitter.emit(
+        "message",
+        `Starting ${options.provider || "auto"} text generation...`,
+      );
+
+      // Process factory configuration
+      const factoryResult = processFactoryOptions(options);
+
+      // Validate factory configuration if present
+      if (factoryResult.hasFactoryConfig && options.factoryConfig) {
+        const validation = validateFactoryConfig(options.factoryConfig);
+        if (!validation.isValid) {
+          logger.warn("Invalid factory configuration detected", {
+            errors: validation.errors,
+          });
+          // Continue with warning rather than throwing - graceful degradation
+        }
+      }
+
+      // 🔧 CRITICAL FIX: Convert to TextGenerationOptions while preserving the input object for multimodal support
+      const baseOptions: TextGenerationOptions = {
+        prompt: options.input.text,
+        provider: options.provider as AIProviderName,
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        systemPrompt: options.systemPrompt,
+        schema: options.schema,
+        output: options.output,
+        disableTools: options.disableTools,
+        enableAnalytics: options.enableAnalytics,
+        enableEvaluation: options.enableEvaluation,
+        context: options.context as Record<string, JsonValue> | undefined,
+        evaluationDomain: options.evaluationDomain,
+        toolUsageContext: options.toolUsageContext,
+        input: options.input, // This includes text, images, and content arrays
+        region: options.region,
+      };
+
+      // Apply factory enhancement using centralized utilities
+      const textOptions = enhanceTextGenerationOptions(
+        baseOptions,
+        factoryResult,
+      );
+
+      // Pass conversation memory config if available
+      if (this.conversationMemory) {
+        textOptions.conversationMemoryConfig = this.conversationMemory.config;
+        // Include original prompt for context summarization
+        textOptions.originalPrompt = originalPrompt;
+      }
+
+      // Detect and execute domain-specific tools
+      const { toolResults, enhancedPrompt } = await this.detectAndExecuteTools(
+        textOptions.prompt || options.input.text,
+        factoryResult.domainType,
+      );
+
+      // Update prompt with tool results if available
+      if (enhancedPrompt !== textOptions.prompt) {
+        textOptions.prompt = enhancedPrompt;
+        logger.debug("Enhanced prompt with tool results", {
+          originalLength: options.input.text.length,
+          enhancedLength: enhancedPrompt.length,
+          toolResults: toolResults.length,
+        });
+      }
+
+      // Use redesigned generation logic
+      const textResult = await this.generateTextInternal(textOptions);
+
+      // Emit generation completion event (NeuroLink format - enhanced with content)
+      this.emitter.emit("generation:end", {
+        provider: textResult.provider,
+        responseTime: Date.now() - startTime,
+        toolsUsed: textResult.toolsUsed,
+        timestamp: Date.now(),
+        result: textResult, // Enhanced: include full result
+      });
+
+      // ADD: Bedrock-compatible response:end event with content
+      this.emitter.emit("response:end", textResult.content || "");
+
+      // ADD: Bedrock-compatible message event
+      this.emitter.emit(
+        "message",
+        `Generation completed in ${Date.now() - startTime}ms`,
+      );
+
+      // Convert back to GenerateResult
+      const generateResult: GenerateResult = {
+        content: textResult.content,
+        provider: textResult.provider,
+        model: textResult.model,
+        usage: textResult.usage
+          ? {
+              input: textResult.usage.input || 0,
+              output: textResult.usage.output || 0,
+              total: textResult.usage.total || 0,
+            }
+          : undefined,
+        responseTime: textResult.responseTime,
+        toolsUsed: textResult.toolsUsed,
+        toolExecutions: transformToolExecutions(textResult.toolExecutions),
+        enhancedWithTools: textResult.enhancedWithTools,
+        availableTools: transformAvailableTools(textResult.availableTools),
+        analytics: textResult.analytics,
+        evaluation: textResult.evaluation
+          ? {
+              ...textResult.evaluation,
+              isOffTopic:
+                ((textResult.evaluation as unknown as UnknownRecord)
+                  .isOffTopic as boolean) ?? false,
+              alertSeverity:
+                ((textResult.evaluation as unknown as UnknownRecord)
+                  .alertSeverity as "low" | "medium" | "high" | "none") ??
+                ("none" as const),
+              reasoning:
+                ((textResult.evaluation as unknown as UnknownRecord)
+                  .reasoning as string) ?? "No evaluation provided",
+              evaluationModel:
+                ((textResult.evaluation as unknown as UnknownRecord)
+                  .evaluationModel as string) ?? "unknown",
+              evaluationTime:
+                ((textResult.evaluation as unknown as UnknownRecord)
+                  .evaluationTime as number) ?? Date.now(),
+              // Include evaluationDomain from original options
+              evaluationDomain:
+                ((textResult.evaluation as unknown as UnknownRecord)
+                  .evaluationDomain as string) ??
+                textOptions.evaluationDomain ??
+                factoryResult.domainType,
+            }
+          : undefined,
+      };
+
+      if (
+        this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+        options.context?.userId &&
+        generateResult.content
+      ) {
+        // Non-blocking memory storage - run in background
+        setImmediate(async () => {
+          try {
+            const mem0 = await this.ensureMem0Ready();
+            if (mem0) {
+              // Store complete conversation turn (user + AI messages)
+              const conversationTurn = [
+                { role: "user", content: options.input.text },
+                { role: "system", content: generateResult.content },
+              ];
+
+              await mem0.add(JSON.stringify(conversationTurn), {
+                userId: options.context?.userId as string,
+                metadata: {
+                  timestamp: new Date().toISOString(),
+                  provider: generateResult.provider,
+                  model: generateResult.model,
+                  type: "conversation_turn",
+                  async_mode: true,
+                },
+              });
+            }
+          } catch (error) {
+            // Non-blocking: Log error but don't fail the generation
+            logger.warn("Mem0 memory storage failed:", error);
+          }
+        });
+      }
+
+      return generateResult;
     });
   }
 
@@ -2645,207 +2653,208 @@ export class NeuroLink {
 
     // Set session and user IDs from context for Langfuse spans and execute with proper async scoping
     return await this.setLangfuseContextFromOptions(options, async () => {
-    let enhancedOptions: StreamOptions;
-    let factoryResult: {
-      hasStreamingConfig: boolean;
-      streamingEnabled?: boolean;
-      enhancedConfig?: StreamOptions["streaming"];
-    };
+      let enhancedOptions: StreamOptions;
+      let factoryResult: {
+        hasStreamingConfig: boolean;
+        streamingEnabled?: boolean;
+        enhancedConfig?: StreamOptions["streaming"];
+      };
 
-    try {
-      // Initialize conversation memory if needed (for lazy loading)
-      await this.initializeConversationMemoryForGeneration(
-        streamId,
-        startTime,
-        hrTimeStart,
-      );
+      try {
+        // Initialize conversation memory if needed (for lazy loading)
+        await this.initializeConversationMemoryForGeneration(
+          streamId,
+          startTime,
+          hrTimeStart,
+        );
 
-      // Initialize MCP
-      await this.initializeMCP();
-      const _originalPrompt = options.input.text;
+        // Initialize MCP
+        await this.initializeMCP();
+        const _originalPrompt = options.input.text;
 
-      if (
-        this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-        options.context?.userId
-      ) {
-        try {
-          const mem0 = await this.ensureMem0Ready();
-          if (!mem0) {
-            // Continue without memories if mem0 is not available
-            logger.debug(
-              "Mem0 not available, continuing without memory retrieval",
-            );
-          } else {
-            const memories = await mem0.search(options.input.text, {
-              userId: options.context.userId as string,
-              limit: 5,
-            });
-
-            if (memories?.results?.length > 0) {
-              // Enhance the input with memory context
-              const memoryContext = memories.results
-                .map((m) => m.memory)
-                .join("\n");
-
-              options.input.text = this.formatMemoryContext(
-                memoryContext,
-                options.input.text,
+        if (
+          this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+          options.context?.userId
+        ) {
+          try {
+            const mem0 = await this.ensureMem0Ready();
+            if (!mem0) {
+              // Continue without memories if mem0 is not available
+              logger.debug(
+                "Mem0 not available, continuing without memory retrieval",
               );
-            }
-          }
-        } catch (error) {
-          // Non-blocking: Log error but continue with streaming
-          logger.warn("Mem0 memory retrieval failed:", error);
-        }
-      }
-
-      // Apply orchestration if enabled and no specific provider/model requested
-      if (this.enableOrchestration && !options.provider && !options.model) {
-        try {
-          const orchestratedOptions =
-            await this.applyStreamOrchestration(options);
-          logger.debug("Stream orchestration applied", {
-            originalProvider: options.provider || "auto",
-            orchestratedProvider: orchestratedOptions.provider,
-            orchestratedModel: orchestratedOptions.model,
-            prompt: options.input.text?.substring(0, 100),
-          });
-
-          // Use orchestrated options
-          Object.assign(options, orchestratedOptions);
-        } catch (error) {
-          logger.warn(
-            "Stream orchestration failed, continuing with original options",
-            {
-              error: error instanceof Error ? error.message : String(error),
-              originalProvider: options.provider || "auto",
-            },
-          );
-          // Continue with original options if orchestration fails
-        }
-      }
-
-      factoryResult = processStreamingFactoryOptions(options);
-      enhancedOptions = createCleanStreamOptions(options);
-      if (options.input?.text) {
-        const { toolResults: _toolResults, enhancedPrompt } =
-          await this.detectAndExecuteTools(options.input.text, undefined);
-        if (enhancedPrompt !== options.input.text) {
-          enhancedOptions.input.text = enhancedPrompt;
-        }
-      }
-
-      const { stream: mcpStream, provider: providerName } =
-        await this.createMCPStream(enhancedOptions);
-
-      // Create a wrapper around the stream that accumulates content
-      let accumulatedContent = "";
-
-      const processedStream = (async function* (self: NeuroLink) {
-        try {
-          for await (const chunk of mcpStream) {
-            if (
-              chunk &&
-              "content" in chunk &&
-              typeof chunk.content === "string"
-            ) {
-              accumulatedContent += chunk.content;
-              // Emit chunk event for compatibility
-              self.emitter.emit("response:chunk", chunk.content);
-            }
-            yield chunk; // Preserve original streaming behavior
-          }
-        } finally {
-          // Store memory after stream consumption is complete
-          if (self.conversationMemory && enhancedOptions.context?.sessionId) {
-            const sessionId = (
-              enhancedOptions.context as Record<string, unknown>
-            )?.sessionId as string;
-            const userId = (enhancedOptions.context as Record<string, unknown>)
-              ?.userId as string;
-
-            try {
-              await self.conversationMemory.storeConversationTurn(
-                sessionId,
-                userId,
-                originalPrompt ?? "",
-                accumulatedContent,
-                new Date(startTime),
-              );
-
-              logger.debug("Stream conversation turn stored", {
-                sessionId,
-                userInputLength: originalPrompt?.length ?? 0,
-                responseLength: accumulatedContent.length,
+            } else {
+              const memories = await mem0.search(options.input.text, {
+                userId: options.context.userId as string,
+                limit: 5,
               });
-            } catch (error) {
-              logger.warn("Failed to store stream conversation turn", {
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }
 
-          if (
-            self.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-            enhancedOptions.context?.userId &&
-            accumulatedContent.trim()
-          ) {
-            // Non-blocking memory storage - run in background
-            setImmediate(async () => {
-              try {
-                const mem0 = await self.ensureMem0Ready();
-                if (mem0) {
-                  // Store complete conversation turn (user + AI messages)
-                  const conversationTurn = [
-                    { role: "user", content: originalPrompt },
-                    { role: "system", content: accumulatedContent.trim() },
-                  ];
+              if (memories?.results?.length > 0) {
+                // Enhance the input with memory context
+                const memoryContext = memories.results
+                  .map((m) => m.memory)
+                  .join("\n");
 
-                  await mem0.add(JSON.stringify(conversationTurn), {
-                    userId: enhancedOptions.context?.userId as string,
-                    metadata: {
-                      timestamp: new Date().toISOString(),
-                      type: "conversation_turn_stream",
-                      userMessage: originalPrompt,
-                      async_mode: true,
-                      aiResponse: accumulatedContent.trim(),
-                    },
-                  });
-                }
-              } catch (error) {
-                logger.warn("Mem0 memory storage failed:", error);
+                options.input.text = this.formatMemoryContext(
+                  memoryContext,
+                  options.input.text,
+                );
               }
-            });
+            }
+          } catch (error) {
+            // Non-blocking: Log error but continue with streaming
+            logger.warn("Mem0 memory retrieval failed:", error);
           }
         }
-      })(this);
-      const streamResult = await this.processStreamResult(
-        mcpStream,
-        enhancedOptions,
-        factoryResult,
-      );
-      const responseTime = Date.now() - startTime;
 
-      this.emitStreamEndEvents(streamResult);
+        // Apply orchestration if enabled and no specific provider/model requested
+        if (this.enableOrchestration && !options.provider && !options.model) {
+          try {
+            const orchestratedOptions =
+              await this.applyStreamOrchestration(options);
+            logger.debug("Stream orchestration applied", {
+              originalProvider: options.provider || "auto",
+              orchestratedProvider: orchestratedOptions.provider,
+              orchestratedModel: orchestratedOptions.model,
+              prompt: options.input.text?.substring(0, 100),
+            });
 
-      return this.createStreamResponse(streamResult, processedStream, {
-        providerName,
-        options,
-        startTime,
-        responseTime,
-        streamId,
-        fallback: false,
-      });
-    } catch (error) {
-      return this.handleStreamError(
-        error,
-        options,
-        startTime,
-        streamId,
-        undefined,
-        undefined,
-      );
-    }
+            // Use orchestrated options
+            Object.assign(options, orchestratedOptions);
+          } catch (error) {
+            logger.warn(
+              "Stream orchestration failed, continuing with original options",
+              {
+                error: error instanceof Error ? error.message : String(error),
+                originalProvider: options.provider || "auto",
+              },
+            );
+            // Continue with original options if orchestration fails
+          }
+        }
+
+        factoryResult = processStreamingFactoryOptions(options);
+        enhancedOptions = createCleanStreamOptions(options);
+        if (options.input?.text) {
+          const { toolResults: _toolResults, enhancedPrompt } =
+            await this.detectAndExecuteTools(options.input.text, undefined);
+          if (enhancedPrompt !== options.input.text) {
+            enhancedOptions.input.text = enhancedPrompt;
+          }
+        }
+
+        const { stream: mcpStream, provider: providerName } =
+          await this.createMCPStream(enhancedOptions);
+
+        // Create a wrapper around the stream that accumulates content
+        let accumulatedContent = "";
+
+        const processedStream = (async function* (self: NeuroLink) {
+          try {
+            for await (const chunk of mcpStream) {
+              if (
+                chunk &&
+                "content" in chunk &&
+                typeof chunk.content === "string"
+              ) {
+                accumulatedContent += chunk.content;
+                // Emit chunk event for compatibility
+                self.emitter.emit("response:chunk", chunk.content);
+              }
+              yield chunk; // Preserve original streaming behavior
+            }
+          } finally {
+            // Store memory after stream consumption is complete
+            if (self.conversationMemory && enhancedOptions.context?.sessionId) {
+              const sessionId = (
+                enhancedOptions.context as Record<string, unknown>
+              )?.sessionId as string;
+              const userId = (
+                enhancedOptions.context as Record<string, unknown>
+              )?.userId as string;
+
+              try {
+                await self.conversationMemory.storeConversationTurn(
+                  sessionId,
+                  userId,
+                  originalPrompt ?? "",
+                  accumulatedContent,
+                  new Date(startTime),
+                );
+
+                logger.debug("Stream conversation turn stored", {
+                  sessionId,
+                  userInputLength: originalPrompt?.length ?? 0,
+                  responseLength: accumulatedContent.length,
+                });
+              } catch (error) {
+                logger.warn("Failed to store stream conversation turn", {
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+
+            if (
+              self.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+              enhancedOptions.context?.userId &&
+              accumulatedContent.trim()
+            ) {
+              // Non-blocking memory storage - run in background
+              setImmediate(async () => {
+                try {
+                  const mem0 = await self.ensureMem0Ready();
+                  if (mem0) {
+                    // Store complete conversation turn (user + AI messages)
+                    const conversationTurn = [
+                      { role: "user", content: originalPrompt },
+                      { role: "system", content: accumulatedContent.trim() },
+                    ];
+
+                    await mem0.add(JSON.stringify(conversationTurn), {
+                      userId: enhancedOptions.context?.userId as string,
+                      metadata: {
+                        timestamp: new Date().toISOString(),
+                        type: "conversation_turn_stream",
+                        userMessage: originalPrompt,
+                        async_mode: true,
+                        aiResponse: accumulatedContent.trim(),
+                      },
+                    });
+                  }
+                } catch (error) {
+                  logger.warn("Mem0 memory storage failed:", error);
+                }
+              });
+            }
+          }
+        })(this);
+        const streamResult = await this.processStreamResult(
+          mcpStream,
+          enhancedOptions,
+          factoryResult,
+        );
+        const responseTime = Date.now() - startTime;
+
+        this.emitStreamEndEvents(streamResult);
+
+        return this.createStreamResponse(streamResult, processedStream, {
+          providerName,
+          options,
+          startTime,
+          responseTime,
+          streamId,
+          fallback: false,
+        });
+      } catch (error) {
+        return this.handleStreamError(
+          error,
+          options,
+          startTime,
+          streamId,
+          undefined,
+          undefined,
+        );
+      }
     });
   }
 

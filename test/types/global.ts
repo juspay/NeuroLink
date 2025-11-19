@@ -10,7 +10,6 @@ export type TestConfigType = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var TestConfig: TestConfigType;
 }
 
