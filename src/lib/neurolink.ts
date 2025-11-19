@@ -1679,9 +1679,9 @@ Current user's request: ${currentInput}`;
               limit: 5,
             });
 
-          if (memories && memories.length > 0) {
-            // Enhance the input with memory context
-            const memoryContext = this.extractMemoryContext(memories);
+            if (memories && memories.length > 0) {
+              // Enhance the input with memory context
+              const memoryContext = this.extractMemoryContext(memories);
 
               options.input.text = this.formatMemoryContext(
                 memoryContext,
@@ -1867,36 +1867,36 @@ Current user's request: ${currentInput}`;
           : undefined,
       };
 
-    if (
-      this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-      options.context?.userId &&
-      generateResult.content
-    ) {
-      // Non-blocking memory storage - run in background
-      setImmediate(async () => {
-        try {
-          const mem0 = await this.ensureMem0Ready();
-          if (mem0) {
-            await this.storeConversationTurn(
-              mem0,
-              originalPrompt,
-              options.context?.userId as string,
-              {
-                timestamp: new Date().toISOString(),
-                provider: generateResult.provider,
-                model: generateResult.model,
-                type: "conversation_turn",
-              },
-            );
+      if (
+        this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+        options.context?.userId &&
+        generateResult.content
+      ) {
+        // Non-blocking memory storage - run in background
+        setImmediate(async () => {
+          try {
+            const mem0 = await this.ensureMem0Ready();
+            if (mem0) {
+              await this.storeConversationTurn(
+                mem0,
+                originalPrompt,
+                options.context?.userId as string,
+                {
+                  timestamp: new Date().toISOString(),
+                  provider: generateResult.provider,
+                  model: generateResult.model,
+                  type: "conversation_turn",
+                },
+              );
+            }
+          } catch (error) {
+            // Non-blocking: Log error but don't fail the generation
+            logger.warn("Mem0 memory storage failed:", error);
           }
-        } catch (error) {
-          // Non-blocking: Log error but don't fail the generation
-          logger.warn("Mem0 memory storage failed:", error);
-        }
-      });
-    }
+        });
+      }
 
-    return generateResult;
+      return generateResult;
     });
   }
 
@@ -2690,26 +2690,26 @@ Current user's request: ${currentInput}`;
         await this.initializeMCP();
         const _originalPrompt = options.input.text;
 
-      if (
-        this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-        options.context?.userId
-      ) {
-        try {
-          const mem0 = await this.ensureMem0Ready();
-          if (!mem0) {
-            // Continue without memories if mem0 is not available
-            logger.debug(
-              "Mem0 not available, continuing without memory retrieval",
-            );
-          } else {
-            const memories = await mem0.search(options.input.text, {
-              user_id: options.context.userId as string,
-              limit: 5,
-            });
+        if (
+          this.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+          options.context?.userId
+        ) {
+          try {
+            const mem0 = await this.ensureMem0Ready();
+            if (!mem0) {
+              // Continue without memories if mem0 is not available
+              logger.debug(
+                "Mem0 not available, continuing without memory retrieval",
+              );
+            } else {
+              const memories = await mem0.search(options.input.text, {
+                user_id: options.context.userId as string,
+                limit: 5,
+              });
 
-            if (memories && memories.length > 0) {
-              // Enhance the input with memory context
-              const memoryContext = this.extractMemoryContext(memories);
+              if (memories && memories.length > 0) {
+                // Enhance the input with memory context
+                const memoryContext = this.extractMemoryContext(memories);
 
                 options.input.text = this.formatMemoryContext(
                   memoryContext,
@@ -2810,41 +2810,41 @@ Current user's request: ${currentInput}`;
               }
             }
 
-          if (
-            self.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
-            enhancedOptions.context?.userId &&
-            accumulatedContent.trim()
-          ) {
-            // Non-blocking memory storage - run in background
-            setImmediate(async () => {
-              try {
-                const mem0 = await self.ensureMem0Ready();
-                if (mem0) {
-                  await self.storeConversationTurn(
-                    mem0,
-                    originalPrompt,
-                    enhancedOptions.context?.userId as string,
-                    {
-                      timestamp: new Date().toISOString(),
-                      type: "conversation_turn_stream",
-                      userMessage: originalPrompt,
-                      aiResponse: accumulatedContent.trim(),
-                    },
-                  );
+            if (
+              self.conversationMemoryConfig?.conversationMemory?.mem0Enabled &&
+              enhancedOptions.context?.userId &&
+              accumulatedContent.trim()
+            ) {
+              // Non-blocking memory storage - run in background
+              setImmediate(async () => {
+                try {
+                  const mem0 = await self.ensureMem0Ready();
+                  if (mem0) {
+                    await self.storeConversationTurn(
+                      mem0,
+                      originalPrompt,
+                      enhancedOptions.context?.userId as string,
+                      {
+                        timestamp: new Date().toISOString(),
+                        type: "conversation_turn_stream",
+                        userMessage: originalPrompt,
+                        aiResponse: accumulatedContent.trim(),
+                      },
+                    );
+                  }
+                } catch (error) {
+                  logger.warn("Mem0 memory storage failed:", error);
                 }
-              } catch (error) {
-                logger.warn("Mem0 memory storage failed:", error);
-              }
-            });
+              });
+            }
           }
-        }
-      })(this);
-      const streamResult = await this.processStreamResult(
-        mcpStream,
-        enhancedOptions,
-        factoryResult,
-      );
-      const responseTime = Date.now() - startTime;
+        })(this);
+        const streamResult = await this.processStreamResult(
+          mcpStream,
+          enhancedOptions,
+          factoryResult,
+        );
+        const responseTime = Date.now() - startTime;
 
         this.emitStreamEndEvents(streamResult);
 
