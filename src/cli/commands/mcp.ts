@@ -701,6 +701,8 @@ export class MCPCommandFactory {
         : ora("Testing MCP server connections...").start();
 
       const sdk = new NeuroLink();
+      // Initialize MCP to load servers from config file
+      await sdk.getMCPStatus();
       let serversToTest = await sdk.listMCPServers();
       if (targetServer) {
         serversToTest = serversToTest.filter((s) => s.name === targetServer);
@@ -815,6 +817,8 @@ export class MCPCommandFactory {
 
       const sdk = new NeuroLink();
 
+      // Initialize MCP to load servers from config file
+      await sdk.getMCPStatus();
       // Check if server exists and is connected
       const allServers = await sdk.listMCPServers();
       const server = allServers.find((s) => s.name === serverName);
@@ -941,6 +945,8 @@ export class MCPCommandFactory {
       }
 
       const sdk = new NeuroLink();
+      // Initialize MCP to load servers from config file
+      await sdk.getMCPStatus();
       const allServers = await sdk.listMCPServers();
       const server = allServers.find((s) => s.name === serverName);
 
