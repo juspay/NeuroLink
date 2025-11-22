@@ -434,7 +434,7 @@ export class MCPCommandFactory {
         if (spinner) {
           spinner.info("No MCP servers configured");
         }
-        logger.always(chalk.yellow("\nNo MCP servers found."));
+        logger.always(chalk.yellow("\nNo MCP servers configured."));
         logger.always(
           chalk.blue(
             "💡 Use 'neurolink mcp install <server>' to install popular servers",
