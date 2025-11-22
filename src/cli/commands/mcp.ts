@@ -430,12 +430,11 @@ export class MCPCommandFactory {
       const mcpStatus: MCPStatus = await sdk.getMCPStatus();
       const allServers = await sdk.listMCPServers();
 
-      if (spinner) {
-        spinner.succeed(`Found ${allServers.length} MCP servers`);
-      }
-
       if (allServers.length === 0) {
-        logger.always(chalk.yellow("No MCP servers configured."));
+        if (spinner) {
+          spinner.info("No MCP servers configured");
+        }
+        logger.always(chalk.yellow("\nNo MCP servers found."));
         logger.always(
           chalk.blue(
             "💡 Use 'neurolink mcp install <server>' to install popular servers",
@@ -445,6 +444,12 @@ export class MCPCommandFactory {
           chalk.blue("💡 Use 'neurolink discover' to find existing servers"),
         );
         return;
+      }
+
+      if (spinner) {
+        spinner.succeed(
+          `Found ${allServers.length} MCP server${allServers.length === 1 ? "" : "s"}`,
+        );
       }
 
       // Format and display results
