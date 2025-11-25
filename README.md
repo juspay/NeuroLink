@@ -60,7 +60,7 @@ NeuroLink is a comprehensive AI development platform. Every feature below is pro
 | Provider              | Models                         | Free Tier       | Tool Support | Status        | Documentation                                                           |
 | --------------------- | ------------------------------ | --------------- | ------------ | ------------- | ----------------------------------------------------------------------- |
 | **OpenAI**            | GPT-4o, GPT-4o-mini, o1        | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#openai)            |
-| **Anthropic**         | Claude 3.5/3.7 Sonnet, Opus    | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#anthropic)         |
+| **Anthropic**         | Claude Opus 4.5, Sonnet 3.5/3.7 | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#anthropic)         |
 | **Google AI Studio**  | Gemini 2.5 Flash/Pro           | ✅ Free Tier    | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#google-ai)         |
 | **AWS Bedrock**       | Claude, Titan, Llama, Nova     | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#bedrock)           |
 | **Google Vertex**     | Gemini via GCP                 | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#vertex)            |
