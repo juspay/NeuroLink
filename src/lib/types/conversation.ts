@@ -335,3 +335,115 @@ export type RedisStorageConfig = {
     [key: string]: string | number | boolean | undefined;
   };
 };
+
+// ============================================================================
+// TOKEN COUNTING TYPES
+// ============================================================================
+
+/**
+ * CoreMessage type from AI SDK for token counting
+ */
+import type { CoreMessage } from "ai";
+import type { Tool } from "ai";
+
+/**
+ * AI Provider names for token counting
+ */
+export type AIProviderName =
+  | "openai"
+  | "azure"
+  | "anthropic"
+  | "google-ai"
+  | "vertex"
+  | "bedrock"
+  | "mistral"
+  | "ollama"
+  | "huggingface"
+  | "litellm"
+  | "sagemaker"
+  | "openai-compatible";
+
+/**
+ * Token counting method used
+ */
+export type TokenCountMethod = "api" | "client" | "estimation";
+
+/**
+ * Token counting accuracy level
+ */
+export type TokenCountAccuracy = "high" | "medium" | "low";
+
+/**
+ * Input for token counting operations
+ */
+export type TokenCountInput = {
+  /** Messages to count tokens for */
+  messages: CoreMessage[];
+
+  /** Model name for provider-specific counting */
+  model: string;
+
+  /** Optional system prompt to include in count */
+  systemPrompt?: string;
+
+  /** Optional tools to include in count */
+  tools?: Tool[];
+};
+
+/**
+ * Result of token counting operation
+ */
+export type TokenCountResult = {
+  /** Number of input tokens counted */
+  inputTokens: number;
+
+  /** Estimated output tokens (if supported by provider) */
+  estimatedOutputTokens?: number;
+
+  /** Method used for counting */
+  method: TokenCountMethod;
+
+  /** Accuracy level of the count */
+  accuracy: TokenCountAccuracy;
+
+  /** Whether result was retrieved from cache */
+  cached: boolean;
+
+  /** Latency in milliseconds */
+  latency: number;
+};
+
+/**
+ * Token counter interface
+ * Defines the contract for provider-specific token counting implementations
+ */
+export type TokenCounter = {
+  /**
+   * Count tokens for the given input
+   */
+  countTokens(input: TokenCountInput): Promise<TokenCountResult>;
+
+  /**
+   * Whether this counter supports async operations
+   */
+  supportsAsync(): boolean;
+
+  /**
+   * List of providers this counter supports
+   */
+  supportedProviders(): AIProviderName[];
+};
+
+/**
+ * Cache entry for token counts
+ */
+export type TokenCountCacheEntry = {
+  /** Cached token count result */
+  result: TokenCountResult;
+
+  /** When this entry was created */
+  timestamp: number;
+
+  /** Cache key used */
+  key: string;
+};

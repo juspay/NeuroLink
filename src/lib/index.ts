@@ -208,6 +208,47 @@ export type {
 export type { LogLevel } from "./types/utilities.js";
 
 // ============================================================================
+// TOKEN COUNTING SERVICE - Conversation Memory Infrastructure
+// ============================================================================
+
+/**
+ * Token Counting Service
+ *
+ * Provides accurate token counting for conversation memory management.
+ * Supports multiple providers with provider-specific counting methods.
+ *
+ * @example
+ * ```typescript
+ * import { countTokens } from '@juspay/neurolink';
+ *
+ * const result = await countTokens('openai', {
+ *   messages: [{ role: 'user', content: 'Hello!' }],
+ *   model: 'gpt-4',
+ * });
+ *
+ * console.log(`Tokens: ${result.inputTokens}`);
+ * console.log(`Cached: ${result.cached}`);
+ * ```
+ */
+export {
+  countTokens,
+  countTokensAuto,
+  clearCounterCache,
+  getSupportedProviders as getSupportedTokenCountProviders,
+  getCacheStats as getTokenCountCacheStats,
+  clearCache as clearTokenCountCache,
+} from "./services/tokenCounting/index.js";
+
+export type {
+  TokenCounter,
+  TokenCountInput,
+  TokenCountResult,
+  TokenCountMethod,
+  TokenCountAccuracy,
+  TokenCountCacheEntry,
+} from "./types/conversation.js";
+
+// ============================================================================
 // REAL-TIME SERVICES & TELEMETRY - Enterprise Platform Features
 // ============================================================================
 
