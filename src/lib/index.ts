@@ -237,6 +237,7 @@ export {
   getSupportedProviders as getSupportedTokenCountProviders,
   getCacheStats as getTokenCountCacheStats,
   clearCache as clearTokenCountCache,
+  stopCacheCleanup as stopTokenCountCacheCleanup,
 } from "./services/tokenCounting/index.js";
 
 export type {

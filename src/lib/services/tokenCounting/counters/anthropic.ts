@@ -17,10 +17,9 @@ import { logger } from "../../../utils/logger.js";
 
 /**
  * Convert CoreMessage to Anthropic's format
- * (Currently unused as we use estimation, but kept for future SDK upgrade)
+ * Reserved for future use when SDK is upgraded to v0.40+
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function convertToAnthropicFormat(
+function _convertToAnthropicFormat(
   messages: CoreMessage[],
 ): Array<{ role: "user" | "assistant"; content: string }> {
   return messages

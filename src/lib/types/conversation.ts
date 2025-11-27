@@ -4,6 +4,8 @@
  */
 
 import type { Mem0Config } from "../memory/mem0Initializer.js";
+import type { CoreMessage } from "ai";
+import type { Tool } from "ai";
 
 /**
  * Configuration for conversation memory feature
@@ -339,12 +341,6 @@ export type RedisStorageConfig = {
 // ============================================================================
 // TOKEN COUNTING TYPES
 // ============================================================================
-
-/**
- * CoreMessage type from AI SDK for token counting
- */
-import type { CoreMessage } from "ai";
-import type { Tool } from "ai";
 
 /**
  * AI Provider names for token counting

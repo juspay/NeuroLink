@@ -10,6 +10,9 @@ import type { CoreMessage } from "ai";
 /**
  * Generate a deterministic hash from messages
  * Used for cache key generation
+ *
+ * Note: This uses a simple hash function for performance.
+ * For production use with sensitive data, consider using a cryptographic hash.
  */
 export function hashMessages(messages: CoreMessage[]): string {
   // Create a stable string representation of messages

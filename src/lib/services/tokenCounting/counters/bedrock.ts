@@ -97,9 +97,10 @@ export class BedrockTokenCounter implements TokenCounter {
         modelId: input.model,
         messages: bedrockMessages,
         system: input.systemPrompt ? [{ text: input.systemPrompt }] : undefined,
-        // Use minimal inference config to get token count without generating
+        // Use minimal inference config to get token count
+        // Note: Using 10 tokens instead of 1 for better model compatibility
         inferenceConfig: {
-          maxTokens: 1, // Minimal tokens to minimize cost
+          maxTokens: 10,
           temperature: 0,
         },
       });

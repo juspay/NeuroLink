@@ -134,6 +134,20 @@ export function getCacheStats(): {
 }
 
 // Clean expired entries every minute
+// Note: In production, consider providing a cleanup/shutdown function
+// to clear this interval and prevent memory leaks in long-running applications
+let cleanupInterval: ReturnType<typeof setInterval> | undefined;
+
 if (typeof setInterval !== "undefined") {
-  setInterval(cleanExpiredEntries, 60 * 1000);
+  cleanupInterval = setInterval(cleanExpiredEntries, 60 * 1000);
+}
+
+/**
+ * Stop automatic cache cleanup (for graceful shutdown)
+ */
+export function stopCacheCleanup(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = undefined;
+  }
 }

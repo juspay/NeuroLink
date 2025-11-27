@@ -57,6 +57,7 @@ export {
   cleanExpiredEntries,
   clearCache,
   getCacheStats,
+  stopCacheCleanup,
   hashMessages,
   normalizeMessages,
   messagesToText,

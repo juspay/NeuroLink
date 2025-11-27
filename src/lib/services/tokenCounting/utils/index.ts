@@ -11,6 +11,7 @@ export {
   cleanExpiredEntries,
   clearCache,
   getCacheStats,
+  stopCacheCleanup,
 } from "./cache.js";
 
 export {
