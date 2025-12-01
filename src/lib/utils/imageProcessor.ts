@@ -26,11 +26,11 @@ export class ImageProcessor {
     content: Buffer,
     _options?: unknown,
   ): Promise<FileProcessingResult> {
+    const mediaType = this.detectImageType(content);
     return this.telemetry.trackOperation(
       "process",
       content.length,
       async () => {
-        const mediaType = this.detectImageType(content);
         const base64 = content.toString("base64");
         const dataUri = `data:${mediaType};base64,${base64}`;
 
@@ -44,7 +44,7 @@ export class ImageProcessor {
           },
         } satisfies FileProcessingResult;
       },
-      { mimeType: this.detectImageType(content) },
+      { mimeType: mediaType },
     );
   }
 

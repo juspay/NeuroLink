@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ImageProcessor } from "../../../src/lib/utils/imageProcessor.js";
 import { ImageProcessingTelemetry } from "../../../src/lib/telemetry/imageProcessingTelemetry.js";
 
+/**
+ * Helper function to create a minimal PNG buffer for testing
+ * Uses a valid 1x1 pixel PNG encoded as base64
+ */
+function createTestPngBuffer(): Buffer {
+  // Minimal 1x1 pixel PNG (smallest valid PNG)
+  return Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "base64",
+  );
+}
+
 describe("ImageProcessor with Telemetry Integration", () => {
   let telemetry: ImageProcessingTelemetry;
 
@@ -12,38 +24,7 @@ describe("ImageProcessor with Telemetry Integration", () => {
 
   describe("process method", () => {
     it("should track telemetry for image processing", async () => {
-      // Create a simple PNG buffer (minimal valid PNG header)
-      const pngBuffer = Buffer.from([
-        0x89,
-        0x50,
-        0x4e,
-        0x47, // PNG signature start
-        0x0d,
-        0x0a,
-        0x1a,
-        0x0a, // PNG signature end
-        0x00,
-        0x00,
-        0x00,
-        0x0d, // IHDR chunk length
-        0x49,
-        0x48,
-        0x44,
-        0x52, // IHDR chunk type
-        0x00,
-        0x00,
-        0x00,
-        0x01, // Width: 1
-        0x00,
-        0x00,
-        0x00,
-        0x01, // Height: 1
-        0x08,
-        0x02,
-        0x00,
-        0x00,
-        0x00,
-      ]);
+      const pngBuffer = createTestPngBuffer();
 
       await ImageProcessor.process(pngBuffer);
 
