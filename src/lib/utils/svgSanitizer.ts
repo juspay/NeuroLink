@@ -143,7 +143,7 @@ export class SVGSanitizer {
 
     // If sanitization is disabled, return content as-is with warning
     if (!opts.sanitize) {
-      const hasScripts = /<script[\s\S]*?<\/script>/gi.test(svgString);
+      const hasScripts = this.hasScriptTags(svgString);
       const hasEventHandlers = this.hasEventHandlers(svgString);
       const hasJavaScriptUrls = /javascript:/gi.test(svgString);
 
@@ -166,39 +166,56 @@ export class SVGSanitizer {
 
     let sanitized = svgString;
 
-    // Remove script tags
+    // Remove script tags (apply repeatedly until no more matches to handle nested cases)
     if (opts.removeScripts) {
-      const scriptMatches = sanitized.match(/<script[\s\S]*?<\/script>/gi);
-      if (scriptMatches) {
-        removedElements.push(
-          ...scriptMatches.map((m) => `script tag: ${m.substring(0, 50)}...`),
-        );
-        sanitized = sanitized.replace(/<script[\s\S]*?<\/script>/gi, "");
+      // Pattern that handles spaces and other content in closing tags
+      // Matches: </script>, </script >, </script\n>, </script anything>
+      const scriptPattern =
+        /<script\b[^<]*(?:(?!<\/script\b[^>]*>)<[^<]*)*<\/script\b[^>]*>/gi;
+      let prevLength: number;
+
+      // Keep removing until no more changes (handles nested cases)
+      do {
+        prevLength = sanitized.length;
+        const matches = sanitized.match(scriptPattern);
+        if (matches) {
+          removedElements.push(
+            ...matches.map((m) => `script tag: ${m.substring(0, 50)}...`),
+          );
+        }
+        sanitized = sanitized.replace(scriptPattern, "");
+      } while (sanitized.length !== prevLength);
+
+      // Also remove script tags that might be self-closing
+      const selfClosingPattern = /<script\b[^>]*\/\s*>/gi;
+      do {
+        prevLength = sanitized.length;
+        const matches = sanitized.match(selfClosingPattern);
+        if (matches) {
+          removedElements.push(
+            ...matches.map((m) => `self-closing script: ${m.substring(0, 50)}`),
+          );
+        }
+        sanitized = sanitized.replace(selfClosingPattern, "");
+      } while (sanitized.length !== prevLength);
+
+      // Remove any remaining orphan script opening tags
+      const openTagPattern = /<script\b[^>]*>/gi;
+      do {
+        prevLength = sanitized.length;
+        const matches = sanitized.match(openTagPattern);
+        if (matches) {
+          removedElements.push(
+            ...matches.map((m) => `malformed script: ${m.substring(0, 50)}`),
+          );
+        }
+        sanitized = sanitized.replace(openTagPattern, "");
+      } while (sanitized.length !== prevLength);
+
+      if (removedElements.length > 0) {
         logger.debug(
-          `[SVGSanitizer] Removed ${scriptMatches.length} script tag(s)`,
+          `[SVGSanitizer] Removed ${removedElements.length} script element(s)`,
         );
-      }
-
-      // Also remove script tags that might be self-closing or malformed
-      const selfClosingScripts = sanitized.match(/<script[^>]*\/>/gi);
-      if (selfClosingScripts) {
-        removedElements.push(
-          ...selfClosingScripts.map(
-            (m) => `self-closing script: ${m.substring(0, 50)}`,
-          ),
-        );
-        sanitized = sanitized.replace(/<script[^>]*\/>/gi, "");
-      }
-
-      // Remove script tags without closing tags (malformed)
-      const malformedScripts = sanitized.match(/<script[^>]*>/gi);
-      if (malformedScripts) {
-        removedElements.push(
-          ...malformedScripts.map(
-            (m) => `malformed script: ${m.substring(0, 50)}`,
-          ),
-        );
-        sanitized = sanitized.replace(/<script[^>]*>/gi, "");
       }
     }
 
@@ -280,6 +297,29 @@ export class SVGSanitizer {
   }
 
   /**
+   * Check if content contains any script tags (complete, self-closing, or malformed)
+   */
+  private static hasScriptTags(content: string): boolean {
+    // Check for complete script tags with any content in closing tag
+    if (
+      /<script\b[^<]*(?:(?!<\/script\b[^>]*>)<[^<]*)*<\/script\b[^>]*>/gi.test(
+        content,
+      )
+    ) {
+      return true;
+    }
+    // Check for self-closing script tags
+    if (/<script\b[^>]*\/\s*>/gi.test(content)) {
+      return true;
+    }
+    // Check for opening script tags (malformed without closing)
+    if (/<script\b[^>]*>/gi.test(content)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Check if content is SVG by examining content patterns
    */
   static isSVG(content: string | Buffer): boolean {
@@ -302,12 +342,8 @@ export class SVGSanitizer {
       typeof content === "string" ? content : content.toString("utf-8");
     const issues: string[] = [];
 
-    // Check for script tags (complete, self-closing, and malformed)
-    if (
-      /<script[\s\S]*?<\/script>/gi.test(str) ||
-      /<script[^>]*\/>/gi.test(str) ||
-      /<script[^>]*>/gi.test(str)
-    ) {
+    // Check for script tags using the hasScriptTags helper
+    if (this.hasScriptTags(str)) {
       issues.push("Contains script tags which can execute JavaScript");
     }
 

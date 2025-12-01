@@ -18,6 +18,20 @@ describe("SVGSanitizer", () => {
       expect(result.removedElements.length).toBeGreaterThan(0);
     });
 
+    it("should remove script tags with spaces in closing tag", () => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg">
+        <script>alert('XSS')</script >
+        <circle cx="50" cy="50" r="40"/>
+      </svg>`;
+
+      const result = SVGSanitizer.sanitize(svg);
+
+      expect(result.sanitized).toBe(true);
+      expect(result.content).not.toContain("<script");
+      expect(result.content).not.toContain("</script");
+      expect(result.content).toContain("<circle");
+    });
+
     it("should remove multiple script tags", () => {
       const svg = `<svg xmlns="http://www.w3.org/2000/svg">
         <script>alert('first')</script>
