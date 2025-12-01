@@ -5,14 +5,33 @@
 
 /**
  * Error codes for common video processing failures.
+ *
+ * This includes both specific error codes for common failures (e.g., INVALID_VIDEO_FORMAT)
+ * and generic category codes used as defaults by error classes (e.g., VIDEO_VALIDATION_ERROR).
+ *
+ * Specific codes:
+ * - INVALID_VIDEO_FORMAT: Video format is not supported
+ * - VIDEO_TOO_LARGE: Video file size exceeds the limit
+ * - VIDEO_TOO_LONG: Video duration exceeds the limit
+ * - FFMPEG_NOT_FOUND: FFmpeg is not installed or not in PATH
+ * - FRAME_EXTRACTION_FAILED: Failed to extract frames from video
+ * - METADATA_EXTRACTION_FAILED: Failed to extract video metadata
+ *
+ * Category codes (used as defaults by error classes):
+ * - VIDEO_PROCESSING_ERROR: Generic processing error (VideoProcessingError)
+ * - VIDEO_VALIDATION_ERROR: Validation failure (VideoValidationError)
+ * - VIDEO_EXTRACTION_ERROR: Extraction failure (VideoExtractionError)
+ * - VIDEO_UPLOAD_FAILED: Upload failure (VideoUploadError)
  */
 export const VideoErrorCodes = {
+  // Specific error codes for common failures
   INVALID_VIDEO_FORMAT: "INVALID_VIDEO_FORMAT",
   VIDEO_TOO_LARGE: "VIDEO_TOO_LARGE",
   VIDEO_TOO_LONG: "VIDEO_TOO_LONG",
   FFMPEG_NOT_FOUND: "FFMPEG_NOT_FOUND",
   FRAME_EXTRACTION_FAILED: "FRAME_EXTRACTION_FAILED",
   METADATA_EXTRACTION_FAILED: "METADATA_EXTRACTION_FAILED",
+  // Category codes (used as defaults by error classes)
   VIDEO_UPLOAD_FAILED: "VIDEO_UPLOAD_FAILED",
   VIDEO_VALIDATION_ERROR: "VIDEO_VALIDATION_ERROR",
   VIDEO_EXTRACTION_ERROR: "VIDEO_EXTRACTION_ERROR",
