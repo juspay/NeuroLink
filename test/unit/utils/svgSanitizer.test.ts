@@ -225,6 +225,22 @@ describe("SVGSanitizer", () => {
       expect(issues.some((i) => i.includes("script"))).toBe(true);
     });
 
+    it("should find self-closing script tags", () => {
+      const svg = `<svg><script src="evil.js"/><circle/></svg>`;
+      const issues = SVGSanitizer.validate(svg);
+
+      expect(issues.length).toBeGreaterThan(0);
+      expect(issues.some((i) => i.includes("script"))).toBe(true);
+    });
+
+    it("should find malformed script tags without closing", () => {
+      const svg = `<svg><script src="evil.js"><circle/></svg>`;
+      const issues = SVGSanitizer.validate(svg);
+
+      expect(issues.length).toBeGreaterThan(0);
+      expect(issues.some((i) => i.includes("script"))).toBe(true);
+    });
+
     it("should find event handlers", () => {
       const svg = `<svg onclick="alert('XSS')"><circle/></svg>`;
       const issues = SVGSanitizer.validate(svg);

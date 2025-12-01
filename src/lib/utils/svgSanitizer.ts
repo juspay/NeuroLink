@@ -302,8 +302,12 @@ export class SVGSanitizer {
       typeof content === "string" ? content : content.toString("utf-8");
     const issues: string[] = [];
 
-    // Check for script tags
-    if (/<script[\s\S]*?<\/script>/gi.test(str)) {
+    // Check for script tags (complete, self-closing, and malformed)
+    if (
+      /<script[\s\S]*?<\/script>/gi.test(str) ||
+      /<script[^>]*\/>/gi.test(str) ||
+      /<script[^>]*>/gi.test(str)
+    ) {
       issues.push("Contains script tags which can execute JavaScript");
     }
 
