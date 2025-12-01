@@ -150,25 +150,27 @@ npx @juspay/neurolink generate "Analyze this call recording" \
 
 **Audio Flags:**
 
-| Flag               | Alias | Description                                           | Default     |
-| ------------------ | ----- | ----------------------------------------------------- | ----------- |
-| `--audio`          | `-a`  | Path to audio file (WAV, MP3, or PCM16LE format)      | –           |
-| `--audio-language` | –     | Language code for transcription (e.g., `en`, `es`)    | Auto-detect |
-| `--audio-provider` | –     | Provider for audio processing                         | `--provider`|
+| Flag               | Alias | Description                                                    | Default     |
+| ------------------ | ----- | -------------------------------------------------------------- | ----------- |
+| `--audio`          | `-a`  | Path to audio file (WAV, MP3, or PCM 16-bit LE raw format)     | –           |
+| `--audio-language` | –     | Language code for transcription (e.g., `en`, `es`)             | Auto-detect |
+| `--audio-provider` | –     | Provider for audio processing                                  | `--provider`|
 
 **Supported Audio Formats:**
 
 - **WAV** – Recommended for highest quality
 - **MP3** – Widely compatible, automatic conversion
-- **PCM16LE** – Raw audio format, lowest latency
+- **PCM 16-bit LE** – Raw audio format, lowest latency (also known as PCM16LE)
 
 **Supported Providers:**
 
-| Provider     | Models                                            | Notes                          |
-| ------------ | ------------------------------------------------- | ------------------------------ |
-| `google-ai`  | `gemini-2.5-flash-preview-native-audio-dialog`    | Best for real-time speech      |
-| `openai`     | `gpt-4o-audio-preview`                            | Audio understanding            |
-| `vertex`     | `gemini-2.5-pro`                                  | Enterprise audio processing    |
+| Provider     | Models                                            | Notes                                       |
+| ------------ | ------------------------------------------------- | ------------------------------------------- |
+| `google-ai`  | `gemini-2.5-flash-preview-native-audio-dialog`    | Best for real-time speech (preview model)   |
+| `openai`     | `gpt-4o-audio-preview`                            | Audio understanding (preview model)         |
+| `vertex`     | `gemini-2.5-pro`                                  | Enterprise audio processing                 |
+
+> **Note:** Audio model names ending in `-preview` are subject to change. Check the provider documentation for the latest stable models.
 
 **Examples with Evaluation:**
 
