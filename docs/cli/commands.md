@@ -17,18 +17,18 @@ npm install @juspay/neurolink
 
 ## Command Map
 
-| Command               | Description                                                 | Example                                                                     |
-| --------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `generate` / `gen`    | One-shot content generation with optional multimodal input. | `npx @juspay/neurolink generate "Draft release notes" --image ./before.png` |
-| `stream`              | Real-time streaming output with tool support.               | `npx @juspay/neurolink stream "Narrate sprint demo" --enableAnalytics`      |
-| `loop`                | Interactive session with persistent variables & memory.     | `npx @juspay/neurolink loop --auto-redis`                                   |
-| `setup`               | Guided provider onboarding and validation.                  | `npx @juspay/neurolink setup --provider openai`                             |
-| `status`              | Health check for configured providers.                      | `npx @juspay/neurolink status --verbose`                                    |
-| `models list`         | Inspect available models and capabilities.                  | `npx @juspay/neurolink models list --capability vision`                     |
-| `config <subcommand>` | Initialise, validate, export, or reset configuration.       | `npx @juspay/neurolink config validate`                                     |
-| `memory <subcommand>` | View, export, or clear conversation history.                | `npx @juspay/neurolink memory history NL_x3yr --format json`                |
-| `mcp <subcommand>`    | Manage Model Context Protocol servers/tools.                | `npx @juspay/neurolink mcp list`                                            |
-| `validate`            | Alias for `config validate`.                                | `npx @juspay/neurolink validate`                                            |
+| Command               | Description                                                           | Example                                                                        |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `generate` / `gen`    | One-shot content generation with optional multimodal input.           | `npx @juspay/neurolink generate "Draft release notes" --image ./before.png`    |
+| `stream`              | Real-time streaming output with tool support and audio capabilities.  | `npx @juspay/neurolink stream "Respond to audio" --audio ./recording.wav`      |
+| `loop`                | Interactive session with persistent variables & memory.               | `npx @juspay/neurolink loop --auto-redis`                                      |
+| `setup`               | Guided provider onboarding and validation.                            | `npx @juspay/neurolink setup --provider openai`                                |
+| `status`              | Health check for configured providers.                                | `npx @juspay/neurolink status --verbose`                                       |
+| `models list`         | Inspect available models and capabilities.                            | `npx @juspay/neurolink models list --capability vision`                        |
+| `config <subcommand>` | Initialise, validate, export, or reset configuration.                 | `npx @juspay/neurolink config validate`                                        |
+| `memory <subcommand>` | View, export, or clear conversation history.                          | `npx @juspay/neurolink memory history NL_x3yr --format json`                   |
+| `mcp <subcommand>`    | Manage Model Context Protocol servers/tools.                          | `npx @juspay/neurolink mcp list`                                               |
+| `validate`            | Alias for `config validate`.                                          | `npx @juspay/neurolink validate`                                               |
 
 ## Primary Commands
 
@@ -45,6 +45,9 @@ Key flags:
 - `--provider`, `-p` – provider slug (default `auto`).
 - `--model`, `-m` – model name for the chosen provider.
 - `--image`, `-i` – attach one or more files/URLs for multimodal prompts.
+- `--audio`, `-a` – attach an audio file for speech-to-speech or audio analysis.
+- `--audio-language` – language code for audio input (e.g., `en`, `es`, `fr`). Helps with transcription accuracy.
+- `--audio-provider` – provider for audio processing (e.g., `google-ai`, `openai`). Defaults to the main `--provider`.
 - `--temperature`, `-t` – creativity (default `0.7`).
 - `--maxTokens` – response limit (default `1000`).
 - `--system`, `-s` – system prompt.
@@ -118,6 +121,82 @@ NeuroLink uses GPT-4o by default as the judge model, but you can configure diffe
 - Compliance checking for regulated industries
 
 **Learn more:** [Auto Evaluation Guide](../features/auto-evaluation.md)
+
+---
+
+### Audio Input {#audio}
+
+NeuroLink supports audio input for speech-to-speech interactions and audio analysis. Use the `--audio` flag with `stream` or `generate` commands to process audio files.
+
+**Basic Audio Usage:**
+
+```bash
+# Process an audio file with speech-to-speech
+npx @juspay/neurolink stream "Respond to the following audio" \
+  --audio ./recordings/question.wav \
+  --provider google-ai
+
+# Specify language for better transcription accuracy
+npx @juspay/neurolink stream "Transcribe and summarize" \
+  --audio ./interview.mp3 \
+  --audio-language en
+
+# Use a specific provider for audio processing
+npx @juspay/neurolink generate "Analyze this call recording" \
+  --audio ./support-call.wav \
+  --audio-provider google-ai \
+  --model gemini-2.5-flash-preview-native-audio-dialog
+```
+
+**Audio Flags:**
+
+| Flag               | Alias | Description                                           | Default     |
+| ------------------ | ----- | ----------------------------------------------------- | ----------- |
+| `--audio`          | `-a`  | Path to audio file (WAV, MP3, or PCM16LE format)      | –           |
+| `--audio-language` | –     | Language code for transcription (e.g., `en`, `es`)    | Auto-detect |
+| `--audio-provider` | –     | Provider for audio processing                         | `--provider`|
+
+**Supported Audio Formats:**
+
+- **WAV** – Recommended for highest quality
+- **MP3** – Widely compatible, automatic conversion
+- **PCM16LE** – Raw audio format, lowest latency
+
+**Supported Providers:**
+
+| Provider     | Models                                            | Notes                          |
+| ------------ | ------------------------------------------------- | ------------------------------ |
+| `google-ai`  | `gemini-2.5-flash-preview-native-audio-dialog`    | Best for real-time speech      |
+| `openai`     | `gpt-4o-audio-preview`                            | Audio understanding            |
+| `vertex`     | `gemini-2.5-pro`                                  | Enterprise audio processing    |
+
+**Examples with Evaluation:**
+
+```bash
+# Analyze audio with quality evaluation
+npx @juspay/neurolink generate "Summarize this podcast segment" \
+  --audio ./podcast-clip.mp3 \
+  --audio-language en \
+  --enableEvaluation \
+  --evaluationDomain "media content"
+
+# Stream audio response with analytics
+npx @juspay/neurolink stream "Respond naturally to this question" \
+  --audio ./user-question.wav \
+  --provider google-ai \
+  --enableAnalytics \
+  --format json
+```
+
+**Best Practices:**
+
+- Use WAV format for best transcription accuracy
+- Specify `--audio-language` when working with non-English content
+- Combine with `--enableAnalytics` to track audio processing costs
+- Use `stream` for real-time speech-to-speech interactions
+- Use `generate` for batch audio analysis tasks
+
+**Learn more:** [Real-Time Speech Agents](../REAL-TIME-SPEECH-AGENTS.md)
 
 ---
 
@@ -264,6 +343,18 @@ npx @juspay/neurolink mcp connect --url https://...  # Attach external server
 | `--domain <slug>`           | Select a domain configuration for analytics/evaluation.                   |
 | `--toolUsageContext <text>` | Describe expected tool usage for better evaluation feedback.              |
 
+## Multimodal Flags (generate/stream)
+
+| Flag               | Alias | Description                                                    |
+| ------------------ | ----- | -------------------------------------------------------------- |
+| `--image`          | `-i`  | Attach image file or URL for multimodal prompts.               |
+| `--audio`          | `-a`  | Attach audio file for speech-to-speech or analysis.            |
+| `--audio-language` | –     | Language code for audio transcription (e.g., `en`, `es`, `fr`).|
+| `--audio-provider` | –     | Provider for audio processing (defaults to main `--provider`). |
+| `--csv`            | `-c`  | Attach CSV file for data analysis.                             |
+| `--pdf`            | –     | Attach PDF file for document analysis.                         |
+| `--file`           | –     | Auto-detect file type (CSV, image, PDF, etc.).                 |
+
 ## JSON-Friendly Automation
 
 - `--format json` returns structured output including analytics, evaluation, tool calls, and response metadata.
@@ -278,6 +369,8 @@ npx @juspay/neurolink mcp connect --url https://...  # Attach external server
 | CLI exits immediately              | Upgrade to the newest release or clear old `neurolink` binaries on PATH.                                 |
 | Provider shows as `not-configured` | Run `neurolink setup --provider <name>` or populate `.env`.                                              |
 | Analytics/evaluation missing       | Ensure both `--enableAnalytics`/`--enableEvaluation` and provider credentials for the judge model exist. |
+| Audio not processing               | Verify provider supports audio (e.g., `google-ai`). Use WAV format for best compatibility.               |
+| Audio transcription inaccurate     | Specify `--audio-language` to improve transcription for non-English content.                             |
 
 For advanced workflows (batching, tooling, configuration management) see the relevant guides in the documentation sidebar.
 
@@ -290,6 +383,7 @@ For advanced workflows (batching, tooling, configuration management) see the rel
 - [CLI Loop Sessions](../features/cli-loop-sessions.md) – Persistent interactive mode with session management
 - [Redis Conversation Export](../features/conversation-history.md) – Export session history via `memory export`
 - [Guardrails Middleware](../features/guardrails.md) – Content filtering (use `--middleware-preset security`)
+- [Real-Time Speech Agents](../REAL-TIME-SPEECH-AGENTS.md) – Use `--audio` flag for speech-to-speech interactions
 
 **Q3 2025:**
 
