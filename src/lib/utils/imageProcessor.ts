@@ -4,6 +4,7 @@
  */
 
 import { logger } from "./logger.js";
+import { ImageProcessingTelemetry } from "../telemetry/imageProcessingTelemetry.js";
 import type { ProcessedImage } from "../types/multimodal.js";
 import type { FileProcessingResult } from "../types/fileTypes.js";
 
@@ -11,6 +12,8 @@ import type { FileProcessingResult } from "../types/fileTypes.js";
  * Image processor class for handling provider-specific image formatting
  */
 export class ImageProcessor {
+  private static telemetry = ImageProcessingTelemetry.getInstance();
+
   /**
    * Process image Buffer (unified interface)
    * Matches CSVProcessor.process() signature for consistency
@@ -23,48 +26,60 @@ export class ImageProcessor {
     content: Buffer,
     _options?: unknown,
   ): Promise<FileProcessingResult> {
-    const mediaType = this.detectImageType(content);
-    const base64 = content.toString("base64");
-    const dataUri = `data:${mediaType};base64,${base64}`;
+    return this.telemetry.trackOperation(
+      "process",
+      content.length,
+      async () => {
+        const mediaType = this.detectImageType(content);
+        const base64 = content.toString("base64");
+        const dataUri = `data:${mediaType};base64,${base64}`;
 
-    return {
-      type: "image",
-      content: dataUri,
-      mimeType: mediaType,
-      metadata: {
-        confidence: 100,
-        size: content.length,
+        return {
+          type: "image",
+          content: dataUri,
+          mimeType: mediaType,
+          metadata: {
+            confidence: 100,
+            size: content.length,
+          },
+        } satisfies FileProcessingResult;
       },
-    } satisfies FileProcessingResult;
+      { mimeType: this.detectImageType(content) },
+    );
   }
 
   /**
    * Process image for OpenAI (requires data URI format)
    */
   static processImageForOpenAI(image: Buffer | string): string {
-    try {
-      if (typeof image === "string") {
-        // Handle URLs
-        if (image.startsWith("http")) {
-          return image;
-        }
-        // Handle data URIs
-        if (image.startsWith("data:")) {
-          return image;
-        }
-        // Handle base64 - convert to data URI
-        return `data:image/jpeg;base64,${image}`;
-      }
+    const imageSize =
+      typeof image === "string"
+        ? Buffer.byteLength(image, "utf-8")
+        : image.length;
 
-      // Handle Buffer - convert to data URI
-      const base64 = image.toString("base64");
-      return `data:image/jpeg;base64,${base64}`;
-    } catch (error) {
-      logger.error("Failed to process image for OpenAI:", error);
-      throw new Error(
-        `Image processing failed for OpenAI: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+    return this.telemetry.trackSync(
+      "processForOpenAI",
+      imageSize,
+      () => {
+        if (typeof image === "string") {
+          // Handle URLs
+          if (image.startsWith("http")) {
+            return image;
+          }
+          // Handle data URIs
+          if (image.startsWith("data:")) {
+            return image;
+          }
+          // Handle base64 - convert to data URI
+          return `data:image/jpeg;base64,${image}`;
+        }
+
+        // Handle Buffer - convert to data URI
+        const base64 = image.toString("base64");
+        return `data:image/jpeg;base64,${base64}`;
+      },
+      { provider: "openai" },
+    );
   }
 
   /**
@@ -74,37 +89,42 @@ export class ImageProcessor {
     mimeType: string;
     data: string;
   } {
-    try {
-      let base64Data: string;
-      let mimeType = "image/jpeg"; // Default
+    const imageSize =
+      typeof image === "string"
+        ? Buffer.byteLength(image, "utf-8")
+        : image.length;
 
-      if (typeof image === "string") {
-        if (image.startsWith("data:")) {
-          // Extract mime type and base64 from data URI
-          const match = image.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            mimeType = match[1];
-            base64Data = match[2];
+    return this.telemetry.trackSync(
+      "processForGoogle",
+      imageSize,
+      () => {
+        let base64Data: string;
+        let mimeType = "image/jpeg"; // Default
+
+        if (typeof image === "string") {
+          if (image.startsWith("data:")) {
+            // Extract mime type and base64 from data URI
+            const match = image.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              mimeType = match[1];
+              base64Data = match[2];
+            } else {
+              base64Data = image.split(",")[1] || image;
+            }
           } else {
-            base64Data = image.split(",")[1] || image;
+            base64Data = image;
           }
         } else {
-          base64Data = image;
+          base64Data = image.toString("base64");
         }
-      } else {
-        base64Data = image.toString("base64");
-      }
 
-      return {
-        mimeType,
-        data: base64Data, // Google wants base64 WITHOUT data URI prefix
-      };
-    } catch (error) {
-      logger.error("Failed to process image for Google AI:", error);
-      throw new Error(
-        `Image processing failed for Google AI: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+        return {
+          mimeType,
+          data: base64Data, // Google wants base64 WITHOUT data URI prefix
+        };
+      },
+      { provider: "google-ai" },
+    );
   }
 
   /**
@@ -114,37 +134,42 @@ export class ImageProcessor {
     mediaType: string;
     data: string;
   } {
-    try {
-      let base64Data: string;
-      let mediaType = "image/jpeg"; // Default
+    const imageSize =
+      typeof image === "string"
+        ? Buffer.byteLength(image, "utf-8")
+        : image.length;
 
-      if (typeof image === "string") {
-        if (image.startsWith("data:")) {
-          // Extract mime type and base64 from data URI
-          const match = image.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            mediaType = match[1];
-            base64Data = match[2];
+    return this.telemetry.trackSync(
+      "processForAnthropic",
+      imageSize,
+      () => {
+        let base64Data: string;
+        let mediaType = "image/jpeg"; // Default
+
+        if (typeof image === "string") {
+          if (image.startsWith("data:")) {
+            // Extract mime type and base64 from data URI
+            const match = image.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              mediaType = match[1];
+              base64Data = match[2];
+            } else {
+              base64Data = image.split(",")[1] || image;
+            }
           } else {
-            base64Data = image.split(",")[1] || image;
+            base64Data = image;
           }
         } else {
-          base64Data = image;
+          base64Data = image.toString("base64");
         }
-      } else {
-        base64Data = image.toString("base64");
-      }
 
-      return {
-        mediaType,
-        data: base64Data, // Anthropic wants base64 WITHOUT data URI prefix
-      };
-    } catch (error) {
-      logger.error("Failed to process image for Anthropic:", error);
-      throw new Error(
-        `Image processing failed for Anthropic: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+        return {
+          mediaType,
+          data: base64Data, // Anthropic wants base64 WITHOUT data URI prefix
+        };
+      },
+      { provider: "anthropic" },
+    );
   }
 
   /**
@@ -154,24 +179,29 @@ export class ImageProcessor {
     image: Buffer | string,
     model: string,
   ): { mimeType?: string; mediaType?: string; data: string } {
-    try {
-      // Route based on model type
-      if (model.includes("gemini")) {
-        // Use Google AI format for Gemini models
-        return ImageProcessor.processImageForGoogle(image);
-      } else if (model.includes("claude")) {
-        // Use Anthropic format for Claude models
-        return ImageProcessor.processImageForAnthropic(image);
-      } else {
-        // Default to Google format
-        return ImageProcessor.processImageForGoogle(image);
-      }
-    } catch (error) {
-      logger.error("Failed to process image for Vertex AI:", error);
-      throw new Error(
-        `Image processing failed for Vertex AI: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
+    const imageSize =
+      typeof image === "string"
+        ? Buffer.byteLength(image, "utf-8")
+        : image.length;
+
+    return this.telemetry.trackSync(
+      "processForVertex",
+      imageSize,
+      () => {
+        // Route based on model type
+        if (model.includes("gemini")) {
+          // Use Google AI format for Gemini models
+          return ImageProcessor.processImageForGoogle(image);
+        } else if (model.includes("claude")) {
+          // Use Anthropic format for Claude models
+          return ImageProcessor.processImageForAnthropic(image);
+        } else {
+          // Default to Google format
+          return ImageProcessor.processImageForGoogle(image);
+        }
+      },
+      { provider: "vertex", model },
+    );
   }
 
   /**

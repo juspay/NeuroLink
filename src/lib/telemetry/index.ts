@@ -1,5 +1,11 @@
 // Optional Telemetry Infrastructure (Phase 2)
 export { TelemetryService, type HealthMetrics } from "./telemetryService.js";
+export {
+  ImageProcessingTelemetry,
+  type ImageOperation,
+  type ImageProcessingMetrics,
+  type ImageProcessingStats,
+} from "./imageProcessingTelemetry.js";
 import { logger } from "../utils/logger.js";
 
 /**
