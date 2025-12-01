@@ -30,9 +30,7 @@ jobs:
 
       # Install ffmpeg for video processing tests (VIDEO-034)
       - name: Install ffmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Install dependencies
         run: pnpm install
@@ -117,9 +115,7 @@ jobs:
 
       # Install ffmpeg for video processing tests (VIDEO-034)
       - name: Install ffmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Install dependencies
         run: pnpm install
