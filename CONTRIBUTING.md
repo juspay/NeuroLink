@@ -14,6 +14,7 @@ Thank you for your interest in contributing to NeuroLink! This document provides
     - [Development Workflow](#development-workflow)
   - [Submitting Changes](#submitting-changes)
   - [Coding Style](#coding-style)
+  - [Logging Guidelines](#logging-guidelines)
   - [Testing](#testing)
   - [Documentation](#documentation)
   - [Release Process](#release-process)
@@ -266,6 +267,30 @@ pnpm format            # Prettier formatting
 ```
 
 **Note:** The build rule enforcement system will automatically prevent commits that don't meet quality standards. See the "Build Rule Enforcement & Quality Standards" section above for complete details.
+
+## Logging Guidelines
+
+NeuroLink uses a unified logging utility with standardized conventions. When adding or modifying logging:
+
+- **Use structured logging** - Pass an object with context data
+- **Choose appropriate log levels** - DEBUG for routine operations, INFO for significant events, WARN for recoverable issues, ERROR for failures
+- **Never log sensitive data** - API keys, tokens, and user data must never appear in logs
+- **Use the logger utility** - Import from `../utils/logger.js`, never use `console.log`
+
+```typescript
+import { logger } from "../utils/logger.js";
+
+// ✅ Good: Structured logging with appropriate level
+logger.info("Generation complete", {
+  provider: this.providerName,
+  tokensUsed: tokens,
+});
+
+// ❌ Bad: String interpolation, no structure
+logger.info(`Complete: ${tokens} tokens`);
+```
+
+📖 **For complete logging conventions, see [Logging Guidelines](docs/contributing/logging-guidelines.md).**
 
 ## Testing
 
