@@ -105,7 +105,7 @@ npx @juspay/neurolink generate "Summarize" \
 - `.docx` - Microsoft Word 2007+ documents
 - `.doc` files are not supported (use `.docx` format)
 
-### `--pptx` / `-p`
+### `--pptx`
 
 Attach PowerPoint presentation (.pptx) files for analysis.
 
@@ -447,7 +447,7 @@ Output includes:
 Options:
   --docx, -d     Add Word document (.docx) for analysis
                  (can be used multiple times)              [string]
-  --pptx, -p     Add PowerPoint presentation (.pptx) for analysis
+  --pptx         Add PowerPoint presentation (.pptx) for analysis
                  (can be used multiple times)              [string]
   --xlsx, -x     Add Excel spreadsheet (.xlsx) for analysis
                  (can be used multiple times)              [string]
@@ -506,7 +506,7 @@ Options:
 ## Summary
 
 - Office document support includes **DOCX**, **PPTX**, and **XLSX** files
-- Use `--docx`, `--pptx`, `--xlsx` CLI flags (with aliases `-d`, `-p`, `-x`)
+- Use `--docx`, `--pptx`, `--xlsx` CLI flags (aliases: `-d` for docx, `-x` for xlsx)
 - SDK uses `docxFiles`, `pptxFiles`, `xlsxFiles` arrays
 - Works with **ALL AI providers**
 - Supports multiple files and mixed file types

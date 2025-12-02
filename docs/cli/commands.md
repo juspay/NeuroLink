@@ -45,11 +45,11 @@ Key flags:
 - `--provider`, `-p` – provider slug (default `auto`).
 - `--model`, `-m` – model name for the chosen provider.
 - `--image`, `-i` – attach one or more files/URLs for multimodal prompts.
-- `--pdf` – attach PDF file(s) for document analysis.
-- `--csv`, `-c` – attach CSV file(s) for data analysis.
-- `--docx`, `-d` – attach Word document(s) for analysis.
-- `--pptx` – attach PowerPoint presentation(s) for analysis.
-- `--xlsx` – attach Excel spreadsheet(s) for analysis.
+- `--pdf` – attach one or more PDF file(s) for document analysis.
+- `--csv`, `-c` – attach one or more CSV file(s) for data analysis.
+- `--docx`, `-d` – attach one or more Word document(s) for analysis.
+- `--pptx` – attach one or more PowerPoint presentation(s) for analysis.
+- `--xlsx`, `-x` – attach one or more Excel spreadsheet(s) for analysis.
 - `--file` – attach file with auto-detection (CSV, image, PDF, office docs).
 - `--temperature`, `-t` – creativity (default `0.7`).
 - `--maxTokens` – response limit (default `1000`).
