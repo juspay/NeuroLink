@@ -294,6 +294,25 @@ export type ProcessedImage = {
 };
 
 /**
+ * Context for image processing operations
+ * Used to provide detailed error messages with file paths, providers, and operation names
+ */
+export type ImageProcessingContext = {
+  /** File path being processed (if available) */
+  filePath?: string;
+  /** URL being processed (if available) */
+  url?: string;
+  /** Provider name (e.g., "openai", "anthropic") */
+  provider?: string;
+  /** Model name being used */
+  model?: string;
+  /** Operation name (e.g., "processImageForOpenAI", "fileToBase64DataUri") */
+  operation?: string;
+  /** Image index in array (for batch processing) */
+  imageIndex?: number;
+};
+
+/**
  * Provider-specific multimodal payload
  */
 export type ProviderMultimodalPayload = {

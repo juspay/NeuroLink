@@ -29,6 +29,7 @@ export type {
   VisionCapability,
   ProviderImageFormat,
   ProcessedImage,
+  ImageProcessingContext,
   ProviderMultimodalPayload,
 } from "./multimodal.js";
 

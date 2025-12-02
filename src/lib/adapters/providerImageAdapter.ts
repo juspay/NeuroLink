@@ -272,7 +272,10 @@ export class ProviderImageAdapter {
 
     images.forEach((image, index) => {
       try {
-        const imageUrl = ImageProcessor.processImageForOpenAI(image);
+        const imageUrl = ImageProcessor.processImageForOpenAI(image, {
+          provider: "openai",
+          imageIndex: index,
+        });
         content.push({
           type: "image_url",
           image_url: { url: imageUrl },
@@ -300,7 +303,10 @@ export class ProviderImageAdapter {
 
     images.forEach((image, index) => {
       try {
-        const { mimeType, data } = ImageProcessor.processImageForGoogle(image);
+        const { mimeType, data } = ImageProcessor.processImageForGoogle(image, {
+          provider: "google-ai",
+          imageIndex: index,
+        });
         parts.push({
           inlineData: { mimeType, data },
         });
@@ -327,8 +333,10 @@ export class ProviderImageAdapter {
 
     images.forEach((image, index) => {
       try {
-        const { mediaType, data } =
-          ImageProcessor.processImageForAnthropic(image);
+        const { mediaType, data } = ImageProcessor.processImageForAnthropic(
+          image,
+          { provider: "anthropic", imageIndex: index },
+        );
         content.push({
           type: "image",
           source: {

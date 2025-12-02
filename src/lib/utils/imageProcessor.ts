@@ -4,8 +4,51 @@
  */
 
 import { logger } from "./logger.js";
-import type { ProcessedImage } from "../types/multimodal.js";
+import type {
+  ProcessedImage,
+  ImageProcessingContext,
+} from "../types/multimodal.js";
 import type { FileProcessingResult } from "../types/fileTypes.js";
+
+/**
+ * Build a detailed error message with context
+ */
+function buildErrorMessage(
+  baseMessage: string,
+  context?: ImageProcessingContext,
+  originalError?: unknown,
+): string {
+  const parts: string[] = [baseMessage];
+
+  if (context) {
+    if (context.operation) {
+      parts.push(`operation: ${context.operation}`);
+    }
+    if (context.provider) {
+      parts.push(`provider: ${context.provider}`);
+    }
+    if (context.model) {
+      parts.push(`model: ${context.model}`);
+    }
+    if (context.filePath) {
+      parts.push(`file: ${context.filePath}`);
+    }
+    if (context.url) {
+      parts.push(`url: ${context.url}`);
+    }
+    if (context.imageIndex !== undefined) {
+      parts.push(`imageIndex: ${context.imageIndex}`);
+    }
+  }
+
+  if (originalError instanceof Error) {
+    parts.push(`cause: ${originalError.message}`);
+  } else if (originalError) {
+    parts.push(`cause: Unknown error`);
+  }
+
+  return parts.join(", ");
+}
 
 /**
  * Image processor class for handling provider-specific image formatting
@@ -17,11 +60,13 @@ export class ImageProcessor {
    *
    * @param content - Image file as Buffer
    * @param options - Processing options (unused for now)
+   * @param context - Context for error messages (file path, provider, operation)
    * @returns Processed image as data URI
    */
   static async process(
     content: Buffer,
     _options?: unknown,
+    context?: ImageProcessingContext,
   ): Promise<FileProcessingResult> {
     const mediaType = this.detectImageType(content);
     const base64 = content.toString("base64");
@@ -34,14 +79,25 @@ export class ImageProcessor {
       metadata: {
         confidence: 100,
         size: content.length,
+        ...(context?.filePath && { filePath: context.filePath }),
       },
     } satisfies FileProcessingResult;
   }
 
   /**
    * Process image for OpenAI (requires data URI format)
+   * @param image - Image as Buffer or string
+   * @param context - Context for error messages (file path, provider, operation)
    */
-  static processImageForOpenAI(image: Buffer | string): string {
+  static processImageForOpenAI(
+    image: Buffer | string,
+    context?: ImageProcessingContext,
+  ): string {
+    const ctx: ImageProcessingContext = {
+      ...context,
+      provider: "openai",
+      operation: "processImageForOpenAI",
+    };
     try {
       if (typeof image === "string") {
         // Handle URLs
@@ -60,20 +116,33 @@ export class ImageProcessor {
       const base64 = image.toString("base64");
       return `data:image/jpeg;base64,${base64}`;
     } catch (error) {
-      logger.error("Failed to process image for OpenAI:", error);
-      throw new Error(
-        `Image processing failed for OpenAI: ${error instanceof Error ? error.message : "Unknown error"}`,
+      const errorMessage = buildErrorMessage(
+        "Image processing failed",
+        ctx,
+        error,
       );
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 
   /**
    * Process image for Google AI (requires base64 without data URI prefix)
+   * @param image - Image as Buffer or string
+   * @param context - Context for error messages (file path, provider, operation)
    */
-  static processImageForGoogle(image: Buffer | string): {
+  static processImageForGoogle(
+    image: Buffer | string,
+    context?: ImageProcessingContext,
+  ): {
     mimeType: string;
     data: string;
   } {
+    const ctx: ImageProcessingContext = {
+      ...context,
+      provider: "google-ai",
+      operation: "processImageForGoogle",
+    };
     try {
       let base64Data: string;
       let mimeType = "image/jpeg"; // Default
@@ -100,20 +169,33 @@ export class ImageProcessor {
         data: base64Data, // Google wants base64 WITHOUT data URI prefix
       };
     } catch (error) {
-      logger.error("Failed to process image for Google AI:", error);
-      throw new Error(
-        `Image processing failed for Google AI: ${error instanceof Error ? error.message : "Unknown error"}`,
+      const errorMessage = buildErrorMessage(
+        "Image processing failed",
+        ctx,
+        error,
       );
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 
   /**
    * Process image for Anthropic (requires base64 without data URI prefix)
+   * @param image - Image as Buffer or string
+   * @param context - Context for error messages (file path, provider, operation)
    */
-  static processImageForAnthropic(image: Buffer | string): {
+  static processImageForAnthropic(
+    image: Buffer | string,
+    context?: ImageProcessingContext,
+  ): {
     mediaType: string;
     data: string;
   } {
+    const ctx: ImageProcessingContext = {
+      ...context,
+      provider: "anthropic",
+      operation: "processImageForAnthropic",
+    };
     try {
       let base64Data: string;
       let mediaType = "image/jpeg"; // Default
@@ -140,37 +222,53 @@ export class ImageProcessor {
         data: base64Data, // Anthropic wants base64 WITHOUT data URI prefix
       };
     } catch (error) {
-      logger.error("Failed to process image for Anthropic:", error);
-      throw new Error(
-        `Image processing failed for Anthropic: ${error instanceof Error ? error.message : "Unknown error"}`,
+      const errorMessage = buildErrorMessage(
+        "Image processing failed",
+        ctx,
+        error,
       );
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 
   /**
    * Process image for Vertex AI (model-specific routing)
+   * @param image - Image as Buffer or string
+   * @param model - Model name for routing
+   * @param context - Context for error messages (file path, provider, operation)
    */
   static processImageForVertex(
     image: Buffer | string,
     model: string,
+    context?: ImageProcessingContext,
   ): { mimeType?: string; mediaType?: string; data: string } {
+    const ctx: ImageProcessingContext = {
+      ...context,
+      provider: "vertex",
+      model,
+      operation: "processImageForVertex",
+    };
     try {
       // Route based on model type
       if (model.includes("gemini")) {
         // Use Google AI format for Gemini models
-        return ImageProcessor.processImageForGoogle(image);
+        return ImageProcessor.processImageForGoogle(image, ctx);
       } else if (model.includes("claude")) {
         // Use Anthropic format for Claude models
-        return ImageProcessor.processImageForAnthropic(image);
+        return ImageProcessor.processImageForAnthropic(image, ctx);
       } else {
         // Default to Google format
-        return ImageProcessor.processImageForGoogle(image);
+        return ImageProcessor.processImageForGoogle(image, ctx);
       }
     } catch (error) {
-      logger.error("Failed to process image for Vertex AI:", error);
-      throw new Error(
-        `Image processing failed for Vertex AI: ${error instanceof Error ? error.message : "Unknown error"}`,
+      const errorMessage = buildErrorMessage(
+        "Image processing failed",
+        ctx,
+        error,
       );
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 
@@ -335,12 +433,23 @@ export class ImageProcessor {
 
   /**
    * Convert image to ProcessedImage format
+   * @param image - Image as Buffer or string
+   * @param provider - Provider name for routing
+   * @param model - Model name for routing (optional)
+   * @param context - Context for error messages (file path, operation)
    */
   static processImage(
     image: Buffer | string,
     provider: string,
     model?: string,
+    context?: ImageProcessingContext,
   ): ProcessedImage {
+    const ctx: ImageProcessingContext = {
+      ...context,
+      provider,
+      model,
+      operation: "processImage",
+    };
     try {
       const mediaType = ImageProcessor.detectImageType(image);
       const size =
@@ -353,21 +462,23 @@ export class ImageProcessor {
 
       switch (provider.toLowerCase()) {
         case "openai":
-          data = ImageProcessor.processImageForOpenAI(image);
+          data = ImageProcessor.processImageForOpenAI(image, ctx);
           format = "data_uri";
           break;
 
         case "google-ai":
         case "google": {
-          const googleResult = ImageProcessor.processImageForGoogle(image);
+          const googleResult = ImageProcessor.processImageForGoogle(image, ctx);
           data = googleResult.data;
           format = "base64";
           break;
         }
 
         case "anthropic": {
-          const anthropicResult =
-            ImageProcessor.processImageForAnthropic(image);
+          const anthropicResult = ImageProcessor.processImageForAnthropic(
+            image,
+            ctx,
+          );
           data = anthropicResult.data;
           format = "base64";
           break;
@@ -377,6 +488,7 @@ export class ImageProcessor {
           const vertexResult = ImageProcessor.processImageForVertex(
             image,
             model || "",
+            ctx,
           );
           data = vertexResult.data;
           format = "base64";
@@ -402,10 +514,13 @@ export class ImageProcessor {
         format,
       };
     } catch (error) {
-      logger.error(`Failed to process image for ${provider}:`, error);
-      throw new Error(
-        `Image processing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      const errorMessage = buildErrorMessage(
+        "Image processing failed",
+        ctx,
+        error,
       );
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
     }
   }
 }
@@ -481,6 +596,9 @@ export const imageUtils = {
 
   /**
    * Convert file path to base64 data URI
+   * @param filePath - Path to the file
+   * @param maxBytes - Maximum file size in bytes
+   * @returns Data URI string
    */
   fileToBase64DataUri: async (
     filePath: string,
@@ -492,13 +610,13 @@ export const imageUtils = {
       // File existence and type validation
       const stat = await fs.stat(filePath);
       if (!stat.isFile()) {
-        throw new Error("Not a file");
+        throw new Error(`Not a file: ${filePath}`);
       }
 
       // Size check before reading - prevent memory exhaustion
       if (stat.size > maxBytes) {
         throw new Error(
-          `File too large: ${stat.size} bytes (max: ${maxBytes} bytes)`,
+          `File too large: ${filePath} (${stat.size} bytes, max: ${maxBytes} bytes)`,
         );
       }
 
@@ -513,13 +631,16 @@ export const imageUtils = {
       return `data:${mimeType};base64,${base64}`;
     } catch (error) {
       throw new Error(
-        `Failed to convert file to base64: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to convert file to base64, file: ${filePath}, cause: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   },
 
   /**
    * Convert URL to base64 data URI by downloading the image
+   * @param url - URL to download
+   * @param options - Timeout and max size options
+   * @returns Data URI string
    */
   urlToBase64DataUri: async (
     url: string,
@@ -528,7 +649,7 @@ export const imageUtils = {
     try {
       // Basic protocol whitelist
       if (!/^https?:\/\//i.test(url)) {
-        throw new Error("Unsupported protocol");
+        throw new Error(`Unsupported protocol for URL: ${url}`);
       }
 
       const controller = new AbortController();
@@ -538,25 +659,29 @@ export const imageUtils = {
         const response = await fetch(url, { signal: controller.signal });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(
+            `HTTP ${response.status}: ${response.statusText}, url: ${url}`,
+          );
         }
 
         const contentType = response.headers.get("content-type") || "";
         if (!/^image\//i.test(contentType)) {
           throw new Error(
-            `Unsupported content-type: ${contentType || "unknown"}`,
+            `Unsupported content-type: ${contentType || "unknown"}, url: ${url}`,
           );
         }
 
         const len = Number(response.headers.get("content-length") || 0);
         if (len && len > maxBytes) {
-          throw new Error(`Content too large: ${len} bytes`);
+          throw new Error(
+            `Content too large: ${len} bytes (max: ${maxBytes} bytes), url: ${url}`,
+          );
         }
 
         const buffer = await response.arrayBuffer();
         if (buffer.byteLength > maxBytes) {
           throw new Error(
-            `Downloaded content too large: ${buffer.byteLength} bytes`,
+            `Downloaded content too large: ${buffer.byteLength} bytes (max: ${maxBytes} bytes), url: ${url}`,
           );
         }
 
@@ -567,7 +692,7 @@ export const imageUtils = {
       }
     } catch (error) {
       throw new Error(
-        `Failed to download and convert URL to base64: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to download and convert URL to base64, url: ${url}, cause: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   },
