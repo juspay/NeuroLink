@@ -275,6 +275,16 @@ export class FileDetector {
 /**
  * Strategy 1: Magic Bytes Detection (95% confidence)
  * Detects file type from binary file headers
+ *
+ * **Performance Note:**
+ * Uses synchronous buffer indexing (safe and intentional):
+ *
+ * 1. Constant-time: Only checks 12-16 bytes (microseconds)
+ * 2. No I/O blocking: Data already in memory
+ * 3. No event loop blocking: Faster than single tick
+ * 4. Optimization: Sync is faster than async wrapping
+ *
+ * @see https://en.wikipedia.org/wiki/List_of_file_signatures
  */
 class MagicBytesStrategy implements DetectionStrategy {
   async detect(input: FileInput): Promise<FileDetectionResult> {
