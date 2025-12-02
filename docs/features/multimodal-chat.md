@@ -293,7 +293,7 @@ Video support in NeuroLink works as a multimodal input type:
 3. **Audio transcription**: Optionally transcribe audio tracks for enhanced context
 
 !!! tip "Provider Selection"
-Use **Google AI Studio** or **Vertex AI** for native video support with videos up to 1 hour. For other providers, NeuroLink automatically extracts frames for analysis.
+    Use **Google AI Studio** or **Vertex AI** for native video support with videos up to 1 hour. For other providers, NeuroLink automatically extracts frames for analysis.
 
 ### Supported Formats
 
@@ -480,7 +480,7 @@ npx @juspay/neurolink stream "Explain this tutorial step by step" \
 | **Token Efficiency**     | High (native)             | Medium (frames)      | Medium (frames)      |
 
 !!! info "Native vs Frame Extraction"
-**Native video** (Gemini) processes the video file directly, preserving temporal information and audio. **Frame extraction** samples key frames from the video and sends them as images, which works with any vision-capable model but loses temporal context.
+    **Native video** (Gemini) processes the video file directly, preserving temporal information and audio. **Frame extraction** samples key frames from the video and sends them as images, which works with any vision-capable model but loses temporal context.
 
 ### Configuration Options
 
@@ -602,7 +602,10 @@ await neurolink.generate({
 | 5 minutes    | 12          | medium  | ~3,072 tokens    | ~$0.015               |
 | 10 minutes   | 16          | medium  | ~4,096 tokens    | ~$0.02                |
 
-!!! tip "Quality Impact on Tokens" - **Low quality**: ~85 tokens per frame (good for quick analysis) - **Medium quality**: ~256 tokens per frame (balanced) - **High quality**: ~765 tokens per frame (detailed analysis, 3x medium cost)
+!!! tip "Quality Impact on Tokens"
+    - **Low quality**: ~85 tokens per frame (good for quick analysis)
+    - **Medium quality**: ~256 tokens per frame (balanced)
+    - **High quality**: ~765 tokens per frame (detailed analysis, 3x medium cost)
 
 **Native Video (Gemini):**
 
@@ -614,7 +617,7 @@ await neurolink.generate({
 | 1 hour       | ~60,000 tokens   | ~$0.06                    |
 
 !!! note "Cost Comparison"
-Native video processing with Gemini is typically 2-5x more token-efficient than frame extraction for videos longer than 2 minutes.
+    Native video processing with Gemini is typically 2-5x more token-efficient than frame extraction for videos longer than 2 minutes.
 
 #### Processing Time
 
