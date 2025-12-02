@@ -22,6 +22,8 @@ import { PDFProcessor } from "./pdfProcessor.js";
 
 /**
  * Format file size in human-readable units
+ * @param bytes - Size in bytes
+ * @returns Human-readable size string (e.g., "1.5 MB")
  */
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) {
@@ -98,6 +100,9 @@ export class FileDetector {
   /**
    * Detect file type using multi-strategy approach
    * Stops at first strategy with confidence >= threshold (default: 80%)
+   * @param input - File input (path, URL, Buffer, or data URI)
+   * @param options - Detection options including confidence threshold
+   * @returns Detection result with file type, MIME type, and confidence score
    */
   private static async detect(
     input: FileInput,
@@ -133,6 +138,11 @@ export class FileDetector {
 
   /**
    * Load file content from various sources
+   * @param input - File input (path, URL, Buffer, or data URI)
+   * @param detection - Detection result containing source type
+   * @param options - Loading options (size limits, timeouts)
+   * @returns File content as Buffer
+   * @throws Error if file cannot be loaded or exceeds size limit
    */
   private static async loadContent(
     input: FileInput,
@@ -171,7 +181,13 @@ export class FileDetector {
   }
 
   /**
-   * Route to appropriate processor
+   * Route to appropriate processor based on detected file type
+   * @param content - File content as Buffer
+   * @param detection - Detection result containing file type
+   * @param options - CSV-specific processing options
+   * @param provider - AI provider name for provider-specific processing
+   * @returns Processed file result with type-specific content
+   * @throws Error if file type is unsupported
    */
   private static async processFile(
     content: Buffer,
@@ -199,7 +215,11 @@ export class FileDetector {
   }
 
   /**
-   * Load file from URL
+   * Load file from URL with size and timeout limits
+   * @param url - HTTP or HTTPS URL to fetch
+   * @param options - Options including maxSize and timeout
+   * @returns File content as Buffer
+   * @throws Error if HTTP request fails or file exceeds size limit
    */
   private static async loadFromURL(
     url: string,
@@ -238,7 +258,11 @@ export class FileDetector {
   }
 
   /**
-   * Load file from filesystem path
+   * Load file from filesystem path with size limit check
+   * @param path - Absolute or relative filesystem path
+   * @param options - Options including maxSize limit
+   * @returns File content as Buffer
+   * @throws Error if path is not a file or exceeds size limit
    */
   private static async loadFromPath(
     path: string,
@@ -261,7 +285,10 @@ export class FileDetector {
   }
 
   /**
-   * Load file from data URI
+   * Load file from base64-encoded data URI
+   * @param dataUri - Data URI in format "data:<mime>;base64,<data>"
+   * @returns File content as Buffer
+   * @throws Error if data URI format is invalid
    */
   private static loadFromDataURI(dataUri: string): Buffer {
     const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
@@ -301,6 +328,11 @@ class MagicBytesStrategy implements DetectionStrategy {
     return this.unknown();
   }
 
+  /**
+   * Check if buffer starts with PNG magic bytes (0x89 0x50 0x4E 0x47)
+   * @param buf - Buffer to check
+   * @returns true if PNG signature detected
+   */
   private isPNG(buf: Buffer): boolean {
     return (
       buf.length >= 4 &&
@@ -311,12 +343,22 @@ class MagicBytesStrategy implements DetectionStrategy {
     );
   }
 
+  /**
+   * Check if buffer starts with JPEG magic bytes (0xFF 0xD8 0xFF)
+   * @param buf - Buffer to check
+   * @returns true if JPEG signature detected
+   */
   private isJPEG(buf: Buffer): boolean {
     return (
       buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
     );
   }
 
+  /**
+   * Check if buffer starts with GIF magic bytes (0x47 0x49 0x46 0x38 = "GIF8")
+   * @param buf - Buffer to check
+   * @returns true if GIF signature detected
+   */
   private isGIF(buf: Buffer): boolean {
     return (
       buf.length >= 4 &&
@@ -327,6 +369,11 @@ class MagicBytesStrategy implements DetectionStrategy {
     );
   }
 
+  /**
+   * Check if buffer is WebP format (RIFF container with WEBP signature)
+   * @param buf - Buffer to check
+   * @returns true if WebP signature detected
+   */
   private isWebP(buf: Buffer): boolean {
     return (
       buf.length >= 12 &&
@@ -335,10 +382,22 @@ class MagicBytesStrategy implements DetectionStrategy {
     );
   }
 
+  /**
+   * Check if buffer starts with PDF magic bytes ("%PDF-")
+   * @param buf - Buffer to check
+   * @returns true if PDF signature detected
+   */
   private isPDF(buf: Buffer): boolean {
     return buf.length >= 5 && buf.slice(0, 5).toString() === "%PDF-";
   }
 
+  /**
+   * Create a detection result with specified type, MIME, and confidence
+   * @param type - Detected file type
+   * @param mime - MIME type string
+   * @param confidence - Confidence score (0-100)
+   * @returns FileDetectionResult with buffer source
+   */
   private result(
     type: FileType,
     mime: string,
@@ -353,6 +412,10 @@ class MagicBytesStrategy implements DetectionStrategy {
     };
   }
 
+  /**
+   * Create an unknown detection result with zero confidence
+   * @returns FileDetectionResult with unknown type and octet-stream MIME
+   */
   private unknown(): FileDetectionResult {
     return {
       type: "unknown",
@@ -398,6 +461,11 @@ class MimeTypeStrategy implements DetectionStrategy {
     }
   }
 
+  /**
+   * Convert MIME type string to FileType enum
+   * @param mime - MIME type string (e.g., "image/png", "text/csv")
+   * @returns Corresponding FileType or "unknown"
+   */
   private mimeToFileType(mime: string): FileType {
     if (mime.includes("text/csv")) {
       return "csv";
@@ -417,10 +485,19 @@ class MimeTypeStrategy implements DetectionStrategy {
     return "unknown";
   }
 
+  /**
+   * Check if string is a valid HTTP/HTTPS URL
+   * @param str - String to check
+   * @returns true if string starts with http:// or https://
+   */
   private isURL(str: string): boolean {
     return str.startsWith("http://") || str.startsWith("https://");
   }
 
+  /**
+   * Create an unknown detection result with zero confidence
+   * @returns FileDetectionResult with unknown type and octet-stream MIME
+   */
   private unknown(): FileDetectionResult {
     return {
       type: "unknown",
@@ -476,6 +553,11 @@ class ExtensionStrategy implements DetectionStrategy {
     };
   }
 
+  /**
+   * Extract file extension from path or URL
+   * @param input - File path or URL string
+   * @returns Extension without dot (e.g., "png") or null if not found
+   */
   private getExtension(input: string): string | null {
     if (this.isURL(input)) {
       const url = new URL(input);
@@ -486,10 +568,20 @@ class ExtensionStrategy implements DetectionStrategy {
     return match ? match[1] : null;
   }
 
+  /**
+   * Check if string is a valid HTTP/HTTPS URL
+   * @param str - String to check
+   * @returns true if string starts with http:// or https://
+   */
   private isURL(str: string): boolean {
     return str.startsWith("http://") || str.startsWith("https://");
   }
 
+  /**
+   * Detect the source type from input string
+   * @param input - Input string (path, URL, or data URI)
+   * @returns FileSource type ("datauri", "url", or "path")
+   */
   private detectSource(input: string): FileSource {
     if (input.startsWith("data:")) {
       return "datauri";
@@ -500,6 +592,11 @@ class ExtensionStrategy implements DetectionStrategy {
     return "path";
   }
 
+  /**
+   * Get MIME type for a file extension
+   * @param ext - File extension without dot
+   * @returns MIME type string or "application/octet-stream" if unknown
+   */
   private getMimeType(ext: string): string {
     const mimeMap: Record<string, string> = {
       csv: "text/csv",
@@ -521,6 +618,10 @@ class ExtensionStrategy implements DetectionStrategy {
     return mimeMap[ext.toLowerCase()] || "application/octet-stream";
   }
 
+  /**
+   * Create an unknown detection result with zero confidence
+   * @returns FileDetectionResult with unknown type and octet-stream MIME
+   */
   private unknown(): FileDetectionResult {
     return {
       type: "unknown",
@@ -551,6 +652,11 @@ class ContentHeuristicStrategy implements DetectionStrategy {
     return this.unknown();
   }
 
+  /**
+   * Check if text content appears to be CSV format
+   * @param text - Text sample to analyze
+   * @returns true if content has consistent comma-separated structure
+   */
   private looksLikeCSV(text: string): boolean {
     const lines = text.split("\n").slice(0, 5);
     if (lines.length < 2) {
@@ -568,6 +674,13 @@ class ContentHeuristicStrategy implements DetectionStrategy {
     return uniqueCounts.size === 1 && columnCounts[0] >= 2;
   }
 
+  /**
+   * Create a detection result with specified type, MIME, and confidence
+   * @param type - Detected file type
+   * @param mime - MIME type string
+   * @param confidence - Confidence score (0-100)
+   * @returns FileDetectionResult with buffer source
+   */
   private result(
     type: FileType,
     mime: string,
@@ -582,6 +695,10 @@ class ContentHeuristicStrategy implements DetectionStrategy {
     };
   }
 
+  /**
+   * Create an unknown detection result with zero confidence
+   * @returns FileDetectionResult with unknown type and octet-stream MIME
+   */
   private unknown(): FileDetectionResult {
     return {
       type: "unknown",
