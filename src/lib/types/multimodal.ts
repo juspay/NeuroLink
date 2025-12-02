@@ -356,7 +356,7 @@ export type ProcessedImage = {
  * import type { TextGenerationInput } from '@huggingface/inference';
  * ```
  *
- * For internal NeuroLink usage, use the concrete types from `./conversation.ts`:
+ * For internal NeuroLink usage, use the concrete types from `./conversation.js`:
  * - `ChatMessage` - Standard message format
  * - `MessageContent` - Content with type information
  * - `MultimodalChatMessage` - Messages with multimodal content
