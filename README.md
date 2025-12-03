@@ -25,6 +25,7 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 ## What's New (Q4 2025)
 
+- **Audio File Support** – Transcribe audio files (MP3, WAV, FLAC, M4A) with multi-language support for meetings, interviews, and voice notes. → [Audio Guide](docs/features/audio-support.md)
 - **Structured Output with Zod Schemas** – Type-safe JSON generation with automatic validation using `schema` + `output.format: "json"` in `generate()`. → [Structured Output Guide](docs/features/structured-output.md)
 - **CSV File Support** – Attach CSV files to prompts for AI-powered data analysis with auto-detection. → [CSV Guide](docs/features/multimodal-chat.md#csv-file-support)
 - **PDF File Support** – Process PDF documents with native visual analysis for Vertex AI, Anthropic, Bedrock, AI Studio. → [PDF Guide](docs/features/pdf-support.md)
@@ -260,6 +261,10 @@ npx @juspay/neurolink generate "Summarize customer feedback" \
 # Turn on analytics + evaluation for observability
 npx @juspay/neurolink generate "Draft release notes" \
   --enable-analytics --enable-evaluation --format json
+
+# Transcribe audio files with multi-language support
+npx @juspay/neurolink generate "Transcribe this meeting and create action items" \
+  --audio ./meeting-recording.mp3 --provider google-ai
 ```
 
 ```typescript
@@ -280,15 +285,25 @@ const result = await neurolink.generate({
       "./sales_data.csv", // Auto-detected as CSV
       "examples/data/invoice.pdf", // Auto-detected as PDF
       "./diagrams/architecture.png", // Auto-detected as image
+      "./meeting-recording.mp3", // Auto-detected as audio
     ],
   },
-  provider: "vertex", // PDF-capable provider (see docs/features/pdf-support.md)
+  provider: "google-ai", // Example of an audio-capable provider (vertex also supports audio, see docs/features/audio-support.md)
   enableEvaluation: true,
   region: "us-east-1",
 });
 
 console.log(result.content);
 console.log(result.evaluation?.overallScore);
+
+// Audio-specific transcription example
+const transcription = await neurolink.generate({
+  input: {
+    text: "Transcribe this Spanish interview and provide a summary in Spanish",
+    audioFiles: ["./spanish-interview.mp3"],
+  },
+  provider: "google-ai",
+});
 ```
 
 Full command and API breakdown lives in [`docs/cli/commands.md`](docs/cli/commands.md) and [`docs/sdk/api-reference.md`](docs/sdk/api-reference.md).
@@ -298,7 +313,7 @@ Full command and API breakdown lives in [`docs/cli/commands.md`](docs/cli/comman
 | Capability               | Highlights                                                                                                               |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | **Provider unification** | 12+ providers with automatic fallback, cost-aware routing, provider orchestration (Q3).                                  |
-| **Multimodal pipeline**  | Stream images + CSV data + PDF documents across providers with local/remote assets. Auto-detection for mixed file types. |
+| **Multimodal pipeline**  | Stream images + audio + CSV data + PDF documents across providers with local/remote assets. Auto-detection for mixed file types. |
 | **Quality & governance** | Auto-evaluation engine (Q3), guardrails middleware (Q4), HITL workflows (Q4), audit logging.                             |
 | **Memory & context**     | Conversation memory, Mem0 integration, Redis history export (Q4), context summarization (Q4).                            |
 | **CLI tooling**          | Loop sessions (Q3), setup wizard, config validation, Redis auto-detect, JSON output.                                     |
