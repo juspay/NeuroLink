@@ -548,7 +548,13 @@ export const imageUtils = {
           );
         }
 
-        const len = Number(response.headers.get("content-length") || 0);
+        const contentLengthHeader = response.headers.get("content-length");
+        const len = Number(contentLengthHeader || 0);
+
+        if (contentLengthHeader !== null && len === 0) {
+          throw new Error("Empty response: content-length is 0");
+        }
+
         if (len && len > maxBytes) {
           throw new Error(`Content too large: ${len} bytes`);
         }
