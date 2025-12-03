@@ -231,11 +231,11 @@ describe("ImageProcessor urlToBase64DataUri - Race Condition Tests", () => {
     // Advance time past timeout
     await vi.advanceTimersByTimeAsync(6000);
 
-    // Abort might have been called before the error, but we're checking
-    // that the cleanup happens properly
+    // Verify that timeout cleanup works correctly: even if abort was called once,
+    // it should not be called multiple times after the timeout is cleared
     const abortCallCount = abortSpy.mock.calls.length;
 
-    // Fast-forward more time - abort should not be called again
+    // Fast-forward more time - abort should not be called again after cleanup
     await vi.advanceTimersByTimeAsync(1000);
 
     // Verify abort wasn't called additional times

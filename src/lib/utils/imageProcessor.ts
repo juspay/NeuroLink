@@ -532,6 +532,7 @@ export const imageUtils = {
       }
 
       const controller = new AbortController();
+      // Flag to prevent race condition: timeout should not abort after successful fetch
       let completed = false;
       const t = setTimeout(() => {
         if (!completed) {
