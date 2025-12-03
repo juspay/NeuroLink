@@ -21,6 +21,7 @@ import {
 import { logger } from "./logger.js";
 import { FileDetector } from "./fileDetector.js";
 import { PDFProcessor } from "./pdfProcessor.js";
+import { urlDownloadRateLimiter } from "./rateLimiter.js";
 import { request, getGlobalDispatcher, interceptors } from "undici";
 import { readFileSync, existsSync } from "fs";
 import type {
@@ -768,8 +769,12 @@ function isInternetUrl(input: string): boolean {
 
 /**
  * Download image from URL and convert to base64 data URI
+ * Rate-limited to 10 downloads per second to prevent DoS
  */
 async function downloadImageFromUrl(url: string): Promise<string> {
+  // Apply rate limiting before download
+  await urlDownloadRateLimiter.acquire();
+
   try {
     const response = await request(url, {
       dispatcher: getGlobalDispatcher().compose(

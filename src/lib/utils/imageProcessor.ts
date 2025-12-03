@@ -4,6 +4,7 @@
  */
 
 import { logger } from "./logger.js";
+import { urlDownloadRateLimiter } from "./rateLimiter.js";
 import type { ProcessedImage } from "../types/multimodal.js";
 import type { FileProcessingResult } from "../types/fileTypes.js";
 
@@ -520,11 +521,15 @@ export const imageUtils = {
 
   /**
    * Convert URL to base64 data URI by downloading the image
+   * Rate-limited to 10 downloads per second to prevent DoS
    */
   urlToBase64DataUri: async (
     url: string,
     { timeoutMs = 15000, maxBytes = 10 * 1024 * 1024 } = {},
   ): Promise<string> => {
+    // Apply rate limiting before download
+    await urlDownloadRateLimiter.acquire();
+
     try {
       // Basic protocol whitelist
       if (!/^https?:\/\//i.test(url)) {
