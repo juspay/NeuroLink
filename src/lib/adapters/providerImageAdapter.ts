@@ -246,6 +246,19 @@ export class ProviderImageAdapter {
         case "ollama":
           adaptedPayload = this.formatForOpenAI(text, images);
           break;
+        case "bedrock":
+        case "aws-bedrock":
+          // Bedrock uses Claude models which require Anthropic format
+          adaptedPayload = this.formatForAnthropic(text, images);
+          break;
+        case "mistral":
+          // Mistral uses OpenAI-compatible format
+          adaptedPayload = this.formatForOpenAI(text, images);
+          break;
+        case "litellm":
+          // LiteLLM is a proxy that uses OpenAI-compatible format
+          adaptedPayload = this.formatForOpenAI(text, images);
+          break;
         default:
           throw new Error(`Vision not supported for provider: ${provider}`);
       }
