@@ -213,3 +213,6 @@ export * from "./fileTypes.js";
 
 // Content types for multimodal support
 export * from "./content.js";
+
+// FFmpeg wrapper types for video/audio processing
+export * from "./ffmpegTypes.js";

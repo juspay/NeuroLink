@@ -55,6 +55,15 @@ Complete installation guide for NeuroLink CLI and SDK across different environme
 - **npm**: 8.0.0 or higher
 - **pnpm**: 8.0.0 or higher (recommended)
 
+### Optional Dependencies
+
+- **ffmpeg**: Required for video/audio processing features
+  - Install via package manager:
+    - macOS: `brew install ffmpeg`
+    - Ubuntu/Debian: `sudo apt install ffmpeg`
+    - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+  - Verify installation: `ffmpeg -version`
+
 ### Supported Platforms
 
 - **macOS**: 10.15+ (Intel and Apple Silicon)

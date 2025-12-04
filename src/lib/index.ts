@@ -39,7 +39,13 @@ export {
   BedrockModels,
   OpenAIModels,
   VertexModels,
+  // FFmpeg enums
+  VideoCodecEnum,
+  AudioCodecEnum,
 } from "./constants/enums.js";
+
+// FFmpeg constants
+export { CommonResolutions } from "./constants/ffmpeg.js";
 
 // Utility exports
 export {
@@ -47,6 +53,38 @@ export {
   getAvailableProviders,
   isValidProvider,
 } from "./utils/providerUtils.js";
+
+// FFmpeg wrapper for video/audio processing
+export { FFmpegWrapper } from "./utils/ffmpegWrapper.js";
+export type {
+  // Base types
+  TimeInSeconds,
+  Resolution,
+  FFmpegOptions,
+  FFmpegBaseOptions,
+  VideoQualitySettings,
+  AudioQualitySettings,
+  VideoDimensions,
+  // FFmpeg types
+  FFmpegPreset,
+  VideoFormat,
+  AudioFormat,
+  VideoCodec,
+  AudioCodec,
+  StreamCodecType,
+  // Operation options
+  VideoConvertOptions,
+  AudioExtractOptions,
+  ThumbnailOptions,
+  TrimOptions,
+  // Results and metadata
+  FFmpegResult,
+  FFmpegError,
+  FFmpegVersion,
+  FFprobeResult,
+  FFprobeFormat,
+  FFprobeStream,
+} from "./types/ffmpegTypes.js";
 
 // Dynamic Models exports
 export { dynamicModelProvider } from "./core/dynamicModels.js";

@@ -154,3 +154,41 @@ export enum ErrorSeverity {
   HIGH = "high",
   CRITICAL = "critical",
 }
+
+// ============================================================================
+// FFMPEG ENUMS
+// ============================================================================
+
+/**
+ * Video codec enum with FFmpeg command values (commonly used codecs)
+ */
+export enum VideoCodecEnum {
+  /** H.264/AVC - Most compatible */
+  H264 = "libx264",
+  /** H.265/HEVC - Better compression */
+  H265 = "libx265",
+  /** VP9 - Google's codec for WebM */
+  VP9 = "libvpx-vp9",
+  /** VP8 - Older WebM codec */
+  VP8 = "libvpx",
+  /** AV1 - Next-gen codec */
+  AV1 = "libaom-av1",
+}
+
+/**
+ * Audio codec enum with FFmpeg command values
+ */
+export enum AudioCodecEnum {
+  /** AAC - Most compatible */
+  AAC = "aac",
+  /** MP3 - Universal compatibility */
+  MP3 = "libmp3lame",
+  /** Opus - Best quality/size for WebM */
+  OPUS = "libopus",
+  /** Vorbis - OGG codec */
+  VORBIS = "libvorbis",
+  /** PCM - Uncompressed */
+  PCM = "pcm_s16le",
+  /** FLAC - Lossless */
+  FLAC = "flac",
+}
