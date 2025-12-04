@@ -5,7 +5,7 @@
 /**
  * Supported file types for multimodal input
  */
-export type FileType = "csv" | "image" | "pdf" | "text" | "unknown";
+export type FileType = "csv" | "image" | "pdf" | "text" | "video" | "unknown";
 
 /**
  * File input can be Buffer or string (path/URL/data URI)
@@ -120,3 +120,65 @@ export type GoogleFilesAPIUploadResult = {
     uri: string;
   };
 };
+
+/**
+ * Video API types for different providers
+ */
+export type VideoAPIType = "files-api" | "frame-extraction";
+
+/**
+ * Video metadata containing technical information
+ */
+export interface VideoMetadata {
+  duration: number;
+  width: number;
+  height: number;
+  codec: string;
+  fps: number;
+  size: number;
+}
+
+/**
+ * Extracted frame from video processing
+ */
+export interface ExtractedFrame {
+  buffer: Buffer;
+  timestamp: number;
+  index: number;
+}
+
+/**
+ * Video content structure for multimodal input (file processing)
+ * Note: This is distinct from VideoContent in multimodal.ts which is for API content.
+ */
+export interface ProcessedVideoContent {
+  type: "video";
+  frames?: ExtractedFrame[];
+  content?: string; // base64 for native video
+  transcription?: string;
+  metadata: VideoMetadata;
+}
+
+/**
+ * Video processor options for configuring video handling
+ */
+export interface VideoProcessorOptions {
+  provider?: string;
+  frameCount?: number;
+  format?: "jpeg" | "png";
+  quality?: number;
+  transcribe?: boolean;
+  transcriptionModel?: string;
+}
+
+/**
+ * Video provider configuration for different AI providers
+ */
+export interface VideoProviderConfig {
+  maxSizeMB: number;
+  maxDurationSec: number;
+  supportsNativeVideo: boolean;
+  supportsAudio: boolean;
+  recommendedFrameCount: number;
+  apiType: VideoAPIType;
+}
