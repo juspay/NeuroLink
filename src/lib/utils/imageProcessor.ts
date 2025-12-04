@@ -23,25 +23,35 @@ export class ImageProcessor {
     content: Buffer,
     _options?: unknown,
   ): Promise<FileProcessingResult> {
-    const mediaType = this.detectImageType(content);
-    const base64 = content.toString("base64");
-    const dataUri = `data:${mediaType};base64,${base64}`;
+    let base64: string | null = null;
+    let dataUri: string | null = null;
+    try {
+      const mediaType = this.detectImageType(content);
+      const contentSize = content.length;
+      base64 = content.toString("base64");
+      dataUri = `data:${mediaType};base64,${base64}`;
 
-    return {
-      type: "image",
-      content: dataUri,
-      mimeType: mediaType,
-      metadata: {
-        confidence: 100,
-        size: content.length,
-      },
-    } satisfies FileProcessingResult;
+      return {
+        type: "image",
+        content: dataUri,
+        mimeType: mediaType,
+        metadata: {
+          confidence: 100,
+          size: contentSize,
+        },
+      } satisfies FileProcessingResult;
+    } finally {
+      // Clear temporary buffer references to aid garbage collection
+      base64 = null;
+      dataUri = null;
+    }
   }
 
   /**
    * Process image for OpenAI (requires data URI format)
    */
   static processImageForOpenAI(image: Buffer | string): string {
+    let base64: string | null = null;
     try {
       if (typeof image === "string") {
         // Handle URLs
@@ -57,13 +67,16 @@ export class ImageProcessor {
       }
 
       // Handle Buffer - convert to data URI
-      const base64 = image.toString("base64");
+      base64 = image.toString("base64");
       return `data:image/jpeg;base64,${base64}`;
     } catch (error) {
       logger.error("Failed to process image for OpenAI:", error);
       throw new Error(
         `Image processing failed for OpenAI: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary buffer reference to aid garbage collection
+      base64 = null;
     }
   }
 
@@ -74,8 +87,8 @@ export class ImageProcessor {
     mimeType: string;
     data: string;
   } {
+    let base64Data: string | null = null;
     try {
-      let base64Data: string;
       let mimeType = "image/jpeg"; // Default
 
       if (typeof image === "string") {
@@ -104,6 +117,9 @@ export class ImageProcessor {
       throw new Error(
         `Image processing failed for Google AI: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary buffer reference to aid garbage collection
+      base64Data = null;
     }
   }
 
@@ -114,8 +130,8 @@ export class ImageProcessor {
     mediaType: string;
     data: string;
   } {
+    let base64Data: string | null = null;
     try {
-      let base64Data: string;
       let mediaType = "image/jpeg"; // Default
 
       if (typeof image === "string") {
@@ -144,6 +160,9 @@ export class ImageProcessor {
       throw new Error(
         `Image processing failed for Anthropic: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary buffer reference to aid garbage collection
+      base64Data = null;
     }
   }
 
@@ -154,23 +173,29 @@ export class ImageProcessor {
     image: Buffer | string,
     model: string,
   ): { mimeType?: string; mediaType?: string; data: string } {
+    let result: { mimeType?: string; mediaType?: string; data: string } | null =
+      null;
     try {
       // Route based on model type
       if (model.includes("gemini")) {
         // Use Google AI format for Gemini models
-        return ImageProcessor.processImageForGoogle(image);
+        result = ImageProcessor.processImageForGoogle(image);
       } else if (model.includes("claude")) {
         // Use Anthropic format for Claude models
-        return ImageProcessor.processImageForAnthropic(image);
+        result = ImageProcessor.processImageForAnthropic(image);
       } else {
         // Default to Google format
-        return ImageProcessor.processImageForGoogle(image);
+        result = ImageProcessor.processImageForGoogle(image);
       }
+      return result;
     } catch (error) {
       logger.error("Failed to process image for Vertex AI:", error);
       throw new Error(
         `Image processing failed for Vertex AI: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary reference to aid garbage collection
+      result = null;
     }
   }
 
@@ -341,6 +366,14 @@ export class ImageProcessor {
     provider: string,
     model?: string,
   ): ProcessedImage {
+    let data: string | null = null;
+    let googleResult: { mimeType: string; data: string } | null = null;
+    let anthropicResult: { mediaType: string; data: string } | null = null;
+    let vertexResult: {
+      mimeType?: string;
+      mediaType?: string;
+      data: string;
+    } | null = null;
     try {
       const mediaType = ImageProcessor.detectImageType(image);
       const size =
@@ -348,7 +381,6 @@ export class ImageProcessor {
           ? Buffer.byteLength(image, "base64")
           : image.length;
 
-      let data: string;
       let format: ProcessedImage["format"];
 
       switch (provider.toLowerCase()) {
@@ -359,22 +391,21 @@ export class ImageProcessor {
 
         case "google-ai":
         case "google": {
-          const googleResult = ImageProcessor.processImageForGoogle(image);
+          googleResult = ImageProcessor.processImageForGoogle(image);
           data = googleResult.data;
           format = "base64";
           break;
         }
 
         case "anthropic": {
-          const anthropicResult =
-            ImageProcessor.processImageForAnthropic(image);
+          anthropicResult = ImageProcessor.processImageForAnthropic(image);
           data = anthropicResult.data;
           format = "base64";
           break;
         }
 
         case "vertex": {
-          const vertexResult = ImageProcessor.processImageForVertex(
+          vertexResult = ImageProcessor.processImageForVertex(
             image,
             model || "",
           );
@@ -406,6 +437,12 @@ export class ImageProcessor {
       throw new Error(
         `Image processing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary buffer references to aid garbage collection
+      data = null;
+      googleResult = null;
+      anthropicResult = null;
+      vertexResult = null;
     }
   }
 }
@@ -486,6 +523,8 @@ export const imageUtils = {
     filePath: string,
     maxBytes: number = 10 * 1024 * 1024,
   ): Promise<string> => {
+    let buffer: Buffer | null = null;
+    let base64: string | null = null;
     try {
       const fs = await import("fs/promises");
 
@@ -502,19 +541,23 @@ export const imageUtils = {
         );
       }
 
-      const buffer = await fs.readFile(filePath);
+      buffer = await fs.readFile(filePath);
 
       // Enhanced MIME detection: try buffer content first, fallback to filename
       const mimeType =
         ImageProcessor.detectImageType(buffer) ||
         ImageProcessor.detectImageType(filePath);
 
-      const base64 = buffer.toString("base64");
+      base64 = buffer.toString("base64");
       return `data:${mimeType};base64,${base64}`;
     } catch (error) {
       throw new Error(
         `Failed to convert file to base64: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary buffer references to aid garbage collection
+      buffer = null;
+      base64 = null;
     }
   },
 
@@ -525,6 +568,8 @@ export const imageUtils = {
     url: string,
     { timeoutMs = 15000, maxBytes = 10 * 1024 * 1024 } = {},
   ): Promise<string> => {
+    let arrayBuffer: ArrayBuffer | null = null;
+    let base64: string | null = null;
     try {
       // Basic protocol whitelist
       if (!/^https?:\/\//i.test(url)) {
@@ -553,14 +598,14 @@ export const imageUtils = {
           throw new Error(`Content too large: ${len} bytes`);
         }
 
-        const buffer = await response.arrayBuffer();
-        if (buffer.byteLength > maxBytes) {
+        arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength > maxBytes) {
           throw new Error(
-            `Downloaded content too large: ${buffer.byteLength} bytes`,
+            `Downloaded content too large: ${arrayBuffer.byteLength} bytes`,
           );
         }
 
-        const base64 = Buffer.from(buffer).toString("base64");
+        base64 = Buffer.from(arrayBuffer).toString("base64");
         return `data:${contentType || "image/jpeg"};base64,${base64}`;
       } finally {
         clearTimeout(t);
@@ -569,6 +614,10 @@ export const imageUtils = {
       throw new Error(
         `Failed to download and convert URL to base64: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+    } finally {
+      // Clear temporary buffer references to aid garbage collection
+      arrayBuffer = null;
+      base64 = null;
     }
   },
 
