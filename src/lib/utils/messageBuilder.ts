@@ -71,8 +71,8 @@ function getFileSize(file: Buffer | string): number | undefined {
     if (file.startsWith("data:")) {
       const match = file.match(/^data:[^;]+;base64,(.+)$/);
       if (match) {
-        // Base64 decodes to approximately 3/4 of the encoded length
-        return Math.floor((match[1].length * 3) / 4);
+        // Use Buffer.from for accurate size calculation
+        return Buffer.from(match[1], "base64").length;
       }
       return undefined;
     }
@@ -135,8 +135,11 @@ export function validateFileSizes(
 ): void {
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    // Use internal filename extraction for error messages
     const filename =
-      typeof file === "string" && !file.startsWith("data:")
+      typeof file === "string" &&
+      !file.startsWith("data:") &&
+      !file.startsWith("http")
         ? file.split("/").pop() || file.split("\\").pop() || `file-${i + 1}`
         : `file-${i + 1}`;
     validateFileSize(file, maxSize, filename);
@@ -452,12 +455,11 @@ export async function buildMessagesArray(
     };
 
     // Early file size validation - fail fast before any processing
-    const maxSize = 50 * 1024 * 1024; // 50MB default
     if (input.csvFiles && input.csvFiles.length > 0) {
-      validateFileSizes(input.csvFiles, maxSize);
+      validateFileSizes(input.csvFiles, DEFAULT_MAX_FILE_SIZE);
     }
     if (input.files && input.files.length > 0) {
-      validateFileSizes(input.files, maxSize);
+      validateFileSizes(input.files, DEFAULT_MAX_FILE_SIZE);
     }
 
     let csvContent = "";
@@ -503,7 +505,7 @@ export async function buildMessagesArray(
         const filename = extractFilename(file);
         try {
           const result = await FileDetector.detectAndProcess(file, {
-            maxSize: 50 * 1024 * 1024,
+            maxSize: DEFAULT_MAX_FILE_SIZE,
             allowedTypes: ["csv"],
             csvOptions: csvOptions,
           });
