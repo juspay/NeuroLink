@@ -52,6 +52,9 @@ function isMetadataLine(lines: string[]): boolean {
   return false;
 }
 
+// Number of lines to sample for delimiter detection
+const DELIMITER_DETECTION_SAMPLE_SIZE = 5;
+
 /**
  * Detect the delimiter used in a CSV file
  * Analyzes the first few non-empty lines to determine the most likely delimiter
@@ -64,8 +67,19 @@ function detectDelimiter(lines: string[]): string {
   // Common delimiters to check
   const delimiters = [",", "\t", ";", "|"];
 
+  // Pre-compute escaped delimiters for regex matching (optimization)
+  const escapedDelimiters: Record<string, string> = {};
+  for (const delimiter of delimiters) {
+    escapedDelimiters[delimiter] = delimiter.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+  }
+
   // Skip empty lines and get first few data lines
-  const dataLines = lines.filter((line) => line.trim().length > 0).slice(0, 5); // Check first 5 non-empty lines
+  const dataLines = lines
+    .filter((line) => line.trim().length > 0)
+    .slice(0, DELIMITER_DETECTION_SAMPLE_SIZE);
 
   if (dataLines.length < 2) {
     return ","; // Default to comma if not enough data
@@ -75,8 +89,7 @@ function detectDelimiter(lines: string[]): string {
   const delimiterScores: Record<string, number[]> = {};
 
   for (const delimiter of delimiters) {
-    // Escape special regex characters properly
-    const escapedDelimiter = delimiter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedDelimiter = escapedDelimiters[delimiter];
     delimiterScores[delimiter] = dataLines.map(
       (line) => (line.match(new RegExp(escapedDelimiter, "g")) || []).length,
     );
@@ -213,6 +226,9 @@ export class CSVProcessor {
           confidence: 100,
           size: content.length,
           rowCount,
+          // Use detected delimiter for column count to match the actual CSV structure
+          // Note: This is a simple split and doesn't handle quoted values,
+          // but it's consistent with the detected delimiter and works for most cases
           columnCount: (limitedLines[0] || "").split(detectedDelimiter).length,
           delimiter: escapedDelimiter,
         },
