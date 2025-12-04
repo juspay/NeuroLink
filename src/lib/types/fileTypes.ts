@@ -127,14 +127,20 @@ export type GoogleFilesAPIUploadResult = {
 export type VideoAPIType = "files-api" | "frame-extraction";
 
 /**
- * Video metadata containing technical information
+ * Video metadata containing technical information about a video file
  */
 export interface VideoMetadata {
+  /** Duration of the video in seconds */
   duration: number;
+  /** Width of the video in pixels */
   width: number;
+  /** Height of the video in pixels */
   height: number;
+  /** Video codec (e.g., 'h264', 'hevc', 'vp9') */
   codec: string;
+  /** Frames per second */
   fps: number;
+  /** File size in bytes */
   size: number;
 }
 
@@ -142,8 +148,11 @@ export interface VideoMetadata {
  * Extracted frame from video processing
  */
 export interface ExtractedFrame {
+  /** Raw image data as a Buffer */
   buffer: Buffer;
+  /** Timestamp in seconds where the frame was extracted */
   timestamp: number;
+  /** Zero-based index of the frame in the extraction sequence */
   index: number;
 }
 
@@ -163,11 +172,17 @@ export interface ProcessedVideoContent {
  * Video processor options for configuring video handling
  */
 export interface VideoProcessorOptions {
+  /** AI provider to use for video processing (e.g., 'openai', 'anthropic', 'google') */
   provider?: string;
+  /** Number of frames to extract from the video (default varies by provider) */
   frameCount?: number;
+  /** Output format for extracted frames */
   format?: "jpeg" | "png";
+  /** Image quality for extracted frames (1-100, only applies to jpeg) */
   quality?: number;
+  /** Whether to transcribe audio from the video */
   transcribe?: boolean;
+  /** Model to use for audio transcription (e.g., 'whisper-1') */
   transcriptionModel?: string;
 }
 
@@ -175,10 +190,16 @@ export interface VideoProcessorOptions {
  * Video provider configuration for different AI providers
  */
 export interface VideoProviderConfig {
+  /** Maximum video file size in megabytes */
   maxSizeMB: number;
+  /** Maximum video duration in seconds */
   maxDurationSec: number;
+  /** Whether the provider supports native video input (vs frame extraction) */
   supportsNativeVideo: boolean;
+  /** Whether the provider supports audio analysis from videos */
   supportsAudio: boolean;
+  /** Recommended number of frames to extract for this provider */
   recommendedFrameCount: number;
+  /** API type used by the provider for video processing */
   apiType: VideoAPIType;
 }
