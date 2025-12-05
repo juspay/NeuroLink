@@ -662,14 +662,31 @@ export async function buildMultimodalMessagesArray(
         typeof f === "string" ? f.toLowerCase().endsWith(".csv") : false,
       ));
   const hasPDFFiles = pdfFiles.length > 0;
+  const hasAudioFiles =
+    (options.input.audioFiles && options.input.audioFiles.length > 0) ||
+    (options.input.files &&
+      options.input.files.some((f) =>
+        typeof f === "string"
+          ? f.toLowerCase().endsWith(".mp3") ||
+            f.toLowerCase().endsWith(".wav") ||
+            f.toLowerCase().endsWith(".ogg") ||
+            f.toLowerCase().endsWith(".webm") ||
+            f.toLowerCase().endsWith(".aac") ||
+            f.toLowerCase().endsWith(".flac") ||
+            f.toLowerCase().endsWith(".m4a")
+          : false,
+      ));
 
-  if (hasCSVFiles || hasPDFFiles) {
+  if (hasCSVFiles || hasPDFFiles || hasAudioFiles) {
     const fileTypes = [];
     if (hasPDFFiles) {
       fileTypes.push("PDFs");
     }
     if (hasCSVFiles) {
       fileTypes.push("CSVs");
+    }
+    if (hasAudioFiles) {
+      fileTypes.push("audio files (transcribed)");
     }
 
     systemPrompt += `\n\nIMPORTANT FILE HANDLING INSTRUCTIONS:

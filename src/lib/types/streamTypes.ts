@@ -160,6 +160,7 @@ export type StreamOptions = {
     images?: Array<Buffer | string>; // Simple image support
     csvFiles?: Array<Buffer | string>; // Explicit CSV files (converted to text)
     pdfFiles?: Array<Buffer | string>; // Explicit PDF files (processed as binary documents, not converted to text)
+    audioFiles?: Array<Buffer | string>; // Audio files (transcribed)
     files?: Array<Buffer | string>; // Auto-detect file types
     content?: Content[]; // Advanced multimodal content
   };
