@@ -1,7 +1,7 @@
 import type { Tool } from "ai";
 import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
 import type { AIModelProviderConfig } from "./providers.js";
-import type { Content } from "./content.js";
+import type { Content, ImageWithAltText } from "./content.js";
 import type {
   AnalyticsData,
   ToolExecutionEvent,
@@ -157,7 +157,24 @@ export type StreamOptions = {
   input: {
     text: string;
     audio?: AudioInputSpec;
-    images?: Array<Buffer | string>; // Simple image support
+    /**
+     * Images to include in the request.
+     * Supports simple image data (Buffer, string) or objects with alt text for accessibility.
+     *
+     * @example Simple usage
+     * ```typescript
+     * images: [imageBuffer, "https://example.com/image.jpg"]
+     * ```
+     *
+     * @example With alt text for accessibility
+     * ```typescript
+     * images: [
+     *   { data: imageBuffer, altText: "Product screenshot showing main dashboard" },
+     *   { data: "https://example.com/chart.png", altText: "Sales chart for Q3 2024" }
+     * ]
+     * ```
+     */
+    images?: Array<Buffer | string | ImageWithAltText>;
     csvFiles?: Array<Buffer | string>; // Explicit CSV files (converted to text)
     pdfFiles?: Array<Buffer | string>; // Explicit PDF files (processed as binary documents, not converted to text)
     files?: Array<Buffer | string>; // Auto-detect file types

@@ -24,6 +24,7 @@ export type {
   AudioContent,
   VideoContent,
   Content,
+  ImageWithAltText,
   MultimodalInput,
   MultimodalMessage,
   VisionCapability,

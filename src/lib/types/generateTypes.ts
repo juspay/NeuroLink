@@ -10,7 +10,7 @@ import type { EvaluationData } from "./evaluation.js";
 import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type { JsonValue } from "./common.js";
-import type { Content } from "./content.js";
+import type { Content, ImageWithAltText } from "./content.js";
 
 /**
  * Generate function options type - Primary method for content generation
@@ -19,7 +19,24 @@ import type { Content } from "./content.js";
 export type GenerateOptions = {
   input: {
     text: string;
-    images?: Array<Buffer | string>; // Simple image support
+    /**
+     * Images to include in the request.
+     * Supports simple image data (Buffer, string) or objects with alt text for accessibility.
+     *
+     * @example Simple usage
+     * ```typescript
+     * images: [imageBuffer, "https://example.com/image.jpg"]
+     * ```
+     *
+     * @example With alt text for accessibility
+     * ```typescript
+     * images: [
+     *   { data: imageBuffer, altText: "Product screenshot showing main dashboard" },
+     *   { data: "https://example.com/chart.png", altText: "Sales chart for Q3 2024" }
+     * ]
+     * ```
+     */
+    images?: Array<Buffer | string | ImageWithAltText>;
     csvFiles?: Array<Buffer | string>; // Explicit CSV files
     pdfFiles?: Array<Buffer | string>; // Explicit PDF files
     files?: Array<Buffer | string>; // Auto-detect file types

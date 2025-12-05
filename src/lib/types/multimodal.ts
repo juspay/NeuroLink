@@ -58,6 +58,8 @@ export type TextContent = {
 export type ImageContent = {
   type: "image";
   data: Buffer | string; // Buffer, base64, URL, or data URI
+  /** Alternative text for accessibility (screen readers, SEO) */
+  altText?: string;
   mediaType?:
     | "image/jpeg"
     | "image/png"
@@ -199,6 +201,29 @@ export type Content =
   | VideoContent;
 
 // ============================================
+// IMAGE WITH ALT TEXT (Accessibility Support)
+// ============================================
+
+/**
+ * Image data with optional alt text for accessibility
+ * Use this when you need to provide alt text for screen readers and SEO
+ *
+ * @example
+ * ```typescript
+ * const imageWithAlt: ImageWithAltText = {
+ *   data: imageBuffer,
+ *   altText: "A dashboard showing quarterly sales trends"
+ * };
+ * ```
+ */
+export type ImageWithAltText = {
+  /** Image data as Buffer, base64 string, URL, or data URI */
+  data: Buffer | string;
+  /** Alternative text for accessibility (screen readers, SEO) */
+  altText?: string;
+};
+
+// ============================================
 // MULTIMODAL INPUT (User-facing API)
 // ============================================
 
@@ -208,7 +233,24 @@ export type Content =
  */
 export type MultimodalInput = {
   text: string;
-  images?: Array<Buffer | string>;
+  /**
+   * Images to include in the request.
+   * Can be simple image data (Buffer, string) or objects with alt text for accessibility.
+   *
+   * @example Simple usage
+   * ```typescript
+   * images: [imageBuffer, "https://example.com/image.jpg"]
+   * ```
+   *
+   * @example With alt text for accessibility
+   * ```typescript
+   * images: [
+   *   { data: imageBuffer, altText: "Product screenshot showing main dashboard" },
+   *   { data: "https://example.com/chart.png", altText: "Sales chart for Q3 2024" }
+   * ]
+   * ```
+   */
+  images?: Array<Buffer | string | ImageWithAltText>;
   content?: Content[];
   csvFiles?: Array<Buffer | string>;
   pdfFiles?: Array<Buffer | string>;

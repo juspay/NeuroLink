@@ -5,7 +5,7 @@
 
 import { logger } from "../utils/logger.js";
 import { ImageProcessor } from "../utils/imageProcessor.js";
-import type { Content } from "../types/multimodal.js";
+import type { Content, ImageWithAltText } from "../types/multimodal.js";
 
 /**
  * Simplified logger for essential error reporting only
@@ -445,19 +445,36 @@ export class ProviderImageAdapter {
 
   /**
    * Convert simple images array to advanced content format
+   * @param text - Text content to include
+   * @param images - Array of images (Buffer, string, or ImageWithAltText)
    */
   static convertToContent(
     text: string,
-    images?: Array<Buffer | string>,
+    images?: Array<Buffer | string | ImageWithAltText>,
   ): Content[] {
     const content: Content[] = [{ type: "text", text }];
 
     if (images && images.length > 0) {
       images.forEach((image) => {
+        // Handle both simple images and images with alt text
+        const imageData =
+          typeof image === "object" &&
+          "data" in image &&
+          !Buffer.isBuffer(image)
+            ? image.data
+            : (image as Buffer | string);
+        const altText =
+          typeof image === "object" &&
+          "data" in image &&
+          !Buffer.isBuffer(image)
+            ? image.altText
+            : undefined;
+
         content.push({
           type: "image",
-          data: image,
-          mediaType: ImageProcessor.detectImageType(image) as
+          data: imageData,
+          altText,
+          mediaType: ImageProcessor.detectImageType(imageData) as
             | "image/jpeg"
             | "image/png"
             | "image/gif"

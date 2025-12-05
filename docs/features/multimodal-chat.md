@@ -103,6 +103,61 @@ console.log(result.evaluation?.overallScore);
 6. Choose a vision-capable provider
 7. Optionally evaluate the quality of multimodal responses
 
+### Image Alt Text for Accessibility
+
+NeuroLink supports alt text for images, which is helpful for accessibility (screen readers) and providing additional context to AI models. Alt text is automatically included as context in the prompt sent to AI providers.
+
+```typescript
+import { readFileSync } from "node:fs";
+import { NeuroLink } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+// Using images with alt text for accessibility
+const result = await neurolink.generate({
+  input: {
+    text: "Compare these two charts and summarize the trends",
+    images: [
+      // (1)!
+      {
+        data: readFileSync("./charts/q1-revenue.png"),
+        altText: "Q1 2024 revenue chart showing 15% growth", // (2)!
+      },
+      {
+        data: "https://example.com/charts/q2-revenue.png",
+        altText: "Q2 2024 revenue chart showing 22% growth", // (3)!
+      },
+    ],
+  },
+  provider: "openai",
+});
+```
+
+1. Images can be objects with `data` and `altText` properties
+2. Alt text for local file - helps AI understand the image context
+3. Alt text for remote URL - provides additional context for accessibility
+
+You can also mix simple images with alt-text-enabled images:
+
+```typescript
+const result = await neurolink.generate({
+  input: {
+    text: "Analyze these images",
+    images: [
+      readFileSync("./simple-image.png"), // Simple buffer (no alt text)
+      "https://example.com/image.jpg", // Simple URL (no alt text)
+      {
+        data: readFileSync("./important-chart.png"),
+        altText: "Critical KPI dashboard for Q3", // With alt text
+      },
+    ],
+  },
+  provider: "google-ai",
+});
+```
+
+!!! tip "Alt Text Best Practices" - Keep alt text concise but descriptive (under 125 characters is ideal) - Focus on the key information the image conveys - Alt text is automatically included as context in the prompt, helping AI models better understand the images
+
 Use `stream()` with the same structure when you need incremental tokens:
 
 ```typescript
@@ -131,10 +186,12 @@ for await (const chunk of stream) {
 - **Multiple images** – Order matters; the builder interleaves captions in the order provided.
 - **Region routing** – Set `region` on each request (e.g., `us-east-1`) for providers that enforce locality.
 - **Loop sessions** – Images uploaded during `loop` are cached per session; call `clear session` to reset.
+- **Alt text** – Add alt text to images for accessibility; the text is included as context for AI models.
 
 ## Best Practices
 
 - Provide short captions in the prompt describing each image (e.g., "see `before.png` on the left").
+- **Use alt text** for images that convey important information, especially for accessibility compliance.
 - Combine analytics + evaluation to benchmark multimodal quality before rolling out widely.
 - Cache remote assets locally if you reuse them frequently to avoid repeated downloads.
 - Stream when presenting content to end-users; use `generate` when you need structured JSON output.

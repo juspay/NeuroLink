@@ -12,7 +12,7 @@ import type {
 import type { TextGenerationOptions } from "../types/index.js";
 import type { StreamOptions } from "../types/streamTypes.js";
 import type { GenerateOptions } from "../types/generateTypes.js";
-import type { Content } from "../types/multimodal.js";
+import type { Content, ImageWithAltText } from "../types/multimodal.js";
 import {
   CONVERSATION_INSTRUCTIONS,
   STRUCTURED_OUTPUT_INSTRUCTIONS,
@@ -35,6 +35,41 @@ import type {
   ImagePart,
   FilePart,
 } from "ai";
+
+/**
+ * Type guard to check if an image input has alt text
+ */
+function isImageWithAltText(
+  image: Buffer | string | ImageWithAltText,
+): image is ImageWithAltText {
+  return (
+    typeof image === "object" && !Buffer.isBuffer(image) && "data" in image
+  );
+}
+
+/**
+ * Extract image data from an image input (handles both simple and alt text formats)
+ */
+function extractImageData(
+  image: Buffer | string | ImageWithAltText,
+): Buffer | string {
+  if (isImageWithAltText(image)) {
+    return image.data;
+  }
+  return image;
+}
+
+/**
+ * Extract alt text from an image input if available
+ */
+function extractAltText(
+  image: Buffer | string | ImageWithAltText,
+): string | undefined {
+  if (isImageWithAltText(image)) {
+    return image.altText;
+  }
+  return undefined;
+}
 
 /**
  * Type guard for validating message roles
@@ -858,35 +893,58 @@ async function downloadImageFromUrl(url: string): Promise<string> {
  * - URLs: Downloaded and converted to base64 for Vercel AI SDK compatibility
  * - Local files: Converted to base64 for Vercel AI SDK compatibility
  * - Buffers/Data URIs: Processed normally
+ * - Supports alt text for accessibility (included as context in text parts)
  */
 async function convertSimpleImagesToProviderFormat(
   text: string,
-  images: Array<Buffer | string>,
+  images: Array<Buffer | string | ImageWithAltText>,
   provider: string,
   _model: string,
 ): Promise<Array<TextPart | ImagePart>> {
   // For Vercel AI SDK, we need to return the content in the standard format
   // The Vercel AI SDK will handle provider-specific formatting internally
 
+  // IMPORTANT: Generate alt text descriptions BEFORE URL downloading to maintain correct image numbering
+  // This ensures image numbers match the original order provided by users, even if some URLs fail to download
+  const altTextDescriptions = images
+    .map((image, idx) => {
+      const altText = extractAltText(image);
+      return altText ? `[Image ${idx + 1}: ${altText}]` : null;
+    })
+    .filter(Boolean);
+
+  // Build enhanced text with alt text context for accessibility
+  // NOTE: Alt text is appended to the user's prompt as contextual information because most AI providers
+  // don't have native alt text fields in their APIs. This approach ensures accessibility metadata
+  // is preserved and helps AI models better understand image content.
+  const enhancedText =
+    altTextDescriptions.length > 0
+      ? `${text}\n\nImage descriptions for context: ${altTextDescriptions.join(" ")}`
+      : text;
+
   // Smart auto-detection: separate URLs from actual image data
-  const urlImages: string[] = [];
-  const actualImages: Array<Buffer | string> = [];
+  // Also track alt text for each image
+  const urlImages: Array<{ url: string; altText?: string }> = [];
+  const actualImages: Array<{ data: Buffer | string; altText?: string }> = [];
 
   images.forEach((image, _index) => {
-    if (typeof image === "string" && isInternetUrl(image)) {
+    const imageData = extractImageData(image);
+    const altText = extractAltText(image);
+
+    if (typeof imageData === "string" && isInternetUrl(imageData)) {
       // Internet URL - will be downloaded and converted to base64
-      urlImages.push(image);
+      urlImages.push({ url: imageData, altText });
     } else {
       // Actual image data (file path, Buffer, data URI) - process for Vercel AI SDK
-      actualImages.push(image);
+      actualImages.push({ data: imageData, altText });
     }
   });
 
   // Download URL images and add to actual images
-  for (const url of urlImages) {
+  for (const { url, altText } of urlImages) {
     try {
       const downloadedDataUri = await downloadImageFromUrl(url);
-      actualImages.push(downloadedDataUri);
+      actualImages.push({ data: downloadedDataUri, altText });
     } catch (error) {
       MultimodalLogger.logError(
         "URL_DOWNLOAD_FAILED_SKIPPING",
@@ -900,10 +958,12 @@ async function convertSimpleImagesToProviderFormat(
     }
   }
 
-  const content: Array<TextPart | ImagePart> = [{ type: "text", text }];
+  const content: Array<TextPart | ImagePart> = [
+    { type: "text", text: enhancedText },
+  ];
 
   // Process all images (including downloaded URLs) for Vercel AI SDK
-  actualImages.forEach((image, index) => {
+  actualImages.forEach(({ data: image }, index) => {
     try {
       // Vercel AI SDK expects { type: 'image', image: Buffer | string, mimeType?: string }
       // For Vertex AI, we need to include mimeType
@@ -997,7 +1057,7 @@ async function convertSimpleImagesToProviderFormat(
  */
 async function convertMultimodalToProviderFormat(
   text: string,
-  images: Array<Buffer | string>,
+  images: Array<Buffer | string | ImageWithAltText>,
   pdfFiles: Array<{ buffer: Buffer; filename: string }>,
   provider: string,
   model: string,
