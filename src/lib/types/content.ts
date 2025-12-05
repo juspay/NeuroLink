@@ -42,4 +42,5 @@ export {
   isAudioContent,
   isVideoContent,
   isMultimodalInput,
+  isMultimodalMessageContent,
 } from "./multimodal.js";
