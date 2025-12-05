@@ -303,13 +303,236 @@ export class ImageProcessor {
   }
 
   /**
-   * Get image dimensions from Buffer (basic implementation)
+   * EXIF orientation values and their meanings:
+   * 1: Normal (no rotation needed)
+   * 2: Flipped horizontally
+   * 3: Rotated 180 degrees
+   * 4: Flipped vertically
+   * 5: Rotated 90 CW and flipped horizontally
+   * 6: Rotated 90 CW (width/height need to be swapped)
+   * 7: Rotated 90 CCW and flipped horizontally
+   * 8: Rotated 90 CCW (width/height need to be swapped)
    */
-  static getImageDimensions(
+  static readonly ORIENTATION_REQUIRES_SWAP = [5, 6, 7, 8];
+
+  /**
+   * Parse EXIF orientation tag from JPEG buffer
+   * Returns orientation value (1-8) or null if not found
+   *
+   * @param buffer - JPEG image buffer
+   * @returns EXIF orientation value (1-8) or null if not found/not JPEG
+   */
+  static getExifOrientation(buffer: Buffer): number | null {
+    try {
+      // Check for JPEG magic bytes
+      if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+        return null;
+      }
+
+      let offset = 2;
+
+      // Scan through JPEG segments to find APP1 (EXIF)
+      while (offset < buffer.length - 4) {
+        // Each segment starts with 0xFF followed by marker type
+        if (buffer[offset] !== 0xff) {
+          break;
+        }
+
+        const marker = buffer[offset + 1];
+
+        // Skip padding bytes (0xFF)
+        if (marker === 0xff) {
+          offset++;
+          continue;
+        }
+
+        // SOS (Start of Scan) or EOI (End of Image) - stop searching
+        if (marker === 0xda || marker === 0xd9) {
+          break;
+        }
+
+        // Get segment length (big-endian, includes the 2 length bytes)
+        if (offset + 4 > buffer.length) {
+          break;
+        }
+        const segmentLength = buffer.readUInt16BE(offset + 2);
+
+        // APP1 marker (0xE1) - contains EXIF data
+        if (marker === 0xe1) {
+          const segmentStart = offset + 4;
+          const segmentEnd = offset + 2 + segmentLength;
+
+          if (segmentEnd > buffer.length) {
+            break;
+          }
+
+          // Check for EXIF header ("Exif\0\0")
+          const exifHeader = buffer.subarray(segmentStart, segmentStart + 6);
+          if (exifHeader.toString("ascii").startsWith("Exif")) {
+            const tiffOffset = segmentStart + 6;
+            return this.parseTiffOrientation(buffer, tiffOffset, segmentEnd);
+          }
+        }
+
+        // Move to next segment
+        offset = offset + 2 + segmentLength;
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn("Failed to parse EXIF orientation:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse TIFF header to find orientation tag
+   */
+  private static parseTiffOrientation(
+    buffer: Buffer,
+    tiffOffset: number,
+    maxOffset: number,
+  ): number | null {
+    try {
+      if (tiffOffset + 8 > maxOffset) {
+        return null;
+      }
+
+      // Check byte order (II = little-endian, MM = big-endian)
+      const byteOrder = buffer.subarray(tiffOffset, tiffOffset + 2).toString();
+      const isLittleEndian = byteOrder === "II";
+
+      // Read function based on endianness
+      const readUInt16 = isLittleEndian
+        ? (pos: number) => buffer.readUInt16LE(pos)
+        : (pos: number) => buffer.readUInt16BE(pos);
+
+      const readUInt32 = isLittleEndian
+        ? (pos: number) => buffer.readUInt32LE(pos)
+        : (pos: number) => buffer.readUInt32BE(pos);
+
+      // Verify TIFF magic number (42)
+      const tiffMagic = readUInt16(tiffOffset + 2);
+      if (tiffMagic !== 42) {
+        return null;
+      }
+
+      // Get offset to first IFD
+      const ifdOffset = readUInt32(tiffOffset + 4);
+      const ifdStart = tiffOffset + ifdOffset;
+
+      if (ifdStart + 2 > maxOffset) {
+        return null;
+      }
+
+      // Read number of directory entries
+      const numEntries = readUInt16(ifdStart);
+
+      // Scan IFD entries for orientation tag (0x0112)
+      for (let i = 0; i < numEntries; i++) {
+        const entryOffset = ifdStart + 2 + i * 12;
+
+        if (entryOffset + 12 > maxOffset) {
+          break;
+        }
+
+        const tagId = readUInt16(entryOffset);
+
+        // Orientation tag
+        if (tagId === 0x0112) {
+          const tagType = readUInt16(entryOffset + 2);
+          // Type 3 = SHORT (2 bytes)
+          if (tagType === 3) {
+            const orientation = readUInt16(entryOffset + 8);
+            if (orientation >= 1 && orientation <= 8) {
+              return orientation;
+            }
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn("Failed to parse TIFF orientation:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get rotation angle in degrees based on EXIF orientation
+   *
+   * @param orientation - EXIF orientation value (1-8)
+   * @returns Rotation angle in degrees (0, 90, 180, 270)
+   */
+  static getRotationFromOrientation(orientation: number): number {
+    switch (orientation) {
+      case 1:
+      case 2:
+        return 0;
+      case 3:
+      case 4:
+        return 180;
+      case 5:
+      case 6:
+        return 90;
+      case 7:
+      case 8:
+        return 270;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Check if dimensions need to be swapped based on EXIF orientation
+   *
+   * @param orientation - EXIF orientation value (1-8)
+   * @returns true if width and height should be swapped
+   */
+  static shouldSwapDimensions(orientation: number): boolean {
+    return this.ORIENTATION_REQUIRES_SWAP.includes(orientation);
+  }
+
+  /**
+   * Get orientation-adjusted dimensions from image buffer
+   * Accounts for EXIF orientation to return the displayed dimensions
+   *
+   * @param buffer - Image buffer
+   * @returns Adjusted dimensions or null if dimensions cannot be determined
+   */
+  static getOrientationAdjustedDimensions(
+    buffer: Buffer,
+  ): { width: number; height: number; orientation: number | null } | null {
+    const rawDimensions = this.getRawImageDimensions(buffer);
+    if (!rawDimensions) {
+      return null;
+    }
+
+    const orientation = this.getExifOrientation(buffer);
+
+    if (orientation && this.shouldSwapDimensions(orientation)) {
+      return {
+        width: rawDimensions.height,
+        height: rawDimensions.width,
+        orientation,
+      };
+    }
+
+    return {
+      width: rawDimensions.width,
+      height: rawDimensions.height,
+      orientation,
+    };
+  }
+
+  /**
+   * Get raw image dimensions from Buffer without EXIF adjustment
+   */
+  static getRawImageDimensions(
     buffer: Buffer,
   ): { width: number; height: number } | null {
     try {
-      // Basic PNG dimension extraction
+      // PNG dimension extraction
       if (
         buffer.length >= 24 &&
         buffer.subarray(0, 8).toString("hex") === "89504e470d0a1a0a"
@@ -319,18 +542,93 @@ export class ImageProcessor {
         return { width, height };
       }
 
-      // Basic JPEG dimension extraction (simplified)
+      // JPEG dimension extraction
       if (buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
-        // This is a very basic implementation
-        // For production, consider using a proper image library
-        return null;
+        return this.getJpegDimensions(buffer);
       }
 
       return null;
     } catch (error) {
-      logger.warn("Failed to extract image dimensions:", error);
+      logger.warn("Failed to extract raw image dimensions:", error);
       return null;
     }
+  }
+
+  /**
+   * Extract dimensions from JPEG buffer by scanning for SOF markers
+   */
+  private static getJpegDimensions(
+    buffer: Buffer,
+  ): { width: number; height: number } | null {
+    try {
+      let offset = 2;
+
+      while (offset < buffer.length - 9) {
+        // Each segment starts with 0xFF
+        if (buffer[offset] !== 0xff) {
+          break;
+        }
+
+        const marker = buffer[offset + 1];
+
+        // Skip padding bytes
+        if (marker === 0xff) {
+          offset++;
+          continue;
+        }
+
+        // SOF markers (Start of Frame) contain image dimensions
+        // SOF0 (0xC0) - Baseline DCT
+        // SOF1 (0xC1) - Extended sequential DCT
+        // SOF2 (0xC2) - Progressive DCT
+        if (
+          marker === 0xc0 ||
+          marker === 0xc1 ||
+          marker === 0xc2 ||
+          marker === 0xc3
+        ) {
+          if (offset + 9 > buffer.length) {
+            break;
+          }
+          // SOF segment: length (2) + precision (1) + height (2) + width (2)
+          const height = buffer.readUInt16BE(offset + 5);
+          const width = buffer.readUInt16BE(offset + 7);
+          return { width, height };
+        }
+
+        // SOS or EOI - stop searching
+        if (marker === 0xda || marker === 0xd9) {
+          break;
+        }
+
+        // Get segment length and move to next segment
+        if (offset + 4 > buffer.length) {
+          break;
+        }
+        const segmentLength = buffer.readUInt16BE(offset + 2);
+        offset = offset + 2 + segmentLength;
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn("Failed to extract JPEG dimensions:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get image dimensions from Buffer (EXIF-aware)
+   * This method now accounts for EXIF orientation and returns the
+   * dimensions as the image would appear when displayed correctly
+   */
+  static getImageDimensions(
+    buffer: Buffer,
+  ): { width: number; height: number } | null {
+    const adjusted = this.getOrientationAdjustedDimensions(buffer);
+    if (adjusted) {
+      return { width: adjusted.width, height: adjusted.height };
+    }
+    return null;
   }
 
   /**
