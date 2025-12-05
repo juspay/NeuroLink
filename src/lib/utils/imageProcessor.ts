@@ -415,14 +415,48 @@ export class ImageProcessor {
  */
 export const imageUtils = {
   /**
-   * Check if a string is a valid data URI
+   * Strict regex pattern for data URI validation
+   * Format: data:[<mediatype>][;base64],<data>
+   * MIME type must be type/subtype format (e.g., image/png, application/pdf)
+   */
+  DATA_URI_REGEX:
+    /^data:([a-zA-Z0-9][a-zA-Z0-9!#$&\-^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-^_+.]*(?:;[a-zA-Z0-9\-]+=(?:[a-zA-Z0-9\-]+|"[^"]*"))*);base64,([A-Za-z0-9+/]*={0,2})$/,
+
+  /**
+   * Check if a string is a valid data URI with strict validation
+   * - Validates data URI structure using strict regex
+   * - Validates MIME type format (type/subtype)
+   * - Validates base64 content
    */
   isDataUri: (str: string): boolean => {
-    return (
-      typeof str === "string" &&
-      str.startsWith("data:") &&
-      str.includes("base64,")
-    );
+    if (typeof str !== "string") {
+      return false;
+    }
+
+    // Use strict regex to validate data URI structure
+    const match = imageUtils.DATA_URI_REGEX.exec(str);
+    if (!match) {
+      return false;
+    }
+
+    const base64Content = match[2];
+
+    // Validate base64 content
+    if (!base64Content || base64Content.length === 0) {
+      // Empty base64 content is technically valid for an empty data URI
+      return true;
+    }
+
+    // Verify the base64 content can be decoded and re-encoded correctly
+    try {
+      const decoded = Buffer.from(base64Content, "base64");
+      const reencoded = decoded.toString("base64");
+      // Normalize by removing padding for comparison
+      const normalizeBase64 = (b64: string) => b64.replace(/=+$/, "");
+      return normalizeBase64(base64Content) === normalizeBase64(reencoded);
+    } catch {
+      return false;
+    }
   },
 
   /**
