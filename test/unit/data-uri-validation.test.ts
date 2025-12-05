@@ -57,9 +57,9 @@ describe("Data URI Validation - imageUtils.isDataUri", () => {
       expect(imageUtils.isDataUri(validPdf)).toBe(true);
     });
 
-    it("should accept data URI with empty base64 content", () => {
+    it("should reject data URI with empty base64 content for security", () => {
       const emptyDataUri = "data:image/png;base64,";
-      expect(imageUtils.isDataUri(emptyDataUri)).toBe(true);
+      expect(imageUtils.isDataUri(emptyDataUri)).toBe(false);
     });
 
     it("should accept data URI with MIME parameters", () => {

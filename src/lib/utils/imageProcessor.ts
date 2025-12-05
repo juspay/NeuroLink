@@ -418,6 +418,15 @@ export const imageUtils = {
    * Strict regex pattern for data URI validation
    * Format: data:[<mediatype>][;base64],<data>
    * MIME type must be type/subtype format (e.g., image/png, application/pdf)
+   *
+   * Regex breakdown:
+   * - ^data: - Must start with "data:" prefix
+   * - ([a-zA-Z0-9][a-zA-Z0-9!#$&\-^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-^_+.]*) - MIME type/subtype
+   *   - Type and subtype each start with alphanumeric and can contain special chars
+   * - (?:;[a-zA-Z0-9\-]+=(?:[a-zA-Z0-9\-]+|"[^"]*"))* - Optional MIME parameters
+   *   - Parameters like charset=UTF-8 or name="file.txt"
+   * - ;base64, - Required base64 encoding marker
+   * - ([A-Za-z0-9+/]*={0,2})$ - Base64 content with 0-2 padding chars
    */
   DATA_URI_REGEX:
     /^data:([a-zA-Z0-9][a-zA-Z0-9!#$&\-^_+.]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-^_+.]*(?:;[a-zA-Z0-9\-]+=(?:[a-zA-Z0-9\-]+|"[^"]*"))*);base64,([A-Za-z0-9+/]*={0,2})$/,
@@ -441,10 +450,9 @@ export const imageUtils = {
 
     const base64Content = match[2];
 
-    // Validate base64 content
+    // Reject empty base64 content for security - empty data URIs could bypass content validation
     if (!base64Content || base64Content.length === 0) {
-      // Empty base64 content is technically valid for an empty data URI
-      return true;
+      return false;
     }
 
     // Verify the base64 content can be decoded and re-encoded correctly
