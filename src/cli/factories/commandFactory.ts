@@ -81,6 +81,12 @@ export class CLICommandFactory {
       type: "string" as const,
       description: "Add PDF file for analysis (can be used multiple times)",
     },
+    audio: {
+      type: "string" as const,
+      description:
+        "Add audio file for transcription (can be used multiple times)",
+      alias: "a",
+    },
     file: {
       type: "string" as const,
       description:
@@ -268,6 +274,16 @@ export class CLICommandFactory {
       return undefined;
     }
     return Array.isArray(pdfFiles) ? pdfFiles : [pdfFiles];
+  }
+
+  // Helper method to process CLI audio files
+  private static processCliAudioFiles(
+    audioFiles?: string | string[],
+  ): Array<Buffer | string> | undefined {
+    if (!audioFiles) {
+      return undefined;
+    }
+    return Array.isArray(audioFiles) ? audioFiles : [audioFiles];
   }
 
   // Helper method to process CLI files with auto-detection
@@ -1431,6 +1447,9 @@ export class CLICommandFactory {
       const pdfFiles = CLICommandFactory.processCliPDFFiles(
         argv.pdf as string | string[] | undefined,
       );
+      const audioFiles = CLICommandFactory.processCliAudioFiles(
+        argv.audio as string | string[] | undefined,
+      );
       const files = CLICommandFactory.processCliFiles(
         argv.file as string | string[] | undefined,
       );
@@ -1440,6 +1459,7 @@ export class CLICommandFactory {
         ...(imageBuffers && { images: imageBuffers }),
         ...(csvFiles && { csvFiles }),
         ...(pdfFiles && { pdfFiles }),
+        ...(audioFiles && { audioFiles }),
         ...(files && { files }),
       };
 
@@ -1686,6 +1706,9 @@ export class CLICommandFactory {
     const pdfFiles = CLICommandFactory.processCliPDFFiles(
       argv.pdf as string | string[] | undefined,
     );
+    const audioFiles = CLICommandFactory.processCliAudioFiles(
+      argv.audio as string | string[] | undefined,
+    );
     const files = CLICommandFactory.processCliFiles(
       argv.file as string | string[] | undefined,
     );
@@ -1696,6 +1719,7 @@ export class CLICommandFactory {
         ...(imageBuffers && { images: imageBuffers }),
         ...(csvFiles && { csvFiles }),
         ...(pdfFiles && { pdfFiles }),
+        ...(audioFiles && { audioFiles }),
         ...(files && { files }),
       },
       csvOptions: {
