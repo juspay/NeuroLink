@@ -375,6 +375,8 @@ export type GenerateResult = CommandResult & {
     name: string;
     description: string;
   }>;
+  /** TTS audio result when TTS is enabled */
+  audio?: import("./index.js").TTSResult;
 };
 
 /**

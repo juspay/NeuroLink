@@ -15,7 +15,6 @@ import type {
 import type {
   TokenUsage,
   AnalyticsData,
-  TTSResult,
 } from "../../lib/types/index.js";
 import { configManager } from "../commands/config.js";
 import { handleError } from "../errorHandler.js";
@@ -467,9 +466,12 @@ export class CLICommandFactory {
       return;
     }
 
-    // Extract audio from result
-    const resultObj = result as Record<string, unknown>;
-    const audio = resultObj?.audio as TTSResult | undefined;
+    // Extract audio from result with proper type checking
+    if (!result || typeof result !== "object") {
+      return;
+    }
+    const generateResult = result as GenerateResult;
+    const audio = generateResult.audio;
 
     if (!audio) {
       if (!options.quiet) {
