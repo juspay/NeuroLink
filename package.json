@@ -146,6 +146,11 @@
       "types": "./dist/cli/index.d.ts",
       "import": "./dist/cli/index.js",
       "default": "./dist/cli/index.js"
+    },
+    "./adapters/tts": {
+      "types": "./dist/adapters/tts/index.d.ts",
+      "import": "./dist/adapters/tts/index.js",
+      "default": "./dist/adapters/tts/index.js"
     }
   },
   "dependencies": {
@@ -189,6 +194,7 @@
     "mem0ai": "^2.1.38",
     "nanoid": "^5.1.5",
     "ollama-ai-provider": "^1.2.0",
+    "openai": "^6.10.0",
     "ora": "^7.0.1",
     "p-limit": "^6.2.0",
     "pdfjs-dist": "^5.4.296",

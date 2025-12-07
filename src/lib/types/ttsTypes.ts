@@ -9,7 +9,7 @@
 /**
  * Supported audio formats for TTS output
  */
-export type AudioFormat = "mp3" | "wav" | "ogg" | "opus";
+export type AudioFormat = "mp3" | "wav" | "ogg" | "opus" | "aac" | "flac" | "pcm";
 
 /**
  * TTS quality settings
@@ -20,6 +20,8 @@ export type TTSQuality = "standard" | "hd";
  * TTS configuration options
  */
 export type TTSOptions = {
+  /** Text to synthesize */
+  text?: string;
   /** Enable TTS output */
   enabled?: boolean;
   /** Voice identifier (e.g., "en-US-Neural2-C") */
@@ -90,6 +92,9 @@ export const VALID_AUDIO_FORMATS: readonly AudioFormat[] = [
   "wav",
   "ogg",
   "opus",
+  "aac",
+  "flac",
+  "pcm",
 ];
 
 /** Valid TTS quality levels as an array for runtime validation */
@@ -141,3 +146,38 @@ export function isValidTTSOptions(options: unknown): options is TTSOptions {
   }
   return true;
 }
+
+/**
+ * OpenAI TTS-specific voice names
+ */
+export type OpenAITTSVoice =
+  | "alloy"
+  | "echo"
+  | "fable"
+  | "onyx"
+  | "nova"
+  | "shimmer";
+
+/**
+ * Base TTS Handler type for implementing TTS providers
+ */
+export type ITTSHandler = {
+  /**
+   * Synthesize text to speech
+   * @param options - Synthesis options
+   * @returns Promise resolving to TTS result
+   */
+  synthesize(options: TTSOptions): Promise<TTSResult>;
+
+  /**
+   * Get supported voices
+   * @returns List of supported voice names
+   */
+  getSupportedVoices(): string[];
+
+  /**
+   * Get supported audio formats
+   * @returns List of supported format names
+   */
+  getSupportedFormats(): AudioFormat[];
+};
