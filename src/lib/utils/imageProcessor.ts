@@ -323,7 +323,13 @@ export class ImageProcessor {
       if (buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
         // This is a very basic implementation
         // For production, consider using a proper image library
-        return null;
+        if (
+          buffer[buffer.length - 2] !== 0xff ||
+          buffer[buffer.length - 1] !== 0xd9
+        ) {
+          logger.warn("JPEG header found but no footer found(FF D9).");
+          return null;
+        }
       }
 
       return null;
