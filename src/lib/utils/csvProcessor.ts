@@ -82,6 +82,7 @@ export class CSVProcessor {
       maxRows: rawMaxRows = 1000,
       formatStyle = "raw",
       includeHeaders = true,
+      extension = null,
     } = options || {};
 
     const maxRows = Math.max(1, Math.min(10000, rawMaxRows));
@@ -124,6 +125,7 @@ export class CSVProcessor {
           size: content.length,
           rowCount,
           columnCount: (limitedLines[0] || "").split(",").length,
+          extension,
         },
       };
     }
@@ -165,6 +167,7 @@ export class CSVProcessor {
         columnNames,
         sampleData,
         hasEmptyColumns,
+        extension,
       },
     };
   }
