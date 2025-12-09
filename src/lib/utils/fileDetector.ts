@@ -181,7 +181,11 @@ export class FileDetector {
   ): Promise<FileProcessingResult> {
     switch (detection.type) {
       case "csv":
-        return await CSVProcessor.process(content, options);
+        // Pass extension from detection result to CSV processor
+        return await CSVProcessor.process(content, {
+          ...options,
+          extension: detection.extension,
+        });
       case "image":
         return await ImageProcessor.process(content);
       case "pdf":

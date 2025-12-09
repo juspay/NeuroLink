@@ -43,6 +43,7 @@ export type FileProcessingResult = {
     confidence: number;
     size?: number;
     filename?: string;
+    extension?: string | null; // Original file extension (e.g., 'csv', 'tsv', 'txt')
     // CSV-specific metadata
     rowCount?: number;
     columnCount?: number;
@@ -64,6 +65,7 @@ export type CSVProcessorOptions = {
   maxRows?: number;
   formatStyle?: "raw" | "markdown" | "json";
   includeHeaders?: boolean;
+  extension?: string | null; // Original file extension to preserve in metadata
 };
 
 /**
