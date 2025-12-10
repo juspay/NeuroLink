@@ -5,8 +5,8 @@ import type {
 } from "../types/fileTypes.js";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { logger } from "./logger.js";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
-import { createCanvas } from "canvas";
+// Lazy-load pdfjs-dist to avoid DOMMatrix errors in Node.js server environment
+// import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const PDF_PROVIDER_CONFIGS: Record<string, PDFProviderConfig> = {
   anthropic: {
@@ -246,6 +246,32 @@ export class PDFProcessor {
       quality?: number;
     },
   ): Promise<Array<{ buffer: Buffer; pageNumber: number }>> {
+    // Dynamic import canvas - only load when actually needed
+    let createCanvas: typeof import("canvas").createCanvas;
+    try {
+      const canvasModule = await import("canvas");
+      createCanvas = canvasModule.createCanvas;
+    } catch {
+      throw new Error(
+        "Canvas dependency not available. " +
+          "PDF-to-image conversion requires the 'canvas' package with native bindings. " +
+          "Install with: pnpm install canvas\n" +
+          "Note: This requires native build tools (Python, C++ compiler).",
+      );
+    }
+
+    // Dynamic import pdfjs - only load when actually needed to avoid DOMMatrix errors
+    let pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+    try {
+      pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    } catch {
+      throw new Error(
+        "pdfjs-dist dependency not available. " +
+          "PDF processing requires the 'pdfjs-dist' package. " +
+          "Install with: pnpm install pdfjs-dist",
+      );
+    }
+
     const maxPages = options?.maxPages || 10;
     const scale = options?.scale || 2.0;
     const format = options?.format || "png";

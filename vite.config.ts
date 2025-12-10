@@ -25,6 +25,12 @@ interface VitestConfig extends Omit<UserConfig, "plugins"> {
 const config: VitestConfig = {
   plugins: [sveltekit()],
 
+  // SSR configuration - externalize native dependencies
+  ssr: {
+    external: ["canvas"],
+    noExternal: [],
+  },
+
   // FIXED test configuration - prevents hanging with execAsync
   test: {
     include: ["test/**/*.ts"], // Include all .ts files in test/ directory
