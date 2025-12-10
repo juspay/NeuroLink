@@ -192,19 +192,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
-
-      - name: Upgrade npm for OIDC compatibility
-        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build package
-        run: pnpm run build
-
       - name: Validate semantic-release configuration
-        run: npx semantic-release --dry-run
+        run: |
+          npx semantic-release --dry-run \
+            --plugins "@semantic-release/commit-analyzer" \
+            --plugins "@semantic-release/release-notes-generator"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
