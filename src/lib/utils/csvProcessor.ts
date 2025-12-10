@@ -103,7 +103,8 @@ export class CSVProcessor {
 
       const limitedCSV = limitedLines.join("\n");
 
-      const rowCount = limitedLines.length - 1; // Subtract header
+      const rowCount = limitedLines.length - 1; // Data rows only (excluding header)
+      const totalLines = limitedLines.length; // Total lines including header
       const originalRowCount = csvLines.length - 1; // Subtract header from original
 
       logger.debug(
@@ -122,7 +123,8 @@ export class CSVProcessor {
         metadata: {
           confidence: 100,
           size: content.length,
-          rowCount,
+          rowCount, // Number of data rows (excluding header)
+          totalLines, // Total lines including header
           columnCount: (limitedLines[0] || "").split(",").length,
         },
       };

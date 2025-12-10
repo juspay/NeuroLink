@@ -44,7 +44,8 @@ export type FileProcessingResult = {
     size?: number;
     filename?: string;
     // CSV-specific metadata
-    rowCount?: number;
+    rowCount?: number; // Number of data rows (excluding header)
+    totalLines?: number; // Total lines including header (raw format only)
     columnCount?: number;
     columnNames?: string[];
     sampleData?: string;
