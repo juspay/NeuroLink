@@ -16,18 +16,18 @@ Office document support in NeuroLink works as a native multimodal input - the sy
 
 ## Supported File Types
 
-| Format | Extension | MIME Type | Description |
-|--------|-----------|-----------|-------------|
-| **Word Document** | `.docx` | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | Microsoft Word documents with text, images, tables |
-| **PowerPoint** | `.pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | Presentations with slides, charts, images |
-| **Excel Spreadsheet** | `.xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | Spreadsheets with data, formulas, charts |
+| Format                | Extension | MIME Type                                                                   | Description                                        |
+| --------------------- | --------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
+| **Word Document**     | `.docx`   | `application/vnd.openxmlformats-officedocument.wordprocessingml.document`   | Microsoft Word documents with text, images, tables |
+| **PowerPoint**        | `.pptx`   | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | Presentations with slides, charts, images          |
+| **Excel Spreadsheet** | `.xlsx`   | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`         | Spreadsheets with data, formulas, charts           |
 
 **Legacy Formats:**
 
-| Format | Extension | MIME Type | Support |
-|--------|-----------|-----------|---------|
-| Word (Legacy) | `.doc` | `application/msword` | Provider-dependent |
-| Excel (Legacy) | `.xls` | `application/vnd.ms-excel` | Provider-dependent |
+| Format         | Extension | MIME Type                  | Support            |
+| -------------- | --------- | -------------------------- | ------------------ |
+| Word (Legacy)  | `.doc`    | `application/msword`       | Provider-dependent |
+| Excel (Legacy) | `.xls`    | `application/vnd.ms-excel` | Provider-dependent |
 
 ## Quick Start
 
@@ -132,11 +132,11 @@ neurolink batch prompts.txt --office meeting-notes.docx --provider bedrock
 type GenerateOptions = {
   input: {
     text: string;
-    images?: Array<Buffer | string>;      // Image files
-    csvFiles?: Array<Buffer | string>;    // CSV files (converted to text)
-    pdfFiles?: Array<Buffer | string>;    // PDF files (native binary)
+    images?: Array<Buffer | string>; // Image files
+    csvFiles?: Array<Buffer | string>; // CSV files (converted to text)
+    pdfFiles?: Array<Buffer | string>; // PDF files (native binary)
     officeFiles?: Array<Buffer | string>; // Office files (native binary)
-    files?: Array<Buffer | string>;       // Auto-detect file types
+    files?: Array<Buffer | string>; // Auto-detect file types
   };
 
   // Provider selection (REQUIRED for Office files)
@@ -218,11 +218,11 @@ officeFiles: ["report.docx", docxBuffer, "./presentation.pptx"];
 
 ### Supported Providers
 
-| Provider | Max Size | DOCX | PPTX | XLSX | DOC | XLS | Notes |
-|----------|----------|------|------|------|-----|-----|-------|
-| **AWS Bedrock** | 5 MB | ✅ | ✅ | ✅ | ✅ | ✅ | Full native support via Converse API |
-| **Google Vertex AI** | 5 MB | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ | Best for DOCX and XLSX |
-| **Anthropic Claude** | 5 MB | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ | Via document API |
+| Provider             | Max Size | DOCX | PPTX | XLSX | DOC | XLS | Notes                                |
+| -------------------- | -------- | ---- | ---- | ---- | --- | --- | ------------------------------------ |
+| **AWS Bedrock**      | 5 MB     | ✅   | ✅   | ✅   | ✅  | ✅  | Full native support via Converse API |
+| **Google Vertex AI** | 5 MB     | ✅   | ⚠️   | ✅   | ⚠️  | ⚠️  | Best for DOCX and XLSX               |
+| **Anthropic Claude** | 5 MB     | ✅   | ⚠️   | ✅   | ⚠️  | ⚠️  | Via document API                     |
 
 ### Unsupported Providers
 
@@ -267,6 +267,7 @@ await neurolink.generate({
 ```
 
 **Supported Document Formats in Bedrock Converse API:**
+
 - Office formats: `doc`, `docx`, `xls`, `xlsx`
 - Other formats: `pdf`, `csv`, `html`, `txt`, `md`
 
@@ -308,11 +309,11 @@ await neurolink.generate({
   input: {
     text: "Analyze all these documents",
     files: [
-      "report.docx",       // Auto-detected as Word document
-      "data.xlsx",         // Auto-detected as Excel spreadsheet
-      "slides.pptx",       // Auto-detected as PowerPoint
-      "summary.pdf",       // Auto-detected as PDF
-      "chart.png",         // Auto-detected as image
+      "report.docx", // Auto-detected as Word document
+      "data.xlsx", // Auto-detected as Excel spreadsheet
+      "slides.pptx", // Auto-detected as PowerPoint
+      "summary.pdf", // Auto-detected as PDF
+      "chart.png", // Auto-detected as image
     ],
   },
   provider: "bedrock",
@@ -467,11 +468,15 @@ try {
   });
 } catch (error) {
   if (error instanceof OfficeSizeError) {
-    console.error(`File too large: ${error.actualSize}MB (max: ${error.maxSize}MB)`);
+    console.error(
+      `File too large: ${error.actualSize}MB (max: ${error.maxSize}MB)`,
+    );
     console.error("Try: --provider google-ai-studio for larger files");
   } else if (error instanceof OfficeProviderError) {
     console.error(`Provider ${error.provider} doesn't support Office files`);
-    console.error(`Supported providers: ${error.supportedProviders.join(", ")}`);
+    console.error(
+      `Supported providers: ${error.supportedProviders.join(", ")}`,
+    );
   } else if (error instanceof OfficeValidationError) {
     console.error(`Invalid Office file: ${error.message}`);
     console.error(`Validation type: ${error.validationType}`);
@@ -487,16 +492,16 @@ try {
 
 When processing Office documents, the following metadata is available:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `confidence` | `number` | Detection confidence (0-100) |
-| `size` | `number` | File size in bytes |
-| `filename` | `string` | Original filename |
-| `format` | `OfficeFileType` | Detected Office format |
-| `provider` | `string` | Provider used for processing |
-| `estimatedPages` | `number` | Estimated page/slide/sheet count |
-| `hasEmbeddedImages` | `boolean` | Whether document contains images |
-| `hasCharts` | `boolean` | Whether document contains charts |
+| Field               | Type             | Description                      |
+| ------------------- | ---------------- | -------------------------------- |
+| `confidence`        | `number`         | Detection confidence (0-100)     |
+| `size`              | `number`         | File size in bytes               |
+| `filename`          | `string`         | Original filename                |
+| `format`            | `OfficeFileType` | Detected Office format           |
+| `provider`          | `string`         | Provider used for processing     |
+| `estimatedPages`    | `number`         | Estimated page/slide/sheet count |
+| `hasEmbeddedImages` | `boolean`        | Whether document contains images |
+| `hasCharts`         | `boolean`        | Whether document contains charts |
 
 ### Accessing Metadata
 
@@ -526,13 +531,13 @@ console.log(result.metadata?.officeFiles?.[0]);
 
 ```typescript
 // For comprehensive Office support
-provider: "bedrock";  // Best overall Office document support
+provider: "bedrock"; // Best overall Office document support
 
 // For Word documents primarily
-provider: "vertex";   // Good DOCX support
+provider: "vertex"; // Good DOCX support
 
 // For enterprise deployments
-provider: "bedrock";  // AWS infrastructure integration
+provider: "bedrock"; // AWS infrastructure integration
 ```
 
 ### 2. Optimize File Size
@@ -544,19 +549,19 @@ import { stat } from "fs/promises";
 async function validateOfficeFile(filePath: string, provider: string) {
   const stats = await stat(filePath);
   const sizeMB = stats.size / (1024 * 1024);
-  
+
   const limits: Record<string, number> = {
     bedrock: 5,
     vertex: 5,
     anthropic: 5,
   };
-  
+
   if (sizeMB > (limits[provider] || 5)) {
     throw new Error(
-      `File ${filePath} (${sizeMB.toFixed(2)}MB) exceeds ${limits[provider]}MB limit for ${provider}`
+      `File ${filePath} (${sizeMB.toFixed(2)}MB) exceeds ${limits[provider]}MB limit for ${provider}`,
     );
   }
-  
+
   console.log(`✓ File validated: ${sizeMB.toFixed(2)}MB`);
 }
 
@@ -605,13 +610,13 @@ for await (const chunk of stream) {
 
 ### Provider Limitations
 
-| Limitation | Description | Workaround |
-|------------|-------------|------------|
-| Size limits | Most providers limit to 5MB | Split large documents or convert to PDF |
-| Password protection | Not supported | Remove password before processing |
-| Macros | VBA macros are ignored | N/A - security feature |
-| External links | May not be resolved | Embed content instead |
-| Complex formatting | Some formatting may be lost | Focus on content extraction |
+| Limitation          | Description                 | Workaround                              |
+| ------------------- | --------------------------- | --------------------------------------- |
+| Size limits         | Most providers limit to 5MB | Split large documents or convert to PDF |
+| Password protection | Not supported               | Remove password before processing       |
+| Macros              | VBA macros are ignored      | N/A - security feature                  |
+| External links      | May not be resolved         | Embed content instead                   |
+| Complex formatting  | Some formatting may be lost | Focus on content extraction             |
 
 ### Token Usage
 
@@ -633,7 +638,7 @@ await neurolink.generate({
     officeFiles: ["document.docx"],
   },
   provider: "bedrock",
-  maxTokens: 4000,  // Allow enough tokens for response
+  maxTokens: 4000, // Allow enough tokens for response
 });
 ```
 
@@ -644,6 +649,7 @@ await neurolink.generate({
 **Problem:** Using unsupported provider (OpenAI, Ollama, etc.)
 
 **Solution:**
+
 ```bash
 # Change provider to supported one
 neurolink generate "Analyze document" --office doc.docx --provider bedrock
@@ -657,6 +663,7 @@ neurolink generate "Analyze document" --file doc.docx --provider vertex
 **Problem:** File too large for provider (>5MB for most providers)
 
 **Solution:**
+
 ```bash
 # Option 1: Split the document into smaller parts
 # Option 2: Convert to PDF first (may have larger size limits)
@@ -668,6 +675,7 @@ neurolink generate "Analyze document" --file doc.docx --provider vertex
 **Problem:** File is not a valid Office Open XML format or corrupted
 
 **Solution:**
+
 ```bash
 # Verify file is valid Office format
 file document.docx  # Should show "Microsoft Word 2007+"
@@ -681,6 +689,7 @@ file document.docx  # Should show "Microsoft Word 2007+"
 **Problem:** No provider selected (Office files require explicit provider)
 
 **Solution:**
+
 ```typescript
 // ❌ Missing provider
 await neurolink.generate({
@@ -696,7 +705,7 @@ await neurolink.generate({
     text: "Analyze",
     officeFiles: ["doc.docx"],
   },
-  provider: "bedrock",  // Required for Office files
+  provider: "bedrock", // Required for Office files
 });
 ```
 
@@ -705,23 +714,25 @@ await neurolink.generate({
 **Problem:** AI says "I cannot read the document" even though file is attached
 
 **Common Causes:**
+
 1. **Wrong provider**: Make sure using supported provider
 2. **File path wrong**: Verify file exists at specified path
 3. **Buffer issue**: If using Buffer, ensure it's valid Office data
 4. **Format mismatch**: Ensure file extension matches actual format
 
 **Debug:**
+
 ```typescript
 import { readFile, stat } from "fs/promises";
 
 // Verify file exists
-await stat("document.docx");  // Throws if not found
+await stat("document.docx"); // Throws if not found
 
 // Verify it's a valid Office file (DOCX is ZIP-based)
 const buffer = await readFile("document.docx");
 const header = buffer.slice(0, 4);
 // DOCX files start with ZIP magic bytes: PK\x03\x04
-console.log("Magic bytes:", header.toString("hex"));  // Should be "504b0304"
+console.log("Magic bytes:", header.toString("hex")); // Should be "504b0304"
 
 // Check size
 const sizeMB = buffer.length / (1024 * 1024);
@@ -735,6 +746,7 @@ console.log("Size:", sizeMB.toFixed(2), "MB");
 If you were previously using manual document extraction:
 
 **Before (Manual Processing):**
+
 ```typescript
 // Old approach: Extract text manually
 import { readFileSync } from "fs";
@@ -749,6 +761,7 @@ const result = await provider.generate({
 ```
 
 **After (Native Support):**
+
 ```typescript
 // New approach: Direct document support
 const result = await neurolink.generate({
@@ -765,6 +778,7 @@ const result = await neurolink.generate({
 If you were converting Office files to PDF first:
 
 **Before (PDF Conversion):**
+
 ```typescript
 // Old approach: Convert to PDF first
 import { convertToPdf } from "some-pdf-library";
@@ -781,12 +795,13 @@ const result = await neurolink.generate({
 ```
 
 **After (Direct Office Support):**
+
 ```typescript
 // New approach: Direct Office document support
 const result = await neurolink.generate({
   input: {
     text: "Analyze this document",
-    officeFiles: ["report.docx"],  // No conversion needed
+    officeFiles: ["report.docx"], // No conversion needed
   },
   provider: "bedrock",
 });
@@ -794,12 +809,12 @@ const result = await neurolink.generate({
 
 ### API Changes Summary
 
-| Previous API | New API | Notes |
-|--------------|---------|-------|
-| Manual text extraction | `officeFiles: [...]` | Native document support |
-| PDF conversion workflow | Direct Office support | No conversion needed |
+| Previous API               | New API                     | Notes                            |
+| -------------------------- | --------------------------- | -------------------------------- |
+| Manual text extraction     | `officeFiles: [...]`        | Native document support          |
+| PDF conversion workflow    | Direct Office support       | No conversion needed             |
 | Provider-specific handling | Unified `officeFiles` array | Works across supported providers |
-| Custom MIME type handling | Auto-detection | Format automatically detected |
+| Custom MIME type handling  | Auto-detection              | Format automatically detected    |
 
 ## Usage Examples
 

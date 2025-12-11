@@ -1053,6 +1053,74 @@ async function convertSimpleImagesToProviderFormat(
 }
 
 /**
+ * Build PDF content based on provider's API type
+ * - "document" API (Anthropic/Bedrock/Vertex): Inline PDF bytes
+ * - "files-api" API (OpenAI/Google AI Studio/Azure): Upload file and reference URI
+ */
+async function buildPDFContent(
+  pdf: { buffer: Buffer; filename: string },
+  provider: string,
+): Promise<FilePart> {
+  const pdfConfig = PDFProcessor.getProviderConfig(provider);
+
+  if (!pdfConfig) {
+    // Fallback to inline if no config found
+    logger.warn(
+      `[PDF] No config found for provider ${provider}, using inline format`,
+    );
+    return {
+      type: "file" as const,
+      data: pdf.buffer,
+      mimeType: "application/pdf",
+      filename: pdf.filename,
+    };
+  }
+
+  // Check API type from config
+  if (pdfConfig.apiType === "document") {
+    // Document API: Inline PDF bytes (Anthropic, Bedrock, Vertex)
+    logger.info(
+      `[PDF] ✅ Using document API (inline) for ${provider}: ${pdf.filename}`,
+    );
+    return {
+      type: "file" as const,
+      data: pdf.buffer,
+      mimeType: "application/pdf",
+      filename: pdf.filename,
+    };
+  } else if (pdfConfig.apiType === "files-api") {
+    // Files API: Should upload file first and reference URI
+    // TODO: Implement provider-specific file upload logic
+    // - OpenAI: https://platform.openai.com/docs/api-reference/files
+    // - Google AI Studio: https://ai.google.dev/api/files
+    // - Azure: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/file-upload
+    logger.warn(
+      `[PDF] Provider ${provider} uses files-api but file upload is not yet implemented. ` +
+        `Falling back to inline format. Full files-api support requires provider-specific upload logic.`,
+    );
+
+    // Fallback to inline for now
+    return {
+      type: "file" as const,
+      data: pdf.buffer,
+      mimeType: "application/pdf",
+      filename: pdf.filename,
+    };
+  }
+
+  // Unknown API type - fallback to inline
+  logger.warn(
+    `[PDF] Unknown API type "${pdfConfig.apiType}" for ${provider}, using inline format`,
+  );
+  return {
+    type: "file" as const,
+    data: pdf.buffer,
+    mimeType: "application/pdf",
+    filename: pdf.filename,
+  };
+}
+
+/**
  * Convert multimodal content (images + PDFs) to provider format
  */
 async function convertMultimodalToProviderFormat(
@@ -1083,22 +1151,14 @@ async function convertMultimodalToProviderFormat(
     }
   }
 
-  // Add PDFs using Vercel AI SDK standard format (works for all providers except Mistral)
+  // Add PDFs using provider-specific format based on API type
   // NOTE: Mistral API has a fundamental limitation - it does NOT support PDFs in any form.
   // The API strictly requires image content to start with data:image/, rejecting data:application/pdf
   // See: MISTRAL_PDF_FIX_SUMMARY.md for full investigation details
-  content.push(
-    ...pdfFiles.map((pdf): FilePart => {
-      logger.info(
-        `[PDF] ✅ Added to content (Vercel AI SDK format): ${pdf.filename}`,
-      );
-      return {
-        type: "file" as const,
-        data: pdf.buffer,
-        mimeType: "application/pdf",
-      };
-    }),
-  );
+  for (const pdf of pdfFiles) {
+    const pdfPart = await buildPDFContent(pdf, provider);
+    content.push(pdfPart);
+  }
 
   return content;
 }
