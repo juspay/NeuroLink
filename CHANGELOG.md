@@ -1,3 +1,9 @@
+## [8.11.0](https://github.com/juspay/neurolink/compare/v8.10.1...v8.11.0) (2025-12-12)
+
+### Features
+
+- **(tts):** implement TTSProcessor skeleton class with handler registry ([8dc63d1](https://github.com/juspay/neurolink/commit/8dc63d15d8b71845145349b932651980aef61aa8))
+
 ## [8.10.1](https://github.com/juspay/neurolink/compare/v8.10.0...v8.10.1) (2025-12-12)
 
 ### Bug Fixes
