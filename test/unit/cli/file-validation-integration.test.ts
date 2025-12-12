@@ -2,99 +2,43 @@
  * CLI File Validation Integration Tests
  *
  * Integration tests to verify file validation works correctly
- * when processing multimodal CLI inputs.
+ * when processing multimodal CLI inputs through the actual CLICommandFactory.
  *
- * These tests verify the validation helper is properly called
- * from the file processing methods.
+ * These tests verify the validation helper is properly integrated
+ * into the file processing methods.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { tmpdir } from "os";
 
-/**
- * Test helper to simulate validateFilePath logic
- * This mirrors the actual validation in commandFactory.ts
- */
-function validateFilePath(
-  filePath: string,
-  fileType: "image" | "pdf" | "csv" | "file",
-  quiet: boolean = false,
-): void {
-  // Skip validation for URLs
-  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-    return;
-  }
+// Type casting to access private methods for testing
+type CLICommandFactoryPrivate = {
+  processCliImages(
+    images?: string | string[],
+    quiet?: boolean,
+  ): Array<Buffer | string> | undefined;
+  processCliCSVFiles(
+    csvFiles?: string | string[],
+    quiet?: boolean,
+  ): Array<Buffer | string> | undefined;
+  processCliPDFFiles(
+    pdfFiles?: string | string[],
+    quiet?: boolean,
+  ): Array<Buffer | string> | undefined;
+  processCliFiles(
+    files?: string | string[],
+    quiet?: boolean,
+  ): Array<Buffer | string> | undefined;
+};
 
-  // Check file existence
-  if (!fs.existsSync(filePath)) {
-    throw new Error(
-      `❌ File not found: ${filePath}\n\n` +
-        `🔧 Troubleshooting steps:\n` +
-        `1. Check if the file path is correct\n` +
-        `2. Ensure the file exists at the specified location\n` +
-        `3. Use absolute paths or paths relative to current directory\n` +
-        `4. For URLs, ensure they start with http:// or https://\n\n` +
-        `💡 Tip: Use 'ls' or 'dir' to verify the file exists`,
-    );
-  }
-
-  // Get file stats
-  const stats = fs.statSync(filePath);
-
-  // Reject directories
-  if (stats.isDirectory()) {
-    throw new Error(
-      `❌ Path is a directory, not a file: ${filePath}\n\n` +
-        `🔧 Troubleshooting steps:\n` +
-        `1. Specify a file path, not a directory\n` +
-        `2. If you want to process multiple files, use the flag multiple times\n` +
-        `   Example: --image file1.jpg --image file2.jpg\n\n` +
-        `💡 Tip: Use 'ls ${filePath}' to see files in the directory`,
-    );
-  }
-
-  // Check file size and warn for large files
-  const fileSizeBytes = stats.size;
-  const fileSizeMB = fileSizeBytes / (1024 * 1024);
-
-  // Define size limits based on file type
-  const sizeLimits = {
-    image: 10,
-    pdf: 50,
-    csv: 50,
-    file: 50,
-  };
-
-  const limit = sizeLimits[fileType];
-
-  if (fileSizeMB > limit && !quiet) {
-    // In actual implementation, this would log a warning
-    // For testing, we just verify the logic would trigger
-    // (Warning logic would go here)
-  }
-}
-
-/**
- * Simulate processCliImages with validation
- */
-function processCliImages(
-  images: string | string[] | undefined,
-  quiet: boolean = false,
-): Array<string> | undefined {
-  if (!images) {
-    return undefined;
-  }
-
-  const imagePaths = Array.isArray(images) ? images : [images];
-
-  // Validate each image path before processing
-  for (const imagePath of imagePaths) {
-    validateFilePath(imagePath, "image", quiet);
-  }
-
-  return imagePaths;
+// Import the actual CLICommandFactory
+async function getCLICommandFactory() {
+  const module = await import(
+    "../../../src/cli/factories/commandFactory.js"
+  );
+  return module.CLICommandFactory as unknown as CLICommandFactoryPrivate;
 }
 
 describe("CLI File Validation Integration", () => {
@@ -105,8 +49,12 @@ describe("CLI File Validation Integration", () => {
   let largeImagePath: string;
   let directoryPath: string;
   let nonExistentPath: string;
+  let CLICommandFactory: CLICommandFactoryPrivate;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Load the actual CLICommandFactory
+    CLICommandFactory = await getCLICommandFactory();
+
     testDir = fs.mkdtempSync(path.join(tmpdir(), "neurolink-integration-"));
 
     validImagePath = path.join(testDir, "test.jpg");
@@ -121,60 +69,126 @@ describe("CLI File Validation Integration", () => {
     fs.writeFileSync(validCsvPath, "data");
     fs.writeFileSync(largeImagePath, Buffer.alloc(15 * 1024 * 1024));
     fs.mkdirSync(directoryPath);
+
+    // Mock logger to suppress warnings during tests
+    vi.mock("../../../src/lib/utils/logger.js", () => ({
+      logger: {
+        always: vi.fn(),
+        debug: vi.fn(),
+        error: vi.fn(),
+      },
+    }));
   });
 
   afterEach(() => {
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
+    vi.clearAllMocks();
   });
 
   describe("processCliImages Integration", () => {
     it("should process valid image file", () => {
-      const result = processCliImages(validImagePath);
+      const result = CLICommandFactory.processCliImages(validImagePath);
       expect(result).toEqual([validImagePath]);
     });
 
     it("should process multiple valid images", () => {
       const images = [validImagePath, validImagePath];
-      const result = processCliImages(images);
+      const result = CLICommandFactory.processCliImages(images);
       expect(result).toEqual(images);
     });
 
     it("should throw error for non-existent image", () => {
       expect(() => {
-        processCliImages(nonExistentPath);
+        CLICommandFactory.processCliImages(nonExistentPath);
       }).toThrow("File not found");
     });
 
     it("should throw error for directory", () => {
       expect(() => {
-        processCliImages(directoryPath);
+        CLICommandFactory.processCliImages(directoryPath);
       }).toThrow("Path is a directory");
     });
 
     it("should process URL without validation", () => {
       const url = "https://example.com/image.jpg";
-      const result = processCliImages(url);
+      const result = CLICommandFactory.processCliImages(url);
       expect(result).toEqual([url]);
     });
 
-    it("should handle large file with warning (quiet mode)", () => {
-      // Should not throw, just warn (which we skip in quiet mode)
-      const result = processCliImages(largeImagePath, true);
+    it("should handle large file in quiet mode", () => {
+      const result = CLICommandFactory.processCliImages(largeImagePath, true);
       expect(result).toEqual([largeImagePath]);
     });
 
     it("should return undefined for no images", () => {
-      const result = processCliImages(undefined);
+      const result = CLICommandFactory.processCliImages(undefined);
       expect(result).toBeUndefined();
+    });
+  });
+
+  describe("processCliPDFFiles Integration", () => {
+    it("should process valid PDF file", () => {
+      const result = CLICommandFactory.processCliPDFFiles(validPdfPath);
+      expect(result).toEqual([validPdfPath]);
+    });
+
+    it("should throw error for non-existent PDF", () => {
+      expect(() => {
+        CLICommandFactory.processCliPDFFiles(nonExistentPath);
+      }).toThrow("File not found");
+    });
+
+    it("should process URL without validation", () => {
+      const url = "https://example.com/document.pdf";
+      const result = CLICommandFactory.processCliPDFFiles(url);
+      expect(result).toEqual([url]);
+    });
+  });
+
+  describe("processCliCSVFiles Integration", () => {
+    it("should process valid CSV file", () => {
+      const result = CLICommandFactory.processCliCSVFiles(validCsvPath);
+      expect(result).toEqual([validCsvPath]);
+    });
+
+    it("should throw error for non-existent CSV", () => {
+      expect(() => {
+        CLICommandFactory.processCliCSVFiles(nonExistentPath);
+      }).toThrow("File not found");
+    });
+
+    it("should process URL without validation", () => {
+      const url = "https://example.com/data.csv";
+      const result = CLICommandFactory.processCliCSVFiles(url);
+      expect(result).toEqual([url]);
+    });
+  });
+
+  describe("processCliFiles Integration", () => {
+    it("should process valid file", () => {
+      const result = CLICommandFactory.processCliFiles(validImagePath);
+      expect(result).toEqual([validImagePath]);
+    });
+
+    it("should throw error for non-existent file", () => {
+      expect(() => {
+        CLICommandFactory.processCliFiles(nonExistentPath);
+      }).toThrow("File not found");
+    });
+
+    it("should process URL without validation", () => {
+      const url = "https://example.com/file.dat";
+      const result = CLICommandFactory.processCliFiles(url);
+      expect(result).toEqual([url]);
     });
   });
 
   describe("Error Message Quality", () => {
     it("should provide helpful error for missing file", () => {
       try {
-        processCliImages(nonExistentPath);
+        CLICommandFactory.processCliImages(nonExistentPath);
         expect.fail("Should have thrown an error");
       } catch (error) {
         const message = (error as Error).message;
@@ -187,7 +201,7 @@ describe("CLI File Validation Integration", () => {
 
     it("should provide helpful error for directory", () => {
       try {
-        processCliImages(directoryPath);
+        CLICommandFactory.processCliImages(directoryPath);
         expect.fail("Should have thrown an error");
       } catch (error) {
         const message = (error as Error).message;
@@ -199,7 +213,7 @@ describe("CLI File Validation Integration", () => {
 
     it("should include file path in error", () => {
       try {
-        processCliImages(nonExistentPath);
+        CLICommandFactory.processCliImages(nonExistentPath);
         expect.fail("Should have thrown an error");
       } catch (error) {
         const message = (error as Error).message;
@@ -208,78 +222,58 @@ describe("CLI File Validation Integration", () => {
     });
   });
 
-  describe("Validation Bypass for URLs", () => {
+  describe("URL Validation Bypass", () => {
     it("should accept HTTP URLs", () => {
       const url = "http://example.com/image.jpg";
-      const result = processCliImages(url);
+      const result = CLICommandFactory.processCliImages(url);
       expect(result).toEqual([url]);
     });
 
     it("should accept HTTPS URLs", () => {
       const url = "https://example.com/image.jpg";
-      const result = processCliImages(url);
+      const result = CLICommandFactory.processCliImages(url);
       expect(result).toEqual([url]);
     });
 
     it("should validate non-URL paths", () => {
       expect(() => {
-        processCliImages(nonExistentPath);
+        CLICommandFactory.processCliImages(nonExistentPath);
       }).toThrow();
     });
 
     it("should handle mixed URLs and file paths", () => {
       const paths = ["https://example.com/1.jpg", validImagePath];
-      const result = processCliImages(paths);
+      const result = CLICommandFactory.processCliImages(paths);
       expect(result).toEqual(paths);
-    });
-  });
-
-  describe("Large File Handling", () => {
-    it("should process large file without error", () => {
-      const result = processCliImages(largeImagePath, true);
-      expect(result).toBeDefined();
-      expect(result).toEqual([largeImagePath]);
-    });
-
-    it("should not throw for file within limits", () => {
-      expect(() => {
-        processCliImages(validImagePath);
-      }).not.toThrow();
     });
   });
 
   describe("Multiple File Validation", () => {
     it("should validate all files in array", () => {
       const files = [validImagePath, validImagePath];
-      const result = processCliImages(files);
+      const result = CLICommandFactory.processCliImages(files);
       expect(result).toHaveLength(2);
     });
 
     it("should stop at first invalid file", () => {
       const files = [validImagePath, nonExistentPath, validImagePath];
       expect(() => {
-        processCliImages(files);
+        CLICommandFactory.processCliImages(files);
       }).toThrow("File not found");
     });
 
     it("should process empty array", () => {
-      const result = processCliImages([]);
+      const result = CLICommandFactory.processCliImages([]);
       expect(result).toEqual([]);
     });
   });
 
   describe("Edge Cases", () => {
-    it("should handle relative paths", () => {
-      const relativePath = path.relative(process.cwd(), validImagePath);
-      // The validation should still work with absolute path resolution
-      expect(path.isAbsolute(validImagePath)).toBe(true);
-    });
-
     it("should handle paths with spaces", () => {
       const spacePath = path.join(testDir, "file with spaces.jpg");
       fs.writeFileSync(spacePath, Buffer.alloc(100));
 
-      const result = processCliImages(spacePath);
+      const result = CLICommandFactory.processCliImages(spacePath);
       expect(result).toEqual([spacePath]);
 
       fs.unlinkSync(spacePath);
@@ -289,7 +283,7 @@ describe("CLI File Validation Integration", () => {
       const specialPath = path.join(testDir, "file(1).jpg");
       fs.writeFileSync(specialPath, Buffer.alloc(100));
 
-      const result = processCliImages(specialPath);
+      const result = CLICommandFactory.processCliImages(specialPath);
       expect(result).toEqual([specialPath]);
 
       fs.unlinkSync(specialPath);
