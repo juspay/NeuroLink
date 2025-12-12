@@ -1,4 +1,4 @@
-# Audio File Support
+# Audio Streaming Support
 
 NeuroLink provides real-time audio streaming capabilities through the **Gemini Live API** for bidirectional voice conversations. Stream audio input to AI models and receive audio responses in real-time.
 
@@ -293,7 +293,7 @@ process.env.GOOGLE_AI_API_KEY = "your-api-key";
 
 const result = await neurolink.stream({
   input: {
-    text: "Start a voice conversation",
+    text: "", // Ignored when audio is present (audio-only mode)
     audio: { frames: audioStream },
   },
   provider: "google-ai",
@@ -302,7 +302,7 @@ const result = await neurolink.stream({
 
 ## Language Support
 
-The Gemini Live API supports multiple languages for voice conversations. Specify the language in your text prompt:
+The Gemini Live API supports multiple languages for voice conversations. The language is automatically detected from the audio input stream.
 
 ### Supported Languages (ISO 639-1)
 
@@ -318,17 +318,7 @@ The Gemini Live API supports multiple languages for voice conversations. Specify
 | tr   | Turkish             | vi   | Vietnamese         |
 | th   | Thai                | id   | Indonesian         |
 
-### Language Example
-
-```typescript
-const result = await neurolink.stream({
-  input: {
-    text: "Respond in Spanish. You are a helpful voice assistant.",
-    audio: { frames: audioStream },
-  },
-  provider: "google-ai",
-});
-```
+> **Note:** Since audio streaming operates in audio-only mode (text field is ignored), the language is automatically detected from the spoken audio. You cannot specify the language via text prompts.
 
 ## Voice Configuration
 
@@ -388,18 +378,22 @@ pnpm add @google/genai
 npm install @google/genai
 ```
 
-### Error: "GOOGLE_AI_API_KEY environment variable is not set"
+### Error: "GOOGLE_AI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY environment variable is not set"
 
-**Problem:** No API key configured for Google AI.
+**Problem:** No API key configured for Google AI. You must set either `GOOGLE_AI_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY`.
 
 **Solution:**
 
 ```bash
-# Set the environment variable
+# Set one of the required environment variables
 export GOOGLE_AI_API_KEY=AIza-your-api-key
+# or
+export GOOGLE_GENERATIVE_AI_API_KEY=AIza-your-api-key
 
 # Or add to .env file
 GOOGLE_AI_API_KEY=AIza-your-api-key
+# or
+GOOGLE_GENERATIVE_AI_API_KEY=AIza-your-api-key
 ```
 
 ### Error: "Stream options must include either input.text or input.audio"
@@ -537,7 +531,7 @@ async function* audioWithFlush(): AsyncIterable<Buffer> {
 try {
   const result = await neurolink.stream({
     input: {
-      text: "Start conversation",
+      text: "", // Ignored when audio is present (audio-only mode)
       audio: { frames: audioStream },
     },
     provider: "google-ai",
