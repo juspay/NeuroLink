@@ -25,6 +25,10 @@ export class MultimodalLogger {
  */
 const VISION_CAPABILITIES = {
   openai: [
+    // GPT-5.2 family (released Dec 11, 2025) - Latest flagship models
+    "gpt-5.2",
+    "gpt-5.2-chat-latest",
+    "gpt-5.2-pro",
     // GPT-5 family (released Aug 2025)
     "gpt-5",
     "gpt-5-2025-08-07",
@@ -38,6 +42,7 @@ const VISION_CAPABILITIES = {
     // o-series reasoning models (released Apr 2025)
     "o3",
     "o3-mini",
+    "o3-pro",
     "o4",
     "o4-mini",
     "o4-mini-deep-research",
@@ -52,12 +57,17 @@ const VISION_CAPABILITIES = {
     "gemini-3-pro-preview",
     "gemini-3-pro-preview-11-2025",
     "gemini-3-pro-latest",
+    "gemini-3-pro-image-preview",
     // Gemini 2.5 Series
     "gemini-2.5-pro",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-image",
     // Gemini 2.0 Series
     "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
     "gemini-2.0-flash-lite",
+    "gemini-2.0-flash-preview-image-generation",
     // Gemini 1.5 Series (Legacy)
     "gemini-1.5-pro",
     "gemini-1.5-flash",
@@ -71,24 +81,44 @@ const VISION_CAPABILITIES = {
     "claude-opus-4-5-20251101",
     "claude-haiku-4-5",
     "claude-haiku-4-5-20251001",
+    // Claude 4.1 and 4.0 Series
+    "claude-opus-4-1",
+    "claude-opus-4-1-20250805",
+    "claude-opus-4",
+    "claude-opus-4-20250514",
+    "claude-sonnet-4",
+    "claude-sonnet-4-20250514",
     // Claude 3.7 Series
     "claude-3-7-sonnet",
+    "claude-3-7-sonnet-20250219",
     // Claude 3.5 Series
     "claude-3-5-sonnet",
+    "claude-3-5-sonnet-20241022",
     // Claude 3 Series
     "claude-3-opus",
     "claude-3-sonnet",
     "claude-3-haiku",
   ],
   azure: [
+    // GPT-5.1 family (December 2025)
+    "gpt-5.1",
+    "gpt-5.1-chat",
+    "gpt-5.1-codex",
     // GPT-5 family
     "gpt-5",
     "gpt-5-pro",
+    "gpt-5-turbo",
+    "gpt-5-chat",
     "gpt-5-mini",
     // GPT-4.1 family
     "gpt-4.1",
     "gpt-4.1-mini",
     "gpt-4.1-nano",
+    // O-series
+    "o3",
+    "o3-mini",
+    "o3-pro",
+    "o4-mini",
     // Existing GPT-4
     "gpt-4o",
     "gpt-4o-mini",
@@ -101,10 +131,12 @@ const VISION_CAPABILITIES = {
     "gemini-3-pro-preview-11-2025",
     "gemini-3-pro-latest",
     "gemini-3-pro-preview",
+    "gemini-3-pro",
     // Gemini 2.5 models on Vertex AI
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-image",
     // Gemini 2.0 models on Vertex AI
     "gemini-2.0-flash-001",
     "gemini-2.0-flash-lite",
@@ -150,27 +182,41 @@ const VISION_CAPABILITIES = {
   litellm: [
     // LiteLLM proxies to underlying providers
     // List models that support vision when going through the proxy
-    // Gemini models
-    "gemini-3-pro-preview",
-    "gemini-3-pro-latest",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash-lite",
-    // Claude 4.5 models
+    // OpenAI models via LiteLLM
+    "openai/gpt-5",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "openai/gpt-4-turbo",
+    "gpt-5",
+    "gpt-4o",
+    "gpt-4.1",
+    // Anthropic models via LiteLLM
+    "anthropic/claude-sonnet-4-5-20250929",
+    "anthropic/claude-opus-4-1-20250805",
+    "anthropic/claude-3-5-sonnet-20240620",
     "claude-sonnet-4-5",
     "claude-sonnet-4-5-20250929",
     "claude-opus-4-5",
     "claude-opus-4-5-20251101",
     "claude-haiku-4-5-20251001",
-    // Claude 4 models
     "claude-sonnet-4",
     "claude-opus-4-1",
-    // OpenAI models
-    "gpt-4o",
-    "gpt-4.1",
-    "gpt-5",
+    // Gemini models via LiteLLM
+    "vertex_ai/gemini-2.5-pro",
+    "gemini/gemini-2.5-pro",
+    "gemini/gemini-2.0-flash",
+    "gemini-3-pro-preview",
+    "gemini-3-pro-latest",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash-lite",
+    // Groq models via LiteLLM (vision)
+    "groq/llama-3.2-11b-vision-preview",
   ],
   mistral: [
+    // Mistral Large (latest has vision via Pixtral integration)
+    "mistral-large-latest",
+    "mistral-large-2512",
     // Mistral Small 3.2 (vision support for images: PNG, JPEG, WEBP, GIF)
     "mistral-small",
     "mistral-small-latest",
@@ -180,26 +226,39 @@ const VISION_CAPABILITIES = {
     "mistral-medium",
     "mistral-medium-latest",
     "mistral-medium-3.1",
+    "mistral-medium-2508",
     // Magistral models (vision support)
     "magistral-small",
+    "magistral-small-latest",
     "magistral-medium",
+    "magistral-medium-latest",
     // Pixtral models (specialized vision models)
     "pixtral-12b",
     "pixtral-12b-latest",
     "pixtral-large",
     "pixtral-large-latest",
+    "pixtral-large-2502",
   ],
   ollama: [
     // Llama 4 family (May 2025 - Best vision + tool calling)
     "llama4:scout",
     "llama4:maverick",
-    // Llama 3.2 vision
+    "llama4:latest",
+    "llama4",
+    // Llama 3.2 vision variants
     "llama3.2-vision",
+    "llama3.2-vision:11b",
+    "llama3.2-vision:90b",
     // Gemma 3 family (SigLIP vision encoder - supports tool calling + vision)
+    "gemma3",
     "gemma3:4b",
     "gemma3:12b",
     "gemma3:27b",
     "gemma3:latest",
+    // Qwen 2.5 VL (Vision-Language)
+    "qwen2.5-vl",
+    "qwen2.5-vl:72b",
+    "qwen2.5-vl:32b",
     // Mistral Small family (vision + tool calling)
     "mistral-small3.1",
     "mistral-small3.1:large",
@@ -207,8 +266,24 @@ const VISION_CAPABILITIES = {
     "mistral-small3.1:small",
     // LLaVA (vision-focused)
     "llava",
+    "llava:7b",
+    "llava:13b",
+    "llava:34b",
+    "llava-llama3",
+    "llava-llama3:8b",
   ],
   bedrock: [
+    // Amazon Nova models (December 2024+) - multimodal vision support
+    "amazon.nova-premier",
+    "amazon.nova-premier-v1:0",
+    "amazon.nova-pro",
+    "amazon.nova-pro-v1:0",
+    "amazon.nova-lite",
+    "amazon.nova-lite-v1:0",
+    "amazon.nova-2-lite-v1:0",
+    "nova-premier",
+    "nova-pro",
+    "nova-lite",
     // Claude 4.5 family (supports vision, PDFs, images - September-November 2025)
     "claude-sonnet-4-5",
     "claude-sonnet-4.5",
@@ -217,7 +292,7 @@ const VISION_CAPABILITIES = {
     "claude-opus-4-5",
     "claude-opus-4.5",
     "anthropic.claude-opus-4-5",
-    "anthropic.claude-opus-4-5-20251101-v1:0",
+    "anthropic.claude-opus-4-5-20251124-v1:0",
     "claude-haiku-4-5",
     "claude-haiku-4.5",
     "anthropic.claude-haiku-4-5",
@@ -226,18 +301,22 @@ const VISION_CAPABILITIES = {
     "claude-sonnet-4",
     "claude-sonnet-4@",
     "anthropic.claude-sonnet-4",
+    "anthropic.claude-sonnet-4-20250514-v1:0",
     "claude-opus-4",
     "claude-opus-4-1",
     "claude-opus-4@",
     "anthropic.claude-opus-4",
+    "anthropic.claude-opus-4-1-20250805-v1:0",
     // Claude 3.7 Sonnet
     "claude-3-7-sonnet",
     "claude-3.7-sonnet",
     "anthropic.claude-3-7-sonnet",
+    "anthropic.claude-3-7-sonnet-20250219-v1:0",
     // Claude 3.5 Sonnet
     "claude-3-5-sonnet",
     "claude-3.5-sonnet",
     "anthropic.claude-3-5-sonnet",
+    "anthropic.claude-3-5-sonnet-20241022-v1:0",
     // Claude 3 Opus
     "claude-3-opus",
     "anthropic.claude-3-opus",
@@ -247,8 +326,31 @@ const VISION_CAPABILITIES = {
     // Claude 3 Haiku
     "claude-3-haiku",
     "anthropic.claude-3-haiku",
+    // Meta Llama 4 models (multimodal vision)
+    "meta.llama4-maverick-17b-instruct-v1:0",
+    "meta.llama4-scout-17b-instruct-v1:0",
+    // Meta Llama 3.2 vision models
+    "meta.llama3-2-90b-instruct-v1:0",
+    "meta.llama3-2-11b-instruct-v1:0",
+    // Mistral Pixtral (multimodal vision)
+    "mistral.pixtral-large-2502-v1:0",
     // Generic anthropic.claude prefix (catches all Claude models)
     "anthropic.claude",
+  ],
+  huggingface: [
+    // Qwen 2.5 VL (Vision-Language)
+    "Qwen/Qwen2.5-VL-32B-Instruct",
+    "Qwen/Qwen2.5-VL-7B-Instruct",
+    // Microsoft Phi-3 Vision
+    "microsoft/Phi-3-vision-128k-instruct",
+    // LLaVA variants
+    "llava-hf/llava-1.5-7b-hf",
+    "llava-hf/llava-v1.6-mistral-7b-hf",
+  ],
+  sagemaker: [
+    // Meta Llama 4 vision models
+    "meta-llama-4-maverick-17b-128e-instruct",
+    "meta-llama-4-scout-17b-16e-instruct",
   ],
 } as const;
 
@@ -292,6 +394,21 @@ export class ProviderImageAdapter {
           break;
         case "ollama":
           adaptedPayload = this.formatForOpenAI(text, images);
+          break;
+        case "huggingface":
+          adaptedPayload = this.formatForOpenAI(text, images);
+          break;
+        case "sagemaker":
+          adaptedPayload = this.formatForOpenAI(text, images);
+          break;
+        case "litellm":
+          adaptedPayload = this.formatForOpenAI(text, images);
+          break;
+        case "mistral":
+          adaptedPayload = this.formatForOpenAI(text, images);
+          break;
+        case "bedrock":
+          adaptedPayload = this.formatForAnthropic(text, images);
           break;
         default:
           throw new Error(`Vision not supported for provider: ${provider}`);
