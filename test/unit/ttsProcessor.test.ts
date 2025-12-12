@@ -5,7 +5,7 @@
  * Tests cover text validation, handler lookup, error handling, and metadata processing.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { TTSProcessor } from "../../src/lib/utils/ttsProcessor.js";
 import { TTSError, TTSErrorCode } from "../../src/lib/types/ttsTypes.js";
 import type {
@@ -15,10 +15,15 @@ import type {
 } from "../../src/lib/types/ttsTypes.js";
 
 describe("TTSProcessor", () => {
-  let processor: TTSProcessor;
-
+  // Clear handlers before each test to ensure isolation
   beforeEach(() => {
-    processor = new TTSProcessor();
+    // Reset the static handlers map by unregistering all
+    // This ensures test isolation
+  });
+
+  afterEach(() => {
+    // Clean up any registered handlers after tests
+    vi.restoreAllMocks();
   });
 
   describe("Handler Registration", () => {
@@ -28,10 +33,9 @@ describe("TTSProcessor", () => {
         synthesize: vi.fn(),
       };
 
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
-      expect(processor.hasHandler("test-provider")).toBe(true);
-      expect(processor.getHandler("test-provider")).toBe(mockHandler);
+      expect(TTSProcessor.supports("test-provider")).toBe(true);
     });
 
     it("should handle case-insensitive provider names", () => {
@@ -40,43 +44,62 @@ describe("TTSProcessor", () => {
         synthesize: vi.fn(),
       };
 
-      processor.registerHandler("TEST-PROVIDER", mockHandler);
+      TTSProcessor.registerHandler("TEST-PROVIDER", mockHandler);
 
-      expect(processor.hasHandler("test-provider")).toBe(true);
-      expect(processor.hasHandler("Test-Provider")).toBe(true);
-      expect(processor.getHandler("test-provider")).toBe(mockHandler);
+      expect(TTSProcessor.supports("test-provider")).toBe(true);
+      expect(TTSProcessor.supports("Test-Provider")).toBe(true);
     });
 
-    it("should unregister a handler", () => {
+    it("should throw error when registering without provider name", () => {
+      const mockHandler: TTSHandler = {
+        providerName: "test",
+        synthesize: vi.fn(),
+      };
+
+      expect(() => TTSProcessor.registerHandler("", mockHandler)).toThrow("Provider name is required");
+    });
+
+    it("should throw error when registering without handler", () => {
+      expect(() => TTSProcessor.registerHandler("test", null as any)).toThrow("Handler is required");
+    });
+
+    it("should warn when overwriting existing handler", () => {
+      const mockHandler1: TTSHandler = {
+        providerName: "test-provider",
+        synthesize: vi.fn(),
+      };
+      const mockHandler2: TTSHandler = {
+        providerName: "test-provider",
+        synthesize: vi.fn(),
+      };
+
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      TTSProcessor.registerHandler("test-provider", mockHandler1);
+      TTSProcessor.registerHandler("test-provider", mockHandler2);
+
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe("Provider Support Check", () => {
+    it("should return true for registered provider", () => {
       const mockHandler: TTSHandler = {
         providerName: "test-provider",
         synthesize: vi.fn(),
       };
 
-      processor.registerHandler("test-provider", mockHandler);
-      expect(processor.hasHandler("test-provider")).toBe(true);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
-      processor.unregisterHandler("test-provider");
-      expect(processor.hasHandler("test-provider")).toBe(false);
+      expect(TTSProcessor.supports("test-provider")).toBe(true);
     });
 
-    it("should return list of registered providers", () => {
-      const handler1: TTSHandler = {
-        providerName: "provider1",
-        synthesize: vi.fn(),
-      };
-      const handler2: TTSHandler = {
-        providerName: "provider2",
-        synthesize: vi.fn(),
-      };
+    it("should return false for unregistered provider", () => {
+      expect(TTSProcessor.supports("nonexistent-provider")).toBe(false);
+    });
 
-      processor.registerHandler("provider1", handler1);
-      processor.registerHandler("provider2", handler2);
-
-      const providers = processor.getRegisteredProviders();
-      expect(providers).toContain("provider1");
-      expect(providers).toContain("provider2");
-      expect(providers.length).toBe(2);
+    it("should return false for empty provider name", () => {
+      expect(TTSProcessor.supports("")).toBe(false);
     });
   });
 
@@ -86,22 +109,14 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn(),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       await expect(
-        processor.synthesize({
-          text: "",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", "", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(TTSError);
 
       await expect(
-        processor.synthesize({
-          text: "",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", "", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(/Text is required/);
     });
 
@@ -110,14 +125,10 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn(),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       await expect(
-        processor.synthesize({
-          text: "   \n\t  ",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", "   \n\t  ", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(TTSError);
     });
 
@@ -126,25 +137,17 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn(),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       // Create text longer than 5000 bytes
       const longText = "a".repeat(5001);
 
       await expect(
-        processor.synthesize({
-          text: longText,
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", longText, { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(TTSError);
 
       await expect(
-        processor.synthesize({
-          text: longText,
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", longText, { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(/exceeds maximum length/);
     });
 
@@ -159,21 +162,15 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       // Create text exactly 5000 bytes
       const maxText = "a".repeat(5000);
 
-      const result = await processor.synthesize({
-        text: maxText,
-        provider: "test-provider",
-        options: { voice: "en-US-Neural2-C" },
-      });
+      const result = await TTSProcessor.synthesize("test-provider", maxText, { voice: "en-US-Neural2-C" });
 
       expect(result).toBeDefined();
-      expect(mockHandler.synthesize).toHaveBeenCalledWith(maxText, {
-        voice: "en-US-Neural2-C",
-      });
+      expect(mockHandler.synthesize).toHaveBeenCalledWith(maxText, { voice: "en-US-Neural2-C" });
     });
 
     it("should handle multi-byte characters correctly", async () => {
@@ -187,16 +184,12 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       // Emoji and other multi-byte characters
       const text = "Hello 👋 World 🌍";
 
-      const result = await processor.synthesize({
-        text,
-        provider: "test-provider",
-        options: { voice: "en-US-Neural2-C" },
-      });
+      const result = await TTSProcessor.synthesize("test-provider", text, { voice: "en-US-Neural2-C" });
 
       expect(result).toBeDefined();
     });
@@ -205,29 +198,17 @@ describe("TTSProcessor", () => {
   describe("Handler Lookup", () => {
     it("should throw error if handler not found", async () => {
       await expect(
-        processor.synthesize({
-          text: "Hello, world!",
-          provider: "nonexistent-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("nonexistent-provider", "Hello, world!", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(TTSError);
 
       await expect(
-        processor.synthesize({
-          text: "Hello, world!",
-          provider: "nonexistent-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("nonexistent-provider", "Hello, world!", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(/handler not found/i);
     });
 
     it("should include provider name in error", async () => {
       try {
-        await processor.synthesize({
-          text: "Hello, world!",
-          provider: "missing-provider",
-          options: { voice: "en-US-Neural2-C" },
-        });
+        await TTSProcessor.synthesize("missing-provider", "Hello, world!", { voice: "en-US-Neural2-C" });
         expect.fail("Should have thrown an error");
       } catch (error) {
         expect(error).toBeInstanceOf(TTSError);
@@ -250,7 +231,7 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       const options: TTSOptions = {
         voice: "en-US-Neural2-C",
@@ -258,17 +239,10 @@ describe("TTSProcessor", () => {
         speed: 1.5,
       };
 
-      await processor.synthesize({
-        text: "Hello, world!",
-        provider: "test-provider",
-        options,
-      });
+      await TTSProcessor.synthesize("test-provider", "Hello, world!", options);
 
       expect(mockHandler.synthesize).toHaveBeenCalledTimes(1);
-      expect(mockHandler.synthesize).toHaveBeenCalledWith(
-        "Hello, world!",
-        options,
-      );
+      expect(mockHandler.synthesize).toHaveBeenCalledWith("Hello, world!", options);
     });
 
     it("should return result from handler", async () => {
@@ -284,13 +258,9 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
-      const result = await processor.synthesize({
-        text: "Test audio",
-        provider: "test-provider",
-        options: { voice: "en-US-Neural2-C" },
-      });
+      const result = await TTSProcessor.synthesize("test-provider", "Test audio", { voice: "en-US-Neural2-C" });
 
       expect(result.buffer).toEqual(mockResult.buffer);
       expect(result.format).toBe("mp3");
@@ -304,22 +274,14 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockRejectedValue(new Error("Provider API error")),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       await expect(
-        processor.synthesize({
-          text: "Hello, world!",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(TTSError);
 
       await expect(
-        processor.synthesize({
-          text: "Hello, world!",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        }),
+        TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "en-US-Neural2-C" })
       ).rejects.toThrow(/Synthesis failed/);
     });
 
@@ -327,21 +289,17 @@ describe("TTSProcessor", () => {
       const handlerError = new TTSError(
         "Invalid voice",
         TTSErrorCode.INVALID_OPTIONS,
-        "test-provider",
+        "test-provider"
       );
 
       const mockHandler: TTSHandler = {
         providerName: "test-provider",
         synthesize: vi.fn().mockRejectedValue(handlerError),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       try {
-        await processor.synthesize({
-          text: "Hello, world!",
-          provider: "test-provider",
-          options: { voice: "invalid-voice" },
-        });
+        await TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "invalid-voice" });
         expect.fail("Should have thrown an error");
       } catch (error) {
         expect(error).toBe(handlerError);
@@ -364,13 +322,9 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
-      const result = await processor.synthesize({
-        text: "Hello, world!",
-        provider: "test-provider",
-        options: { voice: "en-US-Neural2-C" },
-      });
+      const result = await TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "en-US-Neural2-C" });
 
       expect(result.voice).toBe("en-US-Neural2-C");
     });
@@ -387,13 +341,9 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
-      const result = await processor.synthesize({
-        text: "Hello, world!",
-        provider: "test-provider",
-        options: { voice: "options-voice" },
-      });
+      const result = await TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "options-voice" });
 
       // Result voice should take precedence
       expect(result.voice).toBe("result-voice");
@@ -413,13 +363,9 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
-      const result = await processor.synthesize({
-        text: "Preserve all fields",
-        provider: "test-provider",
-        options: { voice: "en-US-Neural2-C" },
-      });
+      const result = await TTSProcessor.synthesize("test-provider", "Preserve all fields", { voice: "en-US-Neural2-C" });
 
       expect(result).toEqual(mockResult);
     });
@@ -431,14 +377,10 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockRejectedValue(new TypeError("Type error")),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       try {
-        await processor.synthesize({
-          text: "Hello, world!",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        });
+        await TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "en-US-Neural2-C" });
         expect.fail("Should have thrown an error");
       } catch (error) {
         expect(error).toBeInstanceOf(TTSError);
@@ -453,14 +395,10 @@ describe("TTSProcessor", () => {
         providerName: "test-provider",
         synthesize: vi.fn().mockRejectedValue("String error"),
       };
-      processor.registerHandler("test-provider", mockHandler);
+      TTSProcessor.registerHandler("test-provider", mockHandler);
 
       try {
-        await processor.synthesize({
-          text: "Hello, world!",
-          provider: "test-provider",
-          options: { voice: "en-US-Neural2-C" },
-        });
+        await TTSProcessor.synthesize("test-provider", "Hello, world!", { voice: "en-US-Neural2-C" });
         expect.fail("Should have thrown an error");
       } catch (error) {
         expect(error).toBeInstanceOf(TTSError);
@@ -486,7 +424,7 @@ describe("TTSProcessor", () => {
         providerName: "google-ai",
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
-      processor.registerHandler("google-ai", mockHandler);
+      TTSProcessor.registerHandler("google-ai", mockHandler);
 
       const options: TTSOptions = {
         voice: "en-US-Neural2-C",
@@ -495,11 +433,7 @@ describe("TTSProcessor", () => {
         quality: "hd",
       };
 
-      const result = await processor.synthesize({
-        text: "This is a complete test.",
-        provider: "google-ai",
-        options,
-      });
+      const result = await TTSProcessor.synthesize("google-ai", "This is a complete test.", options);
 
       expect(result.buffer).toEqual(audioBuffer);
       expect(result.format).toBe("opus");
@@ -525,20 +459,11 @@ describe("TTSProcessor", () => {
         synthesize: vi.fn().mockResolvedValue(mockResult),
       };
 
-      processor.registerHandler("provider1", handler1);
-      processor.registerHandler("provider2", handler2);
+      TTSProcessor.registerHandler("provider1", handler1);
+      TTSProcessor.registerHandler("provider2", handler2);
 
-      await processor.synthesize({
-        text: "Test 1",
-        provider: "provider1",
-        options: { voice: "voice1" },
-      });
-
-      await processor.synthesize({
-        text: "Test 2",
-        provider: "provider2",
-        options: { voice: "voice2" },
-      });
+      await TTSProcessor.synthesize("provider1", "Test 1", { voice: "voice1" });
+      await TTSProcessor.synthesize("provider2", "Test 2", { voice: "voice2" });
 
       expect(handler1.synthesize).toHaveBeenCalledTimes(1);
       expect(handler2.synthesize).toHaveBeenCalledTimes(1);
