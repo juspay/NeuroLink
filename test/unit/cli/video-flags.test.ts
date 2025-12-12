@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 /**
  * Test suite for video CLI flags
  * These tests verify the expected configuration and behavior of video flags.
- * 
+ *
  * Note: The actual CLI flags are defined in commandFactory.ts commonOptions (private),
  * so these tests document the expected values and validate the configuration matches
  * the implementation. For full integration testing, run CLI commands with video flags.
@@ -20,10 +20,10 @@ describe("Video CLI Flags Configuration", () => {
       // These flag names should be available in commandFactory.ts commonOptions
       // Using kebab-case format as defined in CLI
       const expectedVideoFlags = [
-        "video",           // Path to video file
-        "video-frames",    // Number of frames to extract (default: 8)
-        "video-quality",   // Frame quality 0-100 (default: 85)
-        "video-format",    // Frame format (jpeg|png, default: jpeg)
+        "video", // Path to video file
+        "video-frames", // Number of frames to extract (default: 8)
+        "video-quality", // Frame quality 0-100 (default: 85)
+        "video-format", // Frame format (jpeg|png, default: jpeg)
         "transcribe-audio", // Extract and transcribe audio from video
       ];
 
@@ -39,9 +39,9 @@ describe("Video CLI Flags Configuration", () => {
       // Yargs converts kebab-case CLI flags to camelCase for argv access
       const yargsPropertyNames = [
         "video",
-        "videoFrames",     // --video-frames
-        "videoQuality",    // --video-quality
-        "videoFormat",     // --video-format
+        "videoFrames", // --video-frames
+        "videoQuality", // --video-quality
+        "videoFormat", // --video-format
         "transcribeAudio", // --transcribe-audio
       ];
 

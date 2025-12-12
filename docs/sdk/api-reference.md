@@ -593,7 +593,7 @@ interface GenerateOptions {
   toolUsageContext?: string;
   context?: Record<string, JsonValue>;
   conversationHistory?: Array<{ role: string; content: string }>;
-  
+
   // Document processing options
   officeOptions?: OfficeProcessorOptions;
 }
@@ -1935,13 +1935,13 @@ type FileType = "csv" | "image" | "pdf" | "office" | "text" | "unknown";
 interface OfficeProcessorOptions {
   /** Provider to use for document processing */
   provider?: string;
-  
+
   /** Maximum file size in MB (default: 5) */
   maxSizeMB?: number;
-  
+
   /** Whether to extract embedded images */
   extractImages?: boolean;
-  
+
   /** Whether to preserve document structure in output */
   preserveStructure?: boolean;
 }
@@ -1978,13 +1978,13 @@ interface OfficeProviderConfig {
 
 **Office Document Provider Support:**
 
-| Provider | DOCX | PPTX | XLSX | DOC | XLS | Notes |
-|----------|------|------|------|-----|-----|-------|
-| **AWS Bedrock** | ✅ | ✅ | ✅ | ✅ | ✅ | Full native support via Converse API |
-| **Google Vertex AI** | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ | Best for DOCX and XLSX |
-| **Anthropic Claude** | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ | Via document API |
-| **OpenAI** | ❌ | ❌ | ❌ | ❌ | ❌ | Not supported |
-| **Azure OpenAI** | ❌ | ❌ | ❌ | ❌ | ❌ | Not supported |
+| Provider             | DOCX | PPTX | XLSX | DOC | XLS | Notes                                |
+| -------------------- | ---- | ---- | ---- | --- | --- | ------------------------------------ |
+| **AWS Bedrock**      | ✅   | ✅   | ✅   | ✅  | ✅  | Full native support via Converse API |
+| **Google Vertex AI** | ✅   | ⚠️   | ✅   | ⚠️  | ⚠️  | Best for DOCX and XLSX               |
+| **Anthropic Claude** | ✅   | ⚠️   | ✅   | ⚠️  | ⚠️  | Via document API                     |
+| **OpenAI**           | ❌   | ❌   | ❌   | ❌  | ❌  | Not supported                        |
+| **Azure OpenAI**     | ❌   | ❌   | ❌   | ❌  | ❌  | Not supported                        |
 
 **Example Usage:**
 
