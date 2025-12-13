@@ -54,7 +54,7 @@ function isEmptyLine(line: string): boolean {
 }
 
 /**
- * Check if a parsed CSV row is empty (all values are empty/undefined)
+ * Check if a parsed CSV row is empty (all values are empty/undefined/null)
  */
 function isEmptyRow(row: unknown): boolean {
   if (!row || typeof row !== "object") {
@@ -64,7 +64,9 @@ function isEmptyRow(row: unknown): boolean {
   const values = Object.values(row as Record<string, unknown>);
   return (
     values.length === 0 ||
-    values.every((val) => !val || String(val).trim() === "")
+    values.every(
+      (val) => val === null || val === undefined || String(val).trim() === "",
+    )
   );
 }
 
@@ -126,7 +128,7 @@ export class CSVProcessor {
 
       // Filter empty lines if skipEmptyLines is enabled
       const filteredLines = skipEmptyLines
-        ? csvLines.filter((line, index) => index === 0 || !isEmptyLine(line)) // Keep header (index 0) always
+        ? csvLines.filter((line, index) => index === 0 || !isEmptyLine(line)) // Keep first line (assumed to be header) always
         : csvLines;
 
       // Take header + maxRows data rows

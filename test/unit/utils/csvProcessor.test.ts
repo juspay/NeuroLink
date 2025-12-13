@@ -438,6 +438,27 @@ Charlie,35,Chicago`;
         expect(parsed[1].name).toBe("Bob");
         expect(parsed[2].name).toBe("Charlie");
       });
+
+      it("should not treat 0 or false as empty values", async () => {
+        const csvWithZeroFalse = `name,count,active
+Product A,0,false
+
+Product B,10,true`;
+        const buffer = Buffer.from(csvWithZeroFalse);
+        const result = await CSVProcessor.process(buffer, {
+          formatStyle: "json",
+          skipEmptyLines: true,
+        });
+
+        // Both rows should be preserved, 0 and false are valid values
+        expect(result.metadata.rowCount).toBe(2);
+        const parsed = JSON.parse(result.content);
+        expect(parsed).toHaveLength(2);
+        expect(parsed[0].count).toBe("0");
+        expect(parsed[0].active).toBe("false");
+        expect(parsed[1].count).toBe("10");
+        expect(parsed[1].active).toBe("true");
+      });
     });
   });
 });
