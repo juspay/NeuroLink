@@ -318,7 +318,7 @@ Alice,30`;
       const lines = csvWithMeta.split("\n");
       // Test isMetadataLine detection
       const firstLine = lines[0].trim();
-      expect(firstLine.match(/^sep=/i)).toBeTruthy();
+      expect(firstLine.match(/^sep=/i)).not.toBeNull();
 
       // Verify row counting with metadata
       const hasMetadataLine = true;
