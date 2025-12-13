@@ -14,6 +14,12 @@ import type {
 } from "../types/fileTypes.js";
 
 /**
+ * Constants for CSV processing configuration
+ */
+const SAMPLE_ROW_COUNT = 3; // Number of rows to include in sample data
+const DEFAULT_CONFIDENCE = 100; // Default confidence percentage for CSV detection
+
+/**
  * Detect if first line is CSV metadata (not actual data/headers)
  * Common patterns:
  * - Excel separator line: "SEP=,"
@@ -122,7 +128,7 @@ export class CSVProcessor {
         content: limitedCSV,
         mimeType: "text/csv",
         metadata: {
-          confidence: 100,
+          confidence: DEFAULT_CONFIDENCE,
           size: content.length,
           rowCount,
           columnCount: (limitedLines[0] || "").split(",").length,
@@ -141,7 +147,7 @@ export class CSVProcessor {
     const hasEmptyColumns = columnNames.some(
       (col) => !col || col.trim() === "",
     );
-    const sampleRows = rows.slice(0, 3);
+    const sampleRows = rows.slice(0, SAMPLE_ROW_COUNT);
     const sampleData = this.formatSampleData(
       sampleRows,
       sampleDataFormat,
@@ -161,7 +167,7 @@ export class CSVProcessor {
       content: formatted,
       mimeType: "text/csv",
       metadata: {
-        confidence: 100,
+        confidence: DEFAULT_CONFIDENCE,
         size: content.length,
         rowCount,
         columnCount,

@@ -185,4 +185,45 @@ Charlie,35,Chicago`;
       expect(csvOutput.split("\n")[0]).toBe("Alice,30,New York");
     });
   });
+
+  describe("constants", () => {
+    it("should use DEFAULT_CONFIDENCE constant for confidence value", async () => {
+      const buffer = Buffer.from(sampleCSV);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+      });
+
+      // Verify confidence is set to the expected constant value (100)
+      expect(result.metadata.confidence).toBe(100);
+    });
+
+    it("should use DEFAULT_CONFIDENCE constant in raw format", async () => {
+      const buffer = Buffer.from(sampleCSV);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "raw",
+      });
+
+      // Verify confidence is set to the expected constant value (100)
+      expect(result.metadata.confidence).toBe(100);
+    });
+
+    it("should use SAMPLE_ROW_COUNT constant (3 rows)", async () => {
+      const largeCSV = `id,value
+1,a
+2,b
+3,c
+4,d
+5,e
+6,f`;
+      const buffer = Buffer.from(largeCSV);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      // Verify sample data has exactly 3 rows (SAMPLE_ROW_COUNT constant)
+      const sampleData = result.metadata.sampleData as unknown[];
+      expect(sampleData).toHaveLength(3);
+    });
+  });
 });
