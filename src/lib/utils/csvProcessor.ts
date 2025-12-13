@@ -369,12 +369,16 @@ export class CSVProcessor {
             }
           }
 
-          // Calculate approximate byte offset
-          const processedLines = hasMetadataLine ? count + 2 : count + 1; // +1 for header
-          const approximateOffset = lines
-            .slice(0, processedLines)
-            .join("\n").length;
-          if (csvString.length > 1000) {
+          // Calculate approximate byte offset for large files
+          // Use original csvString length to determine if we should include offset
+          let approximateOffset: number | undefined;
+          const originalLength = csvString.length;
+          if (originalLength > 1000) {
+            // Approximate offset based on rows processed
+            const processedLines = hasMetadataLine ? count + 2 : count + 1; // +1 for header
+            approximateOffset = lines
+              .slice(0, processedLines)
+              .join("\n").length;
             contextInfo.push(`offset: ~${approximateOffset} bytes`);
           }
 
@@ -383,7 +387,7 @@ export class CSVProcessor {
             error: error.message,
             rowNumber,
             columnNames,
-            approximateOffset,
+            ...(approximateOffset !== undefined && { approximateOffset }),
           });
 
           const enhancedError = new Error(enhancedMessage);
