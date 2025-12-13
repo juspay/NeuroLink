@@ -524,6 +524,41 @@ export class ImageProcessor {
 }
 
 /**
+ * Cache for base64 validation results
+ * Using Map with string keys since WeakMap only works with object keys
+ * Cache stores validation results to avoid redundant encode/decode operations
+ */
+const validationCache = new Map<string, boolean>();
+
+// Maximum cache size to prevent memory leaks
+const MAX_CACHE_SIZE = 1000;
+
+// Number of entries to remove when cache is full (removes extra to avoid frequent evictions)
+const NUM_TO_EVICT = 10;
+
+/**
+ * Clear validation cache - useful for testing and memory cleanup
+ */
+export const clearValidationCache = (): void => {
+  validationCache.clear();
+};
+
+/**
+ * Helper function to evict old entries from validation cache
+ */
+const evictOldEntries = (): void => {
+  if (validationCache.size >= MAX_CACHE_SIZE) {
+    const keysToDelete = Array.from(validationCache.keys()).slice(
+      0,
+      NUM_TO_EVICT,
+    );
+    for (const key of keysToDelete) {
+      validationCache.delete(key);
+    }
+  }
+};
+
+/**
  * Utility functions for image handling
  */
 export const imageUtils = {
@@ -768,6 +803,11 @@ export const imageUtils = {
       // Remove data URI prefix if present
       const cleanBase64 = str.includes(",") ? str.split(",")[1] : str;
 
+      // Check cache first to avoid redundant encode/decode operations
+      if (validationCache.has(cleanBase64)) {
+        return validationCache.get(cleanBase64)!;
+      }
+
       // Empty string check
       if (!cleanBase64 || cleanBase64.length === 0) {
         return false;
@@ -800,13 +840,30 @@ export const imageUtils = {
       }
 
       // 4. ONLY NOW decode if format is valid
+
+      // Check cache first to avoid redundant encode/decode operations
+      if (validationCache.has(cleanBase64)) {
+        return validationCache.get(cleanBase64)!;
+      }
+
       const decoded = Buffer.from(cleanBase64, "base64");
       const reencoded = decoded.toString("base64");
 
       // Remove padding for comparison (base64 can have different padding)
       const normalizeBase64 = (b64: string) => b64.replace(/=+$/, "");
-      return normalizeBase64(cleanBase64) === normalizeBase64(reencoded);
+      const isValid =
+        normalizeBase64(cleanBase64) === normalizeBase64(reencoded);
+
+      // Cache the result with eviction if needed
+      evictOldEntries();
+      validationCache.set(cleanBase64, isValid);
+
+      return isValid;
     } catch {
+      // On exception, cache the false result to avoid repeated processing
+      const cleanBase64 = str.includes(",") ? str.split(",")[1] : str;
+      evictOldEntries();
+      validationCache.set(cleanBase64, false);
       return false;
     }
   },
