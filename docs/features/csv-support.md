@@ -209,6 +209,62 @@ csvOptions: {
 }
 ```
 
+## Column Name Sanitization
+
+NeuroLink automatically sanitizes CSV column names to ensure they are valid JavaScript identifiers. This prevents issues when column names contain special characters, start with numbers, or have spaces.
+
+### Sanitization Rules
+
+- **Trim whitespace**: `"  Name  "` → `"name"`
+- **Convert special characters**: 
+  - `$` → `Dollar` (e.g., `"Price ($)"` → `"priceDollar"`)
+  - `%` → `Percent` (e.g., `"Discount (%)"` → `"discountPercent"`)
+  - `@` → `At` (e.g., `"Email@Address"` → `"emailAtAddress"`)
+  - `#` → `Number` (e.g., `"#Items"` → `"numberItems"`)
+- **Handle ordinal numbers**:
+  - `"1st Place"` → `"firstPlace"`
+  - `"2nd Place"` → `"secondPlace"`
+  - `"3rd Place"` → `"thirdPlace"`
+- **Convert to camelCase**: `"First Name"` → `"firstName"`
+- **Remove invalid characters**: `"Name/Title"` → `"nameTitle"`
+
+### Original Column Names Preserved
+
+Original column names are preserved in the metadata for reference:
+
+```typescript
+const result = await neurolink.generate({
+  input: {
+    text: "Analyze this data",
+    csvFiles: ["sales.csv"],
+  },
+  csvOptions: {
+    formatStyle: "json",
+  },
+});
+
+// Access metadata (when using CSVProcessor directly or through tools)
+const metadata = result.metadata;
+console.log(metadata.columnNames); // Sanitized: ["priceDollar", "firstPlace"]
+console.log(metadata.originalColumnNames); // Original: ["Price ($)", "1st Place"]
+console.log(metadata.columnMapping); // Map: { priceDollar: "Price ($)", firstPlace: "1st Place" }
+```
+
+### Example Transformations
+
+| Original Column Name | Sanitized Column Name |
+|----------------------|------------------------|
+| `Price ($)`          | `priceDollar`          |
+| `1st Place`          | `firstPlace`           |
+| `Name/Title`         | `nameTitle`            |
+| `  Spaces  `         | `spaces`               |
+| `Email@Address`      | `emailAtAddress`       |
+| `Discount (%)`       | `discountPercent`      |
+| `#Items`             | `numberItems`          |
+| `Start-Date`         | `startDate`            |
+
+This ensures all column names are safe to use as object keys and in queries, while preserving the original names for display or reference purposes.
+
 ## File Detection System
 
 NeuroLink uses a **multi-strategy detection system** with confidence scores:
