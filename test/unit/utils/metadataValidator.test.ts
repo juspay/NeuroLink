@@ -284,7 +284,9 @@ describe("metadataValidator", () => {
         type: "audio",
         data: Buffer.from("test"),
         metadata: {
-          transcription: "x".repeat(AUDIO_CONSTRAINTS.MAX_TRANSCRIPTION_LENGTH + 1),
+          transcription: "x".repeat(
+            AUDIO_CONSTRAINTS.MAX_TRANSCRIPTION_LENGTH + 1,
+          ),
         },
       };
 
@@ -401,14 +403,17 @@ describe("metadataValidator", () => {
         type: "video",
         data: Buffer.from("test"),
         metadata: {
-          extractedFrames: new Array(VIDEO_CONSTRAINTS.MAX_EXTRACTED_FRAMES + 1).fill("frame"),
+          extractedFrames: new Array(
+            VIDEO_CONSTRAINTS.MAX_EXTRACTED_FRAMES + 1,
+          ).fill("frame"),
         },
       };
 
       const result = validateVideoMetadata(content);
       expect(result.isValid).toBe(false);
       expect(result.errors[0].field).toBe("metadata.extractedFrames");
-      expect(result.errors[0].message).toContain("memory DoS");
+      expect(result.errors[0].message).toContain("too large");
+      expect(result.errors[0].code).toBe("MAX_LENGTH");
     });
 
     it("should reject non-string items in extractedFrames", () => {
@@ -416,6 +421,7 @@ describe("metadataValidator", () => {
         type: "video",
         data: Buffer.from("test"),
         metadata: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           extractedFrames: ["frame1", 123 as any, "frame3"],
         },
       };
@@ -443,7 +449,9 @@ describe("metadataValidator", () => {
         type: "video",
         data: Buffer.from("test"),
         metadata: {
-          transcription: "x".repeat(VIDEO_CONSTRAINTS.MAX_TRANSCRIPTION_LENGTH + 1),
+          transcription: "x".repeat(
+            VIDEO_CONSTRAINTS.MAX_TRANSCRIPTION_LENGTH + 1,
+          ),
         },
       };
 
@@ -537,15 +545,12 @@ describe("metadataValidator", () => {
       });
 
       it("should reject filename exceeding max length", () => {
-        const result = validateFilename(
-          "a".repeat(256),
-          "filename",
-          255,
-        );
+        const result = validateFilename("a".repeat(256), "filename", 255);
         expect(result).not.toBeNull();
       });
 
       it("should reject non-string filename", () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = validateFilename(123 as any, "filename", 255);
         expect(result).not.toBeNull();
       });

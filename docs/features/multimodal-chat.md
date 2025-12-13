@@ -213,12 +213,12 @@ const imageContent: ImageContent = {
   data: imageBuffer,
   metadata: {
     dimensions: {
-      width: 1920,  // 1-16384 pixels
-      height: 1080  // 1-16384 pixels
+      width: 1920, // 1-16384 pixels
+      height: 1080, // 1-16384 pixels
     },
-    filename: "photo.jpg",  // Max 255 characters
-    quality: "high"  // "low" | "high" | "auto"
-  }
+    filename: "photo.jpg", // Max 255 characters
+    quality: "high", // "low" | "high" | "auto"
+  },
 };
 
 const result = validateImageMetadata(imageContent);
@@ -234,13 +234,13 @@ const audioContent: AudioContent = {
   type: "audio",
   data: audioBuffer,
   metadata: {
-    duration: 120.5,      // 0.001-86400 seconds (24 hours max)
-    sampleRate: 48000,    // 8000-192000 Hz
-    channels: 2,          // 1-8 channels
-    language: "en",       // ISO 639-1 (2-letter code)
+    duration: 120.5, // 0.001-86400 seconds (24 hours max)
+    sampleRate: 48000, // 8000-192000 Hz
+    channels: 2, // 1-8 channels
+    language: "en", // ISO 639-1 (2-letter code)
     transcription: "...", // Max 1M characters
-    filename: "audio.mp3" // Max 255 characters
-  }
+    filename: "audio.mp3", // Max 255 characters
+  },
 };
 ```
 
@@ -279,7 +279,7 @@ const result = validateVideoMetadata(videoContent);
 
 if (!result.isValid) {
   // Handle validation errors
-  result.errors.forEach(error => {
+  result.errors.forEach((error) => {
     console.error(`${error.field}: ${error.message}`);
     console.log(`Suggestions: ${error.suggestions?.join(", ")}`);
   });
@@ -309,8 +309,8 @@ const badImage: ImageContent = {
   type: "image",
   data: buffer,
   metadata: {
-    dimensions: { width: -1920, height: -1080 }  // Negative values
-  }
+    dimensions: { width: -1920, height: -1080 }, // Negative values
+  },
 };
 
 // ❌ This will be rejected (DoS attack)
@@ -318,8 +318,8 @@ const badVideo: VideoContent = {
   type: "video",
   data: buffer,
   metadata: {
-    extractedFrames: new Array(1000000).fill("frame")  // Too many frames
-  }
+    extractedFrames: new Array(1000000).fill("frame"), // Too many frames
+  },
 };
 
 // ✅ This is valid
@@ -328,8 +328,8 @@ const goodImage: ImageContent = {
   data: buffer,
   metadata: {
     dimensions: { width: 1920, height: 1080 },
-    filename: "photo.jpg"
-  }
+    filename: "photo.jpg",
+  },
 };
 ```
 
