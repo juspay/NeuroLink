@@ -188,13 +188,160 @@ for await (const chunk of stream) {
 - **Loop sessions** – Images uploaded during `loop` are cached per session; call `clear session` to reset.
 - **Alt text** – Add alt text to images for accessibility; the text is included as context for AI models.
 
+## Metadata Validation
+
+!!! info "Security & Validation"
+NeuroLink validates multimodal content metadata to prevent security issues like memory DoS attacks and invalid values. All metadata constraints are documented and enforced at runtime.
+
+### Supported Content Types
+
+NeuroLink provides comprehensive validation for:
+
+- **Image Content** - Validates dimensions, quality settings, and filenames
+- **Audio Content** - Validates duration, sample rates, channels, and language codes
+- **Video Content** - Validates dimensions, frame rates, codecs, and extracted frames
+
+### Validation Constraints
+
+#### Image Metadata
+
+```typescript
+import { validateImageMetadata } from "@juspay/neurolink/utils/metadataValidator";
+
+const imageContent: ImageContent = {
+  type: "image",
+  data: imageBuffer,
+  metadata: {
+    dimensions: {
+      width: 1920,  // 1-16384 pixels
+      height: 1080  // 1-16384 pixels
+    },
+    filename: "photo.jpg",  // Max 255 characters
+    quality: "high"  // "low" | "high" | "auto"
+  }
+};
+
+const result = validateImageMetadata(imageContent);
+if (!result.isValid) {
+  console.error(result.errors);
+}
+```
+
+#### Audio Metadata
+
+```typescript
+const audioContent: AudioContent = {
+  type: "audio",
+  data: audioBuffer,
+  metadata: {
+    duration: 120.5,      // 0.001-86400 seconds (24 hours max)
+    sampleRate: 48000,    // 8000-192000 Hz
+    channels: 2,          // 1-8 channels
+    language: "en",       // ISO 639-1 (2-letter code)
+    transcription: "...", // Max 1M characters
+    filename: "audio.mp3" // Max 255 characters
+  }
+};
+```
+
+#### Video Metadata
+
+```typescript
+const videoContent: VideoContent = {
+  type: "video",
+  data: videoBuffer,
+  metadata: {
+    duration: 300,             // 0.001-86400 seconds
+    dimensions: {
+      width: 1920,             // 1-16384 pixels
+      height: 1080             // 1-16384 pixels
+    },
+    frameRate: 30,             // 1-240 fps
+    codec: "h264",             // Max 50 characters
+    extractedFrames: [...],    // Max 1000 items (DoS protection)
+    transcription: "...",      // Max 1M characters
+    filename: "video.mp4"      // Max 255 characters
+  }
+};
+```
+
+### Runtime Validation
+
+```typescript
+import {
+  validateImageMetadata,
+  validateAudioMetadata,
+  validateVideoMetadata,
+} from "@juspay/neurolink/utils/metadataValidator";
+
+// Validate before processing
+const result = validateVideoMetadata(videoContent);
+
+if (!result.isValid) {
+  // Handle validation errors
+  result.errors.forEach(error => {
+    console.error(`${error.field}: ${error.message}`);
+    console.log(`Suggestions: ${error.suggestions?.join(", ")}`);
+  });
+}
+
+// Check for warnings
+if (result.warnings.length > 0) {
+  console.warn("Warnings:", result.warnings);
+}
+```
+
+### Security Protections
+
+The metadata validator prevents several security issues:
+
+- **Negative dimensions** - Rejects negative or zero width/height values
+- **Memory DoS attacks** - Limits extractedFrames array to 1000 items max
+- **Invalid ranges** - Enforces reasonable bounds for all numeric fields
+- **Unbounded strings** - Limits filename and transcription lengths
+- **Invalid formats** - Validates language codes against ISO 639-1 standard
+
+### Validation Errors
+
+```typescript
+// ❌ This will be rejected
+const badImage: ImageContent = {
+  type: "image",
+  data: buffer,
+  metadata: {
+    dimensions: { width: -1920, height: -1080 }  // Negative values
+  }
+};
+
+// ❌ This will be rejected (DoS attack)
+const badVideo: VideoContent = {
+  type: "video",
+  data: buffer,
+  metadata: {
+    extractedFrames: new Array(1000000).fill("frame")  // Too many frames
+  }
+};
+
+// ✅ This is valid
+const goodImage: ImageContent = {
+  type: "image",
+  data: buffer,
+  metadata: {
+    dimensions: { width: 1920, height: 1080 },
+    filename: "photo.jpg"
+  }
+};
+```
+
 ## Best Practices
 
 - Provide short captions in the prompt describing each image (e.g., "see `before.png` on the left").
 - **Use alt text** for images that convey important information, especially for accessibility compliance.
+- **Validate metadata** before processing to catch errors early and prevent security issues.
 - Combine analytics + evaluation to benchmark multimodal quality before rolling out widely.
 - Cache remote assets locally if you reuse them frequently to avoid repeated downloads.
 - Stream when presenting content to end-users; use `generate` when you need structured JSON output.
+- **Limit extracted frames** to reasonable numbers (under 1000) to avoid memory issues.
 
 ## CSV File Support
 

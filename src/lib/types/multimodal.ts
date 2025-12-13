@@ -68,9 +68,29 @@ export type ImageContent = {
     | "image/bmp"
     | "image/tiff";
   metadata?: {
+    /** Human-readable description of the image content */
     description?: string;
+    /** Image quality setting for processing */
     quality?: "low" | "high" | "auto";
-    dimensions?: { width: number; height: number };
+    /** Image dimensions in pixels */
+    dimensions?: {
+      /**
+       * Image width in pixels
+       * @minimum 1
+       * @maximum 16384
+       */
+      width: number;
+      /**
+       * Image height in pixels
+       * @minimum 1
+       * @maximum 16384
+       */
+      height: number;
+    };
+    /**
+     * Original filename
+     * @maxLength 255
+     */
     filename?: string;
   };
 };
@@ -135,12 +155,39 @@ export type AudioContent = {
     | "audio/flac" // FLAC
     | "audio/mp4"; // M4A
   metadata?: {
+    /**
+     * Original filename
+     * @maxLength 255
+     */
     filename?: string;
-    duration?: number; // in seconds
+    /**
+     * Audio duration in seconds
+     * @minimum 0.001
+     * @maximum 86400
+     */
+    duration?: number;
+    /**
+     * Sample rate in Hz (e.g., 44100, 48000)
+     * @minimum 8000
+     * @maximum 192000
+     */
     sampleRate?: number;
+    /**
+     * Number of audio channels
+     * @minimum 1
+     * @maximum 8
+     */
     channels?: number;
-    transcription?: string; // Optional pre-computed transcription
-    language?: string; // ISO 639-1 code (e.g., "en", "es")
+    /**
+     * Pre-computed transcription text
+     * @maxLength 1000000
+     */
+    transcription?: string;
+    /**
+     * ISO 639-1 language code (e.g., "en", "es")
+     * @pattern ^[a-z]{2}$
+     */
+    language?: string;
   };
 };
 
@@ -175,16 +222,53 @@ export type VideoContent = {
     | "video/x-msvideo" // AVI
     | "video/x-matroska"; // MKV
   metadata?: {
+    /**
+     * Original filename
+     * @maxLength 255
+     */
     filename?: string;
-    duration?: number; // in seconds
+    /**
+     * Video duration in seconds
+     * @minimum 0.001
+     * @maximum 86400
+     */
+    duration?: number;
+    /** Video dimensions in pixels */
     dimensions?: {
+      /**
+       * Video width in pixels
+       * @minimum 1
+       * @maximum 16384
+       */
       width: number;
+      /**
+       * Video height in pixels
+       * @minimum 1
+       * @maximum 16384
+       */
       height: number;
     };
+    /**
+     * Video frame rate (frames per second)
+     * @minimum 1
+     * @maximum 240
+     */
     frameRate?: number;
+    /**
+     * Video codec identifier (e.g., "h264", "vp9")
+     * @maxLength 50
+     */
     codec?: string;
-    extractedFrames?: string[]; // Base64 or URLs of extracted frames
-    transcription?: string; // Optional transcription of audio track
+    /**
+     * Array of extracted frame data (Base64 or URLs)
+     * @maxItems 1000
+     */
+    extractedFrames?: string[];
+    /**
+     * Transcription of audio track
+     * @maxLength 1000000
+     */
+    transcription?: string;
   };
 };
 
