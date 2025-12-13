@@ -60,7 +60,7 @@ describe("PDFProcessor - Password Protection", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should support RC4 encryption (weak crypto)", async () => {
+    it("should support RC4 encryption", async () => {
       const pdfPath = path.join(fixturesDir, "encrypted-rc4.pdf");
       const pdfBuffer = fs.readFileSync(pdfPath);
 
@@ -74,7 +74,7 @@ describe("PDFProcessor - Password Protection", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should support AES-128 encryption", async () => {
+    it("should support AES-256 encryption with different password", async () => {
       const pdfPath = path.join(fixturesDir, "encrypted-aes128.pdf");
       const pdfBuffer = fs.readFileSync(pdfPath);
 

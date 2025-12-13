@@ -338,6 +338,8 @@ export class PDFProcessor {
         error instanceof Error ? error.message : String(error);
 
       // Handle password-related errors with clear messages
+      // Note: Error message strings are specific to pdfjs-dist v5.4.296
+      // These error messages come from pdfjs-dist's internal error handling
       if (errorMessage.includes("No password given")) {
         logger.error(
           `[PDF→Image] ❌ Password-protected PDF requires authentication`,
