@@ -14,6 +14,96 @@ import type {
 } from "../types/fileTypes.js";
 
 /**
+ * Sanitize column name to be a valid JavaScript identifier
+ * Handles special characters, spaces, and names starting with numbers
+ * Converts to camelCase for consistency
+ *
+ * @param columnName - Original column name from CSV
+ * @returns Sanitized column name safe to use as object key
+ *
+ * @example
+ * sanitizeColumnName("Price ($)") // => "priceDollar"
+ * sanitizeColumnName("1st Place") // => "firstPlace"
+ * sanitizeColumnName("Name/Title") // => "nameTitle"
+ * sanitizeColumnName("  Spaces  ") // => "spaces"
+ */
+function sanitizeColumnName(columnName: string): string {
+  // Trim whitespace
+  let sanitized = columnName.trim();
+
+  // Handle empty column names
+  if (!sanitized) {
+    return "column";
+  }
+
+  // Convert special patterns to words (preserve as separate words for camelCase)
+  sanitized = sanitized
+    .replace(/\$/g, " Dollar ")
+    .replace(/€/g, " Euro ")
+    .replace(/£/g, " Pound ")
+    .replace(/¥/g, " Yen ")
+    .replace(/%/g, " Percent ")
+    .replace(/#/g, " Number ")
+    .replace(/&/g, " And ")
+    .replace(/@/g, " At ");
+
+  // Handle number prefixes (e.g., "1st" -> "first", "2nd" -> "second")
+  sanitized = sanitized
+    .replace(/^1st\b/i, "first")
+    .replace(/^2nd\b/i, "second")
+    .replace(/^3rd\b/i, "third")
+    .replace(/^(\d+)th\b/i, "$1th")
+    .replace(/^(\d+)\b/, "num$1");
+
+  // Remove or replace invalid characters (keep only alphanumeric and spaces)
+  sanitized = sanitized.replace(/[^a-zA-Z0-9\s]/g, " ");
+
+  // Split on whitespace and convert to camelCase
+  const words = sanitized
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
+    .map((word, index) => {
+      const lower = word.toLowerCase();
+      if (index === 0) {
+        return lower;
+      }
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    });
+
+  // Join words
+  const result = words.join("");
+
+  // Ensure result starts with letter or underscore (fallback if starts with number)
+  if (result && /^[0-9]/.test(result)) {
+    return "col" + result.charAt(0).toUpperCase() + result.slice(1);
+  }
+
+  return result || "column";
+}
+
+/**
+ * Sanitize row object keys (column names)
+ * Creates a new object with sanitized keys and stores original column names
+ *
+ * @param row - Original row object from csv-parser
+ * @param columnMapping - Map of original to sanitized column names
+ * @returns Row with sanitized column names
+ */
+function sanitizeRowKeys(
+  row: Record<string, unknown>,
+  columnMapping: Map<string, string>,
+): Record<string, unknown> {
+  const sanitizedRow: Record<string, unknown> = {};
+
+  for (const [originalKey, value] of Object.entries(row)) {
+    const sanitizedKey = columnMapping.get(originalKey) || originalKey;
+    sanitizedRow[sanitizedKey] = value;
+  }
+
+  return sanitizedRow;
+}
+
+/**
  * Detect if first line is CSV metadata (not actual data/headers)
  * Common patterns:
  * - Excel separator line: "SEP=,"
@@ -131,7 +221,10 @@ export class CSVProcessor {
     }
 
     // Parse CSV for JSON and Markdown formats only
-    const rows = await this.parseCSVString(csvString, maxRows);
+    const { rows, columnMapping } = await this.parseCSVStringWithMapping(
+      csvString,
+      maxRows,
+    );
 
     // Extract metadata from parsed results
     const rowCount = rows.length;
@@ -147,6 +240,13 @@ export class CSVProcessor {
       sampleDataFormat,
       includeHeaders,
     );
+
+    // Build original column names and mapping for metadata
+    const originalColumnNames = Array.from(columnMapping.keys());
+    const columnMappingObj: Record<string, string> = {};
+    columnMapping.forEach((sanitized, original) => {
+      columnMappingObj[sanitized] = original;
+    });
 
     // Format parsed data
     const formatted = this.formatForLLM(rows, formatStyle, includeHeaders);
@@ -166,6 +266,8 @@ export class CSVProcessor {
         rowCount,
         columnCount,
         columnNames,
+        originalColumnNames,
+        columnMapping: columnMappingObj,
         sampleData,
         hasEmptyColumns,
       },
@@ -218,6 +320,7 @@ export class CSVProcessor {
       const rows: unknown[] = [];
       let count = 0;
       let lineCount = 0;
+      let columnMapping: Map<string, string> | null = null;
 
       const source = fs.createReadStream(filePath, { encoding: "utf-8" });
       const parser = csvParser();
@@ -235,7 +338,21 @@ export class CSVProcessor {
             return;
           }
 
-          rows.push(row);
+          // Build column mapping from first row
+          if (!columnMapping) {
+            columnMapping = new Map();
+            const originalColumns = Object.keys(row as Record<string, unknown>);
+            for (const col of originalColumns) {
+              columnMapping.set(col, sanitizeColumnName(col));
+            }
+          }
+
+          // Sanitize row keys
+          const sanitizedRow = sanitizeRowKeys(
+            row as Record<string, unknown>,
+            columnMapping,
+          );
+          rows.push(sanitizedRow);
           count++;
 
           if (count >= clampedMaxRows) {
@@ -262,12 +379,28 @@ export class CSVProcessor {
    *
    * @param csvString - CSV data as string
    * @param maxRows - Maximum rows to parse (default: 1000)
-   * @returns Array of row objects
+   * @returns Array of row objects with sanitized column names
    */
   static async parseCSVString(
     csvString: string,
     maxRows: number = 1000,
   ): Promise<unknown[]> {
+    const result = await this.parseCSVStringWithMapping(csvString, maxRows);
+    return result.rows;
+  }
+
+  /**
+   * Parse CSV string and return rows with column mapping
+   * Internal method that returns both sanitized rows and original->sanitized column mapping
+   *
+   * @param csvString - CSV data as string
+   * @param maxRows - Maximum rows to parse (default: 1000)
+   * @returns Object with rows and column mapping
+   */
+  private static async parseCSVStringWithMapping(
+    csvString: string,
+    maxRows: number = 1000,
+  ): Promise<{ rows: unknown[]; columnMapping: Map<string, string> }> {
     const clampedMaxRows = Math.max(1, Math.min(10000, maxRows));
 
     // Detect and skip metadata line
@@ -278,6 +411,7 @@ export class CSVProcessor {
     return new Promise((resolve, reject) => {
       const rows: unknown[] = [];
       let count = 0;
+      let columnMapping: Map<string, string> | null = null;
 
       const source = Readable.from([csvData]);
       const parser = csvParser();
@@ -290,7 +424,21 @@ export class CSVProcessor {
       source
         .pipe(parser)
         .on("data", (row: unknown) => {
-          rows.push(row);
+          // Build column mapping from first row
+          if (!columnMapping) {
+            columnMapping = new Map();
+            const originalColumns = Object.keys(row as Record<string, unknown>);
+            for (const col of originalColumns) {
+              columnMapping.set(col, sanitizeColumnName(col));
+            }
+          }
+
+          // Sanitize row keys
+          const sanitizedRow = sanitizeRowKeys(
+            row as Record<string, unknown>,
+            columnMapping,
+          );
+          rows.push(sanitizedRow);
           count++;
 
           if (count >= clampedMaxRows) {
@@ -298,11 +446,11 @@ export class CSVProcessor {
               `[CSVProcessor] Reached row limit ${clampedMaxRows}, stopping parse`,
             );
             abort();
-            resolve(rows);
+            resolve({ rows, columnMapping: columnMapping || new Map() });
           }
         })
         .on("end", () => {
-          resolve(rows);
+          resolve({ rows, columnMapping: columnMapping || new Map() });
         })
         .on("error", (error: Error) => {
           logger.error("[CSVProcessor] Parsing failed:", error);

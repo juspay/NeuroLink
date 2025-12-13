@@ -47,6 +47,8 @@ export type FileProcessingResult = {
     rowCount?: number;
     columnCount?: number;
     columnNames?: string[];
+    originalColumnNames?: string[]; // Original column names before sanitization
+    columnMapping?: Record<string, string>; // Map of sanitized -> original names
     sampleData?: string | unknown[];
     hasEmptyColumns?: boolean;
     // PDF-specific metadata

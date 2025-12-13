@@ -185,4 +185,189 @@ Charlie,35,Chicago`;
       expect(csvOutput.split("\n")[0]).toBe("Alice,30,New York");
     });
   });
+
+  describe("Column Name Sanitization", () => {
+    it("should sanitize column names with special characters", async () => {
+      const csvWithSpecialChars = `Price ($),Discount (%),Email@Address
+100,10,test@example.com
+200,15,user@example.com`;
+      const buffer = Buffer.from(csvWithSpecialChars);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("priceDollar", "100");
+      expect(sampleData[0]).toHaveProperty("discountPercent", "10");
+      expect(sampleData[0]).toHaveProperty("emailAtAddress", "test@example.com");
+    });
+
+    it("should sanitize column names starting with numbers", async () => {
+      const csvWithNumbers = `1st Place,2nd Place,3rd Place,4th Place
+Gold,Silver,Bronze,Participant
+Winner,Runner-up,Third,Fourth`;
+      const buffer = Buffer.from(csvWithNumbers);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("firstPlace", "Gold");
+      expect(sampleData[0]).toHaveProperty("secondPlace", "Silver");
+      expect(sampleData[0]).toHaveProperty("thirdPlace", "Bronze");
+      expect(sampleData[0]).toHaveProperty("col4thPlace", "Participant");
+    });
+
+    it("should trim whitespace from column names", async () => {
+      const csvWithSpaces = `  Name  ,  Age  ,  City  
+Alice,30,New York
+Bob,25,Los Angeles`;
+      const buffer = Buffer.from(csvWithSpaces);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("name", "Alice");
+      expect(sampleData[0]).toHaveProperty("age", "30");
+      expect(sampleData[0]).toHaveProperty("city", "New York");
+      expect(sampleData[0]).not.toHaveProperty("  Name  ");
+    });
+
+    it("should handle column names with slashes and hyphens", async () => {
+      const csvWithSlashes = `Name/Title,Start-Date,End/Date
+CEO/Manager,2021-01-01,2022/12/31
+VP/Director,2020-06-15,2023/06/30`;
+      const buffer = Buffer.from(csvWithSlashes);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("nameTitle", "CEO/Manager");
+      expect(sampleData[0]).toHaveProperty("startDate", "2021-01-01");
+      expect(sampleData[0]).toHaveProperty("endDate", "2022/12/31");
+    });
+
+    it("should convert to camelCase properly", async () => {
+      const csvMixedCase = `First Name,Last Name,Phone Number
+John,Doe,555-1234
+Jane,Smith,555-5678`;
+      const buffer = Buffer.from(csvMixedCase);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("firstName", "John");
+      expect(sampleData[0]).toHaveProperty("lastName", "Doe");
+      expect(sampleData[0]).toHaveProperty("phoneNumber", "555-1234");
+    });
+
+    it("should handle empty column names with fallback", async () => {
+      const csvWithEmpty = `name,,city
+Alice,30,New York`;
+      const buffer = Buffer.from(csvWithEmpty);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("name", "Alice");
+      expect(sampleData[0]).toHaveProperty("column", "30");
+      expect(sampleData[0]).toHaveProperty("city", "New York");
+    });
+
+    it("should preserve original column names in metadata", async () => {
+      const csvWithSpecialChars = `Price ($),1st Place,Name/Title
+100,Gold,CEO
+200,Silver,Manager`;
+      const buffer = Buffer.from(csvWithSpecialChars);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+      });
+
+      expect(result.metadata.originalColumnNames).toEqual([
+        "Price ($)",
+        "1st Place",
+        "Name/Title",
+      ]);
+      expect(result.metadata.columnMapping).toEqual({
+        priceDollar: "Price ($)",
+        firstPlace: "1st Place",
+        nameTitle: "Name/Title",
+      });
+    });
+
+    it("should maintain sanitized column names in columnNames field", async () => {
+      const csvWithSpecialChars = `Price ($),1st Place,Name/Title
+100,Gold,CEO`;
+      const buffer = Buffer.from(csvWithSpecialChars);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+      });
+
+      expect(result.metadata.columnNames).toEqual([
+        "priceDollar",
+        "firstPlace",
+        "nameTitle",
+      ]);
+    });
+
+    it("should handle complex combination of special characters", async () => {
+      const complexCSV = `Price ($),#Items,Start/End Time,% Complete,User@Domain
+$100,5,9:00/17:00,75%,admin@example.com
+$200,10,8:00/16:00,90%,user@example.com`;
+      const buffer = Buffer.from(complexCSV);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("priceDollar", "$100");
+      expect(sampleData[0]).toHaveProperty("numberItems", "5");
+      expect(sampleData[0]).toHaveProperty("startEndTime", "9:00/17:00");
+      expect(sampleData[0]).toHaveProperty("percentComplete", "75%");
+      expect(sampleData[0]).toHaveProperty("userAtDomain", "admin@example.com");
+    });
+
+    it("should not modify already valid column names", async () => {
+      const validCSV = `firstName,lastName,phoneNumber
+John,Doe,555-1234
+Jane,Smith,555-5678`;
+      const buffer = Buffer.from(validCSV);
+      const result = await CSVProcessor.process(buffer, {
+        formatStyle: "json",
+        sampleDataFormat: "object",
+      });
+
+      const sampleData = result.metadata.sampleData as Array<
+        Record<string, unknown>
+      >;
+      expect(sampleData[0]).toHaveProperty("firstName", "John");
+      expect(sampleData[0]).toHaveProperty("lastName", "Doe");
+      expect(sampleData[0]).toHaveProperty("phoneNumber", "555-1234");
+    });
+  });
 });
