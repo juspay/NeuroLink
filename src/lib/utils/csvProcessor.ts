@@ -104,6 +104,32 @@ function sanitizeRowKeys(
 }
 
 /**
+ * Count field separators (commas outside quotes) in a CSV line
+ * Properly handles quoted fields with commas inside
+ */
+function countFieldSeparators(line: string): number {
+  let count = 0;
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      // Check if this is an escaped quote ""
+      if (i + 1 < line.length && line[i + 1] === '"') {
+        i++; // Skip the next quote
+        continue;
+      }
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+/**
  * Detect if first line is CSV metadata (not actual data/headers)
  * Common patterns:
  * - Excel separator line: "SEP=,"
@@ -122,8 +148,9 @@ function isMetadataLine(lines: string[]): boolean {
     return true;
   }
 
-  const firstCommaCount = (firstLine.match(/,/g) || []).length;
-  const secondCommaCount = (secondLine.match(/,/g) || []).length;
+  // Use proper CSV field counting (handles quotes)
+  const firstCommaCount = countFieldSeparators(firstLine);
+  const secondCommaCount = countFieldSeparators(secondLine);
 
   if (firstCommaCount === 0 && secondCommaCount > 0) {
     return true;

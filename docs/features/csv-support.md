@@ -216,7 +216,7 @@ NeuroLink automatically sanitizes CSV column names to ensure they are valid Java
 ### Sanitization Rules
 
 - **Trim whitespace**: `"  Name  "` → `"name"`
-- **Convert special characters**: 
+- **Convert special characters**:
   - `$` → `Dollar` (e.g., `"Price ($)"` → `"priceDollar"`)
   - `%` → `Percent` (e.g., `"Discount (%)"` → `"discountPercent"`)
   - `@` → `At` (e.g., `"Email@Address"` → `"emailAtAddress"`)
@@ -253,15 +253,15 @@ console.log(metadata.columnMapping); // Map: { priceDollar: "Price ($)", firstPl
 ### Example Transformations
 
 | Original Column Name | Sanitized Column Name |
-|----------------------|------------------------|
-| `Price ($)`          | `priceDollar`          |
-| `1st Place`          | `firstPlace`           |
-| `Name/Title`         | `nameTitle`            |
-| `  Spaces  `         | `spaces`               |
-| `Email@Address`      | `emailAtAddress`       |
-| `Discount (%)`       | `discountPercent`      |
-| `#Items`             | `numberItems`          |
-| `Start-Date`         | `startDate`            |
+| -------------------- | --------------------- |
+| `Price ($)`          | `priceDollar`         |
+| `1st Place`          | `firstPlace`          |
+| `Name/Title`         | `nameTitle`           |
+| `  Spaces  `         | `spaces`              |
+| `Email@Address`      | `emailAtAddress`      |
+| `Discount (%)`       | `discountPercent`     |
+| `#Items`             | `numberItems`         |
+| `Start-Date`         | `startDate`           |
 
 This ensures all column names are safe to use as object keys and in queries, while preserving the original names for display or reference purposes.
 
