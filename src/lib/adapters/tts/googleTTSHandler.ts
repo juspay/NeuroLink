@@ -2,41 +2,52 @@
  * Google Cloud Text-to-Speech Handler
  *
  * Handler for Google Cloud Text-to-Speech API integration.
- * Supports Neural2 and WaveNet voice models with 220+ voices across 40+ languages.
  *
  * @module adapters/tts/googleTTSHandler
  * @see https://cloud.google.com/text-to-speech/docs
  */
-
-import type { TTSHandler } from "../../utils/ttsProcessor.js";
-import type { TTSOptions, TTSResult, TTSVoice } from "../../types/ttsTypes.js";
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
+import { TTSError, TTS_ERROR_CODES } from "../../utils/ttsProcessor.js";
+import type { TTSHandler } from "../../utils/ttsProcessor.js";
+import type {
+  GoogleAudioEncoding,
+  TTSOptions,
+  TTSResult,
+  TTSVoice,
+} from "../../types/ttsTypes.js";
+import { ErrorCategory, ErrorSeverity } from "../../constants/enums.js";
 
-/**
- * Google Cloud TTS handler implementation
- *
- * Integrates with Google Cloud Text-to-Speech API for voice synthesis.
- * Supports authentication via:
- *   - Explicit service account JSON key path
- *   - GOOGLE_APPLICATION_CREDENTIALS environment variable
- */
 export class GoogleTTSHandler implements TTSHandler {
   private client: TextToSpeechClient | null = null;
 
   /**
-   * Maximum text length supported by Google Cloud TTS (5000 bytes)
-   * Different providers have different limits
+   * Google Cloud TTS maximum input size.
+   * ~5000 bytes INCLUDING SSML tags.
    */
   private static readonly DEFAULT_MAX_TEXT_LENGTH = 5000;
-  maxTextLength: number = GoogleTTSHandler.DEFAULT_MAX_TEXT_LENGTH;
 
   /**
-   * Constructor for GoogleTTSHandler
+   * Default timeout for Google Cloud TTS API calls (milliseconds)
    *
-   * @param credentialsPath - Optional path to Google Cloud credentials JSON file
+   * Google typically responds within:
+   * - 1–5 seconds for short or normal text
+   * - 5–10 seconds for longer text or Neural2 voices
    */
+  private static readonly DEFAULT_API_TIMEOUT_MS = 30 * 1000;
+
+  /**
+   * Maximum text length supported by Google Cloud TTS (in bytes).
+   *
+   * NOTE:
+   * Validation against this limit is performed by the shared TTS processor
+   * before invoking provider handlers, not inside this class.
+   */
+  public readonly maxTextLength: number =
+    GoogleTTSHandler.DEFAULT_MAX_TEXT_LENGTH;
+
   constructor(credentialsPath?: string) {
     const path = credentialsPath ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
     if (path) {
       this.client = new TextToSpeechClient({ keyFilename: path });
     }
@@ -48,7 +59,7 @@ export class GoogleTTSHandler implements TTSHandler {
    * @returns True if provider can generate TTS
    */
   isConfigured(): boolean {
-    throw new Error("Not implemented yet");
+    return this.client !== null;
   }
 
   /**
@@ -56,6 +67,7 @@ export class GoogleTTSHandler implements TTSHandler {
    *
    * Note: This method is optional in the TTSHandler interface, but Google Cloud TTS
    * fully implements it to provide comprehensive voice discovery capabilities.
+   * Will be Implemented in ISSUE - TTS-014
    *
    * @param languageCode - Optional language filter (e.g., "en-US")
    * @returns List of available voices
@@ -67,11 +79,176 @@ export class GoogleTTSHandler implements TTSHandler {
   /**
    * Generate audio from text using provider-specific TTS API
    *
-   * @param text - Text to convert to speech
+   * @param text - Text or SSML to convert to speech
    * @param options - TTS configuration options
    * @returns Audio buffer with metadata
    */
-  async synthesize(_text: string, _options: TTSOptions): Promise<TTSResult> {
-    throw new Error("Not implemented yet");
+  async synthesize(text: string, options: TTSOptions): Promise<TTSResult> {
+    if (!this.client) {
+      throw new TTSError({
+        code: TTS_ERROR_CODES.PROVIDER_NOT_CONFIGURED,
+        message:
+          "Google Cloud TTS client not initialized. Set GOOGLE_APPLICATION_CREDENTIALS or pass credentials path.",
+        category: ErrorCategory.CONFIGURATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
+    }
+
+    const startTime = Date.now();
+
+    try {
+      const isSSML = text.startsWith("<speak>") && text.endsWith("</speak>");
+      // Note: This validation only checks for the presence of opening and closing <speak> tags.
+      // Other SSML validation, such as malformed structure, unclosed inner tags, or invalid elements,
+      // will be handled by Google's API.
+      if (
+        (text.startsWith("<speak>") && !text.endsWith("</speak>")) ||
+        (!text.startsWith("<speak>") && text.endsWith("</speak>"))
+      ) {
+        throw new TTSError({
+          code: TTS_ERROR_CODES.INVALID_INPUT,
+          message:
+            "Malformed SSML: missing opening <speak> or closing </speak> tag.",
+          category: ErrorCategory.VALIDATION,
+          severity: ErrorSeverity.MEDIUM,
+          retriable: false,
+        });
+      }
+
+      const voiceId = options.voice ?? "en-US-Neural2-C";
+
+      const languageCode = this.extractLanguageCode(voiceId);
+      const audioEncoding = this.mapFormat(options.format ?? "mp3");
+
+      const request = {
+        input: isSSML ? { ssml: text } : { text },
+        voice: {
+          name: voiceId,
+          languageCode,
+        },
+        audioConfig: {
+          audioEncoding,
+          speakingRate: options.speed ?? 1.0,
+          pitch: options.pitch ?? 0.0,
+          volumeGainDb: options.volumeGainDb ?? 0.0,
+        },
+      };
+
+      const [response] = await this.client.synthesizeSpeech(request, {
+        timeout: GoogleTTSHandler.DEFAULT_API_TIMEOUT_MS,
+      });
+
+      const audioContent = response.audioContent;
+
+      if (!audioContent) {
+        throw new TTSError({
+          code: TTS_ERROR_CODES.SYNTHESIS_FAILED,
+          message: "Google TTS returned empty audio content",
+          category: ErrorCategory.EXECUTION,
+          severity: ErrorSeverity.HIGH,
+          retriable: true,
+        });
+      }
+
+      const buffer =
+        audioContent instanceof Uint8Array
+          ? Buffer.from(audioContent)
+          : typeof audioContent === "string"
+            ? Buffer.from(audioContent, "base64")
+            : (() => {
+                throw new TTSError({
+                  code: TTS_ERROR_CODES.SYNTHESIS_FAILED,
+                  message:
+                    "Unsupported audioContent type returned by Google TTS",
+                  category: ErrorCategory.EXECUTION,
+                  severity: ErrorSeverity.HIGH,
+                  retriable: true,
+                  context: { type: typeof audioContent },
+                });
+              })();
+
+      const latency = Date.now() - startTime;
+
+      return {
+        buffer,
+        format: options.format ?? "mp3",
+        size: buffer.length,
+        voice: voiceId,
+        metadata: {
+          latency,
+          provider: "google-ai",
+        },
+      };
+    } catch (err) {
+      if (err instanceof TTSError) {
+        throw err;
+      }
+
+      const latency = Date.now() - startTime;
+      const message = err instanceof Error ? err.message : "Unknown error";
+      throw new TTSError({
+        code: TTS_ERROR_CODES.SYNTHESIS_FAILED,
+        message: `Google TTS failed after ${latency}ms: ${message}`,
+        category: ErrorCategory.EXECUTION,
+        severity: ErrorSeverity.HIGH,
+        retriable: true,
+        context: { latency },
+        originalError: err instanceof Error ? err : undefined,
+      });
+    }
+  }
+
+  /**
+   * Extract language code from a Google Cloud voice name
+   *
+   * Example:
+   *   "en-US-Neural2-C" -> "en-US"
+   *
+   * @param voiceId - Google Cloud voice identifier
+   * @returns Language code compatible with Google TTS
+   */
+  private extractLanguageCode(voiceId: string): string {
+    const parts = voiceId.split("-");
+    if (parts.length >= 2) {
+      return `${parts[0]}-${parts[1]}`;
+    } else {
+      throw new TTSError({
+        code: TTS_ERROR_CODES.INVALID_INPUT,
+        message: `Invalid Google TTS voiceId format: "${voiceId}". Expected format like "en-US-Neural2-C".`,
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.MEDIUM,
+        retriable: false,
+        context: { voiceId },
+      });
+    }
+  }
+
+  /**
+   * Map application audio format to Google Cloud audio encoding
+   *
+   * @param format - Audio format requested by the caller
+   * @returns Google Cloud AudioEncoding enum value
+   * @throws Error if format is unsupported
+   */
+  private mapFormat(format: string): GoogleAudioEncoding {
+    switch (format.toLowerCase()) {
+      case "mp3":
+        return "MP3";
+      case "wav":
+        return "LINEAR16";
+      case "ogg":
+      case "opus":
+        return "OGG_OPUS";
+      default:
+        throw new TTSError({
+          code: TTS_ERROR_CODES.INVALID_INPUT,
+          message: `Unsupported audio format: ${format}`,
+          category: ErrorCategory.VALIDATION,
+          severity: ErrorSeverity.MEDIUM,
+          retriable: false,
+          context: { format },
+        });
+    }
   }
 }

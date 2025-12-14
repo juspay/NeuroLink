@@ -28,6 +28,10 @@ export type TTSOptions = {
   format?: AudioFormat;
   /** Speaking rate 0.25-4.0 (default: 1.0) */
   speed?: number;
+  /** Voice pitch adjustment -20.0 to 20.0 semitones (default: 0.0) */
+  pitch?: number;
+  /** Volume gain in dB -96.0 to 16.0 (default: 0.0) */
+  volumeGainDb?: number;
   /** Audio quality (default: standard) */
   quality?: TTSQuality;
   /** Output file path (optional) */
@@ -52,6 +56,15 @@ export type TTSResult = {
   voice?: string;
   /** Sample rate in Hz */
   sampleRate?: number;
+  /** Performance and request metadata */
+  metadata?: {
+    /** Request latency in milliseconds */
+    latency: number;
+    /** Provider name */
+    provider?: string;
+    /** Additional provider-specific metadata */
+    [key: string]: unknown;
+  };
 };
 
 /**
@@ -94,6 +107,9 @@ export const VALID_AUDIO_FORMATS: readonly AudioFormat[] = [
 
 /** Valid TTS quality levels as an array for runtime validation */
 export const VALID_TTS_QUALITIES: readonly TTSQuality[] = ["standard", "hd"];
+
+/** Valid Google TTS audio formats */
+export type GoogleAudioEncoding = "MP3" | "LINEAR16" | "OGG_OPUS";
 
 /**
  * Type guard to check if an object is a TTSResult
