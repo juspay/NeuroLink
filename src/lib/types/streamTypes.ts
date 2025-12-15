@@ -13,6 +13,7 @@ import type { EvaluationData } from "../index.js";
 import type { UnknownRecord, JsonValue } from "./common.js";
 import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
 import type { ChatMessage } from "./conversation.js";
+import type { TTSOptions, TTSChunk } from "./ttsTypes.js";
 
 /**
  * Progress tracking and metadata for streaming operations
@@ -153,6 +154,63 @@ export type AudioChunk = {
   encoding: PCMEncoding; // 'PCM16LE'
 };
 
+/**
+ * Stream chunk type using discriminated union for type safety
+ *
+ * Used in streaming responses to deliver either text or TTS audio chunks.
+ * The discriminated union ensures type safety - only one variant can exist at a time.
+ *
+ * @example Processing text chunks
+ * ```typescript
+ * for await (const chunk of result.stream) {
+ *   if (chunk.type === "text") {
+ *     console.log(chunk.content); // TypeScript knows 'content' exists
+ *   }
+ * }
+ * ```
+ *
+ * @example Processing audio chunks
+ * ```typescript
+ * const audioBuffer: Buffer[] = [];
+ * for await (const chunk of result.stream) {
+ *   if (chunk.type === "audio") {
+ *     audioBuffer.push(chunk.audioChunk.data); // TypeScript knows 'audioChunk' exists
+ *     if (chunk.audioChunk.isFinal) {
+ *       const fullAudio = Buffer.concat(audioBuffer);
+ *       fs.writeFileSync('output.mp3', fullAudio);
+ *     }
+ *   }
+ * }
+ * ```
+ *
+ * @example Processing both text and audio
+ * ```typescript
+ * for await (const chunk of result.stream) {
+ *   switch (chunk.type) {
+ *     case "text":
+ *       process.stdout.write(chunk.content);
+ *       break;
+ *     case "audio":
+ *       playAudioChunk(chunk.audioChunk.data);
+ *       break;
+ *   }
+ * }
+ * ```
+ */
+export type StreamChunk =
+  | {
+      /** Discriminator for text chunks */
+      type: "text";
+      /** Text content chunk */
+      content: string;
+    }
+  | {
+      /** Discriminator for audio chunks */
+      type: "audio";
+      /** TTS audio chunk data */
+      audioChunk: TTSChunk;
+    };
+
 export type StreamOptions = {
   input: {
     text: string;
@@ -204,6 +262,47 @@ export type StreamOptions = {
     format?: "jpeg" | "png"; // Frame format (default: jpeg)
     transcribeAudio?: boolean; // Extract and transcribe audio (default: false)
   };
+
+  /**
+   * Text-to-Speech (TTS) configuration for streaming
+   *
+   * Enable audio generation from the streamed text response. Audio chunks will be
+   * delivered through the stream alongside text chunks as TTSChunk objects.
+   *
+   * @example Basic streaming TTS
+   * ```typescript
+   * const result = await neurolink.stream({
+   *   input: { text: "Tell me a story" },
+   *   provider: "google-ai",
+   *   tts: { enabled: true, voice: "en-US-Neural2-C" }
+   * });
+   *
+   * for await (const chunk of result.stream) {
+   *   if (chunk.type === "text") {
+   *     process.stdout.write(chunk.content);
+   *   } else if (chunk.type === "audio") {
+   *     // Handle audio chunk
+   *     playAudioChunk(chunk.audioChunk.data);
+   *   }
+   * }
+   * ```
+   *
+   * @example Advanced streaming TTS with audio buffer
+   * ```typescript
+   * const result = await neurolink.stream({
+   *   input: { text: "Speak slowly" },
+   *   provider: "google-ai",
+   *   tts: {
+   *     enabled: true,
+   *     voice: "en-US-Neural2-D",
+   *     speed: 0.8,
+   *     format: "mp3",
+   *     quality: "hd"
+   *   }
+   * });
+   * ```
+   */
+  tts?: TTSOptions;
 
   // Core streaming options
   provider?: AIProviderName | string;

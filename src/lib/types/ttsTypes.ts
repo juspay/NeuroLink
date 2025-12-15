@@ -169,3 +169,28 @@ export function isValidTTSOptions(options: unknown): options is TTSOptions {
   }
   return true;
 }
+
+/**
+ * TTS audio chunk for streaming Text-to-Speech output
+ *
+ * Represents a chunk of audio data generated during streaming TTS.
+ * Used in StreamChunk type to deliver audio alongside text content.
+ */
+export type TTSChunk = {
+  /** Audio data chunk as Buffer */
+  data: Buffer;
+  /** Audio format of this chunk */
+  format: AudioFormat;
+  /** Chunk sequence number (0-indexed) */
+  index: number;
+  /** Whether this is the final audio chunk */
+  isFinal: boolean;
+  /** Cumulative audio size in bytes so far */
+  cumulativeSize?: number;
+  /** Estimated total duration in seconds (if available) */
+  estimatedDuration?: number;
+  /** Voice used for generation */
+  voice?: string;
+  /** Sample rate in Hz */
+  sampleRate?: number;
+};
