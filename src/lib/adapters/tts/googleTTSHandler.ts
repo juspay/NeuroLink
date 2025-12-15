@@ -10,15 +10,20 @@ import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import { TTSError, TTS_ERROR_CODES } from "../../utils/ttsProcessor.js";
 import type { TTSHandler } from "../../utils/ttsProcessor.js";
 import type {
+  Gender,
   GoogleAudioEncoding,
   TTSOptions,
   TTSResult,
   TTSVoice,
+  VoiceType,
 } from "../../types/ttsTypes.js";
 import { ErrorCategory, ErrorSeverity } from "../../constants/enums.js";
+import { logger } from "../../utils/logger.js";
 
 export class GoogleTTSHandler implements TTSHandler {
   private client: TextToSpeechClient | null = null;
+  private voicesCache: { voices: TTSVoice[]; timestamp: number } | null = null;
+  private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   /**
    * Google Cloud TTS maximum input size.
@@ -67,13 +72,96 @@ export class GoogleTTSHandler implements TTSHandler {
    *
    * Note: This method is optional in the TTSHandler interface, but Google Cloud TTS
    * fully implements it to provide comprehensive voice discovery capabilities.
-   * Will be Implemented in ISSUE - TTS-014
    *
    * @param languageCode - Optional language filter (e.g., "en-US")
    * @returns List of available voices
    */
-  async getVoices(_languageCode?: string): Promise<TTSVoice[]> {
-    throw new Error("Not implemented yet");
+  async getVoices(languageCode?: string): Promise<TTSVoice[]> {
+    if (!this.client) {
+      throw new TTSError({
+        code: TTS_ERROR_CODES.PROVIDER_NOT_CONFIGURED,
+        message:
+          "Google Cloud TTS client not initialized. Set GOOGLE_APPLICATION_CREDENTIALS or pass credentials path.",
+        category: ErrorCategory.CONFIGURATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
+    }
+
+    try {
+      // Return cached voices if available, valid, and no language filter is specified
+      if (
+        this.voicesCache &&
+        Date.now() - this.voicesCache.timestamp <
+          GoogleTTSHandler.CACHE_TTL_MS &&
+        !languageCode
+      ) {
+        return this.voicesCache.voices;
+      }
+
+      // Call Google Cloud listVoices API
+      const [response] = await this.client.listVoices(
+        languageCode ? { languageCode } : {},
+      );
+
+      if (!response.voices || response.voices.length === 0) {
+        logger.warn("Google Cloud TTS returned no voices");
+        return [];
+      }
+
+      const voices: TTSVoice[] = [];
+
+      for (const voice of response.voices ?? []) {
+        // Validate required fields
+        if (
+          !voice.name ||
+          !Array.isArray(voice.languageCodes) ||
+          voice.languageCodes.length === 0
+        ) {
+          logger.warn("Skipping voice with missing required fields", {
+            name: voice.name,
+            languageCodesCount: voice.languageCodes?.length,
+          });
+          continue;
+        }
+
+        const voiceName = voice.name;
+        const languageCodes = voice.languageCodes;
+        const primaryLanguageCode = languageCodes[0];
+
+        const voiceType = this.detectVoiceType(voiceName);
+
+        // Map Google's ssmlGender → internal Gender
+        const gender: Gender =
+          voice.ssmlGender === "MALE"
+            ? "male"
+            : voice.ssmlGender === "FEMALE"
+              ? "female"
+              : "neutral";
+
+        voices.push({
+          id: voiceName,
+          name: voiceName,
+          languageCode: primaryLanguageCode,
+          languageCodes,
+          gender,
+          type: voiceType,
+          naturalSampleRateHertz: voice.naturalSampleRateHertz ?? undefined,
+        });
+      }
+
+      // Cache the result with timestamp if no language filter
+      if (!languageCode) {
+        this.voicesCache = { voices, timestamp: Date.now() };
+      }
+
+      return voices;
+    } catch (err) {
+      // Log error but return empty array for graceful degradation
+      const message = err instanceof Error ? err.message : "Unknown error";
+      logger.error(`Failed to fetch Google TTS voices: ${message}`);
+      return [];
+    }
   }
 
   /**
@@ -250,5 +338,40 @@ export class GoogleTTSHandler implements TTSHandler {
           context: { format },
         });
     }
+  }
+
+  /**
+   * Detect the voice type from a Google Cloud TTS voice name
+   *
+   * Parses the voice name to identify the underlying voice technology/model type.
+   * Google Cloud TTS offers different voice types with varying quality and pricing.
+   *
+   * @param name - The full Google Cloud voice name (e.g., "en-US-Neural2-C")
+   * @returns The detected voice type
+   *
+   * @example
+   * detectVoiceType("en-US-Neural2-C") // returns "neural"
+   * detectVoiceType("en-US-Wavenet-A") // returns "wavenet"
+   * detectVoiceType("en-US-Standard-B") // returns "standard"
+   * detectVoiceType("en-US-Chirp-A") // returns "chirp"
+   * detectVoiceType("en-US-Journey-D") // returns "unknown" (unrecognized type)
+   */
+  private detectVoiceType(name: string): VoiceType {
+    const tokens = name.toLowerCase().split("-");
+
+    if (tokens.some((t) => t.startsWith("chirp"))) {
+      return "chirp";
+    }
+    if (tokens.includes("neural2")) {
+      return "neural";
+    }
+    if (tokens.includes("wavenet")) {
+      return "wavenet";
+    }
+    if (tokens.includes("standard")) {
+      return "standard";
+    }
+
+    return "unknown";
   }
 }

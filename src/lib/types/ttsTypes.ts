@@ -81,6 +81,12 @@ export type AudioSaveResult = {
   error?: string;
 };
 
+/** Allowed TTS voice types */
+export type VoiceType = "standard" | "wavenet" | "neural" | "chirp" | "unknown";
+
+/** Allowed genders for TTS voices */
+export type Gender = "male" | "female" | "neutral";
+
 /**
  * TTS voice information
  */
@@ -89,12 +95,18 @@ export type TTSVoice = {
   id: string;
   /** Display name */
   name: string;
-  /** Language code (e.g., "en-US") */
+  /** Primary language code (e.g., "en-US") */
   languageCode: string;
+  /** All supported language codes */
+  languageCodes: string[];
   /** Gender */
-  gender: "male" | "female" | "neutral";
+  gender: Gender;
   /** Voice type */
-  type: "neural" | "wavenet" | "standard";
+  type?: VoiceType;
+  /** Voice description (optional) */
+  description?: string;
+  /** Natural sample rate in Hz (optional) */
+  naturalSampleRateHertz?: number;
 };
 
 /** Valid audio formats as an array for runtime validation */
