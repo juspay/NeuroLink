@@ -1,3 +1,9 @@
+## [8.19.0](https://github.com/juspay/neurolink/compare/v8.18.0...v8.19.0) (2025-12-18)
+
+### Features
+
+- **(tts):** Integrate TTS into BaseProvider.generate() ([ffae0b5](https://github.com/juspay/neurolink/commit/ffae0b5be9c4a2ef249876bdeee265004adf28a3))
+
 ## [8.18.0](https://github.com/juspay/neurolink/compare/v8.17.0...v8.18.0) (2025-12-16)
 
 ### Features
