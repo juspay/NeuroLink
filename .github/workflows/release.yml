@@ -31,6 +31,22 @@ jobs:
           cache: "pnpm"
           registry-url: https://registry.npmjs.org/
 
+      - name: Install ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@36c6454b5a2348e7794ba2d82a21506605921e3d
+        with:
+          ffmpeg-version: "7.0.2"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify ffmpeg installation
+        run: |
+          echo "🎬 Verifying ffmpeg installation..."
+          ffmpeg -version || {
+            echo "❌ ffmpeg installation failed!"
+            echo "Please check the setup-ffmpeg action configuration."
+            exit 1
+          }
+          echo "✅ ffmpeg installed successfully"
+
       - name: Install dependencies
         run: pnpm i
 
@@ -63,6 +79,22 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
+
+      - name: Install ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@36c6454b5a2348e7794ba2d82a21506605921e3d
+        with:
+          ffmpeg-version: "7.0.2"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify ffmpeg installation
+        run: |
+          echo "🎬 Verifying ffmpeg installation..."
+          ffmpeg -version || {
+            echo "❌ ffmpeg installation failed!"
+            echo "Please check the setup-ffmpeg action configuration."
+            exit 1
+          }
+          echo "✅ ffmpeg installed successfully"
 
       - name: Upgrade npm for OIDC support
         run: npm install -g npm@latest
