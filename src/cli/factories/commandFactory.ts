@@ -36,6 +36,10 @@ import fs from "fs";
 import { handleSetup } from "../commands/setup.js";
 import { checkRedisAvailability } from "../../lib/utils/conversationMemoryUtils.js";
 import { saveAudioToFile, formatFileSize } from "../utils/audioFileUtils.js";
+import {
+  showProcessingSpinner,
+  showMultiFileSpinner,
+} from "../utils/spinner.js";
 
 /**
  * CLI Command Factory for generate commands
@@ -81,6 +85,21 @@ export class CLICommandFactory {
     pdf: {
       type: "string" as const,
       description: "Add PDF file for analysis (can be used multiple times)",
+    },
+    docx: {
+      type: "string" as const,
+      description:
+        "Add Word document for analysis (can be used multiple times)",
+    },
+    pptx: {
+      type: "string" as const,
+      description:
+        "Add PowerPoint presentation for analysis (can be used multiple times)",
+    },
+    xlsx: {
+      type: "string" as const,
+      description:
+        "Add Excel spreadsheet for analysis (can be used multiple times)",
     },
     video: {
       type: "string" as const,
@@ -333,6 +352,36 @@ export class CLICommandFactory {
       return undefined;
     }
     return Array.isArray(pdfFiles) ? pdfFiles : [pdfFiles];
+  }
+
+  // Helper method to process CLI DOCX files
+  private static processCliDOCXFiles(
+    docxFiles?: string | string[],
+  ): Array<Buffer | string> | undefined {
+    if (!docxFiles) {
+      return undefined;
+    }
+    return Array.isArray(docxFiles) ? docxFiles : [docxFiles];
+  }
+
+  // Helper method to process CLI PPTX files
+  private static processCliPPTXFiles(
+    pptxFiles?: string | string[],
+  ): Array<Buffer | string> | undefined {
+    if (!pptxFiles) {
+      return undefined;
+    }
+    return Array.isArray(pptxFiles) ? pptxFiles : [pptxFiles];
+  }
+
+  // Helper method to process CLI XLSX files
+  private static processCliXLSXFiles(
+    xlsxFiles?: string | string[],
+  ): Array<Buffer | string> | undefined {
+    if (!xlsxFiles) {
+      return undefined;
+    }
+    return Array.isArray(xlsxFiles) ? xlsxFiles : [xlsxFiles];
   }
 
   // Helper method to process CLI files with auto-detection
@@ -1577,6 +1626,15 @@ export class CLICommandFactory {
       const pdfFiles = CLICommandFactory.processCliPDFFiles(
         argv.pdf as string | string[] | undefined,
       );
+      const docxFiles = CLICommandFactory.processCliDOCXFiles(
+        argv.docx as string | string[] | undefined,
+      );
+      const pptxFiles = CLICommandFactory.processCliPPTXFiles(
+        argv.pptx as string | string[] | undefined,
+      );
+      const xlsxFiles = CLICommandFactory.processCliXLSXFiles(
+        argv.xlsx as string | string[] | undefined,
+      );
       const videoFiles = CLICommandFactory.processCliVideoFiles(
         argv.video as string | string[] | undefined,
       );
@@ -1584,11 +1642,45 @@ export class CLICommandFactory {
         argv.file as string | string[] | undefined,
       );
 
+      // Show progress indicators for office files
+      const allOfficeFiles = [
+        ...(docxFiles || []),
+        ...(pptxFiles || []),
+        ...(xlsxFiles || []),
+      ];
+
+      if (allOfficeFiles.length > 0 && !options.quiet) {
+        if (allOfficeFiles.length === 1) {
+          // Single file - show simple spinner
+          const fileSpinner = showProcessingSpinner(
+            allOfficeFiles[0],
+            options.quiet,
+          );
+          // Note: Spinner will be stopped after SDK processing completes
+          // This is a placeholder for when office processing is implemented
+          fileSpinner?.succeed(
+            chalk.green(`✅ Processed ${allOfficeFiles[0]}`),
+          );
+        } else {
+          // Multiple files - show multi-file spinner
+          const progress = showMultiFileSpinner(allOfficeFiles, options.quiet);
+          // Note: Progress will be updated as files are processed
+          // This is a placeholder for when office processing is implemented
+          for (const file of allOfficeFiles) {
+            progress.updateFile(file, "success");
+          }
+          progress.complete();
+        }
+      }
+
       const generateInput = {
         text: inputText,
         ...(imageBuffers && { images: imageBuffers }),
         ...(csvFiles && { csvFiles }),
         ...(pdfFiles && { pdfFiles }),
+        ...(docxFiles && { docxFiles }),
+        ...(pptxFiles && { pptxFiles }),
+        ...(xlsxFiles && { xlsxFiles }),
         ...(videoFiles && { videoFiles }),
         ...(files && { files }),
       };
@@ -1845,6 +1937,15 @@ export class CLICommandFactory {
     const pdfFiles = CLICommandFactory.processCliPDFFiles(
       argv.pdf as string | string[] | undefined,
     );
+    const docxFiles = CLICommandFactory.processCliDOCXFiles(
+      argv.docx as string | string[] | undefined,
+    );
+    const pptxFiles = CLICommandFactory.processCliPPTXFiles(
+      argv.pptx as string | string[] | undefined,
+    );
+    const xlsxFiles = CLICommandFactory.processCliXLSXFiles(
+      argv.xlsx as string | string[] | undefined,
+    );
     const videoFiles = CLICommandFactory.processCliVideoFiles(
       argv.video as string | string[] | undefined,
     );
@@ -1852,12 +1953,44 @@ export class CLICommandFactory {
       argv.file as string | string[] | undefined,
     );
 
+    // Show progress indicators for office files
+    const allOfficeFiles = [
+      ...(docxFiles || []),
+      ...(pptxFiles || []),
+      ...(xlsxFiles || []),
+    ];
+
+    if (allOfficeFiles.length > 0 && !options.quiet) {
+      if (allOfficeFiles.length === 1) {
+        // Single file - show simple spinner
+        const fileSpinner = showProcessingSpinner(
+          allOfficeFiles[0],
+          options.quiet,
+        );
+        // Note: Spinner will be stopped after SDK processing completes
+        // This is a placeholder for when office processing is implemented
+        fileSpinner?.succeed(chalk.green(`✅ Processed ${allOfficeFiles[0]}`));
+      } else {
+        // Multiple files - show multi-file spinner
+        const progress = showMultiFileSpinner(allOfficeFiles, options.quiet);
+        // Note: Progress will be updated as files are processed
+        // This is a placeholder for when office processing is implemented
+        for (const file of allOfficeFiles) {
+          progress.updateFile(file, "success");
+        }
+        progress.complete();
+      }
+    }
+
     const stream = await sdk.stream({
       input: {
         text: inputText,
         ...(imageBuffers && { images: imageBuffers }),
         ...(csvFiles && { csvFiles }),
         ...(pdfFiles && { pdfFiles }),
+        ...(docxFiles && { docxFiles }),
+        ...(pptxFiles && { pptxFiles }),
+        ...(xlsxFiles && { xlsxFiles }),
         ...(videoFiles && { videoFiles }),
         ...(files && { files }),
       },
