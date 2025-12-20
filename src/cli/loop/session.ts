@@ -483,6 +483,23 @@ export class LoopSession {
         logger.always(chalk.gray(`    Type: ${schema.type}`));
       }
     }
+
+    // Add note about multimodal flags
+    logger.always(
+      chalk.cyan("\nNote: Multimodal Flags (--image, --pdf, --csv, --file)"),
+    );
+    logger.always(
+      chalk.gray(`  These are per-command flags, not session variables.`),
+    );
+    logger.always(
+      chalk.gray(`  Use them directly with your commands in loop mode:`),
+    );
+    logger.always(
+      chalk.dim(`    Example: analyze this chart --image chart.png`),
+    );
+    logger.always(
+      chalk.dim(`    Example: summarize this document --pdf report.pdf`),
+    );
   }
 
   /**
