@@ -93,13 +93,6 @@ const PDF_PROVIDER_CONFIGS: Record<string, PDFProviderConfig> = {
     requiresCitations: false,
     apiType: "files-api",
   },
-  mistral: {
-    maxSizeMB: 10,
-    maxPages: 100,
-    supportsNative: false,
-    requiresCitations: false,
-    apiType: "files-api",
-  },
   "hugging-face": {
     maxSizeMB: 10,
     maxPages: 100,

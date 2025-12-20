@@ -315,10 +315,9 @@ const stream = await neurolink.stream({
 | **Azure OpenAI**      | 10 MB    | 100       | Uses OpenAI Files API           |
 | **LiteLLM**           | 10 MB    | 100       | Depends on upstream model       |
 | **OpenAI Compatible** | 10 MB    | 100       | Depends on upstream model       |
-| **Mistral**           | 10 MB    | 100       | Native PDF support              |
 | **Hugging Face**      | 10 MB    | 100       | Native PDF support              |
 
-**Not supported:** Ollama
+**Not supported:** Mistral, Ollama
 
 ### Best Practices
 

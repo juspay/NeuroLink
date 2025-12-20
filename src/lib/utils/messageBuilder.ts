@@ -1083,10 +1083,8 @@ async function convertMultimodalToProviderFormat(
     }
   }
 
-  // Add PDFs using Vercel AI SDK standard format (works for all providers except Mistral)
-  // NOTE: Mistral API has a fundamental limitation - it does NOT support PDFs in any form.
-  // The API strictly requires image content to start with data:image/, rejecting data:application/pdf
-  // See: MISTRAL_PDF_FIX_SUMMARY.md for full investigation details
+  // Add PDFs using Vercel AI SDK standard format
+  // Note: Some providers don't support PDF files. Check provider configuration in pdfProcessor.ts
   content.push(
     ...pdfFiles.map((pdf): FilePart => {
       logger.info(
