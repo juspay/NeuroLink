@@ -37,16 +37,24 @@ Always reference and build upon this conversation history when relevant. If the 
  * Structured output instructions for JSON/structured output mode
  * Used to ensure AI providers output only valid JSON without conversational filler
  * This addresses the issue where models add text like "Excellent!" before JSON output
+ * and the case where tools are used but final output must still be pure JSON
  */
 export const STRUCTURED_OUTPUT_INSTRUCTIONS = `
+Output ONLY valid JSON. No markdown, text, or decorations—ever.
 
-STRUCTURED OUTPUT REQUIREMENT:
-You MUST respond with ONLY a valid JSON object that matches the provided schema.
-- Do NOT include any text before the JSON (no greetings, acknowledgments, or preamble like "Excellent!", "Sure!", "Here is the result:", etc.)
-- Do NOT include any text after the JSON (no explanations, summaries, or follow-up comments)
-- Do NOT wrap the JSON in markdown code blocks
-- Output ONLY the raw JSON object, starting with { and ending with }
-- Ensure the JSON is valid and parseable`;
+FORBIDDEN: markdown code blocks, text before/after JSON, explanations, preambles, summaries, conversational text about tools.
+
+REQUIRED: response starts with { and ends with }, valid JSON only, no additional characters.
+
+IF YOU CALLED TOOLS: Incorporate data directly into the JSON structure. Do NOT explain what you did.
+
+WRONG: \`\`\`json
+{"field": "value"}
+\`\`\`
+WRONG: Based on the data, here's the result: {"field": "value"}
+CORRECT: {"field": "value"}
+
+Your entire response = raw JSON object. Nothing else.`;
 
 /**
  * Get default configuration values for conversation memory
