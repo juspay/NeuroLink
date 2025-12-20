@@ -34,13 +34,14 @@ describe("Loop Mode set help", () => {
   describe("Multimodal flags documentation", () => {
     it("should document that multimodal flags exist", () => {
       // The help should mention all multimodal flags
-      const expectedFlags = ["--image", "--pdf", "--csv", "--file"];
+      const expectedFlags = ["--image", "--pdf", "--csv", "--video", "--file"];
 
       // Validate each flag is a valid multimodal flag
-      expect(expectedFlags).toHaveLength(4);
+      expect(expectedFlags).toHaveLength(5);
       expect(expectedFlags).toContain("--image");
       expect(expectedFlags).toContain("--pdf");
       expect(expectedFlags).toContain("--csv");
+      expect(expectedFlags).toContain("--video");
       expect(expectedFlags).toContain("--file");
     });
 
@@ -142,15 +143,27 @@ describe("Loop Mode set help", () => {
   describe("Comprehensive multimodal flag coverage", () => {
     it("should list all multimodal flags that are per-command", () => {
       // Comprehensive list of multimodal flags from commandFactory.ts
-      const allMultimodalFlags = ["--image", "--pdf", "--csv", "--file"];
+      const allMultimodalFlags = [
+        "--image",
+        "--pdf",
+        "--csv",
+        "--video",
+        "--file",
+      ];
 
       // Validate each flag
       allMultimodalFlags.forEach((flag) => {
         expect(flag).toMatch(/^--/);
-        expect(["--image", "--pdf", "--csv", "--file"]).toContain(flag);
+        expect([
+          "--image",
+          "--pdf",
+          "--csv",
+          "--video",
+          "--file",
+        ]).toContain(flag);
       });
 
-      expect(allMultimodalFlags.length).toBe(4);
+      expect(allMultimodalFlags.length).toBe(5);
     });
 
     it("should differentiate multimodal flags from session variables", () => {
@@ -164,7 +177,13 @@ describe("Loop Mode set help", () => {
       ];
 
       // Multimodal flags (per-command only):
-      const multimodalFlags = ["--image", "--pdf", "--csv", "--file"];
+      const multimodalFlags = [
+        "--image",
+        "--pdf",
+        "--csv",
+        "--video",
+        "--file",
+      ];
 
       // Verify no overlap - multimodal flags are not session variables
       sessionVariables.forEach((variable) => {

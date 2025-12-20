@@ -486,7 +486,9 @@ export class LoopSession {
 
     // Add note about multimodal flags
     logger.always(
-      chalk.cyan("\nNote: Multimodal Flags (--image, --pdf, --csv, --file)"),
+      chalk.cyan(
+        "\nNote: Multimodal Flags (--image, --pdf, --csv, --video, --file)",
+      ),
     );
     logger.always(
       chalk.gray(`  These are per-command flags, not session variables.`),
