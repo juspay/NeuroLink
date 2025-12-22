@@ -120,3 +120,4 @@ quality-metrics.json
 # Security Files
 *.key
 *.pem
+coverage/
