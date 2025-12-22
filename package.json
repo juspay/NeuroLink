@@ -166,6 +166,7 @@
     "@aws-sdk/types": "^3.862.0",
     "@google-cloud/text-to-speech": "^5.0.0",
     "@google-cloud/vertexai": "^1.10.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.35.0",
     "@google/genai": "^1.19.0",
     "@google/generative-ai": "^0.24.1",
     "@huggingface/inference": "^2.8.1",
