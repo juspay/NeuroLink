@@ -236,9 +236,11 @@ export class PDFProcessor {
     const footerString = buffer.toString("binary", buffer.length - footerSize);
 
     // 2. Validate trailer marker (check both header and footer regions)
+    // Look for 'trailer' keyword followed by dictionary (more specific pattern)
+    const trailerPattern = /trailer\s*<</i;
     if (
-      !headerString.includes("trailer") &&
-      !footerString.includes("trailer")
+      !trailerPattern.test(headerString) &&
+      !trailerPattern.test(footerString)
     ) {
       errors.push("Missing PDF trailer marker - file may be corrupted");
       logger.warn("[PDF] Missing trailer marker - PDF file may be corrupted");
@@ -256,9 +258,11 @@ export class PDFProcessor {
     }
 
     // 4. Detect encryption (check in header where objects are typically defined)
+    // Look for /Encrypt key followed by object reference pattern
     const encryptCheckSize = Math.min(50000, buffer.length);
     const encryptCheckString = buffer.toString("binary", 0, encryptCheckSize);
-    if (encryptCheckString.includes("/Encrypt")) {
+    const encryptPattern = /\/Encrypt\s+(\d+\s+\d+\s+R|<<)/i;
+    if (encryptPattern.test(encryptCheckString)) {
       encrypted = true;
       errors.push("PDF is encrypted - may require password for processing");
       logger.warn(
@@ -296,7 +300,8 @@ export class PDFProcessor {
 
   private static extractBasicMetadata(buffer: Buffer) {
     const headerSize = Math.min(10000, buffer.length);
-    const header = buffer.toString("utf-8", 0, headerSize);
+    // Use binary encoding to preserve PDF structure consistently
+    const header = buffer.toString("binary", 0, headerSize);
 
     const versionMatch = header.match(/%PDF-(\d\.\d)/);
     const version = versionMatch ? versionMatch[1] : "unknown";
