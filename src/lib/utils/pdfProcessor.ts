@@ -155,9 +155,12 @@ export class PDFProcessor {
 
     const metadata = this.extractBasicMetadata(content);
 
-    if (metadata.estimatedPages && metadata.estimatedPages > config.maxPages) {
+    // Get accurate page count using pdfjs
+    const accuratePageCount = await this.getAccuratePageCount(content);
+
+    if (accuratePageCount && accuratePageCount > config.maxPages) {
       logger.warn(
-        `[PDF] PDF appears to have ${metadata.estimatedPages}+ pages. ` +
+        `[PDF] PDF has ${accuratePageCount} pages. ` +
           `${provider} supports up to ${config.maxPages} pages.`,
       );
     }
@@ -175,7 +178,7 @@ export class PDFProcessor {
       provider,
       size: `${sizeMB.toFixed(2)}MB`,
       version: metadata.version,
-      estimatedPages: metadata.estimatedPages,
+      pageCount: accuratePageCount,
       apiType: config.apiType,
     });
 
@@ -186,7 +189,8 @@ export class PDFProcessor {
       metadata: {
         confidence: 100,
         size: content.length,
-        ...metadata,
+        version: metadata.version,
+        estimatedPages: accuratePageCount,
         provider,
         apiType: config.apiType,
       },
@@ -209,6 +213,81 @@ export class PDFProcessor {
     return buffer.subarray(0, 5).equals(this.PDF_SIGNATURE);
   }
 
+  /**
+   * Get accurate page count using pdfjs-dist parser
+   * @param buffer PDF file buffer
+   * @returns Page count or null if it cannot be determined
+   */
+  private static async getAccuratePageCount(
+    buffer: Buffer,
+  ): Promise<number | null> {
+    try {
+      // Dynamic import pdfjs to avoid DOMMatrix errors
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
+      // Helper function to get page count
+      const getPageCount = async (): Promise<number | null> => {
+        let pdfDocument: PDFDocumentProxy | null = null;
+        try {
+          const loadingTask = pdfjs.getDocument({
+            data: new Uint8Array(buffer),
+            useSystemFonts: true,
+            standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+            // Disable password prompts
+            password: "",
+          });
+
+          pdfDocument = await loadingTask.promise;
+          const pageCount = pdfDocument.numPages;
+          return pageCount;
+        } catch (error) {
+          // Handle password-protected PDFs gracefully
+          if (
+            error instanceof Error &&
+            (error.message.includes("password") ||
+              error.message.includes("encrypted"))
+          ) {
+            logger.debug(
+              "[PDF] Password-protected PDF detected, cannot determine page count",
+            );
+            return null;
+          }
+          throw error;
+        } finally {
+          // Clean up resources
+          if (pdfDocument) {
+            try {
+              pdfDocument.destroy();
+            } catch (destroyError) {
+              logger.debug(
+                "[PDF] Error destroying PDF document during page count:",
+                destroyError,
+              );
+            }
+          }
+        }
+      };
+
+      // Apply 5-second timeout
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          logger.debug("[PDF] Page count operation timed out after 5 seconds");
+          resolve(null);
+        }, 5000);
+      });
+
+      // Race between page count and timeout
+      const result = await Promise.race([getPageCount(), timeoutPromise]);
+      return result;
+    } catch (error) {
+      logger.debug(
+        "[PDF] Failed to get accurate page count:",
+        error instanceof Error ? error.message : String(error),
+      );
+      return null;
+    }
+  }
+
   private static extractBasicMetadata(buffer: Buffer) {
     const headerSize = Math.min(10000, buffer.length);
     const header = buffer.toString("utf-8", 0, headerSize);
@@ -216,8 +295,9 @@ export class PDFProcessor {
     const versionMatch = header.match(/%PDF-(\d\.\d)/);
     const version = versionMatch ? versionMatch[1] : "unknown";
 
-    const pageMatches = header.match(/\/Type\s*\/Page[^s]/g);
-    const estimatedPages = pageMatches ? pageMatches.length : null;
+    // Deprecated: Regex-based page detection is unreliable
+    // Use getAccuratePageCount() instead
+    const estimatedPages = null;
 
     return {
       version,
