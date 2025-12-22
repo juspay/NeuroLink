@@ -1,3 +1,9 @@
+## [8.21.0](https://github.com/juspay/neurolink/compare/v8.20.1...v8.21.0) (2025-12-22)
+
+### Features
+
+- **(types):** Add office document type definitions and comprehensive tests ([1b34d3d](https://github.com/juspay/neurolink/commit/1b34d3de8114bdc56600cc785e7e52aa1af1ddc7))
+
 ## [8.20.1](https://github.com/juspay/neurolink/compare/v8.20.0...v8.20.1) (2025-12-22)
 
 ### Bug Fixes
