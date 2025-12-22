@@ -227,10 +227,19 @@ export class PDFProcessor {
     }
 
     // Convert buffer to string for marker detection
-    const pdfString = buffer.toString("utf-8");
+    // For large files, we optimize by checking specific regions
+    const headerSize = Math.min(10000, buffer.length);
+    const footerSize = Math.min(5000, buffer.length);
 
-    // 2. Validate trailer marker
-    if (!pdfString.includes("trailer")) {
+    // Check header region for trailer marker (often near the end but can be in header section)
+    const headerString = buffer.toString("binary", 0, headerSize);
+    const footerString = buffer.toString("binary", buffer.length - footerSize);
+
+    // 2. Validate trailer marker (check both header and footer regions)
+    if (
+      !headerString.includes("trailer") &&
+      !footerString.includes("trailer")
+    ) {
       errors.push("Missing PDF trailer marker - file may be corrupted");
       logger.warn("[PDF] Missing trailer marker - PDF file may be corrupted");
       truncated = true;
@@ -238,9 +247,7 @@ export class PDFProcessor {
 
     // 3. Validate EOF marker (check last 1024 bytes)
     const lastChunkSize = Math.min(1024, buffer.length);
-    const lastChunk = buffer
-      .subarray(buffer.length - lastChunkSize)
-      .toString("utf-8");
+    const lastChunk = buffer.toString("binary", buffer.length - lastChunkSize);
 
     if (!lastChunk.includes("%%EOF")) {
       errors.push("Missing %%EOF marker - file may be truncated");
@@ -248,8 +255,10 @@ export class PDFProcessor {
       truncated = true;
     }
 
-    // 4. Detect encryption
-    if (pdfString.includes("/Encrypt")) {
+    // 4. Detect encryption (check in header where objects are typically defined)
+    const encryptCheckSize = Math.min(50000, buffer.length);
+    const encryptCheckString = buffer.toString("binary", 0, encryptCheckSize);
+    if (encryptCheckString.includes("/Encrypt")) {
       encrypted = true;
       errors.push("PDF is encrypted - may require password for processing");
       logger.warn(
@@ -258,7 +267,8 @@ export class PDFProcessor {
     }
 
     // Determine overall validity
-    const valid = errors.length === 0 || (errors.length === 1 && encrypted);
+    // Valid if: no errors, OR only error is encryption (encrypted PDFs can be processed)
+    const valid = errors.length === 0 || (encrypted && errors.length === 1);
 
     return { valid, encrypted, truncated, errors };
   }

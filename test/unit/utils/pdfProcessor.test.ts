@@ -232,14 +232,16 @@ describe("PDFProcessor", () => {
 
       // Should log both individual warnings and a summary
       expect(logger.warn).toHaveBeenCalled();
-      const calls = (logger.warn as unknown as { mock: { calls: unknown[][] } })
-        .mock.calls;
-      const warningMessages = calls.map((call: unknown[]) => call[0] as string);
+
+      // Check that warnings were logged for validation issues
+      const warnMock = vi.mocked(logger.warn);
+      const calls = warnMock.mock.calls;
+      const warningMessages = calls.map((call) => String(call[0]));
 
       // Should have warnings about the issues
       expect(
         warningMessages.some(
-          (msg: string) =>
+          (msg) =>
             msg.includes("trailer") ||
             msg.includes("EOF") ||
             msg.includes("validation issues"),
