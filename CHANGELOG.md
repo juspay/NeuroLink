@@ -1,3 +1,9 @@
+## [8.20.1](https://github.com/juspay/neurolink/compare/v8.20.0...v8.20.1) (2025-12-22)
+
+### Bug Fixes
+
+- **(Validation):** implement secure base64 validation with fail-fast checks ([f1b9b9c](https://github.com/juspay/neurolink/commit/f1b9b9c105db38ce439a5e69ff343b77b12be174)), closes [#277](https://github.com/juspay/neurolink/issues/277)
+
 ## [8.20.0](https://github.com/juspay/neurolink/compare/v8.19.1...v8.20.0) (2025-12-22)
 
 ### Features
