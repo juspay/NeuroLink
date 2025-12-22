@@ -119,7 +119,7 @@ interface GenerateVideoOptions {
     image: Buffer | string; // Image buffer, file path, or URL
     prompt: string; // Text description of desired video
   };
-  provider: "google-ai" | "vertex";
+  provider: "vertex";
   model?: string; // Default: 'veo-3.1'
   resolution?: "720p" | "1080p";
   length?: 4 | 6 | 8;
