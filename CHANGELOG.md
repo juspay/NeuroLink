@@ -1,3 +1,9 @@
+## [8.23.0](https://github.com/juspay/neurolink/compare/v8.22.0...v8.23.0) (2025-12-23)
+
+### Features
+
+- **(csv):** add file extension field to CSV metadata ([044030c](https://github.com/juspay/neurolink/commit/044030c3be74121729477475becd983840e8f87c))
+
 ## [8.22.0](https://github.com/juspay/neurolink/compare/v8.21.0...v8.22.0) (2025-12-23)
 
 ### Features
