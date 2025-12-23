@@ -571,6 +571,10 @@ interface GenerateOptions {
   input: {
     text: string;
     images?: Array<string | Buffer>; // Local paths, URLs, or buffers
+    csvFiles?: Array<string | Buffer>; // CSV files (converted to text)
+    pdfFiles?: Array<string | Buffer>; // PDF files (native binary)
+    officeFiles?: Array<string | Buffer>; // Office documents (DOCX, PPTX, XLSX)
+    files?: Array<string | Buffer>; // Auto-detect file types
     content?: Array<TextContent | ImageContent>; // Advanced multimodal payloads
   };
   provider?: AIProviderName | string; // Leave undefined to allow orchestration/fallback
@@ -589,8 +593,55 @@ interface GenerateOptions {
   toolUsageContext?: string;
   context?: Record<string, JsonValue>;
   conversationHistory?: Array<{ role: string; content: string }>;
+
+  // Document processing options
+  officeOptions?: OfficeProcessorOptions;
 }
 ```
+
+### Schema Limitations by Provider
+
+**Google Gemini Limitation (Vertex AI & Google AI Studio):**
+
+- ❌ Cannot combine `schema` + `tools` (including built-in tools)
+- ✅ Solution: Use `disableTools: true` when using schemas
+- 🔄 Industry Standard: All frameworks use this approach
+- 📅 Future: Gemini 3 Pro Preview (Nov 2025) supports both
+
+**Example:**
+
+```typescript
+// ❌ Will fail with Google providers
+const result = await neurolink.generate({
+  schema: MySchema,
+  provider: "vertex", // Error: Function calling with JSON mime type unsupported
+});
+
+// ✅ Correct for Google providers
+const result = await neurolink.generate({
+  schema: MySchema,
+  provider: "vertex",
+  disableTools: true, // Required
+});
+
+// ✅ Works without disableTools
+const result = await neurolink.generate({
+  schema: MySchema,
+  provider: "openai", // OpenAI supports both
+});
+```
+
+**Provider Support Matrix:**
+
+| Provider           | Tools + Schema              | Notes                 |
+| ------------------ | --------------------------- | --------------------- |
+| OpenAI             | ✅ Full Support             | No limitations        |
+| Anthropic          | ✅ Full Support             | No limitations        |
+| Vertex AI (Gemini) | ❌ Use `disableTools: true` | Google API limitation |
+| Google AI Studio   | ❌ Use `disableTools: true` | Google API limitation |
+| Vertex AI (Claude) | ✅ Full Support             | Uses Anthropic models |
+| Azure OpenAI       | ✅ Full Support             | No limitations        |
+| Bedrock            | ✅ Full Support             | No limitations        |
 
 **Returns:**
 
@@ -1725,7 +1776,6 @@ DEFAULT_PROVIDER?: 'auto' | 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azu
 FALLBACK_PROVIDER?: 'openai' | 'bedrock' | 'vertex' | 'anthropic' | 'azure' | 'google-ai' | 'huggingface' | 'ollama' | 'mistral' | 'litellm'
 
 // Feature toggles
-ENABLE_STREAMING?: 'true' | 'false'
 ENABLE_FALLBACK?: 'true' | 'false'
 
 // Debugging
@@ -1863,6 +1913,115 @@ interface DynamicModelRegistry {
   getAllModels(): Promise<ModelConfig[]>;
 }
 ```
+
+### Office Document Types
+
+Types for processing Office documents (DOCX, PPTX, XLSX):
+
+```typescript
+/**
+ * Supported Office document types
+ */
+type OfficeFileType = "docx" | "pptx" | "xlsx" | "doc" | "xls";
+
+/**
+ * Extended file type including Office formats
+ */
+type FileType = "csv" | "image" | "pdf" | "office" | "text" | "unknown";
+
+/**
+ * Office processor options
+ */
+interface OfficeProcessorOptions {
+  /** Provider to use for document processing */
+  provider?: string;
+
+  /** Maximum file size in MB (default: 5) */
+  maxSizeMB?: number;
+
+  /** Whether to extract embedded images */
+  extractImages?: boolean;
+
+  /** Whether to preserve document structure in output */
+  preserveStructure?: boolean;
+}
+
+/**
+ * Office processing result
+ */
+interface OfficeProcessingResult {
+  type: "office";
+  content: Buffer;
+  mimeType: string;
+  metadata: {
+    confidence: number;
+    size: number;
+    filename?: string;
+    format: OfficeFileType;
+    provider: string;
+    estimatedPages?: number;
+    hasEmbeddedImages?: boolean;
+    hasCharts?: boolean;
+  };
+}
+
+/**
+ * Office provider configuration
+ */
+interface OfficeProviderConfig {
+  maxSizeMB: number;
+  supportedFormats: OfficeFileType[];
+  supportsNative: boolean;
+  apiType: "document" | "converse" | "unsupported";
+}
+```
+
+**Office Document Provider Support:**
+
+| Provider             | DOCX | PPTX | XLSX | DOC | XLS | Notes                                |
+| -------------------- | ---- | ---- | ---- | --- | --- | ------------------------------------ |
+| **AWS Bedrock**      | ✅   | ✅   | ✅   | ✅  | ✅  | Full native support via Converse API |
+| **Google Vertex AI** | ✅   | ⚠️   | ✅   | ⚠️  | ⚠️  | Best for DOCX and XLSX               |
+| **Anthropic Claude** | ✅   | ⚠️   | ✅   | ⚠️  | ⚠️  | Via document API                     |
+| **OpenAI**           | ❌   | ❌   | ❌   | ❌  | ❌  | Not supported                        |
+| **Azure OpenAI**     | ❌   | ❌   | ❌   | ❌  | ❌  | Not supported                        |
+
+**Example Usage:**
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+// Analyze Word document
+const result = await neurolink.generate({
+  input: {
+    text: "Summarize this document",
+    officeFiles: ["report.docx"],
+  },
+  provider: "bedrock",
+});
+
+// Analyze Excel spreadsheet
+const data = await neurolink.generate({
+  input: {
+    text: "What are the top products by revenue?",
+    officeFiles: ["sales-data.xlsx"],
+  },
+  provider: "bedrock",
+});
+
+// Mixed file types with auto-detection
+const analysis = await neurolink.generate({
+  input: {
+    text: "Compare all documents",
+    files: ["report.docx", "data.xlsx", "chart.png", "notes.pdf"],
+  },
+  provider: "bedrock",
+});
+```
+
+See also: [Office Documents Guide](../features/office-documents.md)
 
 ### Provider Tool Support Status
 
@@ -2802,6 +2961,12 @@ neurolink mcp test filesystem
 - [CLI Loop Sessions](../features/cli-loop-sessions.md) – Interactive mode with persistent state
 - [Provider Orchestration](../features/provider-orchestration.md) – Set `enableOrchestration: true`
 - [Regional Streaming](../features/regional-streaming.md) – Use `region` parameter in `generate()`
+
+**Document Processing:**
+
+- [Office Documents](../features/office-documents.md) – Use `officeFiles` array for DOCX, PPTX, XLSX
+- [PDF Support](../features/pdf-support.md) – Use `pdfFiles` array for PDF documents
+- [CSV Support](../features/csv-support.md) – Use `csvFiles` array for spreadsheet data
 
 **Documentation:**
 

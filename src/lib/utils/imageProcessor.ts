@@ -4,8 +4,72 @@
  */
 
 import { logger } from "./logger.js";
-import type { ProcessedImage } from "../types/content.js";
+import { withRetry } from "./retryHandler.js";
+import { SYSTEM_LIMITS } from "../core/constants.js";
+import type { ProcessedImage } from "../types/multimodal.js";
 import type { FileProcessingResult } from "../types/fileTypes.js";
+
+/**
+ * Network error codes that should trigger a retry
+ */
+const RETRYABLE_ERROR_CODES = new Set([
+  "ECONNRESET",
+  "ENOTFOUND",
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "ERR_NETWORK",
+]);
+
+/**
+ * Determines if an HTTP error is retryable based on status code
+ * Only network errors and certain HTTP status codes should be retried
+ * 4xx client errors like 404 (Not Found) and 403 (Forbidden) should NOT be retried
+ *
+ * @param error - The error to check
+ * @returns true if the error is retryable, false otherwise
+ */
+function isRetryableDownloadError(error: unknown): boolean {
+  // Network-related errors should be retried
+  if (error && typeof error === "object") {
+    const errorCode = (error as { code?: string }).code;
+    const errorName = (error as { name?: string }).name;
+
+    if (
+      RETRYABLE_ERROR_CODES.has(errorCode || "") ||
+      errorName === "AbortError"
+    ) {
+      return true;
+    }
+  }
+
+  // Check for HTTP status code in error message for retryable errors
+  // Only retry on 5xx server errors, 429 (Too Many Requests), and 408 (Request Timeout)
+  // Do NOT retry on 4xx client errors like 404 (Not Found) or 403 (Forbidden)
+  if (error instanceof Error) {
+    const message = error.message;
+
+    // Extract HTTP status from error message like "HTTP 503: Service Unavailable"
+    const statusMatch = message.match(/HTTP (\d{3}):/);
+    if (statusMatch) {
+      const status = parseInt(statusMatch[1], 10);
+      // Retry on 5xx server errors, 429 (rate limit), 408 (timeout)
+      return status >= 500 || status === 429 || status === 408;
+    }
+
+    // Check for timeout/network-related error messages
+    // Use more precise matching to avoid false positives like "No timeout specified"
+    if (
+      /\b(request timed out|operation timed out|connection timed out|timed out)\b/i.test(
+        message,
+      ) ||
+      /\bnetwork (error|failure|unreachable|down)\b/i.test(message)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Image processor class for handling provider-specific image formatting
@@ -23,9 +87,18 @@ export class ImageProcessor {
     content: Buffer,
     _options?: unknown,
   ): Promise<FileProcessingResult> {
+    // Validate content is non-empty before processing
+    if (content.length === 0) {
+      logger.error("Empty buffer provided");
+      throw new Error("Invalid image processing: buffer is empty");
+    }
+
     const mediaType = this.detectImageType(content);
     const base64 = content.toString("base64");
     const dataUri = `data:${mediaType};base64,${base64}`;
+
+    // Validate output before returning
+    this.validateProcessOutput(dataUri, base64, mediaType);
 
     return {
       type: "image",
@@ -36,6 +109,46 @@ export class ImageProcessor {
         size: content.length,
       },
     } satisfies FileProcessingResult;
+  }
+
+  /**
+   * Validate processed output meets required format
+   * Checks:
+   * - Base64 content is non-empty
+   * - Data URI format is valid (data:{mimeType};base64,{content})
+   * - MIME type is in the allowed list
+   * @param dataUri - The complete data URI string
+   * @param base64 - The base64-encoded content
+   * @param mediaType - The MIME type of the image
+   * @throws Error if any validation fails
+   */
+  private static validateProcessOutput(
+    dataUri: string,
+    base64: string,
+    mediaType: string,
+  ): void {
+    // Validate base64 is non-empty (check first for better error message)
+    if (base64.length === 0) {
+      logger.error("Empty base64 content generated");
+      throw new Error("Invalid image processing: base64 content is empty");
+    }
+
+    // Validate data URI format with proper base64 character validation
+    // Base64 can only have 0, 1, or 2 padding characters at the end
+    const dataUriRegex = /^data:[^;]+;base64,[A-Za-z0-9+/]*={0,2}$/;
+    if (!dataUriRegex.test(dataUri)) {
+      logger.error("Invalid data URI format generated", { dataUri });
+      throw new Error(
+        "Invalid data URI format: must be data:{mimeType};base64,{content}",
+      );
+    }
+
+    // Defensive check: ensure detectImageType() returns valid MIME type
+    // This validation protects against future changes to detectImageType()
+    if (!this.validateImageFormat(mediaType)) {
+      logger.error("Invalid MIME type generated", { mediaType });
+      throw new Error(`Invalid MIME type: ${mediaType} is not in allowed list`);
+    }
   }
 
   /**
@@ -519,18 +632,47 @@ export const imageUtils = {
   },
 
   /**
-   * Convert URL to base64 data URI by downloading the image
+   * Convert URL to base64 data URI by downloading the image.
+   * Implements retry logic with exponential backoff for network errors.
+   *
+   * Retries are performed for:
+   * - Network errors (ECONNRESET, ENOTFOUND, ECONNREFUSED, ETIMEDOUT, ERR_NETWORK, AbortError)
+   * - Server errors (5xx status codes)
+   * - Rate limiting (429 Too Many Requests)
+   * - Request timeouts (408 Request Timeout)
+   *
+   * Retries are NOT performed for:
+   * - Client errors (4xx status codes except 408, 429)
+   * - Invalid content type
+   * - Content size limit exceeded
+   * - Unsupported protocol
+   *
+   * @param url - The URL of the image to download
+   * @param options - Configuration options
+   * @param options.timeoutMs - Timeout for each download attempt (default: 15000ms)
+   * @param options.maxBytes - Maximum allowed file size (default: 10MB)
+   * @param options.maxAttempts - Maximum number of total attempts including initial attempt (default: 3)
+   * @returns Promise<string> - Base64 data URI of the downloaded image
    */
   urlToBase64DataUri: async (
     url: string,
-    { timeoutMs = 15000, maxBytes = 10 * 1024 * 1024 } = {},
+    {
+      timeoutMs = 15000,
+      maxBytes = 10 * 1024 * 1024,
+      maxAttempts = 3,
+    }: {
+      timeoutMs?: number;
+      maxBytes?: number;
+      maxAttempts?: number;
+    } = {},
   ): Promise<string> => {
-    try {
-      // Basic protocol whitelist
-      if (!/^https?:\/\//i.test(url)) {
-        throw new Error("Unsupported protocol");
-      }
+    // Basic protocol whitelist - fail fast, no retry needed
+    if (!/^https?:\/\//i.test(url)) {
+      throw new Error("Unsupported protocol");
+    }
 
+    // Perform the actual download with retry logic
+    const performDownload = async (): Promise<string> => {
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -565,6 +707,24 @@ export const imageUtils = {
       } finally {
         clearTimeout(t);
       }
+    };
+
+    try {
+      return await withRetry(performDownload, {
+        maxAttempts,
+        initialDelay: SYSTEM_LIMITS.DEFAULT_INITIAL_DELAY,
+        backoffMultiplier: SYSTEM_LIMITS.DEFAULT_BACKOFF_MULTIPLIER,
+        maxDelay: SYSTEM_LIMITS.DEFAULT_MAX_DELAY,
+        retryCondition: isRetryableDownloadError,
+        onRetry: (attempt: number, error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const attemptsLeft = maxAttempts - attempt;
+          logger.warn(
+            `⚠️ Image download attempt ${attempt} failed for ${url}: ${message}. ${attemptsLeft} ${attemptsLeft === 1 ? "attempt" : "attempts"} remaining...`,
+          );
+        },
+      });
     } catch (error) {
       throw new Error(
         `Failed to download and convert URL to base64: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -601,13 +761,45 @@ export const imageUtils = {
 
   /**
    * Validate base64 string format
+   * Validates format BEFORE buffer allocation to prevent memory exhaustion
    */
   isValidBase64: (str: string): boolean => {
     try {
       // Remove data URI prefix if present
       const cleanBase64 = str.includes(",") ? str.split(",")[1] : str;
 
-      // Check if it's valid base64
+      // Empty string check
+      if (!cleanBase64 || cleanBase64.length === 0) {
+        return false;
+      }
+
+      // 1. Validate character set FIRST (A-Z, a-z, 0-9, +, /, =)
+      // This prevents memory allocation for invalid input like "hello world"
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(cleanBase64)) {
+        return false;
+      }
+
+      // 2. Check length is multiple of 4
+      if (cleanBase64.length % 4 !== 0) {
+        return false;
+      }
+
+      // 3. Validate padding position (max 2 equals at end only)
+      const paddingIndex = cleanBase64.indexOf("=");
+      if (paddingIndex !== -1) {
+        // Padding must be at the end
+        if (paddingIndex < cleanBase64.length - 2) {
+          return false;
+        }
+        // No characters after padding
+        const afterPadding = cleanBase64.slice(paddingIndex);
+        if (!/^=+$/.test(afterPadding)) {
+          return false;
+        }
+      }
+
+      // 4. ONLY NOW decode if format is valid
       const decoded = Buffer.from(cleanBase64, "base64");
       const reencoded = decoded.toString("base64");
 

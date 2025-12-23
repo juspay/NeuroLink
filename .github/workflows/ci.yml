@@ -20,13 +20,29 @@ jobs:
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 9
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: "pnpm"
+
+      - name: Install ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@36c6454b5a2348e7794ba2d82a21506605921e3d
+        with:
+          ffmpeg-version: "7.0.2"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify ffmpeg installation
+        run: |
+          echo "🎬 Verifying ffmpeg installation..."
+          ffmpeg -version || {
+            echo "❌ ffmpeg installation failed!"
+            echo "Please check the setup-ffmpeg action configuration."
+            exit 1
+          }
+          echo "✅ ffmpeg installed successfully"
 
       - name: Install dependencies
         run: pnpm install
@@ -36,8 +52,14 @@ jobs:
           echo "🔄 Running SvelteKit sync to generate TypeScript configs..."
           pnpm exec svelte-kit sync
 
-      - name: Auto-format code
-        run: pnpm run format
+      - name: Check code formatting
+        run: |
+          echo "🎨 Checking code formatting..."
+          pnpm run format:check || {
+            echo "❌ Formatting issues found!"
+            echo "Run 'pnpm run format' locally to fix."
+            exit 1
+          }
 
       - name: Run linting
         run: |
@@ -67,13 +89,29 @@ jobs:
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
+
+      - name: Install ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@36c6454b5a2348e7794ba2d82a21506605921e3d
+        with:
+          ffmpeg-version: "7.0.2"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify ffmpeg installation
+        run: |
+          echo "🎬 Verifying ffmpeg installation..."
+          ffmpeg -version || {
+            echo "❌ ffmpeg installation failed!"
+            echo "Please check the setup-ffmpeg action configuration."
+            exit 1
+          }
+          echo "✅ ffmpeg installed successfully"
 
       - name: Install dependencies
         run: pnpm i
@@ -101,13 +139,30 @@ jobs:
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
+
+      - name: Install ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@36c6454b5a2348e7794ba2d82a21506605921e3d
+        with:
+          # ffmpeg for video features (VIDEO-034)
+          ffmpeg-version: "7.0.2"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify ffmpeg installation
+        run: |
+          echo "🎬 Verifying ffmpeg installation..."
+          ffmpeg -version || {
+            echo "❌ ffmpeg installation failed!"
+            echo "Please check the setup-ffmpeg action configuration."
+            exit 1
+          }
+          echo "✅ ffmpeg installed successfully"
 
       - name: Install dependencies
         run: pnpm install
@@ -162,7 +217,7 @@ jobs:
         run: |
           echo "📋 Build Rule Enforcement Summary:"
           echo "✅ Build validation passed"
-          echo "✅ Environment validation passed" 
+          echo "✅ Environment validation passed"
           echo "✅ Security validation passed"
           echo "✅ TypeScript compilation passed"
           echo "✅ Commit message format validated"
@@ -173,3 +228,34 @@ jobs:
           echo "ℹ️  See: Single Commit Per Branch Enforcement workflow"
           echo ""
           echo "🎉 All quality gates passed!"
+
+  semantic-release-validation:
+    runs-on: ubuntu-latest
+    needs: [test, build-check]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Validate semantic-release configuration
+        run: |
+          npx semantic-release --dry-run \
+            --plugins "@semantic-release/commit-analyzer" \
+            --plugins "@semantic-release/release-notes-generator"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

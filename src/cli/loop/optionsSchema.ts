@@ -25,6 +25,7 @@ export const textGenerationOptionsSchema: Record<
     | "evaluationCriteria"
     | "region"
     | "csvOptions"
+    | "tts"
   >,
   OptionSchema
 > = {
@@ -85,5 +86,10 @@ export const textGenerationOptionsSchema: Record<
   toolUsageContext: {
     type: "string",
     description: "Context about tools/MCPs used in the interaction.",
+  },
+  enableSummarization: {
+    type: "boolean",
+    description:
+      "Enable or disable automatic conversation summarization for this request.",
   },
 };

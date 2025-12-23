@@ -110,6 +110,7 @@ import { EventEmitter } from "events";
 import type {
   ConversationMemoryConfig,
   ChatMessage,
+  ProviderDetails,
 } from "./types/conversation.js";
 import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
 import { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
@@ -648,14 +649,18 @@ Current user's request: ${currentInput}`;
   }
 
   /** Store conversation turn in mem0 */
-  private async storeConversationTurn(
+  private async storeMem0ConversationTurn(
     mem0: MemoryClient,
     userContent: string,
+    aiResponse: string,
     userId: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
-    // Store user message only, reducing latency in mem0
-    const conversationTurn = [{ role: "user" as const, content: userContent }];
+    // Store both user message and AI response for better context extraction
+    const conversationTurn = [
+      { role: "user" as const, content: userContent },
+      { role: "assistant" as const, content: aiResponse },
+    ];
 
     await mem0.add(conversationTurn, {
       user_id: userId,
@@ -719,7 +724,7 @@ Current user's request: ${currentInput}`;
       this.externalServerManager = new ExternalServerManager(
         {
           maxServers: 20,
-          defaultTimeout: 15000,
+          defaultTimeout: 30000, // Increased from 15s to 30s for proxy latency (e.g., LiteLLM)
           enableAutoRestart: true,
           enablePerformanceMonitoring: true,
         },
@@ -1768,6 +1773,7 @@ Current user's request: ${currentInput}`;
         toolUsageContext: options.toolUsageContext,
         input: options.input, // This includes text, images, and content arrays
         region: options.region,
+        tts: options.tts,
       };
 
       // Apply factory enhancement using centralized utilities
@@ -1865,6 +1871,7 @@ Current user's request: ${currentInput}`;
                 factoryResult.domainType,
             }
           : undefined,
+        audio: textResult.audio,
       };
 
       if (
@@ -1877,9 +1884,10 @@ Current user's request: ${currentInput}`;
           try {
             const mem0 = await this.ensureMem0Ready();
             if (mem0) {
-              await this.storeConversationTurn(
+              await this.storeMem0ConversationTurn(
                 mem0,
                 originalPrompt,
+                generateResult.content,
                 options.context?.userId as string,
                 {
                   timestamp: new Date().toISOString(),
@@ -2100,7 +2108,10 @@ Current user's request: ${currentInput}`;
     generateInternalHrTimeStart: bigint,
     functionTag: string,
   ): Promise<TextGenerationResult | null> {
-    if (!options.disableTools) {
+    if (
+      !options.disableTools &&
+      !(options.tts?.enabled && !options.tts?.useAiResponse)
+    ) {
       return await this.performMCPGenerationRetries(
         options,
         generateInternalId,
@@ -2343,6 +2354,7 @@ Current user's request: ${currentInput}`;
         availableTools: transformToolsForMCP(
           transformToolsToExpectedFormat(availableTools),
         ),
+        audio: result.audio,
         // Include analytics and evaluation from BaseProvider
         analytics: result.analytics,
         evaluation: result.evaluation,
@@ -2467,6 +2479,7 @@ Current user's request: ${currentInput}`;
           enhancedWithTools: false,
           analytics: result.analytics,
           evaluation: result.evaluation,
+          audio: result.audio,
         };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -2749,6 +2762,41 @@ Current user's request: ${currentInput}`;
           }
         }
 
+        // 🔧 AUTO-DISABLE TOOLS: For Ollama models that don't support tools (same logic as generate())
+        // This prevents overwhelming smaller models with massive tool descriptions in the system message
+        if (
+          (options.provider === "ollama" ||
+            options.provider?.toLowerCase().includes("ollama")) &&
+          !options.disableTools
+        ) {
+          const { ModelConfigurationManager } = await import(
+            "./core/modelConfiguration.js"
+          );
+          const modelConfig = ModelConfigurationManager.getInstance();
+          const ollamaConfig = modelConfig.getProviderConfiguration("ollama");
+          const toolCapableModels =
+            (ollamaConfig?.modelBehavior?.toolCapableModels as string[]) || [];
+
+          // Only disable tools if we have explicit evidence the model doesn't support them
+          // If toolCapableModels is empty or model is not specified, don't make assumptions
+          const modelName = options.model;
+          if (toolCapableModels.length > 0 && modelName) {
+            const modelSupportsTools = toolCapableModels.some((capableModel) =>
+              modelName.toLowerCase().includes(capableModel.toLowerCase()),
+            );
+            if (!modelSupportsTools) {
+              options.disableTools = true;
+              logger.debug(
+                "Auto-disabled tools for Ollama model that doesn't support them (stream)",
+                {
+                  model: options.model,
+                  toolCapableModels: toolCapableModels.slice(0, 3), // Show first 3 for brevity
+                },
+              );
+            }
+          }
+        }
+
         factoryResult = processStreamingFactoryOptions(options);
         enhancedOptions = createCleanStreamOptions(options);
         if (options.input?.text) {
@@ -2762,22 +2810,117 @@ Current user's request: ${currentInput}`;
         const { stream: mcpStream, provider: providerName } =
           await this.createMCPStream(enhancedOptions);
 
-        // Create a wrapper around the stream that accumulates content
         let accumulatedContent = "";
+        let chunkCount = 0;
+
+        const metadata = {
+          fallbackAttempted: false,
+          guardrailsBlocked: false,
+          error: undefined as string | undefined,
+        };
 
         const processedStream = (async function* (self: NeuroLink) {
           try {
             for await (const chunk of mcpStream) {
+              chunkCount++;
               if (
                 chunk &&
                 "content" in chunk &&
                 typeof chunk.content === "string"
               ) {
                 accumulatedContent += chunk.content;
-                // Emit chunk event for compatibility
                 self.emitter.emit("response:chunk", chunk.content);
               }
-              yield chunk; // Preserve original streaming behavior
+              yield chunk;
+            }
+
+            if (chunkCount === 0 && !metadata.fallbackAttempted) {
+              metadata.fallbackAttempted = true;
+              const errorMsg =
+                "Stream completed with 0 chunks (possible guardrails block)";
+              metadata.error = errorMsg;
+
+              const fallbackRoute = ModelRouter.getFallbackRoute(
+                originalPrompt || enhancedOptions.input.text || "",
+                {
+                  provider: providerName,
+                  model: enhancedOptions.model || "gpt-4o",
+                  reasoning: "primary failed",
+                  confidence: 0.5,
+                },
+                { fallbackStrategy: "auto" },
+              );
+
+              logger.warn("Retrying with fallback provider", {
+                originalProvider: providerName,
+                fallbackProvider: fallbackRoute.provider,
+                reason: errorMsg,
+              });
+
+              try {
+                const fallbackProvider = await AIProviderFactory.createProvider(
+                  fallbackRoute.provider,
+                  fallbackRoute.model,
+                );
+
+                // Ensure fallback provider can execute tools
+                fallbackProvider.setupToolExecutor(
+                  {
+                    customTools: self.getCustomTools(),
+                    executeTool: self.executeTool.bind(self),
+                  },
+                  "NeuroLink.fallbackStream",
+                );
+
+                // Get conversation messages for context (same as primary stream)
+                const conversationMessages = await getConversationMessages(
+                  self.conversationMemory,
+                  {
+                    prompt: enhancedOptions.input.text,
+                    context: enhancedOptions.context as Record<string, unknown>,
+                  } as TextGenerationOptions,
+                );
+
+                const fallbackResult = await fallbackProvider.stream({
+                  ...enhancedOptions,
+                  model: fallbackRoute.model,
+                  conversationMessages,
+                });
+
+                let fallbackChunkCount = 0;
+                for await (const fallbackChunk of fallbackResult.stream) {
+                  fallbackChunkCount++;
+                  if (
+                    fallbackChunk &&
+                    "content" in fallbackChunk &&
+                    typeof fallbackChunk.content === "string"
+                  ) {
+                    accumulatedContent += fallbackChunk.content;
+                    self.emitter.emit("response:chunk", fallbackChunk.content);
+                  }
+                  yield fallbackChunk;
+                }
+
+                if (fallbackChunkCount === 0) {
+                  throw new Error(
+                    `Fallback provider ${fallbackRoute.provider} also returned 0 chunks`,
+                  );
+                }
+
+                // Fallback succeeded - likely guardrails blocked primary
+                metadata.guardrailsBlocked = true;
+              } catch (fallbackError) {
+                const fallbackErrorMsg =
+                  fallbackError instanceof Error
+                    ? fallbackError.message
+                    : String(fallbackError);
+                metadata.error = `${errorMsg}; Fallback failed: ${fallbackErrorMsg}`;
+                logger.error("Fallback provider failed", {
+                  fallbackProvider: fallbackRoute.provider,
+                  error: fallbackErrorMsg,
+                });
+                throw fallbackError;
+              }
             }
           } finally {
             // Store memory after stream consumption is complete
@@ -2788,20 +2931,23 @@ Current user's request: ${currentInput}`;
               const userId = (
                 enhancedOptions.context as Record<string, unknown>
               )?.userId as string;
+              let providerDetails: ProviderDetails | undefined = undefined;
+              if (enhancedOptions.model) {
+                providerDetails = {
+                  provider: providerName,
+                  model: enhancedOptions.model,
+                };
+              }
 
               try {
-                await self.conversationMemory.storeConversationTurn(
+                await self.conversationMemory.storeConversationTurn({
                   sessionId,
                   userId,
-                  originalPrompt ?? "",
-                  accumulatedContent,
-                  new Date(startTime),
-                );
-
-                logger.debug("Stream conversation turn stored", {
-                  sessionId,
-                  userInputLength: originalPrompt?.length ?? 0,
-                  responseLength: accumulatedContent.length,
+                  userMessage: originalPrompt ?? "",
+                  aiResponse: accumulatedContent,
+                  startTimeStamp: new Date(startTime),
+                  providerDetails,
+                  enableSummarization: enhancedOptions.enableSummarization,
                 });
               } catch (error) {
                 logger.warn("Failed to store stream conversation turn", {
@@ -2820,15 +2966,14 @@ Current user's request: ${currentInput}`;
                 try {
                   const mem0 = await self.ensureMem0Ready();
                   if (mem0) {
-                    await self.storeConversationTurn(
+                    await self.storeMem0ConversationTurn(
                       mem0,
                       originalPrompt,
+                      accumulatedContent.trim(),
                       enhancedOptions.context?.userId as string,
                       {
                         timestamp: new Date().toISOString(),
                         type: "conversation_turn_stream",
-                        userMessage: originalPrompt,
-                        aiResponse: accumulatedContent.trim(),
                       },
                     );
                   }
@@ -2840,7 +2985,7 @@ Current user's request: ${currentInput}`;
           }
         })(this);
         const streamResult = await this.processStreamResult(
-          mcpStream,
+          processedStream,
           enhancedOptions,
           factoryResult,
         );
@@ -2854,7 +2999,9 @@ Current user's request: ${currentInput}`;
           startTime,
           responseTime,
           streamId,
-          fallback: false,
+          fallback: metadata.fallbackAttempted,
+          guardrailsBlocked: metadata.guardrailsBlocked,
+          error: metadata.error,
         });
       } catch (error) {
         return this.handleStreamError(
@@ -2945,21 +3092,37 @@ Current user's request: ${currentInput}`;
       "NeuroLink.createMCPStream",
     );
 
+    // 🔧 FIX: Get available tools and create tool-aware system prompt
+    // Use SAME pattern as tryMCPGeneration (generate mode)
+    const availableTools = await this.getAllAvailableTools();
+    const enhancedSystemPrompt = this.createToolAwareSystemPrompt(
+      options.systemPrompt,
+      availableTools,
+    );
+
     // Get conversation messages for context
     const conversationMessages = await getConversationMessages(
       this.conversationMemory,
       {
+        ...options,
         prompt: options.input.text,
-        context: options.context as Record<string, unknown>,
+        context: options.context,
       } as TextGenerationOptions,
     );
 
-    // Let provider handle tools and system prompt automatically via Vercel AI SDK
-    // This ensures proper tool integration in stream mode
+    // 🔧 FIX: Pass enhanced system prompt to real streaming
+    // Tools will be accessed through the streamText call in executeStream
     const streamResult = await provider.stream({
       ...options,
+      systemPrompt: enhancedSystemPrompt, // Use enhanced prompt with tool descriptions
       conversationMessages,
     });
+
+    logger.debug("[createMCPStream] Stream created successfully", {
+      provider: providerName,
+      systemPromptPassedLength: enhancedSystemPrompt.length,
+    });
+
     return { stream: streamResult.stream, provider: providerName };
   }
 
@@ -3027,6 +3190,8 @@ Current user's request: ${currentInput}`;
       responseTime: number;
       streamId: string;
       fallback?: boolean;
+      guardrailsBlocked?: boolean;
+      error?: string;
     },
   ): StreamResult {
     return {
@@ -3044,6 +3209,8 @@ Current user's request: ${currentInput}`;
         startTime: config.startTime,
         responseTime: config.responseTime,
         fallback: config.fallback || false,
+        guardrailsBlocked: config.guardrailsBlocked,
+        error: config.error,
       },
     };
   }
@@ -3102,20 +3269,23 @@ Current user's request: ${currentInput}`;
           )?.sessionId as string;
           const userId = (enhancedOptions?.context as Record<string, unknown>)
             ?.userId as string;
+          let providerDetails: ProviderDetails | undefined = undefined;
+          if (options.model) {
+            providerDetails = {
+              provider: providerName,
+              model: options.model,
+            };
+          }
 
           try {
-            await self.conversationMemory.storeConversationTurn(
-              sessionId || (options.context?.sessionId as string),
-              userId || (options.context?.userId as string),
-              originalPrompt ?? "",
-              fallbackAccumulatedContent,
-              new Date(startTime),
-            );
-
-            logger.debug("Fallback stream conversation turn stored", {
-              sessionId: sessionId || options.context?.sessionId,
-              userInputLength: originalPrompt?.length ?? 0,
-              responseLength: fallbackAccumulatedContent.length,
+            await self.conversationMemory.storeConversationTurn({
+              sessionId: sessionId || (options.context?.sessionId as string),
+              userId: userId || (options.context?.userId as string),
+              userMessage: originalPrompt ?? "",
+              aiResponse: fallbackAccumulatedContent,
+              startTimeStamp: new Date(startTime),
+              providerDetails,
+              enableSummarization: enhancedOptions?.enableSummarization,
             });
           } catch (error) {
             logger.warn("Failed to store fallback stream conversation turn", {
@@ -5750,32 +5920,11 @@ Current user's request: ${currentInput}`;
       );
 
       // Use the integration module to create the appropriate memory manager
-      const memoryManagerCreateStartTime = process.hrtime.bigint();
       const memoryManager = await initializeConversationMemory(
         this.conversationMemoryConfig,
       );
       // Assign to conversationMemory with proper type to handle both memory manager types
       this.conversationMemory = memoryManager;
-
-      const memoryManagerCreateEndTime = process.hrtime.bigint();
-      const memoryManagerCreateDurationNs =
-        memoryManagerCreateEndTime - memoryManagerCreateStartTime;
-
-      logger.info(`[NeuroLink] ✅ LOG_POINT_G004_MEMORY_LAZY_INIT_SUCCESS`, {
-        logPoint: "G004_MEMORY_LAZY_INIT_SUCCESS",
-        generateInternalId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - generateInternalStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - generateInternalHrTimeStart
-        ).toString(),
-        memoryManagerCreateDurationNs: memoryManagerCreateDurationNs.toString(),
-        memoryManagerCreateDurationMs:
-          Number(memoryManagerCreateDurationNs) / 1000000,
-        storageType: process.env.STORAGE_TYPE || "memory",
-        message:
-          "Lazy conversation memory initialization completed successfully",
-      });
 
       // Reset the lazy init flag since we've now initialized
       this.conversationMemoryNeedsInit = false;

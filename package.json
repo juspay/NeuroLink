@@ -1,6 +1,6 @@
 {
   "name": "@juspay/neurolink",
-  "version": "8.1.0",
+  "version": "8.23.0",
   "description": "Universal AI Development Platform with working MCP integration, multi-provider support, and professional CLI. Built-in tools operational, 58+ external MCP servers discoverable. Connect to filesystem, GitHub, database operations, and more. Build, test, and deploy AI applications with 9 major providers: OpenAI, Anthropic, Google AI, AWS Bedrock, Azure, Hugging Face, Ollama, and Mistral AI.",
   "author": {
     "name": "Juspay Technologies",
@@ -38,6 +38,7 @@
     "modelServer": "node scripts/modelServer.js",
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "format:staged": "node scripts/format-staged.cjs",
     "changeset": "changeset",
     "changeset:version": "changeset version && git add --all",
@@ -163,6 +164,7 @@
     "@aws-sdk/client-sagemaker-runtime": "^3.886.0",
     "@aws-sdk/credential-provider-node": "^3.886.0",
     "@aws-sdk/types": "^3.862.0",
+    "@google-cloud/text-to-speech": "^5.0.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/genai": "^1.19.0",
     "@google/generative-ai": "^0.24.1",
@@ -178,26 +180,34 @@
     "@opentelemetry/sdk-trace-base": "^2.1.0",
     "@opentelemetry/sdk-trace-node": "^2.1.0",
     "@opentelemetry/semantic-conventions": "^1.30.1",
+    "adm-zip": "^0.5.16",
     "ai": "4.3.16",
     "chalk": "^5.6.2",
     "csv-parser": "^3.2.0",
     "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
     "inquirer": "^9.3.7",
     "json-schema-to-zod": "^2.6.1",
+    "mammoth": "^1.11.0",
     "mathjs": "^14.7.0",
     "mem0ai": "^2.1.38",
     "nanoid": "^5.1.5",
     "ollama-ai-provider": "^1.2.0",
     "ora": "^7.0.1",
     "p-limit": "^6.2.0",
+    "pdfjs-dist": "^5.4.296",
     "reconnecting-eventsource": "^1.6.4",
     "redis": "^5.8.2",
     "undici": "^7.5.0",
     "uuid": "^11.1.0",
     "ws": "^8.18.3",
+    "xml2js": "^0.6.2",
     "yargs": "^17.7.2",
     "zod": "^3.22.0",
     "zod-to-json-schema": "^3.24.6"
+  },
+  "optionalDependencies": {
+    "canvas": "^3.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.4",
@@ -208,18 +218,20 @@
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.6",
-    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/npm": "^13.1.2",
     "@semantic-release/release-notes-generator": "^14.1.0",
     "@smithy/types": "^4.5.0",
     "@sveltejs/adapter-auto": "^6.1.0",
     "@sveltejs/kit": "^2.38.1",
     "@sveltejs/package": "^2.5.0",
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "@types/adm-zip": "^0.5.7",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/inquirer": "^9.0.9",
     "@types/node": "^20.19.13",
     "@types/ws": "^8.18.1",
+    "@types/xml2js": "^0.4.14",
     "@types/yargs": "^17.0.33",
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
@@ -286,7 +298,8 @@
       "esbuild",
       "protobufjs",
       "puppeteer",
-      "sqlite3"
+      "sqlite3",
+      "canvas"
     ],
     "overrides": {
       "esbuild@<=0.24.2": ">=0.25.0",
@@ -294,7 +307,8 @@
       "@eslint/plugin-kit@<0.3.4": ">=0.3.4",
       "tmp@<=0.2.3": ">=0.2.4",
       "axios@<1.8.2": ">=1.8.2",
-      "glob@>=10.3.7 <=11.0.3": ">=11.1.0"
+      "glob@>=10.3.7 <=11.0.3": ">=11.1.0",
+      "@semantic-release/npm": "^13.1.2"
     }
   },
   "os": [

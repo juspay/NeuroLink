@@ -3,7 +3,10 @@ import type {
   PDFProviderConfig,
   PDFProcessorOptions,
 } from "../types/fileTypes.js";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { logger } from "./logger.js";
+// Lazy-load pdfjs-dist to avoid DOMMatrix errors in Node.js server environment
+// import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const PDF_PROVIDER_CONFIGS: Record<string, PDFProviderConfig> = {
   anthropic: {
@@ -93,7 +96,7 @@ const PDF_PROVIDER_CONFIGS: Record<string, PDFProviderConfig> = {
   mistral: {
     maxSizeMB: 10,
     maxPages: 100,
-    supportsNative: true,
+    supportsNative: false,
     requiresCitations: false,
     apiType: "files-api",
   },
@@ -130,18 +133,16 @@ export class PDFProcessor {
       );
     }
 
-    if (!config || !config.supportsNative) {
-      const supportedProviders = Object.keys(PDF_PROVIDER_CONFIGS)
-        .filter((p) => PDF_PROVIDER_CONFIGS[p].supportsNative)
-        .join(", ");
+    if (!config) {
+      const supportedProviders = Object.keys(PDF_PROVIDER_CONFIGS).join(", ");
 
       throw new Error(
-        `PDF files are not currently supported with ${provider} provider.\n` +
-          `Supported providers: ${supportedProviders}\n` +
+        `PDF files are not configured for ${provider} provider.\n` +
+          `Configured providers: ${supportedProviders}\n` +
           `Current provider: ${provider}\n\n` +
           `Options:\n` +
-          `1. Switch to a supported provider (--provider openai or --provider vertex)\n` +
-          `2. Convert your PDF to text manually`,
+          `1. Switch to a configured provider (--provider openai or --provider vertex)\n` +
+          `2. Contact support to add ${provider} PDF configuration`,
       );
     }
 
@@ -233,6 +234,126 @@ export class PDFProcessor {
       return Math.ceil((pageCount / 3) * 1000);
     } else {
       return Math.ceil((pageCount / 3) * 7000);
+    }
+  }
+
+  static async convertPDFToImages(
+    pdfBuffer: Buffer,
+    options?: {
+      maxPages?: number;
+      scale?: number;
+      format?: "png" | "jpeg";
+      quality?: number;
+    },
+  ): Promise<Array<{ buffer: Buffer; pageNumber: number }>> {
+    // Dynamic import canvas - only load when actually needed
+    let createCanvas: typeof import("canvas").createCanvas;
+    try {
+      const canvasModule = await import("canvas");
+      createCanvas = canvasModule.createCanvas;
+    } catch {
+      throw new Error(
+        "Canvas dependency not available. " +
+          "PDF-to-image conversion requires the 'canvas' package with native bindings. " +
+          "Install with: pnpm install canvas\n" +
+          "Note: This requires native build tools (Python, C++ compiler).",
+      );
+    }
+
+    // Dynamic import pdfjs - only load when actually needed to avoid DOMMatrix errors
+    let pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+    try {
+      pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    } catch {
+      throw new Error(
+        "pdfjs-dist dependency not available. " +
+          "PDF processing requires the 'pdfjs-dist' package. " +
+          "Install with: pnpm install pdfjs-dist",
+      );
+    }
+
+    const maxPages = options?.maxPages || 10;
+    const scale = options?.scale || 2.0;
+    const format = options?.format || "png";
+    const quality = options?.quality || 0.9;
+
+    let pdfDocument: PDFDocumentProxy | null = null;
+
+    try {
+      const loadingTask = pdfjs.getDocument({
+        data: new Uint8Array(pdfBuffer),
+        useSystemFonts: true,
+        standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+      });
+
+      pdfDocument = await loadingTask.promise;
+      const numPages = Math.min(pdfDocument.numPages, maxPages);
+      const images: Array<{ buffer: Buffer; pageNumber: number }> = [];
+
+      logger.info(
+        `[PDF→Image] Converting ${numPages} page(s) from PDF (total: ${pdfDocument.numPages})`,
+      );
+
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum);
+        const viewport = page.getViewport({ scale });
+
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const context = canvas.getContext("2d");
+
+        await page.render({
+          canvasContext: context as unknown as CanvasRenderingContext2D,
+          viewport,
+          // @ts-expect-error - canvas type mismatch between node-canvas and pdfjs-dist
+          canvas: canvas,
+        }).promise;
+
+        const imageBuffer =
+          format === "png"
+            ? canvas.toBuffer("image/png")
+            : canvas.toBuffer("image/jpeg", { quality });
+
+        images.push({ buffer: imageBuffer, pageNumber: pageNum });
+
+        logger.debug(
+          `[PDF→Image] ✅ Converted page ${pageNum}/${numPages} (${(imageBuffer.length / 1024).toFixed(1)}KB)`,
+        );
+      }
+
+      if (pdfDocument.numPages > maxPages) {
+        logger.warn(
+          `[PDF→Image] PDF has ${pdfDocument.numPages} pages, converted only first ${maxPages} pages`,
+        );
+      }
+
+      logger.info(
+        `[PDF→Image] ✅ Successfully converted ${images.length} page(s) to images`,
+      );
+
+      return images;
+    } catch (error) {
+      logger.error(
+        `[PDF→Image] ❌ Failed to convert PDF to images:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      throw new Error(
+        `PDF to image conversion failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      // Ensure pdfDocument is destroyed regardless of success or failure
+      if (pdfDocument) {
+        try {
+          pdfDocument.destroy();
+          logger.debug("[PDF→Image] PDF document resources cleaned up");
+        } catch (destroyError) {
+          logger.warn(
+            "[PDF→Image] Error destroying PDF document:",
+            destroyError instanceof Error
+              ? destroyError.message
+              : String(destroyError),
+          );
+        }
+      }
     }
   }
 }

@@ -10,7 +10,8 @@ import type { EvaluationData } from "./evaluation.js";
 import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type { JsonValue } from "./common.js";
-import type { TextContent, ImageContent } from "./content.js";
+import type { Content, ImageWithAltText } from "./content.js";
+import type { TTSOptions, TTSResult } from "./ttsTypes.js";
 
 /**
  * Generate function options type - Primary method for content generation
@@ -19,11 +20,29 @@ import type { TextContent, ImageContent } from "./content.js";
 export type GenerateOptions = {
   input: {
     text: string;
-    images?: Array<Buffer | string>; // Simple image support
+    /**
+     * Images to include in the request.
+     * Supports simple image data (Buffer, string) or objects with alt text for accessibility.
+     *
+     * @example Simple usage
+     * ```typescript
+     * images: [imageBuffer, "https://example.com/image.jpg"]
+     * ```
+     *
+     * @example With alt text for accessibility
+     * ```typescript
+     * images: [
+     *   { data: imageBuffer, altText: "Product screenshot showing main dashboard" },
+     *   { data: "https://example.com/chart.png", altText: "Sales chart for Q3 2024" }
+     * ]
+     * ```
+     */
+    images?: Array<Buffer | string | ImageWithAltText>;
     csvFiles?: Array<Buffer | string>; // Explicit CSV files
     pdfFiles?: Array<Buffer | string>; // Explicit PDF files
+    videoFiles?: Array<Buffer | string>; // Explicit video files
     files?: Array<Buffer | string>; // Auto-detect file types
-    content?: Array<TextContent | ImageContent>; // Advanced multimodal content
+    content?: Content[]; // Advanced multimodal content
   };
   output?: { format?: "text" | "structured" | "json" }; // Future extensible
 
@@ -34,6 +53,48 @@ export type GenerateOptions = {
     includeHeaders?: boolean;
   };
 
+  // Video processing options
+  videoOptions?: {
+    frames?: number; // Number of frames to extract (default: 8)
+    quality?: number; // Frame quality 0-100 (default: 85)
+    format?: "jpeg" | "png"; // Frame format (default: jpeg)
+    transcribeAudio?: boolean; // Extract and transcribe audio (default: false)
+  };
+
+  /**
+   * Text-to-Speech (TTS) configuration
+   *
+   * Enable audio generation from the text response. The generated audio will be
+   * returned in the result's `audio` field as a TTSResult object.
+   *
+   * @example Basic TTS
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Tell me a story" },
+   *   provider: "google-ai",
+   *   tts: { enabled: true, voice: "en-US-Neural2-C" }
+   * });
+   * console.log(result.audio?.buffer); // Audio Buffer
+   * ```
+   *
+   * @example Advanced TTS with options
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Speak slowly and clearly" },
+   *   provider: "google-ai",
+   *   tts: {
+   *     enabled: true,
+   *     voice: "en-US-Neural2-D",
+   *     speed: 0.8,
+   *     pitch: 2.0,
+   *     format: "mp3",
+   *     quality: "standard"
+   *   }
+   * });
+   * ```
+   */
+  tts?: TTSOptions;
+
   // Core options (inherited from TextGenerationOptions)
   provider?: AIProviderName | string;
   model?: string;
@@ -41,9 +102,58 @@ export type GenerateOptions = {
   temperature?: number;
   maxTokens?: number;
   systemPrompt?: string;
+  /**
+   * Zod schema for structured output validation
+   *
+   * @important Google Gemini Limitation
+   * Google Vertex AI and Google AI Studio cannot combine function calling with
+   * structured output. You MUST use `disableTools: true` when using schemas with
+   * Google providers.
+   *
+   * Error without disableTools: "Function calling with a response mime type:
+   * 'application/json' is unsupported"
+   *
+   * This is a documented Google API limitation, not a NeuroLink bug.
+   * All frameworks (LangChain, Vercel AI SDK, Agno, Instructor) use this approach.
+   *
+   * @example
+   * ```typescript
+   * // ✅ Correct for Google providers
+   * const result = await neurolink.generate({
+   *   schema: MySchema,
+   *   provider: "vertex",
+   *   disableTools: true  // Required for Google
+   * });
+   *
+   * // ✅ No restriction for other providers
+   * const result = await neurolink.generate({
+   *   schema: MySchema,
+   *   provider: "openai"  // Works without disableTools
+   * });
+   * ```
+   *
+   * @see https://ai.google.dev/gemini-api/docs/function-calling
+   */
   schema?: ValidationSchema;
   tools?: Record<string, Tool>;
   timeout?: number | string;
+  /**
+   * Disable tool execution (including built-in tools)
+   *
+   * @required For Google Gemini providers when using schemas
+   * Google Vertex AI and Google AI Studio require this flag when using
+   * structured output (schemas) due to Google API limitations.
+   *
+   * @example
+   * ```typescript
+   * // Required for Google providers with schemas
+   * await neurolink.generate({
+   *   schema: MySchema,
+   *   provider: "vertex",
+   *   disableTools: true
+   * });
+   * ```
+   */
   disableTools?: boolean;
 
   // Analytics and Evaluation
@@ -87,6 +197,36 @@ export type GenerateOptions = {
 export type GenerateResult = {
   content: string; // Primary output
   outputs?: { text: string }; // Future extensible for multi-modal
+
+  /**
+   * Text-to-Speech audio result
+   *
+   * Contains the generated audio buffer and metadata when TTS is enabled.
+   * Generated by TTSProcessor.synthesize() using the specified provider.
+   *
+   * @example Accessing TTS audio
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Hello world" },
+   *   provider: "google-ai",
+   *   tts: { enabled: true, voice: "en-US-Neural2-C" }
+   * });
+   *
+   * if (result.audio) {
+   *   console.log(`Audio size: ${result.audio.size} bytes`);
+   *   console.log(`Format: ${result.audio.format}`);
+   *   if (result.audio.duration) {
+   *     console.log(`Duration: ${result.audio.duration}s`);
+   *   }
+   *   if (result.audio.voice) {
+   *     console.log(`Voice: ${result.audio.voice}`);
+   *   }
+   *   // Save or play the audio buffer
+   *   fs.writeFileSync('output.mp3', result.audio.buffer);
+   * }
+   * ```
+   */
+  audio?: TTSResult;
 
   // Provider information
   provider?: string;
@@ -195,6 +335,38 @@ export type TextGenerationOptions = {
   timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
   disableTools?: boolean; // Disable tools (tools are enabled by default)
   maxSteps?: number; // Maximum tool execution steps (default: 5)
+
+  /**
+   * Text-to-Speech (TTS) configuration
+   *
+   * Enable audio generation from text. Behavior depends on useAiResponse flag:
+   * - When useAiResponse is false/undefined (default): TTS synthesizes the input text directly
+   * - When useAiResponse is true: TTS synthesizes the AI-generated response
+   *
+   * @example Using input text (default)
+   * ```typescript
+   * const neurolink = new NeuroLink();
+   * const result = await neurolink.generate({
+   *   input: { text: "Hello world" },
+   *   provider: "google-ai",
+   *   tts: { enabled: true, voice: "en-US-Neural2-C" }
+   * });
+   * // TTS synthesizes "Hello world" directly, no AI generation
+   * ```
+   *
+   * @example Using AI response
+   * ```typescript
+   * const neurolink = new NeuroLink();
+   * const result = await neurolink.generate({
+   *   input: { text: "Tell me a joke" },
+   *   provider: "google-ai",
+   *   tts: { enabled: true, useAiResponse: true, voice: "en-US-Neural2-C" }
+   * });
+   * // AI generates the joke, then TTS synthesizes the AI's response
+   * ```
+   */
+  tts?: TTSOptions;
+
   // NEW: Analytics and Evaluation Support
   enableEvaluation?: boolean; // Default: false - AI quality scoring
   enableAnalytics?: boolean; // Default: false - Usage tracking
@@ -225,6 +397,8 @@ export type TextGenerationOptions = {
     formatStyle?: "raw" | "markdown" | "json";
     includeHeaders?: boolean;
   };
+
+  enableSummarization?: boolean; // Enable/disable summarization for this specific request
 };
 
 /**
@@ -253,6 +427,7 @@ export type TextGenerationResult = {
   // Analytics and evaluation data
   analytics?: AnalyticsData;
   evaluation?: EvaluationData;
+  audio?: TTSResult;
 };
 
 /**

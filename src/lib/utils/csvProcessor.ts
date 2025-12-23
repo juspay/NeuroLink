@@ -10,6 +10,7 @@ import { logger } from "./logger.js";
 import type {
   FileProcessingResult,
   CSVProcessorOptions,
+  SampleDataFormat,
 } from "../types/fileTypes.js";
 
 /**
@@ -82,9 +83,18 @@ export class CSVProcessor {
       maxRows: rawMaxRows = 1000,
       formatStyle = "raw",
       includeHeaders = true,
+      sampleDataFormat = "json",
+      extension = null,
     } = options || {};
 
     const maxRows = Math.max(1, Math.min(10000, rawMaxRows));
+
+    logger.debug("[CSVProcessor] Starting CSV processing", {
+      contentSize: content.length,
+      formatStyle,
+      maxRows,
+      includeHeaders,
+    });
 
     const csvString = content.toString("utf-8");
 
@@ -93,6 +103,12 @@ export class CSVProcessor {
     if (formatStyle === "raw") {
       const lines = csvString.split("\n");
       const hasMetadataLine = isMetadataLine(lines);
+
+      if (hasMetadataLine) {
+        logger.debug(
+          "[CSVProcessor] Detected metadata line, skipping first line",
+        );
+      }
 
       // Skip metadata line if present, then take header + maxRows data rows
       const csvLines = hasMetadataLine
@@ -105,6 +121,13 @@ export class CSVProcessor {
 
       const rowCount = limitedLines.length - 1; // Subtract header
       const originalRowCount = csvLines.length - 1; // Subtract header from original
+      const wasTruncated = rowCount < originalRowCount;
+
+      if (wasTruncated) {
+        logger.warn(
+          `[CSVProcessor] CSV data truncated: showing ${rowCount} of ${originalRowCount} rows (limit: ${maxRows})`,
+        );
+      }
 
       logger.debug(
         `[CSVProcessor] raw format: ${rowCount} rows (original: ${originalRowCount}) → ${limitedCSV.length} chars`,
@@ -115,6 +138,13 @@ export class CSVProcessor {
         },
       );
 
+      logger.info("[CSVProcessor] ✅ Processed CSV file", {
+        formatStyle: "raw",
+        rowCount,
+        columnCount: (limitedLines[0] || "").split(",").length,
+        truncated: wasTruncated,
+      });
+
       return {
         type: "csv",
         content: limitedCSV,
@@ -124,11 +154,20 @@ export class CSVProcessor {
           size: content.length,
           rowCount,
           columnCount: (limitedLines[0] || "").split(",").length,
+          extension,
         },
       };
     }
 
     // Parse CSV for JSON and Markdown formats only
+    logger.debug(
+      "[CSVProcessor] Parsing CSV for structured format conversion",
+      {
+        formatStyle,
+        maxRows,
+      },
+    );
+
     const rows = await this.parseCSVString(csvString, maxRows);
 
     // Extract metadata from parsed results
@@ -140,18 +179,35 @@ export class CSVProcessor {
       (col) => !col || col.trim() === "",
     );
     const sampleRows = rows.slice(0, 3);
-    const sampleData =
-      sampleRows.length > 0
-        ? JSON.stringify(sampleRows, null, 2)
-        : "No data rows";
+    const sampleData = this.formatSampleData(
+      sampleRows,
+      sampleDataFormat,
+      includeHeaders,
+    );
+
+    if (hasEmptyColumns) {
+      logger.warn("[CSVProcessor] CSV contains empty or blank column headers", {
+        columnNames,
+      });
+    }
+
+    if (rowCount === 0) {
+      logger.warn("[CSVProcessor] CSV file contains no data rows");
+    }
 
     // Format parsed data
+    logger.debug(
+      `[CSVProcessor] Converting ${rowCount} rows to ${formatStyle} format`,
+    );
     const formatted = this.formatForLLM(rows, formatStyle, includeHeaders);
 
-    logger.info(
-      `[CSVProcessor] ${formatStyle} format: ${rowCount} rows × ${columnCount} columns → ${formatted.length} chars`,
-      { rowCount, columnCount, columns: columnNames, hasEmptyColumns },
-    );
+    logger.info("[CSVProcessor] ✅ Processed CSV file", {
+      formatStyle,
+      rowCount,
+      columnCount,
+      outputLength: formatted.length,
+      hasEmptyColumns,
+    });
 
     return {
       type: "csv",
@@ -165,6 +221,7 @@ export class CSVProcessor {
         columnNames,
         sampleData,
         hasEmptyColumns,
+        extension,
       },
     };
   }
@@ -186,6 +243,11 @@ export class CSVProcessor {
   ): Promise<unknown[]> {
     const clampedMaxRows = Math.max(1, Math.min(10000, maxRows));
     const fs = await import("fs");
+
+    logger.debug("[CSVProcessor] Starting file parsing", {
+      filePath,
+      maxRows: clampedMaxRows,
+    });
 
     // Read first 2 lines to detect metadata
     const fileHandle = await fs.promises.open(filePath, "r");
@@ -210,6 +272,12 @@ export class CSVProcessor {
 
     const hasMetadataLine = isMetadataLine(firstLines);
     const skipLines = hasMetadataLine ? 1 : 0;
+
+    if (hasMetadataLine) {
+      logger.debug(
+        "[CSVProcessor] Detected metadata line in file, will skip first line",
+      );
+    }
 
     return new Promise((resolve, reject) => {
       const rows: unknown[] = [];
@@ -244,6 +312,9 @@ export class CSVProcessor {
           }
         })
         .on("end", () => {
+          logger.debug(
+            `[CSVProcessor] File parsing complete: ${rows.length} rows parsed`,
+          );
           resolve(rows);
         })
         .on("error", (error: Error) => {
@@ -267,10 +338,19 @@ export class CSVProcessor {
   ): Promise<unknown[]> {
     const clampedMaxRows = Math.max(1, Math.min(10000, maxRows));
 
+    logger.debug("[CSVProcessor] Starting string parsing", {
+      inputLength: csvString.length,
+      maxRows: clampedMaxRows,
+    });
+
     // Detect and skip metadata line
     const lines = csvString.split("\n");
     const hasMetadataLine = isMetadataLine(lines);
     const csvData = hasMetadataLine ? lines.slice(1).join("\n") : csvString;
+
+    if (hasMetadataLine) {
+      logger.debug("[CSVProcessor] Detected metadata line in string, skipping");
+    }
 
     return new Promise((resolve, reject) => {
       const rows: unknown[] = [];
@@ -299,6 +379,9 @@ export class CSVProcessor {
           }
         })
         .on("end", () => {
+          logger.debug(
+            `[CSVProcessor] String parsing complete: ${rows.length} rows parsed`,
+          );
           resolve(rows);
         })
         .on("error", (error: Error) => {
@@ -365,5 +448,74 @@ export class CSVProcessor {
     });
 
     return markdown;
+  }
+
+  /**
+   * Format sample data according to the specified format
+   *
+   * @param sampleRows - Array of sample row objects
+   * @param format - Output format for sample data
+   * @param includeHeaders - Whether to include headers in CSV/markdown formats
+   * @returns Formatted sample data as string or array
+   */
+  private static formatSampleData(
+    sampleRows: unknown[],
+    format: SampleDataFormat,
+    includeHeaders: boolean,
+  ): string | unknown[] {
+    if (sampleRows.length === 0) {
+      return format === "object" ? [] : "No data rows";
+    }
+
+    switch (format) {
+      case "object":
+        return sampleRows;
+      case "json":
+        return JSON.stringify(sampleRows, null, 2);
+      case "csv":
+        return this.toCSVString(sampleRows, includeHeaders);
+      case "markdown":
+        return this.toMarkdownTable(sampleRows, includeHeaders);
+      default:
+        return sampleRows;
+    }
+  }
+
+  /**
+   * Convert row objects to CSV string format
+   *
+   * @param rows - Array of row objects
+   * @param includeHeaders - Whether to include header row
+   * @returns CSV formatted string
+   */
+  private static toCSVString(rows: unknown[], includeHeaders: boolean): string {
+    if (rows.length === 0) {
+      return "";
+    }
+
+    const headers = Object.keys(rows[0] as Record<string, unknown>);
+
+    // Escape CSV values (wrap in quotes if contains comma, quote, or newline)
+    const escapeCSV = (value: string): string => {
+      if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    };
+
+    const lines: string[] = [];
+
+    if (includeHeaders) {
+      lines.push(headers.map(escapeCSV).join(","));
+    }
+
+    rows.forEach((row) => {
+      const values = headers.map((h) =>
+        escapeCSV(String((row as Record<string, unknown>)[h] ?? "")),
+      );
+      lines.push(values.join(","));
+    });
+
+    return lines.join("\n");
   }
 }

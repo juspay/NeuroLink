@@ -5,6 +5,18 @@
 // Common utility types
 export * from "./common.js";
 
+// Constants and enums
+export { AIProviderName } from "../constants/enums.js";
+
+// Type aliases - only export non-duplicate types that are commonly used
+export type {
+  ZodUnknownSchema,
+  ValidationSchema,
+  OptionalValidationSchema,
+  StandardRecord,
+  OptionalStandardRecord,
+} from "./typeAliases.js";
+
 // Tool system types
 export * from "./tools.js";
 
@@ -201,3 +213,6 @@ export * from "./fileTypes.js";
 
 // Content types for multimodal support
 export * from "./content.js";
+
+// TTS (Text-to-Speech) types
+export * from "./ttsTypes.js";

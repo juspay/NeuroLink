@@ -11,6 +11,12 @@ import {
   AIProviderName,
   GoogleAIModels,
   OpenAIModels,
+  AnthropicModels,
+  VertexModels,
+  MistralModels,
+  OllamaModels,
+  LiteLLMModels,
+  HuggingFaceModels,
 } from "../constants/enums.js";
 
 /**
@@ -52,7 +58,7 @@ export class ProviderRegistry {
           );
         },
         GoogleAIModels.GEMINI_2_5_FLASH,
-        ["googleAiStudio", "google", "gemini", "google-ai"],
+        ["googleAiStudio", "google", "gemini", "google-ai", "google-ai-studio"],
       );
 
       // Register OpenAI provider
@@ -83,7 +89,7 @@ export class ProviderRegistry {
           );
           return new AnthropicProvider(modelName, sdk as NeuroLink | undefined);
         },
-        "claude-3-5-sonnet-20241022",
+        AnthropicModels.CLAUDE_SONNET_4_0,
         ["claude", "anthropic"],
       );
 
@@ -152,7 +158,7 @@ export class ProviderRegistry {
             region,
           );
         },
-        "claude-sonnet-4@20250514",
+        VertexModels.CLAUDE_4_0_SONNET,
         ["vertex", "googleVertex"],
       );
 
@@ -165,7 +171,8 @@ export class ProviderRegistry {
           );
           return new HuggingFaceProvider(modelName);
         },
-        process.env.HUGGINGFACE_MODEL || "microsoft/DialoGPT-medium",
+        process.env.HUGGINGFACE_MODEL ||
+          HuggingFaceModels.QWEN_2_5_72B_INSTRUCT,
         ["huggingface", "hf"],
       );
 
@@ -183,7 +190,7 @@ export class ProviderRegistry {
             sdk as MistralProviderType | undefined,
           );
         },
-        "mistral-large-latest",
+        MistralModels.MISTRAL_LARGE_LATEST,
         ["mistral"],
       );
 
@@ -194,7 +201,7 @@ export class ProviderRegistry {
           const { OllamaProvider } = await import("../providers/ollama.js");
           return new OllamaProvider(modelName);
         },
-        process.env.OLLAMA_MODEL || "llama3.1:8b",
+        process.env.OLLAMA_MODEL || OllamaModels.LLAMA3_2_LATEST,
         ["ollama", "local"],
       );
 
@@ -209,7 +216,7 @@ export class ProviderRegistry {
           const { LiteLLMProvider } = await import("../providers/litellm.js");
           return new LiteLLMProvider(modelName, sdk as NeuroLink | undefined);
         },
-        process.env.LITELLM_MODEL || "openai/gpt-4o-mini",
+        process.env.LITELLM_MODEL || LiteLLMModels.OPENAI_GPT_4O_MINI,
         ["litellm"],
       );
 
@@ -253,6 +260,32 @@ export class ProviderRegistry {
 
       logger.debug("All providers registered successfully");
       this.registered = true;
+
+      // ===== TTS HANDLER REGISTRATION =====
+      try {
+        // Create handler instance and register explicitly
+        const { GoogleTTSHandler } = await import(
+          "../adapters/tts/googleTTSHandler.js"
+        );
+        const { TTSProcessor } = await import("../utils/ttsProcessor.js");
+
+        const googleHandler = new GoogleTTSHandler();
+        TTSProcessor.registerHandler("google-ai", googleHandler);
+        TTSProcessor.registerHandler("vertex", googleHandler);
+
+        logger.debug("TTS handlers registered successfully", {
+          providers: ["google-ai", "vertex"],
+        });
+      } catch (ttsError) {
+        logger.warn(
+          "Failed to register TTS handlers - TTS functionality will be unavailable",
+          {
+            error:
+              ttsError instanceof Error ? ttsError.message : String(ttsError),
+          },
+        );
+        // Don't throw - TTS is optional functionality
+      }
     } catch (error) {
       logger.error("Failed to register providers:", error);
       throw error;

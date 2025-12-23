@@ -25,29 +25,30 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 
 ## Core Features (Q3 2025)
 
-| Feature                                                                        | Description                                                                                     |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| :material-image-text: **[Multimodal Chat Experiences](multimodal-chat.md)**    | Stream text and images together with automatic provider fallbacks and format conversion.        |
-| :material-table-large: **[CSV File Support](csv-support.md)**                  | Process CSV files for data analysis with automatic format conversion. Works with all providers. |
-| :material-file-pdf-box: **[PDF File Support](pdf-support.md)**                 | Process PDF documents for visual analysis and content extraction. Native provider support.      |
-| :material-chart-line: **[Auto Evaluation Engine](auto-evaluation.md)**         | Automated quality scoring and metrics export for AI response validation using LLM-as-judge.     |
-| :material-console: **[CLI Loop Sessions](cli-loop-sessions.md)**               | Persistent interactive mode with conversation memory and session state for prompt engineering.  |
-| :material-earth: **[Regional Streaming Controls](regional-streaming.md)**      | Region-specific model deployment and routing for compliance and latency optimization.           |
-| :material-brain: **[Provider Orchestration Brain](provider-orchestration.md)** | Adaptive provider and model selection with intelligent fallbacks based on task classification.  |
+| Feature                                                                        | Description                                                                                      |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| :material-image-text: **[Multimodal Chat Experiences](multimodal-chat.md)**    | Stream text and images together with automatic provider fallbacks and format conversion.         |
+| :material-table-large: **[CSV File Support](csv-support.md)**                  | Process CSV files for data analysis with automatic format conversion. Works with all providers.  |
+| :material-file-pdf-box: **[PDF File Support](pdf-support.md)**                 | Process PDF documents for visual analysis and content extraction. Native provider support.       |
+| :material-file-word: **[Office Documents](office-documents.md)**               | Process DOCX, PPTX, XLSX files for document analysis. Native Bedrock, Vertex, Anthropic support. |
+| :material-chart-line: **[Auto Evaluation Engine](auto-evaluation.md)**         | Automated quality scoring and metrics export for AI response validation using LLM-as-judge.      |
+| :material-console: **[CLI Loop Sessions](cli-loop-sessions.md)**               | Persistent interactive mode with conversation memory and session state for prompt engineering.   |
+| :material-earth: **[Regional Streaming Controls](regional-streaming.md)**      | Region-specific model deployment and routing for compliance and latency optimization.            |
+| :material-brain: **[Provider Orchestration Brain](provider-orchestration.md)** | Adaptive provider and model selection with intelligent fallbacks based on task classification.   |
 
 ---
 
 ## Platform Capabilities at a Glance
 
-| Category                 | Features                                                                                                                 | Documentation                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **Provider unification** | 12+ providers with automatic failover, cost-aware routing, provider orchestration (Q3)                                   | [Provider Setup](../getting-started/provider-setup.md)                                               |
-| **Multimodal pipeline**  | Stream images + CSV data + PDF documents across providers with local/remote assets. Auto-detection for mixed file types. | [Multimodal Guide](multimodal-chat.md), [CSV Support](csv-support.md), [PDF Support](pdf-support.md) |
-| **Quality & governance** | Auto-evaluation engine (Q3), guardrails middleware (Q4), HITL workflows (Q4), audit logging                              | [Auto Evaluation](auto-evaluation.md), [Guardrails](guardrails.md), [HITL](hitl.md)                  |
-| **Memory & context**     | Conversation memory, Mem0 integration, Redis history export (Q4), context summarization (Q4)                             | [Conversation Memory](../CONVERSATION-MEMORY.md), [Redis Export](conversation-history.md)            |
-| **CLI tooling**          | Loop sessions (Q3), setup wizard, config validation, Redis auto-detect, JSON output                                      | [CLI Loop](cli-loop-sessions.md), [CLI Commands](../cli/commands.md)                                 |
-| **Enterprise ops**       | Proxy support, regional routing (Q3), telemetry hooks, configuration management                                          | [Enterprise Proxy](../ENTERPRISE-PROXY-SETUP.md), [Telemetry](../TELEMETRY-GUIDE.md)                 |
-| **Tool ecosystem**       | MCP auto discovery, LiteLLM hub access, SageMaker custom deployment, web search                                          | [MCP Integration](../advanced/mcp-integration.md), [MCP Catalog](../guides/mcp/server-catalog.md)    |
+| Category                 | Features                                                                                                           | Documentation                                                                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Provider unification** | 12+ providers with automatic failover, cost-aware routing, provider orchestration (Q3)                             | [Provider Setup](../getting-started/provider-setup.md)                                                                                   |
+| **Multimodal pipeline**  | Stream images + CSV data + PDF documents + Office files across providers with auto-detection for mixed file types. | [Multimodal Guide](multimodal-chat.md), [CSV Support](csv-support.md), [PDF Support](pdf-support.md), [Office Docs](office-documents.md) |
+| **Quality & governance** | Auto-evaluation engine (Q3), guardrails middleware (Q4), HITL workflows (Q4), audit logging                        | [Auto Evaluation](auto-evaluation.md), [Guardrails](guardrails.md), [HITL](hitl.md)                                                      |
+| **Memory & context**     | Conversation memory, Mem0 integration, Redis history export (Q4), context summarization (Q4)                       | [Conversation Memory](../CONVERSATION-MEMORY.md), [Redis Export](conversation-history.md)                                                |
+| **CLI tooling**          | Loop sessions (Q3), setup wizard, config validation, Redis auto-detect, JSON output                                | [CLI Loop](cli-loop-sessions.md), [CLI Commands](../cli/commands.md)                                                                     |
+| **Enterprise ops**       | Proxy support, regional routing (Q3), telemetry hooks, configuration management                                    | [Enterprise Proxy](../ENTERPRISE-PROXY-SETUP.md), [Telemetry](../TELEMETRY-GUIDE.md)                                                     |
+| **Tool ecosystem**       | MCP auto discovery, LiteLLM hub access, SageMaker custom deployment, web search                                    | [MCP Integration](../advanced/mcp-integration.md), [MCP Catalog](../guides/mcp/server-catalog.md)                                        |
 
 ---
 

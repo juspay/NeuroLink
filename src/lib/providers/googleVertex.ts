@@ -32,11 +32,6 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import dns from "dns";
-import {
-  buildMessagesArray,
-  buildMultimodalMessagesArray,
-  convertToCoreMessages,
-} from "../utils/messageBuilder.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Import proper types for multimodal message handling
@@ -85,11 +80,21 @@ const hasGoogleCredentials = (): boolean => {
 const createVertexSettings = async (
   region?: string,
 ): Promise<GoogleVertexProviderSettings> => {
+  const location = region || getVertexLocation();
+  const project = getVertexProjectId();
+
   const baseSettings: GoogleVertexProviderSettings = {
-    project: getVertexProjectId(),
-    location: region || getVertexLocation(),
+    project,
+    location,
     fetch: createProxyFetch(),
   };
+
+  // Special handling for global endpoint
+  // Google's global endpoint uses aiplatform.googleapis.com (no region prefix)
+  // instead of {region}-aiplatform.googleapis.com
+  if (location === "global") {
+    baseSettings.baseURL = `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google`;
+  }
 
   // 🎯 OPTION 2: Create credentials file from environment variables at runtime
   // This solves the problem where GOOGLE_APPLICATION_CREDENTIALS exists in ZSHRC locally
@@ -294,6 +299,41 @@ const isAnthropicModel = (modelName: string): boolean => {
  * - Fresh model creation for each request
  * - Enhanced error handling with setup guidance
  * - Tool registration and context management
+ *
+ * @important Structured Output Limitation (Gemini Models Only)
+ * Google Gemini models on Vertex AI cannot combine function calling (tools) with
+ * structured output (JSON schema). When using schemas, you MUST set disableTools: true.
+ *
+ * Error without disableTools:
+ * "Function calling with a response mime type: 'application/json' is unsupported"
+ *
+ * This limitation ONLY affects Gemini models. Anthropic Claude models via Vertex
+ * AI do NOT have this limitation and support both tools + schemas simultaneously.
+ *
+ * @example Gemini models with schemas
+ * ```typescript
+ * const provider = new GoogleVertexProvider("gemini-2.5-flash");
+ * const result = await provider.generate({
+ *   input: { text: "Analyze data" },
+ *   schema: MySchema,
+ *   output: { format: "json" },
+ *   disableTools: true  // Required for Gemini models
+ * });
+ * ```
+ *
+ * @example Claude models (no limitation)
+ * ```typescript
+ * const provider = new GoogleVertexProvider("claude-3-5-sonnet-20241022");
+ * const result = await provider.generate({
+ *   input: { text: "Analyze data" },
+ *   schema: MySchema,
+ *   output: { format: "json" }
+ *   // No disableTools needed - Claude supports both
+ * });
+ * ```
+ *
+ * @note Gemini 3 Pro Preview (November 2025) will support combining tools + schemas
+ * @see https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
  */
 export class GoogleVertexProvider extends BaseProvider {
   private projectId: string;
@@ -836,64 +876,8 @@ export class GoogleVertexProvider extends BaseProvider {
       this.validateStreamOptionsOnly(options);
 
       // Build message array from options with multimodal support
-      const hasMultimodalInput = !!(
-        options.input?.images?.length ||
-        options.input?.content?.length ||
-        options.input?.files?.length ||
-        options.input?.csvFiles?.length ||
-        options.input?.pdfFiles?.length
-      );
-
-      let messages;
-      if (hasMultimodalInput) {
-        logger.debug(
-          `${functionTag}: Detected multimodal input, using multimodal message builder`,
-          {
-            hasImages: !!options.input?.images?.length,
-            imageCount: options.input?.images?.length || 0,
-            hasContent: !!options.input?.content?.length,
-            contentCount: options.input?.content?.length || 0,
-            hasPDFs: !!options.input?.pdfFiles?.length,
-            pdfCount: options.input?.pdfFiles?.length || 0,
-          },
-        );
-
-        // Create multimodal options for buildMultimodalMessagesArray
-        const multimodalOptions = {
-          input: {
-            text: options.input?.text || "",
-            images: options.input?.images,
-            content: options.input?.content,
-            files: options.input?.files,
-            csvFiles: options.input?.csvFiles,
-            pdfFiles: options.input?.pdfFiles,
-          },
-          csvOptions: options.csvOptions,
-          systemPrompt: options.systemPrompt,
-          conversationHistory: options.conversationMessages,
-          provider: this.providerName,
-          model: this.modelName,
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          enableAnalytics: options.enableAnalytics,
-          enableEvaluation: options.enableEvaluation,
-          context: options.context,
-        };
-
-        const mm = await buildMultimodalMessagesArray(
-          multimodalOptions,
-          this.providerName,
-          this.modelName,
-        );
-
-        // Convert multimodal messages to Vercel AI SDK format (CoreMessage[])
-        messages = convertToCoreMessages(mm);
-      } else {
-        logger.debug(
-          `${functionTag}: Text-only input, using standard message builder`,
-        );
-        messages = await buildMessagesArray(options);
-      }
+      // Using protected helper from BaseProvider to eliminate code duplication
+      const messages = await this.buildMessagesForStream(options);
 
       const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
 
@@ -1566,10 +1550,12 @@ export class GoogleVertexProvider extends BaseProvider {
 
     result.region = region;
 
-    // Validate region format
-    const regionPattern = /^[a-z]+-[a-z]+\d+$/;
+    // Validate region format (regional format like us-central1 or global endpoint)
+    const regionPattern = /^([a-z]+-[a-z]+\d+|global)$/;
     if (!regionPattern.test(region)) {
-      result.issues.push(`Invalid region format: ${region}`);
+      result.issues.push(
+        `Invalid region format: ${region} (expected format: 'us-central1' or 'global')`,
+      );
       result.isValid = false;
     }
 
@@ -1942,11 +1928,14 @@ export class GoogleVertexProvider extends BaseProvider {
   private getModelSuggestions(requestedModel: string | undefined): string {
     const availableModels = {
       google: [
+        "gemini-3-pro-preview-11-2025",
+        "gemini-3-pro-latest",
         "gemini-3-pro-preview",
         "gemini-2.5-pro",
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
         "gemini-2.0-flash-001",
+        "gemini-2.0-flash-lite",
         "gemini-1.5-pro",
         "gemini-1.5-flash",
       ],

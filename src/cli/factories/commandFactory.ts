@@ -35,6 +35,7 @@ import { logger } from "../../lib/utils/logger.js";
 import fs from "fs";
 import { handleSetup } from "../commands/setup.js";
 import { checkRedisAvailability } from "../../lib/utils/conversationMemoryUtils.js";
+import { saveAudioToFile, formatFileSize } from "../utils/audioFileUtils.js";
 
 /**
  * CLI Command Factory for generate commands
@@ -54,6 +55,7 @@ export class CLICommandFactory {
         "anthropic",
         "azure",
         "google-ai",
+        "google-ai-studio",
         "huggingface",
         "ollama",
         "mistral",
@@ -79,6 +81,32 @@ export class CLICommandFactory {
     pdf: {
       type: "string" as const,
       description: "Add PDF file for analysis (can be used multiple times)",
+    },
+    video: {
+      type: "string" as const,
+      description:
+        "Add video file for analysis (can be used multiple times) (MP4, WebM, MOV, AVI, MKV)",
+    },
+    "video-frames": {
+      type: "number" as const,
+      default: 8,
+      description: "Number of frames to extract (default: 8)",
+    },
+    "video-quality": {
+      type: "number" as const,
+      default: 85,
+      description: "Frame quality 0-100 (default: 85)",
+    },
+    "video-format": {
+      type: "string" as const,
+      choices: ["jpeg", "png"],
+      default: "jpeg",
+      description: "Frame format (default: jpeg)",
+    },
+    "transcribe-audio": {
+      type: "boolean" as const,
+      default: false,
+      description: "Extract and transcribe audio from video",
     },
     file: {
       type: "string" as const,
@@ -223,6 +251,44 @@ export class CLICommandFactory {
       default: false,
       description: "Test command without making actual API calls (for testing)",
     },
+
+    // TTS (Text-to-Speech) options
+    tts: {
+      type: "boolean" as const,
+      default: false,
+      description: "Enable text-to-speech output",
+    },
+    ttsVoice: {
+      type: "string" as const,
+      description: "TTS voice to use (e.g., 'en-US-Neural2-C')",
+    },
+    ttsFormat: {
+      type: "string" as const,
+      choices: ["mp3", "wav", "ogg", "opus"],
+      default: "mp3",
+      description: "Audio output format",
+    },
+    ttsSpeed: {
+      type: "number" as const,
+      default: 1.0,
+      description: "Speaking rate (0.25-4.0, default: 1.0)",
+    },
+    ttsQuality: {
+      type: "string" as const,
+      choices: ["standard", "hd"],
+      default: "standard",
+      description: "Audio quality level",
+    },
+    ttsOutput: {
+      type: "string" as const,
+      description:
+        "Save TTS audio to file (supports absolute and relative paths)",
+    },
+    ttsPlay: {
+      type: "boolean" as const,
+      default: false,
+      description: "Auto-play generated audio",
+    },
   };
 
   // Helper method to build options for commands
@@ -277,6 +343,16 @@ export class CLICommandFactory {
       return undefined;
     }
     return Array.isArray(files) ? files : [files];
+  }
+
+  // Helper method to process CLI video files
+  private static processCliVideoFiles(
+    videoFiles?: string | string[],
+  ): Array<Buffer | string> | undefined {
+    if (!videoFiles) {
+      return undefined;
+    }
+    return Array.isArray(videoFiles) ? videoFiles : [videoFiles];
   }
 
   // Helper method to process common options
@@ -358,6 +434,14 @@ export class CLICommandFactory {
       noColor: argv.noColor as boolean | undefined,
       configFile: argv.configFile as string | undefined,
       dryRun: argv.dryRun as boolean | undefined,
+      // TTS options
+      tts: argv.tts as boolean | undefined,
+      ttsVoice: argv.ttsVoice as string | undefined,
+      ttsFormat: argv.ttsFormat as "mp3" | "wav" | "ogg" | "opus" | undefined,
+      ttsSpeed: argv.ttsSpeed as number | undefined,
+      ttsQuality: argv.ttsQuality as "standard" | "hd" | undefined,
+      ttsOutput: argv.ttsOutput as string | undefined,
+      ttsPlay: argv.ttsPlay as boolean | undefined,
     };
   }
 
@@ -398,6 +482,61 @@ export class CLICommandFactory {
       }
     } else {
       logger.always(output);
+    }
+  }
+
+  /**
+   * Helper method to handle TTS audio file output
+   * Saves audio to file when --tts-output flag is provided
+   */
+  private static async handleTTSOutput(
+    result: GenerateResult | unknown,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): Promise<void> {
+    // Check if --tts-output flag is provided
+    const ttsOutputPath = options.ttsOutput as string | undefined;
+    if (!ttsOutputPath) {
+      return;
+    }
+
+    // Extract audio from result with proper type checking
+    if (!result || typeof result !== "object") {
+      return;
+    }
+    const generateResult = result as GenerateResult;
+    const audio = generateResult.audio;
+
+    if (!audio) {
+      if (!options.quiet) {
+        logger.always(
+          chalk.yellow(
+            "⚠️  No audio available in result. TTS may not be enabled for this request.",
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Save audio to file
+      const saveResult = await saveAudioToFile(audio, ttsOutputPath);
+
+      if (saveResult.success) {
+        if (!options.quiet) {
+          logger.always(
+            chalk.green(
+              `🔊 Audio saved to: ${saveResult.path} (${formatFileSize(saveResult.size)})`,
+            ),
+          );
+        }
+      } else {
+        handleError(
+          new Error(saveResult.error || "Failed to save audio file"),
+          "TTS Output",
+        );
+      }
+    } catch (error) {
+      handleError(error as Error, "TTS Output");
     }
   }
 
@@ -566,6 +705,10 @@ export class CLICommandFactory {
             .example(
               '$0 generate "Analyze data" --enable-analytics',
               "Enable usage analytics",
+            )
+            .example(
+              '$0 generate "Describe this video" --video path/to/video.mp4',
+              "Analyze video content",
             ),
         );
       },
@@ -600,7 +743,11 @@ export class CLICommandFactory {
               '$0 stream "Code walkthrough" --output story.txt',
               "Stream to file",
             )
-            .example('echo "Live demo" | $0 stream', "Stream from stdin"),
+            .example('echo "Live demo" | $0 stream', "Stream from stdin")
+            .example(
+              '$0 stream "Narrate this video" --video path/to/video.mp4',
+              "Stream video analysis",
+            ),
         );
       },
       handler: async (argv) =>
@@ -1430,6 +1577,9 @@ export class CLICommandFactory {
       const pdfFiles = CLICommandFactory.processCliPDFFiles(
         argv.pdf as string | string[] | undefined,
       );
+      const videoFiles = CLICommandFactory.processCliVideoFiles(
+        argv.video as string | string[] | undefined,
+      );
       const files = CLICommandFactory.processCliFiles(
         argv.file as string | string[] | undefined,
       );
@@ -1439,6 +1589,7 @@ export class CLICommandFactory {
         ...(imageBuffers && { images: imageBuffers }),
         ...(csvFiles && { csvFiles }),
         ...(pdfFiles && { pdfFiles }),
+        ...(videoFiles && { videoFiles }),
         ...(files && { files }),
       };
 
@@ -1451,6 +1602,12 @@ export class CLICommandFactory {
             | "markdown"
             | "json"
             | undefined,
+        },
+        videoOptions: {
+          frames: argv.videoFrames as number | undefined,
+          quality: argv.videoQuality as number | undefined,
+          format: argv.videoFormat as "jpeg" | "png" | undefined,
+          transcribeAudio: argv.transcribeAudio as boolean | undefined,
         },
         provider: enhancedOptions.provider,
         model: enhancedOptions.model,
@@ -1494,6 +1651,9 @@ export class CLICommandFactory {
 
       // Handle output with universal formatting
       this.handleOutput(result, options);
+
+      // Handle TTS audio file output if --tts-output is provided
+      await this.handleTTSOutput(result, options);
 
       if (options.debug) {
         logger.debug("\n" + chalk.yellow("Debug Information:"));
@@ -1685,6 +1845,9 @@ export class CLICommandFactory {
     const pdfFiles = CLICommandFactory.processCliPDFFiles(
       argv.pdf as string | string[] | undefined,
     );
+    const videoFiles = CLICommandFactory.processCliVideoFiles(
+      argv.video as string | string[] | undefined,
+    );
     const files = CLICommandFactory.processCliFiles(
       argv.file as string | string[] | undefined,
     );
@@ -1695,11 +1858,18 @@ export class CLICommandFactory {
         ...(imageBuffers && { images: imageBuffers }),
         ...(csvFiles && { csvFiles }),
         ...(pdfFiles && { pdfFiles }),
+        ...(videoFiles && { videoFiles }),
         ...(files && { files }),
       },
       csvOptions: {
         maxRows: argv.csvMaxRows as number | undefined,
         formatStyle: argv.csvFormat as "raw" | "markdown" | "json" | undefined,
+      },
+      videoOptions: {
+        frames: argv.videoFrames as number | undefined,
+        quality: argv.videoQuality as number | undefined,
+        format: argv.videoFormat as "jpeg" | "png" | undefined,
+        transcribeAudio: argv.transcribeAudio as boolean | undefined,
       },
       provider: enhancedOptions.provider as string | undefined,
       model: enhancedOptions.model as string | undefined,
@@ -1901,6 +2071,22 @@ export class CLICommandFactory {
       fs.writeFileSync(options.output as string, fullContent);
       if (!options.quiet) {
         logger.always(`\nOutput saved to ${options.output}`);
+      }
+    }
+
+    // Handle TTS audio output if --tts-output is provided
+    // Note: For streaming, TTS audio is collected during the stream
+    // and saved at the end if available
+    const ttsOutputPath = options.ttsOutput as string | undefined;
+    if (ttsOutputPath) {
+      // For now, streaming TTS output is not yet available
+      // This will be enabled when the TTS streaming infrastructure is complete
+      if (!options.quiet) {
+        logger.always(
+          chalk.yellow(
+            "⚠️  TTS audio output for streaming is not yet available. Use 'generate' command for TTS output.",
+          ),
+        );
       }
     }
 
