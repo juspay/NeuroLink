@@ -1,32 +1,11 @@
 /**
- * FFmpeg wrapper types for child_process-based execution
- * Provides type definitions for ffmpeg command execution and results
- *
- * SUPPORTED OPERATIONS:
- * 1. convertVideo() - Convert video files between formats with codec/quality control
- *    Use cases: Format conversion, quality optimization, codec transcoding
- *
- * 2. extractAudio() - Extract audio tracks from video files
- *    Use cases: Audio extraction, format conversion, podcast/music extraction
- *
- * 3. extractThumbnail() - Generate thumbnail images from video frames
- *    Use cases: Video previews, poster generation, timeline scrubbing
- *
- * 4. trimVideo() - Cut/trim video segments
- *    Use cases: Clip creation, segment extraction, highlight reels
+ * FFmpeg types for child_process-based execution
+ * Operations: convertVideo, extractAudio, extractThumbnail, trimVideo
  */
 
 import { VideoCodecEnum, AudioCodecEnum } from "../constants/enums.js";
 
-// ============================================================================
-// FFMPEG TYPES - Type definitions for FFmpeg operations
-// ============================================================================
-
-/**
- * FFmpeg encoding presets (official FFmpeg x264/x265 presets)
- * Source: FFmpeg libx264 documentation
- * Trade-off: Speed vs Compression
- */
+/** FFmpeg encoding presets (speed vs compression: ULTRAFAST=fast/large, VERYSLOW=slow/small) */
 export type FFmpegPreset =
   | "ULTRAFAST"
   | "SUPERFAST"
@@ -38,279 +17,144 @@ export type FFmpegPreset =
   | "SLOWER"
   | "VERYSLOW";
 
-/**
- * Supported video output formats
- * Each format has default codecs defined in FFmpegWrapper
- */
 export type VideoFormat = "MP4" | "WEBM" | "MKV" | "AVI" | "MOV";
-
-/**
- * Supported audio output formats
- * Each format has a specific codec defined in FFmpegWrapper
- */
 export type AudioFormat = "MP3" | "AAC" | "WAV" | "FLAC" | "OGG";
-
-/**
- * Video codec type derived from VideoCodecEnum
- */
 export type VideoCodec = keyof typeof VideoCodecEnum;
-
-/**
- * Audio codec type derived from AudioCodecEnum
- */
 export type AudioCodec = keyof typeof AudioCodecEnum;
-
-/**
- * Stream codec type for ffprobe output
- */
 export type StreamCodecType = "VIDEO" | "AUDIO" | "SUBTITLE" | "DATA";
 
-// ============================================================================
-// TIME TYPES - Standardized time representation
-// ============================================================================
-
-/**
- * Time in seconds (always a number for consistency)
- * Standardized across all operations to avoid number | string ambiguity
- */
+/** Time in seconds */
 export type TimeInSeconds = number;
 
-// ============================================================================
-// RESOLUTION TYPES - Standardized resolution representation
-// ============================================================================
-
-/**
- * Video/Image resolution with width and height in pixels
- * Both width and height are required for explicit dimension specification
- */
+/** Video/image resolution in pixels */
 export type Resolution = {
-  /** Width in pixels */
   width: number;
-  /** Height in pixels */
   height: number;
 };
 
-// ============================================================================
-// BASE TYPES - Reusable base configurations
-// ============================================================================
-
-/**
- * Base options for all FFmpeg operations
- */
+/** Base FFmpeg execution options */
 export type FFmpegBaseOptions = {
-  /** Working directory for the command */
   cwd?: string;
-  /**
-   * Timeout in milliseconds.
-   * Default: dynamically calculated based on operation and file size.
-   * For high-level operations, timeout is estimated based on media duration.
-   * Set to 0 to disable timeout (not recommended).
-   */
+  /** Timeout in ms (default: auto-calculated, 0=disabled) */
   timeout?: number;
-  /** Additional environment variables */
   env?: Record<string, string>;
-  /** Maximum buffer size for stdout/stderr in bytes (default: 50MB) */
+  /** Max stdout/stderr buffer in bytes (default: 50MB) */
   maxBuffer?: number;
 };
 
-/**
- * Options for FFmpeg command execution (alias for backward compatibility)
- */
 export type FFmpegOptions = FFmpegBaseOptions;
 
-/**
- * Video quality settings (shared across operations)
- */
+/** Video quality settings */
 export type VideoQualitySettings = {
-  /** Video bitrate (e.g., '1M', '2500k') - optional, can use quality/CRF instead */
+  /** Video bitrate e.g. '1M', '2500k' (use quality/CRF instead if possible) */
   videoBitrate?: string;
-  /** CRF quality (0-51, lower = better quality, default: 23) - recommended over bitrate */
+  /** CRF quality 0-51, lower=better (default: 23) */
   quality?: number;
-  /** Encoding preset (speed vs compression trade-off) */
   preset?: FFmpegPreset;
 };
 
-/**
- * Audio quality settings (shared across operations)
- */
+/** Audio quality settings */
 export type AudioQualitySettings = {
-  /** Audio bitrate (e.g., '128k', '192k', '320k') */
+  /** Audio bitrate e.g. '128k', '192k' */
   bitrate?: string;
-  /** Sample rate in Hz (e.g., 44100, 48000) */
+  /** Sample rate in Hz e.g. 44100, 48000 */
   sampleRate?: number;
-  /** Number of audio channels (1 = mono, 2 = stereo) */
+  /** Channels: 1=mono, 2=stereo */
   channels?: number;
 };
 
-/**
- * Video dimension settings
- */
+/** Video dimension settings */
 export type VideoDimensions = {
-  /** Output resolution with width and height in pixels */
   resolution?: Resolution;
-  /** Frame rate (e.g., 30, 60) */
+  /** Frame rate e.g. 30, 60 */
   frameRate?: number;
 };
 
-// ============================================================================
-// OPERATION-SPECIFIC TYPES - Extending base types
-// ============================================================================
-
-/**
- * Options for video conversion operations
- * Extends base quality and dimension settings
- */
+/** Options for video conversion (format/codec/quality) */
 export type VideoConvertOptions = VideoQualitySettings &
   AudioQualitySettings &
   VideoDimensions & {
-    /** Video codec (default: based on output format) */
     videoCodec?: VideoCodec;
-    /** Audio codec (default: based on output format) */
     audioCodec?: AudioCodec;
-    /** Base execution options */
     baseOptions?: FFmpegBaseOptions;
   };
 
-/**
- * Options for audio extraction
- * Extends audio quality settings
- */
+/** Options for audio extraction from video */
 export type AudioExtractOptions = AudioQualitySettings & {
-  /** Audio format (default: MP3) */
   format?: AudioFormat;
-  /** Base execution options */
   baseOptions?: FFmpegBaseOptions;
 };
 
-/**
- * Options for thumbnail extraction
- */
+/** Options for thumbnail extraction */
 export type ThumbnailOptions = {
-  /** Time position in seconds (standardized to number only) */
   time?: TimeInSeconds;
-  /** Output resolution (optional, can specify resolution or use default) */
   resolution?: Resolution;
-  /** Image quality for JPEG (1-31, lower = better) */
+  /** JPEG quality 1-31, lower=better */
   quality?: number;
-  /** Base execution options */
   baseOptions?: FFmpegBaseOptions;
 };
 
-/**
- * Options for video trimming
- */
+/** Options for video trimming/clipping */
 export type TrimOptions = {
-  /** Start time in seconds (standardized to number only) */
   startTime: TimeInSeconds;
-  /** End time in seconds (optional, use duration if not specified) */
   endTime?: TimeInSeconds;
-  /** Duration in seconds (alternative to endTime) */
+  /** Alternative to endTime */
   duration?: TimeInSeconds;
-  /** Re-encode the output (default: false for fast copy) */
+  /** Re-encode output (default: false for fast copy) */
   reencode?: boolean;
-  /** Base execution options */
   baseOptions?: FFmpegBaseOptions;
 };
 
-// ============================================================================
-// RESULT TYPES - Execution results and errors
-// ============================================================================
-
-/**
- * Result of an FFmpeg command execution
- */
+/** FFmpeg command execution result */
 export type FFmpegResult = {
-  /** Exit code of the process (0 = success) */
   exitCode: number;
-  /** Standard output from ffmpeg */
   stdout: string;
-  /** Standard error from ffmpeg (ffmpeg outputs progress here) */
+  /** FFmpeg outputs progress to stderr */
   stderr: string;
-  /** Whether the command succeeded (exitCode === 0) */
   success: boolean;
-  /** Duration of the command execution in milliseconds */
   durationMs: number;
 };
 
-/**
- * Error thrown when FFmpeg execution fails
- */
+/** FFmpeg execution error */
 export type FFmpegError = {
-  /** Error message */
   message: string;
-  /** Exit code if available */
-  exitCode?: number;
-  /** Standard output if available */
-  stdout?: string;
-  /** Standard error if available */
-  stderr?: string;
-  /** Signal that terminated the process if any */
-  signal?: string;
+  exitCode?: number | null;
+  stdout?: string | null;
+  stderr?: string | null;
+  signal?: string | null;
 };
 
-// ============================================================================
-// PROBE TYPES - Media analysis and metadata
-// ============================================================================
-
-/**
- * Format information from ffprobe
- */
+/** Format metadata from ffprobe */
 export type FFprobeFormat = {
-  /** File name */
-  filename?: string;
-  /** Duration in seconds */
-  duration?: number;
-  /** File size in bytes */
-  size?: number;
-  /** Bit rate in bits per second */
-  bitRate?: number;
-  /** Short format name (e.g., "mov,mp4,m4a,3gp,3g2,mj2") */
-  formatName?: string;
-  /** Long format name (e.g., "QuickTime / MOV") */
-  formatLongName?: string;
+  filename?: string | null;
+  duration?: number | null;
+  size?: number | null;
+  bitRate?: number | null;
+  formatName?: string | null;
+  formatLongName?: string | null;
 };
 
-/**
- * Stream information from ffprobe
- */
+/** Stream metadata from ffprobe */
 export type FFprobeStream = {
-  /** Stream index */
   index: number;
-  /** Codec name (e.g., "h264", "aac") */
-  codecName?: string;
-  /** Codec type */
-  codecType?: StreamCodecType;
-  /** Video/image resolution with width and height */
-  resolution?: Resolution;
-  /** Stream duration in seconds */
-  duration?: number;
-  /** Bit rate in bits per second */
-  bitRate?: number;
-  /** Frame rate (e.g., "30/1", "24000/1001") */
-  frameRate?: string;
-  /** Audio sample rate in Hz */
-  sampleRate?: number;
-  /** Number of audio channels */
-  channels?: number;
+  codecName?: string | null;
+  codecType?: StreamCodecType | null;
+  resolution?: Resolution | null;
+  duration?: number | null;
+  bitRate?: number | null;
+  frameRate?: string | null;
+  sampleRate?: number | null;
+  channels?: number | null;
 };
 
-/**
- * FFmpeg probe information (from ffprobe)
- * Contains format and stream metadata
- */
+/** Media probe result from ffprobe */
 export type FFprobeResult = {
-  /** Format information */
-  format?: FFprobeFormat;
-  /** Stream information array */
-  streams?: FFprobeStream[];
+  format?: FFprobeFormat | null;
+  streams?: FFprobeStream[] | null;
 };
 
-/**
- * FFmpeg version information
- */
+/** FFmpeg version info */
 export type FFmpegVersion = {
-  /** Version string (e.g., "6.0") */
   version: string;
-  /** Full version output */
   fullOutput: string;
 };
