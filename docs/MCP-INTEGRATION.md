@@ -287,6 +287,66 @@ External MCP servers will be configured in `.mcp-config.json`:
 }
 ```
 
+### **Tool Blocking (Blacklist)**
+
+**NEW!** You can now block specific tools from external MCP servers to prevent their execution. This is useful for security, compliance, or when you want to restrict certain operations.
+
+**Configuration in `.mcp-config.json`:**
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "name": "filesystem",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+      "transport": "stdio",
+      "blockedTools": ["move_file", "delete_file", "remove_directory"]
+    },
+    "github": {
+      "name": "github",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "transport": "stdio",
+      "blockedTools": ["delete_repository", "transfer_repository"]
+    }
+  }
+}
+```
+
+**Programmatic Configuration:**
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+// Add server with blocked tools
+await neurolink.addExternalMCPServer("filesystem", {
+  id: "filesystem",
+  name: "filesystem",
+  description: "Filesystem operations with restrictions",
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "/"],
+  transport: "stdio",
+  blockedTools: ["move_file", "delete_file"], // Tools to block
+});
+```
+
+**Features:**
+
+- ✅ **Security** - Prevent execution of dangerous operations
+- ✅ **Compliance** - Enforce organizational policies
+- ✅ **Fine-grained Control** - Block specific tools per server
+- ✅ **Discovery Filtering** - Blocked tools won't appear in available tools
+- ✅ **Execution Prevention** - Attempts to execute blocked tools will throw an error
+
+**Example Use Cases:**
+
+1. **Production Safety**: Block destructive file operations in production environments
+2. **Compliance**: Block tools that access sensitive data or violate policies
+3. **Testing**: Block external API calls during testing
+4. **Multi-tenant**: Different tool access for different users/tenants
+
 ### **Environment Variables**
 
 Set these in your `.env` file for server authentication:

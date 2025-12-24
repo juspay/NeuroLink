@@ -5,7 +5,8 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/"],
       "transport": "stdio",
-      "description": "File and directory operations"
+      "description": "File and directory operations",
+      "blockedTools": []
     },
     "github": {
       "name": "github",
@@ -15,7 +16,8 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_your_token_here"
       },
-      "description": "GitHub repository management"
+      "description": "GitHub repository management",
+      "blockedTools": ["delete_repository", "transfer_repository"]
     },
     "puppeteer": {
       "name": "puppeteer",

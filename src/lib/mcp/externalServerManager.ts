@@ -92,6 +92,17 @@ function isValidExternalMCPServerConfig(
     return false;
   }
   const record = config as UnknownRecord;
+
+  // Validate blockedTools array contains only strings
+  if (record.blockedTools !== undefined) {
+    if (!Array.isArray(record.blockedTools)) {
+      return false;
+    }
+    if (!record.blockedTools.every((item) => typeof item === "string")) {
+      return false;
+    }
+  }
+
   return (
     typeof record.command === "string" &&
     (record.args === undefined || Array.isArray(record.args)) &&
@@ -326,6 +337,9 @@ export class ExternalServerManager extends EventEmitter {
                 typeof serverConfig.url === "string"
                   ? serverConfig.url
                   : undefined,
+              blockedTools: Array.isArray(serverConfig.blockedTools)
+                ? (serverConfig.blockedTools as string[])
+                : undefined,
               metadata: safeMetadataConversion(serverConfig.metadata),
             };
 
@@ -475,6 +489,9 @@ export class ExternalServerManager extends EventEmitter {
               typeof serverConfig.url === "string"
                 ? serverConfig.url
                 : undefined,
+            blockedTools: Array.isArray(serverConfig.blockedTools)
+              ? (serverConfig.blockedTools as string[])
+              : undefined,
             metadata: safeMetadataConversion(serverConfig.metadata),
           };
 
@@ -593,6 +610,7 @@ export class ExternalServerManager extends EventEmitter {
       args: config.args,
       env: config.env,
       tools: [], // Will be populated after server connection
+      blockedTools: config.blockedTools,
       metadata: {
         category: "external" as MCPServerCategory,
         // Store additional ExternalMCPServerConfig fields in metadata
@@ -668,6 +686,7 @@ export class ExternalServerManager extends EventEmitter {
         autoRestart: serverInfo.metadata?.autoRestart as boolean,
         cwd: serverInfo.metadata?.cwd as string,
         url: serverInfo.metadata?.url as string,
+        blockedTools: serverInfo.blockedTools,
         metadata: safeMetadataConversion(serverInfo.metadata),
       };
 
@@ -1434,7 +1453,20 @@ export class ExternalServerManager extends EventEmitter {
         instance.toolsMap.clear();
         instance.toolsArray = undefined;
         instance.tools = [];
+
+        const blockedTools = instance.blockedTools || [];
+        let blockedCount = 0;
+
         for (const tool of discoveryResult.tools) {
+          // Check if tool is blocked
+          if (blockedTools.includes(tool.name)) {
+            mcpLogger.info(
+              `[ExternalServerManager] Blocking tool '${tool.name}' from server '${serverId}' (configured in blockedTools)`,
+            );
+            blockedCount++;
+            continue; // Skip blocked tools
+          }
+
           instance.toolsMap.set(tool.name, tool);
           instance.tools.push({
             name: tool.name,
@@ -1444,7 +1476,7 @@ export class ExternalServerManager extends EventEmitter {
         }
 
         mcpLogger.info(
-          `[ExternalServerManager] Discovered ${discoveryResult.toolCount} tools for ${serverId}`,
+          `[ExternalServerManager] Discovered ${discoveryResult.toolCount} tools for ${serverId} (${blockedCount} blocked, ${instance.toolsMap.size} available)`,
         );
       } else {
         mcpLogger.warn(
@@ -1589,6 +1621,14 @@ export class ExternalServerManager extends EventEmitter {
     if (instance.status !== "connected") {
       throw new Error(
         `Server '${serverId}' is not in connected state: ${instance.status}`,
+      );
+    }
+
+    // Check if tool is blocked
+    const blockedTools = instance.blockedTools || [];
+    if (blockedTools.includes(toolName)) {
+      throw new Error(
+        `Tool '${toolName}' is blocked on server '${serverId}' by configuration`,
       );
     }
 

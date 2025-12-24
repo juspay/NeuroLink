@@ -50,6 +50,9 @@ export type ExternalMCPServerConfig = {
   /** URL for SSE/WebSocket transports */
   url?: string;
 
+  /** List of tool names to block/blacklist from this server */
+  blockedTools?: string[];
+
   /** Additional metadata */
   metadata?: Record<string, JsonValue>;
 };
