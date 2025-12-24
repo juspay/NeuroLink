@@ -26,6 +26,7 @@ export const textGenerationOptionsSchema: Record<
     | "region"
     | "csvOptions"
     | "tts"
+    | "extractTextFallback"
   >,
   OptionSchema
 > = {

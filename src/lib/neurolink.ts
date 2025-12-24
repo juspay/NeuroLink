@@ -1844,6 +1844,8 @@ Current user's request: ${currentInput}`;
         enhancedWithTools: textResult.enhancedWithTools,
         availableTools: transformAvailableTools(textResult.availableTools),
         analytics: textResult.analytics,
+        // CRITICAL FIX: Include imageOutput for image generation models
+        imageOutput: textResult.imageOutput,
         evaluation: textResult.evaluation
           ? {
               ...textResult.evaluation,
@@ -2480,6 +2482,8 @@ Current user's request: ${currentInput}`;
           analytics: result.analytics,
           evaluation: result.evaluation,
           audio: result.audio,
+          // CRITICAL FIX: Include imageOutput for image generation models
+          imageOutput: result.imageOutput,
         };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -3069,7 +3073,9 @@ Current user's request: ${currentInput}`;
    */
   private async createMCPStream(options: StreamOptions): Promise<{
     stream: AsyncIterable<
-      { content: string } | { type: "audio"; audio: AudioChunk }
+      | { content: string }
+      | { type: "audio"; audio: AudioChunk }
+      | { type: "image"; imageOutput: { base64: string } }
     >;
     provider: string;
   }> {
@@ -3131,7 +3137,9 @@ Current user's request: ${currentInput}`;
    */
   private async processStreamResult(
     _stream: AsyncIterable<
-      { content: string } | { type: "audio"; audio: AudioChunk }
+      | { content: string }
+      | { type: "audio"; audio: AudioChunk }
+      | { type: "image"; imageOutput: { base64: string } }
     >,
     _options: StreamOptions,
     _factoryResult: unknown,
@@ -3181,7 +3189,9 @@ Current user's request: ${currentInput}`;
       evaluation?: EvaluationData;
     },
     stream: AsyncIterable<
-      { content: string } | { type: "audio"; audio: AudioChunk }
+      | { content: string }
+      | { type: "audio"; audio: AudioChunk }
+      | { type: "image"; imageOutput: { base64: string } }
     >,
     config: {
       providerName: string;

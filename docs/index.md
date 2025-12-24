@@ -25,6 +25,7 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 ## What's New (Q4 2025)
 
+- **Image Generation** – Generate images from text prompts using Gemini models via Vertex AI or Google AI Studio. Supports streaming mode with automatic file saving. → [Image Generation Guide](IMAGE-GENERATION-STREAMING.md)
 - **CSV File Support** – Attach CSV files to prompts for AI-powered data analysis with auto-detection. → [CSV Guide](features/multimodal-chat.md#csv-file-support)
 - **PDF File Support** – Process PDF documents with native visual analysis for Vertex AI, Anthropic, Bedrock, AI Studio. → [PDF Guide](features/pdf-support.md)
 - **LiteLLM Integration** – Access 100+ AI models from all major providers through unified interface. → [Setup Guide](LITELLM-INTEGRATION.md)

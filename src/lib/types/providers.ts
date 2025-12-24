@@ -569,6 +569,63 @@ export type GenAILiveSession = {
  */
 export type GenAIClient = {
   live: { connect: (config: LiveConnectConfig) => Promise<GenAILiveSession> };
+  getGenerativeModel: (options: { model: string }) => {
+    generateContent: (prompt: string) => Promise<{
+      response: {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<
+              | { text?: string }
+              | { inlineData?: { mimeType?: string; data?: string } }
+            >;
+          };
+        }>;
+        text: () => string;
+      };
+    }>;
+  };
+  models: {
+    generateContent: (options: {
+      model: string;
+      contents: Array<{
+        role: string;
+        parts: Array<
+          { text: string } | { inlineData: { mimeType: string; data: string } }
+        >;
+      }>;
+      config?: { responseModalities?: string[] };
+    }) => Promise<{
+      candidates?: Array<{
+        content?: {
+          parts?: Array<
+            | { text?: string }
+            | { inlineData?: { mimeType?: string; data?: string } }
+          >;
+        };
+      }>;
+    }>;
+    generateContentStream: (options: {
+      model: string;
+      contents: Array<{
+        role: string;
+        parts: Array<
+          { text: string } | { inlineData: { mimeType: string; data: string } }
+        >;
+      }>;
+      config?: { responseModalities?: string[] };
+    }) => Promise<
+      AsyncIterable<{
+        candidates?: Array<{
+          content?: {
+            parts?: Array<
+              | { text?: string }
+              | { inlineData?: { mimeType?: string; data?: string } }
+            >;
+          };
+        }>;
+      }>
+    >;
+  };
 };
 
 /**

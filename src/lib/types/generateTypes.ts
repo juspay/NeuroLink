@@ -227,6 +227,7 @@ export type GenerateResult = {
    * ```
    */
   audio?: TTSResult;
+  imageOutput?: { base64: string } | null; // Standard format for image generation
 
   // Provider information
   provider?: string;
@@ -322,7 +323,11 @@ export type FactoryEnhancedProvider = EnhancedProvider & {
  */
 export type TextGenerationOptions = {
   prompt?: string;
-  input?: { text: string }; // Alternative to prompt for SDK compatibility
+  input?: {
+    text: string;
+    images?: Array<Buffer | string | ImageWithAltText>; // Support for image inputs
+    pdfFiles?: Array<Buffer | string>; // Support for PDF inputs (for image generation with Vertex AI)
+  }; // Alternative to prompt for SDK compatibility
   provider?: AIProviderName;
   model?: string;
   region?: string;
@@ -399,6 +404,9 @@ export type TextGenerationOptions = {
   };
 
   enableSummarization?: boolean; // Enable/disable summarization for this specific request
+
+  // NEW: PDF Processing Options
+  extractTextFallback?: boolean; // Enable text extraction fallback for PDFs when native support unavailable
 };
 
 /**
@@ -428,6 +436,8 @@ export type TextGenerationResult = {
   analytics?: AnalyticsData;
   evaluation?: EvaluationData;
   audio?: TTSResult;
+  // Image generation output
+  imageOutput?: { base64: string } | null;
 };
 
 /**
