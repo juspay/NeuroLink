@@ -107,6 +107,9 @@ export type MCPServerInfo = {
   autoRestart?: boolean; // Whether to automatically restart on failure
   healthCheckInterval?: number; // Health check interval in milliseconds
 
+  // Tool filtering (blocklist for security/control)
+  blockedTools?: string[]; // List of tool names to block from this server
+
   // Extensible metadata
   metadata?: {
     uptime?: number;
