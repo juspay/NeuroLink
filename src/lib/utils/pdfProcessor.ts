@@ -277,6 +277,13 @@ export class PDFProcessor {
     const format = options?.format || "png";
     const quality = options?.quality || 0.9;
 
+    // Validate format
+    if (format !== "png" && format !== "jpeg") {
+      throw new Error(
+        `Invalid format: "${format}". Supported formats: "png", "jpeg".`,
+      );
+    }
+
     let pdfDocument: PDFDocumentProxy | null = null;
 
     try {
