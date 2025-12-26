@@ -61,7 +61,7 @@ export abstract class BaseProvider implements AIProvider {
 
   // Composition modules - Single Responsibility Principle
   private readonly messageBuilder: MessageBuilder;
-  private readonly streamHandler: StreamHandler;
+  protected readonly streamHandler: StreamHandler;
   private readonly generationHandler: GenerationHandler;
   private readonly telemetryHandler: TelemetryHandler;
   private readonly utilities: Utilities;
