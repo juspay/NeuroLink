@@ -277,6 +277,21 @@ export class ToolsManager {
       const toolInfo =
         (toolDef as Record<string, unknown> | undefined) ||
         ({} as Record<string, unknown>);
+
+      // 🔧 DEBUG: Check execute property status
+      logger.info(
+        `[ToolsManager] Detailed check for execute property on ${toolName}`,
+        {
+          type: typeof toolInfo.execute,
+          isNull: toolInfo.execute === null,
+          isUndefined: toolInfo.execute === undefined,
+          valuePreview:
+            typeof toolInfo.execute === "function"
+              ? "[Function]"
+              : String(toolInfo.execute).substring(0, 200),
+        },
+      );
+
       if (toolInfo && typeof toolInfo.execute === "function") {
         const tool = await this.createCustomToolFromDefinition(
           toolName,
@@ -289,7 +304,15 @@ export class ToolsManager {
         );
         if (tool && !tools[toolName]) {
           tools[toolName] = tool;
+        } else if (tools[toolName]) {
+          logger.info(
+            `[ToolsManager] Custom tool ${toolName} skipped because a tool with this name already exists.`,
+          );
         }
+      } else {
+        logger.warn(
+          `[ToolsManager] Skipping wrapper for custom tool ${toolName} - execute is not a function`,
+        );
       }
     }
 
@@ -313,6 +336,7 @@ export class ToolsManager {
     if (this.mcpTools) {
       for (const [name, tool] of Object.entries(this.mcpTools)) {
         if (!tools[name]) {
+          logger.debug(`[ToolsManager] Adding unwrapped MCP tool: ${name}`);
           tools[name] = tool;
         }
       }
@@ -423,6 +447,13 @@ export class ToolsManager {
         execute: async (params) => {
           const startTime = Date.now();
           let executionId: string | undefined;
+
+          // 🔧 DEBUG: Check neurolink availability for event emission
+          logger.info(`[ToolsManager] Checking neurolink availability for event emission`, {
+            neurolink: this.neurolink,
+            hasEmitToolStart: !!this.neurolink?.emitToolStart,
+            hasEmitToolEnd: !!this.neurolink?.emitToolEnd,
+          });
 
           if (this.neurolink?.emitToolStart) {
             executionId = this.neurolink.emitToolStart(
