@@ -1,3 +1,9 @@
+## [8.27.0](https://github.com/juspay/neurolink/compare/v8.26.1...v8.27.0) (2026-01-01)
+
+### Features
+
+- **(validation):** Video generation input validation (VIDEO-GEN-002) ([b58a532](https://github.com/juspay/neurolink/commit/b58a532fa822b365ab26a145b20719982377b73a))
+
 ## [8.26.1](https://github.com/juspay/neurolink/compare/v8.26.0...v8.26.1) (2025-12-31)
 
 ### Bug Fixes
