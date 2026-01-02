@@ -1,3 +1,9 @@
+## [8.28.0](https://github.com/juspay/neurolink/compare/v8.27.0...v8.28.0) (2026-01-02)
+
+### Features
+
+- **(video-provider):** Add video generation provider (VIDEO-GEN-003) ([e8a6eb2](https://github.com/juspay/neurolink/commit/e8a6eb2c46cf69fc341a703d7032ac381bebac23))
+
 ## [8.27.0](https://github.com/juspay/neurolink/compare/v8.26.1...v8.27.0) (2026-01-01)
 
 ### Features
