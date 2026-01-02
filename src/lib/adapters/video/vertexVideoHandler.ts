@@ -28,8 +28,12 @@ import { logger } from "../../utils/logger.js";
  * Video generation runtime error codes
  *
  * These are for runtime/execution errors during video generation.
- * Input validation errors (missing image, invalid options, etc.) are handled
- * by parameterValidation.ts using ERROR_CODES from errorHandling.ts.
+ * Pure option/shape validation (missing image option, invalid config values, etc.)
+ * is handled by parameterValidation.ts using ERROR_CODES from errorHandling.ts.
+ *
+ * Error categorization:
+ * - INVALID_INPUT → ErrorCategory.execution (runtime I/O failures)
+ * - parameterValidation errors → ErrorCategory.validation (schema/option issues)
  *
  * Following TTS pattern (TTS_ERROR_CODES + TTSError in ttsProcessor.ts)
  */
@@ -40,6 +44,12 @@ export const VIDEO_ERROR_CODES = {
   PROVIDER_NOT_CONFIGURED: "VIDEO_PROVIDER_NOT_CONFIGURED",
   /** Polling for video completion timed out */
   POLL_TIMEOUT: "VIDEO_POLL_TIMEOUT",
+  /**
+   * Runtime I/O error during input processing.
+   * Used for: failed URL fetch, failed file read, corrupt/unreadable buffer.
+   * NOT for: missing options or invalid config shapes (use parameterValidation).
+   */
+  INVALID_INPUT: "VIDEO_INVALID_INPUT",
 } as const;
 
 /**

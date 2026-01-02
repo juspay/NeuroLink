@@ -431,10 +431,27 @@ export type FactoryEnhancedProvider = EnhancedProvider & {
 
 /**
  * Text generation options type (consolidated from core types)
+ * Extended to support video generation mode
  */
 export type TextGenerationOptions = {
   prompt?: string;
-  input?: { text: string }; // Alternative to prompt for SDK compatibility
+  /**
+   * Alternative input format for multimodal SDK operations.
+   *
+   * NOTE: This field is only used by the higher-level `generate()` API
+   * (NeuroLink.generate, BaseProvider.generate). Legacy `generateText()`
+   * callers must still use the `prompt` field directly.
+   *
+   * Supports text, images, and other multimodal inputs.
+   */
+  input?: {
+    text: string;
+    /**
+     * Images to include in the request.
+     * For video generation, the first image is used as the source frame.
+     */
+    images?: Array<Buffer | string | import("./content.js").ImageWithAltText>;
+  };
   provider?: AIProviderName;
   model?: string;
   region?: string;
@@ -442,7 +459,30 @@ export type TextGenerationOptions = {
   maxTokens?: number;
   systemPrompt?: string;
   schema?: ZodUnknownSchema | Schema<unknown>;
-  output?: { format?: "text" | "structured" | "json" }; // Output format preference
+  /**
+   * Output configuration options
+   *
+   * @example Video generation
+   * ```typescript
+   * output: {
+   *   mode: "video",
+   *   video: { resolution: "1080p", length: 8 }
+   * }
+   * ```
+   */
+  output?: {
+    format?: "text" | "structured" | "json";
+    /**
+     * Output mode - determines the type of content generated
+     * - "text": Standard text generation (default)
+     * - "video": Video generation using models like Veo 3.1
+     */
+    mode?: "text" | "video";
+    /**
+     * Video generation configuration (used when mode is "video")
+     */
+    video?: VideoOutputOptions;
+  };
   tools?: Record<string, Tool>; // Enable MCP tools integration
   timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')
   disableTools?: boolean; // Disable tools (tools are enabled by default)
@@ -632,6 +672,7 @@ export type TextGenerationResult = {
   analytics?: AnalyticsData;
   evaluation?: EvaluationData;
   audio?: TTSResult;
+  video?: VideoGenerationResult;
 };
 
 /**

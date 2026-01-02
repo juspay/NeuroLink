@@ -1872,6 +1872,7 @@ Current user's request: ${currentInput}`;
             }
           : undefined,
         audio: textResult.audio,
+        video: textResult.video,
       };
 
       if (
@@ -2355,6 +2356,7 @@ Current user's request: ${currentInput}`;
           transformToolsToExpectedFormat(availableTools),
         ),
         audio: result.audio,
+        video: result.video,
         // Include analytics and evaluation from BaseProvider
         analytics: result.analytics,
         evaluation: result.evaluation,
@@ -2480,6 +2482,7 @@ Current user's request: ${currentInput}`;
           analytics: result.analytics,
           evaluation: result.evaluation,
           audio: result.audio,
+          video: result.video,
         };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));

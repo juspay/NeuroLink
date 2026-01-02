@@ -490,6 +490,12 @@ export abstract class BaseProvider implements AIProvider {
     const startTime = Date.now();
 
     try {
+      // ===== VIDEO GENERATION MODE =====
+      // Generate video from image + prompt using Veo 3.1
+      if (options.output?.mode === "video") {
+        return await this.handleVideoGeneration(options, startTime);
+      }
+
       // ===== TTS MODE 1: Direct Input Synthesis (useAiResponse=false) =====
       // Synthesize input text directly without AI generation
       // This is optimal for simple read-aloud scenarios
@@ -1013,6 +1019,205 @@ export abstract class BaseProvider implements AIProvider {
     }
 
     return enhancedResult;
+  }
+
+  /**
+   * Handle video generation mode
+   *
+   * Generates video from input image + text prompt using Vertex AI Veo 3.1.
+   *
+   * @param options - Text generation options with video configuration
+   * @param startTime - Generation start timestamp for metrics
+   * @returns Enhanced result with video data
+   *
+   * @example
+   * ```typescript
+   * const result = await provider.generate({
+   *   input: { text: "Product showcase", images: [imageBuffer] },
+   *   output: { mode: "video", video: { resolution: "1080p" } }
+   * });
+   * // result.video contains the generated video
+   * ```
+   */
+  private async handleVideoGeneration(
+    options: TextGenerationOptions,
+    startTime: number,
+  ): Promise<EnhancedGenerateResult> {
+    // Dynamic imports to avoid loading video dependencies unless needed
+    const { generateVideoWithVertex, VideoError, VIDEO_ERROR_CODES } =
+      await import("../adapters/video/vertexVideoHandler.js");
+    const { validateVideoGenerationInput, validateImageForVideo } =
+      await import("../utils/parameterValidation.js");
+    const { ErrorFactory } = await import("../utils/errorHandling.js");
+
+    // Build GenerateOptions for validation
+    const generateOptions = {
+      input: options.input || { text: options.prompt || "" },
+      output: options.output,
+      provider: options.provider,
+      model: options.model,
+    };
+
+    // Validate video generation input
+    const validation = validateVideoGenerationInput(generateOptions);
+    if (!validation.isValid) {
+      throw ErrorFactory.invalidParameters(
+        "video-generation",
+        new Error(validation.errors.map((e) => e.message).join("; ")),
+        { errors: validation.errors },
+      );
+    }
+
+    // Log warnings if any
+    if (validation.warnings.length > 0) {
+      for (const warning of validation.warnings) {
+        logger.warn(`Video generation warning: ${warning}`);
+      }
+    }
+
+    // Extract image from input
+    const imageInput = options.input?.images?.[0];
+    if (!imageInput) {
+      throw new VideoError({
+        code: VIDEO_ERROR_CODES.INVALID_INPUT,
+        message:
+          "Video generation requires an input image. Provide via input.images array.",
+        retriable: false,
+        context: { field: "input.images" },
+      });
+    }
+
+    // Timeout for image IO operations (15 seconds)
+    const IMAGE_IO_TIMEOUT_MS = 15000;
+
+    // Load image buffer if path/URL
+    let imageBuffer: Buffer;
+    if (typeof imageInput === "string") {
+      if (
+        imageInput.startsWith("http://") ||
+        imageInput.startsWith("https://")
+      ) {
+        // URL - fetch the image with timeout
+        logger.debug("Fetching image from URL for video generation", {
+          url: imageInput.substring(0, 100),
+        });
+        let response: Response;
+        try {
+          response = await this.executeWithTimeout(() => fetch(imageInput), {
+            timeout: IMAGE_IO_TIMEOUT_MS,
+            operationType: "generate", // Part of video generation flow
+          });
+        } catch (error) {
+          throw new VideoError({
+            code: VIDEO_ERROR_CODES.INVALID_INPUT,
+            message: `Failed to fetch image from URL: ${error instanceof Error ? error.message : "Request timed out"}`,
+            retriable: true,
+            context: { url: imageInput, timeout: IMAGE_IO_TIMEOUT_MS },
+            originalError: error instanceof Error ? error : undefined,
+          });
+        }
+        if (!response.ok) {
+          throw new VideoError({
+            code: VIDEO_ERROR_CODES.INVALID_INPUT,
+            message: `Failed to fetch image from URL: ${response.status} ${response.statusText}`,
+            retriable: response.status >= 500,
+            context: { url: imageInput, status: response.status },
+          });
+        }
+        imageBuffer = Buffer.from(await response.arrayBuffer());
+      } else {
+        // File path - read from disk with timeout
+        logger.debug("Reading image from path for video generation", {
+          path: imageInput,
+        });
+        const fs = await import("node:fs/promises");
+        try {
+          imageBuffer = await this.executeWithTimeout(
+            () => fs.readFile(imageInput),
+            { timeout: IMAGE_IO_TIMEOUT_MS, operationType: "generate" }, // Part of video generation flow
+          );
+        } catch (error) {
+          throw new VideoError({
+            code: VIDEO_ERROR_CODES.INVALID_INPUT,
+            message: `Failed to read image file: ${error instanceof Error ? error.message : String(error)}`,
+            retriable: false,
+            context: { path: imageInput, timeout: IMAGE_IO_TIMEOUT_MS },
+            originalError: error instanceof Error ? error : undefined,
+          });
+        }
+      }
+    } else if (Buffer.isBuffer(imageInput)) {
+      imageBuffer = imageInput;
+    } else if (typeof imageInput === "object" && "data" in imageInput) {
+      // ImageWithAltText type
+      const imgData = imageInput.data;
+      if (typeof imgData === "string") {
+        imageBuffer = Buffer.from(imgData, "base64");
+      } else if (Buffer.isBuffer(imgData)) {
+        imageBuffer = imgData;
+      } else {
+        throw new VideoError({
+          code: VIDEO_ERROR_CODES.INVALID_INPUT,
+          message: "ImageWithAltText.data must be a base64 string or Buffer.",
+          retriable: false,
+          context: { field: "input.images[0].data", type: typeof imgData },
+        });
+      }
+    } else {
+      throw new VideoError({
+        code: VIDEO_ERROR_CODES.INVALID_INPUT,
+        message:
+          "Invalid image input type. Provide Buffer, path string, URL, or ImageWithAltText.",
+        retriable: false,
+        context: { field: "input.images[0]", type: typeof imageInput },
+      });
+    }
+
+    // Validate image format and size (for Buffer inputs)
+    const imageValidation = validateImageForVideo(imageBuffer);
+    if (imageValidation) {
+      throw ErrorFactory.invalidParameters(
+        "video-generation",
+        new Error(imageValidation.message),
+        { field: "input.images[0]", validation: imageValidation },
+      );
+    }
+
+    // Get prompt text
+    const prompt = options.prompt || options.input?.text || "";
+
+    logger.info("Starting video generation", {
+      provider: "vertex",
+      model: options.model || "veo-3.1-generate-001",
+      promptLength: prompt.length,
+      imageSize: imageBuffer.length,
+      resolution: options.output?.video?.resolution || "720p",
+      duration: options.output?.video?.length || 6,
+    });
+
+    // Generate video using Vertex handler (no processor abstraction)
+    const videoResult = await generateVideoWithVertex(
+      imageBuffer,
+      prompt,
+      options.output?.video,
+    );
+
+    logger.info("Video generation complete", {
+      videoSize: videoResult.data.length,
+      duration: videoResult.metadata?.duration,
+      processingTime: videoResult.metadata?.processingTime,
+    });
+
+    // Build result
+    const baseResult: EnhancedGenerateResult = {
+      content: prompt, // Echo the prompt as content
+      provider: "vertex",
+      model: options.model || "veo-3.1-generate-001",
+      usage: { input: 0, output: 0, total: 0 },
+      video: videoResult,
+    };
+
+    return await this.enhanceResult(baseResult, options, startTime);
   }
 
   /**

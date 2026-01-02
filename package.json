@@ -187,6 +187,7 @@
     "dotenv": "^16.6.1",
     "exceljs": "^4.4.0",
     "inquirer": "^9.3.7",
+    "google-auth-library": "^9.1.0",
     "json-schema-to-zod": "^2.6.1",
     "mammoth": "^1.11.0",
     "mathjs": "^14.7.0",

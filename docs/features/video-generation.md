@@ -110,7 +110,6 @@ if (result.video) {
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
 import { readFile, writeFile } from "fs/promises";
-import type { VideoGenerationResult } from "@juspay/neurolink/types";
 
 const neurolink = new NeuroLink();
 
@@ -226,10 +225,6 @@ npx @juspay/neurolink generate "Camera pans across futuristic city" \
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
 import { readFile, writeFile } from "fs/promises";
-import type {
-  GenerateResult,
-  VideoGenerationResult,
-} from "@juspay/neurolink/types";
 
 const neurolink = new NeuroLink();
 
@@ -429,12 +424,7 @@ if (result.video) {
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import {
-  AuthenticationError,
-  RateLimitError,
-  NetworkError,
-  ProviderError,
-} from "@juspay/neurolink/types";
+import { NeuroLinkError } from "@juspay/neurolink";
 import { readFile, writeFile } from "fs/promises";
 
 const neurolink = new NeuroLink();
@@ -469,31 +459,37 @@ async function generateVideoWithErrorHandling(
     } catch (error) {
       lastError = error;
 
-      if (error instanceof AuthenticationError) {
-        console.error(
-          "Authentication failed. Check your Vertex AI credentials.",
-        );
-        throw error; // Don't retry auth errors
-      }
+      if (error instanceof NeuroLinkError) {
+        // Check error category and handle accordingly
+        if (
+          error.category === "configuration" ||
+          error.category === "permission"
+        ) {
+          console.error(
+            "Configuration/permission error. Check your Vertex AI credentials.",
+          );
+          throw error; // Don't retry config/permission errors
+        }
 
-      if (error instanceof RateLimitError) {
-        const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
-        console.log(
-          `Rate limited. Waiting ${waitTime / 1000}s before retry...`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, waitTime));
-        continue;
-      }
+        if (error.code.includes("RATE_LIMIT")) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(
+            `Rate limited. Waiting ${waitTime / 1000}s before retry...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          continue;
+        }
 
-      if (error instanceof NetworkError) {
-        console.log(`Network error on attempt ${attempt}. Retrying...`);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        continue;
-      }
+        if (error.category === "network" && error.retriable) {
+          console.log(`Network error on attempt ${attempt}. Retrying...`);
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
+        }
 
-      if (error instanceof ProviderError) {
-        console.error(`Provider error: ${error.message}`);
-        throw error;
+        if (error.category === "execution") {
+          console.error(`Execution error: ${error.message}`);
+          throw error;
+        }
       }
 
       throw error;
@@ -636,10 +632,14 @@ Options for video output configuration:
 
 ```typescript
 type VideoOutputOptions = {
+  /** Output resolution - "720p" (1280x720) or "1080p" (1920x1080) */
   resolution?: "720p" | "1080p";
-  length?: 4 | 6 | 8; // Duration in seconds
+  /** Video duration in seconds (4, 6, or 8 seconds supported) */
+  length?: 4 | 6 | 8;
+  /** Aspect ratio - "9:16" for portrait or "16:9" for landscape */
   aspectRatio?: "9:16" | "16:9";
-  audio?: boolean; // Enable audio generation (default: true)
+  /** Enable audio generation (default: true) */
+  audio?: boolean;
 };
 ```
 
@@ -649,22 +649,35 @@ Result type for generated video:
 
 ```typescript
 type VideoGenerationResult = {
-  data: Buffer; // Raw video data
+  /** Raw video data as Buffer */
+  data: Buffer;
+  /** Video media type */
   mediaType: "video/mp4" | "video/webm";
+  /** Video metadata */
   metadata?: {
+    /** Original filename if applicable */
     filename?: string;
-    duration?: number; // in seconds
+    /** Video duration in seconds */
+    duration?: number;
+    /** Video dimensions */
     dimensions?: {
       width: number;
       height: number;
     };
+    /** Frame rate in fps */
     frameRate?: number;
+    /** Video codec used */
     codec?: string;
+    /** Model used for generation */
     model?: string;
+    /** Provider used for generation */
     provider?: string;
+    /** Aspect ratio of the video */
     aspectRatio?: string;
+    /** Whether audio was enabled during generation */
     audioEnabled?: boolean;
-    processingTime?: number; // in milliseconds
+    /** Processing time in milliseconds */
+    processingTime?: number;
   };
 };
 ```
@@ -675,7 +688,7 @@ The `generate()` function returns an extended result when video mode is enabled:
 
 ```typescript
 type GenerateResult = {
-  content: string; // Text content (may be empty for video-only)
+  content: string; // Text content (prompt echoed back)
   provider?: string;
   model?: string;
   usage?: TokenUsage;
@@ -683,6 +696,11 @@ type GenerateResult = {
 
   // Video-specific field (present when output.mode === "video")
   video?: VideoGenerationResult;
+
+  // Other optional fields
+  toolsUsed?: string[];
+  analytics?: AnalyticsData;
+  evaluation?: EvaluationData;
 };
 ```
 
@@ -698,8 +716,8 @@ type GenerateResult = {
 | `model`                    | `string`           | `"veo-3.1"` | No       | Model version to use                  |
 | `output.mode`              | `string`           | `"text"`    | Yes      | Must be `"video"` for video output    |
 | `output.video.resolution`  | `string`           | `"720p"`    | No       | Output resolution (`720p` or `1080p`) |
-| `output.video.length`      | `number`           | `8`         | No       | Duration in seconds (4, 6, or 8)      |
-| `output.video.aspectRatio` | `string`           | `"9:16"`    | No       | Aspect ratio (`9:16` or `16:9`)       |
+| `output.video.length`      | `number`           | `6`         | No       | Duration in seconds (4, 6, or 8)      |
+| `output.video.aspectRatio` | `string`           | `"16:9"`    | No       | Aspect ratio (`9:16` or `16:9`)       |
 | `output.video.audio`       | `boolean`          | `true`      | No       | Enable audio generation               |
 
 ### Video Quality Settings
@@ -841,40 +859,46 @@ const videos = await Promise.all(
 
 ### Validation Rules
 
-| Parameter                  | Validation                      | Error Type      | Example Message                                    |
-| -------------------------- | ------------------------------- | --------------- | -------------------------------------------------- |
-| `input.images[0]`          | Must be valid image file/buffer | ValidationError | `Invalid image format. Supported: JPEG, PNG, WebP` |
-| `input.images[0]`          | Max 10MB                        | ValidationError | `Image size exceeds 10MB limit`                    |
-| `input.text`               | 1-500 characters                | ValidationError | `Prompt must be between 1 and 500 characters`      |
-| `output.video.resolution`  | `720p` or `1080p`               | ValidationError | `Invalid resolution. Use '720p' or '1080p'`        |
-| `output.video.length`      | 4, 6, or 8                      | ValidationError | `Invalid length. Use 4, 6, or 8 seconds`           |
-| `output.video.aspectRatio` | `9:16` or `16:9`                | ValidationError | `Invalid aspect ratio. Use '9:16' or '16:9'`       |
+| Parameter                  | Validation                      | Error Type     | Example Message                                    |
+| -------------------------- | ------------------------------- | -------------- | -------------------------------------------------- |
+| `input.images[0]`          | Must be valid image file/buffer | NeuroLinkError | `Invalid image format. Supported: JPEG, PNG, WebP` |
+| `input.images[0]`          | Max 10MB                        | NeuroLinkError | `Image size exceeds 10MB limit`                    |
+| `input.text`               | 1-500 characters                | NeuroLinkError | `Prompt must be between 1 and 500 characters`      |
+| `output.video.resolution`  | `720p` or `1080p`               | NeuroLinkError | `Invalid resolution. Use '720p' or '1080p'`        |
+| `output.video.length`      | 4, 6, or 8                      | NeuroLinkError | `Invalid length. Use 4, 6, or 8 seconds`           |
+| `output.video.aspectRatio` | `9:16` or `16:9`                | NeuroLinkError | `Invalid aspect ratio. Use '9:16' or '16:9'`       |
 
 ### Error Types
 
-NeuroLink throws typed errors for different failure scenarios:
+NeuroLink uses a unified error handling system with error categories:
 
 ```typescript
-import {
-  AuthenticationError,
-  AuthorizationError,
-  NetworkError,
-  RateLimitError,
-  ProviderError,
-  ValidationError,
-} from "@juspay/neurolink/types";
+import { NeuroLinkError } from "@juspay/neurolink";
+
+// Error categories (from ErrorCategory enum)
+type ErrorCategory =
+  | "validation"
+  | "timeout"
+  | "network"
+  | "resource"
+  | "permission"
+  | "configuration"
+  | "execution"
+  | "system";
+
+// Video-specific error codes
+const VIDEO_ERROR_CODES = {
+  GENERATION_FAILED: "VIDEO_GENERATION_FAILED",
+  PROVIDER_NOT_CONFIGURED: "VIDEO_PROVIDER_NOT_CONFIGURED",
+  POLL_TIMEOUT: "VIDEO_POLL_TIMEOUT",
+  INVALID_INPUT: "VIDEO_INVALID_INPUT",
+};
 ```
 
 ### Error Handling Example
 
 ```typescript
-import {
-  AuthenticationError,
-  RateLimitError,
-  NetworkError,
-  ProviderError,
-  ValidationError,
-} from "@juspay/neurolink/types";
+import { NeuroLinkError } from "@juspay/neurolink";
 
 try {
   const result = await neurolink.generate({
@@ -887,25 +911,45 @@ try {
     output: { mode: "video", video: { resolution: "720p" } },
   });
 } catch (error) {
-  if (error instanceof ValidationError) {
-    console.error("Validation error:", error.message);
-    // Common validation issues:
-    // - Unsupported image format (use JPEG, PNG, or WebP)
-    // - Image too large (max 10MB)
-    // - Invalid prompt length (1-500 characters)
-    // - Invalid resolution, length, or aspect ratio
-  } else if (error instanceof RateLimitError) {
-    console.error("Rate limited:", error.message);
-    // Implement exponential backoff
-  } else if (error instanceof AuthenticationError) {
-    console.error("Authentication failed:", error.message);
-    // Check GOOGLE_APPLICATION_CREDENTIALS
-  } else if (error instanceof NetworkError) {
-    console.error("Network error:", error.message);
-    // Retry with backoff
-  } else if (error instanceof ProviderError) {
-    console.error("Provider error:", error.message);
-    // Check provider status and quotas
+  if (error instanceof NeuroLinkError) {
+    console.error(`Error [${error.code}]:`, error.message);
+    console.error("Category:", error.category);
+    console.error("Severity:", error.severity);
+    console.error("Retriable:", error.retriable);
+
+    // Handle specific error categories
+    switch (error.category) {
+      case "validation":
+        console.error("Validation issues:");
+        // - Unsupported image format (use JPEG, PNG, or WebP)
+        // - Image too large (max 10MB)
+        // - Invalid prompt length (1-500 characters)
+        // - Invalid resolution, length, or aspect ratio
+        break;
+
+      case "timeout":
+        console.error("Request timed out - retry with backoff");
+        break;
+
+      case "configuration":
+      case "permission":
+        console.error(
+          "Config/auth failed - check GOOGLE_APPLICATION_CREDENTIALS",
+        );
+        break;
+
+      case "network":
+        console.error("Network error - retry with backoff");
+        break;
+
+      case "execution":
+        console.error("Execution error - check status and quotas");
+        // Detect rate limiting via error code
+        if (error.code.includes("RATE_LIMIT")) {
+          console.error("Rate limited - implement exponential backoff");
+        }
+        break;
+    }
   }
 }
 ```
@@ -1146,14 +1190,21 @@ describe("Video Generation Integration", () => {
 
 The video generation feature is implemented across these files:
 
-| File                                       | Purpose                                        |
-| ------------------------------------------ | ---------------------------------------------- |
-| `src/lib/types/multimodal.ts`              | Core multimodal types including `VideoContent` |
-| `src/lib/types/generateTypes.ts`           | Extended `GenerateOptions` with video output   |
-| `src/lib/providers/googleVertex.ts`        | Vertex AI provider with Veo integration        |
-| `src/lib/utils/messageBuilder.ts`          | Message construction with video support        |
-| `src/lib/adapters/providerImageAdapter.ts` | Image/media adaptation for providers           |
-| `src/cli/factories/commandFactory.ts`      | CLI command options for video output           |
-| `src/lib/utils/parameterValidation.ts`     | Input validation for video generation          |
+| File                                           | Purpose                                                                       |
+| ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| `src/lib/types/multimodal.ts`                  | Core types: `VideoOutputOptions`, `VideoGenerationResult`                     |
+| `src/lib/types/generateTypes.ts`               | Extended `GenerateOptions` with video output mode                             |
+| `src/lib/adapters/video/vertexVideoHandler.ts` | Vertex AI Veo 3.1 video generation handler                                    |
+| `src/lib/core/baseProvider.ts`                 | Video generation routing in `generate()` method                               |
+| `src/lib/neurolink.ts`                         | Main SDK interface with video result handling                                 |
+| `src/lib/utils/parameterValidation.ts`         | Input validation: `validateVideoGenerationInput()`, `validateImageForVideo()` |
+| `src/lib/utils/errorHandling.ts`               | Error factory methods for video generation errors                             |
+
+### Key Functions
+
+- **`generateVideoWithVertex()`** - Main video generation function in `vertexVideoHandler.ts`
+- **`validateVideoGenerationInput()`** - Comprehensive input validation in `parameterValidation.ts`
+- **`validateImageForVideo()`** - Image format and size validation in `parameterValidation.ts`
+- **`handleVideoGeneration()`** - Private method in `BaseProvider` that orchestrates the video generation flow
 
 **Next:** [Multimodal Chat Guide](./multimodal-chat.md) | [PDF Support](./pdf-support.md)
