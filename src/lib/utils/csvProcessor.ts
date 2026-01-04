@@ -119,8 +119,12 @@ export class CSVProcessor {
 
       const limitedCSV = limitedLines.join("\n");
 
-      const rowCount = limitedLines.length - 1; // Subtract header
-      const originalRowCount = csvLines.length - 1; // Subtract header from original
+      const rowCount = limitedLines
+        .slice(1)
+        .filter((line) => line.trim() !== "").length;
+      const originalRowCount = csvLines
+        .slice(1)
+        .filter((line) => line.trim() !== "").length;
       const wasTruncated = rowCount < originalRowCount;
 
       if (wasTruncated) {
@@ -153,6 +157,7 @@ export class CSVProcessor {
           confidence: 100,
           size: content.length,
           rowCount,
+          totalLines: limitedLines.length,
           columnCount: (limitedLines[0] || "").split(",").length,
           extension,
         },
@@ -170,15 +175,32 @@ export class CSVProcessor {
 
     const rows = await this.parseCSVString(csvString, maxRows);
 
+    // Filter out empty rows (empty objects or rows with only whitespace values from blank lines)
+    const nonEmptyRows = rows.filter((row) => {
+      if (!row || typeof row !== "object") {
+        return false;
+      }
+      const keys = Object.keys(row);
+      if (keys.length === 0) {
+        return false;
+      }
+      // Check if all values are empty or whitespace-only
+      return !Object.values(row).every(
+        (val) => val === "" || (typeof val === "string" && val.trim() === ""),
+      );
+    });
+
     // Extract metadata from parsed results
-    const rowCount = rows.length;
+    const rowCount = nonEmptyRows.length;
     const columnNames =
-      rows.length > 0 ? Object.keys(rows[0] as Record<string, unknown>) : [];
+      nonEmptyRows.length > 0
+        ? Object.keys(nonEmptyRows[0] as Record<string, unknown>)
+        : [];
     const columnCount = columnNames.length;
     const hasEmptyColumns = columnNames.some(
       (col) => !col || col.trim() === "",
     );
-    const sampleRows = rows.slice(0, 3);
+    const sampleRows = nonEmptyRows.slice(0, 3);
     const sampleData = this.formatSampleData(
       sampleRows,
       sampleDataFormat,
@@ -199,7 +221,11 @@ export class CSVProcessor {
     logger.debug(
       `[CSVProcessor] Converting ${rowCount} rows to ${formatStyle} format`,
     );
-    const formatted = this.formatForLLM(rows, formatStyle, includeHeaders);
+    const formatted = this.formatForLLM(
+      nonEmptyRows,
+      formatStyle,
+      includeHeaders,
+    );
 
     logger.info("[CSVProcessor] ✅ Processed CSV file", {
       formatStyle,

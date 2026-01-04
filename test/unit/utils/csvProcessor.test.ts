@@ -424,4 +424,126 @@ Charlie,35,Chicago`;
       expect(csvOutput.split("\n")[0]).toBe("Alice,30,New York");
     });
   });
+
+  describe("rowCount consistency across formats", () => {
+    it("should have consistent rowCount between raw and json formats", async () => {
+      const csvData = Buffer.from("name,age\nAlice,30\nBob,25");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(rawResult.metadata.rowCount).toEqual(jsonResult.metadata.rowCount);
+    });
+
+    it("should exclude trailing empty lines from rowCount in raw format", async () => {
+      const csvData = Buffer.from("name,age\nAlice,30\nBob,25\n");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(rawResult.metadata.totalLines).toBe(4); // header + 2 data + 1 empty
+    });
+
+    it("should exclude multiple trailing empty lines from rowCount", async () => {
+      const csvData = Buffer.from("name,age\nAlice,30\nBob,25\n\n\n");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(rawResult.metadata.totalLines).toBe(6); // header + 2 data + 3 empty
+    });
+
+    it("should handle CSV with only header and empty lines", async () => {
+      const csvData = Buffer.from("name,age\n\n");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(0);
+      expect(jsonResult.metadata.rowCount).toBe(0);
+      expect(rawResult.metadata.totalLines).toBe(3); // header + 2 empty
+    });
+
+    it("should include totalLines in raw format metadata", async () => {
+      const csvData = Buffer.from("name,age\nAlice,30\nBob,25\nCharlie,35");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+
+      expect(rawResult.metadata.totalLines).toBe(4); // header + 3 data rows
+      expect(rawResult.metadata.rowCount).toBe(3);
+    });
+
+    it("should handle metadata line with consistent rowCount", async () => {
+      const csvData = Buffer.from("SEP=,\nname,age\nAlice,30\nBob,25");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(rawResult.metadata.totalLines).toBe(3); // header + 2 data (metadata excluded)
+    });
+
+    it("should maintain consistency with row limiting", async () => {
+      const csvData = Buffer.from(
+        "name,age\nAlice,30\nBob,25\nCharlie,35\nDiana,40",
+      );
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+        maxRows: 2,
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+        maxRows: 2,
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(rawResult.metadata.totalLines).toBe(3); // header + 2 data rows
+    });
+
+    it("should handle whitespace-only lines as empty", async () => {
+      const csvData = Buffer.from("name,age\nAlice,30\n   \nBob,25\n\t");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(rawResult.metadata.totalLines).toBe(5); // header + 2 data + 2 whitespace
+    });
+  });
 });
