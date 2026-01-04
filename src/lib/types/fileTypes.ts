@@ -60,6 +60,7 @@ export type FileProcessingResult = {
     extension?: string | null; // Original file extension (e.g., 'csv', 'tsv', 'txt')
     // CSV-specific metadata
     rowCount?: number;
+    totalLines?: number;
     columnCount?: number;
     columnNames?: string[];
     sampleData?: string | unknown[];
