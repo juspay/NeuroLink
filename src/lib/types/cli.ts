@@ -81,6 +81,19 @@ export type GenerateCommandArgs = BaseCommandArgs & {
   thinkingLevel?: "minimal" | "low" | "medium" | "high";
   /** Vertex AI region */
   region?: string;
+  // Video generation options (Veo 3.1)
+  /** Output mode - 'text' for standard generation, 'video' for video generation */
+  "output-mode"?: "text" | "video";
+  /** Path to save generated video file */
+  "video-output"?: string;
+  /** Video output resolution (720p or 1080p) */
+  "video-resolution"?: "720p" | "1080p";
+  /** Video duration in seconds (4, 6, or 8) */
+  "video-length"?: 4 | 6 | 8;
+  /** Video aspect ratio (9:16 for portrait, 16:9 for landscape) */
+  "video-aspect-ratio"?: "9:16" | "16:9";
+  /** Enable/disable audio generation in video */
+  "video-audio"?: boolean;
   /** Custom path for generated image output */
   imageOutput?: string;
 };
@@ -395,6 +408,8 @@ export type GenerateResult = CommandResult & {
   }>;
   /** TTS audio result when TTS is enabled */
   audio?: import("./index.js").TTSResult;
+  /** Video generation result when video mode is enabled */
+  video?: import("./multimodal.js").VideoGenerationResult;
   imageOutput?: {
     base64: string;
     savedPath?: string; // Local file path where image was saved
