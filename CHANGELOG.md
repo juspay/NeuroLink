@@ -1,3 +1,9 @@
+## [8.32.0](https://github.com/juspay/neurolink/compare/v8.31.3...v8.32.0) (2026-01-05)
+
+### Features
+
+- **(cli):** Add video generation to CLI ([8e7f0cf](https://github.com/juspay/neurolink/commit/8e7f0cfd983f6c09aa3eaf3bdb09d9c22c0d5b02))
+
 ## [8.31.3](https://github.com/juspay/neurolink/compare/v8.31.2...v8.31.3) (2026-01-05)
 
 ### Bug Fixes
