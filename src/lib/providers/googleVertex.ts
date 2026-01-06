@@ -1,20 +1,12 @@
-import {
-  createVertex,
-  type GoogleVertexProviderSettings,
-} from "@ai-sdk/google-vertex";
-import {
-  createVertexAnthropic,
-  type GoogleVertexAnthropicProviderSettings,
-} from "@ai-sdk/google-vertex/anthropic";
+// Native SDK imports - no more @ai-sdk/google-vertex dependency
 import type { ZodType, ZodTypeDef } from "zod";
 import {
-  streamText,
-  Output,
   type Schema,
   type LanguageModelV1,
   type LanguageModel,
   type Tool,
 } from "ai";
+import type { AnthropicVertex as AnthropicVertexType } from "@anthropic-ai/vertex-sdk";
 import {
   AIProviderName,
   ErrorCategory,
@@ -23,7 +15,12 @@ import {
 import { NeuroLinkError, ERROR_CODES } from "../utils/errorHandling.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { UnknownRecord } from "../types/common.js";
-import type { GenAIClient, GoogleGenAIClass } from "../types/providers.js";
+import type {
+  GenAIClient,
+  GoogleGenAIClass,
+  GoogleVertexProviderSettings,
+  AnthropicVertexSettings,
+} from "../types/providers.js";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
 import type {
   TextGenerationOptions,
@@ -32,8 +29,14 @@ import type {
 import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
-import { AuthenticationError, ProviderError } from "../types/errors.js";
+import { TimeoutError } from "../utils/timeout.js";
+import {
+  AuthenticationError,
+  InvalidModelError,
+  NetworkError,
+  ProviderError,
+  RateLimitError,
+} from "../types/errors.js";
 import {
   DEFAULT_MAX_STEPS,
   GLOBAL_LOCATION_MODELS,
@@ -45,30 +48,38 @@ import {
   createVertexProjectConfig,
   createGoogleAuthConfig,
 } from "../utils/providerConfig.js";
-import { isGemini3Model } from "../utils/modelDetection.js";
 import {
   convertZodToJsonSchema,
   inlineJsonSchema,
+  ensureNestedSchemaTypes,
 } from "../utils/schemaConversion.js";
 import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import dns from "dns";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { FileDetector } from "../utils/fileDetector.js";
 
 // Import proper types for multimodal message handling
 
-// Enhanced Anthropic support with direct imports
-// Using the dual provider architecture from Vercel AI SDK
-const hasAnthropicSupport = (): boolean => {
-  try {
-    // Verify the anthropic module is available
-    return typeof createVertexAnthropic === "function";
-  } catch {
-    return false;
+// Dynamic import helper for native Anthropic Vertex SDK
+let anthropicVertexModule: typeof import("@anthropic-ai/vertex-sdk") | null =
+  null;
+
+async function getAnthropicVertexModule(): Promise<
+  typeof import("@anthropic-ai/vertex-sdk")
+> {
+  if (!anthropicVertexModule) {
+    anthropicVertexModule = await import("@anthropic-ai/vertex-sdk");
   }
+  return anthropicVertexModule;
+}
+
+// Enhanced Anthropic support check - now uses native SDK
+const hasAnthropicSupport = (): boolean => {
+  // Always return true as we have the native SDK available
+  // Actual availability is checked at runtime when creating the client
+  return true;
 };
 
 // Configuration helpers - now using consolidated utility
@@ -114,17 +125,9 @@ const createVertexSettings = async (
     fetch: createProxyFetch(),
   };
 
-  // Special handling for global endpoint
-  // Google's global endpoint uses aiplatform.googleapis.com (no region prefix)
-  // instead of {region}-aiplatform.googleapis.com
-  if (location === "global") {
-    baseSettings.baseURL = `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google`;
-    logger.debug("[GoogleVertexProvider] Using global endpoint", {
-      baseURL: baseSettings.baseURL,
-      location,
-      project,
-    });
-  }
+  // Note: Global endpoint handling is managed by the @google/genai SDK based on location parameter.
+  // Authentication is handled via GOOGLE_APPLICATION_CREDENTIALS environment variable
+  // or the temporary credentials file approach below.
 
   // 🎯 OPTION 2: Create credentials file from environment variables at runtime
   // This solves the problem where GOOGLE_APPLICATION_CREDENTIALS exists in ZSHRC locally
@@ -227,65 +230,9 @@ const createVertexSettings = async (
     }
   }
 
-  // Fallback to explicit credentials for development and production
-  // Enhanced to check ALL required fields from the .env file configuration
-  const requiredEnvVars = {
-    type: process.env.GOOGLE_AUTH_TYPE,
-    project_id: process.env.GOOGLE_AUTH_BREEZE_PROJECT_ID,
-    private_key: process.env.GOOGLE_AUTH_PRIVATE_KEY,
-    client_email: process.env.GOOGLE_AUTH_CLIENT_EMAIL,
-    client_id: process.env.GOOGLE_AUTH_CLIENT_ID,
-    auth_uri: process.env.GOOGLE_AUTH_AUTH_URI,
-    token_uri: process.env.GOOGLE_AUTH_TOKEN_URI,
-    auth_provider_x509_cert_url: process.env.GOOGLE_AUTH_AUTH_PROVIDER_CERT_URL,
-    client_x509_cert_url: process.env.GOOGLE_AUTH_CLIENT_CERT_URL,
-    universe_domain: process.env.GOOGLE_AUTH_UNIVERSE_DOMAIN,
-  };
-
-  // Check if we have the minimal required fields (client_email and private_key are essential)
-  if (requiredEnvVars.client_email && requiredEnvVars.private_key) {
-    logger.debug("Using explicit service account credentials authentication", {
-      authMethod: "explicit_service_account_credentials",
-      hasType: !!requiredEnvVars.type,
-      hasProjectId: !!requiredEnvVars.project_id,
-      hasClientEmail: !!requiredEnvVars.client_email,
-      hasPrivateKey: !!requiredEnvVars.private_key,
-      hasClientId: !!requiredEnvVars.client_id,
-      hasAuthUri: !!requiredEnvVars.auth_uri,
-      hasTokenUri: !!requiredEnvVars.token_uri,
-      hasAuthProviderCertUrl: !!requiredEnvVars.auth_provider_x509_cert_url,
-      hasClientCertUrl: !!requiredEnvVars.client_x509_cert_url,
-      hasUniverseDomain: !!requiredEnvVars.universe_domain,
-      credentialsCompleteness: "using_individual_env_vars_as_fallback",
-    });
-
-    // Build complete service account credentials object
-    const serviceAccountCredentials = {
-      type: requiredEnvVars.type || "service_account",
-      project_id: requiredEnvVars.project_id || getVertexProjectId(),
-      private_key: requiredEnvVars.private_key.replace(/\\n/g, "\n"),
-      client_email: requiredEnvVars.client_email,
-      client_id: requiredEnvVars.client_id || "",
-      auth_uri:
-        requiredEnvVars.auth_uri || "https://accounts.google.com/o/oauth2/auth",
-      token_uri:
-        requiredEnvVars.token_uri || "https://oauth2.googleapis.com/token",
-      auth_provider_x509_cert_url:
-        requiredEnvVars.auth_provider_x509_cert_url ||
-        "https://www.googleapis.com/oauth2/v1/certs",
-      client_x509_cert_url: requiredEnvVars.client_x509_cert_url || "",
-      universe_domain: requiredEnvVars.universe_domain || "googleapis.com",
-    };
-
-    return {
-      ...baseSettings,
-      googleAuthOptions: {
-        credentials: serviceAccountCredentials,
-      },
-    };
-  }
-
-  // Log comprehensive warning if no valid authentication is available
+  // Log warning if no valid authentication is available
+  // Note: Authentication is handled via GOOGLE_APPLICATION_CREDENTIALS environment variable
+  // or the temporary credentials file approach (OPTION 2 above).
   logger.warn("No valid authentication found for Google Vertex AI", {
     authMethod: "none",
     authenticationAttempts: {
@@ -295,13 +242,8 @@ const createVertexSettings = async (
         fileExists: false, // We already checked above
       },
       explicitCredentials: {
-        hasClientEmail: !!requiredEnvVars.client_email,
-        hasPrivateKey: !!requiredEnvVars.private_key,
-        hasProjectId: !!requiredEnvVars.project_id,
-        hasType: !!requiredEnvVars.type,
-        missingFields: Object.entries(requiredEnvVars)
-          .filter(([_key, value]) => !value)
-          .map(([key]) => key),
+        hasClientEmail: !!process.env.GOOGLE_AUTH_CLIENT_EMAIL,
+        hasPrivateKey: !!process.env.GOOGLE_AUTH_PRIVATE_KEY,
       },
     },
     troubleshooting: [
@@ -312,22 +254,17 @@ const createVertexSettings = async (
   return baseSettings;
 };
 
-// Create Anthropic-specific Vertex settings with the same authentication and proxy support
+// Create Anthropic-specific Vertex settings for native @anthropic-ai/vertex-sdk
 const createVertexAnthropicSettings = async (
   region?: string,
-): Promise<GoogleVertexAnthropicProviderSettings> => {
-  const baseVertexSettings = await createVertexSettings(region);
+): Promise<AnthropicVertexSettings> => {
+  const location = region || getVertexLocation();
+  const project = getVertexProjectId();
 
-  // GoogleVertexAnthropicProviderSettings extends GoogleVertexProviderSettings
-  // so we can use the same settings with proper typing
   return {
-    project: baseVertexSettings.project,
-    location: baseVertexSettings.location,
-    fetch: baseVertexSettings.fetch,
-    ...(baseVertexSettings.googleAuthOptions && {
-      googleAuthOptions: baseVertexSettings.googleAuthOptions,
-    }),
-  } as GoogleVertexAnthropicProviderSettings;
+    projectId: project,
+    region: location,
+  };
 };
 
 // Helper function to determine if a model is an Anthropic model
@@ -346,39 +283,38 @@ const isAnthropicModel = (modelName: string): boolean => {
  * - Enhanced error handling with setup guidance
  * - Tool registration and context management
  *
- * @important Structured Output Limitation (Gemini Models Only)
- * Google Gemini models on Vertex AI cannot combine function calling (tools) with
- * structured output (JSON schema). When using schemas, you MUST set disableTools: true.
+ * @important Tools + Schema Support (Fixed)
+ * Gemini models on Vertex AI now support combining function calling (tools) with
+ * structured output (JSON schema) simultaneously. The fix works by NOT setting
+ * `responseMimeType: "application/json"` when tools are present, which was
+ * causing the Google API error.
  *
- * Error without disableTools:
- * "Function calling with a response mime type: 'application/json' is unsupported"
+ * The `responseSchema` is still set to guide the output structure, allowing
+ * tools to execute AND the final output to follow the schema format.
  *
- * This limitation ONLY affects Gemini models. Anthropic Claude models via Vertex
- * AI do NOT have this limitation and support both tools + schemas simultaneously.
- *
- * @example Gemini models with schemas
+ * @example Gemini models with tools + schemas
  * ```typescript
  * const provider = new GoogleVertexProvider("gemini-2.5-flash");
  * const result = await provider.generate({
- *   input: { text: "Analyze data" },
+ *   input: { text: "Analyze data using tools" },
  *   schema: MySchema,
  *   output: { format: "json" },
- *   disableTools: true  // Required for Gemini models
+ *   // No need for disableTools: true anymore!
  * });
  * ```
  *
- * @example Claude models (no limitation)
+ * @example Claude models (always supported both)
  * ```typescript
  * const provider = new GoogleVertexProvider("claude-3-5-sonnet-20241022");
  * const result = await provider.generate({
  *   input: { text: "Analyze data" },
  *   schema: MySchema,
  *   output: { format: "json" }
- *   // No disableTools needed - Claude supports both
  * });
  * ```
  *
- * @note Gemini 3 Pro Preview (November 2025) will support combining tools + schemas
+ * @note "Too many states for serving" errors can still occur with very complex schemas + tools.
+ *       Solution: Simplify schema or reduce number of tools if this occurs.
  * @see https://cloud.google.com/vertex-ai/docs/generative-ai/learn/models
  */
 export class GoogleVertexProvider extends BaseProvider {
@@ -449,8 +385,18 @@ export class GoogleVertexProvider extends BaseProvider {
    * Creates fresh model instances for each request
    */
   protected async getAISDKModel(): Promise<LanguageModel> {
-    const model = await this.getModel();
-    return model as LanguageModel;
+    // This method is no longer used - we route ALL models directly to native SDKs
+    // in executeStream and generate methods. Throwing an error to catch any
+    // unexpected code paths that might try to use the old Vercel AI SDK approach.
+    throw new NeuroLinkError({
+      code: ERROR_CODES.INVALID_CONFIGURATION,
+      message:
+        "GoogleVertexProvider no longer uses @ai-sdk/google-vertex. All models use native SDKs: @google/genai for Gemini, @anthropic-ai/vertex-sdk for Claude.",
+      category: ErrorCategory.CONFIGURATION,
+      severity: ErrorSeverity.CRITICAL,
+      retriable: false,
+      context: { provider: this.providerName, model: this.modelName },
+    });
   }
 
   /**
@@ -615,7 +561,6 @@ export class GoogleVertexProvider extends BaseProvider {
             projectId: vertexSettings?.project,
             location: vertexSettings?.location,
             hasFetch: !!vertexSettings?.fetch,
-            hasGoogleAuthOptions: !!vertexSettings?.googleAuthOptions,
             settingsSize: vertexSettings
               ? JSON.stringify(vertexSettings).length
               : 0,
@@ -711,159 +656,25 @@ export class GoogleVertexProvider extends BaseProvider {
   }
 
   /**
-   * Create Vertex AI instance and model with comprehensive logging
+   * @deprecated This method is no longer used. All models now use native SDKs.
    */
   private async createVertexInstance(
-    vertexSettings: unknown,
-    modelName: string,
-    modelCreationId: string,
-    modelCreationStartTime: number,
-    modelCreationHrTimeStart: bigint,
+    _vertexSettings: unknown,
+    _modelName: string,
+    _modelCreationId: string,
+    _modelCreationStartTime: number,
+    _modelCreationHrTimeStart: bigint,
   ): Promise<LanguageModelV1> {
-    const vertexInstanceStartTime = process.hrtime.bigint();
-    logger.debug(
-      `[GoogleVertexProvider] 🏗️ LOG_POINT_V010_VERTEX_INSTANCE_START`,
-      {
-        logPoint: "V010_VERTEX_INSTANCE_START",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - modelCreationStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - modelCreationHrTimeStart
-        ).toString(),
-        vertexInstanceStartTimeNs: vertexInstanceStartTime.toString(),
-
-        // Pre-creation network environment
-        networkEnvironment: {
-          dnsServers: (() => {
-            try {
-              return dns.getServers ? dns.getServers() : "NOT_AVAILABLE";
-            } catch {
-              return "NOT_AVAILABLE";
-            }
-          })(),
-          networkInterfaces: (() => {
-            try {
-              return Object.keys(os.networkInterfaces());
-            } catch {
-              return [];
-            }
-          })(),
-          hostname: (() => {
-            try {
-              return os.hostname();
-            } catch {
-              return "UNKNOWN";
-            }
-          })(),
-          platform: (() => {
-            try {
-              return os.platform();
-            } catch {
-              return "UNKNOWN";
-            }
-          })(),
-          release: (() => {
-            try {
-              return os.release();
-            } catch {
-              return "UNKNOWN";
-            }
-          })(),
-        },
-
-        message: "Creating Vertex AI instance",
-      },
-    );
-
-    const vertex = createVertex(vertexSettings as GoogleVertexProviderSettings);
-
-    const vertexInstanceEndTime = process.hrtime.bigint();
-    const vertexInstanceDurationNs =
-      vertexInstanceEndTime - vertexInstanceStartTime;
-
-    logger.debug(
-      `[GoogleVertexProvider] ✅ LOG_POINT_V011_VERTEX_INSTANCE_SUCCESS`,
-      {
-        logPoint: "V011_VERTEX_INSTANCE_SUCCESS",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - modelCreationStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - modelCreationHrTimeStart
-        ).toString(),
-        vertexInstanceDurationNs: vertexInstanceDurationNs.toString(),
-        vertexInstanceDurationMs: Number(vertexInstanceDurationNs) / 1000000,
-        hasVertexInstance: !!vertex,
-        vertexInstanceType: typeof vertex,
-        message: "Vertex AI instance created successfully",
-      },
-    );
-
-    const modelInstanceStartTime = process.hrtime.bigint();
-    logger.debug(
-      `[GoogleVertexProvider] 🎯 LOG_POINT_V012_MODEL_INSTANCE_START`,
-      {
-        logPoint: "V012_MODEL_INSTANCE_START",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        elapsedMs: Date.now() - modelCreationStartTime,
-        elapsedNs: (
-          process.hrtime.bigint() - modelCreationHrTimeStart
-        ).toString(),
-        modelInstanceStartTimeNs: modelInstanceStartTime.toString(),
-        modelName,
-        hasVertexInstance: !!vertex,
-        message: "Creating model instance from Vertex AI instance",
-      },
-    );
-
-    const model = vertex(modelName);
-
-    const modelInstanceEndTime = process.hrtime.bigint();
-    const modelInstanceDurationNs =
-      modelInstanceEndTime - modelInstanceStartTime;
-    const totalModelCreationDurationNs =
-      modelInstanceEndTime - modelCreationHrTimeStart;
-
-    logger.info(
-      `[GoogleVertexProvider] 🏁 LOG_POINT_V013_MODEL_CREATION_COMPLETE`,
-      {
-        logPoint: "V013_MODEL_CREATION_COMPLETE",
-        modelCreationId,
-        timestamp: new Date().toISOString(),
-        totalElapsedMs: Date.now() - modelCreationStartTime,
-        totalElapsedNs: totalModelCreationDurationNs.toString(),
-        totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
-        modelInstanceDurationNs: modelInstanceDurationNs.toString(),
-        modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
-
-        // Final model analysis
-        finalModel: {
-          hasModel: !!model,
-          modelType: typeof model,
-          modelName,
-          isAnthropicModel: isAnthropicModel(modelName),
-          projectId: this.projectId,
-          location: this.location,
-        },
-
-        // Performance summary
-        performanceSummary: {
-          vertexSettingsDurationMs: Number(vertexInstanceDurationNs) / 1000000,
-          vertexInstanceDurationMs: Number(vertexInstanceDurationNs) / 1000000,
-          modelInstanceDurationMs: Number(modelInstanceDurationNs) / 1000000,
-          totalDurationMs: Number(totalModelCreationDurationNs) / 1000000,
-        },
-
-        // Memory usage
-        finalMemoryUsage: process.memoryUsage(),
-
-        message: "Model creation completed successfully - ready for API calls",
-      },
-    );
-
-    return model as LanguageModelV1;
+    // This method is dead code - all models now route to native SDK methods.
+    throw new NeuroLinkError({
+      code: ERROR_CODES.INVALID_CONFIGURATION,
+      message:
+        "createVertexInstance is deprecated. Use executeNativeGemini3Stream/Generate or executeNativeAnthropicStream/Generate instead.",
+      category: ErrorCategory.CONFIGURATION,
+      severity: ErrorSeverity.CRITICAL,
+      retriable: false,
+      context: { provider: this.providerName },
+    });
   }
 
   /**
@@ -912,222 +723,46 @@ export class GoogleVertexProvider extends BaseProvider {
 
   protected async executeStream(
     options: StreamOptions,
-    analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
+    _analysisSchema?: ZodType<unknown, ZodTypeDef, unknown> | Schema<unknown>,
   ): Promise<StreamResult> {
-    // Check if this is a Gemini 3 model with tools - use native SDK for thought_signature
-    const gemini3CheckModelName =
+    // ALL models now use native SDKs - no more @ai-sdk/google-vertex dependency
+    const modelName =
       options.model || this.modelName || getDefaultVertexModel();
 
     // Check for tools from options AND from SDK (MCP tools)
-    // Need to check early if we should route to native SDK
-    const gemini3CheckShouldUseTools =
-      !options.disableTools && this.supportsTools();
+    const shouldUseTools = !options.disableTools && this.supportsTools();
     const optionTools = options.tools || {};
-    const sdkTools = gemini3CheckShouldUseTools ? await this.getAllTools() : {};
-    const combinedToolCount =
-      Object.keys(optionTools).length + Object.keys(sdkTools).length;
-    const hasTools = gemini3CheckShouldUseTools && combinedToolCount > 0;
+    const sdkTools = shouldUseTools ? await this.getAllTools() : {};
 
-    if (isGemini3Model(gemini3CheckModelName) && hasTools) {
-      // Process CSV files before routing to native SDK (bypasses normal message builder)
-      const processedOptions = await this.processCSVFilesForNativeSDK(options);
+    // Process CSV files before routing to native SDK (bypasses normal message builder)
+    const processedOptions = await this.processCSVFilesForNativeSDK(options);
 
-      // Merge SDK tools into options for native SDK path
-      const mergedOptions = {
-        ...processedOptions,
-        tools: { ...sdkTools, ...optionTools },
-      };
+    // Merge SDK tools into options for native SDK path
+    const mergedOptions = {
+      ...processedOptions,
+      tools: { ...sdkTools, ...optionTools },
+    };
+
+    // Route Claude models to native Anthropic SDK
+    if (isAnthropicModel(modelName)) {
       logger.info(
-        "[GoogleVertex] Routing Gemini 3 to native SDK for tool calling",
+        "[GoogleVertex] Routing Claude model to native @anthropic-ai/vertex-sdk",
         {
-          model: gemini3CheckModelName,
+          model: modelName,
           optionToolCount: Object.keys(optionTools).length,
           sdkToolCount: Object.keys(sdkTools).length,
-          totalToolCount: combinedToolCount,
         },
       );
-      return this.executeNativeGemini3Stream(mergedOptions);
+      return this.executeNativeAnthropicStream(mergedOptions);
     }
 
-    // Initialize stream execution tracking
-    const functionTag = "GoogleVertexProvider.executeStream";
-    let chunkCount = 0;
-
-    // Setup timeout controller
-    const timeout = this.getTimeout(options);
-
-    const timeoutController = createTimeoutController(
-      timeout,
-      this.providerName,
-      "stream",
-    );
-
-    try {
-      // Validate stream options
-      this.validateStreamOptionsOnly(options);
-
-      // Build message array from options with multimodal support
-      // Using protected helper from BaseProvider to eliminate code duplication
-      const messages = await this.buildMessagesForStream(options);
-
-      const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
-
-      // Get all available tools (direct + MCP + external) for streaming
-      const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools ? await this.getAllTools() : {};
-
-      logger.debug(`${functionTag}: Tools for streaming`, {
-        shouldUseTools,
-        toolCount: Object.keys(tools).length,
-        toolNames: Object.keys(tools),
-      });
-
-      // Model-specific maxTokens handling
-      const modelName = this.modelName || getDefaultVertexModel();
-
-      // Use cached model configuration to determine maxTokens handling for streaming performance
-      // This avoids hardcoded model-specific logic and repeated config lookups
-      const shouldSetMaxTokens = this.shouldSetMaxTokensCached(modelName);
-      const maxTokens = shouldSetMaxTokens
-        ? options.maxTokens // No default limit
-        : undefined;
-
-      // Build complete stream options with proper typing
-      let streamOptions: Parameters<typeof streamText>[0] = {
-        model: model,
-        messages: messages,
-        temperature: options.temperature,
-        ...(maxTokens && { maxTokens }),
-        ...(shouldUseTools &&
-          Object.keys(tools).length > 0 && {
-            tools,
-            toolChoice: "auto",
-            maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
-          }),
-        abortSignal: timeoutController?.controller.signal,
-        experimental_telemetry:
-          this.telemetryHandler.getTelemetryConfig(options),
-        // Gemini 3: use thinkingLevel via providerOptions (Vertex AI)
-        // Gemini 2.5: use thinkingBudget via providerOptions
-        ...(options.thinkingConfig?.enabled && {
-          providerOptions: {
-            vertex: {
-              thinkingConfig: {
-                ...(options.thinkingConfig.thinkingLevel && {
-                  thinkingLevel: options.thinkingConfig.thinkingLevel,
-                }),
-                ...(options.thinkingConfig.budgetTokens &&
-                  !options.thinkingConfig.thinkingLevel && {
-                    thinkingBudget: options.thinkingConfig.budgetTokens,
-                  }),
-                includeThoughts: true,
-              },
-            },
-          },
-        }),
-
-        onError: (event: { error: unknown }) => {
-          const error = event.error;
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          logger.error(`${functionTag}: Stream error`, {
-            provider: this.providerName,
-            modelName: this.modelName,
-            error: errorMessage,
-            chunkCount,
-          });
-        },
-
-        onFinish: (event: {
-          finishReason: string;
-          usage: Record<string, unknown>;
-          text?: string;
-        }) => {
-          logger.debug(`${functionTag}: Stream finished`, {
-            finishReason: event.finishReason,
-            totalChunks: chunkCount,
-          });
-        },
-
-        onChunk: () => {
-          chunkCount++;
-        },
-
-        onStepFinish: ({ toolCalls, toolResults }) => {
-          logger.info("Tool execution completed", { toolResults, toolCalls });
-
-          // Handle tool execution storage
-          this.handleToolExecutionStorage(
-            toolCalls,
-            toolResults,
-            options,
-            new Date(),
-          ).catch((error: unknown) => {
-            logger.warn(
-              "[GoogleVertexProvider] Failed to store tool executions",
-              {
-                provider: this.providerName,
-                error: error instanceof Error ? error.message : String(error),
-              },
-            );
-          });
-        },
-      };
-
-      if (analysisSchema) {
-        try {
-          streamOptions = {
-            ...streamOptions,
-            experimental_output: Output.object({
-              schema: analysisSchema,
-            }),
-          };
-        } catch (error) {
-          logger.warn("Schema application failed, continuing without schema", {
-            error: String(error),
-          });
-        }
-      }
-
-      const result = streamText(streamOptions);
-
-      timeoutController?.cleanup();
-
-      // Transform string stream to content object stream using BaseProvider method
-      const transformedStream = this.createTextStream(result);
-
-      // Track tool calls and results for streaming
-      const toolCalls: Array<{
-        toolName: string;
-        parameters: Record<string, unknown>;
-        id?: string;
-      }> = [];
-      const toolResults: Array<{
-        toolName: string;
-        status: "success" | "failure";
-        result?: unknown;
-        error?: string;
-      }> = [];
-
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        ...(shouldUseTools && {
-          toolCalls,
-          toolResults,
-        }),
-      };
-    } catch (error) {
-      timeoutController?.cleanup();
-      logger.error(`${functionTag}: Exception`, {
-        provider: this.providerName,
-        modelName: this.modelName,
-        error: String(error),
-        chunkCount,
-      });
-      throw this.handleProviderError(error);
-    }
+    // ALL Gemini models use native @google/genai SDK
+    logger.info("[GoogleVertex] Routing Gemini model to native @google/genai", {
+      model: modelName,
+      optionToolCount: Object.keys(optionTools).length,
+      sdkToolCount: Object.keys(sdkTools).length,
+    });
+    return this.executeNativeGemini3Stream(mergedOptions);
   }
 
   /**
@@ -1155,10 +790,14 @@ export class GoogleVertexProvider extends BaseProvider {
     const Ctor = ctor as GoogleGenAIClass;
 
     // Use vertexai mode with project and location
+    // Include httpOptions with proxy fetch for corporate network support
     return new Ctor({
       vertexai: true,
       project,
       location,
+      httpOptions: {
+        fetch: createProxyFetch(),
+      },
     });
   }
 
@@ -1319,11 +958,16 @@ export class GoogleVertexProvider extends BaseProvider {
           const rawSchema = convertZodToJsonSchema(
             tool.parameters as ZodUnknownSchema,
           ) as Record<string, unknown>;
-          decl.parametersJsonSchema = inlineJsonSchema(rawSchema);
+          const inlinedSchema = inlineJsonSchema(rawSchema);
           // Remove $schema if present - @google/genai doesn't need it
-          if (decl.parametersJsonSchema.$schema) {
-            delete decl.parametersJsonSchema.$schema;
+          if (inlinedSchema.$schema) {
+            delete inlinedSchema.$schema;
           }
+          // CRITICAL: Google Vertex AI requires ALL nested schemas to have a type field
+          // ensureNestedSchemaTypes recursively adds missing type fields to tool schemas
+          // Note: convertZodToJsonSchema now uses openApi3 target which produces nullable: true
+          const typedSchema = ensureNestedSchemaTypes(inlinedSchema);
+          decl.parametersJsonSchema = typedSchema;
         }
 
         functionDeclarations.push(decl);
@@ -1347,6 +991,17 @@ export class GoogleVertexProvider extends BaseProvider {
       maxOutputTokens: options.maxTokens,
     };
 
+    // Add topP, topK, stopSequences if provided
+    if (options.topP !== undefined) {
+      config.topP = options.topP;
+    }
+    if (options.topK !== undefined) {
+      config.topK = options.topK;
+    }
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      config.stopSequences = options.stopSequences;
+    }
+
     if (tools) {
       config.tools = tools;
     }
@@ -1364,12 +1019,18 @@ export class GoogleVertexProvider extends BaseProvider {
     }
 
     // Add JSON output format support for native SDK stream
-    // Note: Combining tools + schema may have limitations with Gemini models
+    // CRITICAL: Google Gemini API does NOT allow combining responseMimeType with function calling.
+    // Error: "Function calling with a response mime type: 'application/json' is unsupported"
+    // Only set responseMimeType when there are NO tools. Schema can still work without it.
     const streamOptions = options as TextGenerationOptions;
     if (streamOptions.output?.format === "json" || streamOptions.schema) {
-      config.responseMimeType = "application/json";
+      // Only set responseMimeType when NOT using tools - this is the key fix for tools + schema
+      if (!tools) {
+        config.responseMimeType = "application/json";
+      }
 
       // Convert schema to JSON schema format for the native SDK
+      // responseSchema can still be set with tools - it guides output structure
       if (streamOptions.schema) {
         const rawSchema = convertZodToJsonSchema(
           streamOptions.schema as ZodUnknownSchema,
@@ -1379,12 +1040,16 @@ export class GoogleVertexProvider extends BaseProvider {
         if (inlinedSchema.$schema) {
           delete inlinedSchema.$schema;
         }
-        config.responseSchema = inlinedSchema;
+        // CRITICAL: Google Vertex AI requires ALL nested schemas to have a type field
+        // ensureNestedSchemaTypes recursively adds missing type fields
+        // Note: convertZodToJsonSchema now uses openApi3 target which produces nullable: true
+        const typedSchema = ensureNestedSchemaTypes(inlinedSchema);
+        config.responseSchema = typedSchema;
 
         logger.debug(
           "[GoogleVertex] Added responseSchema for JSON output (stream)",
           {
-            schemaKeys: Object.keys(inlinedSchema),
+            schemaKeys: Object.keys(typedSchema),
           },
         );
       }
@@ -1684,8 +1349,9 @@ export class GoogleVertexProvider extends BaseProvider {
     );
 
     // Build contents from input with multimodal support
+    // Prioritize input.text over prompt since processCSVFilesForNativeSDK modifies input.text with CSV data
     const inputText =
-      options.prompt || options.input?.text || "Please respond.";
+      options.input?.text || options.prompt || "Please respond.";
 
     // Type for native SDK content parts (text, inlineData for PDFs/images)
     type NativePart =
@@ -1826,11 +1492,16 @@ export class GoogleVertexProvider extends BaseProvider {
           const rawSchema = convertZodToJsonSchema(
             tool.parameters as ZodUnknownSchema,
           ) as Record<string, unknown>;
-          decl.parametersJsonSchema = inlineJsonSchema(rawSchema);
+          const inlinedSchema = inlineJsonSchema(rawSchema);
           // Remove $schema if present - @google/genai doesn't need it
-          if (decl.parametersJsonSchema.$schema) {
-            delete decl.parametersJsonSchema.$schema;
+          if (inlinedSchema.$schema) {
+            delete inlinedSchema.$schema;
           }
+          // CRITICAL: Google Vertex AI requires ALL nested schemas to have a type field
+          // ensureNestedSchemaTypes recursively adds missing type fields to tool schemas
+          // Note: convertZodToJsonSchema now uses openApi3 target which produces nullable: true
+          const typedSchema = ensureNestedSchemaTypes(inlinedSchema);
+          decl.parametersJsonSchema = typedSchema;
         }
 
         functionDeclarations.push(decl);
@@ -1854,6 +1525,17 @@ export class GoogleVertexProvider extends BaseProvider {
       maxOutputTokens: options.maxTokens,
     };
 
+    // Add topP, topK, stopSequences if provided
+    if (options.topP !== undefined) {
+      config.topP = options.topP;
+    }
+    if (options.topK !== undefined) {
+      config.topK = options.topK;
+    }
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      config.stopSequences = options.stopSequences;
+    }
+
     if (tools) {
       config.tools = tools;
     }
@@ -1870,9 +1552,41 @@ export class GoogleVertexProvider extends BaseProvider {
       config.thinkingConfig = nativeThinkingConfig2;
     }
 
-    // Note: Schema/JSON output for Gemini 3 native SDK is complex due to $ref resolution issues
-    // For now, schemas are handled via the AI SDK fallback path, not native SDK
-    // TODO: Implement proper $ref resolution for complex nested schemas
+    // Add JSON output format support for native SDK generate (matching stream implementation)
+    // CRITICAL: Google Gemini API does NOT allow combining responseMimeType with function calling.
+    // Error: "Function calling with a response mime type: 'application/json' is unsupported"
+    // Only set responseMimeType when there are NO tools. Schema can still work without it.
+    if (options.output?.format === "json" || options.schema) {
+      // Only set responseMimeType when NOT using tools - this is the key fix for tools + schema
+      if (!tools) {
+        config.responseMimeType = "application/json";
+      }
+
+      // Convert schema to JSON schema format for the native SDK
+      // responseSchema can still be set with tools - it guides output structure
+      if (options.schema) {
+        const rawSchema = convertZodToJsonSchema(
+          options.schema as ZodUnknownSchema,
+        ) as Record<string, unknown>;
+        const inlinedSchema = inlineJsonSchema(rawSchema);
+        // Remove $schema if present - @google/genai doesn't need it
+        if (inlinedSchema.$schema) {
+          delete inlinedSchema.$schema;
+        }
+        // CRITICAL: Google Vertex AI requires ALL nested schemas to have a type field
+        // ensureNestedSchemaTypes recursively adds missing type fields
+        // Note: convertZodToJsonSchema now uses openApi3 target which produces nullable: true
+        const typedSchema = ensureNestedSchemaTypes(inlinedSchema);
+        config.responseSchema = typedSchema;
+
+        logger.debug(
+          "[GoogleVertex] Added responseSchema for JSON output (generate)",
+          {
+            schemaKeys: Object.keys(typedSchema),
+          },
+        );
+      }
+    }
 
     const startTime = Date.now();
     // Ensure maxSteps is a valid positive integer to prevent infinite loops
@@ -2179,6 +1893,606 @@ export class GoogleVertexProvider extends BaseProvider {
   }
 
   /**
+   * Create native AnthropicVertex client for Claude models
+   */
+  private async createAnthropicVertexClient(): Promise<AnthropicVertexType> {
+    const mod = await getAnthropicVertexModule();
+    const settings = await createVertexAnthropicSettings(this.location);
+    return new mod.AnthropicVertex(settings);
+  }
+
+  /**
+   * Execute stream using native @anthropic-ai/vertex-sdk for Claude models on Vertex AI
+   * This bypasses @ai-sdk/google-vertex completely and uses Anthropic's native SDK
+   */
+  private async executeNativeAnthropicStream(
+    options: StreamOptions,
+  ): Promise<StreamResult> {
+    const client = await this.createAnthropicVertexClient();
+    const modelName =
+      options.model || this.modelName || "claude-sonnet-4-5@20250929";
+    const startTime = Date.now();
+
+    logger.debug(
+      "[GoogleVertex] Using native @anthropic-ai/vertex-sdk for Claude stream",
+      {
+        model: modelName,
+        project: this.projectId,
+        location: this.location,
+      },
+    );
+
+    // Build messages from input
+    type AnthropicMessage = {
+      role: "user" | "assistant";
+      content:
+        | string
+        | Array<
+            | { type: "text"; text: string }
+            | { type: "image"; source: unknown }
+            | { type: "tool_use"; id: string; name: string; input: unknown }
+            | { type: "tool_result"; tool_use_id: string; content: string }
+            | { type: "thinking"; thinking: string }
+            | { type: "redacted_thinking"; data: string }
+          >;
+    };
+
+    const messages: AnthropicMessage[] = [];
+
+    // Add conversation history if present
+    if (
+      options.conversationMessages &&
+      options.conversationMessages.length > 0
+    ) {
+      for (const msg of options.conversationMessages) {
+        if (msg.role === "user" || msg.role === "assistant") {
+          messages.push({
+            role: msg.role,
+            content:
+              typeof msg.content === "string"
+                ? msg.content
+                : JSON.stringify(msg.content),
+          });
+        }
+      }
+    }
+
+    // Add current user input
+    messages.push({
+      role: "user",
+      content: options.input.text,
+    });
+
+    // Convert tools to Anthropic format if present
+    type AnthropicTool = {
+      name: string;
+      description: string;
+      input_schema: {
+        type: "object";
+        properties?: Record<string, unknown>;
+        required?: string[];
+      };
+    };
+
+    let tools: AnthropicTool[] | undefined;
+    const executeMap = new Map<
+      string,
+      (params: Record<string, unknown>) => Promise<unknown>
+    >();
+
+    if (
+      options.tools &&
+      Object.keys(options.tools).length > 0 &&
+      !options.disableTools
+    ) {
+      tools = [];
+
+      for (const [name, tool] of Object.entries(options.tools)) {
+        const anthropicTool: AnthropicTool = {
+          name,
+          description: tool.description || `Tool: ${name}`,
+          input_schema: {
+            type: "object",
+          },
+        };
+
+        if (tool.parameters) {
+          const jsonSchema = convertZodToJsonSchema(
+            tool.parameters as ZodUnknownSchema,
+          ) as Record<string, unknown>;
+          const inlined = inlineJsonSchema(jsonSchema);
+          anthropicTool.input_schema = {
+            type: "object",
+            properties: (inlined.properties as Record<string, unknown>) || {},
+            required: (inlined.required as string[]) || [],
+          };
+        }
+
+        tools.push(anthropicTool);
+
+        if (tool.execute) {
+          executeMap.set(
+            name,
+            tool.execute as (
+              params: Record<string, unknown>,
+            ) => Promise<unknown>,
+          );
+        }
+      }
+
+      logger.debug("[GoogleVertex] Converted tools for native Anthropic SDK", {
+        toolCount: tools.length,
+        toolNames: tools.map((t) => t.name),
+      });
+    }
+
+    // Build request options
+    const requestParams: Parameters<typeof client.messages.stream>[0] = {
+      model: modelName,
+      max_tokens: options.maxTokens || 4096,
+      messages: messages as Parameters<
+        typeof client.messages.stream
+      >[0]["messages"],
+      ...(tools && tools.length > 0 && { tools }),
+      ...(options.systemPrompt && { system: options.systemPrompt }),
+      ...(options.temperature !== undefined && {
+        temperature: options.temperature,
+      }),
+      ...(options.topP !== undefined && { top_p: options.topP }),
+      ...(options.stopSequences &&
+        options.stopSequences.length > 0 && {
+          stop_sequences: options.stopSequences,
+        }),
+    };
+
+    // Handle tool calling loop with max steps
+    const maxSteps = options.maxSteps || DEFAULT_MAX_STEPS;
+    let step = 0;
+    let finalText = "";
+    const allToolCalls: Array<{
+      toolName: string;
+      args: Record<string, unknown>;
+    }> = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const currentMessages = [...messages];
+
+    while (step < maxSteps) {
+      step++;
+
+      try {
+        // Use streaming API
+        const stream = await client.messages.stream({
+          ...requestParams,
+          messages: currentMessages as Parameters<
+            typeof client.messages.stream
+          >[0]["messages"],
+        });
+
+        // Collect the full response
+        const response = await stream.finalMessage();
+
+        // Update token counts
+        totalInputTokens += response.usage?.input_tokens || 0;
+        totalOutputTokens += response.usage?.output_tokens || 0;
+
+        // Check if we need to handle tool use
+        // Define content block types for Anthropic SDK
+        type AnthropicStreamContentBlock =
+          | { type: "text"; text: string }
+          | {
+              type: "tool_use";
+              id: string;
+              name: string;
+              input: Record<string, unknown>;
+            }
+          | { type: "tool_result"; tool_use_id: string; content: string };
+
+        const toolUseBlocks = (
+          response.content as AnthropicStreamContentBlock[]
+        ).filter(
+          (
+            block,
+          ): block is {
+            type: "tool_use";
+            id: string;
+            name: string;
+            input: Record<string, unknown>;
+          } => block.type === "tool_use",
+        );
+
+        // Extract text from response
+        const textBlocks = (
+          response.content as AnthropicStreamContentBlock[]
+        ).filter(
+          (block): block is { type: "text"; text: string } =>
+            block.type === "text",
+        );
+        const responseText = textBlocks.map((b) => b.text).join("");
+
+        if (toolUseBlocks.length === 0) {
+          // No tool calls, we're done
+          finalText = responseText || finalText;
+          break;
+        }
+
+        // Handle tool calls
+        const toolResults: Array<{
+          type: "tool_result";
+          tool_use_id: string;
+          content: string;
+        }> = [];
+
+        for (const toolUse of toolUseBlocks) {
+          allToolCalls.push({
+            toolName: toolUse.name,
+            args: toolUse.input,
+          });
+
+          const execute = executeMap.get(toolUse.name);
+          if (execute) {
+            try {
+              const result = await execute(toolUse.input);
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolUse.id,
+                content:
+                  typeof result === "string" ? result : JSON.stringify(result),
+              });
+            } catch (err) {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolUse.id,
+                content: `Error executing tool: ${err instanceof Error ? err.message : String(err)}`,
+              });
+            }
+          } else {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: toolUse.id,
+              content: `TOOL_NOT_FOUND: The tool "${toolUse.name}" does not exist.`,
+            });
+          }
+        }
+
+        // Add assistant message and tool results to continue the loop
+        currentMessages.push({
+          role: "assistant",
+          content: response.content,
+        });
+        currentMessages.push({
+          role: "user",
+          content: toolResults,
+        });
+
+        // Store last text in case we hit max steps
+        if (responseText) {
+          finalText = responseText;
+        }
+      } catch (error) {
+        logger.error("[GoogleVertex] Native Anthropic SDK stream error", error);
+        throw this.handleProviderError(error);
+      }
+    }
+
+    const responseTime = Date.now() - startTime;
+
+    // Create async iterable for streaming result
+    async function* createTextStream(): AsyncIterable<{ content: string }> {
+      yield { content: finalText };
+    }
+
+    return {
+      stream: createTextStream(),
+      provider: this.providerName,
+      model: modelName,
+      usage: {
+        input: totalInputTokens,
+        output: totalOutputTokens,
+        total: totalInputTokens + totalOutputTokens,
+      },
+      toolCalls: allToolCalls.map((tc) => ({
+        toolName: tc.toolName,
+        args: tc.args,
+      })),
+      metadata: {
+        streamId: `native-anthropic-vertex-${Date.now()}`,
+        startTime,
+        responseTime,
+        totalToolExecutions: allToolCalls.length,
+      },
+    };
+  }
+
+  /**
+   * Execute generate using native @anthropic-ai/vertex-sdk for Claude models on Vertex AI
+   */
+  private async executeNativeAnthropicGenerate(
+    options: TextGenerationOptions,
+  ): Promise<EnhancedGenerateResult> {
+    const client = await this.createAnthropicVertexClient();
+    const modelName =
+      options.model || this.modelName || "claude-sonnet-4-5@20250929";
+    const startTime = Date.now();
+
+    logger.debug(
+      "[GoogleVertex] Using native @anthropic-ai/vertex-sdk for Claude generate",
+      {
+        model: modelName,
+        project: this.projectId,
+        location: this.location,
+      },
+    );
+
+    // Build messages from input
+    type AnthropicMessage = {
+      role: "user" | "assistant";
+      content:
+        | string
+        | Array<
+            | { type: "text"; text: string }
+            | { type: "image"; source: unknown }
+            | { type: "tool_use"; id: string; name: string; input: unknown }
+            | { type: "tool_result"; tool_use_id: string; content: string }
+            | { type: "thinking"; thinking: string }
+            | { type: "redacted_thinking"; data: string }
+          >;
+    };
+
+    const messages: AnthropicMessage[] = [];
+    const inputText =
+      options.prompt || options.input?.text || "Please respond.";
+
+    // Add conversation history if present
+    if (options.conversationHistory && options.conversationHistory.length > 0) {
+      for (const msg of options.conversationHistory) {
+        if (msg.role === "user" || msg.role === "assistant") {
+          messages.push({
+            role: msg.role,
+            content:
+              typeof msg.content === "string"
+                ? msg.content
+                : JSON.stringify(msg.content),
+          });
+        }
+      }
+    }
+
+    // Add current user input
+    messages.push({
+      role: "user",
+      content: inputText,
+    });
+
+    // Convert tools to Anthropic format if present
+    type AnthropicTool = {
+      name: string;
+      description: string;
+      input_schema: {
+        type: "object";
+        properties?: Record<string, unknown>;
+        required?: string[];
+      };
+    };
+
+    let tools: AnthropicTool[] | undefined;
+    const executeMap = new Map<
+      string,
+      (params: Record<string, unknown>) => Promise<unknown>
+    >();
+    const toolExecutions: Array<{
+      name: string;
+      input: Record<string, unknown>;
+      output: unknown;
+    }> = [];
+
+    if (options.tools && Object.keys(options.tools).length > 0) {
+      tools = [];
+
+      for (const [name, tool] of Object.entries(options.tools)) {
+        const anthropicTool: AnthropicTool = {
+          name,
+          description: tool.description || `Tool: ${name}`,
+          input_schema: {
+            type: "object",
+          },
+        };
+
+        if (tool.parameters) {
+          const jsonSchema = convertZodToJsonSchema(
+            tool.parameters as ZodUnknownSchema,
+          ) as Record<string, unknown>;
+          const inlined = inlineJsonSchema(jsonSchema);
+          anthropicTool.input_schema = {
+            type: "object",
+            properties: (inlined.properties as Record<string, unknown>) || {},
+            required: (inlined.required as string[]) || [],
+          };
+        }
+
+        tools.push(anthropicTool);
+
+        if (tool.execute) {
+          executeMap.set(
+            name,
+            tool.execute as (
+              params: Record<string, unknown>,
+            ) => Promise<unknown>,
+          );
+        }
+      }
+    }
+
+    // Build request options
+    const requestParams = {
+      model: modelName,
+      max_tokens: options.maxTokens || 4096,
+      messages,
+      ...(tools && tools.length > 0 && { tools }),
+      ...(options.systemPrompt && { system: options.systemPrompt }),
+      ...(options.temperature !== undefined && {
+        temperature: options.temperature,
+      }),
+      ...(options.topP !== undefined && { top_p: options.topP }),
+      ...(options.stopSequences &&
+        options.stopSequences.length > 0 && {
+          stop_sequences: options.stopSequences,
+        }),
+    };
+
+    // Handle tool calling loop with max steps
+    const maxSteps = options.maxSteps || DEFAULT_MAX_STEPS;
+    let step = 0;
+    let finalText = "";
+    const allToolCalls: Array<{
+      toolName: string;
+      args: Record<string, unknown>;
+    }> = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    const currentMessages = [...messages];
+
+    while (step < maxSteps) {
+      step++;
+
+      try {
+        const response = await client.messages.create({
+          ...requestParams,
+          messages: currentMessages as Parameters<
+            typeof client.messages.create
+          >[0]["messages"],
+        });
+
+        // Update token counts
+        totalInputTokens += response.usage?.input_tokens || 0;
+        totalOutputTokens += response.usage?.output_tokens || 0;
+
+        // Check if we need to handle tool use
+        // Define content block types for Anthropic SDK
+        type AnthropicGenerateContentBlock =
+          | { type: "text"; text: string }
+          | {
+              type: "tool_use";
+              id: string;
+              name: string;
+              input: Record<string, unknown>;
+            }
+          | { type: "tool_result"; tool_use_id: string; content: string };
+
+        const toolUseBlocks = (
+          response.content as AnthropicGenerateContentBlock[]
+        ).filter(
+          (
+            block,
+          ): block is {
+            type: "tool_use";
+            id: string;
+            name: string;
+            input: Record<string, unknown>;
+          } => block.type === "tool_use",
+        );
+
+        // Extract text from response
+        const textBlocks = (
+          response.content as AnthropicGenerateContentBlock[]
+        ).filter(
+          (block): block is { type: "text"; text: string } =>
+            block.type === "text",
+        );
+        const responseText = textBlocks.map((b) => b.text).join("");
+
+        if (toolUseBlocks.length === 0) {
+          // No tool calls, we're done
+          finalText = responseText || finalText;
+          break;
+        }
+
+        // Handle tool calls
+        const toolResults: Array<{
+          type: "tool_result";
+          tool_use_id: string;
+          content: string;
+        }> = [];
+
+        for (const toolUse of toolUseBlocks) {
+          allToolCalls.push({
+            toolName: toolUse.name,
+            args: toolUse.input,
+          });
+
+          const execute = executeMap.get(toolUse.name);
+          if (execute) {
+            try {
+              const result = await execute(toolUse.input);
+              toolExecutions.push({
+                name: toolUse.name,
+                input: toolUse.input,
+                output: result,
+              });
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolUse.id,
+                content:
+                  typeof result === "string" ? result : JSON.stringify(result),
+              });
+            } catch (err) {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolUse.id,
+                content: `Error executing tool: ${err instanceof Error ? err.message : String(err)}`,
+              });
+            }
+          } else {
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: toolUse.id,
+              content: `TOOL_NOT_FOUND: The tool "${toolUse.name}" does not exist.`,
+            });
+          }
+        }
+
+        // Add assistant message and tool results to continue the loop
+        currentMessages.push({
+          role: "assistant",
+          content: response.content,
+        });
+        currentMessages.push({
+          role: "user",
+          content: toolResults,
+        });
+
+        // Store last text in case we hit max steps
+        if (responseText) {
+          finalText = responseText;
+        }
+      } catch (error) {
+        logger.error(
+          "[GoogleVertex] Native Anthropic SDK generate error",
+          error,
+        );
+        throw this.handleProviderError(error);
+      }
+    }
+
+    const responseTime = Date.now() - startTime;
+
+    return {
+      content: finalText,
+      provider: this.providerName,
+      model: modelName,
+      usage: {
+        input: totalInputTokens,
+        output: totalOutputTokens,
+        total: totalInputTokens + totalOutputTokens,
+      },
+      responseTime,
+      toolsUsed: allToolCalls.map((tc) => tc.toolName),
+      toolExecutions,
+      enhancedWithTools: allToolCalls.length > 0,
+    };
+  }
+
+  /**
    * Process CSV files and append content to options.input.text
    * This ensures CSV data is available in the prompt for native Gemini 3 SDK calls
    * Returns a new options object with modified input (immutable pattern)
@@ -2270,7 +2584,8 @@ export class GoogleVertexProvider extends BaseProvider {
   }
 
   /**
-   * Override generate to route Gemini 3 models with tools to native SDK
+   * Override generate to route ALL models to native SDKs
+   * No more @ai-sdk/google-vertex dependency
    */
   async generate(
     optionsOrPrompt: TextGenerationOptions | string,
@@ -2284,39 +2599,42 @@ export class GoogleVertexProvider extends BaseProvider {
     const modelName =
       options.model || this.modelName || getDefaultVertexModel();
 
-    // Check if we should use native SDK for Gemini 3 with tools
+    // Get tools from SDK and options
     const shouldUseTools = !options.disableTools && this.supportsTools();
     const sdkTools = shouldUseTools ? await this.getAllTools() : {};
-    const hasTools =
-      shouldUseTools &&
-      (Object.keys(sdkTools).length > 0 ||
-        (options.tools && Object.keys(options.tools).length > 0));
 
-    if (isGemini3Model(modelName) && hasTools) {
-      // Process CSV files before routing to native SDK (bypasses normal message builder)
-      const processedOptions = await this.processCSVFilesForNativeSDK(options);
+    // Process CSV files before routing to native SDK (bypasses normal message builder)
+    const processedOptions = await this.processCSVFilesForNativeSDK(options);
 
-      // Merge SDK tools into options for native SDK path
-      const mergedOptions = {
-        ...processedOptions,
-        tools: { ...sdkTools, ...(processedOptions.tools || {}) },
-      };
+    // Merge SDK tools into options for native SDK path
+    const mergedOptions = {
+      ...processedOptions,
+      tools: { ...sdkTools, ...(processedOptions.tools || {}) },
+    };
+
+    // Route Claude models to native Anthropic SDK
+    if (isAnthropicModel(modelName)) {
       logger.info(
-        "[GoogleVertex] Routing Gemini 3 generate to native SDK for tool calling",
+        "[GoogleVertex] Routing Claude generate to native @anthropic-ai/vertex-sdk",
         {
           model: modelName,
           sdkToolCount: Object.keys(sdkTools).length,
           optionToolCount: Object.keys(processedOptions.tools || {}).length,
-          totalToolCount:
-            Object.keys(sdkTools).length +
-            Object.keys(processedOptions.tools || {}).length,
         },
       );
-      return this.executeNativeGemini3Generate(mergedOptions);
+      return this.executeNativeAnthropicGenerate(mergedOptions);
     }
 
-    // Fall back to BaseProvider implementation
-    return super.generate(optionsOrPrompt);
+    // ALL Gemini models use native @google/genai SDK
+    logger.info(
+      "[GoogleVertex] Routing Gemini generate to native @google/genai",
+      {
+        model: modelName,
+        sdkToolCount: Object.keys(sdkTools).length,
+        optionToolCount: Object.keys(processedOptions.tools || {}).length,
+      },
+    );
+    return this.executeNativeGemini3Generate(mergedOptions);
   }
 
   protected handleProviderError(error: unknown): Error {
@@ -2325,9 +2643,9 @@ export class GoogleVertexProvider extends BaseProvider {
       typeof errorRecord?.name === "string" &&
       errorRecord.name === "TimeoutError"
     ) {
-      return new TimeoutError(
+      return new NetworkError(
         `Google Vertex AI request timed out. Consider increasing timeout or using a lighter model.`,
-        this.defaultTimeout,
+        this.providerName,
       );
     }
 
@@ -2335,34 +2653,116 @@ export class GoogleVertexProvider extends BaseProvider {
       typeof errorRecord?.message === "string"
         ? errorRecord.message
         : "Unknown error occurred";
+    const statusCode =
+      typeof errorRecord?.status === "number"
+        ? errorRecord.status
+        : typeof errorRecord?.statusCode === "number"
+          ? errorRecord.statusCode
+          : undefined;
 
-    if (message.includes("PERMISSION_DENIED")) {
-      return new Error(
-        `❌ Google Vertex AI Permission Denied\n\nYour Google Cloud credentials don't have permission to access Vertex AI.\n\nRequired Steps:\n1. Ensure your service account has Vertex AI User role\n2. Check if Vertex AI API is enabled in your project\n3. Verify your project ID is correct\n4. Confirm your location/region has Vertex AI available`,
+    // Authentication and permission errors
+    if (
+      message.includes("PERMISSION_DENIED") ||
+      message.includes("UNAUTHENTICATED") ||
+      message.includes("Invalid API key") ||
+      statusCode === 401 ||
+      statusCode === 403
+    ) {
+      return new AuthenticationError(
+        `Google Vertex AI Permission Denied. Your Google Cloud credentials don't have permission to access Vertex AI. ` +
+          `Required Steps: 1. Ensure your service account has Vertex AI User role ` +
+          `2. Check if Vertex AI API is enabled in your project ` +
+          `3. Verify your project ID is correct ` +
+          `4. Confirm your location/region has Vertex AI available`,
+        this.providerName,
       );
     }
 
-    if (message.includes("NOT_FOUND")) {
+    // Model not found errors
+    if (
+      message.includes("NOT_FOUND") ||
+      message.includes("model not found") ||
+      message.includes("Model not found") ||
+      statusCode === 404
+    ) {
       const modelSuggestions = this.getModelSuggestions(this.modelName);
-      return new Error(
-        `❌ Google Vertex AI Model Not Found\n\n${message}\n\nModel '${this.modelName}' is not available.\n\nSuggested alternatives:\n${modelSuggestions}\n\nTroubleshooting:\n1. Check model name spelling and format\n2. Verify model is available in your region (${this.location})\n3. Ensure your project has access to the model\n4. For Claude models, enable Anthropic integration in Google Cloud Console`,
+      return new InvalidModelError(
+        `Model '${this.modelName}' is not available in region ${this.location}. ` +
+          `Suggested alternatives: ${modelSuggestions}. ` +
+          `Troubleshooting: 1. Check model name spelling and format ` +
+          `2. Verify model is available in your region ` +
+          `3. Ensure your project has access to the model ` +
+          `4. For Claude models, enable Anthropic integration in Google Cloud Console`,
+        this.providerName,
       );
     }
 
-    if (message.includes("QUOTA_EXCEEDED")) {
-      return new Error(
-        `❌ Google Vertex AI Quota Exceeded\n\n${message}\n\nSolutions:\n1. Check your Vertex AI quotas in Google Cloud Console\n2. Request quota increase if needed\n3. Try a different model or reduce request frequency\n4. Consider using a different region`,
+    // Rate limit and quota errors
+    if (
+      message.includes("QUOTA_EXCEEDED") ||
+      message.includes("RATE_LIMIT_EXCEEDED") ||
+      message.includes("rate limit") ||
+      message.includes("429") ||
+      statusCode === 429
+    ) {
+      return new RateLimitError(
+        `Google Vertex AI quota/rate limit exceeded. ` +
+          `Solutions: 1. Check your Vertex AI quotas in Google Cloud Console ` +
+          `2. Request quota increase if needed ` +
+          `3. Try a different model or reduce request frequency ` +
+          `4. Consider using a different region`,
+        this.providerName,
       );
     }
 
+    // Network connectivity errors
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ETIMEDOUT") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      return new NetworkError(
+        `Connection error: ${message}`,
+        this.providerName,
+      );
+    }
+
+    // Server errors (5xx)
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error") ||
+      message.includes("Internal Server Error") ||
+      message.includes("INTERNAL") ||
+      message.includes("UNAVAILABLE") ||
+      (statusCode && statusCode >= 500 && statusCode < 600)
+    ) {
+      return new ProviderError(
+        `Google Vertex AI server error: ${message}. Please try again later.`,
+        this.providerName,
+      );
+    }
+
+    // Invalid argument errors
     if (message.includes("INVALID_ARGUMENT")) {
-      return new Error(
-        `❌ Google Vertex AI Invalid Request\n\n${message}\n\nCheck:\n1. Request parameters are within model limits\n2. Input text is properly formatted\n3. Temperature and other settings are valid\n4. Model supports your request type`,
+      return new ProviderError(
+        `Google Vertex AI Invalid Request: ${message}. ` +
+          `Check: 1. Request parameters are within model limits ` +
+          `2. Input text is properly formatted ` +
+          `3. Temperature and other settings are valid ` +
+          `4. Model supports your request type`,
+        this.providerName,
       );
     }
 
-    return new Error(
-      `❌ Google Vertex AI Provider Error\n\n${message}\n\nTroubleshooting:\n1. Check Google Cloud credentials and permissions\n2. Verify project ID and location settings\n3. Ensure Vertex AI API is enabled\n4. Check network connectivity`,
+    return new ProviderError(
+      `Google Vertex AI error: ${message}`,
+      this.providerName,
     );
   }
 
@@ -2496,219 +2896,23 @@ export class GoogleVertexProvider extends BaseProvider {
   }
 
   /**
-   * Create an Anthropic model instance using vertexAnthropic provider
-   * Uses fresh vertex settings for each request with comprehensive validation
-   * @param modelName Anthropic model name (e.g., 'claude-3-sonnet@20240229')
-   * @returns LanguageModelV1 instance or null if not available
+   * @deprecated This method is no longer used. Claude models now use native @anthropic-ai/vertex-sdk
+   * via executeNativeAnthropicStream and executeNativeAnthropicGenerate.
    */
   async createAnthropicModel(
-    modelName: string,
+    _modelName: string,
   ): Promise<LanguageModelV1 | null> {
-    const validationId = `anthropic-validation-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-
-    logger.debug(
-      "[GoogleVertexProvider] 🧠 Starting comprehensive Anthropic model validation",
-      {
-        validationId,
-        modelName,
-        timestamp: new Date().toISOString(),
-      },
-    );
-
-    // 1. SDK Module Availability Validation
-    if (!hasAnthropicSupport()) {
-      logger.error("[GoogleVertexProvider] ❌ SDK module validation failed", {
-        validationId,
-        issue: "createVertexAnthropic function not available",
-        solution:
-          "Update @ai-sdk/google-vertex to latest version with Anthropic support",
-        command: "npm install @ai-sdk/google-vertex@latest",
-        documentation:
-          "https://sdk.vercel.ai/providers/ai-sdk-providers/google-vertex#anthropic-models",
-      });
-      return null;
-    }
-
-    // 2. Authentication Validation
-    const authValidation = await this.validateVertexAuthentication();
-    if (!authValidation.isValid) {
-      logger.error(
-        "[GoogleVertexProvider] ❌ Authentication validation failed",
-        {
-          validationId,
-          method: authValidation.method,
-          issues: authValidation.issues,
-          solutions: [
-            "Option 1: Set GOOGLE_APPLICATION_CREDENTIALS to valid service account OR ADC file",
-            "Option 2: Set individual env vars: GOOGLE_AUTH_CLIENT_EMAIL, GOOGLE_AUTH_PRIVATE_KEY",
-            "Option 3: Use gcloud auth application-default login for ADC",
-            "Documentation: https://cloud.google.com/docs/authentication/provide-credentials-adc",
-          ],
-        },
-      );
-      return null;
-    }
-
-    // 3. Project Configuration Validation
-    const projectValidation = await this.validateVertexProjectConfiguration();
-    if (!projectValidation.isValid) {
-      logger.error(
-        "[GoogleVertexProvider] ❌ Project configuration validation failed",
-        {
-          validationId,
-          projectId: projectValidation.projectId,
-          region: projectValidation.region,
-          issues: projectValidation.issues,
-          solutions: [
-            "Set GOOGLE_VERTEX_PROJECT or GOOGLE_CLOUD_PROJECT environment variable",
-            "Ensure project exists and has Vertex AI API enabled",
-            "Check: https://console.cloud.google.com/apis/library/aiplatform.googleapis.com",
-          ],
-        },
-      );
-      return null;
-    }
-
-    // 4. Regional Support Validation
-    const regionSupported = await this.checkVertexRegionalSupport(
-      projectValidation.region,
-    );
-    if (!regionSupported) {
-      logger.warn("[GoogleVertexProvider] ⚠️ Regional support warning", {
-        validationId,
-        region: projectValidation.region,
-        warning: "Anthropic models may not be available in this region",
-        supportedRegions: [
-          "us-central1",
-          "us-east4",
-          "us-east5",
-          "us-west1",
-          "us-west4",
-          "europe-west1",
-          "europe-west4",
-          "asia-southeast1",
-          "asia-northeast1",
-        ],
-        solution: "Set GOOGLE_CLOUD_LOCATION to a supported region",
-      });
-      // Continue with warning, don't block
-    }
-
-    // 5. Model Name Validation
-    const modelValidation = this.validateAnthropicModelName(modelName);
-    if (!modelValidation.isValid) {
-      logger.error("[GoogleVertexProvider] ❌ Model name validation failed", {
-        validationId,
-        modelName,
-        issue: modelValidation.issue,
-        recommendedModels: [
-          "claude-sonnet-4-5@20250929",
-          "claude-sonnet-4@20250514",
-          "claude-opus-4@20250514",
-          "claude-3-5-sonnet-20241022",
-          "claude-3-5-haiku-20241022",
-        ],
-      });
-      return null;
-    }
-
-    try {
-      // 6. Settings Creation with Enhanced Error Handling
-      logger.debug(
-        "[GoogleVertexProvider] 🔧 Creating vertexAnthropic settings",
-        {
-          validationId,
-          authMethod: authValidation.method,
-          projectId: projectValidation.projectId,
-          region: projectValidation.region,
-        },
-      );
-
-      const vertexAnthropicSettings = await createVertexAnthropicSettings(
-        this.location,
-      );
-
-      // 7. Settings Validation
-      if (
-        !vertexAnthropicSettings.project ||
-        !vertexAnthropicSettings.location
-      ) {
-        logger.error("[GoogleVertexProvider] ❌ Settings validation failed", {
-          validationId,
-          hasProject: !!vertexAnthropicSettings.project,
-          hasLocation: !!vertexAnthropicSettings.location,
-          hasProxy: !!vertexAnthropicSettings.fetch,
-          hasAuth: !!vertexAnthropicSettings.googleAuthOptions,
-        });
-        return null;
-      }
-
-      logger.debug(
-        "[GoogleVertexProvider] ✅ Creating vertexAnthropic instance",
-        {
-          validationId,
-          modelName,
-          project: vertexAnthropicSettings.project,
-          location: vertexAnthropicSettings.location,
-          hasProxy: !!vertexAnthropicSettings.fetch,
-          hasAuth: !!vertexAnthropicSettings.googleAuthOptions,
-        },
-      );
-
-      // 8. Provider Instance Creation
-      const vertexAnthropicInstance = createVertexAnthropic(
-        vertexAnthropicSettings,
-      );
-
-      // 9. Model Instance Creation with Network Error Handling
-      const model = vertexAnthropicInstance(modelName);
-
-      logger.info(
-        "[GoogleVertexProvider] ✅ Anthropic model created successfully",
-        {
-          validationId,
-          modelName,
-          hasModel: !!model,
-          modelType: typeof model,
-          authMethod: authValidation.method,
-          projectId: projectValidation.projectId,
-          region: projectValidation.region,
-          validationsPassed: [
-            "SDK_MODULE_AVAILABLE",
-            "AUTHENTICATION_VALID",
-            "PROJECT_CONFIGURED",
-            "MODEL_NAME_VALID",
-            "SETTINGS_CREATED",
-            "PROVIDER_INSTANCE_CREATED",
-            "MODEL_INSTANCE_CREATED",
-          ],
-        },
-      );
-
-      return model as LanguageModelV1;
-    } catch (error) {
-      // Enhanced error analysis and reporting
-      const errorAnalysis = this.analyzeAnthropicCreationError(error, {
-        validationId,
-        modelName,
-        projectId: projectValidation.projectId,
-        region: projectValidation.region,
-        authMethod: authValidation.method,
-      });
-
-      logger.error(
-        "[GoogleVertexProvider] ❌ Anthropic model creation failed",
-        {
-          validationId,
-          modelName,
-          ...errorAnalysis,
-          detailedTroubleshooting:
-            this.getAnthropicTroubleshootingSteps(errorAnalysis),
-        },
-      );
-
-      return null;
-    }
+    // This method is dead code - all Claude models now route to native SDK methods.
+    // Throwing an error to catch any unexpected calls to this method.
+    throw new NeuroLinkError({
+      code: ERROR_CODES.INVALID_CONFIGURATION,
+      message:
+        "createAnthropicModel is deprecated. Use executeNativeAnthropicStream or executeNativeAnthropicGenerate instead.",
+      category: ErrorCategory.CONFIGURATION,
+      severity: ErrorSeverity.CRITICAL,
+      retriable: false,
+      context: { provider: this.providerName },
+    });
   }
 
   /**
@@ -3116,14 +3320,14 @@ export class GoogleVertexProvider extends BaseProvider {
           "2. Check project ID and region format",
           "3. Ensure model name follows correct format",
           "4. Verify request parameters are within model limits",
-          "5. Update @ai-sdk/google-vertex to latest version",
+          "5. Verify @google-cloud/vertexai and @anthropic-ai/vertex-sdk versions",
         );
         break;
 
       default:
         steps.push(
           "🔧 General Troubleshooting:",
-          "1. Update @ai-sdk/google-vertex to latest version",
+          "1. Verify native SDK packages are properly installed",
           "2. Check Google Cloud service status",
           "3. Verify all authentication and configuration",
           "4. Try with a simple Claude model like claude-3-haiku-20240307",

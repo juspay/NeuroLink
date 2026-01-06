@@ -29,6 +29,7 @@ import { logger } from "../utils/logger.js";
 import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import {
   AuthenticationError,
+  InvalidModelError,
   NetworkError,
   ProviderError,
   RateLimitError,
@@ -41,10 +42,12 @@ import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import { isGemini3Model } from "../utils/modelDetection.js";
 import {
   convertZodToJsonSchema,
+  ensureNestedSchemaTypes,
   inlineJsonSchema,
   isZodSchema,
 } from "../utils/schemaConversion.js";
 import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 
 // Google AI Live API types now imported from ../types/providerSpecific.js
 
@@ -65,7 +68,13 @@ async function createGoogleGenAIClient(apiKey: string): Promise<GenAIClient> {
     });
   }
   const Ctor = ctor as GoogleGenAIClass;
-  return new Ctor({ apiKey });
+  // Include httpOptions with proxy fetch for corporate network support
+  return new Ctor({
+    apiKey,
+    httpOptions: {
+      fetch: createProxyFetch(),
+    },
+  });
 }
 
 // Environment variable setup
@@ -80,32 +89,29 @@ if (
  * Google AI Studio provider implementation using BaseProvider
  * Migrated from original GoogleAIStudio class to new factory pattern
  *
- * @important Structured Output Limitation
- * Google Gemini models cannot combine function calling (tools) with structured
- * output (JSON schema). When using schemas with output.format: "json", you MUST
- * set disableTools: true.
+ * @important Tools + Schema Support (Fixed)
+ * This provider now supports combining function calling (tools) with structured
+ * output (JSON schema) simultaneously. The fix works by NOT setting
+ * `responseMimeType: "application/json"` when tools are present, which was
+ * causing the Google API error.
  *
- * Error without disableTools:
- * "Function calling with a response mime type: 'application/json' is unsupported"
- *
- * This is a Google API limitation documented at:
- * https://ai.google.dev/gemini-api/docs/function-calling
+ * The `responseSchema` is still set to guide the output structure, allowing
+ * tools to execute AND the final output to follow the schema format.
  *
  * @example
  * ```typescript
- * // ✅ Correct usage with schemas
+ * // ✅ Tools + Schema now works together
  * const provider = new GoogleAIStudioProvider("gemini-2.5-flash");
  * const result = await provider.generate({
- *   input: { text: "Analyze data" },
+ *   input: { text: "Analyze data using the readFile tool" },
  *   schema: MySchema,
  *   output: { format: "json" },
- *   disableTools: true  // Required
+ *   // No need for disableTools: true anymore!
  * });
  * ```
  *
- * @note Gemini 3 Pro Preview (November 2025) will support combining tools + schemas
- * @note "Too many states for serving" errors can occur with complex schemas + tools.
- *       Solution: Simplify schema or use disableTools: true
+ * @note "Too many states for serving" errors can still occur with very complex schemas + tools.
+ *       Solution: Simplify schema or reduce number of tools if this occurs.
  */
 export class GoogleAIStudioProvider extends BaseProvider {
   constructor(modelName?: string, sdk?: unknown) {
@@ -137,7 +143,10 @@ export class GoogleAIStudioProvider extends BaseProvider {
    */
   public getAISDKModel(): LanguageModelV1 {
     const apiKey = this.getApiKey();
-    const google = createGoogleGenerativeAI({ apiKey });
+    const google = createGoogleGenerativeAI({
+      apiKey,
+      fetch: createProxyFetch(),
+    });
     return google(this.modelName);
   }
 
@@ -151,17 +160,76 @@ export class GoogleAIStudioProvider extends BaseProvider {
       typeof errorRecord?.message === "string"
         ? errorRecord.message
         : "Unknown error";
+    const statusCode =
+      typeof errorRecord?.status === "number"
+        ? errorRecord.status
+        : typeof errorRecord?.statusCode === "number"
+          ? errorRecord.statusCode
+          : undefined;
 
-    if (message.includes("API_KEY_INVALID")) {
+    // Authentication errors
+    if (
+      message.includes("API_KEY_INVALID") ||
+      message.includes("Invalid API key") ||
+      statusCode === 401
+    ) {
       throw new AuthenticationError(
         "Invalid Google AI API key. Please check your GOOGLE_AI_API_KEY environment variable.",
         this.providerName,
       );
     }
 
-    if (message.includes("RATE_LIMIT_EXCEEDED")) {
+    // Rate limit errors
+    if (
+      message.includes("RATE_LIMIT_EXCEEDED") ||
+      message.includes("rate limit") ||
+      message.includes("429") ||
+      statusCode === 429
+    ) {
       throw new RateLimitError(
         "Google AI rate limit exceeded. Please try again later.",
+        this.providerName,
+      );
+    }
+
+    // Model not found errors
+    if (
+      message.includes("NOT_FOUND") ||
+      message.includes("model not found") ||
+      message.includes("Model not found") ||
+      message.includes("models/") ||
+      statusCode === 404
+    ) {
+      throw new InvalidModelError(
+        `Model '${this.modelName}' not found. Please check the model name and ensure it is available.`,
+        this.providerName,
+      );
+    }
+
+    // Network connectivity errors
+    if (
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ETIMEDOUT") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("network") ||
+      message.includes("connection")
+    ) {
+      throw new NetworkError(`Connection error: ${message}`, this.providerName);
+    }
+
+    // Server errors (5xx)
+    if (
+      message.includes("500") ||
+      message.includes("502") ||
+      message.includes("503") ||
+      message.includes("504") ||
+      message.includes("server error") ||
+      message.includes("Internal Server Error") ||
+      (statusCode && statusCode >= 500 && statusCode < 600)
+    ) {
+      throw new ProviderError(
+        `Google AI server error: ${message}. Please try again later.`,
         this.providerName,
       );
     }
@@ -723,11 +791,14 @@ export class GoogleAIStudioProvider extends BaseProvider {
             rawSchema = { type: "object", properties: {} };
           }
 
-          decl.parametersJsonSchema = inlineJsonSchema(rawSchema);
+          const inlinedSchema = inlineJsonSchema(rawSchema);
           // Remove $schema if present - @google/genai doesn't need it
-          if (decl.parametersJsonSchema.$schema) {
-            delete decl.parametersJsonSchema.$schema;
+          if (inlinedSchema.$schema) {
+            delete inlinedSchema.$schema;
           }
+          // CRITICAL: Google Gemini requires ALL nested schemas to have a type field
+          // ensureNestedSchemaTypes recursively adds missing type fields to tool schemas
+          decl.parametersJsonSchema = ensureNestedSchemaTypes(inlinedSchema);
         }
 
         functionDeclarations.push(decl);
@@ -751,6 +822,17 @@ export class GoogleAIStudioProvider extends BaseProvider {
       maxOutputTokens: options.maxTokens,
     };
 
+    // Add topP, topK, stopSequences if provided
+    if (options.topP !== undefined) {
+      config.topP = options.topP;
+    }
+    if (options.topK !== undefined) {
+      config.topK = options.topK;
+    }
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      config.stopSequences = options.stopSequences;
+    }
+
     if (tools) {
       config.tools = tools;
     }
@@ -765,6 +847,44 @@ export class GoogleAIStudioProvider extends BaseProvider {
     );
     if (nativeThinkingConfig) {
       config.thinkingConfig = nativeThinkingConfig;
+    }
+
+    // Add JSON output format support for native SDK stream
+    // CRITICAL: Google Gemini API does NOT allow combining responseMimeType with function calling.
+    // Error: "Function calling with a response mime type: 'application/json' is unsupported"
+    // Only set responseMimeType when there are NO tools. Schema can still work without it.
+    const streamOptions = options as TextGenerationOptions;
+    if (streamOptions.output?.format === "json" || streamOptions.schema) {
+      // Only set responseMimeType when NOT using tools - this is the key fix for tools + schema
+      if (!tools) {
+        config.responseMimeType = "application/json";
+      }
+
+      // Convert schema to JSON schema format for the native SDK
+      // responseSchema can still be set with tools - it guides output structure
+      if (streamOptions.schema) {
+        const rawSchema = isZodSchema(streamOptions.schema)
+          ? (convertZodToJsonSchema(
+              streamOptions.schema as ZodUnknownSchema,
+            ) as Record<string, unknown>)
+          : (streamOptions.schema as Record<string, unknown>);
+        const inlinedSchema = inlineJsonSchema(rawSchema);
+        // Remove $schema if present - @google/genai doesn't need it
+        if (inlinedSchema.$schema) {
+          delete inlinedSchema.$schema;
+        }
+        // CRITICAL: Google Gemini requires ALL nested schemas to have a type field
+        // ensureNestedSchemaTypes recursively adds missing type fields
+        const typedSchema = ensureNestedSchemaTypes(inlinedSchema);
+        config.responseSchema = typedSchema;
+
+        logger.debug(
+          "[GoogleAIStudio] Added responseSchema for JSON output (stream)",
+          {
+            schemaKeys: Object.keys(typedSchema),
+          },
+        );
+      }
     }
 
     // Ensure maxSteps is a valid positive integer to prevent infinite loops
@@ -1104,11 +1224,14 @@ export class GoogleAIStudioProvider extends BaseProvider {
               rawSchema = { type: "object", properties: {} };
             }
 
-            decl.parametersJsonSchema = inlineJsonSchema(rawSchema);
+            const inlinedSchema = inlineJsonSchema(rawSchema);
             // Remove $schema if present - @google/genai doesn't need it
-            if (decl.parametersJsonSchema.$schema) {
-              delete decl.parametersJsonSchema.$schema;
+            if (inlinedSchema.$schema) {
+              delete inlinedSchema.$schema;
             }
+            // CRITICAL: Google Gemini requires ALL nested schemas to have a type field
+            // ensureNestedSchemaTypes recursively adds missing type fields to tool schemas
+            decl.parametersJsonSchema = ensureNestedSchemaTypes(inlinedSchema);
           }
 
           functionDeclarations.push(decl);
@@ -1136,12 +1259,68 @@ export class GoogleAIStudioProvider extends BaseProvider {
       maxOutputTokens: options.maxTokens,
     };
 
+    // Add topP, topK, stopSequences if provided
+    if (options.topP !== undefined) {
+      config.topP = options.topP;
+    }
+    if (options.topK !== undefined) {
+      config.topK = options.topK;
+    }
+    if (options.stopSequences && options.stopSequences.length > 0) {
+      config.stopSequences = options.stopSequences;
+    }
+
     if (tools) {
       config.tools = tools;
     }
 
     if (options.systemPrompt) {
       config.systemInstruction = options.systemPrompt;
+    }
+
+    // Add thinking config for Gemini 3
+    const nativeThinkingConfig2 = createNativeThinkingConfig(
+      options.thinkingConfig,
+    );
+    if (nativeThinkingConfig2) {
+      config.thinkingConfig = nativeThinkingConfig2;
+    }
+
+    // Add JSON output format support for native SDK generate (matching stream implementation)
+    // CRITICAL: Google Gemini API does NOT allow combining responseMimeType with function calling.
+    // Error: "Function calling with a response mime type: 'application/json' is unsupported"
+    // Only set responseMimeType when there are NO tools. Schema can still work without it.
+    if (options.output?.format === "json" || options.schema) {
+      // Only set responseMimeType when NOT using tools - this is the key fix for tools + schema
+      if (!tools) {
+        config.responseMimeType = "application/json";
+      }
+
+      // Convert schema to JSON schema format for the native SDK
+      // responseSchema can still be set with tools - it guides output structure
+      if (options.schema) {
+        const rawSchema = isZodSchema(options.schema)
+          ? (convertZodToJsonSchema(
+              options.schema as ZodUnknownSchema,
+            ) as Record<string, unknown>)
+          : (options.schema as Record<string, unknown>);
+        const inlinedSchema = inlineJsonSchema(rawSchema);
+        // Remove $schema if present - @google/genai doesn't need it
+        if (inlinedSchema.$schema) {
+          delete inlinedSchema.$schema;
+        }
+        // CRITICAL: Google Gemini requires ALL nested schemas to have a type field
+        // ensureNestedSchemaTypes recursively adds missing type fields
+        const typedSchema = ensureNestedSchemaTypes(inlinedSchema);
+        config.responseSchema = typedSchema;
+
+        logger.debug(
+          "[GoogleAIStudio] Added responseSchema for JSON output (generate)",
+          {
+            schemaKeys: Object.keys(typedSchema),
+          },
+        );
+      }
     }
 
     const startTime = Date.now();

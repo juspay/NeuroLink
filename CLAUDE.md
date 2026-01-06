@@ -458,7 +458,7 @@ Note: When `thinkingLevel` is enabled, some providers may have limitations (see 
 4. **Backward Compatibility:** SDK changes must maintain existing API
 5. **File Size Limits:** Consider token limits for multimodal content
 6. **Environment Isolation:** CLI and SDK have separate concerns (CLI can use manual MCP, SDK cannot)
-7. **Gemini Tool + JSON Schema Limitation:** Google Gemini models (AI Studio and Vertex) cannot use tools and JSON schema output simultaneously. When `structuredOutput` with a JSON schema is specified, tools must be disabled. This is a limitation of the Gemini API. Design workflows to either use tools OR structured JSON output, not both together.
+7. **Gemini Tool + JSON Schema Support:** Google Gemini models (AI Studio and Vertex) now support using tools and JSON schema output together. The fix works by not setting `responseMimeType: "application/json"` when tools are present (this was causing the conflict). The `responseSchema` is still set to guide output structure. Note: Very complex schemas with many tools may still trigger "Too many states for serving" errors - simplify if this occurs.
 
 ## Development Workflow
 

@@ -392,29 +392,14 @@ export async function testComplexZodSchemaMultiProvider(
 
   // Use provided provider/model or defaults
   const providerName = providerOverride || "vertex";
-  const modelName = modelOverride || undefined;
-
-  // Check if this is a Gemini MODEL - Gemini cannot use tools + JSON schema together
-  // This is a documented Gemini limitation, not a bug in the SDK.
-  // Note: provider name alone is not sufficient - Vertex can run Claude too.
-  const isGeminiModel =
-    modelName?.toLowerCase().includes("gemini") ||
-    (!modelName &&
-      (providerName === "google-ai" || providerName === "googleAiStudio"));
-
-  if (isGeminiModel) {
-    logTest(
-      "Complex Zod Schema Multi-Provider",
-      "PASS",
-      "SKIPPED: Gemini providers cannot use tools + JSON schema together (documented limitation). Test requires tools to read data files.",
-    );
-    return true; // Return true since this is an expected limitation, not a failure
-  }
+  const modelName = modelOverride; // undefined means use provider default
+  const displayModelName = modelName || "default"; // For display purposes only
 
   const providers = [
     {
       name: providerName,
       model: modelName,
+      displayModel: displayModelName,
     },
   ];
   const results: {
@@ -449,10 +434,9 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
 
   for (const providerConfig of providers) {
     try {
-      logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Zod Schema Test`,
-        "TESTING",
-        "Generating structured output with complex schema...",
+      log(
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}): Generating structured output with complex schema...`,
+        "blue",
       );
 
       const sdk = new NeuroLink();
@@ -502,7 +486,7 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
       }
 
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Tool Usage`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Tool Usage`,
         "PASS",
         `Tools used: ${[...new Set(toolNames)].join(", ")} (${result.toolExecutions.length} executions)`,
       );
@@ -528,7 +512,7 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
       }
 
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Tool Usage Verification`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Tool Usage Verification`,
         "PASS",
         `readFile called ${readFileCount} times, getCurrentTime called`,
       );
@@ -569,14 +553,14 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
           .join("; ");
 
         logTest(
-          `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Zod Schema Validation`,
+          `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Zod Schema Validation`,
           "FAIL",
           `Schema validation failed: ${errorDetails}`,
         );
 
         results.push({
           provider: providerConfig.name,
-          model: providerConfig.model,
+          model: providerConfig.displayModel,
           success: false,
           error: `Zod validation failed: ${errorDetails}`,
         });
@@ -584,7 +568,7 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
       }
 
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Zod Schema Validation`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Zod Schema Validation`,
         "PASS",
         "Schema validation successful",
       );
@@ -598,13 +582,13 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
 
       if (!numericValidation.passed) {
         logTest(
-          `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Numeric Fields`,
+          `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Numeric Fields`,
           "FAIL",
           numericValidation.details.join("; "),
         );
         results.push({
           provider: providerConfig.name,
-          model: providerConfig.model,
+          model: providerConfig.displayModel,
           success: false,
           error: `Numeric field validation failed: ${numericValidation.details.join("; ")}`,
         });
@@ -612,7 +596,7 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
       }
 
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Numeric Fields`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Numeric Fields`,
         "PASS",
         numericValidation.details.join("; "),
       );
@@ -623,13 +607,13 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
 
       if (!fieldsValidation.passed) {
         logTest(
-          `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Required Fields`,
+          `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Required Fields`,
           "FAIL",
           fieldsValidation.details.join("; "),
         );
         results.push({
           provider: providerConfig.name,
-          model: providerConfig.model,
+          model: providerConfig.displayModel,
           success: false,
           error: `Required fields validation failed: ${fieldsValidation.details.join("; ")}`,
         });
@@ -637,7 +621,7 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
       }
 
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Required Fields`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Required Fields`,
         "PASS",
         "All required fields present",
       );
@@ -652,13 +636,13 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
 
       if (!dataValidation.passed) {
         logTest(
-          `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Data Accuracy`,
+          `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Data Accuracy`,
           "FAIL",
           dataValidation.details.join("; "),
         );
         results.push({
           provider: providerConfig.name,
-          model: providerConfig.model,
+          model: providerConfig.displayModel,
           success: false,
           error: `Data accuracy validation failed: ${dataValidation.details.join("; ")}`,
         });
@@ -666,34 +650,34 @@ DO NOT hallucinate data. ALL metrics, campaign IDs, and account information must
       }
 
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Data Accuracy`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Data Accuracy`,
         "PASS",
         dataValidation.details.join("; "),
       );
 
       // All validations passed for this provider
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Overall`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Overall`,
         "PASS",
         "All validations passed successfully",
       );
 
       results.push({
         provider: providerConfig.name,
-        model: providerConfig.model,
+        model: providerConfig.displayModel,
         success: true,
       });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       logTest(
-        `${providerConfig.name.toUpperCase()} (${providerConfig.model}) - Execution`,
+        `${providerConfig.name.toUpperCase()} (${providerConfig.displayModel}) - Execution`,
         "FAIL",
         errorMessage,
       );
       results.push({
         provider: providerConfig.name,
-        model: providerConfig.model,
+        model: providerConfig.displayModel,
         success: false,
         error: errorMessage,
       });

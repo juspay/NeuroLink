@@ -258,11 +258,12 @@ function validateBusinessData(
     }
   }
 
-  const passed = foundMetrics.length >= 2; // At least 2 metrics found
+  const totalMetrics = Object.keys(businessMetrics).length;
+  const passed = foundMetrics.length === totalMetrics; // All metrics required
   const details = [
     `Found metrics: ${foundMetrics.join(", ") || "none"}`,
-    `Total found: ${foundMetrics.length}/${Object.keys(businessMetrics).length}`,
-    `Required minimum: 2`,
+    `Total found: ${foundMetrics.length}/${totalMetrics}`,
+    `Required: all ${totalMetrics} metrics`,
   ];
 
   return { passed, details };
@@ -1072,10 +1073,9 @@ async function testSDKBusinessTools(): Promise<boolean> {
     );
 
     // Test SDK Generate with business tools
-    logTest(
-      "SDK Generate with Business Tools",
-      "TESTING",
-      "Generating response with business data...",
+    log(
+      "SDK Generate with Business Tools: Generating response with business data...",
+      "blue",
     );
 
     const generateResult = await sdk.generate({
@@ -1086,47 +1086,60 @@ async function testSDKBusinessTools(): Promise<boolean> {
       ...buildBaseSDKOptions(),
     });
 
-    // Verify business data appears in response
-    const businessData = [
-      "15847293.47", // Revenue
-      "1247", // Total employees
-      "34567", // Total SKUs
-      "Q4 2024", // Quarter
-      "+23.5%", // Growth
-      "94.2%", // Retention
+    // Verify business data appears in response - use patterns to handle number formatting variations
+    const businessDataPatterns: { name: string; patterns: string[] }[] = [
+      {
+        name: "Revenue",
+        patterns: ["15847293.47", "15,847,293.47", "15847293", "15,847,293"],
+      },
+      { name: "Employees", patterns: ["1247", "1,247"] },
+      { name: "SKUs", patterns: ["34567", "34,567"] },
+      { name: "Quarter", patterns: ["Q4 2024"] },
+      { name: "Growth", patterns: ["+23.5%", "23.5%"] },
+      { name: "Retention", patterns: ["94.2%"] },
     ];
 
-    const foundData = businessData.filter(
-      (data) => generateResult.content?.includes(data) || false,
-    );
+    const foundData: string[] = [];
+    const missingData: string[] = [];
+    const content = generateResult.content || "";
 
-    if (foundData.length >= 3) {
+    for (const metric of businessDataPatterns) {
+      const found = metric.patterns.some((pattern) =>
+        content.includes(pattern),
+      );
+      if (found) {
+        foundData.push(metric.name);
+      } else {
+        missingData.push(metric.name);
+      }
+    }
+
+    if (foundData.length === 6) {
       logTest(
         "SDK Generate with Business Tools",
         "PASS",
-        `Found ${foundData.length}/6 business metrics in AI response`,
+        `Found ${foundData.length}/6 business metrics in AI response: ${foundData.join(", ")}`,
       );
     } else {
       logTest(
         "SDK Generate with Business Tools",
         "FAIL",
-        `Only found ${foundData.length}/6 business metrics: ${foundData.join(", ")}`,
+        `Only found ${foundData.length}/6 business metrics: ${foundData.join(", ")}. Missing: ${missingData.join(", ")}`,
       );
       return false;
     }
 
     // Test SDK Stream with business tools
-    logTest(
-      "SDK Stream with Business Tools",
-      "TESTING",
-      "Streaming response with business data...",
+    log(
+      "SDK Stream with Business Tools: Streaming response with business data...",
+      "blue",
     );
 
     const streamResult = await sdk.stream({
       input: {
-        text: "What is our current quarterly revenue and employee headcount? Use the business tools to get exact numbers.",
+        text: "Give me a complete business dashboard summary. Use the quarterly_revenue, employee_metrics, and inventory_status tools to get ALL the latest data. Include all specific numbers and metrics in your response.",
       },
-      maxTokens: 500,
+      maxTokens: 1000,
       ...buildBaseSDKOptions(),
     });
 
@@ -1137,22 +1150,32 @@ async function testSDKBusinessTools(): Promise<boolean> {
       }
     }
 
-    const streamFoundData = businessData.filter((data) =>
-      streamContent.includes(data),
-    );
+    const streamFoundData: string[] = [];
+    const streamMissingData: string[] = [];
 
-    if (streamFoundData.length >= 2) {
+    for (const metric of businessDataPatterns) {
+      const found = metric.patterns.some((pattern) =>
+        streamContent.includes(pattern),
+      );
+      if (found) {
+        streamFoundData.push(metric.name);
+      } else {
+        streamMissingData.push(metric.name);
+      }
+    }
+
+    if (streamFoundData.length === 6) {
       logTest(
         "SDK Stream with Business Tools",
         "PASS",
-        `Found ${streamFoundData.length} business metrics in stream response`,
+        `Found ${streamFoundData.length}/6 business metrics in stream response: ${streamFoundData.join(", ")}`,
       );
       return true;
     } else {
       logTest(
         "SDK Stream with Business Tools",
         "FAIL",
-        `Only found ${streamFoundData.length} business metrics in stream`,
+        `Only found ${streamFoundData.length}/6 business metrics in stream. Missing: ${streamMissingData.join(", ")}`,
       );
       return false;
     }
@@ -1203,10 +1226,9 @@ async function testCLIBusinessTools(): Promise<boolean> {
     );
 
     // Test with generate (simulating CLI usage)
-    logTest(
-      "CLI Business Tools Generate",
-      "TESTING",
-      "Testing business tool execution...",
+    log(
+      "CLI Business Tools Generate: Testing business tool execution...",
+      "blue",
     );
 
     // Add timeout to prevent hanging
@@ -1519,10 +1541,9 @@ async function testSDKHITLGenerate(): Promise<boolean> {
       log(`⏰ [HITL] Timeout occurred for: ${payload.toolName}`, "yellow");
     });
 
-    logTest(
-      "SDK HITL Generate",
-      "TESTING",
-      "Testing HITL with dangerous business tools...",
+    log(
+      "SDK HITL Generate: Testing HITL with dangerous business tools...",
+      "blue",
     );
 
     // Test with dangerous quarterly data tool
@@ -1607,11 +1628,7 @@ async function testSDKHITLStream(): Promise<boolean> {
       );
     });
 
-    logTest(
-      "SDK HITL Stream",
-      "TESTING",
-      "Testing HITL with dangerous stream tools...",
-    );
+    log("SDK HITL Stream: Testing HITL with dangerous stream tools...", "blue");
 
     // Test with dangerous employee termination tool
     const streamResult = await sdk.stream({
