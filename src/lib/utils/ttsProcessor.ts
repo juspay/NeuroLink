@@ -8,7 +8,12 @@
  */
 
 import { logger } from "./logger.js";
-import type { TTSOptions, TTSResult, TTSVoice } from "../types/ttsTypes.js";
+import type {
+  TTSOptions,
+  TTSResult,
+  TTSVoice,
+  TTSChunk,
+} from "../types/ttsTypes.js";
 import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
 import { NeuroLinkError } from "./errorHandling.js";
 
@@ -393,6 +398,189 @@ export class TTSProcessor {
         },
         originalError: err instanceof Error ? err : undefined,
       });
+    }
+  }
+
+  /**
+   * Synthesize streaming TTS from text chunks
+   *
+   * Converts text chunks into audio chunks for real-time TTS during streaming operations.
+   * Buffers text until punctuation or sufficient length is reached, then synthesizes audio.
+   *
+   * **Buffering Strategy:**
+   * - Accumulates text chunks until natural break point (sentence end, pause)
+   * - Minimum buffer size: 50 characters (configurable)
+   * - Maximum buffer size: provider's maxTextLength
+   * - Flushes on: sentence end (. ! ?), comma, or max buffer reached
+   *
+   * **Error Handling:**
+   * - Logs TTS errors but continues streaming (graceful degradation)
+   * - Does not interrupt text streaming on TTS failures
+   * - Errors are logged with context for debugging
+   *
+   * @param textChunks - Async iterable of text chunks from AI response
+   * @param provider - TTS provider identifier
+   * @param options - TTS configuration options
+   * @returns Async generator yielding TTSChunk objects
+   *
+   * @example
+   * ```typescript
+   * const textChunks = async function* () {
+   *   yield "Hello, ";
+   *   yield "world! ";
+   *   yield "How are you?";
+   * }();
+   *
+   * const audioChunks = TTSProcessor.synthesizeStream(
+   *   textChunks,
+   *   "google-ai",
+   *   { voice: "en-US-Neural2-C", format: "mp3" }
+   * );
+   *
+   * for await (const chunk of audioChunks) {
+   *   console.log(`Audio chunk ${chunk.index}: ${chunk.data.length} bytes`);
+   *   if (chunk.isFinal) {
+   *     console.log("Final audio chunk received");
+   *   }
+   * }
+   * ```
+   */
+  static async *synthesizeStream(
+    textChunks: AsyncIterable<string>,
+    provider: string,
+    options: TTSOptions,
+  ): AsyncGenerator<TTSChunk> {
+    // Configuration
+    const MIN_BUFFER_SIZE = 50; // Minimum characters before synthesis
+    const handler = this.getHandler(provider);
+    const maxTextLength = handler?.maxTextLength ?? this.DEFAULT_MAX_TEXT_LENGTH;
+
+    // State
+    let buffer = "";
+    let chunkIndex = 0;
+    let cumulativeSize = 0;
+    let totalDuration = 0;
+
+    logger.debug("[TTSProcessor] Starting streaming TTS synthesis", {
+      provider,
+      minBufferSize: MIN_BUFFER_SIZE,
+      maxTextLength,
+    });
+
+    try {
+      // Process text chunks
+      for await (const textChunk of textChunks) {
+        buffer += textChunk;
+
+        // Determine if we should synthesize
+        const shouldSynthesize =
+          buffer.length >= maxTextLength || // Buffer full
+          (buffer.length >= MIN_BUFFER_SIZE &&
+            /[.!?;,]\s*$/.test(buffer)); // Natural break
+
+        if (shouldSynthesize && buffer.trim()) {
+          const textToSynthesize = buffer.trim();
+          buffer = ""; // Reset buffer
+
+          try {
+            const synthStartTime = Date.now();
+
+            // Synthesize buffered text
+            const result = await this.synthesize(
+              textToSynthesize,
+              provider,
+              options,
+            );
+
+            const synthLatency = Date.now() - synthStartTime;
+
+            // Update cumulative metrics
+            cumulativeSize += result.size;
+            if (result.duration) {
+              totalDuration += result.duration;
+            }
+
+            // Create and yield audio chunk
+            const audioChunk: TTSChunk = {
+              data: result.buffer,
+              format: result.format,
+              index: chunkIndex++,
+              isFinal: false,
+              cumulativeSize,
+              estimatedDuration: totalDuration || undefined,
+              voice: result.voice,
+              sampleRate: result.sampleRate,
+            };
+
+            logger.debug("[TTSProcessor] Yielding audio chunk", {
+              index: audioChunk.index,
+              size: audioChunk.data.length,
+              latency: synthLatency,
+              textLength: textToSynthesize.length,
+            });
+
+            yield audioChunk;
+          } catch (err) {
+            // Log error but continue streaming (graceful degradation)
+            logger.error(
+              `[TTSProcessor] Streaming synthesis failed for chunk, continuing:`,
+              err,
+            );
+            // Don't yield audio chunk on error, just continue with text
+          }
+        }
+      }
+
+      // Flush remaining buffer
+      if (buffer.trim()) {
+        try {
+          const synthStartTime = Date.now();
+          const result = await this.synthesize(buffer.trim(), provider, options);
+          const synthLatency = Date.now() - synthStartTime;
+
+          cumulativeSize += result.size;
+          if (result.duration) {
+            totalDuration += result.duration;
+          }
+
+          const finalChunk: TTSChunk = {
+            data: result.buffer,
+            format: result.format,
+            index: chunkIndex++,
+            isFinal: true, // Mark as final
+            cumulativeSize,
+            estimatedDuration: totalDuration || undefined,
+            voice: result.voice,
+            sampleRate: result.sampleRate,
+          };
+
+          logger.debug("[TTSProcessor] Yielding final audio chunk", {
+            index: finalChunk.index,
+            size: finalChunk.data.length,
+            latency: synthLatency,
+            totalChunks: chunkIndex,
+            totalSize: cumulativeSize,
+          });
+
+          yield finalChunk;
+        } catch (err) {
+          logger.error(
+            `[TTSProcessor] Final chunk synthesis failed:`,
+            err,
+          );
+          // Don't yield on error
+        }
+      } else if (chunkIndex > 0) {
+        // No remaining buffer, but we have chunks - mark last one as final
+        logger.debug("[TTSProcessor] Streaming synthesis complete", {
+          totalChunks: chunkIndex,
+          totalSize: cumulativeSize,
+          totalDuration,
+        });
+      }
+    } catch (err) {
+      logger.error("[TTSProcessor] Streaming synthesis error:", err);
+      throw err;
     }
   }
 }
