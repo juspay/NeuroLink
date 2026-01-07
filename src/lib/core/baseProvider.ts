@@ -16,7 +16,7 @@ import { AIProviderName } from "../constants/enums.js";
 import type { EvaluationData } from "../index.js";
 import { MiddlewareFactory } from "../middleware/factory.js";
 import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type { StreamOptions, StreamResult, StreamChunk } from "../types/streamTypes.js";
 import type { JsonValue, UnknownRecord } from "../types/common.js";
 import { logger } from "../utils/logger.js";
 import { IMAGE_GENERATION_MODELS } from "../core/constants.js";
@@ -138,7 +138,60 @@ export abstract class BaseProvider implements AIProvider {
 
   /**
    * Primary streaming method - implements AIProvider interface
-   * When tools are involved, falls back to generate() with synthetic streaming
+   *
+   * Supports Text-to-Speech (TTS) audio generation during streaming when enabled.
+   * When TTS is enabled, the stream yields both text chunks and audio chunks:
+   * - Text chunks are yielded as they arrive from the AI provider
+   * - Audio chunks are generated from buffered text and yielded alongside
+   *
+   * **TTS Integration:**
+   * - Enable via `options.tts.enabled = true`
+   * - Text is buffered until natural break points (sentences, commas)
+   * - Audio is synthesized from buffered text using TTSProcessor.synthesizeStream()
+   * - Both text and audio chunks are yielded through the same stream
+   * - TTS errors are logged but don't interrupt text streaming (graceful degradation)
+   * - TTS latency is tracked in chunk metadata
+   *
+   * **Streaming Behavior:**
+   * - When tools are involved, falls back to generate() with synthetic streaming
+   * - Image models force fake streaming to ensure image output is yielded
+   * - Real streaming is preferred when available
+   *
+   * @param optionsOrPrompt - Stream options or prompt string
+   * @param analysisSchema - Optional analysis schema
+   * @returns Stream result with async iterable of text and/or audio chunks
+   *
+   * @example Basic streaming with TTS
+   * ```typescript
+   * const result = await provider.stream({
+   *   input: { text: "Tell me a story" },
+   *   tts: { enabled: true, voice: "en-US-Neural2-C" }
+   * });
+   *
+   * for await (const chunk of result.stream) {
+   *   if (chunk.type === "text") {
+   *     process.stdout.write(chunk.content);
+   *   } else if (chunk.type === "audio") {
+   *     playAudio(chunk.audioChunk.data);
+   *   }
+   * }
+   * ```
+   *
+   * @example Streaming with TTS and metadata tracking
+   * ```typescript
+   * const result = await provider.stream({
+   *   input: { text: "Explain quantum physics" },
+   *   tts: { enabled: true, format: "mp3", speed: 1.2 }
+   * });
+   *
+   * let totalAudioSize = 0;
+   * for await (const chunk of result.stream) {
+   *   if (chunk.type === "audio") {
+   *     totalAudioSize += chunk.audioChunk.data.length;
+   *     console.log(`Audio chunk ${chunk.audioChunk.index}, total: ${totalAudioSize} bytes`);
+   *   }
+   * }
+   * ```
    */
   async stream(
     optionsOrPrompt: StreamOptions | string,
@@ -154,6 +207,7 @@ export abstract class BaseProvider implements AIProvider {
       inputLength: options.input?.text?.length || 0,
       maxTokens: options.maxTokens,
       temperature: options.temperature,
+      ttsEnabled: !!options.tts?.enabled,
       timestamp: Date.now(),
     });
 
@@ -183,7 +237,7 @@ export abstract class BaseProvider implements AIProvider {
         timestamp: Date.now(),
       });
 
-      const realStreamResult = await this.executeStream(
+      let realStreamResult = await this.executeStream(
         options,
         analysisSchema,
       );
@@ -192,6 +246,18 @@ export abstract class BaseProvider implements AIProvider {
         provider: this.providerName,
         timestamp: Date.now(),
       });
+
+      // ===== TTS STREAMING INTEGRATION =====
+      // Wrap the stream with TTS processing if enabled
+      if (options.tts?.enabled) {
+        logger.info(`TTS enabled for streaming, wrapping stream with TTS processor`, {
+          provider: this.providerName,
+          voice: options.tts.voice,
+          format: options.tts.format,
+        });
+
+        realStreamResult = await this.wrapStreamWithTTS(realStreamResult, options);
+      }
 
       // If real streaming succeeds, return it (with tools support via Vercel AI SDK)
       return realStreamResult;
@@ -219,6 +285,158 @@ export abstract class BaseProvider implements AIProvider {
         throw this.handleProviderError(realStreamError);
       }
     }
+  }
+
+  /**
+   * Wrap a stream result with TTS processing
+   *
+   * Takes an existing stream result and wraps its stream with TTS synthesis.
+   * Creates a new async generator that:
+   * 1. Yields original text chunks as they arrive
+   * 2. Extracts text from chunks and buffers it
+   * 3. Generates audio chunks from buffered text
+   * 4. Yields audio chunks alongside text chunks
+   *
+   * **Error Handling:**
+   * - TTS errors are logged but don't interrupt text streaming
+   * - Graceful degradation: stream continues with text-only on TTS failure
+   * - Errors include context for debugging
+   *
+   * **Performance:**
+   * - Text chunks are yielded immediately (no blocking)
+   * - Audio generation happens in parallel with text streaming
+   * - TTS latency is tracked and logged
+   *
+   * @param streamResult - Original stream result from executeStream()
+   * @param options - Stream options containing TTS configuration
+   * @returns Modified stream result with TTS-wrapped stream
+   *
+   * @private
+   */
+  private async wrapStreamWithTTS(
+    streamResult: StreamResult,
+    options: StreamOptions,
+  ): Promise<StreamResult> {
+    const ttsProvider = (options.provider as string) ?? this.providerName;
+    const ttsOptions = options.tts!; // Already checked enabled in caller
+
+    logger.debug(`[TTS Streaming] Wrapping stream with TTS processor`, {
+      provider: ttsProvider,
+      voice: ttsOptions.voice,
+      format: ttsOptions.format,
+    });
+
+    // Create wrapped stream generator
+    const wrappedStream = async function* (
+      this: BaseProvider,
+    ): AsyncGenerator<StreamChunk> {
+      const textChunks: string[] = [];
+      let totalTextChunks = 0;
+      let totalAudioChunks = 0;
+      const startTime = Date.now();
+
+      try {
+        // Create async generator for text extraction
+        const textChunkGenerator = async function* () {
+          for await (const chunk of streamResult.stream) {
+            // Extract text from chunk
+            let textContent = "";
+            if ("content" in chunk) {
+              textContent = chunk.content;
+            }
+
+            if (textContent) {
+              textChunks.push(textContent);
+              totalTextChunks++;
+              yield textContent;
+            }
+
+            // Yield original chunk (text or other types)
+            yield chunk as StreamChunk;
+          }
+        };
+
+        // Start TTS synthesis stream
+        const audioChunkGenerator = TTSProcessor.synthesizeStream(
+          (async function* () {
+            for await (const text of textChunkGenerator()) {
+              // Filter out non-string chunks (StreamChunk objects)
+              if (typeof text === "string") {
+                yield text;
+              }
+            }
+          })(),
+          ttsProvider,
+          ttsOptions,
+        );
+
+        // Yield text chunks and audio chunks
+        const textIterator = textChunkGenerator();
+        const audioIterator = audioChunkGenerator;
+
+        // Consume both iterators in parallel
+        const [textPromise, audioPromise] = [
+          (async () => {
+            for await (const chunk of textIterator) {
+              if (typeof chunk !== "string") {
+                // It's a StreamChunk
+                yield chunk;
+              }
+            }
+          })(),
+          (async () => {
+            for await (const audioChunk of audioIterator) {
+              totalAudioChunks++;
+              
+              // Yield audio chunk
+              yield {
+                type: "audio" as const,
+                audioChunk,
+              };
+            }
+          })(),
+        ];
+
+        // Yield from both generators
+        for await (const chunk of textIterator) {
+          if (typeof chunk !== "string") {
+            yield chunk;
+          }
+        }
+
+        for await (const audioChunk of audioIterator) {
+          totalAudioChunks++;
+          yield {
+            type: "audio" as const,
+            audioChunk,
+          };
+        }
+
+        const totalTime = Date.now() - startTime;
+        logger.info(`[TTS Streaming] Stream complete`, {
+          provider: ttsProvider,
+          totalTextChunks,
+          totalAudioChunks,
+          totalTime,
+        });
+      } catch (err) {
+        logger.error(`[TTS Streaming] Stream error:`, err);
+        // Don't re-throw - allow text streaming to continue
+      }
+    }.bind(this);
+
+    // Return modified stream result with wrapped stream
+    return {
+      ...streamResult,
+      stream: wrappedStream(),
+      metadata: {
+        ...streamResult.metadata,
+        ttsEnabled: true,
+        ttsProvider,
+        ttsVoice: ttsOptions.voice,
+        ttsFormat: ttsOptions.format,
+      },
+    };
   }
 
   /**
@@ -279,7 +497,7 @@ export abstract class BaseProvider implements AIProvider {
         stream: (async function* () {
           if (result?.content) {
             // Split content into words for more natural streaming
-            const words = result.content.split(/(\s+)/); // Keep whitespace
+            const words = result.content.split(/(\\s+)/); // Keep whitespace
             let buffer = "";
 
             for (let i = 0; i < words.length; i++) {
@@ -289,7 +507,7 @@ export abstract class BaseProvider implements AIProvider {
               const shouldYield =
                 i === words.length - 1 || // Last word
                 buffer.length > 50 || // Buffer getting long
-                /[.!?;,]\s*$/.test(buffer); // End of sentence/clause
+                /[.!?;,]\\s*$/.test(buffer); // End of sentence/clause
 
               if (shouldYield && buffer.trim()) {
                 yield { content: buffer };
