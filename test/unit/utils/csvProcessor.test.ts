@@ -23,6 +23,110 @@ Charlie,35,Chicago`;
     vi.clearAllMocks();
   });
 
+  describe("Line ending support (CSV-004)", () => {
+    describe("raw format", () => {
+      it("should handle Unix line endings (\\n)", async () => {
+        const csvData = Buffer.from("name,age\nAlice,30\nBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "raw" });
+
+        expect(result.metadata.rowCount).toBe(2);
+        expect(result.content).toContain("Alice,30");
+        expect(result.content).toContain("Bob,25");
+      });
+
+      it("should handle Windows line endings (\\r\\n)", async () => {
+        const csvData = Buffer.from("name,age\r\nAlice,30\r\nBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "raw" });
+
+        expect(result.metadata.rowCount).toBe(2);
+        expect(result.content).toContain("Alice,30");
+        expect(result.content).toContain("Bob,25");
+      });
+
+      it("should handle Mac line endings (\\r)", async () => {
+        const csvData = Buffer.from("name,age\rAlice,30\rBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "raw" });
+
+        expect(result.metadata.rowCount).toBe(2);
+        expect(result.content).toContain("Alice,30");
+        expect(result.content).toContain("Bob,25");
+      });
+
+      it("should handle mixed line endings", async () => {
+        const csvData = Buffer.from("name,age\r\nAlice,30\nBob,25\rCharlie,35");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "raw" });
+
+        expect(result.metadata.rowCount).toBe(3);
+        expect(result.content).toContain("Alice,30");
+        expect(result.content).toContain("Bob,25");
+        expect(result.content).toContain("Charlie,35");
+      });
+    });
+
+    describe("json format", () => {
+      it("should parse Windows line endings correctly", async () => {
+        const csvData = Buffer.from("name,age\r\nAlice,30\r\nBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "json" });
+
+        expect(result.metadata.rowCount).toBe(2);
+        const parsed = JSON.parse(result.content);
+        expect(parsed).toHaveLength(2);
+        expect(parsed[0]).toEqual({ name: "Alice", age: "30" });
+        expect(parsed[1]).toEqual({ name: "Bob", age: "25" });
+      });
+
+      it("should parse Mac line endings correctly", async () => {
+        const csvData = Buffer.from("name,age\rAlice,30\rBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "json" });
+
+        expect(result.metadata.rowCount).toBe(2);
+        const parsed = JSON.parse(result.content);
+        expect(parsed).toHaveLength(2);
+        expect(parsed[0]).toEqual({ name: "Alice", age: "30" });
+      });
+
+      it("should parse mixed line endings correctly", async () => {
+        const csvData = Buffer.from("name,age\r\nAlice,30\nBob,25\rCharlie,35");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "json" });
+
+        expect(result.metadata.rowCount).toBe(3);
+        const parsed = JSON.parse(result.content);
+        expect(parsed).toHaveLength(3);
+      });
+    });
+
+    describe("markdown format", () => {
+      it("should handle Windows line endings in markdown output", async () => {
+        const csvData = Buffer.from("name,age\r\nAlice,30\r\nBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "markdown" });
+
+        expect(result.content).toContain("| name | age |");
+        expect(result.content).toContain("| Alice | 30 |");
+        expect(result.content).toContain("| Bob | 25 |");
+        // Ensure no \r characters remain in the output
+        expect(result.content).not.toContain("\r");
+      });
+
+      it("should handle Mac line endings in markdown output", async () => {
+        const csvData = Buffer.from("name,age\rAlice,30\rBob,25");
+        const result = await CSVProcessor.process(csvData, { formatStyle: "markdown" });
+
+        expect(result.content).toContain("| name | age |");
+        expect(result.content).toContain("| Alice | 30 |");
+        expect(result.content).not.toContain("\r");
+      });
+
+      it("should strip \\r from cell values containing newlines", async () => {
+        const csvData = Buffer.from('name,description\r\n"Alice","Line1\r\nLine2"\r\n"Bob","Single line"');
+        const result = await CSVProcessor.process(csvData, { formatStyle: "markdown" });
+
+        // The markdown output should replace newlines with spaces
+        expect(result.content).toContain("| Alice | Line1 Line2 |");
+        expect(result.content).not.toContain("\r");
+      });
+    });
+  });
+
   describe("Logging behavior", () => {
     it("should log debug when starting CSV processing", async () => {
       const csvData = Buffer.from("name,age\nAlice,30\nBob,25");
