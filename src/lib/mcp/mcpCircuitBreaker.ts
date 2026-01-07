@@ -39,7 +39,7 @@ export class MCPCircuitBreaker extends EventEmitter {
       failureThreshold: config.failureThreshold ?? 5,
       resetTimeout: config.resetTimeout ?? 60000,
       halfOpenMaxCalls: config.halfOpenMaxCalls ?? 3,
-      operationTimeout: config.operationTimeout ?? 30000,
+      operationTimeout: config.operationTimeout ?? 120000, // 120s for CI environments (npx downloads)
       minimumCallsBeforeCalculation: config.minimumCallsBeforeCalculation ?? 10,
       statisticsWindowSize: config.statisticsWindowSize ?? 300000, // 5 minutes
     };

@@ -61,7 +61,7 @@ export class MCPClientFactory {
         `mcp-client-${config.id}`,
         {
           failureThreshold: 3,
-          resetTimeout: 30000,
+          resetTimeout: 120000, // 120s for CI environments
           operationTimeout: timeout,
         },
       );
