@@ -15,7 +15,7 @@ NeuroLink provides comprehensive multimodal support, allowing you to combine tex
 - **Images** - JPEG, PNG, GIF, WebP, HEIC (vision-capable models)
 - **PDFs** - Document analysis and content extraction
 - **CSV/Spreadsheets** - Data analysis and tabular content processing
-- **Audio** - (Coming soon: Audio input for transcription and analysis)
+- **Audio** - Transcription, analysis, and real-time voice input ([Audio Input Guide](audio-input.md))
 
 All multimodal inputs work seamlessly across both the CLI and SDK, with automatic format detection and provider-specific optimization.
 
@@ -80,6 +80,20 @@ CSV support works with **all providers** because files are converted to text bef
 - **Raw format** - Best for large files (minimal token usage)
 - **JSON format** - Best for structured data processing
 - **Markdown format** - Best for small datasets (<100 rows), readable tables
+
+### Audio Input
+
+| Provider             | Native Audio | Transcription | Real-time | Max Duration | Notes                               |
+| -------------------- | ------------ | ------------- | --------- | ------------ | ----------------------------------- |
+| **Google AI Studio** | ✅           | ✅            | ✅        | 1 hour       | Best for real-time voice            |
+| **Google Vertex AI** | ✅           | ✅            | ✅        | 1 hour       | Native Gemini audio support         |
+| **OpenAI**           | ❌           | ✅ Whisper    | ❌        | 25 MB        | Excellent transcription accuracy    |
+| **Azure OpenAI**     | ❌           | ✅ Whisper    | ❌        | 25 MB        | Via Whisper integration             |
+| **Anthropic**        | ❌           | Via fallback  | ❌        | -            | Uses transcription approach         |
+| **AWS Bedrock**      | ❌           | Via fallback  | ❌        | -            | Uses transcription approach         |
+| **Others**           | ❌           | Via fallback  | ❌        | -            | Audio transcribed before processing |
+
+For comprehensive audio documentation, see the [Audio Input Guide](audio-input.md).
 
 ---
 
@@ -538,6 +552,7 @@ const result = await neurolink.generate({
 
 **Advanced Features:**
 
+- [Audio Input](audio-input.md) - Transcription, analysis, and real-time voice
 - [TTS Integration](tts.md) - Text-to-Speech audio output
 - [Video Generation](video-generation.md) - AI-powered video creation
 

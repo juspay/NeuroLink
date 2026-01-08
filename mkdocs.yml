@@ -156,7 +156,10 @@ nav:
       - MCP Tools Showcase: features/mcp-tools-showcase.md
       - Guardrails Middleware: features/guardrails.md
       - Redis Conversation Export: features/conversation-history.md
+      - Multimodal: features/multimodal.md
       - Multimodal Chat Experiences: features/multimodal-chat.md
+      - Audio Input: features/audio-input.md
+      - TTS (Text-to-Speech): features/tts.md
       - CSV Support: features/csv-support.md
       - PDF Support: features/pdf-support.md
       - Office Documents: features/office-documents.md
@@ -176,6 +179,7 @@ nav:
       - sdk/index.md
       - API Reference: sdk/api-reference.md
       - Framework Integration: sdk/framework-integration.md
+      - NestJS Integration: sdk/nestjs-integration.md
       - Custom Tools: sdk/custom-tools.md
   - Integrations & Platforms:
       - LITELLM Integration: litellm-integration.md
@@ -223,6 +227,7 @@ nav:
       - Frameworks:
           - Next.js: guides/frameworks/nextjs.md
           - Express.js: guides/frameworks/express.md
+          - Fastify: guides/frameworks/fastify.md
           - SvelteKit: guides/frameworks/sveltekit.md
       - Examples:
           - Use Cases: guides/examples/use-cases.md
@@ -257,8 +262,10 @@ nav:
   - Reference:
       - reference/index.md
       - Configuration Reference: reference/configuration.md
+      - Error Codes: reference/error-codes.md
       - Provider Capabilities Audit: reference/provider-capabilities-audit.md
       - Provider Comparison: reference/provider-comparison.md
+      - Provider Feature Compatibility: reference/provider-feature-compatibility.md
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
       - Documentation Matrix: tracking/FEATURE-DOC-MATRIX.md

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroLink Chat</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1rem 2rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .header h1 {
+        color: #fff;
+        font-size: 1.5rem;
+        font-weight: 600;
+      }
+
+      .header span {
+        color: #64ffda;
+      }
+
+      .container {
+        flex: 1;
+        max-width: 900px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .settings {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .settings select {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+
+      .settings select:focus {
+        outline: none;
+        border-color: #64ffda;
+      }
+
+      .settings label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+      }
+
+      .settings input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+
+      .chat-container {
+        flex: 1;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .message {
+        max-width: 80%;
+        padding: 1rem 1.25rem;
+        border-radius: 16px;
+        line-height: 1.5;
+        animation: fadeIn 0.3s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.user {
+        background: #64ffda;
+        color: #1a1a2e;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+      }
+
+      .message.assistant {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+      }
+
+      .message.error {
+        background: rgba(255, 82, 82, 0.2);
+        color: #ff5252;
+        align-self: center;
+      }
+
+      .message .meta {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        margin-top: 0.5rem;
+      }
+
+      .input-container {
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .input-wrapper {
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      #messageInput {
+        flex: 1;
+        padding: 1rem 1.25rem;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        font-size: 1rem;
+        resize: none;
+        min-height: 50px;
+        max-height: 150px;
+      }
+
+      #messageInput:focus {
+        outline: none;
+        border-color: #64ffda;
+      }
+
+      #messageInput::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      #sendButton {
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        border: none;
+        background: #64ffda;
+        color: #1a1a2e;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      #sendButton:hover {
+        background: #52e5c4;
+        transform: translateY(-1px);
+      }
+
+      #sendButton:disabled {
+        background: rgba(100, 255, 218, 0.3);
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 1rem;
+      }
+
+      .typing-indicator span {
+        width: 8px;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out;
+      }
+
+      .typing-indicator span:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      .typing-indicator span:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1);
+        }
+      }
+
+      .empty-state {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.5);
+        padding: 3rem;
+      }
+
+      .empty-state h2 {
+        margin-bottom: 0.5rem;
+        color: rgba(255, 255, 255, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <h1><span>NeuroLink</span> Chat</h1>
+    </header>
+
+    <div class="container">
+      <div class="settings">
+        <select id="providerSelect">
+          <option value="">Auto-detect Provider</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="google-ai">Google AI</option>
+          <option value="mistral">Mistral</option>
+        </select>
+        <label>
+          <input type="checkbox" id="streamToggle" checked />
+          Enable Streaming
+        </label>
+      </div>
+
+      <div class="chat-container">
+        <div class="messages" id="messages">
+          <div class="empty-state">
+            <h2>Welcome to NeuroLink Chat</h2>
+            <p>Start a conversation by typing a message below.</p>
+          </div>
+        </div>
+
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea
+              id="messageInput"
+              placeholder="Type your message..."
+              rows="1"
+            ></textarea>
+            <button id="sendButton">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const messagesContainer = document.getElementById("messages");
+      const messageInput = document.getElementById("messageInput");
+      const sendButton = document.getElementById("sendButton");
+      const providerSelect = document.getElementById("providerSelect");
+      const streamToggle = document.getElementById("streamToggle");
+
+      let isProcessing = false;
+
+      // Auto-resize textarea
+      messageInput.addEventListener("input", () => {
+        messageInput.style.height = "auto";
+        messageInput.style.height =
+          Math.min(messageInput.scrollHeight, 150) + "px";
+      });
+
+      // Handle Enter key
+      messageInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      sendButton.addEventListener("click", sendMessage);
+
+      function addMessage(content, type, meta = null) {
+        // Remove empty state if present
+        const emptyState = messagesContainer.querySelector(".empty-state");
+        if (emptyState) emptyState.remove();
+
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = content;
+
+        if (meta) {
+          const metaDiv = document.createElement("div");
+          metaDiv.className = "meta";
+          metaDiv.textContent = meta;
+          messageDiv.appendChild(metaDiv);
+        }
+
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        return messageDiv;
+      }
+
+      function showTypingIndicator() {
+        const indicator = document.createElement("div");
+        indicator.className = "message assistant typing-indicator";
+        indicator.id = "typingIndicator";
+        indicator.innerHTML = "<span></span><span></span><span></span>";
+        messagesContainer.appendChild(indicator);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      function hideTypingIndicator() {
+        const indicator = document.getElementById("typingIndicator");
+        if (indicator) indicator.remove();
+      }
+
+      async function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message || isProcessing) return;
+
+        isProcessing = true;
+        sendButton.disabled = true;
+        messageInput.value = "";
+        messageInput.style.height = "auto";
+
+        // Add user message
+        addMessage(message, "user");
+
+        const provider = providerSelect.value || undefined;
+        const useStreaming = streamToggle.checked;
+
+        if (useStreaming) {
+          await sendStreamingMessage(message, provider);
+        } else {
+          await sendStandardMessage(message, provider);
+        }
+
+        isProcessing = false;
+        sendButton.disabled = false;
+        messageInput.focus();
+      }
+
+      async function sendStandardMessage(message, provider) {
+        showTypingIndicator();
+
+        try {
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message, provider }),
+          });
+
+          hideTypingIndicator();
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.details || error.error || "Request failed");
+          }
+
+          const data = await response.json();
+          addMessage(
+            data.response,
+            "assistant",
+            `${data.provider} / ${data.model}`,
+          );
+        } catch (error) {
+          hideTypingIndicator();
+          addMessage(`Error: ${error.message}`, "error");
+        }
+      }
+
+      async function sendStreamingMessage(message, provider) {
+        // Remove empty state if present
+        const emptyState = messagesContainer.querySelector(".empty-state");
+        if (emptyState) emptyState.remove();
+
+        // Create assistant message div for streaming
+        const assistantDiv = document.createElement("div");
+        assistantDiv.className = "message assistant";
+        messagesContainer.appendChild(assistantDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        try {
+          const response = await fetch("/api/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message, provider }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.details || error.error || "Request failed");
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let fullText = "";
+          let meta = null;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6);
+                if (data === "[DONE]") continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.type === "text") {
+                    fullText += parsed.content;
+                    assistantDiv.textContent = fullText;
+                    messagesContainer.scrollTop =
+                      messagesContainer.scrollHeight;
+                  } else if (parsed.type === "done") {
+                    meta = `${parsed.provider} / ${parsed.model}`;
+                  } else if (parsed.type === "error") {
+                    throw new Error(parsed.error);
+                  }
+                } catch (e) {
+                  if (e.message !== "Unexpected end of JSON input") {
+                    console.error("Parse error:", e);
+                  }
+                }
+              }
+            }
+          }
+
+          // Add metadata
+          if (meta) {
+            const metaDiv = document.createElement("div");
+            metaDiv.className = "meta";
+            metaDiv.textContent = meta;
+            assistantDiv.appendChild(metaDiv);
+          }
+        } catch (error) {
+          assistantDiv.remove();
+          addMessage(`Error: ${error.message}`, "error");
+        }
+      }
+
+      // Load available providers on startup
+      async function loadProviders() {
+        try {
+          const response = await fetch("/api/chat/providers");
+          const data = await response.json();
+
+          if (data.providers && data.providers.length > 0) {
+            // Update select options based on available providers
+            const options = providerSelect.querySelectorAll("option");
+            options.forEach((option) => {
+              if (option.value && !data.providers.includes(option.value)) {
+                option.disabled = true;
+                option.textContent += " (not configured)";
+              }
+            });
+          }
+        } catch (error) {
+          console.error("Failed to load providers:", error);
+        }
+      }
+
+      loadProviders();
+    </script>
+  </body>
+</html>

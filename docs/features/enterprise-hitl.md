@@ -8,15 +8,12 @@ keywords: hitl, human in the loop, enterprise, compliance, approval workflow, au
 
 > **Since**: v7.39.0 | **Status**: Production Ready | **Availability**: SDK & CLI
 
-> **Planned Feature - Enterprise HITL**
->
-> This document describes planned enterprise HITL features that are not yet implemented.
-> The features below represent the target API design for future releases.
->
-> **Currently Available:** Basic HITL with `dangerousActions`, `timeout`, `autoApproveOnTimeout`,
-> `allowArgumentModification`, and `auditLogging`. See [Basic HITL Guide](./hitl.md).
->
-> **Tracking Issue:** [GitHub Issue #XXX](link)
+!!! note "Feature Status - Enterprise HITL"
+This document describes enterprise HITL features. Some advanced features (marked as "Planned")
+are not yet implemented and represent the target API design for future releases.
+
+    **Currently Available:** Basic HITL with `dangerousActions`, `timeout`, `autoApproveOnTimeout`,
+    `allowArgumentModification`, and `auditLogging`. See [Basic HITL Guide](./hitl.md).
 
 ---
 
@@ -171,7 +168,7 @@ try {
 
 HITL supports both synchronous (blocking) and asynchronous (non-blocking) approval patterns:
 
-#### Synchronous Approval (Blocking) (Planned)
+#### Synchronous Approval (Blocking)
 
 AI operation pauses until human approves or rejects:
 
@@ -195,7 +192,7 @@ const neurolink = new NeuroLink({
 - Interactive applications with user present
 - High-risk actions requiring instant validation
 
-#### Asynchronous Approval (Non-blocking) (Planned)
+#### Asynchronous Approval (Non-blocking)
 
 AI operation returns pending status, continues when approved:
 
@@ -373,26 +370,26 @@ const neurolink = new NeuroLink({
 Complete configuration interface:
 
 ```typescript
-type HITLConfig = {
+interface HITLConfiguration {
   // Core settings
   enabled: boolean;
-  mode?: "synchronous" | "asynchronous"; // (Planned)
+  mode?: "synchronous" | "asynchronous"; // (Planned feature)
   timeout?: number; // milliseconds
 
   // Approval triggers
   requireApproval?: string[]; // Tool names
-  confidenceThreshold?: number; // 0-1 (Planned)
-  contentPatterns?: RegExp[]; // (Planned)
+  confidenceThreshold?: number; // 0-1 (Planned feature)
+  contentPatterns?: RegExp[]; // (Planned feature)
 
-  // Callbacks (Planned)
+  // Callbacks
   reviewCallback: (
     action: HITLAction,
     context: HITLContext,
   ) => Promise<HITLReviewResult>;
 
-  statusCallback?: (reviewId: string) => Promise<HITLReviewStatus>; // (Planned)
+  statusCallback?: (reviewId: string) => Promise<HITLReviewStatus>; // (Planned feature)
 
-  // Escalation (Planned)
+  // Escalation (Planned feature)
   escalationPolicy?: {
     onTimeout: "approve" | "reject" | "escalate";
     escalationLevels?: EscalationLevel[];
@@ -404,29 +401,29 @@ type HITLConfig = {
     storage: "file" | "database" | "custom";
     customLogger?: (entry: AuditEntry) => Promise<void>;
   };
-};
+}
 
-type HITLAction = {
+interface HITLAction {
   tool: string;
   args: Record<string, any>;
   timestamp: Date;
   sessionId: string;
-};
+}
 
-type HITLContext = {
+interface HITLContext {
   aiConfidence?: number;
   provider: string;
   model: string;
   escalationLevel?: number;
-};
+}
 
-type HITLReviewResult = {
+interface HITLReviewResult {
   approved: boolean;
   reason?: string;
   reviewer?: string;
   modifications?: Record<string, any>;
   escalate?: boolean;
-};
+}
 ```
 
 ### Approval Callback Patterns
@@ -948,26 +945,26 @@ const result = await codeAI.generate({
 Complete TypeScript interface with all available options:
 
 ```typescript
-type HITLConfig = {
+interface HITLConfiguration {
   // === Core Settings ===
   enabled: boolean;
-  mode?: "synchronous" | "asynchronous"; // (Planned)
+  mode?: "synchronous" | "asynchronous"; // (Planned feature)
   timeout?: number; // Default: 300000 (5 minutes)
 
   // === Approval Triggers ===
   requireApproval?: string[]; // Tool names requiring approval
-  confidenceThreshold?: number; // 0-1, trigger review if AI confidence below (Planned)
-  contentPatterns?: RegExp[]; // Patterns that trigger review (Planned)
+  confidenceThreshold?: number; // 0-1, trigger review if AI confidence below (Planned feature)
+  contentPatterns?: RegExp[]; // Patterns that trigger review (Planned feature)
 
-  // === Callbacks (Planned) ===
+  // === Callbacks ===
   reviewCallback: (
     action: HITLAction,
     context: HITLContext,
   ) => Promise<HITLReviewResult>;
 
-  statusCallback?: (reviewId: string) => Promise<HITLReviewStatus>; // (Planned)
+  statusCallback?: (reviewId: string) => Promise<HITLReviewStatus>; // (Planned feature)
 
-  // === Escalation (Planned) ===
+  // === Escalation (Planned feature) ===
   escalationPolicy?: {
     onTimeout: "approve" | "reject" | "escalate";
     escalationLevels?: Array<{
@@ -994,7 +991,7 @@ type HITLConfig = {
     requireMFA?: boolean;
     ipWhitelist?: string[];
   };
-};
+}
 ```
 
 ### Environment Variables

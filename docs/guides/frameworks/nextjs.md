@@ -912,6 +912,7 @@ API_SECRET=your-secret-key
 - **[Streaming Guide](../../advanced/streaming.md)** - Streaming responses
 - **[Cost Optimization](../enterprise/cost-optimization.md)** - Reduce costs
 - **[Compliance Guide](../enterprise/compliance.md)** - Security and authentication
+- **[Fastify Integration](fastify.md)** - High-performance Node.js framework with schema validation
 
 ---
 

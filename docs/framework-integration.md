@@ -750,6 +750,110 @@ app.post("/api/ai/batch", async (req, res) => {
 });
 ```
 
+## Fastify Integration
+
+Fastify is a high-performance web framework for Node.js with built-in support for plugins, schema validation, and TypeScript. Its efficient architecture makes it ideal for AI-powered APIs.
+
+### Basic Server Setup
+
+```typescript
+import Fastify from "fastify";
+import { createBestAIProvider } from "@juspay/neurolink";
+
+const fastify = Fastify({ logger: true });
+
+// JSON Schema for request validation
+const generateSchema = {
+  body: {
+    type: "object",
+    required: ["prompt"],
+    properties: {
+      prompt: { type: "string" },
+      temperature: { type: "number", minimum: 0, maximum: 2 },
+      maxTokens: { type: "integer", minimum: 1 },
+    },
+  },
+};
+
+// Generation endpoint with schema validation
+fastify.post(
+  "/api/generate",
+  { schema: generateSchema },
+  async (request, reply) => {
+    const {
+      prompt,
+      temperature = 0.7,
+      maxTokens = 1000,
+    } = request.body as {
+      prompt: string;
+      temperature?: number;
+      maxTokens?: number;
+    };
+
+    try {
+      const provider = createBestAIProvider();
+      const result = await provider.generate({
+        input: { text: prompt },
+        temperature,
+        maxTokens,
+      });
+
+      return {
+        success: true,
+        text: result.text,
+        provider: result.provider,
+        usage: result.usage,
+      };
+    } catch (error) {
+      reply.status(500);
+      return { success: false, error: error.message };
+    }
+  },
+);
+
+// Streaming endpoint
+fastify.post("/api/stream", async (request, reply) => {
+  const { prompt } = request.body as { prompt: string };
+
+  try {
+    const provider = createBestAIProvider();
+    const result = await provider.stream({
+      input: { text: prompt },
+    });
+
+    reply.raw.setHeader("Content-Type", "text/plain");
+    reply.raw.setHeader("Cache-Control", "no-cache");
+
+    for await (const chunk of result.textStream) {
+      reply.raw.write(chunk);
+    }
+    reply.raw.end();
+  } catch (error) {
+    reply.status(500).send({ error: error.message });
+  }
+});
+
+// Health check endpoint
+fastify.get("/health", async () => {
+  return { status: "ok", timestamp: new Date().toISOString() };
+});
+
+// Start server
+const start = async () => {
+  try {
+    await fastify.listen({ port: 3000, host: "0.0.0.0" });
+    console.log("Fastify server running on http://localhost:3000");
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
+```
+
+[Full Fastify Guide](./guides/frameworks/fastify.md)
+
 ## React Hook (Universal)
 
 ### Custom Hook for AI Generation

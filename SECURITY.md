@@ -72,11 +72,21 @@ When using NeuroLink in production, follow these security best practices:
 NeuroLink includes a production-ready HITL system for high-stakes operations:
 
 ```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
 const neurolink = new NeuroLink({
   hitl: {
     enabled: true,
-    dangerousActions: ["delete", "remove", "drop", "truncate", "execute"],
-    timeout: 30000, // 30 seconds for user confirmation
+    dangerousActions: [
+      "write",
+      "execute",
+      "send",
+      "delete",
+      "database",
+      "drop",
+      "truncate",
+    ],
+    timeout: 60000, // 60 seconds for user response
     autoApproveOnTimeout: false, // Reject on timeout for safety
     allowArgumentModification: true, // Allow users to modify tool arguments
     auditLogging: true, // Enable audit logs for compliance
@@ -100,6 +110,7 @@ emitter.on("hitl:confirmation-request", async (event) => {
     payload: {
       confirmationId,
       approved,
+      reason: approved ? undefined : "Denied by security policy",
       metadata: { timestamp: new Date().toISOString() },
     },
   });
@@ -181,6 +192,7 @@ import { MiddlewareFactory } from "@juspay/neurolink";
 
 // Create middleware factory with guardrails configuration
 const factory = new MiddlewareFactory({
+  enabledMiddleware: ["guardrails"],
   middlewareConfig: {
     guardrails: {
       enabled: true,
@@ -191,6 +203,7 @@ const factory = new MiddlewareFactory({
         },
         modelFilter: {
           enabled: true,
+          filterModel: "gpt-3.5-turbo", // Use a fast model for content filtering
         },
         precallEvaluation: {
           enabled: true,

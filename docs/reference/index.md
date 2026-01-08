@@ -24,19 +24,25 @@ This section provides comprehensive reference materials for advanced usage, conf
 
   ***
 
-  Comprehensive audit of all 13 provider implementations with capability matrices and configuration examples.
+  Comprehensive audit of all 12 provider implementations with capability matrices and configuration examples.
 
 - :material-compare: **[Provider Comparison](provider-comparison.md)**
 
   ***
 
-  Detailed comparison of all 13 supported AI providers with features, costs, and recommendations.
+  Detailed comparison of all 12 supported AI providers with features, costs, and recommendations.
 
 - :material-frequently-asked-questions: **[FAQ](faq.md)**
 
   ***
 
   Frequently asked questions about NeuroLink features, limitations, and best practices.
+
+- :material-alert-circle: **[Error Codes](error-codes.md)**
+
+  ***
+
+  Complete error code reference with categorized codes, severity levels, and resolution guidance.
 
 </div>
 

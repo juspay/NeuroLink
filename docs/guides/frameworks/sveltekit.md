@@ -894,6 +894,7 @@ vercel env add JWT_SECRET
 - **[Streaming Guide](../../advanced/streaming.md)** - Real-time responses
 - **[Compliance Guide](../enterprise/compliance.md)** - Security and authentication
 - **[Cost Optimization](../enterprise/cost-optimization.md)** - Reduce costs
+- **[Fastify Integration](fastify.md)** - High-performance Node.js framework with schema validation
 
 ---
 

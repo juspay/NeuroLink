@@ -967,6 +967,7 @@ services:
 - **[Compliance Guide](../enterprise/compliance.md)** - Security and authentication
 - **[Cost Optimization](../enterprise/cost-optimization.md)** - Reduce costs
 - **[Monitoring](../enterprise/monitoring.md)** - Observability
+- [Fastify Integration](fastify.md) - High-performance alternative with schema validation
 
 ---
 

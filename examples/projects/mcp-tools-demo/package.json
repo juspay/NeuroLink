@@ -1,0 +1,31 @@
+{
+  "name": "neurolink-mcp-tools-demo",
+  "version": "1.0.0",
+  "description": "Demonstrates MCP (Model Context Protocol) tool integration patterns with NeuroLink",
+  "type": "module",
+  "scripts": {
+    "demo:built-in": "ts-node src/demo/built-in-tools.ts",
+    "demo:custom": "ts-node src/demo/custom-tools.ts",
+    "demo:external": "ts-node src/demo/external-mcp.ts",
+    "demo:http": "ts-node src/demo/http-transport.ts",
+    "start": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.1",
+    "@juspay/neurolink": "^8.32.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.2"
+  },
+  "keywords": [
+    "neurolink",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "tools"
+  ],
+  "license": "MIT"
+}

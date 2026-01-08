@@ -1,7 +1,7 @@
 ---
 title: Feature Guides
 description: In-depth guides for NeuroLink's latest capabilities and platform features
-keywords: features, capabilities, guides, tutorials, how-to, q3 2025, q4 2025, q1 2026, video generation, runway, image generation, gemini, http transport, mcp
+keywords: features, capabilities, guides, tutorials, how-to, q3 2025, q4 2025, q1 2026, image generation, gemini, http transport, mcp, audio input
 ---
 
 # Feature Guides
@@ -12,17 +12,19 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 
 ## Latest Features (Q1 2026)
 
-| Feature                                                                                    | Description                                                                                                       |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| :material-video: **[Video Generation](video-generation.md)**                               | Generate videos from text prompts using RunwayML (ML5, ML6 Turbo models) with full prompt and duration control.   |
-| :material-image-plus: **[Image Generation with Gemini](../image-generation-streaming.md)** | Native image generation using Gemini 2.0 Flash Experimental with imagen-3.0-generate-002 model.                   |
-| :material-web: **[HTTP/Streamable HTTP Transport for MCP](../mcp-http-transport.md)**      | Connect to remote MCP servers via HTTP with authentication, rate limiting, retry support, and session management. |
+| Feature                                                                                            | Description                                                                                                       |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| :material-video: **Video Generation** :material-clock-outline:{ .coming-soon title="Coming Soon" } | Generate videos from text prompts using RunwayML (ML5, ML6 Turbo models). _Coming Soon_                           |
+| :material-image-plus: **[Image Generation with Gemini](../image-generation-streaming.md)**         | Native image generation using Gemini 2.0 Flash Experimental with imagen-3.0-generate-002 model.                   |
+| :material-web: **[HTTP/Streamable HTTP Transport for MCP](../mcp-http-transport.md)**              | Connect to remote MCP servers via HTTP with authentication, rate limiting, retry support, and session management. |
+| :material-microphone: **[Audio Input](audio-input.md)**                                            | Real-time voice conversations with Gemini Live and audio streaming capabilities.                                  |
 
 **Q1 2026 Highlights:**
 
-- **Video Generation**: Create AI-generated videos with RunwayML integration supporting ML5 and ML6 Turbo models, customizable duration (5-10s), and watermark control
+- **Video Generation** _(Coming Soon)_: Create AI-generated videos with RunwayML integration supporting ML5 and ML6 Turbo models, customizable duration (5-10s), and watermark control
 - **Gemini Image Generation**: Native support for Google's imagen-3.0-generate-002 model through Gemini 2.0 Flash Experimental for high-quality image synthesis
 - **Remote MCP Servers**: HTTP/Streamable HTTP transport enables connecting to cloud-hosted MCP servers with Bearer token authentication, configurable rate limits, automatic retry with exponential backoff, and session management via `Mcp-Session-Id` header
+- **Audio Input**: Real-time voice conversations with Gemini Live API enabling bidirectional audio streaming for interactive voice-based AI experiences
 
 ---
 

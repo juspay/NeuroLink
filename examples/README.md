@@ -219,6 +219,26 @@ const result = await neurolink.generate({
 | SDK Integration    | ✅ Ready   | TypeScript/JavaScript SDK examples        |
 | External Tools     | 🔧 Coming  | Direct external tool execution (v1.8.0)   |
 
+## End-to-End Projects
+
+Complete, runnable example applications demonstrating NeuroLink integration patterns.
+
+| Project                                    | Description                             | Key Features                               |
+| ------------------------------------------ | --------------------------------------- | ------------------------------------------ |
+| [Chat Application](projects/chat-app/)     | Real-time chat with streaming responses | Streaming, Express, Provider selection     |
+| [MCP Tools Demo](projects/mcp-tools-demo/) | MCP tool integration examples           | Custom tools, External MCP, HTTP transport |
+| [Enterprise App](projects/enterprise-app/) | Production-ready enterprise patterns    | HITL, Redis memory, Audit logging, Docker  |
+
+### Running a Project
+
+```bash
+cd examples/projects/chat-app
+npm install
+cp .env.example .env
+# Add your API keys to .env
+npm run dev
+```
+
 ---
 
 **🚀 Start with `basic-usage.js` and `mcp-built-in-tools.js` to see NeuroLink in action!**

@@ -1,7 +1,7 @@
 <div align="center">
   <h1>🧠 NeuroLink</h1>
   <p><strong>The Enterprise AI SDK for Production Applications</strong></p>
-  <p>13 Providers | 58+ MCP Tools | HITL Security | Redis Persistence</p>
+  <p>12 Providers | 58+ MCP Tools | HITL Security | Redis Persistence</p>
 </div>
 
 <div align="center">
@@ -21,9 +21,9 @@ Enterprise AI development platform with unified provider access, production-read
 
 ## 🧠 What is NeuroLink?
 
-**NeuroLink is the universal AI integration platform that unifies 13 major AI providers and 100+ models under one consistent API.**
+**NeuroLink is the universal AI integration platform that unifies 12 major AI providers and 100+ models under one consistent API.**
 
-Extracted from production systems at Juspay and battle-tested at enterprise scale, NeuroLink provides a production-ready solution for integrating AI into any application. Whether you're building with OpenAI, Anthropic, Google, AWS Bedrock, Azure, or any of our 13 supported providers, NeuroLink gives you a single, consistent interface that works everywhere.
+Extracted from production systems at Juspay and battle-tested at enterprise scale, NeuroLink provides a production-ready solution for integrating AI into any application. Whether you're building with OpenAI, Anthropic, Google, AWS Bedrock, Azure, or any of our 12 supported providers, NeuroLink gives you a single, consistent interface that works everywhere.
 
 **Why NeuroLink?** Switch providers with a single parameter change, leverage 64+ built-in tools and MCP servers, deploy with confidence using enterprise features like Redis memory and multi-provider failover, and optimize costs automatically with intelligent routing. Use it via our professional CLI or TypeScript SDK—whichever fits your workflow.
 
@@ -35,20 +35,12 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 ## What's New (Q1 2026)
 
-| Feature                            | Version | Description                                                                                                                                                  | Guide                                                        |
-| ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| **Video Generation**               | v8.32.0 | Generate videos from text prompts using RunwayML integration with ML5 and ML6 Turbo models. Create cinematic content, product demos, and animated sequences. | [Video Generation Guide](docs/features/video-generation.md)  |
-| **Image Generation with Gemini**   | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI.               | [Image Generation Guide](docs/image-generation-streaming.md) |
-| **HTTP/Streamable HTTP Transport** | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.                | [HTTP Transport Guide](docs/mcp-http-transport.md)           |
+| Feature                            | Version | Description                                                                                                                                    | Guide                                                        |
+| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Image Generation with Gemini**   | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI. | [Image Generation Guide](docs/image-generation-streaming.md) |
+| **HTTP/Streamable HTTP Transport** | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.  | [HTTP Transport Guide](docs/mcp-http-transport.md)           |
 
 ```typescript
-// Video Generation (v8.32.0)
-const video = await neurolink.generateVideo({
-  prompt: "A serene mountain landscape at sunset",
-  model: "runway-ml6-turbo",
-  duration: 5,
-});
-
 // Image Generation with Gemini (v8.31.0)
 const image = await neurolink.generateImage({
   prompt: "A futuristic cityscape",
@@ -134,7 +126,7 @@ NeuroLink is a comprehensive AI development platform. Every feature below is pro
 
 ### 🤖 AI Provider Integration
 
-**13 providers unified under one API** - Switch providers with a single parameter change.
+**12 providers unified under one API** - Switch providers with a single parameter change.
 
 | Provider              | Models                             | Free Tier       | Tool Support | Status        | Documentation                                                           |
 | --------------------- | ---------------------------------- | --------------- | ------------ | ------------- | ----------------------------------------------------------------------- |
@@ -145,7 +137,6 @@ NeuroLink is a comprehensive AI development platform. Every feature below is pro
 | **Google Vertex**     | Gemini 3/2.5 (gemini-3-\*-preview) | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#vertex)            |
 | **Azure OpenAI**      | GPT-4, GPT-4o, o1                  | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#azure)             |
 | **LiteLLM**           | 100+ models unified                | Varies          | ✅ Full      | ✅ Production | [Setup Guide](docs/litellm-integration.md)                              |
-| **OpenRouter**        | 300+ models unified                | Varies          | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#openrouter)        |
 | **AWS SageMaker**     | Custom deployed models             | ❌              | ✅ Full      | ✅ Production | [Setup Guide](docs/sagemaker-integration.md)                            |
 | **Mistral AI**        | Mistral Large, Small               | ✅ Free Tier    | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#mistral)           |
 | **Hugging Face**      | 100,000+ models                    | ✅ Free         | ⚠️ Partial   | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#huggingface)       |
@@ -153,7 +144,7 @@ NeuroLink is a comprehensive AI development platform. Every feature below is pro
 | **OpenAI Compatible** | Any OpenAI-compatible endpoint     | Varies          | ✅ Full      | ✅ Production | [Setup Guide](docs/getting-started/provider-setup.md#openai-compatible) |
 
 **[📖 Provider Comparison Guide](docs/reference/provider-comparison.md)** - Detailed feature matrix and selection criteria
-**[🔬 Provider Feature Compatibility](docs/reference/provider-feature-compatibility.md)** - Test-based compatibility reference for all 19 features across 11 providers
+**[🔬 Provider Feature Compatibility](docs/reference/provider-feature-compatibility.md)** - Test-based compatibility reference for all 19 features across 12 providers
 
 ---
 
@@ -496,7 +487,7 @@ Full command and API breakdown lives in [`docs/cli/commands.md`](docs/cli/comman
 
 | Capability               | Highlights                                                                                                               |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| **Provider unification** | 13+ providers with automatic fallback, cost-aware routing, provider orchestration (Q3).                                  |
+| **Provider unification** | 12+ providers with automatic fallback, cost-aware routing, provider orchestration (Q3).                                  |
 | **Multimodal pipeline**  | Stream images + CSV data + PDF documents across providers with local/remote assets. Auto-detection for mixed file types. |
 | **Quality & governance** | Auto-evaluation engine (Q3), guardrails middleware (Q4), HITL workflows (Q4), audit logging.                             |
 | **Memory & context**     | Conversation memory, Mem0 integration, Redis history export (Q4), context summarization (Q4).                            |
