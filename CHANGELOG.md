@@ -1,3 +1,9 @@
+## [8.34.0](https://github.com/juspay/neurolink/compare/v8.33.0...v8.34.0) (2026-01-13)
+
+### Features
+
+- **(object):** use instance-specific timeout for tool discovery and ([ba1ae4c](https://github.com/juspay/neurolink/commit/ba1ae4c13feeb3513d6800776d50b5aca94d5460))
+
 ## [8.33.0](https://github.com/juspay/neurolink/compare/v8.32.0...v8.33.0) (2026-01-12)
 
 ### Features
