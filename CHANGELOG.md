@@ -1,3 +1,9 @@
+## [8.34.1](https://github.com/juspay/neurolink/compare/v8.34.0...v8.34.1) (2026-01-14)
+
+### Bug Fixes
+
+- **(dependancy):** add back text-to-speech to dependencies and added types to barrel import ([c4bc86b](https://github.com/juspay/neurolink/commit/c4bc86bbd3ca7fe59595c5fa3bc8c5583a2031a3))
+
 ## [8.34.0](https://github.com/juspay/neurolink/compare/v8.33.0...v8.34.0) (2026-01-13)
 
 ### Features
