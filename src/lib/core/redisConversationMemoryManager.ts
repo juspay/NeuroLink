@@ -458,6 +458,7 @@ export class RedisConversationMemoryManager {
         timestamp: this.generateTimestamp(),
         role: "assistant",
         content: options.aiResponse,
+        events: options.events || undefined,
       };
       conversation.messages.push(assistantMsg);
 

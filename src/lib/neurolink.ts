@@ -2992,13 +2992,74 @@ Current user's request: ${currentInput}`;
         let accumulatedContent = "";
         let chunkCount = 0;
 
+        const eventSequence: Array<{
+          type: string;
+          seq: number;
+          timestamp: number;
+          [key: string]: unknown;
+        }> = [];
+        let eventSeqCounter = 0;
+
+        const captureEvent = (type: string, data?: unknown) => {
+          eventSequence.push({
+            type,
+            seq: eventSeqCounter++,
+            timestamp: Date.now(),
+            ...(data && typeof data === "object" ? data : { data }),
+          });
+        };
+
+        const onResponseChunk = (...args: unknown[]) => {
+          const chunk = args[0] as string;
+          captureEvent("response:chunk", { content: chunk });
+        };
+        const onToolStart = (...args: unknown[]) => {
+          const data = args[0] as { toolName: string; timestamp: number };
+          captureEvent("tool:start", data);
+        };
+        const onToolEnd = (...args: unknown[]) => {
+          const data = args[0] as {
+            toolName: string;
+            success: boolean;
+            responseTime: number;
+            result?: { uiComponent?: boolean; [key: string]: unknown };
+            [key: string]: unknown;
+          };
+          captureEvent("tool:end", data);
+
+          if (data.result && data.result.uiComponent === true) {
+            captureEvent("ui-component", {
+              toolName: data.toolName,
+              componentData: data.result,
+              timestamp: Date.now(),
+            });
+          }
+        };
+        const onUIComponent = (...args: unknown[]) => {
+          captureEvent("ui-component", args[0]);
+        };
+        const onHITLRequest = (...args: unknown[]) => {
+          captureEvent("hitl:confirmation-request", args[0]);
+        };
+        const onHITLResponse = (...args: unknown[]) => {
+          captureEvent("hitl:confirmation-response", args[0]);
+        };
+
+        this.emitter.on("response:chunk", onResponseChunk);
+        this.emitter.on("tool:start", onToolStart);
+        this.emitter.on("tool:end", onToolEnd);
+        this.emitter.on("ui-component", onUIComponent);
+        this.emitter.on("hitl:confirmation-request", onHITLRequest);
+        this.emitter.on("hitl:confirmation-response", onHITLResponse);
+
         const metadata = {
           fallbackAttempted: false,
           guardrailsBlocked: false,
           error: undefined as string | undefined,
         };
 
-        const processedStream = (async function* (self: NeuroLink) {
+        const self = this;
+        const processedStream = (async function* () {
           try {
             for await (const chunk of mcpStream) {
               chunkCount++;
@@ -3102,6 +3163,13 @@ Current user's request: ${currentInput}`;
               }
             }
           } finally {
+            self.emitter.off("response:chunk", onResponseChunk);
+            self.emitter.off("tool:start", onToolStart);
+            self.emitter.off("tool:end", onToolEnd);
+            self.emitter.off("ui-component", onUIComponent);
+            self.emitter.off("hitl:confirmation-request", onHITLRequest);
+            self.emitter.off("hitl:confirmation-response", onHITLResponse);
+
             // Store memory after stream consumption is complete
             if (self.conversationMemory && enhancedOptions.context?.sessionId) {
               const sessionId = (
@@ -3127,7 +3195,17 @@ Current user's request: ${currentInput}`;
                   startTimeStamp: new Date(startTime),
                   providerDetails,
                   enableSummarization: enhancedOptions.enableSummarization,
+                  events: eventSequence.length > 0 ? eventSequence : undefined,
                 });
+
+                logger.debug(
+                  "[NeuroLink.stream] Stored conversation turn with events",
+                  {
+                    sessionId,
+                    eventCount: eventSequence.length,
+                    eventTypes: [...new Set(eventSequence.map((e) => e.type))],
+                  },
+                );
               } catch (error) {
                 logger.warn("Failed to store stream conversation turn", {
                   error: error instanceof Error ? error.message : String(error),
@@ -3162,7 +3240,7 @@ Current user's request: ${currentInput}`;
               });
             }
           }
-        })(this);
+        })();
         const streamResult = await this.processStreamResult(
           processedStream,
           enhancedOptions,
@@ -3181,6 +3259,7 @@ Current user's request: ${currentInput}`;
           fallback: metadata.fallbackAttempted,
           guardrailsBlocked: metadata.guardrailsBlocked,
           error: metadata.error,
+          events: eventSequence,
         });
       } catch (error) {
         return this.handleStreamError(
@@ -3377,6 +3456,12 @@ Current user's request: ${currentInput}`;
       fallback?: boolean;
       guardrailsBlocked?: boolean;
       error?: string;
+      events?: Array<{
+        type: string;
+        seq: number;
+        timestamp: number;
+        [key: string]: unknown;
+      }>;
     },
   ): StreamResult {
     return {
@@ -3389,6 +3474,8 @@ Current user's request: ${currentInput}`;
       toolResults: streamResult.toolResults,
       analytics: streamResult.analytics,
       evaluation: streamResult.evaluation,
+      events:
+        config.events && config.events.length > 0 ? config.events : undefined,
       metadata: {
         streamId: config.streamId,
         startTime: config.startTime,

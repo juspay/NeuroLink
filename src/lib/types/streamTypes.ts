@@ -460,6 +460,14 @@ export type StreamResult = {
   // Analytics and evaluation (available after stream completion)
   analytics?: AnalyticsData | Promise<AnalyticsData>;
   evaluation?: EvaluationData | Promise<EvaluationData>;
+
+  // Event sequence for chat history reconstruction
+  events?: Array<{
+    type: string;
+    seq: number;
+    timestamp: number;
+    [key: string]: unknown;
+  }>;
 };
 
 /**

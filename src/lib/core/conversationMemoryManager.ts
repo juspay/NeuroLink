@@ -99,6 +99,11 @@ export class ConversationMemoryManager {
         "assistant",
         tokenThreshold,
       );
+
+      if (options.events && options.events.length > 0) {
+        assistantMsg.events = options.events;
+      }
+
       session.messages.push(userMsg, assistantMsg);
       session.lastActivity = Date.now();
 

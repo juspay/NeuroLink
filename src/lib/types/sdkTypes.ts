@@ -193,4 +193,5 @@ export type {
   SessionMetadata,
   RedisConversationObject,
   RedisStorageConfig,
+  StoreConversationTurnOptions,
 } from "./conversation.js";

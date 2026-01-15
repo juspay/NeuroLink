@@ -146,6 +146,22 @@ export type ConversationMemoryStats = {
 };
 
 /**
+ * Stream event for event sequence tracking
+ * Used to reconstruct exact flow of streaming responses with proper ordering
+ * @since 8.21.0
+ */
+export type StreamEventSequence = {
+  /** Event type (text-chunk, ui-component, tool:start, tool:end, hitl:confirmation-request, etc.) */
+  type: string;
+  /** Sequence number for ordering events */
+  seq: number;
+  /** Timestamp when event occurred */
+  timestamp: number;
+  /** Event-specific data */
+  [key: string]: unknown;
+};
+
+/**
  * Chat message format for conversation history
  */
 export type ChatMessage = {
@@ -180,6 +196,14 @@ export type ChatMessage = {
     type?: string;
     error?: string;
   };
+
+  /**
+   * Event sequence for rich history reconstruction
+   * Stores ordered events (text-chunk, ui-component, tool calls, HITL, etc.)
+   * Enables proper ordering and complete context restoration
+   * @since 8.21.0
+   */
+  events?: StreamEventSequence[];
 
   /** Message metadata (NEW - for token-based memory) */
   metadata?: {
@@ -310,6 +334,7 @@ export type StoreConversationTurnOptions = {
   startTimeStamp?: Date;
   providerDetails?: ProviderDetails;
   enableSummarization?: boolean;
+  events?: StreamEventSequence[];
 };
 
 /**
