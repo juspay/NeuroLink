@@ -1,3 +1,9 @@
+## [8.35.0](https://github.com/juspay/neurolink/compare/v8.34.1...v8.35.0) (2026-01-15)
+
+### Features
+
+- **(history):** Added support for maintaning sequence in ai response in Chat History ([e29fcae](https://github.com/juspay/neurolink/commit/e29fcaec10d84e4319ebe75e94aa8f0a35773ff7))
+
 ## [8.34.1](https://github.com/juspay/neurolink/compare/v8.34.0...v8.34.1) (2026-01-14)
 
 ### Bug Fixes
