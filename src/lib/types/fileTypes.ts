@@ -131,6 +131,27 @@ export type PDFProcessorOptions = {
 };
 
 /**
+ * Aggregate PDF validation result
+ */
+export type AggregatePDFValidationResult = {
+  isValid: boolean;
+  totalSizeMB: number;
+  totalPages: number;
+  pdfCount: number;
+  warnings: string[];
+  error?: string;
+};
+
+/**
+ * PDF file info for aggregate validation
+ */
+export type PDFFileInfo = {
+  buffer: Buffer;
+  filename: string;
+  pageCount?: number | null;
+};
+
+/**
  * Audio provider configuration for transcription services
  *
  * Describes the capabilities and limitations of each audio transcription provider

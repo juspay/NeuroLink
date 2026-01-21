@@ -109,6 +109,15 @@ export const PDF_LIMITS = {
   MAX_SIZE_MB: 20,
   // Default maximum pages for image conversion
   DEFAULT_MAX_PAGES: 20,
+  // Aggregate limits for multiple PDFs in a single request
+  AGGREGATE: {
+    // Maximum total size across all PDFs (50MB)
+    MAX_TOTAL_SIZE_MB: 50,
+    // Maximum total pages across all PDFs (100 pages)
+    MAX_TOTAL_PAGES: 100,
+    // Warning threshold (80% of limit)
+    WARNING_THRESHOLD: 0.8,
+  },
 };
 
 // Performance and System Limits

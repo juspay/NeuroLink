@@ -12,6 +12,8 @@ import type {
   FileProcessingResult,
   PDFProviderConfig,
   PDFProcessorOptions,
+  AggregatePDFValidationResult,
+  PDFFileInfo,
 } from "../types/fileTypes.js";
 import { PDF_LIMITS } from "../core/constants.js";
 import { logger } from "./logger.js";
@@ -515,6 +517,186 @@ export class PDFProcessor {
     return Object.entries(PDF_PROVIDER_CONFIGS)
       .filter(([_, config]) => config.supportsNative)
       .map(([name]) => name);
+  }
+
+  // ============================================================================
+  // Aggregate PDF Validation (for multiple PDFs in a single request)
+  // ============================================================================
+
+  /**
+   * Validate aggregate limits across multiple PDFs
+   *
+   * This prevents users from bypassing per-PDF limits by sending many small PDFs.
+   * For example, sending 100 one-page PDFs instead of 1 hundred-page PDF.
+   *
+   * @param pdfFiles - Array of PDF file info (buffer, filename, pageCount)
+   * @param options - Optional configuration for custom limits
+   * @returns Validation result with totals, warnings, and any error
+   *
+   * @example
+   * ```typescript
+   * const result = PDFProcessor.validateAggregateLimits([
+   *   { buffer: pdf1Buffer, filename: 'doc1.pdf', pageCount: 10 },
+   *   { buffer: pdf2Buffer, filename: 'doc2.pdf', pageCount: 20 },
+   * ]);
+   *
+   * if (!result.isValid) {
+   *   throw new Error(result.error);
+   * }
+   *
+   * // Log warnings if approaching limits
+   * result.warnings.forEach(warning => logger.warn(warning));
+   * ```
+   */
+  static validateAggregateLimits(
+    pdfFiles: PDFFileInfo[],
+    options?: {
+      maxTotalSizeMB?: number;
+      maxTotalPages?: number;
+      warningThreshold?: number;
+    },
+  ): AggregatePDFValidationResult {
+    const maxTotalSizeMB =
+      options?.maxTotalSizeMB ?? PDF_LIMITS.AGGREGATE.MAX_TOTAL_SIZE_MB;
+    const maxTotalPages =
+      options?.maxTotalPages ?? PDF_LIMITS.AGGREGATE.MAX_TOTAL_PAGES;
+    const warningThreshold =
+      options?.warningThreshold ?? PDF_LIMITS.AGGREGATE.WARNING_THRESHOLD;
+
+    const warnings: string[] = [];
+    let totalSizeBytes = 0;
+    let totalPages = 0;
+
+    // Calculate aggregates
+    for (const pdf of pdfFiles) {
+      totalSizeBytes += pdf.buffer.length;
+      totalPages += pdf.pageCount ?? 0;
+    }
+
+    const totalSizeMB = totalSizeBytes / (1024 * 1024);
+    const pdfCount = pdfFiles.length;
+
+    // Check for aggregate size limit violation
+    if (totalSizeMB > maxTotalSizeMB) {
+      const fileList = pdfFiles
+        .map(
+          (p) =>
+            `  - ${p.filename}: ${(p.buffer.length / (1024 * 1024)).toFixed(2)}MB`,
+        )
+        .join("\n");
+
+      return {
+        isValid: false,
+        totalSizeMB,
+        totalPages,
+        pdfCount,
+        warnings,
+        error:
+          `Aggregate PDF size (${totalSizeMB.toFixed(2)}MB) exceeds the maximum limit of ${maxTotalSizeMB}MB.\n` +
+          `You have ${pdfCount} PDF(s) with a combined size that exceeds the limit.\n` +
+          `Individual PDF sizes:\n${fileList}\n\n` +
+          `Options:\n` +
+          `1. Reduce the number of PDFs in a single request\n` +
+          `2. Compress or split large PDFs\n` +
+          `3. Process PDFs in separate requests`,
+      };
+    }
+
+    // Check for aggregate page limit violation
+    if (totalPages > maxTotalPages) {
+      const fileList = pdfFiles
+        .map((p) => `  - ${p.filename}: ${p.pageCount ?? "unknown"} pages`)
+        .join("\n");
+
+      return {
+        isValid: false,
+        totalSizeMB,
+        totalPages,
+        pdfCount,
+        warnings,
+        error:
+          `Aggregate PDF page count (${totalPages}) exceeds the maximum limit of ${maxTotalPages} pages.\n` +
+          `You have ${pdfCount} PDF(s) with a combined page count that exceeds the limit.\n` +
+          `Individual PDF page counts:\n${fileList}\n\n` +
+          `Options:\n` +
+          `1. Reduce the number of PDFs in a single request\n` +
+          `2. Use PDFs with fewer pages\n` +
+          `3. Process PDFs in separate requests`,
+      };
+    }
+
+    // Check for warning thresholds (approaching limits)
+    const sizeRatio = totalSizeMB / maxTotalSizeMB;
+    const pageRatio = totalPages / maxTotalPages;
+
+    if (sizeRatio >= warningThreshold) {
+      warnings.push(
+        `[PDF] ⚠️ Aggregate PDF size (${totalSizeMB.toFixed(2)}MB) is approaching the limit of ${maxTotalSizeMB}MB ` +
+          `(${(sizeRatio * 100).toFixed(0)}% used)`,
+      );
+    }
+
+    if (pageRatio >= warningThreshold && totalPages > 0) {
+      warnings.push(
+        `[PDF] ⚠️ Aggregate PDF page count (${totalPages}) is approaching the limit of ${maxTotalPages} pages ` +
+          `(${(pageRatio * 100).toFixed(0)}% used)`,
+      );
+    }
+
+    // Log aggregate info for debugging
+    logger.debug("[PDF] Aggregate validation passed", {
+      pdfCount,
+      totalSizeMB: totalSizeMB.toFixed(2),
+      totalPages,
+      maxTotalSizeMB,
+      maxTotalPages,
+    });
+
+    return {
+      isValid: true,
+      totalSizeMB,
+      totalPages,
+      pdfCount,
+      warnings,
+    };
+  }
+
+  /**
+   * Validate and throw if aggregate limits are exceeded
+   *
+   * Convenience method that throws an error if validation fails.
+   * Use this for simple validation where you want to immediately reject invalid requests.
+   *
+   * @param pdfFiles - Array of PDF file info
+   * @param options - Optional configuration for custom limits
+   * @throws Error if aggregate limits are exceeded
+   */
+  static assertAggregateLimits(
+    pdfFiles: PDFFileInfo[],
+    options?: {
+      maxTotalSizeMB?: number;
+      maxTotalPages?: number;
+      warningThreshold?: number;
+    },
+  ): void {
+    const result = this.validateAggregateLimits(pdfFiles, options);
+
+    // Log warnings even if validation passes
+    for (const warning of result.warnings) {
+      logger.warn(warning);
+    }
+
+    if (!result.isValid && result.error) {
+      throw new Error(result.error);
+    }
+
+    // Log success for multiple PDFs
+    if (result.pdfCount > 1) {
+      logger.info(
+        `[PDF] ✅ Aggregate validation passed for ${result.pdfCount} PDFs ` +
+          `(${result.totalSizeMB.toFixed(2)}MB total, ${result.totalPages} pages)`,
+      );
+    }
   }
 }
 

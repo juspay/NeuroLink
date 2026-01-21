@@ -1,5 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PDFProcessor } from "../../../src/lib/utils/pdfProcessor.js";
+import { logger } from "../../../src/lib/utils/logger.js";
+
+// Mock the logger to capture warnings
+vi.mock("../../../src/lib/utils/logger.js", () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
 
 describe("PDFProcessor.convertToImages", () => {
   describe("empty PDF validation", () => {
@@ -193,5 +204,403 @@ describe("PDFProcessor.convertToImages", () => {
         expect((error as Error).message).not.toContain("Invalid format");
       }
     });
+  });
+});
+
+describe("PDFProcessor.validateAggregateLimits", () => {
+  // Helper to create mock PDF buffers of specific sizes
+  const createMockPdfBuffer = (sizeInMB: number): Buffer => {
+    const sizeInBytes = Math.floor(sizeInMB * 1024 * 1024);
+    const buffer = Buffer.alloc(sizeInBytes);
+    // Write PDF header to make it look like a valid PDF
+    buffer.write("%PDF-1.4", 0);
+    return buffer;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("single PDF validation", () => {
+    it("should pass for single PDF under limits", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(5),
+          filename: "doc1.pdf",
+          pageCount: 10,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.totalSizeMB).toBeCloseTo(5, 1);
+      expect(result.totalPages).toBe(10);
+      expect(result.pdfCount).toBe(1);
+      expect(result.error).toBeUndefined();
+    });
+  });
+
+  describe("multiple PDFs under aggregate limits", () => {
+    it("should pass for multiple PDFs under aggregate size limit", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(10),
+          filename: "doc1.pdf",
+          pageCount: 20,
+        },
+        {
+          buffer: createMockPdfBuffer(10),
+          filename: "doc2.pdf",
+          pageCount: 20,
+        },
+        {
+          buffer: createMockPdfBuffer(10),
+          filename: "doc3.pdf",
+          pageCount: 20,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.totalSizeMB).toBeCloseTo(30, 1);
+      expect(result.totalPages).toBe(60);
+      expect(result.pdfCount).toBe(3);
+    });
+
+    it("should pass for multiple PDFs under aggregate page limit", () => {
+      const pdfFiles = [
+        { buffer: createMockPdfBuffer(1), filename: "doc1.pdf", pageCount: 30 },
+        { buffer: createMockPdfBuffer(1), filename: "doc2.pdf", pageCount: 30 },
+        { buffer: createMockPdfBuffer(1), filename: "doc3.pdf", pageCount: 30 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.totalPages).toBe(90);
+    });
+  });
+
+  describe("aggregate size limit violations", () => {
+    it("should fail when aggregate size exceeds limit", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(20),
+          filename: "doc1.pdf",
+          pageCount: 10,
+        },
+        {
+          buffer: createMockPdfBuffer(20),
+          filename: "doc2.pdf",
+          pageCount: 10,
+        },
+        {
+          buffer: createMockPdfBuffer(20),
+          filename: "doc3.pdf",
+          pageCount: 10,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("Aggregate PDF size");
+      expect(result.error).toContain("exceeds the maximum limit");
+      expect(result.error).toContain("50MB");
+    });
+
+    it("should include individual PDF sizes in error message", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(30),
+          filename: "large1.pdf",
+          pageCount: 5,
+        },
+        {
+          buffer: createMockPdfBuffer(30),
+          filename: "large2.pdf",
+          pageCount: 5,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("large1.pdf");
+      expect(result.error).toContain("large2.pdf");
+      expect(result.error).toContain("30.00MB");
+    });
+  });
+
+  describe("aggregate page limit violations", () => {
+    it("should fail when aggregate pages exceed limit", () => {
+      // 5 PDFs with 25 pages each = 125 pages (exceeds 100 page limit)
+      const pdfFiles = [
+        { buffer: createMockPdfBuffer(1), filename: "doc1.pdf", pageCount: 25 },
+        { buffer: createMockPdfBuffer(1), filename: "doc2.pdf", pageCount: 25 },
+        { buffer: createMockPdfBuffer(1), filename: "doc3.pdf", pageCount: 25 },
+        { buffer: createMockPdfBuffer(1), filename: "doc4.pdf", pageCount: 25 },
+        { buffer: createMockPdfBuffer(1), filename: "doc5.pdf", pageCount: 25 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("Aggregate PDF page count");
+      expect(result.error).toContain("125");
+      expect(result.error).toContain("exceeds the maximum limit");
+      expect(result.error).toContain("100 pages");
+    });
+
+    it("should bypass per-PDF limit with many small PDFs (the fix scenario)", () => {
+      // This tests the exact scenario described in the issue:
+      // 100 one-page PDFs should fail aggregate validation even though each passes individual validation
+      const pdfFiles = Array.from({ length: 101 }, (_, i) => ({
+        buffer: createMockPdfBuffer(0.1), // Small 100KB PDFs
+        filename: `small-${i + 1}.pdf`,
+        pageCount: 1,
+      }));
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("101");
+      expect(result.error).toContain("exceeds the maximum limit");
+    });
+
+    it("should include individual PDF page counts in error message", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(1),
+          filename: "many-pages1.pdf",
+          pageCount: 60,
+        },
+        {
+          buffer: createMockPdfBuffer(1),
+          filename: "many-pages2.pdf",
+          pageCount: 60,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("many-pages1.pdf");
+      expect(result.error).toContain("many-pages2.pdf");
+      expect(result.error).toContain("60 pages");
+    });
+  });
+
+  describe("warning thresholds", () => {
+    it("should warn when approaching size limit (80%)", () => {
+      // 40MB = 80% of 50MB limit
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(20),
+          filename: "doc1.pdf",
+          pageCount: 10,
+        },
+        {
+          buffer: createMockPdfBuffer(20),
+          filename: "doc2.pdf",
+          pageCount: 10,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0]).toContain("approaching the limit");
+      expect(result.warnings[0]).toContain("50MB");
+    });
+
+    it("should warn when approaching page limit (80%)", () => {
+      // 80 pages = 80% of 100 page limit
+      const pdfFiles = [
+        { buffer: createMockPdfBuffer(1), filename: "doc1.pdf", pageCount: 40 },
+        { buffer: createMockPdfBuffer(1), filename: "doc2.pdf", pageCount: 40 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.warnings.some((w) => w.includes("page count"))).toBe(true);
+      expect(result.warnings.some((w) => w.includes("80"))).toBe(true);
+    });
+
+    it("should not warn when well below limits", () => {
+      const pdfFiles = [
+        { buffer: createMockPdfBuffer(5), filename: "doc1.pdf", pageCount: 10 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.warnings).toHaveLength(0);
+    });
+  });
+
+  describe("custom limits", () => {
+    it("should respect custom size limit", () => {
+      const pdfFiles = [
+        { buffer: createMockPdfBuffer(15), filename: "doc1.pdf", pageCount: 5 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles, {
+        maxTotalSizeMB: 10,
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("10MB");
+    });
+
+    it("should respect custom page limit", () => {
+      const pdfFiles = [
+        { buffer: createMockPdfBuffer(1), filename: "doc1.pdf", pageCount: 30 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles, {
+        maxTotalPages: 20,
+      });
+
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("20 pages");
+    });
+
+    it("should respect custom warning threshold", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(30),
+          filename: "doc1.pdf",
+          pageCount: 10,
+        },
+      ];
+
+      // 30MB = 60% of 50MB, but with 50% threshold should warn
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles, {
+        warningThreshold: 0.5,
+      });
+
+      expect(result.isValid).toBe(true);
+      expect(result.warnings.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle empty PDF array", () => {
+      const result = PDFProcessor.validateAggregateLimits([]);
+
+      expect(result.isValid).toBe(true);
+      expect(result.totalSizeMB).toBe(0);
+      expect(result.totalPages).toBe(0);
+      expect(result.pdfCount).toBe(0);
+    });
+
+    it("should handle PDFs with null/undefined page counts", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(1),
+          filename: "doc1.pdf",
+          pageCount: null,
+        },
+        {
+          buffer: createMockPdfBuffer(1),
+          filename: "doc2.pdf",
+          pageCount: undefined,
+        },
+        { buffer: createMockPdfBuffer(1), filename: "doc3.pdf", pageCount: 10 },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.totalPages).toBe(10); // Only counts the valid page count
+    });
+
+    it("should handle very small PDFs", () => {
+      const pdfFiles = [
+        {
+          buffer: createMockPdfBuffer(0.001),
+          filename: "tiny.pdf",
+          pageCount: 1,
+        },
+      ];
+
+      const result = PDFProcessor.validateAggregateLimits(pdfFiles);
+
+      expect(result.isValid).toBe(true);
+      expect(result.totalSizeMB).toBeCloseTo(0.001, 3);
+    });
+  });
+});
+
+describe("PDFProcessor.assertAggregateLimits", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const createMockPdfBuffer = (sizeInMB: number): Buffer => {
+    const sizeInBytes = Math.floor(sizeInMB * 1024 * 1024);
+    const buffer = Buffer.alloc(sizeInBytes);
+    buffer.write("%PDF-1.4", 0);
+    return buffer;
+  };
+
+  it("should not throw for valid PDFs", () => {
+    const pdfFiles = [
+      { buffer: createMockPdfBuffer(5), filename: "doc1.pdf", pageCount: 10 },
+    ];
+
+    expect(() => PDFProcessor.assertAggregateLimits(pdfFiles)).not.toThrow();
+  });
+
+  it("should throw for invalid aggregate size", () => {
+    const pdfFiles = [
+      { buffer: createMockPdfBuffer(30), filename: "doc1.pdf", pageCount: 10 },
+      { buffer: createMockPdfBuffer(30), filename: "doc2.pdf", pageCount: 10 },
+    ];
+
+    expect(() => PDFProcessor.assertAggregateLimits(pdfFiles)).toThrow(
+      /Aggregate PDF size.*exceeds/,
+    );
+  });
+
+  it("should throw for invalid aggregate pages", () => {
+    const pdfFiles = Array.from({ length: 20 }, (_, i) => ({
+      buffer: createMockPdfBuffer(0.5),
+      filename: `doc${i}.pdf`,
+      pageCount: 10,
+    }));
+
+    expect(() => PDFProcessor.assertAggregateLimits(pdfFiles)).toThrow(
+      /Aggregate PDF page count.*exceeds/,
+    );
+  });
+
+  it("should log warnings when approaching limits", () => {
+    const pdfFiles = [
+      { buffer: createMockPdfBuffer(20), filename: "doc1.pdf", pageCount: 40 },
+      { buffer: createMockPdfBuffer(20), filename: "doc2.pdf", pageCount: 40 },
+    ];
+
+    PDFProcessor.assertAggregateLimits(pdfFiles);
+
+    expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it("should log success for multiple PDFs", () => {
+    const pdfFiles = [
+      { buffer: createMockPdfBuffer(5), filename: "doc1.pdf", pageCount: 10 },
+      { buffer: createMockPdfBuffer(5), filename: "doc2.pdf", pageCount: 10 },
+    ];
+
+    PDFProcessor.assertAggregateLimits(pdfFiles);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("Aggregate validation passed"),
+    );
   });
 });

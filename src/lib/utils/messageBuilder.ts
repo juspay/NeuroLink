@@ -641,6 +641,11 @@ export async function buildMultimodalMessagesArray(
     }
   }
 
+  // Validate aggregate PDF limits (prevents bypass via multiple small PDFs)
+  if (pdfFiles.length > 0) {
+    PDFProcessor.assertAggregateLimits(pdfFiles);
+  }
+
   // Check if this is a multimodal request
   const hasImages =
     (options.input.images && options.input.images.length > 0) ||
