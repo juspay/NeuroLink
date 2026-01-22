@@ -14,6 +14,7 @@ import type {
   SessionMemory,
   StoreConversationTurnOptions,
 } from "../types/conversation.js";
+import type { TypedEventEmitter, NeuroLinkEvents } from "../types/common.js";
 import { ConversationMemoryError } from "../types/conversation.js";
 import type { PendingToolExecution } from "../types/tools.js";
 import {
@@ -51,6 +52,11 @@ export class RedisConversationMemoryManager {
     null;
 
   /**
+   * Event emitter for conversation memory events
+   */
+  private eventEmitter?: TypedEventEmitter<NeuroLinkEvents>;
+
+  /**
    * Temporary storage for tool execution data to prevent race conditions
    * Key format: "${sessionId}:${userId}"
    */
@@ -71,9 +77,11 @@ export class RedisConversationMemoryManager {
   constructor(
     config: ConversationMemoryConfig,
     redisConfig: RedisStorageConfig = {},
+    eventEmitter?: TypedEventEmitter<NeuroLinkEvents>,
   ) {
     this.config = config;
     this.redisConfig = getNormalizedConfig(redisConfig);
+    this.eventEmitter = eventEmitter;
   }
 
   /**
@@ -397,6 +405,15 @@ export class RedisConversationMemoryManager {
                   updatedRedisKey,
                   this.redisConfig.ttl,
                 );
+              }
+
+              if (this.eventEmitter) {
+                this.eventEmitter.emit("conversation:titleGenerated", {
+                  sessionId: options.sessionId,
+                  userId: normalizedUserId,
+                  title,
+                  timestamp: Date.now(),
+                });
               }
             }
           } catch (titleError) {
@@ -1016,12 +1033,12 @@ export class RedisConversationMemoryManager {
         conversationMemory: { enabled: false },
       });
 
-      const titlePrompt = `Generate a clear, concise, and descriptive title (5–8 words maximum) for a conversation based on the following user message. 
-The title must meaningfully reflect the topic or intent of the message. 
-Do not output anything unrelated, vague, or generic. 
-Do not say you cannot create a title. Always return a valid title.
+      const fallbackTitlePrompt = `\nYou are an expert at generating ultra-concise conversation titles.\n\nGenerate a single clear, descriptive title that accurately reflects the core topic of the user's message.\n\nStrict rules:\n- The title MUST be 18 characters or fewer (including spaces).\n- Output ONLY the title text (no quotes, no punctuation, no explanations).\n- Use natural words; abbreviations are allowed only if they improve clarity.\n- Avoid generic words like "issue", "problem", "help", or "discussion".\n- Do not say you cannot generate a title.\n- Always return exactly one valid title within the character limit.\n\nUser message:\n"${userMessage}"\n`;
 
-User message: "${userMessage}`;
+      const envPrompt = process.env.NEUROLINK_TITLE_PROMPT;
+      const titlePrompt = envPrompt
+        ? envPrompt.replace(/\$\{userMessage\}/g, userMessage)
+        : fallbackTitlePrompt;
 
       const result = await titleGenerator.generate({
         input: { text: titlePrompt },
