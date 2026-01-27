@@ -1,3 +1,9 @@
+## [8.39.0](https://github.com/juspay/neurolink/compare/v8.38.0...v8.39.0) (2026-01-27)
+
+### Features
+
+- **(ppt):** Implement SlideGenerator() for PPT Gen ([c804e97](https://github.com/juspay/neurolink/commit/c804e97ceda8d90bfc5ee5b976b1a8b3864f86ef))
+
 ## [8.38.0](https://github.com/juspay/neurolink/compare/v8.37.0...v8.38.0) (2026-01-23)
 
 ### Features
