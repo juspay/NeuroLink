@@ -1,3 +1,9 @@
+## [8.40.0](https://github.com/juspay/neurolink/compare/v8.39.0...v8.40.0) (2026-01-28)
+
+### Features
+
+- **(events):** Emit event when title generation is finished ([aab4a1f](https://github.com/juspay/neurolink/commit/aab4a1f9d336a9b1fa20a5b6196155ab1d8673ed))
+
 ## [8.39.0](https://github.com/juspay/neurolink/compare/v8.38.0...v8.39.0) (2026-01-27)
 
 ### Features
