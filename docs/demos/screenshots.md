@@ -6,8 +6,10 @@ Visual demonstration of NeuroLink's CLI, web interface, and integration capabili
 
 ### Help & Overview
 
-![CLI Help Command](../assets/images/cli-help-demo.png)
-_Comprehensive CLI help showing all available commands and options_
+<!-- Screenshot placeholder: CLI Help Command -->
+<!-- Image pending: ../assets/images/cli-help-demo.png -->
+
+_[Screenshot placeholder: Comprehensive CLI help showing all available commands and options]_
 
 **Key Features Shown:**
 
@@ -18,8 +20,10 @@ _Comprehensive CLI help showing all available commands and options_
 
 ### Provider Status & Connectivity
 
-![Provider Status](../assets/images/provider-status.png)
-_Real-time provider status showing connectivity and response times_
+<!-- Screenshot placeholder: Provider Status -->
+<!-- Image pending: ../assets/images/provider-status.png -->
+
+_[Screenshot placeholder: Real-time provider status showing connectivity and response times]_
 
 **Features Demonstrated:**
 
@@ -30,8 +34,10 @@ _Real-time provider status showing connectivity and response times_
 
 ### Text Generation Examples
 
-![Text Generation](../assets/images/text-generation.png)
-_Live text generation with multiple providers and analytics_
+<!-- Screenshot placeholder: Text Generation -->
+<!-- Image pending: ../assets/images/text-generation.png -->
+
+_[Screenshot placeholder: Live text generation with multiple providers and analytics]_
 
 **Capabilities Shown:**
 
@@ -44,8 +50,10 @@ _Live text generation with multiple providers and analytics_
 
 ### Performance Dashboard
 
-![Monitoring Analytics](../assets/images/monitoring-analytics.png)
-_Advanced analytics dashboard showing usage patterns and performance metrics_
+<!-- Screenshot placeholder: Monitoring Analytics -->
+<!-- Image pending: ../assets/images/monitoring-analytics.png -->
+
+_[Screenshot placeholder: Advanced analytics dashboard showing usage patterns and performance metrics]_
 
 **Analytics Features:**
 
@@ -56,8 +64,10 @@ _Advanced analytics dashboard showing usage patterns and performance metrics_
 
 ### MCP Tools Integration
 
-![MCP Tools](../assets/images/mcp-tools.png)
-_Model Context Protocol tools discovery and integration_
+<!-- Screenshot placeholder: MCP Tools -->
+<!-- Image pending: ../assets/images/mcp-tools.png -->
+
+_[Screenshot placeholder: Model Context Protocol tools discovery and integration]_
 
 **MCP Capabilities:**
 
@@ -70,8 +80,10 @@ _Model Context Protocol tools discovery and integration_
 
 ### Business Applications
 
-![Business Use Cases](../assets/images/business-use-cases.png)
-_Enterprise applications across different business functions_
+<!-- Screenshot placeholder: Business Use Cases -->
+<!-- Image pending: ../assets/images/business-use-cases.png -->
+
+_[Screenshot placeholder: Enterprise applications across different business functions]_
 
 **Business Scenarios:**
 
@@ -82,8 +94,10 @@ _Enterprise applications across different business functions_
 
 ### Developer Tools
 
-![Developer Tools](../assets/images/developer-tools.png)
-_Development workflow integration and code assistance_
+<!-- Screenshot placeholder: Developer Tools -->
+<!-- Image pending: ../assets/images/developer-tools.png -->
+
+_[Screenshot placeholder: Development workflow integration and code assistance]_
 
 **Developer Features:**
 
@@ -94,8 +108,10 @@ _Development workflow integration and code assistance_
 
 ### Creative Applications
 
-![Creative Tools](../assets/images/creative-tools.png)
-_Creative content generation and design assistance_
+<!-- Screenshot placeholder: Creative Tools -->
+<!-- Image pending: ../assets/images/creative-tools.png -->
+
+_[Screenshot placeholder: Creative content generation and design assistance]_
 
 **Creative Capabilities:**
 
@@ -129,8 +145,10 @@ _Demonstrates configuring multiple AI providers and managing their settings_
 
 ### Main Dashboard
 
-![Web Demo Overview](../assets/images/web-demo-overview.png)
-_Web interface showing the main dashboard with navigation and features_
+<!-- Screenshot placeholder: Web Demo Overview -->
+<!-- Image pending: ../assets/images/web-demo-overview.png -->
+
+_[Screenshot placeholder: Web interface showing the main dashboard with navigation and features]_
 
 **Web Interface Features:**
 

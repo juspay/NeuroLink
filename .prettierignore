@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 .svelte-kit/
+.docusaurus/
 .output/
 .vercel/
 .netlify/
@@ -42,6 +43,9 @@ neurolink-demo/screenshots/
 scripts/
 memory-bank/
 archive/
+
+# Generated documentation (synced from /docs)
+docs-site/docs/
 
 # Package files
 *.tgz

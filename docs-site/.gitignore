@@ -1,0 +1,4 @@
+# Docusaurus build artifacts
+.docusaurus/
+build/
+docs/
