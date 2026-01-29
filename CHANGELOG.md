@@ -1,3 +1,9 @@
+## [8.41.0](https://github.com/juspay/neurolink/compare/v8.40.1...v8.41.0) (2026-01-29)
+
+### Features
+
+- **(docs):** migrate documentation from MkDocs to Docusaurus v3 ([2f70a32](https://github.com/juspay/neurolink/commit/2f70a32d930eae2756e7785b12ee5912dd4ed5e2))
+
 ## [8.40.1](https://github.com/juspay/neurolink/compare/v8.40.0...v8.40.1) (2026-01-28)
 
 ### Bug Fixes
