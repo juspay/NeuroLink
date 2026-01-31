@@ -1,3 +1,9 @@
+## [8.41.1](https://github.com/juspay/neurolink/compare/v8.41.0...v8.41.1) (2026-01-31)
+
+### Bug Fixes
+
+- **(ci):** add fork detection to docs PR validation workflow ([6d1f9eb](https://github.com/juspay/neurolink/commit/6d1f9eb720dea1a5997e53cbcff8d6a5c86282cd))
+
 ## [8.41.0](https://github.com/juspay/neurolink/compare/v8.40.1...v8.41.0) (2026-01-29)
 
 ### Features
