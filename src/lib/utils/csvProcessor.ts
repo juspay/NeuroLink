@@ -11,7 +11,541 @@ import type {
   FileProcessingResult,
   CSVProcessorOptions,
   SampleDataFormat,
+  CSVColumnDataType,
+  CSVColumnMetadata,
+  CSVDataQualityWarning,
 } from "../types/fileTypes.js";
+
+// ============================================================================
+// Data Type Detection Patterns
+// ============================================================================
+
+const DATE_PATTERNS = [
+  { regex: /^\d{4}-\d{2}-\d{2}$/, format: "YYYY-MM-DD" },
+  { regex: /^\d{2}\/\d{2}\/\d{4}$/, format: "MM/DD/YYYY" },
+  { regex: /^\d{2}-\d{2}-\d{4}$/, format: "DD-MM-YYYY" },
+  { regex: /^\d{2}\.\d{2}\.\d{4}$/, format: "DD.MM.YYYY" },
+  { regex: /^\d{4}\/\d{2}\/\d{2}$/, format: "YYYY/MM/DD" },
+];
+
+const DATETIME_PATTERNS = [
+  { regex: /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/, format: "ISO8601" },
+  { regex: /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/, format: "MM/DD/YYYY HH:mm" },
+];
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_REGEX = /^(https?:\/\/|www\.)[^\s]+$/i;
+const INTEGER_REGEX = /^-?\d+$/;
+const FLOAT_REGEX = /^-?\d+\.\d+$/;
+const BOOLEAN_VALUES = new Set([
+  "true",
+  "false",
+  "yes",
+  "no",
+  "1",
+  "0",
+  "t",
+  "f",
+  "y",
+  "n",
+]);
+
+// ============================================================================
+// Column Name Validation
+// ============================================================================
+
+/**
+ * Validate column name and return issues
+ */
+function validateColumnName(name: string): string[] {
+  const issues: string[] = [];
+
+  if (!name || name.trim() === "") {
+    issues.push("Empty or blank column name");
+    return issues;
+  }
+
+  if (name !== name.trim()) {
+    issues.push("Leading or trailing whitespace");
+  }
+
+  if (/^\d/.test(name)) {
+    issues.push("Starts with a number");
+  }
+
+  if (/[^a-zA-Z0-9_\- ]/.test(name)) {
+    issues.push("Contains special characters");
+  }
+
+  if (name.length > 64) {
+    issues.push("Name exceeds 64 characters");
+  }
+
+  if (/\s{2,}/.test(name)) {
+    issues.push("Contains multiple consecutive spaces");
+  }
+
+  return issues;
+}
+
+// ============================================================================
+// Data Type Detection
+// ============================================================================
+
+/**
+ * Detect the data type of a single value
+ */
+function detectValueType(value: string): CSVColumnDataType {
+  if (value === "" || value === null || value === undefined) {
+    return "empty";
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed === "") {
+    return "empty";
+  }
+
+  // Check boolean first (before numbers since "1" and "0" could be both)
+  if (BOOLEAN_VALUES.has(trimmed.toLowerCase())) {
+    return "boolean";
+  }
+
+  // Check integer
+  if (INTEGER_REGEX.test(trimmed)) {
+    return "integer";
+  }
+
+  // Check float
+  if (FLOAT_REGEX.test(trimmed)) {
+    return "float";
+  }
+
+  // Check email
+  if (EMAIL_REGEX.test(trimmed)) {
+    return "email";
+  }
+
+  // Check URL
+  if (URL_REGEX.test(trimmed)) {
+    return "url";
+  }
+
+  // Check datetime (before date since datetime is more specific)
+  for (const pattern of DATETIME_PATTERNS) {
+    if (pattern.regex.test(trimmed)) {
+      return "datetime";
+    }
+  }
+
+  // Check date
+  for (const pattern of DATE_PATTERNS) {
+    if (pattern.regex.test(trimmed)) {
+      return "date";
+    }
+  }
+
+  return "string";
+}
+
+/**
+ * Detect date format from value
+ */
+function detectDateFormat(value: string): string | undefined {
+  const trimmed = value.trim();
+
+  for (const pattern of DATETIME_PATTERNS) {
+    if (pattern.regex.test(trimmed)) {
+      return pattern.format;
+    }
+  }
+
+  for (const pattern of DATE_PATTERNS) {
+    if (pattern.regex.test(trimmed)) {
+      return pattern.format;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Determine the predominant type for a column based on sampled values
+ */
+function determineColumnType(types: CSVColumnDataType[]): {
+  type: CSVColumnDataType;
+  confidence: number;
+} {
+  const nonEmpty = types.filter((t) => t !== "empty");
+
+  if (nonEmpty.length === 0) {
+    return { type: "empty", confidence: 100 };
+  }
+
+  // Count occurrences of each type
+  const typeCounts = new Map<CSVColumnDataType, number>();
+  for (const t of nonEmpty) {
+    typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
+  }
+
+  // Find the most common type
+  let maxType: CSVColumnDataType = "string";
+  let maxCount = 0;
+  for (const [type, count] of typeCounts) {
+    if (count > maxCount) {
+      maxCount = count;
+      maxType = type;
+    }
+  }
+
+  // Calculate confidence
+  const confidence = Math.round((maxCount / nonEmpty.length) * 100);
+
+  // Consolidate integer and float into number if the column contains only numeric types
+  // This check must happen before the mixed-type check to avoid classifying numeric-only columns as mixed
+  if (typeCounts.has("integer") && typeCounts.has("float")) {
+    // Check if these are the only two types (purely numeric column)
+    if (typeCounts.size === 2) {
+      const totalNumeric =
+        (typeCounts.get("integer") || 0) + (typeCounts.get("float") || 0);
+      const numericConfidence = Math.round(
+        (totalNumeric / nonEmpty.length) * 100,
+      );
+      return { type: "number", confidence: numericConfidence };
+    }
+  }
+
+  // If confidence is low and multiple types exist, mark as mixed
+  if (confidence < 70 && typeCounts.size > 1) {
+    return { type: "mixed", confidence };
+  }
+
+  return { type: maxType, confidence };
+}
+
+/**
+ * Analyze a single column and return rich metadata
+ */
+function analyzeColumn(
+  columnName: string,
+  columnIndex: number,
+  values: string[],
+): CSVColumnMetadata {
+  const types: CSVColumnDataType[] = [];
+  const uniqueValues = new Set<string>();
+  const numericValues: number[] = [];
+  let nullCount = 0;
+  let dateFormat: string | undefined;
+
+  for (const value of values) {
+    const trimmed = value?.trim() ?? "";
+
+    if (trimmed === "") {
+      nullCount++;
+      types.push("empty");
+      continue;
+    }
+
+    uniqueValues.add(trimmed);
+    const type = detectValueType(trimmed);
+    types.push(type);
+
+    // Collect numeric values for statistics
+    if (type === "integer" || type === "float") {
+      const num = parseFloat(trimmed);
+      if (!isNaN(num)) {
+        numericValues.push(num);
+      }
+    }
+
+    // Detect date format
+    if ((type === "date" || type === "datetime") && !dateFormat) {
+      dateFormat = detectDateFormat(trimmed);
+    }
+  }
+
+  const { type: detectedType, confidence } = determineColumnType(types);
+
+  // Get sample values (up to 5 unique non-empty)
+  const sampleValues = Array.from(uniqueValues).slice(0, 5);
+
+  // Calculate numeric statistics
+  let minValue: number | undefined;
+  let maxValue: number | undefined;
+  let avgValue: number | undefined;
+
+  if (numericValues.length > 0) {
+    minValue = Math.min(...numericValues);
+    maxValue = Math.max(...numericValues);
+    avgValue =
+      Math.round(
+        (numericValues.reduce((a, b) => a + b, 0) / numericValues.length) * 100,
+      ) / 100;
+  }
+
+  // Validate column name
+  const nameIssues = validateColumnName(columnName);
+
+  const metadata: CSVColumnMetadata = {
+    name: columnName,
+    index: columnIndex,
+    detectedType,
+    typeConfidence: confidence,
+    nullCount,
+    uniqueCount: uniqueValues.size,
+    sampleValues,
+  };
+
+  if (minValue !== undefined) {
+    metadata.minValue = minValue;
+  }
+  if (maxValue !== undefined) {
+    metadata.maxValue = maxValue;
+  }
+  if (avgValue !== undefined) {
+    metadata.avgValue = avgValue;
+  }
+  if (dateFormat) {
+    metadata.dateFormat = dateFormat;
+  }
+  if (nameIssues.length > 0) {
+    metadata.nameIssues = nameIssues;
+  }
+
+  return metadata;
+}
+
+/**
+ * Generate data quality warnings based on column analysis
+ */
+function generateDataQualityWarnings(
+  columns: CSVColumnMetadata[],
+  totalRows: number,
+): CSVDataQualityWarning[] {
+  const warnings: CSVDataQualityWarning[] = [];
+
+  for (const col of columns) {
+    // Check for high null rate (>20%)
+    const nullRate = totalRows > 0 ? col.nullCount / totalRows : 0;
+    if (nullRate > 0.2) {
+      warnings.push({
+        column: col.name,
+        type: "high_null_rate",
+        message: `Column has ${Math.round(nullRate * 100)}% empty/null values (${col.nullCount} of ${totalRows} rows)`,
+        severity: nullRate > 0.5 ? "warning" : "info",
+        affectedRows: col.nullCount,
+      });
+    }
+
+    // Check for invalid column names
+    if (col.nameIssues && col.nameIssues.length > 0) {
+      warnings.push({
+        column: col.name,
+        type: "invalid_name",
+        message: `Column name issues: ${col.nameIssues.join(", ")}`,
+        severity: col.name.trim() === "" ? "error" : "warning",
+      });
+    }
+
+    // Check for mixed types (low confidence)
+    if (col.detectedType === "mixed" || col.typeConfidence < 70) {
+      warnings.push({
+        column: col.name,
+        type: "mixed_types",
+        message: `Column has inconsistent data types (${col.typeConfidence}% confidence for ${col.detectedType})`,
+        severity: "warning",
+      });
+    }
+
+    // Check for potential duplicates (very low unique count)
+    if (totalRows > 10 && col.uniqueCount === 1 && col.nullCount === 0) {
+      warnings.push({
+        column: col.name,
+        type: "duplicates",
+        message: `All ${totalRows} rows have the same value`,
+        severity: "info",
+        affectedRows: totalRows,
+      });
+    }
+
+    // Check for all empty column
+    if (col.detectedType === "empty") {
+      warnings.push({
+        column: col.name,
+        type: "empty_values",
+        message: "Column is entirely empty",
+        severity: "warning",
+        affectedRows: totalRows,
+      });
+    }
+  }
+
+  return warnings;
+}
+
+/**
+ * Calculate overall data quality score
+ */
+function calculateDataQualityScore(
+  columns: CSVColumnMetadata[],
+  warnings: CSVDataQualityWarning[],
+  totalRows: number,
+): number {
+  if (columns.length === 0 || totalRows === 0) {
+    return 0;
+  }
+
+  let score = 100;
+
+  // Deduct for warnings
+  for (const warning of warnings) {
+    switch (warning.severity) {
+      case "error":
+        score -= 15;
+        break;
+      case "warning":
+        score -= 8;
+        break;
+      case "info":
+        score -= 3;
+        break;
+    }
+  }
+
+  // Deduct for overall null rate
+  const totalNulls = columns.reduce((sum, col) => sum + col.nullCount, 0);
+  const totalCells = columns.length * totalRows;
+  const overallNullRate = totalCells > 0 ? totalNulls / totalCells : 0;
+  score -= Math.round(overallNullRate * 30);
+
+  // Deduct for low type confidence
+  const avgConfidence =
+    columns.reduce((sum, col) => sum + col.typeConfidence, 0) / columns.length;
+  if (avgConfidence < 80) {
+    score -= Math.round((80 - avgConfidence) / 2);
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Analyze all columns in parsed CSV data
+ */
+function analyzeColumns(rows: unknown[]): {
+  columnMetadata: CSVColumnMetadata[];
+  dataQualityWarnings: CSVDataQualityWarning[];
+  dataQualityScore: number;
+} {
+  if (rows.length === 0) {
+    return {
+      columnMetadata: [],
+      dataQualityWarnings: [],
+      dataQualityScore: 0,
+    };
+  }
+
+  const columnNames = Object.keys(rows[0] as Record<string, unknown>);
+  const columnMetadata: CSVColumnMetadata[] = [];
+
+  for (let i = 0; i < columnNames.length; i++) {
+    const colName = columnNames[i];
+    const values = rows.map((row) =>
+      String((row as Record<string, unknown>)[colName] ?? ""),
+    );
+    columnMetadata.push(analyzeColumn(colName, i, values));
+  }
+
+  const dataQualityWarnings = generateDataQualityWarnings(
+    columnMetadata,
+    rows.length,
+  );
+  const dataQualityScore = calculateDataQualityScore(
+    columnMetadata,
+    dataQualityWarnings,
+    rows.length,
+  );
+
+  return {
+    columnMetadata,
+    dataQualityWarnings,
+    dataQualityScore,
+  };
+}
+
+/**
+ * Detect if the first row appears to be a header row
+ *
+ * Heuristics used:
+ * 1. Header values should be text/string type (not numbers, dates, emails, etc.)
+ * 2. Header values should be unique (no duplicate column names)
+ * 3. If data rows exist, headers should have different type profile than data
+ *
+ * @param headerValues - The values from the first row (potential headers)
+ * @param dataRows - Sample of data rows for comparison (optional)
+ * @returns true if the first row appears to be headers
+ */
+function detectHasHeaders(
+  headerValues: string[],
+  dataRows?: Record<string, unknown>[],
+): boolean {
+  if (headerValues.length === 0) {
+    return false;
+  }
+
+  // Check 1: All header values should look like text labels, not data values
+  let textLikeCount = 0;
+  for (const value of headerValues) {
+    const trimmed = value?.trim() ?? "";
+    if (trimmed === "") {
+      continue; // Empty headers are allowed but don't count toward text-like
+    }
+
+    const type = detectValueType(trimmed);
+    // Headers are typically strings - not numbers, dates, emails, URLs, or booleans
+    if (type === "string") {
+      textLikeCount++;
+    }
+  }
+
+  // If most header values are text-like (not numeric/date/etc.), likely headers
+  const nonEmptyHeaders = headerValues.filter((v) => v?.trim()).length;
+  if (nonEmptyHeaders === 0) {
+    return false;
+  }
+
+  const textRatio = textLikeCount / nonEmptyHeaders;
+
+  // Check 2: Headers should be unique
+  const uniqueHeaders = new Set(
+    headerValues.map((v) => v?.trim().toLowerCase()),
+  );
+  const hasUniqueHeaders = uniqueHeaders.size === headerValues.length;
+
+  // Check 3: Compare with data rows if available
+  if (dataRows && dataRows.length > 0) {
+    // If first data row has different type profile than headers, likely has headers
+    const firstDataRow = Object.values(dataRows[0] || {}).map((v) =>
+      String(v ?? ""),
+    );
+    let dataTextCount = 0;
+    for (const value of firstDataRow) {
+      const type = detectValueType(value?.trim() ?? "");
+      if (type === "string") {
+        dataTextCount++;
+      }
+    }
+    const dataTextRatio =
+      firstDataRow.length > 0 ? dataTextCount / firstDataRow.length : 0;
+
+    // If headers are mostly text but data has more varied types, likely has headers
+    if (textRatio > 0.7 && dataTextRatio < textRatio - 0.2) {
+      return true;
+    }
+  }
+
+  // Default: if >70% of header values are text-like and unique, assume headers
+  return textRatio >= 0.7 && hasUniqueHeaders;
+}
 
 /**
  * Detect if first line is CSV metadata (not actual data/headers)
@@ -149,6 +683,22 @@ export class CSVProcessor {
         truncated: wasTruncated,
       });
 
+      // Parse a sample for enhanced metadata analysis (raw format still benefits from column analysis)
+      const sampleForAnalysis = await this.parseCSVString(
+        limitedCSV,
+        Math.min(rowCount, 500),
+      );
+      const { columnMetadata, dataQualityWarnings, dataQualityScore } =
+        analyzeColumns(sampleForAnalysis);
+
+      // Log data quality summary
+      if (dataQualityWarnings.length > 0) {
+        logger.debug("[CSVProcessor] Data quality warnings detected", {
+          warningCount: dataQualityWarnings.length,
+          score: dataQualityScore,
+        });
+      }
+
       return {
         type: "csv",
         content: limitedCSV,
@@ -160,6 +710,14 @@ export class CSVProcessor {
           totalLines: limitedLines.length,
           columnCount: (limitedLines[0] || "").split(",").length,
           extension,
+          columnMetadata,
+          dataQualityWarnings,
+          dataQualityScore,
+          hasHeaders: detectHasHeaders(
+            (limitedLines[0] || "").split(","),
+            undefined,
+          ),
+          detectedDelimiter: ",",
         },
       };
     }
@@ -217,6 +775,18 @@ export class CSVProcessor {
       logger.warn("[CSVProcessor] CSV file contains no data rows");
     }
 
+    // Perform enhanced column analysis
+    const { columnMetadata, dataQualityWarnings, dataQualityScore } =
+      analyzeColumns(nonEmptyRows);
+
+    // Log data quality summary
+    if (dataQualityWarnings.length > 0) {
+      logger.debug("[CSVProcessor] Data quality warnings detected", {
+        warningCount: dataQualityWarnings.length,
+        score: dataQualityScore,
+      });
+    }
+
     // Format parsed data
     logger.debug(
       `[CSVProcessor] Converting ${rowCount} rows to ${formatStyle} format`,
@@ -233,6 +803,7 @@ export class CSVProcessor {
       columnCount,
       outputLength: formatted.length,
       hasEmptyColumns,
+      dataQualityScore,
     });
 
     return {
@@ -248,6 +819,14 @@ export class CSVProcessor {
         sampleData,
         hasEmptyColumns,
         extension,
+        columnMetadata,
+        dataQualityWarnings,
+        dataQualityScore,
+        hasHeaders: detectHasHeaders(
+          columnNames,
+          nonEmptyRows as Record<string, unknown>[],
+        ),
+        detectedDelimiter: ",",
       },
     };
   }
