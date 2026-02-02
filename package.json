@@ -199,7 +199,7 @@
     "dotenv": "^16.6.1",
     "exceljs": "^4.4.0",
     "google-auth-library": "^9.1.0",
-    "hono": "^4.6.0",
+    "hono": "^4.11.7",
     "inquirer": "^9.3.7",
     "json-schema-to-zod": "^2.6.1",
     "mammoth": "^1.11.0",
