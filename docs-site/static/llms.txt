@@ -2,7 +2,7 @@
 
 > Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI
 
-Generated: 2026-01-29T12:13:12.821Z
+Generated: 2026-02-02T15:12:46.394Z
 Full documentation: https://docs.neurolink.ink/llms-full.txt
 
 ---
@@ -800,8 +800,8 @@ npm install @juspay/neurolink
 
 Comprehensive guides for all NeuroLink features organized by category. Each guide includes setup, usage patterns, configuration, and troubleshooting.
 
------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-|  **Video Generation**  | Generate videos from text prompts using RunwayML (ML5, ML6 Turbo models).
+----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 

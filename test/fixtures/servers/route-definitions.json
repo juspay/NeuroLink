@@ -1,0 +1,486 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NeuroLink Server Adapter Route Definitions",
+  "description": "Sample route definitions for testing all route groups",
+  "version": "1.0.0",
+  "_note": "FIXTURE STATUS: This fixture is prepared for use but not yet imported by any test files. The loadTestFixture utility in server-test-utils.ts can load this file. See docs-site/docs/server-tests/TESTING.md for intended usage patterns.",
+
+  "routeGroups": {
+    "agent": {
+      "prefix": "/api/agent",
+      "description": "Agent execution and streaming endpoints",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api/agent/execute",
+          "description": "Execute agent with prompt",
+          "tags": ["agent"],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "oneOf": [
+                  { "type": "string" },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": { "type": "string" },
+                      "images": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "files": {
+                        "type": "array",
+                        "items": { "type": "string" }
+                      }
+                    },
+                    "required": ["text"]
+                  }
+                ]
+              },
+              "provider": { "type": "string" },
+              "model": { "type": "string" },
+              "systemPrompt": { "type": "string" },
+              "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+              "maxTokens": { "type": "integer", "minimum": 1 },
+              "tools": { "type": "array", "items": { "type": "string" } },
+              "stream": { "type": "boolean" },
+              "sessionId": { "type": "string" },
+              "userId": { "type": "string" }
+            },
+            "required": ["input"]
+          },
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "content": { "type": "string" },
+              "provider": { "type": "string" },
+              "model": { "type": "string" },
+              "usage": {
+                "type": "object",
+                "properties": {
+                  "input": { "type": "integer" },
+                  "output": { "type": "integer" },
+                  "total": { "type": "integer" }
+                }
+              },
+              "toolCalls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "arguments": { "type": "object" },
+                    "result": {}
+                  }
+                }
+              },
+              "finishReason": { "type": "string" }
+            },
+            "required": ["content", "provider", "model"]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/agent/stream",
+          "description": "Stream agent response",
+          "tags": ["agent", "streaming"],
+          "streaming": {
+            "enabled": true,
+            "contentType": "text/event-stream"
+          },
+          "requestSchema": {
+            "$ref": "#/routeGroups/agent/routes/0/requestSchema"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/agent/providers",
+          "description": "List available AI providers",
+          "tags": ["agent", "providers"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "providers": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "total": { "type": "integer" }
+            }
+          }
+        }
+      ]
+    },
+
+    "tools": {
+      "prefix": "/api/tools",
+      "description": "Tool listing, discovery, and execution endpoints",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/tools",
+          "description": "List all available tools",
+          "tags": ["tools"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "tools": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "inputSchema": { "type": "object" },
+                    "source": { "type": "string" }
+                  }
+                }
+              },
+              "total": { "type": "integer" }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tools/:name",
+          "description": "Get tool details by name",
+          "tags": ["tools"],
+          "pathParams": {
+            "name": { "type": "string", "description": "Tool name" }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tools/execute",
+          "description": "Execute a tool with arguments",
+          "tags": ["tools"],
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "arguments": { "type": "object" },
+              "sessionId": { "type": "string" },
+              "userId": { "type": "string" }
+            },
+            "required": ["name", "arguments"]
+          },
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": {},
+              "error": { "type": "string" },
+              "duration": { "type": "integer" },
+              "metadata": { "type": "object" }
+            },
+            "required": ["success", "duration"]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tools/:name/execute",
+          "description": "Execute a specific tool by name",
+          "tags": ["tools"],
+          "pathParams": {
+            "name": { "type": "string", "description": "Tool name" }
+          },
+          "requestSchema": {
+            "type": "object",
+            "description": "Tool arguments as key-value pairs"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tools/search",
+          "description": "Search tools by name or description",
+          "tags": ["tools"],
+          "queryParams": {
+            "q": { "type": "string", "description": "Search query" },
+            "source": { "type": "string", "description": "Filter by source" },
+            "limit": {
+              "type": "integer",
+              "description": "Max results (default: 50)"
+            }
+          }
+        }
+      ]
+    },
+
+    "mcp": {
+      "prefix": "/api/mcp",
+      "description": "MCP server management endpoints",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/mcp/servers",
+          "description": "List all MCP servers",
+          "tags": ["mcp"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "servers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "serverId": { "type": "string" },
+                    "name": { "type": "string" },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "connected",
+                        "disconnected",
+                        "connecting",
+                        "error"
+                      ]
+                    },
+                    "toolCount": { "type": "integer" },
+                    "lastHealthCheck": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": { "type": "string" }
+                  }
+                }
+              },
+              "total": { "type": "integer" }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/mcp/servers/:name",
+          "description": "Get MCP server status",
+          "tags": ["mcp"],
+          "pathParams": {
+            "name": { "type": "string", "description": "Server name" }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/mcp/servers/:name/reconnect",
+          "description": "Reconnect to an MCP server",
+          "tags": ["mcp"]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/mcp/servers/:name",
+          "description": "Remove an MCP server",
+          "tags": ["mcp"]
+        },
+        {
+          "method": "GET",
+          "path": "/api/mcp/servers/:name/tools",
+          "description": "List tools from a specific MCP server",
+          "tags": ["mcp", "tools"]
+        },
+        {
+          "method": "POST",
+          "path": "/api/mcp/servers/:name/tools/:toolName/execute",
+          "description": "Execute a tool from a specific MCP server",
+          "tags": ["mcp", "tools"],
+          "pathParams": {
+            "name": { "type": "string", "description": "Server name" },
+            "toolName": { "type": "string", "description": "Tool name" }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/mcp/health",
+          "description": "Health check for all MCP servers",
+          "tags": ["mcp", "health"]
+        }
+      ]
+    },
+
+    "memory": {
+      "prefix": "/api/memory",
+      "description": "Conversation memory management endpoints",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/memory/stats",
+          "description": "Get memory statistics",
+          "tags": ["memory"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "available": { "type": "boolean" },
+              "type": { "type": "string" },
+              "stats": { "type": "object" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/memory/sessions/:sessionId",
+          "description": "Clear a conversation session",
+          "tags": ["memory"],
+          "pathParams": {
+            "sessionId": {
+              "type": "string",
+              "description": "Session ID to clear"
+            }
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/memory/sessions",
+          "description": "Clear all conversation sessions",
+          "tags": ["memory"]
+        },
+        {
+          "method": "GET",
+          "path": "/api/memory/health",
+          "description": "Check memory system health",
+          "tags": ["memory", "health"]
+        }
+      ]
+    },
+
+    "health": {
+      "prefix": "/api/health",
+      "description": "Health check and system status endpoints",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/api/health",
+          "description": "Basic health check",
+          "tags": ["health"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["ok", "degraded", "unhealthy"]
+              },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "uptime": { "type": "number" },
+              "version": { "type": "string" }
+            },
+            "required": ["status", "timestamp", "uptime", "version"]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/health/live",
+          "description": "Kubernetes liveness probe",
+          "tags": ["health"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/health/ready",
+          "description": "Kubernetes readiness probe",
+          "tags": ["health"],
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "ready": { "type": "boolean" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "services": {
+                "type": "object",
+                "properties": {
+                  "neurolink": { "type": "boolean" },
+                  "tools": { "type": "boolean" },
+                  "externalServers": { "type": "boolean" }
+                }
+              }
+            },
+            "required": ["ready", "timestamp", "services"]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/health/startup",
+          "description": "Kubernetes startup probe",
+          "tags": ["health"]
+        },
+        {
+          "method": "GET",
+          "path": "/api/health/detailed",
+          "description": "Detailed health information",
+          "tags": ["health"]
+        },
+        {
+          "method": "GET",
+          "path": "/api/version",
+          "description": "Get version information",
+          "tags": ["health", "version"]
+        }
+      ]
+    }
+  },
+
+  "testScenarios": {
+    "agent": {
+      "validExecute": {
+        "description": "Valid agent execute request",
+        "request": {
+          "input": "What is the capital of France?",
+          "provider": "openai",
+          "model": "gpt-4"
+        },
+        "expectedStatus": 200
+      },
+      "streamingExecute": {
+        "description": "Streaming agent request",
+        "request": {
+          "input": "Tell me a story",
+          "stream": true
+        },
+        "expectedContentType": "text/event-stream"
+      },
+      "multimodalInput": {
+        "description": "Agent with images",
+        "request": {
+          "input": {
+            "text": "What is in this image?",
+            "images": ["base64-encoded-image"]
+          }
+        }
+      }
+    },
+    "tools": {
+      "listTools": {
+        "description": "List all tools",
+        "expectedStatus": 200,
+        "expectedFields": ["tools", "total"]
+      },
+      "executeBuiltIn": {
+        "description": "Execute built-in tool",
+        "request": {
+          "name": "calculateMath",
+          "arguments": { "expression": "2 + 2" }
+        },
+        "expectedStatus": 200
+      }
+    },
+    "mcp": {
+      "listServers": {
+        "description": "List MCP servers when none configured",
+        "expectedStatus": 200,
+        "expectedFields": ["servers", "total"]
+      }
+    },
+    "health": {
+      "basicHealth": {
+        "description": "Basic health check",
+        "expectedStatus": 200,
+        "expectedFields": ["status", "timestamp", "uptime", "version"]
+      },
+      "readiness": {
+        "description": "Readiness probe",
+        "expectedStatus": 200,
+        "expectedFields": ["ready", "services"]
+      }
+    }
+  }
+}

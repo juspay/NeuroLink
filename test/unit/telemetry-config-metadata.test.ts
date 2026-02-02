@@ -2,11 +2,19 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { TelemetryHandler } from "../../src/lib/core/modules/TelemetryHandler";
 import { AIProviderName } from "../../src/lib/constants/enums";
 import type { TextGenerationOptions, StreamOptions } from "../../src/lib/types";
+import type { NeuroLink } from "../../src/lib/neurolink";
+
+/**
+ * Mock interface for NeuroLink that only includes the methods used by TelemetryHandler
+ */
+interface MockNeuroLink extends Pick<NeuroLink, "isTelemetryEnabled"> {
+  isTelemetryEnabled: () => boolean;
+}
 
 // Mock NeuroLink instance
-const mockNeurolink = {
+const mockNeurolink: MockNeuroLink = {
   isTelemetryEnabled: () => true,
-} as any;
+};
 
 describe("TelemetryHandler - Custom Metadata Support", () => {
   let telemetryHandler: TelemetryHandler;
@@ -15,7 +23,7 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
     telemetryHandler = new TelemetryHandler(
       AIProviderName.OPENAI,
       "gpt-4",
-      mockNeurolink,
+      mockNeurolink as unknown as NeuroLink,
     );
   });
 
@@ -204,7 +212,7 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
       const options: StreamOptions = {
         input: { text: "test input" },
         context: { traceName: "test-trace" },
-        sessionId: {} as any, // Invalid type
+        sessionId: {} as unknown as string, // Invalid type - testing runtime behavior
       };
 
       const config = telemetryHandler.getTelemetryConfig(options);
@@ -213,6 +221,8 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
     });
 
     it("should handle system field conflicts - system metadata fields should not be overridden", () => {
+      // Testing that user-provided metadata cannot override system fields
+      // Using type assertions to simulate invalid user input at runtime
       const options: TextGenerationOptions = {
         prompt: "test prompt",
         context: {
@@ -220,9 +230,9 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
           metadata: {
             provider: "attempted-override",
             model: "attempted-override",
-            toolsEnabled: false as any,
-            neurolink: false as any,
-            operationType: "attempted-override" as any,
+            toolsEnabled: false as unknown as string,
+            neurolink: false as unknown as string,
+            operationType: "attempted-override",
             originalProvider: "attempted-override",
           },
         },
@@ -254,14 +264,14 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
     });
 
     it("should return undefined when telemetry is disabled", async () => {
-      const disabledNeurolink = {
+      const disabledNeurolink: MockNeuroLink = {
         isTelemetryEnabled: () => false,
-      } as any;
+      };
 
       const disabledHandler = new TelemetryHandler(
         AIProviderName.ANTHROPIC,
         "claude-3",
-        disabledNeurolink,
+        disabledNeurolink as unknown as NeuroLink,
       );
 
       const options: TextGenerationOptions = {
@@ -281,7 +291,7 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
       const anthropicHandler = new TelemetryHandler(
         AIProviderName.ANTHROPIC,
         "claude-3-opus-20240229",
-        mockNeurolink,
+        mockNeurolink as unknown as NeuroLink,
       );
 
       const options: StreamOptions = {

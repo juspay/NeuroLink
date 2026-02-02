@@ -1,7 +1,12 @@
 import type { ReactElement } from "react";
 import styles from "./SidebarBadge.module.css";
 
-export type BadgeType = "new" | "beta" | "deprecated" | "experimental";
+export type BadgeType =
+  | "new"
+  | "updated"
+  | "beta"
+  | "deprecated"
+  | "experimental";
 
 interface SidebarBadgeProps {
   type: BadgeType;
@@ -9,6 +14,7 @@ interface SidebarBadgeProps {
 
 const badgeLabels: Record<BadgeType, string> = {
   new: "new",
+  updated: "updated",
   beta: "beta",
   deprecated: "deprecated",
   experimental: "exp",
@@ -25,6 +31,7 @@ export function SidebarBadge({ type }: SidebarBadgeProps): ReactElement {
 // Regex patterns to match badge markers in labels
 const BADGE_PATTERNS: Record<BadgeType, RegExp> = {
   new: /\s*\[new\]\s*/i,
+  updated: /\s*\[updated\]\s*/i,
   beta: /\s*\[beta\]\s*/i,
   deprecated: /\s*\[deprecated\]\s*/i,
   experimental: /\s*\[experimental\]\s*/i,
@@ -37,15 +44,16 @@ interface ParsedLabel {
 
 /**
  * Parses a sidebar label to extract any badge markers.
- * Supports: [new], [beta], [deprecated], [experimental]
+ * Supports: [new], [updated], [beta], [deprecated], [experimental]
  *
  * Example:
  * - "My Feature [new]" -> { cleanLabel: "My Feature", badge: "new" }
+ * - "Updated Feature [updated]" -> { cleanLabel: "Updated Feature", badge: "updated" }
  * - "Old API [deprecated]" -> { cleanLabel: "Old API", badge: "deprecated" }
  *
  * Note: Badge priority is determined by iteration order of BADGE_PATTERNS.
  * If multiple badges are present in a label, only the first match is returned.
- * Current priority: new > beta > deprecated > experimental
+ * Current priority: new > updated > beta > deprecated > experimental
  */
 export function parseBadgeFromLabel(label: string): ParsedLabel {
   for (const [badgeType, pattern] of Object.entries(BADGE_PATTERNS)) {

@@ -1,0 +1,350 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NeuroLink Server Adapter Test Configurations",
+  "description": "Default test configurations for server adapter testing across all supported frameworks",
+  "version": "1.0.0",
+  "_note": "FIXTURE STATUS: This fixture is prepared for use but not yet imported by any test files. The loadTestFixture utility in server-test-utils.ts can load this file. See docs-site/docs/server-tests/TESTING.md for intended usage patterns.",
+
+  "frameworks": {
+    "hono": {
+      "port": 0,
+      "host": "127.0.0.1",
+      "basePath": "/api",
+      "enableSwagger": false,
+      "enableMetrics": false,
+      "disableBuiltInHealth": false,
+      "timeout": 30000,
+      "cors": {
+        "enabled": true,
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        "headers": ["Content-Type", "Authorization", "X-Request-ID"],
+        "credentials": false,
+        "maxAge": 86400
+      },
+      "rateLimit": {
+        "enabled": false,
+        "windowMs": 900000,
+        "maxRequests": 100,
+        "message": "Too many requests from this IP"
+      },
+      "bodyParser": {
+        "enabled": true,
+        "maxSize": "10mb",
+        "jsonLimit": "10mb",
+        "urlEncoded": true
+      },
+      "logging": {
+        "enabled": false,
+        "level": "info",
+        "includeBody": false,
+        "includeResponse": false
+      }
+    },
+
+    "express": {
+      "port": 0,
+      "host": "127.0.0.1",
+      "basePath": "/api",
+      "enableSwagger": false,
+      "enableMetrics": false,
+      "disableBuiltInHealth": false,
+      "timeout": 30000,
+      "cors": {
+        "enabled": true,
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        "headers": ["Content-Type", "Authorization", "X-Request-ID"],
+        "credentials": false,
+        "maxAge": 86400
+      },
+      "rateLimit": {
+        "enabled": false,
+        "windowMs": 900000,
+        "maxRequests": 100,
+        "message": "Too many requests from this IP"
+      },
+      "bodyParser": {
+        "enabled": true,
+        "maxSize": "10mb",
+        "jsonLimit": "10mb",
+        "urlEncoded": true
+      },
+      "logging": {
+        "enabled": false,
+        "level": "info",
+        "includeBody": false,
+        "includeResponse": false
+      }
+    },
+
+    "fastify": {
+      "port": 0,
+      "host": "127.0.0.1",
+      "basePath": "/api",
+      "enableSwagger": false,
+      "enableMetrics": false,
+      "disableBuiltInHealth": false,
+      "timeout": 30000,
+      "cors": {
+        "enabled": true,
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        "headers": ["Content-Type", "Authorization", "X-Request-ID"],
+        "credentials": false,
+        "maxAge": 86400
+      },
+      "rateLimit": {
+        "enabled": false,
+        "windowMs": 900000,
+        "maxRequests": 100,
+        "message": "Too many requests from this IP"
+      },
+      "bodyParser": {
+        "enabled": true,
+        "maxSize": "10mb",
+        "jsonLimit": "10mb",
+        "urlEncoded": true
+      },
+      "logging": {
+        "enabled": false,
+        "level": "info",
+        "includeBody": false,
+        "includeResponse": false
+      }
+    },
+
+    "koa": {
+      "port": 0,
+      "host": "127.0.0.1",
+      "basePath": "/api",
+      "enableSwagger": false,
+      "enableMetrics": false,
+      "disableBuiltInHealth": false,
+      "timeout": 30000,
+      "cors": {
+        "enabled": true,
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        "headers": ["Content-Type", "Authorization", "X-Request-ID"],
+        "credentials": false,
+        "maxAge": 86400
+      },
+      "rateLimit": {
+        "enabled": false,
+        "windowMs": 900000,
+        "maxRequests": 100,
+        "message": "Too many requests from this IP"
+      },
+      "bodyParser": {
+        "enabled": true,
+        "maxSize": "10mb",
+        "jsonLimit": "10mb",
+        "urlEncoded": true
+      },
+      "logging": {
+        "enabled": false,
+        "level": "info",
+        "includeBody": false,
+        "includeResponse": false
+      }
+    }
+  },
+
+  "testScenarios": {
+    "basic": {
+      "description": "Basic test configuration with minimal settings",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "enableSwagger": false,
+        "enableMetrics": false,
+        "logging": { "enabled": false },
+        "rateLimit": { "enabled": false },
+        "cors": { "enabled": true, "origins": ["*"] }
+      }
+    },
+
+    "withRateLimit": {
+      "description": "Configuration with rate limiting enabled",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "rateLimit": {
+          "enabled": true,
+          "windowMs": 60000,
+          "maxRequests": 10,
+          "message": "Rate limit exceeded for testing"
+        }
+      }
+    },
+
+    "withAuth": {
+      "description": "Configuration for authentication testing",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api"
+      },
+      "authConfig": {
+        "strategy": "bearer",
+        "required": true,
+        "headerName": "Authorization"
+      }
+    },
+
+    "withCORS": {
+      "description": "Configuration with strict CORS settings",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "cors": {
+          "enabled": true,
+          "origins": ["http://localhost:3000", "http://localhost:5173"],
+          "methods": ["GET", "POST"],
+          "credentials": true
+        }
+      }
+    },
+
+    "withMetrics": {
+      "description": "Configuration with metrics enabled",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "enableMetrics": true
+      }
+    },
+
+    "withSwagger": {
+      "description": "Configuration with OpenAPI/Swagger enabled",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "enableSwagger": true
+      }
+    },
+
+    "production": {
+      "description": "Production-like configuration for load testing",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "enableSwagger": false,
+        "enableMetrics": true,
+        "timeout": 60000,
+        "cors": {
+          "enabled": true,
+          "origins": ["https://app.example.com"],
+          "credentials": true
+        },
+        "rateLimit": {
+          "enabled": true,
+          "windowMs": 900000,
+          "maxRequests": 1000
+        },
+        "logging": {
+          "enabled": true,
+          "level": "warn",
+          "includeBody": false
+        }
+      }
+    },
+
+    "noHealthRoutes": {
+      "description": "Configuration without built-in health routes",
+      "config": {
+        "port": 0,
+        "host": "127.0.0.1",
+        "basePath": "/api",
+        "disableBuiltInHealth": true
+      }
+    }
+  },
+
+  "mockResponses": {
+    "generate": {
+      "success": {
+        "content": "This is a mocked AI response for testing.",
+        "provider": "openai",
+        "model": "gpt-4",
+        "usage": {
+          "input": 25,
+          "output": 50,
+          "total": 75
+        },
+        "finishReason": "stop"
+      },
+      "withToolCalls": {
+        "content": "I'll help you with that.",
+        "provider": "openai",
+        "model": "gpt-4",
+        "usage": {
+          "input": 50,
+          "output": 100,
+          "total": 150
+        },
+        "toolCalls": [
+          {
+            "name": "getCurrentTime",
+            "arguments": { "timezone": "UTC" },
+            "result": { "time": "2024-01-15T10:30:00Z" }
+          }
+        ],
+        "finishReason": "tool_calls"
+      }
+    },
+    "toolExecution": {
+      "success": {
+        "success": true,
+        "data": { "result": "Tool executed successfully" },
+        "duration": 150
+      },
+      "error": {
+        "success": false,
+        "error": "Tool execution failed: Invalid arguments",
+        "duration": 50
+      }
+    }
+  },
+
+  "testUsers": {
+    "admin": {
+      "id": "test-admin-001",
+      "email": "admin@test.neurolink.io",
+      "roles": ["admin", "developer"],
+      "permissions": ["read", "write", "delete", "admin"]
+    },
+    "developer": {
+      "id": "test-dev-001",
+      "email": "dev@test.neurolink.io",
+      "roles": ["developer"],
+      "permissions": ["read", "write"]
+    },
+    "readonly": {
+      "id": "test-readonly-001",
+      "email": "readonly@test.neurolink.io",
+      "roles": ["viewer"],
+      "permissions": ["read"]
+    },
+    "playground": {
+      "id": "playground",
+      "roles": ["developer"],
+      "permissions": ["read", "write"]
+    }
+  },
+
+  "testTokens": {
+    "validBearer": "test-bearer-token-valid-12345",
+    "invalidBearer": "test-bearer-token-invalid-99999",
+    "expiredBearer": "test-bearer-token-expired-00000",
+    "apiKey": "test-api-key-xyz789",
+    "invalidApiKey": "test-api-key-invalid"
+  }
+}

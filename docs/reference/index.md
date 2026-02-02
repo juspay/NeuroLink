@@ -56,6 +56,12 @@ This section provides comprehensive reference materials for advanced usage, conf
 
   Comprehensive guide to NeuroLink analytics, metrics, token tracking, cost monitoring, and observability integration.
 
+- :material-server: **[Server Configuration](/reference/server-configuration)** :material-new-box:{ .new-badge }
+
+  ***
+
+  Configuration reference for server adapters including Hono, Express, Fastify, and Koa framework integration.
+
 </div>
 
 ## 🔧 Quick Reference
@@ -109,6 +115,14 @@ neurolink config init              # Interactive setup
 neurolink mcp discover             # Find available servers
 neurolink mcp list                 # List installed servers
 neurolink mcp install <server>     # Install MCP server
+
+# Server Management
+neurolink serve                              # Start server (foreground)
+neurolink server start --port 3000           # Start server (background)
+neurolink server status                      # Check server status
+neurolink server routes                      # List API routes
+neurolink server config                      # View configuration
+neurolink server openapi -o api.json         # Generate OpenAPI spec
 ```
 
 ### SDK Quick Reference

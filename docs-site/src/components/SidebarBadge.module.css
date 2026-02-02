@@ -1,14 +1,14 @@
-/* Sidebar Badge Styles */
+/* Sidebar Badge Styles - Compact size for sidebar */
 .badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-size: 8px;
+  padding: 1px 4px;
+  border-radius: 3px;
   text-transform: uppercase;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin-left: auto;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   flex-shrink: 0;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 /* New badge - success/green theme */
@@ -16,6 +16,13 @@
   background: var(--neurolink-success-bg);
   color: var(--neurolink-success-text);
   border: 1px solid var(--neurolink-success-border);
+}
+
+/* Updated badge - info/cyan theme */
+.updated {
+  background: var(--neurolink-info-bg);
+  color: var(--neurolink-info-text);
+  border: 1px solid var(--neurolink-info-border);
 }
 
 /* Beta badge - info/blue theme */

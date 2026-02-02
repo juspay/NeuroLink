@@ -417,3 +417,193 @@ export async function generateText(
   const neurolink = new NeuroLink();
   return await neurolink.generateText(options);
 }
+
+// ============================================================================
+// SERVER ADAPTERS - HTTP API Framework Integration
+// ============================================================================
+
+/**
+ * Server Adapters for exposing NeuroLink as HTTP APIs
+ *
+ * Supports multiple frameworks: Hono, Express, Fastify, Koa
+ *
+ * @example
+ * ```typescript
+ * import { NeuroLink } from '@juspay/neurolink';
+ * import { createServer } from '@juspay/neurolink/server';
+ *
+ * const neurolink = new NeuroLink({ provider: 'openai' });
+ * const server = await createServer(neurolink, {
+ *   framework: 'hono',
+ *   config: { port: 3000 }
+ * });
+ * await server.start();
+ * ```
+ */
+export {
+  // Server Factory
+  createServer,
+  ServerAdapterFactory,
+  // Framework Adapters
+  BaseServerAdapter,
+  HonoServerAdapter,
+  ExpressServerAdapter,
+  FastifyServerAdapter,
+  KoaServerAdapter,
+  // Routes
+  createAgentRoutes,
+  createAllRoutes,
+  createHealthRoutes,
+  createMCPRoutes,
+  createMemoryRoutes,
+  createToolRoutes,
+  registerAllRoutes,
+  // Middleware
+  createAuthMiddleware,
+  createRoleMiddleware,
+  createRateLimitMiddleware,
+  createSlidingWindowRateLimitMiddleware,
+  InMemoryRateLimitStore,
+  RateLimitError,
+  createCacheMiddleware,
+  createCacheInvalidator,
+  InMemoryCacheStore,
+  createRequestValidationMiddleware,
+  createFieldValidator,
+  ValidationError,
+  createTimingMiddleware,
+  createRequestIdMiddleware,
+  createErrorHandlingMiddleware,
+  createSecurityHeadersMiddleware,
+  createLoggingMiddleware,
+  createCompressionMiddleware,
+  // Validation
+  AgentExecuteRequestSchema,
+  createErrorResponse,
+  ServerNameParamSchema,
+  SessionIdParamSchema,
+  ToolArgumentsSchema,
+  ToolExecuteRequestSchema,
+  ToolNameParamSchema,
+  ToolSearchQuerySchema,
+  validateParams,
+  validateQuery,
+  validateRequest,
+  // OpenAPI
+  OpenAPIGenerator,
+  createOpenAPIGenerator,
+  generateOpenAPISpec,
+  generateOpenAPIFromConfig,
+  // Streaming
+  createDataStreamWriter,
+  DataStreamResponse,
+  createDataStreamResponse,
+  pipeAsyncIterableToDataStream,
+  createSSEHeaders,
+  createNDJSONHeaders,
+  // WebSocket
+  WebSocketConnectionManager,
+  WebSocketMessageRouter,
+  createAgentWebSocketHandler,
+  // Errors
+  ServerAdapterError,
+  ConfigurationError,
+  RouteConflictError,
+  RouteNotFoundError,
+  ServerValidationError,
+  AuthenticationError,
+  InvalidAuthenticationError,
+  AuthorizationError,
+  ServerRateLimitError,
+  TimeoutError,
+  HandlerError,
+  StreamingError,
+  StreamAbortedError,
+  WebSocketError,
+  WebSocketConnectionError,
+  ServerStartError,
+  ServerStopError,
+  AlreadyRunningError,
+  NotRunningError,
+  MissingDependencyError,
+  ErrorRecoveryStrategies,
+  wrapError,
+  // Error Constants
+  ErrorCategory,
+  ErrorSeverity,
+  ServerAdapterErrorCode,
+} from "./server/index.js";
+
+// Server Types
+export type {
+  AgentExecuteRequest,
+  AgentExecuteResponse,
+  BodyParserConfig,
+  CORSConfig,
+  DataStreamWriter,
+  HealthResponse,
+  HttpMethod,
+  LoggingConfig,
+  MCPServerStatusResponse,
+  MiddlewareDefinition,
+  MiddlewareHandler,
+  RateLimitConfig as ServerRateLimitConfig,
+  ReadyResponse,
+  RequiredServerAdapterConfig,
+  RouteDefinition,
+  RouteGroup,
+  RouteHandler,
+  ServerAdapterConfig,
+  ServerAdapterEvents,
+  ServerAdapterFactoryOptions,
+  ServerContext,
+  ServerFramework,
+  ServerResponse,
+  ServerStatus,
+  SSEWriteOptions,
+  StreamingConfig,
+  ToolExecuteRequest,
+  ToolExecuteResponse,
+  ErrorResponse,
+  ValidationResult,
+  AuthConfig,
+  AuthResult,
+  RateLimitMiddlewareConfig,
+  RateLimitStore,
+  CacheConfig,
+  CacheEntry,
+  CacheStore,
+  ValidationConfig,
+  ValidationSchema,
+  PropertySchema,
+  OpenAPIGeneratorConfig,
+  OpenAPISpec,
+  DataStreamEventType,
+  DataStreamEvent,
+  TextStartEvent,
+  TextDeltaEvent,
+  TextEndEvent,
+  ToolCallEvent,
+  ToolResultEvent,
+  DataEvent,
+  ErrorEvent,
+  FinishEvent,
+  DataStreamWriterConfig,
+  DataStreamResponseConfig,
+  // WebSocket Types
+  WebSocketConfig,
+  WebSocketHandler,
+  WebSocketConnection,
+  WebSocketMessage,
+  WebSocketMessageType,
+  AuthenticatedUser,
+  WebSocketAuthConfig,
+  AuthStrategy,
+  // Error Types
+  ErrorCategoryType,
+  ErrorSeverityType,
+  ServerAdapterErrorCodeType,
+  ServerAdapterErrorContext,
+  // Route Types
+  CreateRoutesOptions,
+} from "./server/index.js";

@@ -154,6 +154,11 @@
       "types": "./dist/cli/index.d.ts",
       "import": "./dist/cli/index.js",
       "default": "./dist/cli/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     }
   },
   "dependencies": {
@@ -194,6 +199,7 @@
     "dotenv": "^16.6.1",
     "exceljs": "^4.4.0",
     "google-auth-library": "^9.1.0",
+    "hono": "^4.6.0",
     "inquirer": "^9.3.7",
     "json-schema-to-zod": "^2.6.1",
     "mammoth": "^1.11.0",
@@ -217,7 +223,9 @@
     "@google-cloud/text-to-speech": "^5.0.0"
   },
   "optionalDependencies": {
-    "canvas": "^3.2.0"
+    "@hono/node-server": "^1.13.0",
+    "canvas": "^3.2.0",
+    "express-rate-limit": "^7.4.0"
   },
   "devDependencies": {
     "@actions/core": "^2.0.2",
@@ -227,6 +235,10 @@
     "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.7",
     "@eslint/js": "^9.35.0",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@koa/cors": "^5.0.0",
+    "@koa/router": "^15.3.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
@@ -242,6 +254,9 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/inquirer": "^9.0.9",
+    "@types/koa": "^3.0.1",
+    "@types/koa-bodyparser": "^4.3.13",
+    "@types/koa__cors": "^5.0.1",
     "@types/node": "^20.19.13",
     "@types/ws": "^8.18.1",
     "@types/xml2js": "^0.4.14",
@@ -250,11 +265,15 @@
     "@typescript-eslint/parser": "^8.43.0",
     "@vercel/ncc": "^0.38.4",
     "@vitest/coverage-v8": "^2.1.9",
+    "concurrently": "^8.2.2",
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "cors": "^2.8.5",
     "eslint": "^9.35.0",
     "express": "^5.1.0",
+    "fastify": "^5.7.2",
     "husky": "^9.1.7",
+    "koa": "^3.1.1",
+    "koa-bodyparser": "^4.4.1",
     "lint-staged": "^16.1.6",
     "playwright": "^1.55.0",
     "prettier": "^3.6.2",

@@ -35,13 +35,15 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 ## What's New (Q1 2026)
 
-| Feature                            | Version | Description                                                                                                                                    | Guide                                                        |
-| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Title Generation Events**        | v8.38.0 | Emit `conversation:titleGenerated` event when conversation title is generated. Supports custom title prompts via `NEUROLINK_TITLE_PROMPT`.     | [Conversation Memory Guide](docs/conversation-memory.md)     |
-| **Video Generation with Veo**      | v8.32.0 | Video generation using Veo 3.1 (`veo-3.1`). Realistic video generation with many parameter options                                             | [Video Generation Guide](docs/features/video-generation.md)  |
-| **Image Generation with Gemini**   | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI. | [Image Generation Guide](docs/image-generation-streaming.md) |
-| **HTTP/Streamable HTTP Transport** | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.  | [HTTP Transport Guide](docs/mcp-http-transport.md)           |
+| Feature                            | Version | Description                                                                                                                                    | Guide                                                         |
+| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Server Adapters**                | v8.41.0 | Multi-framework HTTP server with Hono, Express, Fastify, Koa support. Full CLI for server management with foreground/background modes.         | [Server Adapters Guide](docs/guides/server-adapters/index.md) |
+| **Title Generation Events**        | v8.38.0 | Emit `conversation:titleGenerated` event when conversation title is generated. Supports custom title prompts via `NEUROLINK_TITLE_PROMPT`.     | [Conversation Memory Guide](docs/conversation-memory.md)      |
+| **Video Generation with Veo**      | v8.32.0 | Video generation using Veo 3.1 (`veo-3.1`). Realistic video generation with many parameter options                                             | [Video Generation Guide](docs/features/video-generation.md)   |
+| **Image Generation with Gemini**   | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI. | [Image Generation Guide](docs/image-generation-streaming.md)  |
+| **HTTP/Streamable HTTP Transport** | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.  | [HTTP Transport Guide](docs/mcp-http-transport.md)            |
 
+- **Server Adapters** – Deploy NeuroLink as an HTTP API server with your framework of choice (Hono, Express, Fastify, Koa). Full CLI support with `serve` and `server` commands for foreground/background modes, route management, and OpenAPI generation. → [Server Adapters Guide](docs/guides/server-adapters/index.md)
 - **Title Generation Events** – Emit real-time events when conversation titles are auto-generated. Listen to `conversation:titleGenerated` for session tracking. → [Conversation Memory Guide](docs/conversation-memory.md#title-generation-events)
 - **Custom Title Prompts** – Customize conversation title generation with `NEUROLINK_TITLE_PROMPT` environment variable. Use `${userMessage}` placeholder for dynamic prompts. → [Conversation Memory Guide](docs/conversation-memory.md#customizing-the-title-prompt)
 - **Video Generation** – Transform images into 8-second videos with synchronized audio using Google Veo 3.1 via Vertex AI. Supports 720p/1080p resolutions, portrait/landscape aspect ratios. → [Video Generation Guide](docs/features/video-generation.md)
@@ -335,16 +337,23 @@ node your-app.js
 
 **15+ commands** for every workflow:
 
-| Command    | Purpose                            | Example                    | Documentation                             |
-| ---------- | ---------------------------------- | -------------------------- | ----------------------------------------- |
-| `setup`    | Interactive provider configuration | `neurolink setup`          | [Setup Guide](docs/cli/index.md)          |
-| `generate` | Text generation                    | `neurolink gen "Hello"`    | [Generate](docs/cli/commands.md#generate) |
-| `stream`   | Streaming generation               | `neurolink stream "Story"` | [Stream](docs/cli/commands.md#stream)     |
-| `status`   | Provider health check              | `neurolink status`         | [Status](docs/cli/commands.md#status)     |
-| `loop`     | Interactive session                | `neurolink loop`           | [Loop](docs/cli/commands.md#loop)         |
-| `mcp`      | MCP server management              | `neurolink mcp discover`   | [MCP CLI](docs/cli/commands.md#mcp)       |
-| `models`   | Model listing                      | `neurolink models`         | [Models](docs/cli/commands.md#models)     |
-| `eval`     | Model evaluation                   | `neurolink eval`           | [Eval](docs/cli/commands.md#eval)         |
+| Command          | Purpose                              | Example                    | Documentation                             |
+| ---------------- | ------------------------------------ | -------------------------- | ----------------------------------------- |
+| `setup`          | Interactive provider configuration   | `neurolink setup`          | [Setup Guide](docs/cli/index.md)          |
+| `generate`       | Text generation                      | `neurolink gen "Hello"`    | [Generate](docs/cli/commands.md#generate) |
+| `stream`         | Streaming generation                 | `neurolink stream "Story"` | [Stream](docs/cli/commands.md#stream)     |
+| `status`         | Provider health check                | `neurolink status`         | [Status](docs/cli/commands.md#status)     |
+| `loop`           | Interactive session                  | `neurolink loop`           | [Loop](docs/cli/commands.md#loop)         |
+| `mcp`            | MCP server management                | `neurolink mcp discover`   | [MCP CLI](docs/cli/commands.md#mcp)       |
+| `models`         | Model listing                        | `neurolink models`         | [Models](docs/cli/commands.md#models)     |
+| `eval`           | Model evaluation                     | `neurolink eval`           | [Eval](docs/cli/commands.md#eval)         |
+| `serve`          | Start HTTP server in foreground mode | `neurolink serve`          | [Serve](docs/cli/commands.md#serve)       |
+| `server start`   | Start HTTP server in background mode | `neurolink server start`   | [Server](docs/cli/commands.md#server)     |
+| `server stop`    | Stop running background server       | `neurolink server stop`    | [Server](docs/cli/commands.md#server)     |
+| `server status`  | Show server status information       | `neurolink server status`  | [Server](docs/cli/commands.md#server)     |
+| `server routes`  | List all registered API routes       | `neurolink server routes`  | [Server](docs/cli/commands.md#server)     |
+| `server config`  | View or modify server configuration  | `neurolink server config`  | [Server](docs/cli/commands.md#server)     |
+| `server openapi` | Generate OpenAPI specification       | `neurolink server openapi` | [Server](docs/cli/commands.md#server)     |
 
 **[📖 Complete CLI Reference](docs/cli/commands.md)** - All commands and options
 

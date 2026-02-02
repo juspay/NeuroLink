@@ -35,10 +35,11 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 ## What's New (Q1 2026)
 
-| Feature                            | Version | Description                                                                                                                                    | Guide                                                   |
-| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Image Generation with Gemini**   | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI. | [Image Generation Guide](image-generation-streaming.md) |
-| **HTTP/Streamable HTTP Transport** | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.  | [HTTP Transport Guide](mcp-http-transport.md)           |
+| Feature                            | Version | Description                                                                                                                                    | Guide                                                    |
+| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Image Generation with Gemini**   | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI. | [Image Generation Guide](image-generation-streaming.md)  |
+| **HTTP/Streamable HTTP Transport** | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.  | [HTTP Transport Guide](mcp-http-transport.md)            |
+| **Server Adapters**                | v8.42.0 | Expose NeuroLink AI agents as HTTP APIs with built-in support for Hono, Express, Fastify, and Koa frameworks.                                  | [Server Adapters Guide](guides/server-adapters/index.md) |
 
 ```typescript
 // Image Generation with Gemini (v8.31.0)
@@ -56,6 +57,13 @@ await neurolink.addExternalMCPServer("remote-tools", {
   retries: 3,
   timeout: 15000,
 });
+
+// Server Adapters (v8.42.0)
+const server = await createServer(neurolink, {
+  framework: "hono", // or "express", "fastify", "koa"
+  config: { port: 3000, basePath: "/api" },
+});
+await server.start();
 ```
 
 ---
@@ -316,18 +324,68 @@ node your-app.js
 
 **15+ commands** for every workflow:
 
-| Command    | Purpose                            | Example                    | Documentation                        |
-| ---------- | ---------------------------------- | -------------------------- | ------------------------------------ |
-| `setup`    | Interactive provider configuration | `neurolink setup`          | [Setup Guide](cli/index.md)          |
-| `generate` | Text generation                    | `neurolink gen "Hello"`    | [Generate](cli/commands.md#generate) |
-| `stream`   | Streaming generation               | `neurolink stream "Story"` | [Stream](cli/commands.md#stream)     |
-| `status`   | Provider health check              | `neurolink status`         | [Status](cli/commands.md#status)     |
-| `loop`     | Interactive session                | `neurolink loop`           | [Loop](cli/commands.md#loop)         |
-| `mcp`      | MCP server management              | `neurolink mcp discover`   | [MCP CLI](cli/commands.md#mcp)       |
-| `models`   | Model listing                      | `neurolink models`         | [Models](cli/commands.md#models)     |
-| `eval`     | Model evaluation                   | `neurolink eval`           | [Eval](cli/commands.md#eval)         |
+| Command    | Purpose                            | Example                       | Documentation                               |
+| ---------- | ---------------------------------- | ----------------------------- | ------------------------------------------- |
+| `setup`    | Interactive provider configuration | `neurolink setup`             | [Setup Guide](cli/index.md)                 |
+| `generate` | Text generation                    | `neurolink gen "Hello"`       | [Generate](cli/commands.md#generate)        |
+| `stream`   | Streaming generation               | `neurolink stream "Story"`    | [Stream](cli/commands.md#stream)            |
+| `status`   | Provider health check              | `neurolink status`            | [Status](cli/commands.md#status)            |
+| `loop`     | Interactive session                | `neurolink loop`              | [Loop](cli/commands.md#loop)                |
+| `mcp`      | MCP server management              | `neurolink mcp discover`      | [MCP CLI](cli/commands.md#mcp)              |
+| `models`   | Model listing                      | `neurolink models`            | [Models](cli/commands.md#models)            |
+| `eval`     | Model evaluation                   | `neurolink eval`              | [Eval](cli/commands.md#eval)                |
+| `serve`    | HTTP API server                    | `neurolink serve --port 3000` | [Serve](cli/commands.md#serve)              |
+| `server`   | Background server management       | `neurolink server start`      | [Server](cli/commands.md#server-subcommand) |
 
 **[📖 Complete CLI Reference](cli/commands.md)** - All commands and options
+
+---
+
+### 🚀 Server Adapters (NEW)
+
+**Deploy NeuroLink as an HTTP API** with your framework of choice. Full support for Hono, Express, Fastify, and Koa with streaming, authentication, and built-in rate limiting.
+
+```bash
+# Start a server with your preferred framework
+neurolink serve --framework hono --port 3000
+
+# Or use background mode for long-running servers
+neurolink server start --port 3000
+neurolink server status
+neurolink server routes
+
+# Stop the background server
+neurolink server stop
+```
+
+**SDK Usage:**
+
+```typescript
+import { NeuroLink, createServer } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+const server = await createServer(neurolink, {
+  framework: "hono", // or "express", "fastify", "koa"
+  config: {
+    port: 3000,
+    basePath: "/api",
+    cors: { origin: "*" },
+    rateLimit: { windowMs: 60000, max: 100 },
+  },
+});
+
+await server.start();
+// API available at http://localhost:3000/api/generate, /api/stream, etc.
+```
+
+| Framework   | Streaming | Middleware | Use Case                 |
+| ----------- | --------- | ---------- | ------------------------ |
+| **Hono**    | ✅ Full   | ✅ Full    | Edge, Cloudflare, Bun    |
+| **Express** | ✅ Full   | ✅ Full    | Traditional Node.js      |
+| **Fastify** | ✅ Full   | ✅ Full    | High-performance APIs    |
+| **Koa**     | ✅ Full   | ✅ Full    | Lightweight, async-first |
+
+**[📖 Server Adapters Guide](guides/server-adapters/index.md)** - Complete setup and configuration
 
 ---
 
@@ -585,7 +643,6 @@ Full command and API breakdown lives in [`docs/cli/commands.md`](cli/commands.md
 
 - Bug reports and feature requests → [GitHub Issues](https://github.com/juspay/neurolink/issues)
 - Development workflow, testing, and pull request guidelines → [`docs/development/contributing.md`](development/contributing.md)
-- Documentation improvements → open a PR with your changes.
 
 ---
 

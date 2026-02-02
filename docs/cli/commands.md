@@ -28,6 +28,8 @@ npm install @juspay/neurolink
 | `config <subcommand>` | Initialise, validate, export, or reset configuration.       | `npx @juspay/neurolink config validate`                                     |
 | `memory <subcommand>` | View, export, or clear conversation history.                | `npx @juspay/neurolink memory history NL_x3yr --format json`                |
 | `mcp <subcommand>`    | Manage Model Context Protocol servers/tools.                | `npx @juspay/neurolink mcp list`                                            |
+| `server <subcommand>` | Manage NeuroLink HTTP server                                |                                                                             |
+| `serve`               | Start server in foreground mode                             |                                                                             |
 | `validate`            | Alias for `config validate`.                                | `npx @juspay/neurolink validate`                                            |
 
 ## Primary Commands
@@ -309,6 +311,244 @@ npx @juspay/neurolink mcp remove myserver
 - OAuth 2.1 support with PKCE
 
 See [MCP HTTP Transport Guide](../mcp-http-transport.md) for complete configuration options.
+
+---
+
+## `serve`
+
+Start the NeuroLink HTTP server in foreground mode.
+
+### Usage
+
+```bash
+neurolink serve [options]
+```
+
+### Options
+
+| Option        | Alias | Type    | Default | Description                                              |
+| ------------- | ----- | ------- | ------- | -------------------------------------------------------- |
+| `--port`      | `-p`  | number  | 3000    | Port to listen on                                        |
+| `--host`      | `-H`  | string  | 0.0.0.0 | Host to bind to                                          |
+| `--framework` | `-f`  | string  | hono    | Web framework: hono, express, fastify, koa               |
+| `--basePath`  |       | string  | /api    | Base path for all routes                                 |
+| `--cors`      |       | boolean | true    | Enable CORS                                              |
+| `--rateLimit` |       | number  | 100     | Rate limit (requests per 15-minute window, 0 to disable) |
+| `--swagger`   |       | boolean | false   | Enable Swagger UI and OpenAPI endpoints                  |
+| `--watch`     | `-w`  | boolean | false   | Enable watch mode                                        |
+| `--config`    | `-c`  | string  |         | Path to config file                                      |
+
+### Swagger/OpenAPI Endpoints
+
+When `--swagger` is enabled, these endpoints become available:
+
+| Endpoint                | Description                              |
+| ----------------------- | ---------------------------------------- |
+| `GET /api/openapi.json` | OpenAPI 3.1 specification in JSON format |
+| `GET /api/openapi.yaml` | OpenAPI 3.1 specification in YAML format |
+| `GET /api/docs`         | Interactive Swagger UI documentation     |
+
+> **Note:** Disable with `--no-swagger` in production to avoid exposing API structure.
+
+### Examples
+
+```bash
+# Start with defaults
+neurolink serve
+
+# Start on specific port with Express
+neurolink serve --port 8080 --framework express
+
+# Start with custom config file
+neurolink serve --config ./server.config.json
+```
+
+---
+
+## `server <subcommand>`
+
+Manage NeuroLink HTTP server for exposing AI agents as REST APIs.
+
+### Subcommands
+
+| Subcommand | Description                         |
+| ---------- | ----------------------------------- |
+| `start`    | Start the HTTP server in background |
+| `stop`     | Stop the running server             |
+| `status`   | Show server status                  |
+| `routes`   | List all registered routes          |
+| `config`   | Show or modify server configuration |
+| `openapi`  | Generate OpenAPI specification      |
+
+---
+
+### `server start`
+
+Start the HTTP server in background mode.
+
+```bash
+neurolink server start [options]
+```
+
+| Option        | Alias | Type    | Default | Description                                              |
+| ------------- | ----- | ------- | ------- | -------------------------------------------------------- |
+| `--port`      | `-p`  | number  | 3000    | Port to listen on                                        |
+| `--host`      | `-H`  | string  | 0.0.0.0 | Host to bind to                                          |
+| `--framework` | `-f`  | string  | hono    | Framework: hono, express, fastify, koa                   |
+| `--basePath`  |       | string  | /api    | Base path for all routes                                 |
+| `--cors`      |       | boolean | true    | Enable CORS                                              |
+| `--rateLimit` |       | number  | 100     | Rate limit (requests per 15-minute window, 0 to disable) |
+
+**Examples:**
+
+```bash
+# Start with defaults
+neurolink server start
+
+# Start on port 8080 with Express
+neurolink server start -p 8080 --framework express
+```
+
+---
+
+### `server stop`
+
+Stop a running background server.
+
+```bash
+neurolink server stop [options]
+```
+
+| Option    | Type    | Default | Description                                 |
+| --------- | ------- | ------- | ------------------------------------------- |
+| `--force` | boolean | false   | Force stop even if server is not responding |
+
+**Examples:**
+
+```bash
+# Stop gracefully
+neurolink server stop
+
+# Force stop
+neurolink server stop --force
+```
+
+---
+
+### `server status`
+
+Show server status information.
+
+```bash
+neurolink server status [options]
+```
+
+| Option     | Type   | Default | Description               |
+| ---------- | ------ | ------- | ------------------------- |
+| `--format` | string | text    | Output format: text, json |
+
+**Examples:**
+
+```bash
+# Text output
+neurolink server status
+
+# JSON output for scripting
+neurolink server status --format json
+```
+
+---
+
+### `server routes`
+
+List all registered server routes.
+
+```bash
+neurolink server routes [options]
+```
+
+| Option     | Type   | Default | Description                                                  |
+| ---------- | ------ | ------- | ------------------------------------------------------------ |
+| `--format` | string | table   | Output format: text, json, table                             |
+| `--group`  | string | all     | Filter by route group: agent, tool, mcp, memory, health, all |
+| `--method` | string | all     | Filter by HTTP method: GET, POST, PUT, DELETE, PATCH, all    |
+
+**Examples:**
+
+```bash
+# List all routes in table format
+neurolink server routes
+
+# List only agent routes
+neurolink server routes --group agent
+
+# List all POST endpoints as JSON
+neurolink server routes --method POST --format json
+```
+
+---
+
+### `server config`
+
+Show or modify server configuration.
+
+```bash
+neurolink server config [options]
+```
+
+| Option     | Type    | Default | Description                            |
+| ---------- | ------- | ------- | -------------------------------------- |
+| `--get`    | string  |         | Get a specific config value            |
+| `--set`    | string  |         | Set a config value (format: key=value) |
+| `--reset`  | boolean | false   | Reset configuration to defaults        |
+| `--format` | string  | text    | Output format: text, json              |
+
+**Examples:**
+
+```bash
+# Show all configuration
+neurolink server config
+
+# Get specific value
+neurolink server config --get defaultPort
+
+# Set a value
+neurolink server config --set defaultPort=8080
+
+# Reset to defaults
+neurolink server config --reset
+```
+
+---
+
+### `server openapi`
+
+Generate OpenAPI specification.
+
+```bash
+neurolink server openapi [options]
+```
+
+| Option       | Alias | Type   | Default | Description               |
+| ------------ | ----- | ------ | ------- | ------------------------- |
+| `--output`   | `-o`  | string | stdout  | Output file path          |
+| `--format`   |       | string | json    | Output format: json, yaml |
+| `--basePath` |       | string | /api    | Base path for all routes  |
+| `--title`    |       | string |         | API title                 |
+| `--version`  |       | string |         | API version               |
+
+**Examples:**
+
+```bash
+# Generate to stdout
+neurolink server openapi
+
+# Save to file
+neurolink server openapi -o openapi.json
+
+# Generate YAML format
+neurolink server openapi --format yaml -o openapi.yaml
+```
 
 ## Global Flags (available on every command)
 

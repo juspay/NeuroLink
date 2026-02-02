@@ -1,0 +1,478 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NeuroLink Server Adapter Middleware Configuration",
+  "description": "Sample middleware configurations for testing",
+  "version": "1.0.0",
+  "_note": "FIXTURE STATUS: This fixture is prepared for use but not yet imported by any test files. The loadTestFixture utility in server-test-utils.ts can load this file. See docs-site/docs/server-tests/TESTING.md for intended usage patterns.",
+
+  "authentication": {
+    "bearer": {
+      "type": "bearer",
+      "description": "JWT Bearer token authentication",
+      "headerName": "Authorization",
+      "tokenFormat": "Bearer <token>",
+      "config": {
+        "type": "bearer",
+        "validate": "async (token) => validateJWT(token)",
+        "skipPaths": ["/api/health", "/api/ready", "/api/version"],
+        "errorMessage": "Invalid or expired token"
+      },
+      "testCases": [
+        {
+          "name": "valid_bearer_token",
+          "headers": { "Authorization": "Bearer valid-jwt-token-here" },
+          "expected": { "authenticated": true }
+        },
+        {
+          "name": "missing_bearer_prefix",
+          "headers": { "Authorization": "invalid-token" },
+          "expected": { "error": "MISSING_TOKEN" }
+        },
+        {
+          "name": "expired_token",
+          "headers": { "Authorization": "Bearer expired-token" },
+          "expected": { "error": "INVALID_TOKEN" }
+        },
+        {
+          "name": "missing_header",
+          "headers": {},
+          "expected": { "error": "MISSING_TOKEN" }
+        }
+      ]
+    },
+
+    "apiKey": {
+      "type": "api-key",
+      "description": "API Key authentication",
+      "headerName": "X-API-Key",
+      "config": {
+        "type": "api-key",
+        "headerName": "x-api-key",
+        "validate": "async (key) => validateAPIKey(key)",
+        "skipPaths": ["/api/health"]
+      },
+      "testCases": [
+        {
+          "name": "valid_api_key",
+          "headers": { "X-API-Key": "sk-valid-api-key" },
+          "expected": { "authenticated": true }
+        },
+        {
+          "name": "invalid_api_key",
+          "headers": { "X-API-Key": "invalid-key" },
+          "expected": { "error": "INVALID_TOKEN" }
+        },
+        {
+          "name": "wrong_header",
+          "headers": { "Authorization": "Bearer sk-valid-api-key" },
+          "expected": { "error": "MISSING_TOKEN" }
+        }
+      ]
+    },
+
+    "basic": {
+      "type": "basic",
+      "description": "HTTP Basic authentication",
+      "headerName": "Authorization",
+      "tokenFormat": "Basic <base64(username:password)>",
+      "config": {
+        "type": "basic",
+        "validate": "async (credentials) => validateBasicAuth(credentials)"
+      },
+      "testCases": [
+        {
+          "name": "valid_basic_auth",
+          "headers": { "Authorization": "Basic YWRtaW46c2VjcmV0" },
+          "description": "admin:secret in base64",
+          "expected": { "authenticated": true, "user": { "id": "admin" } }
+        },
+        {
+          "name": "invalid_credentials",
+          "headers": { "Authorization": "Basic aW52YWxpZDppbnZhbGlk" },
+          "description": "invalid:invalid in base64",
+          "expected": { "error": "INVALID_TOKEN" }
+        },
+        {
+          "name": "malformed_base64",
+          "headers": { "Authorization": "Basic not-valid-base64!!!" },
+          "expected": { "error": "AUTH_ERROR" }
+        }
+      ]
+    },
+
+    "custom": {
+      "type": "custom",
+      "description": "Custom authentication with token extractor",
+      "config": {
+        "type": "custom",
+        "extractToken": "(ctx) => ctx.headers['x-custom-auth'] || ctx.query.token",
+        "validate": "async (token) => validateCustomToken(token)"
+      },
+      "testCases": [
+        {
+          "name": "custom_header",
+          "headers": { "X-Custom-Auth": "custom-token-value" },
+          "expected": { "authenticated": true }
+        },
+        {
+          "name": "query_param_token",
+          "query": { "token": "query-token-value" },
+          "expected": { "authenticated": true }
+        }
+      ]
+    }
+  },
+
+  "rateLimit": {
+    "fixedWindow": {
+      "type": "fixed-window",
+      "description": "Fixed window rate limiting",
+      "config": {
+        "maxRequests": 100,
+        "windowMs": 900000,
+        "message": "Too many requests, please try again later",
+        "skipPaths": ["/api/health", "/api/ready"],
+        "keyGenerator": "(ctx) => ctx.headers['x-forwarded-for'] || ctx.headers['x-real-ip'] || 'unknown'"
+      },
+      "testCases": [
+        {
+          "name": "within_limit",
+          "requestCount": 50,
+          "expected": { "allowed": true }
+        },
+        {
+          "name": "at_limit",
+          "requestCount": 100,
+          "expected": { "allowed": true, "remaining": 0 }
+        },
+        {
+          "name": "exceeded_limit",
+          "requestCount": 101,
+          "expected": {
+            "allowed": false,
+            "statusCode": 429,
+            "headers": {
+              "X-RateLimit-Limit": "100",
+              "X-RateLimit-Remaining": "0",
+              "Retry-After": "number"
+            }
+          }
+        },
+        {
+          "name": "skip_health_path",
+          "path": "/api/health",
+          "requestCount": 1000,
+          "expected": { "allowed": true, "rateLimitApplied": false }
+        }
+      ]
+    },
+
+    "slidingWindow": {
+      "type": "sliding-window",
+      "description": "Sliding window rate limiting (more accurate)",
+      "config": {
+        "maxRequests": 100,
+        "windowMs": 900000,
+        "subWindows": 10,
+        "message": "Rate limit exceeded"
+      },
+      "testCases": [
+        {
+          "name": "smooth_distribution",
+          "description": "Requests distributed over time pass",
+          "requestPattern": "10 requests every 90 seconds over 15 minutes",
+          "expected": { "allowed": true }
+        },
+        {
+          "name": "burst_detection",
+          "description": "100 rapid requests followed by gradual recovery",
+          "requestPattern": "100 requests in 1 second",
+          "expected": { "allowed": false, "recoveryTime": "gradual" }
+        }
+      ]
+    },
+
+    "perEndpoint": {
+      "type": "per-endpoint",
+      "description": "Different limits for different endpoints",
+      "config": {
+        "default": { "maxRequests": 100, "windowMs": 900000 },
+        "endpoints": {
+          "/api/agent/execute": { "maxRequests": 20, "windowMs": 60000 },
+          "/api/agent/stream": { "maxRequests": 10, "windowMs": 60000 },
+          "/api/tools/execute": { "maxRequests": 50, "windowMs": 60000 }
+        }
+      }
+    }
+  },
+
+  "cache": {
+    "lru": {
+      "type": "lru",
+      "description": "LRU cache with TTL",
+      "config": {
+        "ttlMs": 300000,
+        "maxSize": 1000,
+        "methods": ["GET"],
+        "excludePaths": [
+          "/api/health",
+          "/api/agent/execute",
+          "/api/agent/stream"
+        ],
+        "includeQuery": true
+      },
+      "testCases": [
+        {
+          "name": "cache_hit",
+          "scenario": [
+            { "request": "GET /api/tools", "expected": { "cache": "MISS" } },
+            { "request": "GET /api/tools", "expected": { "cache": "HIT" } }
+          ]
+        },
+        {
+          "name": "cache_miss_different_query",
+          "scenario": [
+            {
+              "request": "GET /api/tools?source=built-in",
+              "expected": { "cache": "MISS" }
+            },
+            {
+              "request": "GET /api/tools?source=mcp",
+              "expected": { "cache": "MISS" }
+            }
+          ]
+        },
+        {
+          "name": "cache_expiry",
+          "scenario": [
+            { "request": "GET /api/tools", "expected": { "cache": "MISS" } },
+            { "wait": 300001 },
+            { "request": "GET /api/tools", "expected": { "cache": "MISS" } }
+          ]
+        },
+        {
+          "name": "post_not_cached",
+          "request": "POST /api/agent/execute",
+          "expected": { "cached": false }
+        }
+      ]
+    },
+
+    "ttlByPath": {
+      "type": "ttl-by-path",
+      "description": "Different TTL for different paths",
+      "config": {
+        "ttlMs": 60000,
+        "ttlByPath": {
+          "/api/tools": 300000,
+          "/api/mcp/servers": 30000,
+          "/api/version": 3600000
+        }
+      }
+    }
+  },
+
+  "validation": {
+    "requestBody": {
+      "type": "body-validation",
+      "description": "Request body validation with JSON schema",
+      "config": {
+        "body": {
+          "type": "object",
+          "properties": {
+            "input": { "type": "string", "minLength": 1 },
+            "provider": { "type": "string" }
+          },
+          "required": ["input"]
+        }
+      },
+      "testCases": [
+        {
+          "name": "valid_body",
+          "body": { "input": "Hello", "provider": "openai" },
+          "expected": { "valid": true }
+        },
+        {
+          "name": "missing_required",
+          "body": { "provider": "openai" },
+          "expected": {
+            "valid": false,
+            "errors": [{ "field": "input", "message": "required" }]
+          }
+        },
+        {
+          "name": "wrong_type",
+          "body": { "input": 123, "provider": "openai" },
+          "expected": {
+            "valid": false,
+            "errors": [{ "field": "input", "message": "must be string" }]
+          }
+        }
+      ]
+    },
+
+    "fieldValidator": {
+      "type": "field-validation",
+      "description": "Field-level validation with custom validators",
+      "config": {
+        "required": ["name", "email"],
+        "types": {
+          "name": "string",
+          "email": "string",
+          "age": "number"
+        },
+        "validators": {
+          "email": "(value) => typeof value === 'string' && value.includes('@')",
+          "age": "(value) => typeof value === 'number' && value >= 0 && value <= 150"
+        }
+      }
+    }
+  },
+
+  "common": {
+    "timing": {
+      "name": "timing",
+      "description": "Request timing middleware",
+      "order": 1,
+      "output": {
+        "headers": {
+          "X-Response-Time": "duration in ms"
+        },
+        "metadata": {
+          "timing": {
+            "start": "timestamp",
+            "end": "timestamp",
+            "duration": "ms"
+          }
+        }
+      }
+    },
+
+    "requestId": {
+      "name": "request-id",
+      "description": "Request ID generation middleware",
+      "order": 0,
+      "output": {
+        "headers": {
+          "X-Request-ID": "uuid"
+        },
+        "context": {
+          "requestId": "uuid"
+        }
+      }
+    },
+
+    "errorHandling": {
+      "name": "error-handling",
+      "description": "Global error handling middleware",
+      "order": -1,
+      "errorFormats": {
+        "AuthenticationError": {
+          "statusCode": 401,
+          "body": {
+            "error": {
+              "code": "AUTH_REQUIRED",
+              "message": "string"
+            }
+          }
+        },
+        "InvalidAuthenticationError": {
+          "statusCode": 401,
+          "body": {
+            "error": {
+              "code": "AUTH_INVALID",
+              "message": "string"
+            }
+          }
+        },
+        "RateLimitError": {
+          "statusCode": 429,
+          "headers": { "Retry-After": "seconds" },
+          "body": {
+            "error": {
+              "code": "RATE_LIMIT_EXCEEDED",
+              "message": "string",
+              "retryAfter": "seconds"
+            }
+          }
+        },
+        "ValidationError": {
+          "statusCode": 400,
+          "body": {
+            "error": {
+              "code": "VALIDATION_ERROR",
+              "message": "string",
+              "errors": "array"
+            }
+          }
+        },
+        "GenericError": {
+          "statusCode": 500,
+          "body": {
+            "error": {
+              "code": "INTERNAL_ERROR",
+              "message": "string"
+            }
+          }
+        }
+      }
+    },
+
+    "securityHeaders": {
+      "name": "security-headers",
+      "description": "Security headers middleware",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+      }
+    },
+
+    "logging": {
+      "name": "logging",
+      "description": "Request/response logging middleware",
+      "config": {
+        "includeBody": false,
+        "includeResponse": false,
+        "level": "info",
+        "redactFields": ["password", "token", "apiKey", "authorization"]
+      }
+    },
+
+    "cors": {
+      "name": "cors",
+      "description": "CORS middleware",
+      "config": {
+        "enabled": true,
+        "origins": ["*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        "headers": [
+          "Content-Type",
+          "Authorization",
+          "X-API-Key",
+          "X-Request-ID"
+        ],
+        "credentials": true,
+        "maxAge": 86400
+      }
+    }
+  },
+
+  "middlewareOrder": {
+    "description": "Recommended middleware execution order",
+    "order": [
+      { "name": "request-id", "order": 0 },
+      { "name": "timing", "order": 1 },
+      { "name": "error-handling", "order": 2 },
+      { "name": "security-headers", "order": 3 },
+      { "name": "cors", "order": 4 },
+      { "name": "rate-limit", "order": 5 },
+      { "name": "authentication", "order": 10 },
+      { "name": "role-check", "order": 11 },
+      { "name": "cache", "order": 20 },
+      { "name": "validation", "order": 25 },
+      { "name": "logging", "order": 30 }
+    ]
+  }
+}

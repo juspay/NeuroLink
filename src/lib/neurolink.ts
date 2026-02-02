@@ -4214,32 +4214,40 @@ Current user's request: ${currentInput}`;
   }
 
   /**
-   * Get all registered in-memory servers
+   * Get all registered in-memory servers as a Map for ID-based lookup.
+   *
+   * This method is primarily used when you need O(1) lookup by server ID,
+   * such as in `testMCPServer()` for checking if a specific server exists.
+   *
    * @returns Map of server IDs to MCPServerInfo
+   * @see {@link getInMemoryServerInfos} for array-based access (useful for iteration/spreading)
    */
   getInMemoryServers(): Map<string, MCPServerInfo> {
-    // Get in-memory servers from toolRegistry
-    const serverInfos = this.toolRegistry.getBuiltInServerInfos();
+    // Reuse getInMemoryServerInfos() to avoid duplicating filter logic
+    const serverInfos = this.getInMemoryServerInfos();
     const serverMap = new Map<string, MCPServerInfo>();
 
     for (const serverInfo of serverInfos) {
-      if (
-        detectCategory({
-          existingCategory: serverInfo.metadata?.category,
-          serverId: serverInfo.id,
-        }) === "in-memory"
-      ) {
-        serverMap.set(serverInfo.id, serverInfo);
-      }
+      serverMap.set(serverInfo.id, serverInfo);
     }
 
     return serverMap;
   }
 
   /**
-   * Get in-memory servers as MCPServerInfo - ZERO conversion needed
-   * Now fetches from centralized tool registry instead of local duplication
-   * @returns Array of MCPServerInfo
+   * Get in-memory servers as an array of MCPServerInfo.
+   *
+   * This method is the canonical source for in-memory server filtering.
+   * It fetches from the centralized tool registry and filters servers
+   * with the "in-memory" category.
+   *
+   * Use this method when you need to:
+   * - Iterate over all in-memory servers
+   * - Spread servers into another array (e.g., in `listMCPServers()`)
+   * - Get a count of in-memory servers
+   *
+   * @returns Array of MCPServerInfo for in-memory servers
+   * @see {@link getInMemoryServers} for Map-based access (useful for ID lookups)
    */
   getInMemoryServerInfos(): MCPServerInfo[] {
     // Get in-memory servers from centralized tool registry
@@ -6389,6 +6397,28 @@ Current user's request: ${currentInput}`;
       logger.error("[NeuroLink] Critical error during disposal:", error);
       throw error;
     }
+  }
+
+  // ============================================
+  // Internal Access Methods (for Server Adapters)
+  // ============================================
+
+  /**
+   * Get the tool registry instance
+   * Used internally by server adapters for tool management
+   * @returns The MCPToolRegistry instance
+   */
+  getToolRegistry(): MCPToolRegistry {
+    return this.toolRegistry;
+  }
+
+  /**
+   * Get the external server manager instance
+   * Used internally by server adapters for external MCP server management
+   * @returns The ExternalServerManager instance
+   */
+  getExternalServerManager(): ExternalServerManager {
+    return this.externalServerManager;
   }
 }
 

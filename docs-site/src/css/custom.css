@@ -109,3 +109,37 @@ html:not([data-theme="dark"])
   .themedComponent_rrg5.themedComponent--light_ElNy {
   display: block !important;
 }
+
+/* =========================================
+   SIDEBAR BADGE POSITIONING
+   ========================================= */
+
+/* Wrapper for sidebar items with badges */
+.sidebar-category-wrapper,
+.sidebar-link-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+/* Menu item container takes full width */
+.sidebar-category-wrapper > div:first-child,
+.sidebar-link-wrapper > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Badge container - positioned on the RIGHT, at the TOP */
+.sidebar-badge-right {
+  flex-shrink: 0;
+  margin-left: 4px;
+  margin-top: 8px;
+  margin-right: 4px;
+}
+
+/* Smaller badge size for sidebar */
+.sidebar-badge-right .badge {
+  font-size: 8px;
+  padding: 1px 4px;
+  letter-spacing: 0.03em;
+}

@@ -13,6 +13,7 @@ import * as fs from "fs";
 import { glob } from "glob";
 import matter from "gray-matter";
 import * as path from "path";
+import { GitChangeDetector, GitChangeInfo } from "./gitChangeDetector.js";
 
 // Configuration
 const SOURCE_DIR = path.resolve(__dirname, "../../docs");
@@ -24,6 +25,9 @@ const directorySidebarCounters = new Map<string, number>();
 
 // Directories to exclude from sync
 const EXCLUDED_DIRS = ["tracking", "phases", "analysis"];
+
+// Auto-badge detection configuration
+const ENABLE_AUTO_BADGES = process.env.AUTO_BADGE_DETECTION !== "false";
 
 // Badge mappings for title tags
 const TITLE_BADGES: Record<string, string> = {
@@ -668,6 +672,70 @@ function processFrontmatter(
 }
 
 /**
+ * Add auto-detected badges based on git changes
+ * This adds both:
+ * 1. Tags to frontmatter (for filtering/search)
+ * 2. Badge markers to sidebar_label (for sidebar display)
+ *
+ * Badge detection is tag-based: files changed since the base branch get badges.
+ * No time-based expiration - badges are removed when the branch is merged.
+ */
+function addAutoBadges(
+  frontmatter: Record<string, unknown>,
+  relativePath: string,
+  gitChanges: GitChangeInfo | null
+): Record<string, unknown> {
+  if (!ENABLE_AUTO_BADGES || !gitChanges) {
+    return frontmatter;
+  }
+
+  const processed = { ...frontmatter };
+  const existingTags = Array.isArray(processed.tags)
+    ? [...(processed.tags as string[])]
+    : typeof processed.tags === "string"
+      ? [processed.tags]
+      : [];
+
+  // Skip if manual badges already exist in tags
+  const manualBadges = ["new", "updated", "beta", "deprecated", "experimental"];
+  if (existingTags.some(tag => manualBadges.includes(tag))) {
+    return processed;
+  }
+
+  // Skip if sidebar_label already has a badge marker
+  const sidebarLabel = processed.sidebar_label as string | undefined;
+  if (sidebarLabel && /\[(new|updated|beta|deprecated|experimental)\]/i.test(sidebarLabel)) {
+    return processed;
+  }
+
+  let badgeType: "new" | "updated" | null = null;
+
+  // Check if file is new (added since base branch)
+  if (gitChanges.addedFiles.has(relativePath)) {
+    badgeType = "new";
+  }
+  // Check if file is modified (but not also added - avoid double badge for staged+modified)
+  else if (gitChanges.modifiedFiles.has(relativePath) && !gitChanges.addedFiles.has(relativePath)) {
+    badgeType = "updated";
+  }
+
+  if (badgeType) {
+    // Add to tags for filtering/search
+    existingTags.push(badgeType);
+    processed.tags = existingTags;
+
+    // Add marker to sidebar_label for sidebar badge display
+    // Use existing sidebar_label or fall back to title
+    const baseLabel = sidebarLabel || (processed.title as string) || "";
+    if (baseLabel) {
+      processed.sidebar_label = `${baseLabel} [${badgeType}]`;
+    }
+  }
+
+  return processed;
+}
+
+/**
  * Escape JSX-like syntax that would break MDX parsing
  * Examples: <1ms, <2x, etc.
  */
@@ -945,6 +1013,39 @@ const LINK_MAPPINGS: Record<string, string> = {
   GenerateResult: "/api/type-aliases/GenerateResult",
   ExecutionContext: "/api/type-aliases/ExecutionContext",
   AIModelProviderConfig: "/api/type-aliases/AIModelProviderConfig",
+
+  // Server Adapters - path-prefixed versions for explicit reference
+  // NOTE: Simple names like "hono", "express" etc. should use guides/server-adapters/ paths
+  // in their source files to avoid conflicts with other mappings
+  "guides/server-adapters/hono": "/guides/server-adapters/hono",
+  "guides/server-adapters/hono.md": "/guides/server-adapters/hono",
+  "guides/server-adapters/express": "/guides/server-adapters/express",
+  "guides/server-adapters/express.md": "/guides/server-adapters/express",
+  "guides/server-adapters/fastify": "/guides/server-adapters/fastify",
+  "guides/server-adapters/fastify.md": "/guides/server-adapters/fastify",
+  "guides/server-adapters/koa": "/guides/server-adapters/koa",
+  "guides/server-adapters/koa.md": "/guides/server-adapters/koa",
+  "guides/server-adapters/security": "/guides/server-adapters/security",
+  "guides/server-adapters/security.md": "/guides/server-adapters/security",
+  "guides/server-adapters/deployment": "/guides/server-adapters/deployment",
+  "guides/server-adapters/deployment.md": "/guides/server-adapters/deployment",
+  "guides/server-adapters/streaming": "/guides/server-adapters/streaming",
+  "guides/server-adapters/streaming.md": "/guides/server-adapters/streaming",
+  "guides/server-adapters/websocket": "/guides/server-adapters/websocket",
+  "guides/server-adapters/websocket.md": "/guides/server-adapters/websocket",
+  "guides/server-adapters/errors": "/guides/server-adapters/errors",
+  "guides/server-adapters/errors.md": "/guides/server-adapters/errors",
+  "guides/server-adapters/middleware": "/guides/server-adapters/middleware",
+  "guides/server-adapters/middleware.md": "/guides/server-adapters/middleware",
+  "guides/server-adapters": "/guides/server-adapters",
+  "guides/server-adapters/index": "/guides/server-adapters",
+  "guides/server-adapters/index.md": "/guides/server-adapters",
+  "server-configuration": "/reference/server-configuration",
+  "server-configuration.md": "/reference/server-configuration",
+  "features/observability": "/observability/health-monitoring",
+  "features/observability.md": "/observability/health-monitoring",
+  observability: "/observability/health-monitoring",
+  "observability.md": "/observability/health-monitoring",
 
   // Other missing mappings
   "error-codes": "/reference/error-codes",
@@ -1234,6 +1335,16 @@ function fixInternalLinks(content: string): string {
       return match;
     }
 
+    // Extract base path and anchor
+    const [basePath, anchor] = path.split("#");
+
+    // FIRST check if this needs transformation via LINK_MAPPINGS
+    // This takes precedence over the valid prefix check
+    if (LINK_MAPPINGS[basePath]) {
+      const newPath = anchor ? "/docs" + LINK_MAPPINGS[basePath] + "#" + anchor : "/docs" + LINK_MAPPINGS[basePath];
+      return `](${newPath})`;
+    }
+
     // Valid doc prefixes - these paths are valid doc paths and just need /docs/ prefix
     const validPrefixes = [
       "mcp/",
@@ -1260,15 +1371,6 @@ function fixInternalLinks(content: string): string {
     // If it starts with a valid prefix, just add /docs/
     if (validPrefixes.some((prefix) => path.startsWith(prefix))) {
       return `](/docs/${path})`;
-    }
-
-    // Extract base path and anchor
-    const [basePath, anchor] = path.split("#");
-
-    // Check if this needs transformation via LINK_MAPPINGS
-    if (LINK_MAPPINGS[basePath]) {
-      const newPath = anchor ? "/docs" + LINK_MAPPINGS[basePath] + "#" + anchor : "/docs" + LINK_MAPPINGS[basePath];
-      return `](${newPath})`;
     }
 
     // For other paths, add /docs/ prefix
@@ -1343,20 +1445,29 @@ async function copyAssets(sourceDir: string, staticDir: string): Promise<void> {
 
 /**
  * Apply file mapping to determine the target path
- * Checks if the file's basename matches any mapping key
+ * Checks the full relative path FIRST (for more specific matches),
+ * then falls back to basename matching (for generic mappings)
  */
 function applyFileMapping(relativePath: string): string {
-  const basename = path.basename(relativePath);
-
-  // Check if there's a direct mapping for this file
-  if (FILE_MAPPINGS[basename]) {
-    return FILE_MAPPINGS[basename];
-  }
-
   // Check if the full relative path matches (for files in subdirectories)
+  // This takes precedence over basename matching to allow subdirectory files
+  // to keep their location even if there's a basename-based mapping
   const normalizedPath = relativePath.replace(/\\/g, "/");
   if (FILE_MAPPINGS[normalizedPath]) {
     return FILE_MAPPINGS[normalizedPath];
+  }
+
+  // Check if the file should NOT be remapped based on its parent directory
+  // Files in certain directories (like guides/server-adapters) should keep their location
+  const preservedPrefixes = ["guides/server-adapters/", "guides/migration/", "guides/frameworks/"];
+  if (preservedPrefixes.some(prefix => normalizedPath.startsWith(prefix))) {
+    return relativePath;
+  }
+
+  // Check if there's a direct mapping for this file by basename
+  const basename = path.basename(relativePath);
+  if (FILE_MAPPINGS[basename]) {
+    return FILE_MAPPINGS[basename];
   }
 
   // No mapping found, use original path
@@ -1433,6 +1544,16 @@ async function syncDocs(): Promise<void> {
   // Extract all target relative paths for deterministic sidebar positioning
   const allTargetPaths = files.map(f => path.relative(TARGET_DIR, f.targetPath));
 
+  // Initialize git change detector for auto-badges (tag-based detection)
+  let gitChanges: GitChangeInfo | null = null;
+
+  if (ENABLE_AUTO_BADGES) {
+    console.log("🔍 Detecting git changes for auto-badge injection...");
+    const changeDetector = new GitChangeDetector();
+    // getChangedFiles() uses tag-based detection and logs the baseline tag being used
+    gitChanges = changeDetector.getChangedFiles();
+  }
+
   let successCount = 0;
   let errorCount = 0;
 
@@ -1449,8 +1570,11 @@ async function syncDocs(): Promise<void> {
       // Pass allTargetPaths for deterministic sidebar positioning
       const { content, frontmatter } = transformContent(sourceContent, targetRelativePath, allTargetPaths);
 
+      // Add auto-detected badges based on git changes
+      const finalFrontmatter = addAutoBadges(frontmatter, file.relativePath, gitChanges);
+
       // Build output with frontmatter
-      const frontmatterYaml = Object.entries(frontmatter)
+      const frontmatterYaml = Object.entries(finalFrontmatter)
         .map(([key, value]) => {
           if (Array.isArray(value)) {
             return `${key}:\n${value.map((v) => `  - "${String(v).replace(/"/g, '\\"')}"`).join("\n")}`;

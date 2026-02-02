@@ -931,6 +931,140 @@ neurolink ollama stop
 neurolink ollama setup
 ```
 
+---
+
+## Server Management
+
+NeuroLink provides comprehensive server management commands for running AI agents as REST APIs.
+
+### Starting a Server
+
+**Foreground Mode (Development):**
+
+```bash
+# Start with defaults (Hono on port 3000)
+neurolink serve
+
+# Start with specific framework and port
+neurolink serve --framework express --port 8080
+
+# Enable watch mode for auto-reload
+neurolink serve --watch
+```
+
+**Background Mode (Production):**
+
+```bash
+# Start server in background
+neurolink server start --port 3000 --framework hono
+
+# Check server status
+neurolink server status
+
+# Stop the server
+neurolink server stop
+```
+
+### Viewing Server Routes
+
+List all registered API endpoints:
+
+```bash
+# Show all routes in table format
+neurolink server routes
+
+# Filter by route group
+neurolink server routes --group agent
+neurolink server routes --group health
+
+# Filter by HTTP method
+neurolink server routes --method POST
+
+# Export as JSON
+neurolink server routes --format json > routes.json
+```
+
+**Route Groups:**
+
+| Group    | Base Path   | Description                      |
+| -------- | ----------- | -------------------------------- |
+| `agent`  | /api/agent  | AI agent execution and streaming |
+| `tool`   | /api/tools  | Tool listing and execution       |
+| `mcp`    | /api/mcp    | MCP server management            |
+| `memory` | /api/memory | Conversation memory              |
+| `health` | /api/health | Health checks and metrics        |
+
+### Managing Server Configuration
+
+View and modify server settings:
+
+```bash
+# Show all configuration
+neurolink server config
+
+# Get specific value
+neurolink server config --get defaultPort
+neurolink server config --get cors.enabled
+
+# Set configuration values
+neurolink server config --set defaultPort=8080
+neurolink server config --set rateLimit.maxRequests=200
+
+# Reset to defaults
+neurolink server config --reset
+
+# Export as JSON
+neurolink server config --format json
+```
+
+### Generating OpenAPI Specification
+
+Generate API documentation:
+
+```bash
+# Output to stdout
+neurolink server openapi
+
+# Save to file
+neurolink server openapi -o openapi.json
+
+# Generate YAML format
+neurolink server openapi --format yaml -o api-spec.yaml
+
+# With custom metadata
+neurolink server openapi --title "My API" --version "1.0.0"
+```
+
+### Server Command Reference
+
+| Command                    | Description                |
+| -------------------------- | -------------------------- |
+| `serve [options]`          | Start server in foreground |
+| `server start [options]`   | Start server in background |
+| `server stop [--force]`    | Stop background server     |
+| `server status [--format]` | Show server status         |
+| `server routes [options]`  | List registered routes     |
+| `server config [options]`  | Manage configuration       |
+| `server openapi [options]` | Generate OpenAPI spec      |
+
+### Framework Selection
+
+Choose the right framework for your needs:
+
+```bash
+# Hono (default) - Lightweight, fast, edge-ready
+neurolink serve --framework hono
+
+# Express - Most ecosystem support, familiar API
+neurolink serve --framework express
+
+# Fastify - High performance, schema validation
+neurolink serve --framework fastify
+
+# Koa - Elegant middleware composition
+neurolink serve --framework koa
+```
+
 ### MCP Configuration Management
 
 MCP servers are automatically configured in `.mcp-config.json`:

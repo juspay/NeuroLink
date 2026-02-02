@@ -1,0 +1,499 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NeuroLink Server Adapter Request Payloads",
+  "description": "Sample request payloads for testing server adapters",
+  "version": "1.0.0",
+  "_note": "FIXTURE STATUS: This fixture is prepared for use but not yet imported by any test files. The loadTestFixture utility in server-test-utils.ts can load this file. See docs-site/docs/server-tests/TESTING.md for intended usage patterns.",
+
+  "agentExecuteRequest": {
+    "valid": {
+      "minimal": {
+        "description": "Minimal valid request with just input",
+        "payload": {
+          "input": "Hello, world!"
+        }
+      },
+      "withProvider": {
+        "description": "Request with provider and model specified",
+        "payload": {
+          "input": "What is the capital of France?",
+          "provider": "openai",
+          "model": "gpt-4"
+        }
+      },
+      "withSystemPrompt": {
+        "description": "Request with system prompt",
+        "payload": {
+          "input": "Explain quantum computing",
+          "provider": "anthropic",
+          "model": "claude-3-5-sonnet-20241022",
+          "systemPrompt": "You are a physics professor explaining concepts to undergraduate students."
+        }
+      },
+      "withParameters": {
+        "description": "Request with all generation parameters",
+        "payload": {
+          "input": "Write a creative story about a robot",
+          "provider": "openai",
+          "model": "gpt-4",
+          "temperature": 0.9,
+          "maxTokens": 2000,
+          "systemPrompt": "You are a creative writer."
+        }
+      },
+      "withTools": {
+        "description": "Request with tools enabled",
+        "payload": {
+          "input": "What time is it in Tokyo?",
+          "provider": "openai",
+          "model": "gpt-4",
+          "tools": ["getCurrentTime", "websearchGrounding"]
+        }
+      },
+      "withSession": {
+        "description": "Request with session context",
+        "payload": {
+          "input": "Continue our conversation",
+          "sessionId": "session-abc-123",
+          "userId": "user-456"
+        }
+      },
+      "multimodalText": {
+        "description": "Multimodal request with text object",
+        "payload": {
+          "input": {
+            "text": "Describe this image",
+            "images": [
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            ]
+          },
+          "provider": "openai",
+          "model": "gpt-4o"
+        }
+      },
+      "streamingRequest": {
+        "description": "Request for streaming response",
+        "payload": {
+          "input": "Tell me a long story",
+          "stream": true,
+          "provider": "openai",
+          "model": "gpt-4"
+        }
+      }
+    },
+
+    "invalid": {
+      "missingInput": {
+        "description": "Missing required input field",
+        "payload": {
+          "provider": "openai"
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "input"
+        }
+      },
+      "emptyInput": {
+        "description": "Empty input string",
+        "payload": {
+          "input": ""
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "input"
+        }
+      },
+      "invalidTemperature": {
+        "description": "Temperature out of range",
+        "payload": {
+          "input": "Hello",
+          "temperature": 3.0
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "temperature",
+          "message": "must be between 0 and 2"
+        }
+      },
+      "negativeMaxTokens": {
+        "description": "Negative max tokens",
+        "payload": {
+          "input": "Hello",
+          "maxTokens": -100
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "maxTokens"
+        }
+      },
+      "wrongInputType": {
+        "description": "Input as number instead of string/object",
+        "payload": {
+          "input": 12345
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "input",
+          "message": "must be string or object"
+        }
+      },
+      "invalidProvider": {
+        "description": "Non-existent provider",
+        "payload": {
+          "input": "Hello",
+          "provider": "nonexistent-provider"
+        },
+        "expectedError": {
+          "code": "PROVIDER_NOT_FOUND"
+        }
+      },
+      "nullBody": {
+        "description": "Null request body",
+        "payload": null,
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "message": "Request body required"
+        }
+      },
+      "arrayBody": {
+        "description": "Array instead of object body",
+        "payload": ["input", "value"],
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "message": "Request body must be an object"
+        }
+      }
+    }
+  },
+
+  "toolExecuteRequest": {
+    "valid": {
+      "minimal": {
+        "description": "Minimal tool execution request",
+        "payload": {
+          "name": "calculateMath",
+          "arguments": {
+            "expression": "2 + 2"
+          }
+        }
+      },
+      "withSession": {
+        "description": "Tool execution with session context",
+        "payload": {
+          "name": "readFile",
+          "arguments": {
+            "path": "/path/to/file.txt"
+          },
+          "sessionId": "session-abc-123",
+          "userId": "user-456"
+        }
+      },
+      "complexArguments": {
+        "description": "Tool with complex nested arguments",
+        "payload": {
+          "name": "complexTool",
+          "arguments": {
+            "config": {
+              "nested": {
+                "value": 42
+              },
+              "array": [1, 2, 3]
+            },
+            "options": {
+              "enabled": true,
+              "mode": "advanced"
+            }
+          }
+        }
+      },
+      "emptyArguments": {
+        "description": "Tool with no arguments",
+        "payload": {
+          "name": "getCurrentTime",
+          "arguments": {}
+        }
+      }
+    },
+
+    "invalid": {
+      "missingName": {
+        "description": "Missing tool name",
+        "payload": {
+          "arguments": { "key": "value" }
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "name"
+        }
+      },
+      "missingArguments": {
+        "description": "Missing arguments field",
+        "payload": {
+          "name": "calculateMath"
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "arguments"
+        }
+      },
+      "emptyName": {
+        "description": "Empty tool name",
+        "payload": {
+          "name": "",
+          "arguments": {}
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "name"
+        }
+      },
+      "argumentsNotObject": {
+        "description": "Arguments as string instead of object",
+        "payload": {
+          "name": "testTool",
+          "arguments": "not-an-object"
+        },
+        "expectedError": {
+          "code": "VALIDATION_ERROR",
+          "field": "arguments",
+          "message": "must be an object"
+        }
+      },
+      "nonexistentTool": {
+        "description": "Tool that doesn't exist",
+        "payload": {
+          "name": "nonexistentTool",
+          "arguments": {}
+        },
+        "expectedError": {
+          "code": "TOOL_NOT_FOUND"
+        }
+      }
+    }
+  },
+
+  "mcpToolExecuteRequest": {
+    "valid": {
+      "pathStyle": {
+        "description": "Execute MCP tool via path parameters",
+        "path": "/api/mcp/servers/github/tools/create_issue/execute",
+        "payload": {
+          "owner": "juspay",
+          "repo": "neurolink",
+          "title": "Test issue",
+          "body": "This is a test"
+        }
+      }
+    },
+
+    "invalid": {
+      "serverNotFound": {
+        "description": "MCP server doesn't exist",
+        "path": "/api/mcp/servers/nonexistent/tools/someTool/execute",
+        "payload": {},
+        "expectedError": {
+          "code": "SERVER_NOT_FOUND"
+        }
+      },
+      "toolNotOnServer": {
+        "description": "Tool not available on specified server",
+        "path": "/api/mcp/servers/github/tools/nonexistent_tool/execute",
+        "payload": {},
+        "expectedError": {
+          "code": "TOOL_NOT_FOUND"
+        }
+      }
+    }
+  },
+
+  "memoryRequest": {
+    "clearSession": {
+      "description": "Clear a specific session",
+      "path": "/api/memory/sessions/session-abc-123",
+      "method": "DELETE",
+      "expectedResponse": {
+        "success": true,
+        "sessionId": "session-abc-123"
+      }
+    },
+    "clearAllSessions": {
+      "description": "Clear all sessions",
+      "path": "/api/memory/sessions",
+      "method": "DELETE",
+      "expectedResponse": {
+        "success": true
+      }
+    },
+    "invalidSessionId": {
+      "description": "Invalid session ID format",
+      "path": "/api/memory/sessions/",
+      "method": "DELETE",
+      "expectedError": {
+        "code": "VALIDATION_ERROR"
+      }
+    }
+  },
+
+  "errorResponses": {
+    "validation": {
+      "statusCode": 400,
+      "body": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "Validation failed",
+          "details": {
+            "errors": [
+              {
+                "field": "input",
+                "message": "Required field missing",
+                "code": "required"
+              }
+            ]
+          }
+        },
+        "metadata": {
+          "requestId": "uuid",
+          "timestamp": "ISO-8601"
+        }
+      }
+    },
+    "authentication": {
+      "statusCode": 401,
+      "body": {
+        "error": {
+          "code": "AUTH_REQUIRED",
+          "message": "Authentication required"
+        },
+        "metadata": {
+          "requestId": "uuid",
+          "timestamp": "ISO-8601"
+        }
+      }
+    },
+    "authorization": {
+      "statusCode": 403,
+      "body": {
+        "error": {
+          "code": "INSUFFICIENT_PERMISSIONS",
+          "message": "Insufficient permissions"
+        }
+      }
+    },
+    "notFound": {
+      "statusCode": 404,
+      "body": {
+        "error": {
+          "code": "NOT_FOUND",
+          "message": "Resource not found"
+        }
+      }
+    },
+    "rateLimit": {
+      "statusCode": 429,
+      "headers": {
+        "Retry-After": "60",
+        "X-RateLimit-Limit": "100",
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "1704067200"
+      },
+      "body": {
+        "error": {
+          "code": "RATE_LIMIT_EXCEEDED",
+          "message": "Too many requests, please try again later",
+          "retryAfter": 60
+        }
+      }
+    },
+    "serverError": {
+      "statusCode": 500,
+      "body": {
+        "error": {
+          "code": "INTERNAL_ERROR",
+          "message": "An unexpected error occurred"
+        },
+        "metadata": {
+          "requestId": "uuid",
+          "timestamp": "ISO-8601"
+        }
+      }
+    }
+  },
+
+  "streamingPayloads": {
+    "sseEvents": {
+      "textStart": {
+        "event": "text-start",
+        "data": { "id": "text-1" }
+      },
+      "textDelta": {
+        "event": "text-delta",
+        "data": { "id": "text-1", "delta": "Hello" }
+      },
+      "textEnd": {
+        "event": "text-end",
+        "data": { "id": "text-1" }
+      },
+      "toolCall": {
+        "event": "tool-call",
+        "data": {
+          "id": "tool-1",
+          "name": "getCurrentTime",
+          "arguments": { "timezone": "UTC" }
+        }
+      },
+      "toolResult": {
+        "event": "tool-result",
+        "data": {
+          "id": "tool-1",
+          "name": "getCurrentTime",
+          "result": { "time": "2024-01-15T10:30:00Z" }
+        }
+      },
+      "error": {
+        "event": "error",
+        "data": {
+          "message": "Stream interrupted",
+          "code": "STREAM_ERROR"
+        }
+      },
+      "done": {
+        "event": "done",
+        "data": {
+          "usage": {
+            "input": 50,
+            "output": 100,
+            "total": 150
+          },
+          "finishReason": "stop"
+        }
+      }
+    },
+    "ndjsonEvents": {
+      "description": "Newline-delimited JSON format",
+      "contentType": "application/x-ndjson",
+      "example": [
+        "{\"type\":\"text-start\",\"id\":\"text-1\"}",
+        "{\"type\":\"text-delta\",\"id\":\"text-1\",\"delta\":\"Hello\"}",
+        "{\"type\":\"text-delta\",\"id\":\"text-1\",\"delta\":\" World\"}",
+        "{\"type\":\"text-end\",\"id\":\"text-1\"}",
+        "{\"type\":\"done\",\"usage\":{\"input\":10,\"output\":20,\"total\":30}}"
+      ]
+    }
+  },
+
+  "batchRequests": {
+    "toolBatch": {
+      "description": "Execute multiple tools in sequence",
+      "requests": [
+        {
+          "name": "getCurrentTime",
+          "arguments": {}
+        },
+        {
+          "name": "calculateMath",
+          "arguments": { "expression": "42 * 2" }
+        }
+      ]
+    }
+  }
+}

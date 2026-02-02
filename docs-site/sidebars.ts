@@ -150,6 +150,20 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "category",
+          label: "Server Adapters",
+          collapsed: false,
+          items: [
+            "guides/server-adapters/index",
+            "guides/server-adapters/hono",
+            "guides/server-adapters/express",
+            "guides/server-adapters/fastify",
+            "guides/server-adapters/koa",
+            "guides/server-adapters/security",
+            "guides/server-adapters/deployment",
+          ],
+        },
+        {
+          type: "category",
           label: "Migration",
           items: [
             "guides/migration/from-langchain",

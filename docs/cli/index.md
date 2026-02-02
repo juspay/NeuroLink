@@ -59,6 +59,26 @@ The CLI is designed for:
     neurolink mcp install <server>
     ```
 
+=== "Server Management"
+
+    ```bash
+    # Start server in foreground
+    neurolink serve --port 3000 --framework hono
+
+    # Background server management
+    neurolink server start --port 8080
+    neurolink server status
+    neurolink server stop
+
+    # View and manage routes
+    neurolink server routes
+    neurolink server routes --group agent --format json
+
+    # Configuration management
+    neurolink server config
+    neurolink server config --set defaultPort=8080
+    ```
+
 ## 📚 Documentation Sections
 
 <div class="grid cards" markdown>

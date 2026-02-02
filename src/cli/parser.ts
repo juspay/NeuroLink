@@ -7,6 +7,8 @@ import { globalSession } from "../lib/session/globalSessionState.js";
 import { handleError } from "./errorHandler.js";
 import { logger } from "../lib/utils/logger.js";
 import { SetupCommandFactory } from "./factories/setupCommandFactory.js";
+import { ServerCommandFactory } from "./commands/server.js";
+import { ServeCommandFactory } from "./commands/serve.js";
 
 // Enhanced CLI with Professional UX
 export function initializeCliParser() {
@@ -194,5 +196,11 @@ export function initializeCliParser() {
 
       // Setup Commands - Using SetupCommandFactory
       .command(SetupCommandFactory.createSetupCommands())
+
+      // Server Command Group - Using ServerCommandFactory
+      .command(ServerCommandFactory.createServerCommands())
+
+      // Serve Command - Simplified server start - Using ServeCommandFactory
+      .command(ServeCommandFactory.createServeCommands())
   ); // Close the main return statement
 }

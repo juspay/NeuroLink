@@ -1,0 +1,198 @@
+/**
+ * Health Routes
+ * Endpoints for health checks and system status
+ */
+
+import type {
+  HealthResponse,
+  ReadyResponse,
+  RouteGroup,
+  ServerContext,
+} from "../types.js";
+
+/**
+ * Create health check routes
+ */
+export function createHealthRoutes(basePath: string = "/api"): RouteGroup {
+  return {
+    prefix: `${basePath}/health`,
+    routes: [
+      {
+        method: "GET",
+        path: `${basePath}/health`,
+        handler: async (): Promise<HealthResponse> => {
+          return {
+            status: "ok",
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime() * 1000,
+            version: process.env.npm_package_version || "unknown",
+          };
+        },
+        description: "Basic health check",
+        tags: ["health"],
+      },
+      {
+        method: "GET",
+        path: `${basePath}/health/live`,
+        handler: async (): Promise<{ status: string; timestamp: string }> => {
+          // Liveness probe - just checks if the server is running
+          return {
+            status: "alive",
+            timestamp: new Date().toISOString(),
+          };
+        },
+        description: "Kubernetes liveness probe",
+        tags: ["health"],
+      },
+      {
+        method: "GET",
+        path: `${basePath}/health/ready`,
+        handler: async (ctx: ServerContext): Promise<ReadyResponse> => {
+          // Readiness probe - checks if all dependencies are ready
+          const tools = await ctx.toolRegistry.listTools();
+          const hasTools = tools.length > 0;
+          const hasExternalManager = !!ctx.externalServerManager;
+
+          // Check external servers if available
+          let externalServersReady = true;
+          if (ctx.externalServerManager) {
+            const statuses = ctx.externalServerManager.getServerStatuses();
+            for (const status of statuses) {
+              if (status.status !== "connected") {
+                externalServersReady = false;
+                break;
+              }
+            }
+          }
+
+          const isReady =
+            hasTools || !hasExternalManager || externalServersReady;
+
+          return {
+            ready: isReady,
+            timestamp: new Date().toISOString(),
+            services: {
+              neurolink: true,
+              tools: hasTools,
+              externalServers: externalServersReady,
+            },
+          };
+        },
+        description: "Kubernetes readiness probe",
+        tags: ["health"],
+      },
+      {
+        method: "GET",
+        path: `${basePath}/health/startup`,
+        handler: async (ctx: ServerContext) => {
+          // Startup probe - checks if the application has started successfully
+          const tools = await ctx.toolRegistry.listTools();
+
+          return {
+            started: true,
+            timestamp: new Date().toISOString(),
+            services: {
+              neurolink: true,
+              toolsLoaded: tools.length,
+              externalServerManager: !!ctx.externalServerManager,
+            },
+          };
+        },
+        description: "Kubernetes startup probe",
+        tags: ["health"],
+      },
+      {
+        method: "GET",
+        path: `${basePath}/health/detailed`,
+        handler: async (ctx: ServerContext) => {
+          const tools = await ctx.toolRegistry.listTools();
+
+          // Group tools by source
+          const toolsBySource: Record<string, number> = {};
+          for (const tool of tools) {
+            const source =
+              typeof tool.source === "string"
+                ? tool.source
+                : tool.serverId || "built-in";
+            toolsBySource[source] = (toolsBySource[source] || 0) + 1;
+          }
+
+          // Get external server statuses
+          const externalServers: Array<{
+            name: string;
+            status: string;
+            toolCount: number;
+          }> = [];
+          if (ctx.externalServerManager) {
+            const statuses = ctx.externalServerManager.getServerStatuses();
+            for (const status of statuses) {
+              externalServers.push({
+                name: status.serverId,
+                status: status.status,
+                toolCount: status.toolCount,
+              });
+            }
+          }
+
+          // Memory status
+          const memory = ctx.neurolink.conversationMemory;
+          const memoryStatus = {
+            available: !!memory,
+            type: memory?.constructor.name || "none",
+          };
+
+          return {
+            status: "ok",
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime() * 1000,
+            version: process.env.npm_package_version || "unknown",
+            node: {
+              version: process.version,
+              platform: process.platform,
+              arch: process.arch,
+            },
+            memory: {
+              ...memoryStatus,
+              process: {
+                heapUsed: Math.round(
+                  process.memoryUsage().heapUsed / 1024 / 1024,
+                ),
+                heapTotal: Math.round(
+                  process.memoryUsage().heapTotal / 1024 / 1024,
+                ),
+                rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
+                external: Math.round(
+                  process.memoryUsage().external / 1024 / 1024,
+                ),
+              },
+            },
+            tools: {
+              total: tools.length,
+              bySource: toolsBySource,
+            },
+            externalServers: {
+              count: externalServers.length,
+              servers: externalServers,
+            },
+          };
+        },
+        description: "Detailed health information",
+        tags: ["health"],
+      },
+      {
+        method: "GET",
+        path: `${basePath}/version`,
+        handler: async () => {
+          return {
+            name: "@juspay/neurolink",
+            version: process.env.npm_package_version || "unknown",
+            node: process.version,
+            timestamp: new Date().toISOString(),
+          };
+        },
+        description: "Get version information",
+        tags: ["health", "version"],
+      },
+    ],
+  };
+}

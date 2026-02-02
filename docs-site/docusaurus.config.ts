@@ -274,6 +274,14 @@ const config: Config = {
   plugins: [
     // Client-side redirects for legacy paths, SEO, and URL migrations
     redirectsPluginConfig,
+
+    // NOTE: docusaurus-plugin-new-docs is available but disabled.
+    // Location: plugins/docusaurus-plugin-new-docs/index.js
+    // Purpose: Auto-detect new/modified docs via Git history for "NEW" badges.
+    // Status: Disabled due to Docusaurus 3.9.2 generatedFilesDir compatibility issue.
+    // Workaround: Badge detection handled via frontmatter tags and sync-docs.ts.
+    // To re-enable: Uncomment the plugin config below after fixing generatedFilesDir issue.
+    // See: https://github.com/facebook/docusaurus/issues (search generatedFilesDir)
   ],
 };
 
