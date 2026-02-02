@@ -494,4 +494,113 @@ describe("FileDetector", () => {
       expect(result.type).toBe("pdf");
     });
   });
+
+  describe("CSV-009: Single-column CSV detection", () => {
+    it("should detect and process single-column CSV with IDs", async () => {
+      const csvPath = join(fixturesPath, "single-column-ids.csv");
+      const result = await FileDetector.detectAndProcess(csvPath);
+
+      expect(result.type).toBe("csv");
+      expect(result.mimeType).toBe("text/csv");
+      expect(result.metadata.columnCount).toBe(1);
+      expect(result.metadata.rowCount).toBeGreaterThanOrEqual(3);
+      expect(result.content).toContain("ID123");
+    });
+
+    it("should detect and process single-column CSV with names", async () => {
+      const csvPath = join(fixturesPath, "single-column-names.csv");
+      const result = await FileDetector.detectAndProcess(csvPath);
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.columnCount).toBe(1);
+      expect(result.metadata.rowCount).toBeGreaterThanOrEqual(5);
+      expect(result.content).toContain("Alice Johnson");
+      expect(result.content).toContain("Bob Smith");
+    });
+
+    it("should detect and process single-column CSV with cities (varied lengths)", async () => {
+      const csvPath = join(fixturesPath, "single-column-cities.csv");
+      const result = await FileDetector.detectAndProcess(csvPath);
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.columnCount).toBe(1);
+      expect(result.metadata.rowCount).toBeGreaterThanOrEqual(5);
+      expect(result.content).toContain("New York");
+      expect(result.content).toContain("Los Angeles");
+      expect(result.content).toContain("Philadelphia");
+    });
+
+    it("should detect and process single-column CSV with emails", async () => {
+      const csvPath = join(fixturesPath, "single-column-emails.csv");
+      const result = await FileDetector.detectAndProcess(csvPath);
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.columnCount).toBe(1);
+      // First row becomes header, so at least 2 data rows
+      expect(result.metadata.rowCount).toBeGreaterThanOrEqual(2);
+      expect(result.content).toContain("alice@example.com");
+      expect(result.content).toContain("bob.smith@company.org");
+    });
+
+    it("should detect single-column CSV from Buffer", async () => {
+      const csvBuffer = Buffer.from("Item1\nItem2\nItem3\nItem4");
+      const result = await FileDetector.detectAndProcess(csvBuffer);
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.columnCount).toBe(1);
+      // First row becomes header, so 3 data rows
+      expect(result.metadata.rowCount).toBe(3);
+    });
+
+    it("should respect allowedTypes for single-column CSVs", async () => {
+      const csvPath = join(fixturesPath, "single-column-ids.csv");
+      const result = await FileDetector.detectAndProcess(csvPath, {
+        allowedTypes: ["csv"],
+      });
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.columnCount).toBe(1);
+    });
+
+    it("should apply CSV options to single-column CSVs", async () => {
+      const csvPath = join(fixturesPath, "single-column-names.csv");
+      const result = await FileDetector.detectAndProcess(csvPath, {
+        csvOptions: {
+          maxRows: 3,
+          formatStyle: "json",
+        },
+      });
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.rowCount).toBe(3);
+      expect(result.metadata.columnCount).toBe(1);
+    });
+
+    it("should not detect prose/sentences as single-column CSV", async () => {
+      const proseBuffer = Buffer.from(
+        "This is a normal sentence with many words.\nHere is another sentence with even more words in it.\nAnd a third sentence to complete the paragraph.",
+      );
+      const result = await FileDetector.detectAndProcess(proseBuffer);
+
+      // Should be detected as text, not CSV (prose has >4 words per line)
+      expect(result.type).toBe("text");
+    });
+
+    it("should not detect JSON as single-column CSV", async () => {
+      const jsonBuffer = Buffer.from('[{"name": "Alice"}, {"name": "Bob"}]');
+      const result = await FileDetector.detectAndProcess(jsonBuffer);
+
+      // Should be detected as text (JSON), not CSV
+      expect(result.type).toBe("text");
+      expect(result.mimeType).toContain("json");
+    });
+
+    it("should not detect YAML as single-column CSV", async () => {
+      const yamlBuffer = Buffer.from("---\nkey1: value1\nkey2: value2\n");
+      const result = await FileDetector.detectAndProcess(yamlBuffer);
+
+      // Should be detected as text (YAML), not CSV
+      expect(result.type).toBe("text");
+    });
+  });
 });

@@ -12,6 +12,30 @@ CSV support in NeuroLink works just like image support - it's a multimodal input
 4. **Injects** formatted CSV data into your prompt text
 5. **Works** with ALL AI providers (not limited to vision models)
 
+### Single-Column CSV Support (CSV-009)
+
+NeuroLink fully supports **single-column CSV files**, which are commonly used for:
+
+- **Lists of IDs**: `ID123`, `ID456`, `ID789`
+- **Names**: `Alice Johnson`, `Bob Smith`, `Charlie Brown`
+- **Email addresses**: `alice@example.com`, `bob@company.org`
+- **Cities/Locations**: `New York`, `Los Angeles`, `Chicago`
+- **Product codes**, **account numbers**, **reference numbers**, etc.
+
+Single-column CSVs are automatically detected and processed like multi-column CSVs:
+
+```typescript
+// Example: Analyze a list of customer IDs
+const result = await neurolink.generate({
+  input: {
+    text: "Analyze these customer IDs and identify any patterns",
+    csvFiles: ["customer-ids.csv"], // Single column: ID123, ID456, ID789...
+  },
+});
+```
+
+The detection system uses data-like pattern validation to distinguish single-column CSVs from prose or other text formats.
+
 ## Quick Start
 
 ### SDK Usage
@@ -231,6 +255,8 @@ NeuroLink uses a **multi-strategy detection system** with confidence scores:
 4. **Content Heuristics** (75% confidence)
    - Analyzes file content patterns
    - Detects CSV by checking consistent comma-separated columns
+   - **CSV-009**: Supports single-column CSVs (e.g., lists of IDs, names, emails)
+   - Single-column detection uses data-like pattern validation
 
 The system stops at the **first strategy with 80%+ confidence**.
 

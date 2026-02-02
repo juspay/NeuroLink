@@ -1088,19 +1088,31 @@ class ContentHeuristicStrategy implements DetectionStrategy {
       );
       const noBinaryChars = !text.includes("\0");
 
-      // Single-column CSVs should have VERY uniform line lengths
-      // (data values like IDs, codes, numbers - not varied content)
+      // CSV-009: Accept single-column CSVs with varied data
+      // Single-column CSVs can contain varied data (names, cities, emails, IDs, etc.)
+      // We check for data-like characteristics rather than strict uniformity
       const lengths = lines.map((l) => l.length);
       const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
       const variance =
         lengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) /
         lengths.length;
       const stdDev = Math.sqrt(variance);
-      // Single-column CSVs can contain varied data (names, cities, emails, etc.)
-      // but should still show some consistency compared to random text
-      const hasUniformLengths = stdDev / avgLength < 0.75;
 
-      return hasReasonableLengths && noBinaryChars && hasUniformLengths;
+      // Relaxed coefficient of variation check (1.0 instead of 0.75)
+      // This allows for more variation while still filtering out random text/prose
+      const coefficientOfVariation = stdDev / avgLength;
+      const hasReasonableVariation = coefficientOfVariation < 1.0;
+
+      // Additional check: At least 50% of lines should be non-empty after trimming
+      const nonEmptyLines = lines.filter((l) => l.trim().length > 0).length;
+      const hasEnoughContent = nonEmptyLines / lines.length >= 0.5;
+
+      return (
+        hasReasonableLengths &&
+        noBinaryChars &&
+        hasReasonableVariation &&
+        hasEnoughContent
+      );
     }
 
     // Count delimiters per line and check consistency

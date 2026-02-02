@@ -546,4 +546,114 @@ Charlie,35,Chicago`;
       expect(rawResult.metadata.totalLines).toBe(5); // header + 2 data + 2 whitespace
     });
   });
+
+  describe("CSV-009: Single-column CSV support", () => {
+    it("should process single-column CSV with IDs", async () => {
+      const csvData = Buffer.from("ID123\nID456\nID789\nID101");
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(rawResult.type).toBe("csv");
+      expect(rawResult.metadata.columnCount).toBe(1);
+      expect(rawResult.metadata.rowCount).toBeGreaterThanOrEqual(3);
+      expect(rawResult.content).toContain("ID123");
+
+      expect(jsonResult.type).toBe("csv");
+      expect(jsonResult.metadata.columnCount).toBe(1);
+    });
+
+    it("should process single-column CSV with names", async () => {
+      const csvData = Buffer.from(
+        "Alice Johnson\nBob Smith\nCharlie Brown\nDiana Martinez",
+      );
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+
+      expect(rawResult.type).toBe("csv");
+      expect(rawResult.metadata.columnCount).toBe(1);
+      expect(rawResult.metadata.rowCount).toBeGreaterThanOrEqual(3);
+      expect(rawResult.content).toContain("Alice Johnson");
+      expect(rawResult.content).toContain("Bob Smith");
+    });
+
+    it("should process single-column CSV with emails", async () => {
+      const csvData = Buffer.from(
+        "alice@example.com\nbob.smith@company.org\ncharlie.brown@mail.com",
+      );
+
+      const jsonResult = await CSVProcessor.process(csvData, {
+        formatStyle: "json",
+      });
+
+      expect(jsonResult.type).toBe("csv");
+      expect(jsonResult.metadata.columnCount).toBe(1);
+      // First row becomes header, so 2 data rows
+      expect(jsonResult.metadata.rowCount).toBe(2);
+      expect(jsonResult.content).toContain("alice@example.com");
+    });
+
+    it("should process single-column CSV with cities (varied lengths)", async () => {
+      const csvData = Buffer.from(
+        "New York\nLos Angeles\nChicago\nHouston\nPhoenix\nPhiladelphia",
+      );
+
+      const rawResult = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+      });
+
+      expect(rawResult.type).toBe("csv");
+      expect(rawResult.metadata.columnCount).toBe(1);
+      // First row becomes header, so 5 data rows
+      expect(rawResult.metadata.rowCount).toBe(5);
+      expect(rawResult.content).toContain("New York");
+      expect(rawResult.content).toContain("Philadelphia");
+    });
+
+    it("should respect maxRows for single-column CSVs", async () => {
+      const csvData = Buffer.from("Item1\nItem2\nItem3\nItem4\nItem5\nItem6");
+
+      const result = await CSVProcessor.process(csvData, {
+        formatStyle: "raw",
+        maxRows: 3,
+      });
+
+      expect(result.metadata.rowCount).toBe(3);
+      expect(result.content).toContain("Item1");
+      expect(result.content).toContain("Item3");
+      expect(result.content).not.toContain("Item6");
+    });
+
+    it("should handle single-column CSV in markdown format", async () => {
+      const csvData = Buffer.from("Product\nLaptop\nMouse\nKeyboard");
+
+      const result = await CSVProcessor.process(csvData, {
+        formatStyle: "markdown",
+      });
+
+      expect(result.type).toBe("csv");
+      expect(result.metadata.columnCount).toBe(1);
+      expect(result.content).toContain("Product");
+      expect(result.content).toContain("Laptop");
+    });
+
+    it("should log success for single-column CSV processing", async () => {
+      const csvData = Buffer.from("Value1\nValue2\nValue3");
+      await CSVProcessor.process(csvData, { formatStyle: "raw" });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        "[CSVProcessor] ✅ Processed CSV file",
+        expect.objectContaining({
+          formatStyle: "raw",
+          columnCount: 1,
+        }),
+      );
+    });
+  });
 });
