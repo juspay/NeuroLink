@@ -65,6 +65,16 @@ export type FileProcessingResult = {
     columnNames?: string[];
     sampleData?: string | unknown[];
     hasEmptyColumns?: boolean;
+    /** Enhanced column metadata with type detection and statistics */
+    columnMetadata?: CSVColumnMetadata[];
+    /** Data quality warnings */
+    dataQualityWarnings?: CSVDataQualityWarning[];
+    /** Overall data quality score (0-100) */
+    dataQualityScore?: number;
+    /** Whether headers were detected */
+    hasHeaders?: boolean;
+    /** Detected delimiter */
+    detectedDelimiter?: string;
     // PDF-specific metadata
     version?: string;
     estimatedPages?: number | null;
@@ -92,6 +102,66 @@ export type FileProcessingResult = {
  * - 'markdown': Markdown table format
  */
 export type SampleDataFormat = "object" | "json" | "csv" | "markdown";
+
+/**
+ * Detected data type for a CSV column
+ */
+export type CSVColumnDataType =
+  | "string"
+  | "number"
+  | "integer"
+  | "float"
+  | "boolean"
+  | "date"
+  | "datetime"
+  | "email"
+  | "url"
+  | "empty"
+  | "mixed";
+
+/**
+ * Data quality warning for CSV columns
+ */
+export type CSVDataQualityWarning = {
+  column: string;
+  type:
+    | "empty_values"
+    | "invalid_name"
+    | "mixed_types"
+    | "high_null_rate"
+    | "duplicates"
+    | "inconsistent_format";
+  message: string;
+  severity: "info" | "warning" | "error";
+  affectedRows?: number;
+};
+
+/**
+ * Rich metadata for a single CSV column
+ */
+export type CSVColumnMetadata = {
+  name: string;
+  index: number;
+  detectedType: CSVColumnDataType;
+  /** Confidence of type detection (0-100) */
+  typeConfidence: number;
+  /** Count of null/empty values */
+  nullCount: number;
+  /** Count of unique values */
+  uniqueCount: number;
+  /** Sample values from this column (up to 5) */
+  sampleValues: string[];
+  /** For numeric columns: min value */
+  minValue?: number;
+  /** For numeric columns: max value */
+  maxValue?: number;
+  /** For numeric columns: average value */
+  avgValue?: number;
+  /** For date columns: detected format (e.g., 'YYYY-MM-DD', 'MM/DD/YYYY') */
+  dateFormat?: string;
+  /** Column name validation issues */
+  nameIssues?: string[];
+};
 
 /**
  * CSV processor options
