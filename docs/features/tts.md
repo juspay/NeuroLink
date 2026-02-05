@@ -811,6 +811,7 @@ For detailed pricing, see [Google Cloud TTS Pricing](https://cloud.google.com/te
 - [Multimodal Guide](multimodal.md) - Images, PDFs, CSV inputs
 - [PDF Support](pdf-support.md) - Document processing
 - [Video Generation](video-generation.md) - AI-powered video creation
+- [PPT Generation](ppt-generation.md) - AI-powered PowerPoint presentations
 
 **Advanced Features:**
 

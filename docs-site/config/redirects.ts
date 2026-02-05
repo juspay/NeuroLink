@@ -104,6 +104,9 @@ const sectionReorganizationRedirects: PluginOptions["redirects"] = [
   { from: "/image-generation", to: "/docs/features/image-generation" },
   { from: "/video-generation", to: "/docs/features/video-generation" },
   { from: "/video", to: "/docs/features/video-generation" },
+  { from: "/ppt-generation", to: "/docs/features/ppt-generation" },
+  { from: "/ppt", to: "/docs/features/ppt-generation" },
+  { from: "/powerpoint", to: "/docs/features/ppt-generation" },
 
   // Enterprise features redirects
   { from: "/hitl", to: "/docs/features/hitl" },

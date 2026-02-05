@@ -516,8 +516,8 @@ export type GenerateResult = {
    * });
    *
    * if (result.ppt) {
-   *   console.log(`Generated ${result.ppt.slides.length} slides`);
-   *   console.log(`Title: ${result.ppt.slides[0].title}`);
+   *   console.log(`Generated ${result.ppt.totalSlides} slides`);
+   *   console.log(`Saved at: ${result.ppt.filePath}`);
    * }
    * ```
    */

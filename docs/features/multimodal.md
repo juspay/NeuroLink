@@ -562,6 +562,7 @@ const result = await neurolink.generate({
 - [Audio Input](audio-input.md) - Transcription, analysis, and real-time voice
 - [TTS Integration](tts.md) - Text-to-Speech audio output
 - [Video Generation](video-generation.md) - AI-powered video creation
+- [PPT Generation](ppt-generation.md) - AI-powered PowerPoint presentations
 
 **Documentation:**
 

@@ -82,8 +82,8 @@ export type GenerateCommandArgs = BaseCommandArgs & {
   /** Vertex AI region */
   region?: string;
   // Video generation options (Veo 3.1)
-  /** Output mode - 'text' for standard generation, 'video' for video generation */
-  outputMode?: "text" | "video";
+  /** Output mode - 'text' for standard generation, 'video' for video generation, 'ppt' for presentation */
+  outputMode?: "text" | "video" | "ppt";
   /** Path to save generated video file */
   videoOutput?: string;
   /** Video output resolution (720p or 1080p) */
@@ -94,6 +94,21 @@ export type GenerateCommandArgs = BaseCommandArgs & {
   videoAspectRatio?: "9:16" | "16:9";
   /** Enable/disable audio generation in video */
   videoAudio?: boolean;
+  // PPT generation options
+  /** Number of slides to generate (5-50) */
+  pptPages?: number;
+  /** Presentation theme/style */
+  pptTheme?: "modern" | "corporate" | "creative" | "minimal" | "dark";
+  /** Target audience */
+  pptAudience?: "business" | "students" | "technical" | "general";
+  /** Presentation tone/style */
+  pptTone?: "professional" | "casual" | "educational" | "persuasive";
+  /** Path to save generated PPTX file */
+  pptOutput?: string;
+  /** PPT aspect ratio */
+  pptAspectRatio?: "16:9" | "4:3";
+  /** Disable AI image generation for PPT slides */
+  pptNoImages?: boolean;
   /** Custom path for generated image output */
   imageOutput?: string;
 };
@@ -410,6 +425,8 @@ export type GenerateResult = CommandResult & {
   audio?: import("./index.js").TTSResult;
   /** Video generation result when video mode is enabled */
   video?: import("./multimodal.js").VideoGenerationResult;
+  /** PPT generation result when ppt mode is enabled */
+  ppt?: import("./pptTypes.js").PPTGenerationResult;
   imageOutput?: {
     base64: string;
     savedPath?: string; // Local file path where image was saved

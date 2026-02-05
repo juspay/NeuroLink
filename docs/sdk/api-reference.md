@@ -167,8 +167,9 @@ type GenerateOptions = {
   // Output configuration
   output?: {
     format?: "text" | "structured" | "json";
-    mode?: "text" | "video"; // Output mode: 'text' (default) or 'video'
+    mode?: "text" | "video" | "ppt"; // Output mode: 'text' (default), 'video', or 'ppt'
     video?: VideoOutputOptions; // Video generation options (when mode is 'video')
+    ppt?: PPTOutputOptions; // PPT generation options (when mode is 'ppt')
   };
 
   // Document processing options
@@ -216,6 +217,22 @@ type GenerateResult = {
       duration?: number; // Video duration in seconds
       dimensions?: { width: number; height: number };
       model?: string; // Model used for generation
+    };
+  };
+
+  // PPT generation result (when output.mode is 'ppt')
+  ppt?: {
+    filePath: string; // Path to generated PPTX file
+    totalSlides: number; // Number of slides generated
+    format: "pptx"; // Output format
+    provider: string; // Provider used for content planning
+    model: string; // Model used for content planning
+    metadata?: {
+      theme?: string; // Theme applied
+      audience?: string; // Target audience
+      tone?: string; // Presentation tone
+      imageModel?: string; // Model used for image generation
+      fileSize?: number; // File size in bytes
     };
   };
 

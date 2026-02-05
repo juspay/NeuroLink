@@ -105,6 +105,58 @@ try {
 - **Engagement:** 40% higher engagement on video vs. static images
 - **Scale:** Generate videos for entire product catalog
 
+### Product Presentation Generation
+
+**Business Challenge:** Create professional product presentations for sales teams, investor meetings, and partner showcases.
+
+**Solution Implementation:**
+
+```javascript
+import { NeuroLink } from "@juspay/neurolink";
+import { writeFile } from "fs/promises";
+
+const neurolink = new NeuroLink();
+
+try {
+  // Generate product presentation
+  const pptResult = await neurolink.generate({
+    input: {
+      text: `Create a professional product presentation for ${product.name}.
+      Include: product overview, key features, competitive advantages,
+      pricing tiers, customer testimonials, and call to action.
+      Target audience: ${product.targetAudience}`,
+    },
+    provider: "vertex",
+    model: "gemini-2.5-pro",
+    output: {
+      mode: "ppt",
+      ppt: {
+        theme: "corporate",
+        pages: 12,
+        generateAIImages: true,
+        outputPath: `./presentations/${product.id}-deck.pptx`,
+      },
+    },
+    enableAnalytics: true,
+  });
+
+  if (pptResult.ppt) {
+    // Use your logger instead: logger.info(`Presentation generated: ${pptResult.ppt.totalSlides} slides`)
+  }
+} catch (error) {
+  // Handle PPT generation errors (timeout, slide validation, file creation, etc.)
+  // Use your logger instead: logger.error('Presentation generation failed', { error, productId: product.id })
+  throw error;
+}
+```
+
+**Business Results:**
+
+- **Time Savings:** 95% faster than manual deck creation
+- **Consistency:** Brand-aligned presentations every time
+- **Scale:** Generate presentations for entire product catalog
+- **Quality:** Professional 35 slide types with 5 theme options
+
 ### Customer Review Response
 
 **CLI Implementation:**

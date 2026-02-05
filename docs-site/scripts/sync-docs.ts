@@ -967,6 +967,7 @@ const LINK_MAPPINGS: Record<string, string> = {
   "auto-evaluation": "/features/auto-evaluation",
   interactive: "/demos/interactive",
   "video-generation": "/features/video-generation",
+  "ppt-generation": "/features/ppt-generation",
   "conversation-history": "/features/conversation-history",
   "mcp-tools-showcase": "/features/mcp-tools-showcase",
   "provider-orchestration": "/features/provider-orchestration",

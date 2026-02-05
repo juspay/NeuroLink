@@ -30,6 +30,35 @@ if (result.video) {
 
 **See:** [Video Generation Guide](video-generation.md) for complete documentation.
 
+## PPT Generation {#ppt-generation}
+
+NeuroLink supports **AI-powered PowerPoint generation** from text prompts. Create professional presentations with 35 slide types, 5 themes, and optional AI-generated images.
+
+```typescript
+const result = await neurolink.generate({
+  input: {
+    text: "Quarterly Business Report: Revenue growth, key metrics, and 2026 outlook",
+  },
+  provider: "vertex",
+  model: "gemini-2.5-pro",
+  output: {
+    mode: "ppt",
+    ppt: {
+      pages: 15,
+      theme: "corporate",
+      audience: "business",
+      generateAIImages: true,
+    },
+  },
+});
+
+if (result.ppt) {
+  console.log(`Presentation saved: ${result.ppt.filePath}`);
+}
+```
+
+**See:** [PPT Generation Guide](ppt-generation.md) for complete documentation.
+
 ## Images {#images}
 
 NeuroLink provides comprehensive image support across all vision-capable providers. Images can be provided as local file paths, HTTPS URLs, or Buffer objects, and are automatically converted to the provider's required encoding format.
@@ -374,6 +403,11 @@ Set appropriate `maxTokens` for PDF analysis (recommended: 2000-8000 tokens).
 | `Streaming ends early`             | Disable tools (`--disableTools`) to avoid tool calls that may not support vision. |
 
 ## Related Features
+
+**Content Generation:**
+
+- [PPT Generation](ppt-generation.md) – AI-powered PowerPoint presentations with 35 slide types
+- [Video Generation](video-generation.md) – Generate videos from images with Veo 3.1
 
 **Document Processing:**
 

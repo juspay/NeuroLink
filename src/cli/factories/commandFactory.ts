@@ -339,10 +339,10 @@ export class CLICommandFactory {
     // Video Generation options (Veo 3.1)
     outputMode: {
       type: "string" as const,
-      choices: ["text", "video"],
+      choices: ["text", "video", "ppt"],
       default: "text",
       description:
-        "Output mode: 'text' for standard generation, 'video' for video generation",
+        "Output mode: 'text' for standard generation, 'video' for video, 'ppt' for presentation",
     },
     videoOutput: {
       type: "string" as const,
@@ -371,6 +371,46 @@ export class CLICommandFactory {
       type: "boolean" as const,
       default: true,
       description: "Enable/disable audio generation in video",
+    },
+
+    // PPT Generation options
+    pptPages: {
+      type: "number" as const,
+      alias: "pages",
+      description:
+        "Number of slides to generate (5-50, default: 10 when PPT mode is enabled)",
+    },
+    pptTheme: {
+      type: "string" as const,
+      choices: ["modern", "corporate", "creative", "minimal", "dark"],
+      description:
+        "Presentation theme/style (default: AI selects based on topic)",
+    },
+    pptAudience: {
+      type: "string" as const,
+      choices: ["business", "students", "technical", "general"],
+      description: "Target audience (default: AI selects based on topic)",
+    },
+    pptTone: {
+      type: "string" as const,
+      choices: ["professional", "casual", "educational", "persuasive"],
+      description: "Presentation tone (default: AI selects based on topic)",
+    },
+    pptOutput: {
+      type: "string" as const,
+      alias: "po",
+      description: "Path to save generated PPTX file (e.g., ./output.pptx)",
+    },
+    pptAspectRatio: {
+      type: "string" as const,
+      choices: ["16:9", "4:3"],
+      description:
+        "Slide aspect ratio (default: 16:9 when PPT mode is enabled)",
+    },
+    pptNoImages: {
+      type: "boolean" as const,
+      default: false,
+      description: "Disable AI image generation for slides",
     },
 
     thinking: {
@@ -609,12 +649,36 @@ export class CLICommandFactory {
       ttsOutput: argv.ttsOutput as string | undefined,
       ttsPlay: argv.ttsPlay as boolean | undefined,
       // Video generation options (Veo 3.1)
-      outputMode: argv.outputMode as "text" | "video" | undefined,
+      outputMode: argv.outputMode as "text" | "video" | "ppt" | undefined,
       videoOutput: argv.videoOutput as string | undefined,
       videoResolution: argv.videoResolution as "720p" | "1080p" | undefined,
       videoLength: argv.videoLength as 4 | 6 | 8 | undefined,
       videoAspectRatio: argv.videoAspectRatio as "9:16" | "16:9" | undefined,
       videoAudio: argv.videoAudio as boolean | undefined,
+      // PPT generation options
+      pptPages: argv.pptPages as number | undefined,
+      pptTheme: argv.pptTheme as
+        | "modern"
+        | "corporate"
+        | "creative"
+        | "minimal"
+        | "dark"
+        | undefined,
+      pptAudience: argv.pptAudience as
+        | "business"
+        | "students"
+        | "technical"
+        | "general"
+        | undefined,
+      pptTone: argv.pptTone as
+        | "professional"
+        | "casual"
+        | "educational"
+        | "persuasive"
+        | undefined,
+      pptOutput: argv.pptOutput as string | undefined,
+      pptAspectRatio: argv.pptAspectRatio as "16:9" | "4:3" | undefined,
+      pptNoImages: argv.pptNoImages as boolean | undefined,
       // Extended thinking options for Claude and Gemini models
       thinking: argv.thinking as boolean | undefined,
       thinkingBudget: argv.thinkingBudget as number | undefined,
@@ -929,6 +993,67 @@ export class CLICommandFactory {
   }
 
   /**
+   * Helper method to configure options for PPT generation mode
+   * Auto-configures provider, model, and tools settings for presentation generation
+   */
+  private static configurePPTMode(
+    enhancedOptions: BaseCommandArgs & Record<string, unknown>,
+    argv: BaseCommandArgs & Record<string, unknown>,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): void {
+    const userEnabledTools = !argv.disableTools; // Tools are enabled by default
+    enhancedOptions.disableTools = true;
+
+    // Auto-set provider for PPT generation if not explicitly specified
+    // PPT works best with Vertex or Google AI for content planning
+    if (!enhancedOptions.provider) {
+      enhancedOptions.provider = "vertex";
+      if (options.debug) {
+        logger.debug(
+          "Auto-setting provider to 'vertex' for PPT generation mode",
+        );
+      }
+    }
+
+    // Auto-set model if not explicitly specified
+    if (!enhancedOptions.model) {
+      // Use gemini-2.5-flash for fast, high-quality content planning
+      const modelAlias = "gemini-2.5-flash";
+      const resolvedModel = ModelResolver.resolveModel(modelAlias);
+      const fullModelId = resolvedModel?.id || "gemini-2.5-flash-001";
+      enhancedOptions.model = fullModelId;
+      if (options.debug) {
+        logger.debug(
+          `Auto-setting model to '${fullModelId}' for PPT generation mode`,
+        );
+      }
+    }
+
+    // Warn user if they explicitly enabled tools
+    if (userEnabledTools && !options.quiet) {
+      logger.always(
+        chalk.yellow(
+          "⚠️  Note: MCP tools are not supported in PPT generation mode and have been disabled.",
+        ),
+      );
+    }
+
+    if (options.debug) {
+      logger.debug("PPT generation mode enabled (tools auto-disabled):", {
+        provider: enhancedOptions.provider,
+        model: enhancedOptions.model,
+        pages: enhancedOptions.pptPages,
+        theme: enhancedOptions.pptTheme,
+        audience: enhancedOptions.pptAudience,
+        tone: enhancedOptions.pptTone,
+        aspectRatio: enhancedOptions.pptAspectRatio,
+        noImages: enhancedOptions.pptNoImages,
+        outputPath: enhancedOptions.pptOutput,
+      });
+    }
+  }
+
+  /**
    * Helper method to handle video file output
    * Saves generated video to file when --videoOutput flag is provided
    */
@@ -965,18 +1090,15 @@ export class CLICommandFactory {
       const saveResult = await saveVideoToFile(video, videoOutputPath);
 
       if (saveResult.success) {
-        if (!options.quiet) {
-          // Format video info output
-          const sizeInfo = formatVideoFileSize(saveResult.size);
-          const metadataSummary = getVideoMetadataSummary(video);
+        const sizeInfo = formatVideoFileSize(saveResult.size);
+        const metadataSummary = getVideoMetadataSummary(video);
 
-          logger.always(
-            chalk.green(`🎬 Video saved to: ${saveResult.path} (${sizeInfo})`),
-          );
+        logger.always(
+          chalk.green(`🎬 Video saved to: ${saveResult.path} (${sizeInfo})`),
+        );
 
-          if (metadataSummary) {
-            logger.always(chalk.gray(`   ${metadataSummary}`));
-          }
+        if (!options.quiet && metadataSummary) {
+          logger.always(chalk.gray(`   ${metadataSummary}`));
         }
       } else {
         handleError(
@@ -986,6 +1108,65 @@ export class CLICommandFactory {
       }
     } catch (error) {
       handleError(error as Error, "Video Output");
+    }
+  }
+
+  /**
+   * Helper method to handle PPT file output
+   * Displays PPT generation result info
+   */
+  private static async handlePPTOutput(
+    result: GenerateResult | unknown,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): Promise<void> {
+    // Extract PPT from result with proper type checking
+    if (!result || typeof result !== "object") {
+      return;
+    }
+    const generateResult = result as GenerateResult;
+    const ppt = generateResult.ppt;
+
+    if (!ppt) {
+      // PPT not in result - either not PPT mode or generation failed
+      return;
+    }
+
+    try {
+      if (options.quiet) {
+        if (ppt.filePath) {
+          logger.always(
+            chalk.green(`📊 Presentation saved to: ${ppt.filePath}`),
+          );
+        } else {
+          logger.always(chalk.green("📊 Presentation generated successfully."));
+        }
+        if (ppt.totalSlides) {
+          logger.always(chalk.white(`📄 Slides: ${ppt.totalSlides}`));
+        }
+        return;
+      }
+
+      logger.always(chalk.green("\n📊 Presentation Generated Successfully!"));
+      logger.always(chalk.gray("─".repeat(50)));
+
+      if (ppt.filePath) {
+        logger.always(chalk.white(`   📁 File: ${ppt.filePath}`));
+      }
+      if (ppt.totalSlides) {
+        logger.always(chalk.white(`   📄 Slides: ${ppt.totalSlides}`));
+      }
+      if (ppt.format) {
+        logger.always(chalk.white(`   📋 Format: ${ppt.format.toUpperCase()}`));
+      }
+
+      logger.always(chalk.gray("─".repeat(50)));
+      logger.always(
+        chalk.cyan(
+          "💡 Tip: Open the file with PowerPoint or Google Slides to view.",
+        ),
+      );
+    } catch (error) {
+      handleError(error as Error, "PPT Output");
     }
   }
 
@@ -1178,12 +1359,16 @@ export class CLICommandFactory {
               "Video generation with full options",
             )
             .example(
-              '$0 generate "Explain AI" --provider anthropic --subscription-tier pro',
-              "Use Anthropic with Pro subscription tier",
+              '$0 generate "AI in Healthcare" --pptPages 10',
+              "Generate a PowerPoint presentation",
             )
             .example(
-              '$0 generate "Deep analysis" --provider anthropic-subscription --subscription-tier max --auth-method oauth',
-              "Use Anthropic with Max subscription and OAuth",
+              '$0 generate "Company Q4 Results" --pptPages 15 --pptTheme corporate --pptAudience business',
+              "Generate presentation with options",
+            )
+            .example(
+              '$0 generate "Machine Learning 101" --pptTheme minimal --pptTone educational --pptNoImages',
+              "Generate educational slides without AI images",
             ),
         );
       },
@@ -1960,39 +2145,288 @@ export class CLICommandFactory {
   }
 
   /**
-   * Execute the generate command
+   * Handle stdin input for generate command
    */
-  private static async executeGenerate(argv: GenerateCommandArgs) {
-    // Handle stdin input if no input provided
+  private static async handleGenerateStdinInput(
+    argv: GenerateCommandArgs,
+  ): Promise<string> {
     if (!argv.input && !process.stdin.isTTY) {
       let stdinData = "";
       process.stdin.setEncoding("utf8");
       for await (const chunk of process.stdin) {
         stdinData += chunk;
       }
-      argv.input = stdinData.trim();
-      if (!argv.input) {
+      const trimmedData = stdinData.trim();
+      if (!trimmedData) {
         throw new Error("No input received from stdin");
       }
+      return trimmedData;
     } else if (!argv.input) {
       throw new Error(
         'Input required. Use: neurolink generate "your prompt" or echo "prompt" | neurolink generate',
       );
     }
+    return argv.input as string;
+  }
 
-    const options = CLICommandFactory.processOptions(argv);
+  /**
+   * Detect output mode (video, ppt, or text) based on CLI arguments
+   */
+  private static detectGenerateOutputMode(
+    argv: GenerateCommandArgs,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): { isVideoMode: boolean; isPPTMode: boolean; spinnerMessage: string } {
+    const outputMode = (options as Record<string, unknown>).outputMode;
 
-    // Validate Anthropic subscription options if using Anthropic provider
-    this.validateAnthropicSubscriptionOptions(
-      options as Record<string, unknown>,
-    );
+    const isVideoMode = outputMode === "video";
 
-    // Determine if video generation mode is enabled
-    const isVideoMode =
-      (options as Record<string, unknown>).outputMode === "video";
+    const hasPPTFlags =
+      argv.pptPages !== undefined ||
+      argv.pptTheme !== undefined ||
+      argv.pptAudience !== undefined ||
+      argv.pptTone !== undefined ||
+      argv.pptOutput !== undefined ||
+      argv.pptAspectRatio !== undefined ||
+      argv.pptNoImages === true;
+
+    const hasVideoSignals =
+      outputMode === "video" || argv.videoOutput !== undefined;
+    const hasPPTSignals = outputMode === "ppt" || hasPPTFlags;
+
+    if (hasVideoSignals && hasPPTSignals) {
+      throw new Error(
+        "Conflicting output mode signals detected. Use either video mode (--outputMode video, optionally with --videoOutput) or PPT mode (--outputMode ppt / --ppt* flags), not both.",
+      );
+    }
+
+    const isPPTMode = outputMode === "ppt" || hasPPTFlags;
+
     const spinnerMessage = isVideoMode
       ? "🎬 Generating video... (this may take 1-2 minutes)"
-      : "🤖 Generating text...";
+      : isPPTMode
+        ? "📊 Generating presentation... (this may take 2-5 minutes)"
+        : "🤖 Generating text...";
+
+    return { isVideoMode, isPPTMode, spinnerMessage };
+  }
+
+  /**
+   * Process context for generation command
+   */
+  private static processGenerateContext(
+    inputText: string,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): { inputText: string; contextMetadata: Partial<BaseContext> | undefined } {
+    let processedInputText = inputText;
+    let contextMetadata: Partial<BaseContext> | undefined;
+
+    if (options.context && options.contextConfig) {
+      const processedContextResult = ContextFactory.processContext(
+        options.context as unknown as BaseContext,
+        options.contextConfig,
+      );
+
+      if (processedContextResult.processedContext) {
+        processedInputText =
+          processedContextResult.processedContext + processedInputText;
+      }
+
+      contextMetadata = {
+        ...ContextFactory.extractAnalyticsContext(
+          options.context as unknown as BaseContext,
+        ),
+        contextMode: processedContextResult.config.mode,
+        contextTruncated: processedContextResult.metadata.truncated,
+      };
+
+      if (options.debug) {
+        logger.debug("Context processed:", {
+          mode: processedContextResult.config.mode,
+          truncated: processedContextResult.metadata.truncated,
+          processingTime: processedContextResult.metadata.processingTime,
+        });
+      }
+    }
+
+    return { inputText: processedInputText, contextMetadata };
+  }
+
+  /**
+   * Build multimodal input from CLI arguments
+   */
+  private static buildGenerateMultimodalInput(
+    inputText: string,
+    argv: GenerateCommandArgs,
+  ): {
+    text: string;
+    images?: Array<Buffer | string>;
+    csvFiles?: Array<Buffer | string>;
+    pdfFiles?: Array<Buffer | string>;
+    videoFiles?: Array<Buffer | string>;
+    files?: Array<Buffer | string>;
+  } {
+    const imageBuffers = CLICommandFactory.processCliImages(
+      argv.image as string | string[] | undefined,
+    );
+    const csvFiles = CLICommandFactory.processCliCSVFiles(
+      argv.csv as string | string[] | undefined,
+    );
+    const pdfFiles = CLICommandFactory.processCliPDFFiles(
+      argv.pdf as string | string[] | undefined,
+    );
+    const videoFiles = CLICommandFactory.processCliVideoFiles(
+      argv.video as string | string[] | undefined,
+    );
+    const files = CLICommandFactory.processCliFiles(
+      argv.file as string | string[] | undefined,
+    );
+
+    return {
+      text: inputText,
+      ...(imageBuffers && { images: imageBuffers }),
+      ...(csvFiles && { csvFiles }),
+      ...(pdfFiles && { pdfFiles }),
+      ...(videoFiles && { videoFiles }),
+      ...(files && { files }),
+    };
+  }
+
+  /**
+   * Build output configuration for generate request
+   */
+  private static buildGenerateOutputConfig(
+    isVideoMode: boolean,
+    isPPTMode: boolean,
+    enhancedOptions: BaseCommandArgs & Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    if (isVideoMode) {
+      return {
+        mode: "video" as const,
+        video: {
+          resolution: enhancedOptions.videoResolution as
+            | "720p"
+            | "1080p"
+            | undefined,
+          length: enhancedOptions.videoLength as 4 | 6 | 8 | undefined,
+          aspectRatio: enhancedOptions.videoAspectRatio as
+            | "9:16"
+            | "16:9"
+            | undefined,
+          audio: enhancedOptions.videoAudio as boolean | undefined,
+        },
+      };
+    }
+
+    if (isPPTMode) {
+      return {
+        mode: "ppt" as const,
+        ppt: {
+          pages: (enhancedOptions.pptPages as number) || 10,
+          theme: enhancedOptions.pptTheme as
+            | "modern"
+            | "corporate"
+            | "creative"
+            | "minimal"
+            | "dark"
+            | undefined,
+          audience: enhancedOptions.pptAudience as
+            | "business"
+            | "students"
+            | "technical"
+            | "general"
+            | undefined,
+          tone: enhancedOptions.pptTone as
+            | "professional"
+            | "casual"
+            | "educational"
+            | "persuasive"
+            | undefined,
+          aspectRatio:
+            (enhancedOptions.pptAspectRatio as "16:9" | "4:3") || "16:9",
+          generateAIImages: !(enhancedOptions.pptNoImages as boolean),
+          outputPath: enhancedOptions.pptOutput as string | undefined,
+        },
+      };
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Handle successful generation result
+   */
+  private static async handleGenerateSuccess(
+    result: GenerateResult | unknown,
+    options: BaseCommandArgs & Record<string, unknown>,
+    isVideoMode: boolean,
+    isPPTMode: boolean,
+    spinner: ReturnType<typeof ora> | null,
+  ): Promise<void> {
+    const genResult = result as GenerateResult;
+    if (spinner) {
+      if (isVideoMode) {
+        spinner.succeed(chalk.green("✅ Video generated successfully!"));
+      } else if (isPPTMode) {
+        spinner.succeed(chalk.green("✅ Presentation generated successfully!"));
+      } else {
+        spinner.succeed(chalk.green("✅ Text generated successfully!"));
+      }
+    }
+
+    if (!options.quiet) {
+      const providerInfo = genResult.provider || "auto";
+      const modelInfo = genResult.model || "default";
+      logger.always(
+        chalk.gray(`🔧 Provider: ${providerInfo} | Model: ${modelInfo}`),
+      );
+    }
+
+    if (!isVideoMode && !isPPTMode) {
+      this.handleOutput(genResult, options);
+    }
+
+    await this.handleTTSOutput(genResult, options);
+    await this.handleVideoOutput(genResult, options);
+    await this.handlePPTOutput(genResult, options);
+
+    if (options.debug) {
+      logger.debug("\n" + chalk.yellow("Debug Information:"));
+      logger.debug("Provider:", genResult.provider);
+      logger.debug("Model:", genResult.model);
+      if (genResult.analytics) {
+        logger.debug(
+          "Analytics:",
+          JSON.stringify(genResult.analytics, null, 2),
+        );
+      }
+      if (genResult.evaluation) {
+        logger.debug(
+          "Evaluation:",
+          JSON.stringify(genResult.evaluation, null, 2),
+        );
+      }
+    }
+
+    if (!globalSession.getCurrentSessionId()) {
+      await this.flushLangfuseTraces();
+      process.exit(0);
+    }
+  }
+
+  /**
+   * Execute the generate command
+   */
+  private static async executeGenerate(argv: GenerateCommandArgs) {
+    // Handle stdin input
+    const rawInput = await this.handleGenerateStdinInput(argv);
+    argv.input = rawInput;
+
+    const options = this.processOptions(argv);
+
+    // Detect output mode
+    const { isVideoMode, isPPTMode, spinnerMessage } =
+      this.detectGenerateOutputMode(argv, options);
+
     const spinner = argv.quiet ? null : ora(spinnerMessage).start();
 
     try {
@@ -2001,38 +2435,11 @@ export class CLICommandFactory {
         await new Promise((resolve) => setTimeout(resolve, options.delay));
       }
 
-      // Process context if provided
-      let inputText = argv.input as string;
-      let contextMetadata: Partial<BaseContext> | undefined;
-
-      if (options.context && options.contextConfig) {
-        const processedContextResult = ContextFactory.processContext(
-          options.context,
-          options.contextConfig,
-        );
-
-        // Integrate context into prompt if configured
-        if (processedContextResult.processedContext) {
-          inputText = processedContextResult.processedContext + inputText;
-        }
-
-        // Add context metadata for analytics
-        contextMetadata = {
-          ...ContextFactory.extractAnalyticsContext(
-            options.context as BaseContext,
-          ),
-          contextMode: processedContextResult.config.mode,
-          contextTruncated: processedContextResult.metadata.truncated,
-        };
-
-        if (options.debug) {
-          logger.debug("Context processed:", {
-            mode: processedContextResult.config.mode,
-            truncated: processedContextResult.metadata.truncated,
-            processingTime: processedContextResult.metadata.processingTime,
-          });
-        }
-      }
+      // Process context
+      const { inputText, contextMetadata } = this.processGenerateContext(
+        rawInput,
+        options,
+      );
 
       // Handle dry-run mode for testing
       if (options.dryRun) {
@@ -2040,11 +2447,7 @@ export class CLICommandFactory {
           content: "Mock response for testing purposes",
           provider: options.provider || "auto",
           model: options.model || "test-model",
-          usage: {
-            input: 10,
-            output: 15,
-            total: 25,
-          },
+          usage: { input: 10, output: 15, total: 25 },
           responseTime: 150,
           analytics: options.enableAnalytics
             ? {
@@ -2072,22 +2475,21 @@ export class CLICommandFactory {
         if (spinner) {
           spinner.succeed(chalk.green("✅ Dry-run completed successfully!"));
         }
-
-        CLICommandFactory.handleOutput(mockResult, options);
-
+        this.handleOutput(mockResult, options);
         if (options.debug) {
           logger.debug("\n" + chalk.yellow("Debug Information (Dry-run):"));
           logger.debug("Provider:", mockResult.provider);
           logger.debug("Model:", mockResult.model);
           logger.debug("Mode: DRY-RUN (no actual API calls made)");
         }
-
         if (!globalSession.getCurrentSessionId()) {
           await CLICommandFactory.flushLangfuseTraces();
           process.exit(0);
         }
+        return;
       }
 
+      // Initialize SDK and session
       const sdk = globalSession.getOrCreateNeuroLink();
       const sessionVariables = globalSession.getSessionVariables();
       const enhancedOptions = { ...options, ...sessionVariables };
@@ -2103,37 +2505,23 @@ export class CLICommandFactory {
         });
       }
 
-      // Video generation doesn't support tools, so auto-disable them
+      // Configure mode-specific options
       if (isVideoMode) {
         CLICommandFactory.configureVideoMode(enhancedOptions, argv, options);
       }
+      if (isPPTMode) {
+        this.configurePPTMode(enhancedOptions, argv, options);
+      }
 
-      // Process CLI multimodal inputs
-      const imageBuffers = CLICommandFactory.processCliImages(
-        argv.image as string | string[] | undefined,
-      );
-      const csvFiles = CLICommandFactory.processCliCSVFiles(
-        argv.csv as string | string[] | undefined,
-      );
-      const pdfFiles = CLICommandFactory.processCliPDFFiles(
-        argv.pdf as string | string[] | undefined,
-      );
-      const videoFiles = CLICommandFactory.processCliVideoFiles(
-        argv.video as string | string[] | undefined,
-      );
-      const files = CLICommandFactory.processCliFiles(
-        argv.file as string | string[] | undefined,
+      // Build multimodal input and output configuration
+      const generateInput = this.buildGenerateMultimodalInput(inputText, argv);
+      const outputConfig = this.buildGenerateOutputConfig(
+        isVideoMode,
+        isPPTMode,
+        enhancedOptions,
       );
 
-      const generateInput = {
-        text: inputText,
-        ...(imageBuffers && { images: imageBuffers }),
-        ...(csvFiles && { csvFiles }),
-        ...(pdfFiles && { pdfFiles }),
-        ...(videoFiles && { videoFiles }),
-        ...(files && { files }),
-      };
-
+      // Execute generation
       const result = await sdk.generate({
         input: generateInput,
         csvOptions: {
@@ -2150,24 +2538,7 @@ export class CLICommandFactory {
           format: argv.videoFormat as "jpeg" | "png" | undefined,
           transcribeAudio: argv.transcribeAudio as boolean | undefined,
         },
-        // Video generation output configuration
-        output: isVideoMode
-          ? {
-              mode: "video" as const,
-              video: {
-                resolution: enhancedOptions.videoResolution as
-                  | "720p"
-                  | "1080p"
-                  | undefined,
-                length: enhancedOptions.videoLength as 4 | 6 | 8 | undefined,
-                aspectRatio: enhancedOptions.videoAspectRatio as
-                  | "9:16"
-                  | "16:9"
-                  | undefined,
-                audio: enhancedOptions.videoAudio as boolean | undefined,
-              },
-            }
-          : undefined,
+        output: outputConfig,
         provider: enhancedOptions.provider,
         model: enhancedOptions.model,
         temperature: enhancedOptions.temperature,
@@ -2209,73 +2580,16 @@ export class CLICommandFactory {
               topK: argv.ragTopK as number | undefined,
             }
           : undefined,
-        // TTS configuration
-        tts: enhancedOptions.tts
-          ? {
-              enabled: true,
-              useAiResponse: true,
-              voice: enhancedOptions.ttsVoice as string | undefined,
-              format:
-                (enhancedOptions.ttsFormat as "mp3" | "wav" | "ogg" | "opus") ||
-                undefined,
-              speed: enhancedOptions.ttsSpeed as number | undefined,
-              quality: enhancedOptions.ttsQuality as
-                | "standard"
-                | "hd"
-                | undefined,
-              output: enhancedOptions.ttsOutput as string | undefined,
-              play: enhancedOptions.ttsPlay as boolean | undefined,
-            }
-          : undefined,
       });
 
-      if (spinner) {
-        if (isVideoMode) {
-          spinner.succeed(chalk.green("✅ Video generated successfully!"));
-        } else {
-          spinner.succeed(chalk.green("✅ Text generated successfully!"));
-        }
-      }
-
-      // Display provider and model info by default (unless quiet mode)
-      if (!options.quiet) {
-        const providerInfo = result.provider || "auto";
-        const modelInfo = result.model || "default";
-        logger.always(
-          chalk.gray(`🔧 Provider: ${providerInfo} | Model: ${modelInfo}`),
-        );
-      }
-
-      // Handle output with universal formatting (for text mode)
-      if (!isVideoMode) {
-        CLICommandFactory.handleOutput(result, options);
-      }
-
-      // Handle TTS audio file output if --tts-output is provided
-      await CLICommandFactory.handleTTSOutput(result, options);
-
-      // Handle video file output if --videoOutput is provided
-      await CLICommandFactory.handleVideoOutput(result, options);
-
-      if (options.debug) {
-        logger.debug("\n" + chalk.yellow("Debug Information:"));
-        logger.debug("Provider:", result.provider);
-        logger.debug("Model:", result.model);
-        if (result.analytics) {
-          logger.debug("Analytics:", JSON.stringify(result.analytics, null, 2));
-        }
-        if (result.evaluation) {
-          logger.debug(
-            "Evaluation:",
-            JSON.stringify(result.evaluation, null, 2),
-          );
-        }
-      }
-
-      if (!globalSession.getCurrentSessionId()) {
-        await CLICommandFactory.flushLangfuseTraces();
-        process.exit(0);
-      }
+      // Handle successful result
+      await this.handleGenerateSuccess(
+        result,
+        options,
+        isVideoMode,
+        isPPTMode,
+        spinner,
+      );
     } catch (error) {
       if (spinner) {
         spinner.fail();

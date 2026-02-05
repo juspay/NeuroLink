@@ -158,6 +158,7 @@ export {
   toError,
   isObject,
   isLogoConfig,
+  validateImageBuffer,
 } from "./utils.js";
 
 // Re-export EffectivePPTProviderResult type from types

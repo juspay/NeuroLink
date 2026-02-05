@@ -696,6 +696,7 @@ const neurolink = new NeuroLink({
 
 - [TTS Integration Guide](tts.md) - Complete Text-to-Speech documentation
 - [Video Generation](video-generation.md) - AI-powered video with audio
+- [PPT Generation](ppt-generation.md) - AI-powered PowerPoint presentations
 
 **Multimodal Capabilities:**
 

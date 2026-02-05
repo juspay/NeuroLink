@@ -126,13 +126,24 @@ npx @juspay/neurolink gen "Analyze this problem" --provider google-ai --model ge
 
 **Video Generation Options (Veo 3.1):**
 
-- `--outputMode <mode>` - Output mode: 'text' (default) or 'video'
+- `--outputMode <mode>` - Output mode: 'text' (default), 'video', or 'ppt'
 - `--image <path>` - Path to input image file for image-based video generation (required for video mode, e.g., ./input.jpg)
 - `--videoOutput <path>` - Path to save generated video file (e.g., ./output.mp4)
 - `--videoResolution <res>` - Video resolution: '720p' or '1080p' (default: 720p)
 - `--videoLength <seconds>` - Video duration: 4, 6, or 8 seconds (default: 6)
 - `--videoAspectRatio <ratio>` - Aspect ratio: '9:16' (portrait) or '16:9' (landscape, default: 16:9)
 - `--videoAudio <bool>` - Include synchronized audio (default: true)
+
+**PPT Generation Options:**
+
+- `--outputMode ppt` - Set output mode to PPT generation
+- `--pptOutput <path>` or `--po <path>` - Path to save generated PPTX file (e.g., ./presentation.pptx)
+- `--pptTheme <theme>` - Theme: 'modern', 'corporate', 'creative', 'minimal', or 'dark' (default: AI-selected)
+- `--pptAudience <audience>` - Audience: 'business', 'students', 'technical', or 'general' (default: AI-selected)
+- `--pptTone <tone>` - Tone: 'professional', 'casual', 'educational', or 'persuasive' (default: AI-selected)
+- `--pptPages <number>` or `--pages <number>` - Number of slides to generate (5-50, default: 10)
+- `--pptAspectRatio <ratio>` - Aspect ratio: '16:9' (default) or '4:3'
+- `--pptNoImages` - Disable AI image generation for slides (AI images are enabled by default)
 
 **Output Example:**
 

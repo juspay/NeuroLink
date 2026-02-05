@@ -14,6 +14,7 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 
 | Feature                                                                                            | Description                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| :material-presentation: **[PPT Generation](ppt-generation.md)**                                    | Generate professional PowerPoint presentations from text prompts with 35 slide types, 5 themes, and optional AI images.                     |
 | :material-video: **Video Generation** :material-clock-outline:{ .coming-soon title="Coming Soon" } | Generate videos from text prompts using RunwayML (ML5, ML6 Turbo models). _Coming Soon_                                                     |
 | :material-image-plus: **[Image Generation with Gemini](../image-generation-streaming.md)**         | Native image generation using Gemini 2.0 Flash Experimental with imagen-3.0-generate-002 model.                                             |
 | :material-web: **[HTTP/Streamable HTTP Transport for MCP](../mcp-http-transport.md)**              | Connect to remote MCP servers via HTTP with authentication, rate limiting, retry support, and session management.                           |
@@ -26,6 +27,7 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 
 **Q1 2026 Highlights:**
 
+- **PPT Generation**: Create AI-powered PowerPoint presentations with 35 slide types (title, content, charts, timelines, dashboards, composite layouts), 5 built-in themes, optional AI-generated images, and multi-provider support (Vertex, OpenAI, Anthropic, Google AI, Azure, Bedrock)
 - **Video Generation** _(Coming Soon)_: Create AI-generated videos with RunwayML integration supporting ML5 and ML6 Turbo models, customizable duration (5-10s), and watermark control
 - **Gemini Image Generation**: Native support for Google's imagen-3.0-generate-002 model through Gemini 2.0 Flash Experimental for high-quality image synthesis
 - **Remote MCP Servers**: HTTP/Streamable HTTP transport enables connecting to cloud-hosted MCP servers with Bearer token authentication, configurable rate limits, automatic retry with exponential backoff, and session management via `Mcp-Session-Id` header

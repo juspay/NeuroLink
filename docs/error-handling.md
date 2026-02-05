@@ -33,6 +33,18 @@ Video generation via Veo 3.1 on Vertex AI may encounter specific error condition
 - **VIDEO_QUOTA_EXCEEDED** - Vertex AI quota or rate limit exceeded
 - **VIDEO_REGION_UNAVAILABLE** - Veo 3.1 not available in specified region
 
+### PPT Generation Errors
+
+PPT (PowerPoint) generation may encounter specific error conditions:
+
+- **PPT_PLANNING_FAILED** - AI content planning process failed
+- **PPT_INVALID_AI_RESPONSE** - AI returned invalid or malformed slide data
+- **PPT_IMAGE_GENERATION_FAILED** - AI image generation failed for visual slides
+- **PPT_ASSEMBLY_FAILED** - PPTX file assembly failed
+- **PPT_FILE_WRITE_FAILED** - Could not write presentation to disk
+- **PPT_INVALID_INPUT** - Invalid input parameters (prompt length, page count, theme, etc.)
+- **PPT_TIMEOUT** - Presentation generation exceeded timeout
+
 ## Error Recovery
 
 ### Automatic Retry
@@ -97,6 +109,68 @@ try {
     console.error("Vertex AI quota exceeded. Check your billing and quotas.");
   } else {
     console.error("Video generation failed:", error.message);
+  }
+}
+```
+
+### PPT Generation Error Handling
+
+**Example: Handling PPT generation errors**
+
+```typescript
+import { NeuroLink, PPTError } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+try {
+  const result = await neurolink.generate({
+    input: {
+      text: "Quarterly Business Review",
+    },
+    provider: "vertex",
+    model: "gemini-2.5-pro",
+    output: {
+      mode: "ppt",
+      ppt: {
+        pages: 15,
+        theme: "corporate",
+        audience: "business",
+        generateAIImages: true,
+      },
+    },
+    timeout: 300, // 5 minutes for PPT generation
+  });
+
+  if (result.ppt) {
+    console.log(`Presentation saved: ${result.ppt.filePath}`);
+    console.log(`Total slides: ${result.ppt.totalSlides}`);
+  }
+} catch (error) {
+  // Use your logger for production: logger.error('PPT generation failed', { code: error.code, error })
+  if (error.code === "PPT_PLANNING_FAILED") {
+    console.error(
+      "Content planning failed. Try a more specific prompt or different model.",
+    );
+  } else if (error.code === "PPT_INVALID_AI_RESPONSE") {
+    console.error(
+      "AI returned invalid response. Retry with a different model.",
+    );
+  } else if (error.code === "PPT_IMAGE_GENERATION_FAILED") {
+    console.error("Image generation failed. Try with generateAIImages: false.");
+  } else if (error.code === "PPT_ASSEMBLY_FAILED") {
+    console.error("PPTX assembly failed. Check file system permissions.");
+  } else if (error.code === "PPT_FILE_WRITE_FAILED") {
+    console.error(
+      "Could not write file. Check disk space and output path permissions.",
+    );
+  } else if (error.code === "PPT_INVALID_INPUT") {
+    console.error(
+      "Invalid input. Check pages (5-50), theme, and prompt length.",
+    );
+  } else if (error.code === "PPT_TIMEOUT") {
+    console.error("Generation timed out. Reduce pages or disable AI images.");
+  } else {
+    console.error("PPT generation failed:", error.message);
   }
 }
 ```

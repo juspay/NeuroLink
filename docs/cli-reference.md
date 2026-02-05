@@ -70,13 +70,24 @@ npx @juspay/neurolink gen "Write code" --provider openai
 
 | Flag                   | Type    | Default | Description                                                               |
 | ---------------------- | ------- | ------- | ------------------------------------------------------------------------- |
-| `--outputMode`         | string  | `text`  | Output mode: 'text' or 'video'                                            |
+| `--outputMode`         | string  | `text`  | Output mode: 'text', 'video', or 'ppt'                                    |
 | `--image`              | string  | none    | Path to an input image to base the generated video on (e.g., ./input.png) |
 | `--videoOutput`, `-vo` | string  | none    | Path to save generated video (e.g., ./output.mp4)                         |
 | `--videoResolution`    | string  | `720p`  | Video resolution: '720p' or '1080p'                                       |
 | `--videoLength`        | number  | `6`     | Video duration in seconds: 4, 6, or 8                                     |
 | `--videoAspectRatio`   | string  | `16:9`  | Aspect ratio: '9:16' (portrait) or '16:9' (landscape)                     |
 | `--videoAudio`         | boolean | `true`  | Include synchronized audio                                                |
+
+### PPT Generation (AI Presentations)
+
+- `--outputMode` (string, default: `text`) — Output mode: `text`, `video`, or `ppt`
+- `--pptPages`, `--pages` (number, default: `10`) — Number of slides to generate (5-50)
+- `--pptTheme` (string, default: AI-selected) — Theme: `modern`, `corporate`, `creative`, `minimal`, or `dark`
+- `--pptAudience` (string, default: AI-selected) — Audience: `business`, `students`, `technical`, or `general`
+- `--pptTone` (string, default: AI-selected) — Tone: `professional`, `casual`, `educational`, or `persuasive`
+- `--pptNoImages` (boolean, default: `false`) — Disable AI image generation (AI images are enabled by default in CLI)
+- `--pptAspectRatio` (string, default: `16:9`) — Aspect ratio: `16:9` or `4:3`
+- `--pptOutput`, `--po` (string, default: auto-generated) — Path to save generated presentation
 
 ## Usage Examples
 
@@ -308,6 +319,57 @@ npx @juspay/neurolink generate "Vertical scroll animation" \
 ```
 
 > **Note:** Video generation requires Vertex AI credentials. See [Video Generation Guide](./features/video-generation.md).
+
+## PPT Generation Examples
+
+Generate AI-powered PowerPoint presentations:
+
+```bash
+# Basic PPT generation
+npx @juspay/neurolink generate "Introduction to Machine Learning" \
+  --outputMode ppt \
+  --pptPages 10 \
+  --pptOutput ./ml-presentation.pptx
+
+# With theme and audience customization
+npx @juspay/neurolink generate "Quarterly Sales Report Q4 2025" \
+  --provider vertex \
+  --model gemini-2.5-pro \
+  --outputMode ppt \
+  --pptPages 15 \
+  --pptTheme corporate \
+  --pptAudience business \
+  --pptTone professional \
+  --pptOutput ./q4-report.pptx
+
+# Creative presentation with AI-generated images
+npx @juspay/neurolink generate "Future of Space Tourism" \
+  --outputMode ppt \
+  --pptPages 12 \
+  --pptTheme creative \
+  --pptOutput ./space-tourism.pptx
+
+# Technical documentation with dark theme
+npx @juspay/neurolink generate "Kubernetes Architecture Deep Dive" \
+  --provider anthropic \
+  --model claude-3-5-sonnet \
+  --outputMode ppt \
+  --pptPages 20 \
+  --pptTheme dark \
+  --pptAudience technical \
+  --pptTone educational \
+  --pptOutput ./k8s-architecture.pptx
+
+# Disable AI image generation
+npx @juspay/neurolink generate "Company Brand Guidelines" \
+  --outputMode ppt \
+  --pptPages 8 \
+  --pptTheme minimal \
+  --pptNoImages \
+  --pptOutput ./brand-guidelines.pptx
+```
+
+> **Note:** PPT generation works with multiple AI providers. See [PPT Generation Guide](./features/ppt-generation.md).
 
 ## Environment Variables
 

@@ -1,6 +1,15 @@
+// -----------------------------------------------------------------------
+// Imports
+// -----------------------------------------------------------------------
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Constants & Enums
 import { AIProviderName } from "../../src/lib/constants/enums.js";
+
+// PPT Feature - Main exports (use index.ts as primary source)
 import {
+  // Constants
   AUDIENCE_GUIDELINES,
   buildContentPlanningPrompt,
   DIAGRAM_SLIDE_TYPES,
@@ -17,49 +26,70 @@ import {
   VALID_AUDIENCES,
   VALID_THEMES,
   VALID_TONES,
-} from "../../src/lib/features/ppt/constants.js";
-import {
+  // Slide Generator
   createSlideGenerator,
   generateSlidesFromPlan,
-  type LogoConfig,
-  type LogoPosition,
   PptxGenJS,
   SlideGenerator,
-  type SlideGeneratorConfig,
-} from "../../src/lib/features/ppt/slideGenerator.js";
-import type {
-  CompleteSlide,
-  PresentationTheme,
-} from "../../src/lib/features/ppt/types.js";
-import { extractPPTContext } from "../../src/lib/features/ppt/utils.js";
-import type { GenerateOptions } from "../../src/lib/types/index.js";
+  // Slide Type Inference
+  inferFromTitle,
+  inferBulletStyleFromContent,
+  // Utilities
+  extractPPTContext,
+  generateOutputPath,
+  normalizeLogoConfig,
+  getLayoutName,
+  toError,
+  getFailureStage,
+  isObject,
+  isLogoConfig,
+  validateImageBuffer,
+  PPT_VALID_PROVIDERS,
+  // Validation
+  validatePPTGenerationInput as orchestratorValidateInput,
+} from "../../src/lib/features/ppt/index.js";
+
+// Types - from pptTypes.ts (canonical source for all PPT types)
 import {
-  type BulletPoint,
-  type ChartOptions,
-  type ChartSeries,
-  type ComparisonColumn,
-  type ContentPlan,
-  type ImageProps,
   isValidHexColor,
   MAX_SLIDES,
   MIN_SLIDES,
   normalizeHexColor,
-  type PositionProps,
   PPT_ERROR_CODES,
   PPTError,
-  type PPTOutputOptions,
-  type ProcessStep,
-  type ShadowProps,
-  type ShapeProps,
   SLIDE_DIMENSIONS,
-  type SlideLayout,
-  type SlideSchema,
-  type SlideType,
-  type Statistic,
-  type TableCell,
-  type TableOptions,
-  type TimelineItem,
 } from "../../src/lib/types/pptTypes.js";
+
+import type {
+  BulletPoint,
+  ChartOptions,
+  ChartSeries,
+  ComparisonColumn,
+  CompleteSlide,
+  ContentPlan,
+  ImageProps,
+  LogoConfig,
+  LogoPosition,
+  PositionProps,
+  PPTOutputOptions,
+  PresentationTheme,
+  ProcessStep,
+  ShadowProps,
+  ShapeProps,
+  SlideGeneratorConfig,
+  SlideLayout,
+  SlideSchema,
+  SlideType,
+  Statistic,
+  TableCell,
+  TableOptions,
+  TimelineItem,
+} from "../../src/lib/types/pptTypes.js";
+
+// Types - Core
+import type { GenerateOptions } from "../../src/lib/types/index.js";
+
+// Validation Utils
 import {
   validatePPTGenerationInput,
   validatePPTOutputOptions,
@@ -218,7 +248,7 @@ describe("PPT Validation", () => {
 // -----------------------------------------------------------------------
 
 describe("PPT Types & Layouts", () => {
-  it("should have all 31 slide types defined", () => {
+  it("should have all 35 slide types defined", () => {
     const allSlideTypes: SlideType[] = [
       "title",
       "section-header",
@@ -251,6 +281,10 @@ describe("PPT Types & Layouts", () => {
       "icons",
       "conclusion",
       "blank",
+      "dashboard",
+      "mixed-content",
+      "stats-grid",
+      "icon-grid",
     ];
     allSlideTypes.forEach((type) => {
       expect(SLIDE_TYPE_TO_LAYOUT[type]).toBeDefined();
@@ -1230,11 +1264,6 @@ describe("E2E Integration", () => {
 // Presentation Orchestrator Tests (Stage 4)
 // -----------------------------------------------------------------------
 
-import {
-  validatePPTGenerationInput as orchestratorValidateInput,
-  type PPTValidationResult,
-} from "../../src/lib/features/ppt/index.js";
-
 describe("Presentation Orchestrator", () => {
   describe("validatePPTGenerationInput", () => {
     it("should validate valid PPT generation options", () => {
@@ -1543,5 +1572,860 @@ describe("Presentation Orchestrator", () => {
 
       expect(() => extractPPTContext(options)).toThrow(PPTError);
     });
+  });
+});
+
+// -----------------------------------------------------------------------
+// Slide Type Inference Tests
+// -----------------------------------------------------------------------
+
+describe("Slide Type Inference", () => {
+  describe("inferFromTitle", () => {
+    it("should infer agenda slide type from agenda keywords", () => {
+      const result = inferFromTitle("Agenda");
+      expect(result.slideType).toBe("agenda");
+      expect(result.bulletStyle).toBe("number");
+    });
+
+    it("should infer agenda from table of contents", () => {
+      const result = inferFromTitle("Table of Contents");
+      expect(result.slideType).toBe("agenda");
+      expect(result.bulletStyle).toBe("number");
+    });
+
+    it("should infer conclusion from summary keywords", () => {
+      const result = inferFromTitle("Key Takeaways");
+      expect(result.slideType).toBe("conclusion");
+      expect(result.bulletStyle).toBe("checkmark");
+    });
+
+    it("should infer closing from thank you", () => {
+      const result = inferFromTitle("Thank You");
+      expect(result.slideType).toBe("closing");
+      expect(result.bulletStyle).toBe("checkmark");
+    });
+
+    it("should infer comparison from vs keywords", () => {
+      const result = inferFromTitle("Pros and Cons");
+      expect(result.slideType).toBe("comparison");
+      expect(result.bulletStyle).toBe("arrow");
+    });
+
+    it("should infer numbered-list from process keywords", () => {
+      const result = inferFromTitle("Implementation Steps");
+      expect(result.slideType).toBe("numbered-list");
+      expect(result.bulletStyle).toBe("number");
+    });
+
+    it("should infer features from features keywords", () => {
+      const result = inferFromTitle("Features");
+      expect(result.slideType).toBe("features");
+      expect(result.bulletStyle).toBe("disc");
+    });
+
+    it("should return null for unrecognized titles", () => {
+      const result = inferFromTitle("Random Title XYZ 123");
+      expect(result.slideType).toBeNull();
+      expect(result.bulletStyle).toBeNull();
+    });
+
+    it("should handle case insensitivity", () => {
+      const result = inferFromTitle("AGENDA");
+      expect(result.slideType).toBe("agenda");
+    });
+
+    it("should handle whitespace in title", () => {
+      const result = inferFromTitle("  Conclusion  ");
+      expect(result.slideType).toBe("conclusion");
+    });
+  });
+
+  describe("inferBulletStyleFromContent", () => {
+    it("should infer number style from numbered bullets", () => {
+      const bullets: BulletPoint[] = [
+        { text: "1. First item", emphasis: false },
+        { text: "2. Second item", emphasis: false },
+      ];
+      expect(inferBulletStyleFromContent(bullets)).toBe("number");
+    });
+
+    it("should infer checkmark from checkmark unicode", () => {
+      const bullets: BulletPoint[] = [
+        { text: "✓ Completed task", emphasis: false },
+        { text: "✔ Another done", emphasis: false },
+      ];
+      expect(inferBulletStyleFromContent(bullets)).toBe("checkmark");
+    });
+
+    it("should infer arrow from arrow unicode", () => {
+      const bullets: BulletPoint[] = [
+        { text: "→ Action item", emphasis: false },
+        { text: "➤ Another action", emphasis: false },
+      ];
+      expect(inferBulletStyleFromContent(bullets)).toBe("arrow");
+    });
+
+    it("should return null for dashed bullets (not in CONTENT_PATTERNS)", () => {
+      // Note: "- " pattern is not in CONTENT_PATTERNS, so returns null
+      const bullets: BulletPoint[] = [
+        { text: "- Item one", emphasis: false },
+        { text: "- Item two", emphasis: false },
+      ];
+      expect(inferBulletStyleFromContent(bullets)).toBeNull();
+    });
+
+    it("should return null for mixed or undetectable patterns", () => {
+      const bullets: BulletPoint[] = [
+        { text: "Plain text item", emphasis: false },
+        { text: "Another plain item", emphasis: false },
+      ];
+      expect(inferBulletStyleFromContent(bullets)).toBeNull();
+    });
+
+    it("should handle empty bullet array", () => {
+      expect(inferBulletStyleFromContent([])).toBeNull();
+    });
+  });
+});
+
+// -----------------------------------------------------------------------
+// PPT Utils Tests
+// -----------------------------------------------------------------------
+
+describe("PPT Utils", () => {
+  describe("generateOutputPath", () => {
+    it("should use provided outputPath with .pptx extension", () => {
+      const context = {
+        topic: "Test Topic",
+        pages: 10,
+        outputPath: "/custom/path/presentation.pptx",
+        theme: "modern",
+        audience: "business",
+        tone: "professional",
+        generateAIImages: false,
+        aspectRatio: "16:9" as const,
+      };
+      expect(generateOutputPath(context)).toBe(
+        "/custom/path/presentation.pptx",
+      );
+    });
+
+    it("should append filename when outputPath is directory", () => {
+      const context = {
+        topic: "My Test Presentation",
+        pages: 10,
+        outputPath: "/custom/directory",
+        theme: "modern",
+        audience: "business",
+        tone: "professional",
+        generateAIImages: false,
+        aspectRatio: "16:9" as const,
+      };
+      const result = generateOutputPath(context);
+      expect(result).toContain("/custom/directory/");
+      expect(result).toContain("my_test_presentation");
+      expect(result.endsWith(".pptx")).toBe(true);
+    });
+
+    it("should generate default path when no outputPath provided", () => {
+      const context = {
+        topic: "Test",
+        pages: 10,
+        theme: "modern",
+        audience: "general",
+        tone: "professional",
+        generateAIImages: false,
+        aspectRatio: "16:9" as const,
+      };
+      const result = generateOutputPath(context);
+      expect(result).toContain("output");
+      expect(result.endsWith(".pptx")).toBe(true);
+    });
+
+    it("should sanitize special characters in topic", () => {
+      const context = {
+        topic: "Test@#$%^&* Special/\\Characters",
+        pages: 10,
+        theme: "modern",
+        audience: "general",
+        tone: "professional",
+        generateAIImages: false,
+        aspectRatio: "16:9" as const,
+      };
+      const result = generateOutputPath(context);
+      expect(result).not.toContain("@");
+      expect(result).not.toContain("$");
+      expect(result).not.toContain("/\\");
+    });
+  });
+
+  describe("normalizeLogoConfig", () => {
+    it("should return null for null input", () => {
+      expect(normalizeLogoConfig(null)).toBeNull();
+    });
+
+    it("should normalize Buffer to LogoConfig", () => {
+      const buffer = Buffer.from("test");
+      const result = normalizeLogoConfig(buffer);
+      expect(result).not.toBeNull();
+      expect(result?.data).toBe(buffer);
+      expect(result?.position).toBe("bottom-right");
+      expect(result?.width).toBe(1);
+      expect(result?.height).toBe(0.4);
+    });
+
+    it("should normalize string to LogoConfig", () => {
+      const dataUrl = "data:image/png;base64,abc123";
+      const result = normalizeLogoConfig(dataUrl);
+      expect(result).not.toBeNull();
+      expect(result?.data).toBe(dataUrl);
+      expect(result?.showOn).toBe("all-slides");
+    });
+
+    it("should pass through valid LogoConfig", () => {
+      const config = {
+        data: "data:image/png;base64,test",
+        position: "top-left" as const,
+        width: 2,
+        height: 1,
+        showOn: "first-slide" as const,
+      };
+      const result = normalizeLogoConfig(config);
+      expect(result).toEqual(config);
+    });
+  });
+
+  describe("getLayoutName", () => {
+    it("should return LAYOUT_16x9 for 16:9", () => {
+      expect(getLayoutName("16:9")).toBe("LAYOUT_16x9");
+    });
+
+    it("should return LAYOUT_4x3 for 4:3", () => {
+      expect(getLayoutName("4:3")).toBe("LAYOUT_4x3");
+    });
+
+    it("should default to LAYOUT_16x9 for unknown", () => {
+      expect(getLayoutName("unknown" as "16:9")).toBe("LAYOUT_16x9");
+    });
+  });
+
+  describe("toError", () => {
+    it("should return Error as-is", () => {
+      const error = new Error("test");
+      expect(toError(error)).toBe(error);
+    });
+
+    it("should convert string to Error", () => {
+      const result = toError("error message");
+      expect(result).toBeInstanceOf(Error);
+      expect(result.message).toBe("error message");
+    });
+
+    it("should convert object to Error", () => {
+      // Note: String({ code: 500 }) returns "[object Object]"
+      const result = toError({ code: 500 });
+      expect(result).toBeInstanceOf(Error);
+      expect(result.message).toBe("[object Object]");
+    });
+
+    it("should handle null/undefined", () => {
+      expect(toError(null).message).toBe("null");
+      expect(toError(undefined).message).toBe("undefined");
+    });
+  });
+
+  describe("getFailureStage", () => {
+    it("should return content-planning when contentPlan is null", () => {
+      expect(
+        getFailureStage({ contentPlan: null, slides: null, outputPath: null }),
+      ).toBe("content-planning");
+    });
+
+    it("should return slide-generation when slides is null", () => {
+      expect(
+        getFailureStage({ contentPlan: {}, slides: null, outputPath: null }),
+      ).toBe("slide-generation");
+    });
+
+    it("should return pptx-assembly when outputPath is null", () => {
+      expect(
+        getFailureStage({ contentPlan: {}, slides: [], outputPath: null }),
+      ).toBe("pptx-assembly");
+    });
+
+    it("should return file-output when all stages complete", () => {
+      expect(
+        getFailureStage({
+          contentPlan: {},
+          slides: [],
+          outputPath: "/path/file.pptx",
+        }),
+      ).toBe("file-output");
+    });
+  });
+
+  describe("validateImageBuffer", () => {
+    it("should validate PNG images", () => {
+      // PNG magic bytes: 89 50 4E 47
+      const pngBuffer = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+        Buffer.alloc(100),
+      ]);
+      const result = validateImageBuffer(pngBuffer);
+      expect(result.isValid).toBe(true);
+      expect(result.format).toBe("PNG");
+      expect(result.mimeType).toBe("image/png");
+    });
+
+    it("should validate JPEG images", () => {
+      // JPEG magic bytes: FF D8 FF
+      const jpegBuffer = Buffer.concat([
+        Buffer.from([0xff, 0xd8, 0xff]),
+        Buffer.alloc(100),
+      ]);
+      const result = validateImageBuffer(jpegBuffer);
+      expect(result.isValid).toBe(true);
+      expect(result.format).toBe("JPEG");
+      expect(result.mimeType).toBe("image/jpeg");
+    });
+
+    it("should validate GIF images", () => {
+      // GIF magic bytes: 47 49 46
+      const gifBuffer = Buffer.concat([
+        Buffer.from([0x47, 0x49, 0x46]),
+        Buffer.alloc(100),
+      ]);
+      const result = validateImageBuffer(gifBuffer);
+      expect(result.isValid).toBe(true);
+      expect(result.format).toBe("GIF");
+      expect(result.mimeType).toBe("image/gif");
+    });
+
+    it("should reject empty buffer", () => {
+      const result = validateImageBuffer(Buffer.alloc(0));
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("Empty");
+    });
+
+    it("should reject undefined buffer", () => {
+      const result = validateImageBuffer(undefined);
+      expect(result.isValid).toBe(false);
+    });
+
+    it("should reject too small buffer", () => {
+      const result = validateImageBuffer(Buffer.alloc(50));
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("too small");
+    });
+
+    it("should reject unknown format", () => {
+      const unknownBuffer = Buffer.concat([
+        Buffer.from([0x00, 0x00, 0x00, 0x00]),
+        Buffer.alloc(100),
+      ]);
+      const result = validateImageBuffer(unknownBuffer);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain("Unknown format");
+    });
+  });
+
+  describe("isObject", () => {
+    it("should return true for plain objects", () => {
+      expect(isObject({})).toBe(true);
+      expect(isObject({ key: "value" })).toBe(true);
+    });
+
+    it("should return false for null", () => {
+      expect(isObject(null)).toBe(false);
+    });
+
+    it("should return false for arrays", () => {
+      expect(isObject([])).toBe(false);
+      expect(isObject([1, 2, 3])).toBe(false);
+    });
+
+    it("should return false for primitives", () => {
+      expect(isObject("string")).toBe(false);
+      expect(isObject(123)).toBe(false);
+      expect(isObject(true)).toBe(false);
+    });
+  });
+
+  describe("isLogoConfig", () => {
+    it("should return true for valid LogoConfig with Buffer", () => {
+      expect(isLogoConfig({ data: Buffer.from("test") })).toBe(true);
+    });
+
+    it("should return true for valid LogoConfig with string", () => {
+      expect(isLogoConfig({ data: "data:image/png;base64,test" })).toBe(true);
+    });
+
+    it("should return false for invalid structures", () => {
+      expect(isLogoConfig(null)).toBe(false);
+      expect(isLogoConfig({})).toBe(false);
+      expect(isLogoConfig({ data: 123 })).toBe(false);
+      expect(isLogoConfig("string")).toBe(false);
+    });
+  });
+
+  describe("PPT_VALID_PROVIDERS", () => {
+    it("should include all supported providers", () => {
+      expect(PPT_VALID_PROVIDERS).toContain("vertex");
+      expect(PPT_VALID_PROVIDERS).toContain("openai");
+      expect(PPT_VALID_PROVIDERS).toContain("anthropic");
+      expect(PPT_VALID_PROVIDERS).toContain("google-ai");
+      expect(PPT_VALID_PROVIDERS).toContain("azure");
+      expect(PPT_VALID_PROVIDERS).toContain("bedrock");
+    });
+
+    it("should have correct length", () => {
+      expect(PPT_VALID_PROVIDERS.length).toBe(6);
+    });
+  });
+});
+
+// -----------------------------------------------------------------------
+// Additional Slide Type Rendering Tests
+// -----------------------------------------------------------------------
+
+describe("Complete Slide Type Rendering Coverage", () => {
+  const gen = createSlideGenerator(createMockConfig());
+  const ppt = () => {
+    const p = new PptxGenJS();
+    p.layout = "LAYOUT_16x9";
+    return p;
+  };
+  const render = (schema: SlideSchema) =>
+    gen.renderSlide(
+      ppt(),
+      { slideNumber: 1, schema, generationTime: 10 },
+      1,
+      10,
+    );
+
+  describe("Opening/Closing slide types", () => {
+    it("should render section-header", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "section-header",
+            layout: "title-centered",
+            title: "Section 1",
+            content: { subtitle: "Introduction" },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render thank-you", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "thank-you",
+            layout: "contact-info",
+            title: "Thank You!",
+            content: { cta: "Questions?", contactInfo: "email@test.com" },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render closing", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "closing",
+            layout: "thank-you",
+            title: "The End",
+            content: { cta: "Let's Connect" },
+          }),
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe("Content slide types", () => {
+    it("should render agenda", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "agenda",
+            layout: "title-content",
+            title: "Agenda",
+            content: {
+              bullets: [
+                { text: "Topic 1", emphasis: false },
+                { text: "Topic 2", emphasis: false },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render numbered-list", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "numbered-list",
+            layout: "title-content",
+            title: "Steps",
+            content: {
+              bullets: [
+                { text: "Step 1", emphasis: false },
+                { text: "Step 2", emphasis: false },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe("Visual slide types", () => {
+    it("should render image-left", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "image-left",
+            layout: "image-left-content-right",
+            title: "Image Left",
+            content: { body: "Content on right side" },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render image-right", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "image-right",
+            layout: "image-right-content-left",
+            title: "Image Right",
+            content: { body: "Content on left side" },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render full-bleed-image", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "full-bleed-image",
+            layout: "image-full-overlay",
+            title: "Full Image",
+            content: {},
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render gallery", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "gallery",
+            layout: "image-grid-2x2",
+            title: "Gallery",
+            content: {},
+          }),
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe("Layout slide types", () => {
+    it("should render three-column", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "three-column",
+            layout: "three-column-equal",
+            title: "Three Columns",
+            content: {
+              leftColumn: { title: "Col 1", bullets: [] },
+              centerColumn: { title: "Col 2", bullets: [] },
+              rightColumn: { title: "Col 3", bullets: [] },
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render split-content", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "split-content",
+            layout: "two-column-equal",
+            title: "Split Content",
+            content: {
+              leftColumn: { title: "Left", bullets: [] },
+              rightColumn: { title: "Right", bullets: [] },
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe("Data slide types", () => {
+    it("should render chart-line", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "chart-line",
+            content: {
+              chartData: {
+                type: "line",
+                title: "Trends",
+                series: [
+                  { name: "Data", labels: ["Q1", "Q2"], values: [10, 20] },
+                ],
+              },
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render chart-pie", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "chart-pie",
+            content: {
+              chartData: {
+                type: "pie",
+                title: "Distribution",
+                series: [
+                  { name: "Share", labels: ["A", "B"], values: [60, 40] },
+                ],
+              },
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render chart-area", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "chart-area",
+            content: {
+              chartData: {
+                type: "area",
+                title: "Area Chart",
+                series: [
+                  { name: "Values", labels: ["1", "2"], values: [5, 15] },
+                ],
+              },
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+  });
+
+  describe("Special slide types", () => {
+    it("should render process-flow", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "process-flow",
+            layout: "process-horizontal",
+            title: "Process",
+            content: {
+              processSteps: [
+                { step: 1, title: "Start", description: "Begin here" },
+                { step: 2, title: "Middle", description: "Continue" },
+                { step: 3, title: "End", description: "Finish" },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render features", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "features",
+            layout: "icon-grid",
+            title: "Features",
+            content: {
+              features: [
+                { name: "Feature 1", description: "Description 1" },
+                { name: "Feature 2", description: "Description 2" },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render team", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "team",
+            layout: "team-grid",
+            title: "Our Team",
+            content: {
+              team: [
+                { name: "Alice", role: "CEO" },
+                { name: "Bob", role: "CTO" },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render icons", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "icons",
+            layout: "icon-grid",
+            title: "Icons",
+            content: {
+              icons: [
+                { icon: "star", label: "Quality" },
+                { icon: "rocket", label: "Speed" },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+
+    it("should render conclusion", () => {
+      expect(() =>
+        render(
+          createMockSlideSchema({
+            type: "conclusion",
+            layout: "summary-bullets",
+            title: "Conclusion",
+            content: {
+              bullets: [
+                { text: "Key point 1", emphasis: true },
+                { text: "Key point 2", emphasis: false },
+              ],
+            },
+          }),
+        ),
+      ).not.toThrow();
+    });
+  });
+});
+
+// -----------------------------------------------------------------------
+// Context Edge Cases Tests
+// -----------------------------------------------------------------------
+
+describe("PPT Context Edge Cases", () => {
+  it("should handle logo from input.images[0] as fallback", () => {
+    const options: GenerateOptions = {
+      input: {
+        text: "Test Presentation",
+        images: [Buffer.from("logo-data")],
+      },
+      output: { mode: "ppt", ppt: { pages: 10 } },
+    };
+
+    const context = extractPPTContext(options);
+    expect(context.logo).toBeDefined();
+    expect(context.images).toHaveLength(1);
+  });
+
+  it("should prioritize logoPath over input.images", () => {
+    const logoBuffer = Buffer.from("explicit-logo");
+    const options: GenerateOptions = {
+      input: {
+        text: "Test Presentation",
+        images: [Buffer.from("fallback-logo")],
+      },
+      output: {
+        mode: "ppt",
+        ppt: {
+          pages: 10,
+          logoPath: logoBuffer,
+        },
+      },
+    };
+
+    const context = extractPPTContext(options);
+    expect(context.logo).toBe(logoBuffer);
+  });
+
+  it("should extract multiple images from input.images", () => {
+    const options: GenerateOptions = {
+      input: {
+        text: "Multi-image presentation",
+        images: [
+          Buffer.from("image1"),
+          Buffer.from("image2"),
+          "data:image/png;base64,image3",
+        ],
+      },
+      output: { mode: "ppt", ppt: { pages: 10 } },
+    };
+
+    const context = extractPPTContext(options);
+    expect(context.images).toHaveLength(3);
+  });
+
+  it("should handle very long topic by truncating in output path", () => {
+    const longTopic = "A".repeat(100);
+    const options: GenerateOptions = {
+      input: { text: longTopic },
+      output: { mode: "ppt", ppt: { pages: 10 } },
+    };
+
+    const context = extractPPTContext(options);
+    expect(context.topic).toBe(longTopic);
+
+    // Output path should truncate
+    const outputPath = generateOutputPath(context);
+    const filename = outputPath.split("/").pop() || "";
+    expect(filename.length).toBeLessThan(100);
+  });
+});
+
+// -----------------------------------------------------------------------
+// Aspect Ratio Tests
+// -----------------------------------------------------------------------
+
+describe("Aspect Ratio Handling", () => {
+  it("should generate slides with 16:9 aspect ratio", async () => {
+    const gen = createSlideGenerator(createMockConfig({ aspectRatio: "16:9" }));
+    const result = await gen.generateSlide(createMockSlideSchema());
+    expect(result).toBeDefined();
+  });
+
+  it("should generate slides with 4:3 aspect ratio", async () => {
+    const gen = createSlideGenerator(createMockConfig({ aspectRatio: "4:3" }));
+    const result = await gen.generateSlide(createMockSlideSchema());
+    expect(result).toBeDefined();
+  });
+
+  it("should apply correct layout based on aspect ratio", () => {
+    const ppt16x9 = new PptxGenJS();
+    ppt16x9.layout = getLayoutName("16:9");
+    expect(ppt16x9.layout).toBe("LAYOUT_16x9");
+
+    const ppt4x3 = new PptxGenJS();
+    ppt4x3.layout = getLayoutName("4:3");
+    expect(ppt4x3.layout).toBe("LAYOUT_4x3");
+  });
+
+  it("should have correct SLIDE_DIMENSIONS for both ratios", () => {
+    expect(SLIDE_DIMENSIONS["16:9"]).toEqual({ width: 10, height: 5.625 });
+    expect(SLIDE_DIMENSIONS["4:3"]).toEqual({ width: 10, height: 7.5 });
   });
 });

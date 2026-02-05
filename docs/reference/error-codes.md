@@ -335,6 +335,140 @@ const result = await neurolink.generate({
 });
 ```
 
+## PPT Validation Errors
+
+Errors specific to PPT (PowerPoint) generation validation.
+
+| Code                   | Description                       | Severity | Retriable | Category   |
+| ---------------------- | --------------------------------- | -------- | --------- | ---------- |
+| `INVALID_PPT_PAGES`    | Invalid page count (must be 5-50) | MEDIUM   | No        | VALIDATION |
+| `INVALID_PPT_THEME`    | Invalid theme specified           | MEDIUM   | No        | VALIDATION |
+| `INVALID_PPT_AUDIENCE` | Invalid audience type             | MEDIUM   | No        | VALIDATION |
+| `INVALID_PPT_TONE`     | Invalid tone specified            | MEDIUM   | No        | VALIDATION |
+| `INVALID_PPT_ASPECT`   | Invalid aspect ratio              | MEDIUM   | No        | VALIDATION |
+| `INVALID_PPT_FORMAT`   | Invalid output format             | MEDIUM   | No        | VALIDATION |
+| `INVALID_PPT_MODE`     | Output mode not set to ppt        | MEDIUM   | No        | VALIDATION |
+| `EMPTY_PPT_PROMPT`     | Prompt cannot be empty            | MEDIUM   | No        | VALIDATION |
+| `PPT_PROMPT_TOO_SHORT` | Prompt must be at least 10 chars  | MEDIUM   | No        | VALIDATION |
+| `PPT_PROMPT_TOO_LONG`  | Prompt exceeds 1000 characters    | MEDIUM   | No        | VALIDATION |
+
+### Resolution Guide
+
+**INVALID_PPT_PAGES**
+
+```typescript
+// Valid page count: 5-50 slides
+const result = await neurolink.generate({
+  input: { text: "Company presentation" },
+  output: {
+    mode: "ppt",
+    ppt: { pages: 10 }, // Must be between 5 and 50
+  },
+});
+```
+
+**INVALID_PPT_THEME**
+
+```typescript
+// Valid themes: 'modern', 'corporate', 'creative', 'minimal', 'dark'
+const result = await neurolink.generate({
+  input: { text: "Product launch" },
+  output: {
+    mode: "ppt",
+    ppt: {
+      pages: 12,
+      theme: "corporate", // Valid theme name
+    },
+  },
+});
+```
+
+**INVALID_PPT_AUDIENCE**
+
+```typescript
+// Valid audiences: 'business', 'students', 'technical', 'general'
+const result = await neurolink.generate({
+  input: { text: "Technical architecture overview" },
+  output: {
+    mode: "ppt",
+    ppt: {
+      pages: 15,
+      audience: "technical", // Valid audience type
+    },
+  },
+});
+```
+
+## PPT Generation Runtime Errors
+
+Runtime errors during PPT generation (as opposed to validation errors).
+
+| Code                          | Description                      | Severity | Retriable | Category   |
+| ----------------------------- | -------------------------------- | -------- | --------- | ---------- |
+| `PPT_PLANNING_FAILED`         | AI content planning failed       | HIGH     | Yes       | EXECUTION  |
+| `PPT_INVALID_AI_RESPONSE`     | AI returned malformed slide data | HIGH     | Yes       | EXECUTION  |
+| `PPT_IMAGE_GENERATION_FAILED` | AI image generation failed       | MEDIUM   | Yes       | EXECUTION  |
+| `PPT_ASSEMBLY_FAILED`         | PPTX file assembly failed        | HIGH     | No        | EXECUTION  |
+| `PPT_FILE_WRITE_FAILED`       | Could not write file to disk     | HIGH     | No        | RESOURCE   |
+| `PPT_TIMEOUT`                 | Generation exceeded timeout      | HIGH     | Yes       | TIMEOUT    |
+| `PPT_INVALID_INPUT`           | Invalid input during runtime     | HIGH     | No        | VALIDATION |
+
+### Resolution Guide
+
+**PPT_PLANNING_FAILED**
+
+```typescript
+// Use a more specific prompt or try a different model
+const result = await neurolink.generate({
+  input: {
+    text: `Quarterly Sales Report: 
+      - Revenue growth 23% YoY
+      - 450 new customers
+      - Top 3 products by region
+      - 2026 targets and roadmap`,
+  },
+  provider: "anthropic",
+  model: "claude-3.5-sonnet", // Try advanced model
+  output: {
+    mode: "ppt",
+    ppt: { pages: 15, theme: "corporate" },
+  },
+});
+```
+
+**PPT_IMAGE_GENERATION_FAILED**
+
+```typescript
+// Disable AI image generation if it fails
+const result = await neurolink.generate({
+  input: { text: "Technical architecture" },
+  output: {
+    mode: "ppt",
+    ppt: {
+      pages: 10,
+      generateAIImages: false, // Disable AI images
+    },
+  },
+});
+```
+
+**PPT_TIMEOUT**
+
+```typescript
+// Reduce slides or disable images for faster generation
+const result = await neurolink.generate({
+  input: { text: "Quick summary presentation" },
+  output: {
+    mode: "ppt",
+    ppt: {
+      pages: 5, // Fewer slides
+      generateAIImages: false, // No AI images
+    },
+  },
+  timeout: 300, // 5 minute timeout
+});
+```
+
 ## SDK Error Handling Example
 
 Complete example demonstrating proper error handling in the SDK:

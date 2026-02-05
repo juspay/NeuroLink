@@ -481,6 +481,8 @@ const result = await neurolink.generate({
 
 > **Video Generation:** Use `output.mode: "video"` with Veo 3.1 to generate videos. See [Video Generation Guide](../features/video-generation.md).
 
+> **PPT Generation:** Use `output.mode: "ppt"` with supported providers (Vertex AI, Google AI, OpenAI, Anthropic, Azure OpenAI, or Bedrock) and compatible text models to generate PowerPoint presentations. See [PPT Generation Guide](../features/ppt-generation.md).
+
 ### Gemini 3 Extended Thinking Configuration
 
 Gemini 3 models support **extended thinking** (also known as "thinking mode"), which allows the model to reason more deeply before providing responses. This is particularly useful for complex reasoning tasks, math problems, and multi-step analysis.

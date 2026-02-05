@@ -214,6 +214,27 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
 
 See [Video Generation Guide](features/video-generation.md) for complete setup and usage.
 
+### **PPT Generation (PowerPoint Presentations)**
+
+Generate professional PowerPoint presentations with supported providers (Vertex AI, Google AI, OpenAI, Anthropic, Azure OpenAI, and Bedrock) using compatible text models.
+
+```bash
+# Use your existing provider credentials (any of these):
+export GOOGLE_VERTEX_PROJECT="your-project-id"  # For Vertex AI
+export OPENAI_API_KEY="sk-..."                  # For OpenAI
+export ANTHROPIC_API_KEY="sk-ant-..."           # For Anthropic
+export GOOGLE_AI_API_KEY="..."                  # For Google AI Studio
+```
+
+**Optional: Enable AI Image Generation for Slides**
+
+```bash
+# Gemini model for slide image generation (optional)
+export VERTEX_IMAGE_MODEL="gemini-2.0-flash-exp"
+```
+
+See [PPT Generation Guide](features/ppt-generation.md) for complete setup and usage.
+
 ### **Regional Routing**
 
 Set region-specific variables to control latency and compliance.

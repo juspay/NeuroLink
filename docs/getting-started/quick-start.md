@@ -125,6 +125,7 @@ npx @juspay/neurolink generate "Write a poem" --disable-tools
 **Latest Features:**
 
 - [Multimodal Chat](../features/multimodal-chat.md) - Add images to your prompts
+- [PPT Generation](../features/ppt-generation.md) - Generate PowerPoint presentations
 - [Auto Evaluation](../features/auto-evaluation.md) - Quality scoring for responses
 - [Guardrails](../features/guardrails.md) - Content filtering and safety
 

@@ -70,6 +70,15 @@ This guide helps diagnose and resolve common issues with NeuroLink, including AI
 | `Project not found` error              | Set `GOOGLE_VERTEX_PROJECT` or `GOOGLE_CLOUD_PROJECT` environment variable                                                                                    |
 | Audio missing from generated video     | Set `output.video.audio: true` (enabled by default) and ensure Veo 3.1 model is used                                                                          |
 
+### PPT Generation (PowerPoint Presentations)
+
+- `PPT_PLANNING_FAILED` — Check AI provider connection and ensure valid prompt. See [PPT Generation Guide](features/ppt-generation.md#troubleshooting)
+- `PPT_INVALID_AI_RESPONSE` during generation — Simplify prompt/topic and retry. See [PPT Generation Guide](features/ppt-generation.md#error-handling)
+- `PPT_FILE_WRITE_FAILED` — Check write permissions for output directory and disk space. See [PPT Generation Guide](features/ppt-generation.md#file-output)
+- Empty slides in presentation — Ensure content plan has enough detail; try more specific prompts
+- Images not generating — Set `generateAIImages: true` in `output.ppt` (SDK) or avoid `--pptNoImages` (CLI), and configure `VERTEX_IMAGE_MODEL`. See [PPT Generation Guide](features/ppt-generation.md#ai-image-generation)
+- Theme not applying correctly — Verify theme name: `modern`, `corporate`, `creative`, `minimal`, or `dark`
+
 ## 🎯 **Generate Function Migration Issues**
 
 ### **Migration Questions**

@@ -79,6 +79,7 @@ const sidebars: SidebarsConfig = {
         "features/tts",
         "features/audio-input",
         "features/video-generation",
+        "features/ppt-generation",
         "features/pdf-support",
         "features/csv-support",
         "features/office-documents",
