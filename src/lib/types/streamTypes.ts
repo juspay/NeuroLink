@@ -1,19 +1,20 @@
 import type { Tool } from "ai";
-import type { ValidationSchema, StandardRecord } from "./typeAliases.js";
-import type { AIModelProviderConfig } from "./providers.js";
-import type { Content, ImageWithAltText } from "./content.js";
+import type { AIProviderName } from "../constants/enums.js";
+import type { EvaluationData } from "../index.js";
+import type { RAGConfig } from "../rag/types.js";
 import type {
   AnalyticsData,
   ToolExecutionEvent,
   ToolExecutionSummary,
 } from "../types/index.js";
-import { AIProviderName } from "../constants/enums.js";
-import type { TokenUsage } from "./analytics.js";
-import type { EvaluationData } from "../index.js";
-import type { UnknownRecord, JsonValue } from "./common.js";
 import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
+import type { TokenUsage } from "./analytics.js";
+import type { JsonValue, UnknownRecord } from "./common.js";
+import type { Content, ImageWithAltText } from "./content.js";
 import type { ChatMessage } from "./conversation.js";
-import type { TTSOptions, TTSChunk } from "./ttsTypes.js";
+import type { AIModelProviderConfig } from "./providers.js";
+import type { TTSChunk, TTSOptions } from "./ttsTypes.js";
+import type { StandardRecord, ValidationSchema } from "./typeAliases.js";
 
 /**
  * Progress tracking and metadata for streaming operations
@@ -406,6 +407,26 @@ export type StreamOptions = {
   middleware?: MiddlewareFactoryOptions;
 
   enableSummarization?: boolean; // Enable/disable summarization for this specific request
+
+  /**
+   * RAG (Retrieval-Augmented Generation) configuration.
+   *
+   * When provided, NeuroLink automatically loads the specified files, chunks them,
+   * generates embeddings, and creates a search tool that the AI model can invoke
+   * on demand to find relevant context before answering.
+   *
+   * @example Basic RAG streaming
+   * ```typescript
+   * const stream = await neurolink.stream({
+   *   input: { text: "What is RAG?" },
+   *   provider: "vertex",
+   *   rag: {
+   *     files: ["./docs/guide.md"],
+   *   }
+   * });
+   * ```
+   */
+  rag?: RAGConfig;
 };
 
 /**

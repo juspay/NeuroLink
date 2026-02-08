@@ -1,0 +1,76 @@
+[
+  {
+    "id": "generate-basic",
+    "description": "Basic RAG generation test",
+    "prompt": "What chunking strategies are available in NeuroLink?",
+    "expectedToolCall": "search_knowledge_base",
+    "expectedKeywords": [
+      "chunk",
+      "strategy",
+      "recursive",
+      "sentence",
+      "markdown"
+    ],
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "generate-technical",
+    "description": "Technical question requiring retrieval",
+    "prompt": "Explain how hybrid search combines BM25 and vector search",
+    "expectedToolCall": "search_knowledge_base",
+    "expectedKeywords": ["hybrid", "BM25", "vector", "fusion", "RRF"],
+    "ragConfig": {
+      "topK": 5,
+      "minScore": 0.6
+    }
+  },
+  {
+    "id": "generate-config",
+    "description": "Configuration-related question",
+    "prompt": "How do I configure the embedding model for RAG?",
+    "expectedToolCall": "search_knowledge_base",
+    "expectedKeywords": ["embedding", "model", "config", "provider"],
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "stream-basic",
+    "description": "Basic streaming with RAG",
+    "prompt": "What is retrieval-augmented generation?",
+    "expectedToolCall": "search_knowledge_base",
+    "expectedKeywords": ["retrieval", "augmented", "generation", "RAG"],
+    "ragConfig": {
+      "topK": 3,
+      "stream": true
+    }
+  },
+  {
+    "id": "stream-rerank",
+    "description": "Streaming with reranking enabled",
+    "prompt": "How does reranking improve search results?",
+    "expectedToolCall": "search_knowledge_base",
+    "expectedKeywords": ["rerank", "relevance", "score", "precision"],
+    "ragConfig": {
+      "topK": 5,
+      "rerank": true,
+      "stream": true
+    }
+  },
+  {
+    "id": "generate-no-match",
+    "description": "Query with no relevant documents",
+    "prompt": "What is the weather like on Mars?",
+    "expectedToolCall": "search_knowledge_base",
+    "expectedKeywords": [],
+    "expectNoResults": true,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.8
+    }
+  }
+]

@@ -159,3 +159,115 @@ console.log(result.content);
 - [getBestProvider](functions/getBestProvider.md)
 - [getAvailableProviders](functions/getAvailableProviders.md)
 - [isValidProvider](functions/isValidProvider.md)
+
+## RAG Document Processing
+
+### Classes
+
+- [ChunkerFactory](classes/ChunkerFactory.md)
+- [ChunkerRegistry](classes/ChunkerRegistry.md)
+- [RerankerFactory](classes/RerankerFactory.md)
+- [RerankerRegistry](classes/RerankerRegistry.md)
+- [MDocument](classes/MDocument.md)
+- [RAGPipeline](classes/RAGPipeline.md)
+- [InMemoryVectorStore](classes/InMemoryVectorStore.md)
+- [InMemoryBM25Index](classes/InMemoryBM25Index.md)
+- [GraphRAG](classes/GraphRAG.md)
+
+### Functions
+
+- [createChunker](functions/createChunker.md)
+- [getAvailableStrategies](functions/getAvailableStrategies.md)
+- [getChunkerMetadata](functions/getChunkerMetadata.md)
+- [chunkText](functions/chunkText.md)
+- [createReranker](functions/createReranker.md)
+- [getAvailableRerankerTypes](functions/getAvailableRerankerTypes.md)
+- [rerank](functions/rerank.md)
+- [batchRerank](functions/batchRerank.md)
+- [simpleRerank](functions/simpleRerank.md)
+- [createHybridSearch](functions/createHybridSearch.md)
+- [reciprocalRankFusion](functions/reciprocalRankFusion.md)
+- [linearCombination](functions/linearCombination.md)
+- [loadDocument](functions/loadDocument.md)
+- [loadDocuments](functions/loadDocuments.md)
+- [assembleContext](functions/assembleContext.md)
+- [createContextWindow](functions/createContextWindow.md)
+- [prepareRAGTool](functions/prepareRAGTool.md)
+
+### Type Aliases
+
+- [ChunkingStrategy](type-aliases/ChunkingStrategy.md)
+- [ChunkerConfig](type-aliases/ChunkerConfig.md)
+- [RerankerType](type-aliases/RerankerType.md)
+- [RerankerConfig](type-aliases/RerankerConfig.md)
+- [HybridSearchConfig](type-aliases/HybridSearchConfig.md)
+- [VectorQueryToolConfig](type-aliases/VectorQueryToolConfig.md)
+- [Chunk](type-aliases/Chunk.md)
+- [ChunkMetadata](type-aliases/ChunkMetadata.md)
+- [RAGConfig](type-aliases/RAGConfig.md)
+- [RAGPreparedTool](type-aliases/RAGPreparedTool.md)
+
+### Using RAG Tools with generate()
+
+#### Simplified API (Recommended)
+
+Pass `rag: { files }` directly to `generate()` or `stream()` for automatic RAG pipeline setup. NeuroLink handles file loading, chunking, embedding, vector storage, and tool creation automatically:
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+// Generate with RAG - just pass files
+const result = await neurolink.generate({
+  prompt: "What are the key features described in the docs?",
+  rag: {
+    files: ["./docs/guide.md", "./docs/api.md"],
+    strategy: "markdown", // Optional: auto-detected from extension
+    chunkSize: 512, // Optional: default 1000
+    chunkOverlap: 50, // Optional: default 200
+    topK: 5, // Optional: default 5
+  },
+});
+
+// Stream with RAG - same API
+const stream = await neurolink.stream({
+  prompt: "Summarize the architecture",
+  rag: { files: ["./docs/architecture.md"] },
+});
+```
+
+#### Advanced API
+
+For full control over embeddings and vector stores, use `createVectorQueryTool` directly:
+
+```typescript
+import {
+  NeuroLink,
+  createVectorQueryTool,
+  InMemoryVectorStore,
+} from "@juspay/neurolink";
+
+const vectorStore = new InMemoryVectorStore();
+// ... populate with data
+
+const ragTool = createVectorQueryTool(
+  {
+    id: "kb-search",
+    indexName: "knowledge-base",
+    embeddingModel: { provider: "openai", modelName: "text-embedding-3-small" },
+  },
+  vectorStore,
+);
+
+const result = await neurolink.generate({
+  input: { text: "Your question" },
+  tools: [ragTool],
+});
+```
+
+**Related Documentation:**
+
+- [createVectorQueryTool](functions/createVectorQueryTool.md) - Factory function for creating vector query tools
+- [InMemoryVectorStore](classes/InMemoryVectorStore.md) - In-memory vector store implementation
+- [VectorQueryToolConfig](type-aliases/VectorQueryToolConfig.md) - Configuration options for vector query tools

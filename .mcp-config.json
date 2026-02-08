@@ -27,16 +27,6 @@
         "maxBurst": 10
       },
       "description": "GitHub Copilot MCP API with full configuration"
-    },
-    "bitbucket": {
-      "name": "bitbucket",
-      "command": "npx",
-      "args": ["-y", "@nexus2520/bitbucket-mcp-server"],
-      "transport": "stdio",
-      "env": {
-        "BITBUCKET_USERNAME": "${BITBUCKET_USERNAME}",
-        "BITBUCKET_APP_PASSWORD": "${BITBUCKET_APP_PASSWORD}"
-      }
     }
   },
   "autoDiscovery": {

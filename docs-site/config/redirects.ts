@@ -122,8 +122,9 @@ const sectionReorganizationRedirects: PluginOptions["redirects"] = [
   { from: "/docs/middleware", to: "/docs/advanced/middleware-architecture" },
 
   // Analytics/observability redirects (redirect to telemetry as main observability page)
-  { from: "/analytics", to: "/docs/reference/analytics" },
-  { from: "/docs/analytics", to: "/docs/reference/analytics" },
+  { from: "/analytics", to: "/docs/observability/telemetry" },
+  { from: "/docs/analytics", to: "/docs/observability/telemetry" },
+  { from: "/docs/reference/analytics", to: "/docs/observability/telemetry" },
   { from: "/observability", to: "/docs/observability/telemetry" },
   { from: "/telemetry", to: "/docs/observability/telemetry" },
 

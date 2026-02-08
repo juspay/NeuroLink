@@ -1,0 +1,153 @@
+[
+  {
+    "id": "query-1",
+    "query": "What is NeuroLink?",
+    "description": "Basic introductory question about the platform",
+    "expectedChunkIds": ["chunk-1", "chunk-2"],
+    "queryVector": [0.8, 0.18, 0.47, 0.65, 0.29, 0.89, 0.14, 0.52, 0.74, 0.41],
+    "expectedMinScore": 0.85,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "query-2",
+    "query": "How does RAG retrieval work?",
+    "description": "Question about retrieval-augmented generation process",
+    "expectedChunkIds": ["chunk-3", "chunk-8", "chunk-9"],
+    "queryVector": [0.43, 0.74, 0.86, 0.25, 0.54, 0.36, 0.69, 0.88, 0.14, 0.48],
+    "expectedMinScore": 0.8,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.6
+    }
+  },
+  {
+    "id": "query-3",
+    "query": "Configure embedding model settings",
+    "description": "Configuration-related query",
+    "expectedChunkIds": ["chunk-4", "chunk-5"],
+    "queryVector": [0.35, 0.61, 0.45, 0.73, 0.79, 0.21, 0.65, 0.29, 0.92, 0.53],
+    "expectedMinScore": 0.75,
+    "ragConfig": {
+      "topK": 2,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "query-4",
+    "query": "How to use the streaming API?",
+    "description": "API usage question for streaming",
+    "expectedChunkIds": ["chunk-6", "chunk-7"],
+    "queryVector": [0.54, 0.79, 0.31, 0.62, 0.71, 0.43, 0.86, 0.17, 0.38, 0.9],
+    "expectedMinScore": 0.78,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5,
+      "stream": true
+    }
+  },
+  {
+    "id": "query-5",
+    "query": "Vector similarity search options",
+    "description": "Technical query about vector search",
+    "expectedChunkIds": ["chunk-8", "chunk-3"],
+    "queryVector": [0.44, 0.71, 0.84, 0.26, 0.55, 0.37, 0.72, 0.89, 0.15, 0.51],
+    "expectedMinScore": 0.82,
+    "ragConfig": {
+      "topK": 2,
+      "minScore": 0.6,
+      "similarityMetric": "cosine"
+    }
+  },
+  {
+    "id": "query-6",
+    "query": "Improve retrieval with reranking",
+    "description": "Question about reranking functionality",
+    "expectedChunkIds": ["chunk-9", "chunk-5"],
+    "queryVector": [0.4, 0.7, 0.81, 0.3, 0.49, 0.54, 0.7, 0.85, 0.21, 0.57],
+    "expectedMinScore": 0.8,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5,
+      "rerank": true,
+      "rerankTopK": 5
+    }
+  },
+  {
+    "id": "query-7",
+    "query": "Which LLM providers are supported?",
+    "description": "Provider compatibility question",
+    "expectedChunkIds": ["chunk-10", "chunk-1"],
+    "queryVector": [0.77, 0.17, 0.46, 0.63, 0.33, 0.87, 0.15, 0.51, 0.77, 0.42],
+    "expectedMinScore": 0.75,
+    "ragConfig": {
+      "topK": 2,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "query-8",
+    "query": "Production deployment best practices",
+    "description": "DevOps and deployment query",
+    "expectedChunkIds": ["chunk-11", "chunk-7"],
+    "queryVector": [0.26, 0.55, 0.74, 0.44, 0.89, 0.19, 0.62, 0.4, 0.83, 0.31],
+    "expectedMinScore": 0.78,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "query-9",
+    "query": "Context window and token limits",
+    "description": "Query about context management",
+    "expectedChunkIds": ["chunk-12", "chunk-6"],
+    "queryVector": [0.49, 0.76, 0.81, 0.27, 0.57, 0.44, 0.71, 0.84, 0.2, 0.56],
+    "expectedMinScore": 0.76,
+    "ragConfig": {
+      "topK": 2,
+      "minScore": 0.5,
+      "maxContextTokens": 4096
+    }
+  },
+  {
+    "id": "query-10",
+    "query": "Chunking strategies for documents",
+    "description": "Document processing question",
+    "expectedChunkIds": ["chunk-5", "chunk-3"],
+    "queryVector": [0.36, 0.67, 0.77, 0.3, 0.45, 0.5, 0.73, 0.82, 0.18, 0.58],
+    "expectedMinScore": 0.8,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5
+    }
+  },
+  {
+    "id": "query-edge-empty",
+    "query": "",
+    "description": "Edge case: empty query string",
+    "expectedChunkIds": [],
+    "queryVector": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "expectedMinScore": 0.0,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.5
+    },
+    "expectError": true,
+    "errorCode": "EMPTY_QUERY"
+  },
+  {
+    "id": "query-edge-no-match",
+    "query": "quantum entanglement in black holes",
+    "description": "Edge case: query with no relevant chunks",
+    "expectedChunkIds": [],
+    "queryVector": [0.95, 0.02, 0.08, 0.91, 0.04, 0.12, 0.97, 0.03, 0.06, 0.88],
+    "expectedMinScore": 0.0,
+    "ragConfig": {
+      "topK": 3,
+      "minScore": 0.8
+    }
+  }
+]

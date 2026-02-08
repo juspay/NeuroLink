@@ -16,7 +16,7 @@ Server adapters allow you to expose your NeuroLink AI agents as HTTP APIs using 
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 // Initialize NeuroLink
 const neurolink = new NeuroLink({
@@ -292,7 +292,7 @@ const server = await createServer(neurolink, {
 ### With Authentication
 
 ```typescript
-import { createServer, createAuthMiddleware } from "@juspay/neurolink/server";
+import { createServer, createAuthMiddleware } from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "hono",

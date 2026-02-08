@@ -1,12 +1,12 @@
 ---
 title: "Server Adapters Comparison Analysis"
-description: "Comprehensive comparison analysis of NeuroLink server adapters implementation versus Mastra reference implementation"
+description: "Comprehensive comparison analysis of NeuroLink server adapters implementation versus  reference implementation"
 ---
 
-# Server Adapters Comparison Analysis: NeuroLink vs Mastra
+# Server Adapters Comparison Analysis: NeuroLink vs
 
 **Status**: COMPREHENSIVE COMPARISON COMPLETE (REVISED v1.1)
-**Reference**: Mastra server adapters implementation
+**Reference**: server adapters implementation
 **Files Analyzed**: 50+ source files across both repositories
 
 > **v1.1 Changes:**
@@ -19,11 +19,11 @@ description: "Comprehensive comparison analysis of NeuroLink server adapters imp
 
 ## Executive Summary
 
-This document provides a comprehensive analysis comparing the NeuroLink server adapters implementation against the Mastra reference implementation. The analysis covers architecture, routes, middleware, streaming, error handling, testing, documentation, and identified gaps.
+This document provides a comprehensive analysis comparing the NeuroLink server adapters implementation against the reference implementation. The analysis covers architecture, routes, middleware, streaming, error handling, testing, documentation, and identified gaps.
 
 ### Key Findings
 
-| Category          | NeuroLink Status | Comparison to Mastra                                         |
+| Category          | NeuroLink Status | Comparison to                                                |
 | ----------------- | ---------------- | ------------------------------------------------------------ |
 | Architecture      | Excellent        | **Better** - Factory pattern with lazy loading               |
 | Framework Support | Excellent        | **Equal** - Hono, Express, Fastify, Koa                      |
@@ -83,12 +83,12 @@ src/lib/server/
 4. **Middleware Chain**: Framework-agnostic middleware interface
 5. **Type-First Design**: All types defined in `types.ts` using TypeScript `type` (not `interface`)
 
-### 1.2 Mastra Architecture
+### 1.2 Architecture
 
-Mastra uses a **monorepo structure** with separate packages per framework:
+uses a **monorepo structure** with separate packages per framework:
 
 ```
-mastra/
+/
 ├── packages/
 │   └── server/
 │       └── src/server/
@@ -114,7 +114,7 @@ mastra/
 
 **Key Differences:**
 
-| Aspect             | NeuroLink                 | Mastra                       |
+| Aspect             | NeuroLink                 |                              |
 | ------------------ | ------------------------- | ---------------------------- |
 | Package Structure  | Monolithic                | Multi-package monorepo       |
 | Adapter Pattern    | Factory with lazy loading | Direct instantiation         |
@@ -128,7 +128,7 @@ mastra/
 
 ### 2.1 Hono Adapter
 
-| Feature                | NeuroLink              | Mastra                 |
+| Feature                | NeuroLink              |                        |
 | ---------------------- | ---------------------- | ---------------------- |
 | Multi-runtime support  | Yes (Node.js + edge)   | Yes                    |
 | Middleware integration | Native Hono middleware | Native Hono middleware |
@@ -158,7 +158,7 @@ export class HonoServerAdapter extends BaseServerAdapter {
 
 ### 2.2 Express Adapter
 
-| Feature              | NeuroLink      | Mastra           |
+| Feature              | NeuroLink      |                  |
 | -------------------- | -------------- | ---------------- |
 | Async initialization | Yes            | Yes              |
 | Body parsing         | Built-in       | Built-in         |
@@ -167,10 +167,10 @@ export class HonoServerAdapter extends BaseServerAdapter {
 
 **Gap Identified**: Express abort signal handling
 
-**Mastra Implementation** (reference):
+** Implementation** (reference):
 
 ```typescript
-// mastra/server-adapters/express/src/index.ts
+// /server-adapters/express/src/index.ts
 const controller = new AbortController();
 res.on("close", () => {
   if (!res.writableFinished) {
@@ -182,7 +182,7 @@ res.locals.abortSignal = controller.signal;
 
 ### 2.3 Fastify Adapter
 
-| Feature             | NeuroLink      | Mastra               |
+| Feature             | NeuroLink      |                      |
 | ------------------- | -------------- | -------------------- |
 | Plugin system       | Yes            | Yes                  |
 | Schema validation   | Via Zod        | Built-in JSON Schema |
@@ -191,10 +191,10 @@ res.locals.abortSignal = controller.signal;
 
 **Gap Identified**: MCP raw body attachment
 
-**Mastra Implementation** (reference):
+** Implementation** (reference):
 
 ```typescript
-// mastra/server-adapters/fastify/src/index.ts
+// /server-adapters/fastify/src/index.ts
 const rawReq = request.raw as typeof request.raw & { body?: unknown };
 if (request.body !== undefined) {
   rawReq.body = request.body;
@@ -203,7 +203,7 @@ if (request.body !== undefined) {
 
 ### 2.4 Koa Adapter
 
-| Feature            | NeuroLink      | Mastra       |
+| Feature            | NeuroLink      |              |
 | ------------------ | -------------- | ------------ |
 | Router integration | @koa/router    | @koa/router  |
 | Middleware support | Native Koa     | Native Koa   |
@@ -216,7 +216,7 @@ if (request.body !== undefined) {
 
 ### 3.1 Routes Present in Both
 
-| Route Category | NeuroLink            | Mastra                     |
+| Route Category | NeuroLink            |                            |
 | -------------- | -------------------- | -------------------------- |
 | Health/Ready   | `/api/health/*`      | `/health`, `/ready`        |
 | Agent Execute  | `/api/agent/execute` | `/api/agents/:id/generate` |
@@ -225,9 +225,9 @@ if (request.body !== undefined) {
 | Tool Execute   | `/api/tools/execute` | `/api/tools/:id/execute`   |
 | MCP Health     | `/api/mcp/health`    | `/mcp/health`              |
 
-### 3.2 Routes in Mastra but NOT in NeuroLink
+### 3.2 Routes in but NOT in NeuroLink
 
-| Route            | Mastra Path                  | Purpose                      | Priority |
+| Route            | Path                         | Purpose                      | Priority |
 | ---------------- | ---------------------------- | ---------------------------- | -------- |
 | Workflow Execute | `/api/workflows/:id/execute` | Execute workflow             | Medium   |
 | Workflow Resume  | `/api/workflows/:id/resume`  | Resume paused workflow       | Medium   |
@@ -237,7 +237,7 @@ if (request.body !== undefined) {
 | A2A Protocol     | `/api/a2a/*`                 | Agent-to-agent communication | Low      |
 | Syncs            | `/api/syncs/*`               | Data synchronization         | Low      |
 
-### 3.3 Routes in NeuroLink but NOT in Mastra
+### 3.3 Routes in NeuroLink but NOT in
 
 | Route           | NeuroLink Path             | Purpose                  |
 | --------------- | -------------------------- | ------------------------ |
@@ -255,7 +255,7 @@ if (request.body !== undefined) {
 
 ### 4.1 Authentication
 
-| Feature             | NeuroLink | Mastra  |
+| Feature             | NeuroLink |         |
 | ------------------- | --------- | ------- |
 | Bearer Token        | Yes       | Yes     |
 | API Key             | Yes       | Yes     |
@@ -266,10 +266,10 @@ if (request.body !== undefined) {
 
 **Gap Identified**: Dev playground authentication skip
 
-**Mastra Implementation** (reference):
+** Implementation** (reference):
 
 ```typescript
-// mastra/packages/server/src/server/auth/helpers.ts
+// /packages/server/src/server/auth/helpers.ts
 if (isDevPlayground(headers)) {
   return { valid: true, user: { id: "playground" } };
 }
@@ -277,31 +277,31 @@ if (isDevPlayground(headers)) {
 
 ### 4.2 Rate Limiting
 
-| Feature              | NeuroLink | Mastra |
-| -------------------- | --------- | ------ |
-| Fixed Window         | Yes       | Yes    |
-| Sliding Window       | **YES**   | No     |
-| Per-IP               | Yes       | Yes    |
-| Per-User             | Yes       | Yes    |
-| Custom Key Generator | Yes       | No     |
-| Skip Paths           | Yes       | Yes    |
+| Feature              | NeuroLink |     |
+| -------------------- | --------- | --- |
+| Fixed Window         | Yes       | Yes |
+| Sliding Window       | **YES**   | No  |
+| Per-IP               | Yes       | Yes |
+| Per-User             | Yes       | Yes |
+| Custom Key Generator | Yes       | No  |
+| Skip Paths           | Yes       | Yes |
 
 **NeuroLink Advantage**: Sliding window rate limiting provides smoother limits
 
 ### 4.3 Caching
 
-| Feature       | NeuroLink | Mastra |
-| ------------- | --------- | ------ |
-| In-Memory LRU | Yes       | No     |
-| TTL Support   | Yes       | No     |
-| Per-Path TTL  | Yes       | No     |
-| Cache Headers | Yes       | No     |
+| Feature       | NeuroLink |     |
+| ------------- | --------- | --- |
+| In-Memory LRU | Yes       | No  |
+| TTL Support   | Yes       | No  |
+| Per-Path TTL  | Yes       | No  |
+| Cache Headers | Yes       | No  |
 
 **NeuroLink Advantage**: Full caching middleware with LRU eviction
 
 ### 4.4 Validation
 
-| Feature            | NeuroLink | Mastra            |
+| Feature            | NeuroLink |                   |
 | ------------------ | --------- | ----------------- |
 | Zod Schemas        | Yes       | No (uses TypeBox) |
 | JSON Schema        | Via Zod   | Yes               |
@@ -314,7 +314,7 @@ if (isDevPlayground(headers)) {
 
 ### 5.1 SSE/NDJSON Streaming
 
-| Feature            | NeuroLink | Mastra  |
+| Feature            | NeuroLink |         |
 | ------------------ | --------- | ------- |
 | SSE Format         | Yes       | Yes     |
 | NDJSON Format      | Yes       | Yes     |
@@ -324,7 +324,7 @@ if (isDevPlayground(headers)) {
 
 **Gap Identified**: Stream chunk redaction for sensitive data
 
-> **Important Implementation Note**: Stream redaction must be **DISABLED by default** in NeuroLink implementation. Unlike Mastra's always-on approach, NeuroLink should require explicit opt-in via `config.redaction.enabled = true`. This ensures backward compatibility and allows users to control when redaction is applied.
+> **Important Implementation Note**: Stream redaction must be **DISABLED by default** in NeuroLink implementation. Unlike 's always-on approach, NeuroLink should require explicit opt-in via `config.redaction.enabled = true`. This ensures backward compatibility and allows users to control when redaction is applied.
 
 **Existing Types to Reuse** (DO NOT DUPLICATE):
 
@@ -332,10 +332,10 @@ if (isDevPlayground(headers)) {
 - `DataStreamEventType` from `src/lib/server/streaming/dataStream.ts`
 - `DataStreamWriter` from `src/lib/server/types.ts`
 
-**Mastra Implementation** (reference):
+** Implementation** (reference):
 
 ```typescript
-// mastra/packages/server/src/server/server-adapter/redact.ts
+// /packages/server/src/server/server-adapter/redact.ts
 export function redactStreamChunk<OUTPUT = undefined>(
   chunk: ChunkType<OUTPUT>,
 ): ChunkType<OUTPUT> {
@@ -371,12 +371,12 @@ if (!config?.enabled) {
 
 ### 5.2 WebSocket Support
 
-| Feature               | NeuroLink | Mastra |
-| --------------------- | --------- | ------ |
-| WebSocket Connections | **YES**   | No     |
-| Connection Management | **YES**   | No     |
-| Heartbeat             | **YES**   | No     |
-| Reconnection          | **YES**   | No     |
+| Feature               | NeuroLink |     |
+| --------------------- | --------- | --- |
+| WebSocket Connections | **YES**   | No  |
+| Connection Management | **YES**   | No  |
+| Heartbeat             | **YES**   | No  |
+| Reconnection          | **YES**   | No  |
 
 **NeuroLink Advantage**: Full WebSocket support with connection management
 
@@ -421,9 +421,9 @@ type ErrorRecoveryStrategy =
   | "CIRCUIT_BREAK";
 ```
 
-### 6.2 Mastra Error Handling
+### 6.2 Error Handling
 
-Mastra uses simpler error handling without recovery strategies:
+uses simpler error handling without recovery strategies:
 
 ```typescript
 // Simple error response
@@ -438,7 +438,7 @@ throw new HTTPException(400, { message: "Invalid request" });
 
 ### 7.1 Test Coverage Comparison
 
-| Category              | NeuroLink  | Mastra         |
+| Category              | NeuroLink  |                |
 | --------------------- | ---------- | -------------- |
 | Unit Tests            | Yes        | Yes            |
 | Integration Tests     | Yes        | Yes            |
@@ -465,10 +465,10 @@ test/
         └── ...
 ```
 
-### 7.3 Mastra Test Utilities (Reference)
+### 7.3 Test Utilities (Reference)
 
 ```typescript
-// mastra/tests/utils.ts
+// /tests/utils.ts
 export function createTestAgent(config?: AgentConfig) {
   return new Agent({
     name: "test-agent",
@@ -477,10 +477,10 @@ export function createTestAgent(config?: AgentConfig) {
   });
 }
 
-export function createTestMastra() {
-  return new Mastra({
+export function createTest() {
+  return new {
     agents: { testAgent: createTestAgent() },
-  });
+  }();
 }
 ```
 
@@ -490,19 +490,19 @@ export function createTestMastra() {
 
 ### 8.1 OpenAPI Generation
 
-| Feature             | NeuroLink | Mastra |
-| ------------------- | --------- | ------ |
-| OpenAPI 3.1         | Yes       | Yes    |
-| Auto-generation     | Yes       | Yes    |
-| Schema Inference    | Yes       | Yes    |
-| Route Documentation | Yes       | Yes    |
-| CLI Export          | Yes       | Yes    |
+| Feature             | NeuroLink |     |
+| ------------------- | --------- | --- |
+| OpenAPI 3.1         | Yes       | Yes |
+| Auto-generation     | Yes       | Yes |
+| Schema Inference    | Yes       | Yes |
+| Route Documentation | Yes       | Yes |
+| CLI Export          | Yes       | Yes |
 
 **Note**: The `neurolink server openapi` CLI command is now implemented for OpenAPI export.
 
 ### 8.2 Documentation Coverage
 
-| Documentation             | NeuroLink | Mastra  |
+| Documentation             | NeuroLink |         |
 | ------------------------- | --------- | ------- |
 | API Reference             | Yes       | Yes     |
 | Configuration Guide       | Yes       | Yes     |
@@ -558,7 +558,7 @@ docs/
 
 ### 9.2 Architectural Advantages
 
-1. **Single Package**: Simpler deployment vs Mastra's multi-package approach
+1. **Single Package**: Simpler deployment vs 's multi-package approach
 2. **EventEmitter Base**: Lifecycle events for monitoring and debugging
 3. **Route Groups**: Logical organization with prefix support
 4. **Framework-Agnostic Middleware**: Same middleware interface across all adapters
@@ -569,34 +569,34 @@ docs/
 
 ### High Priority Gaps
 
-| Gap                                    | Impact            | Effort | Reference                                                    |
-| -------------------------------------- | ----------------- | ------ | ------------------------------------------------------------ |
-| Stream Redaction (disabled by default) | Security          | Medium | `mastra/packages/server/src/server/server-adapter/redact.ts` |
-| Express Abort Signal                   | Reliability       | Low    | `mastra/server-adapters/express/src/index.ts`                |
-| Fastify MCP Body                       | MCP Compatibility | Low    | `mastra/server-adapters/fastify/src/index.ts`                |
-| Shared Test Utilities                  | Testing           | Medium | `mastra/tests/utils.ts`                                      |
-| Dev Playground Skip                    | DX                | Low    | `mastra/packages/server/src/server/auth/helpers.ts`          |
-| Route Deprecation                      | API Evolution     | Low    | N/A                                                          |
-| **Documentation Structure**            | DX                | Medium | NeuroLink Docusaurus patterns                                |
+| Gap                                    | Impact            | Effort | Reference                                              |
+| -------------------------------------- | ----------------- | ------ | ------------------------------------------------------ |
+| Stream Redaction (disabled by default) | Security          | Medium | `/packages/server/src/server/server-adapter/redact.ts` |
+| Express Abort Signal                   | Reliability       | Low    | `/server-adapters/express/src/index.ts`                |
+| Fastify MCP Body                       | MCP Compatibility | Low    | `/server-adapters/fastify/src/index.ts`                |
+| Shared Test Utilities                  | Testing           | Medium | `/tests/utils.ts`                                      |
+| Dev Playground Skip                    | DX                | Low    | `/packages/server/src/server/auth/helpers.ts`          |
+| Route Deprecation                      | API Evolution     | Low    | N/A                                                    |
+| **Documentation Structure**            | DX                | Medium | NeuroLink Docusaurus patterns                          |
 
 ### Medium Priority Gaps
 
-| Gap                   | Impact       | Effort | Reference                                                |
-| --------------------- | ------------ | ------ | -------------------------------------------------------- |
-| Workflow Routes       | Completeness | High   | `mastra/packages/server/src/server/handlers/workflow.ts` |
-| Vector Routes         | Completeness | High   | `mastra/packages/server/src/server/handlers/vector.ts`   |
-| A2A Routes            | Completeness | High   | `mastra/packages/server/src/server/handlers/a2a.ts`      |
-| Composite Auth        | Flexibility  | Medium | N/A                                                      |
-| Per-Route Body Limits | Security     | Low    | N/A                                                      |
-| CLI Serve Command     | Usability    | Medium | N/A                                                      |
+| Gap                   | Impact       | Effort | Reference                                          |
+| --------------------- | ------------ | ------ | -------------------------------------------------- |
+| Workflow Routes       | Completeness | High   | `/packages/server/src/server/handlers/workflow.ts` |
+| Vector Routes         | Completeness | High   | `/packages/server/src/server/handlers/vector.ts`   |
+| A2A Routes            | Completeness | High   | `/packages/server/src/server/handlers/a2a.ts`      |
+| Composite Auth        | Flexibility  | Medium | N/A                                                |
+| Per-Route Body Limits | Security     | Low    | N/A                                                |
+| CLI Serve Command     | Usability    | Medium | N/A                                                |
 
 ### Low Priority Gaps
 
-| Gap                     | Impact        | Effort | Reference                                            |
-| ----------------------- | ------------- | ------ | ---------------------------------------------------- |
-| Sync Routes             | Completeness  | Medium | `mastra/packages/server/src/server/handlers/sync.ts` |
-| Memory Routes Expansion | Completeness  | Low    | N/A                                                  |
-| Telemetry Routes        | Observability | Low    | N/A                                                  |
+| Gap                     | Impact        | Effort | Reference                                      |
+| ----------------------- | ------------- | ------ | ---------------------------------------------- |
+| Sync Routes             | Completeness  | Medium | `/packages/server/src/server/handlers/sync.ts` |
+| Memory Routes Expansion | Completeness  | Low    | N/A                                            |
+| Telemetry Routes        | Observability | Low    | N/A                                            |
 
 ---
 
@@ -631,7 +631,7 @@ docs/
 
 ## 12. Conclusion
 
-The NeuroLink server adapters implementation is **architecturally superior** to Mastra in several key areas (factory pattern, error handling, middleware options, WebSocket support). However, there are **specific functional gaps** that should be addressed to achieve feature parity:
+The NeuroLink server adapters implementation is **architecturally superior** to in several key areas (factory pattern, error handling, middleware options, WebSocket support). However, there are **specific functional gaps** that should be addressed to achieve feature parity:
 
 1. **Security**: Stream redaction is critical for production use (must be disabled by default)
 2. **Reliability**: Abort signal handling improves client disconnection handling
@@ -651,12 +651,12 @@ The gaps identified are well-scoped and can be implemented incrementally while m
 
 ## Appendix A: File Mapping
 
-| NeuroLink File                              | Mastra Equivalent                              |
+| NeuroLink File                              | Equivalent                                     |
 | ------------------------------------------- | ---------------------------------------------- |
 | `src/lib/server/adapters/honoAdapter.ts`    | `server-adapters/hono/src/index.ts`            |
 | `src/lib/server/adapters/expressAdapter.ts` | `server-adapters/express/src/index.ts`         |
 | `src/lib/server/adapters/fastifyAdapter.ts` | `server-adapters/fastify/src/index.ts`         |
-| `src/lib/server/adapters/koaAdapter.ts`     | N/A (Mastra doesn't have Koa)                  |
+| `src/lib/server/adapters/koaAdapter.ts`     | N/A ( doesn't have Koa)                        |
 | `src/lib/server/middleware/auth.ts`         | `packages/server/src/server/auth/helpers.ts`   |
 | `src/lib/server/routes/agentRoutes.ts`      | `packages/server/src/server/handlers/agent.ts` |
 | `src/lib/server/utils/openapi.ts`           | `packages/server/src/server/openapi.ts`        |
@@ -664,7 +664,7 @@ The gaps identified are well-scoped and can be implemented incrementally while m
 
 ## Appendix B: Type System Comparison
 
-| Aspect            | NeuroLink                                 | Mastra               |
+| Aspect            | NeuroLink                                 |                      |
 | ----------------- | ----------------------------------------- | -------------------- |
 | Type vs Interface | Uses `type` exclusively                   | Mixed usage          |
 | Location          | Centralized `types.ts`                    | Per-file definitions |
@@ -673,7 +673,7 @@ The gaps identified are well-scoped and can be implemented incrementally while m
 
 ## Appendix C: Test Pattern Comparison
 
-| Aspect      | NeuroLink                      | Mastra             |
+| Aspect      | NeuroLink                      |                    |
 | ----------- | ------------------------------ | ------------------ |
 | Test Runner | Vitest                         | Vitest             |
 | Structure   | describe/it blocks             | describe/it blocks |

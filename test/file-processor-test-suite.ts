@@ -191,7 +191,6 @@ function runCommand(
 ): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     let proc: ReturnType<typeof spawn>;
-    let timeoutId: NodeJS.Timeout;
     let isResolved = false;
 
     try {
@@ -229,7 +228,7 @@ function runCommand(
       }
     });
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (isResolved) {
         return;
       }

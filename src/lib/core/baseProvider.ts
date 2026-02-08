@@ -1,40 +1,37 @@
-import type {
-  ZodUnknownSchema,
-  ValidationSchema,
-  StandardRecord,
-} from "../types/typeAliases.js";
-import type { Tool, LanguageModelV1, CoreMessage } from "ai";
-import { generateText } from "ai";
-import type {
-  AIProvider,
-  TextGenerationOptions,
-  TextGenerationResult,
-  EnhancedGenerateResult,
-  AnalyticsData,
-  GenerateOptions,
-} from "../types/index.js";
-import { AIProviderName } from "../constants/enums.js";
+import type { CoreMessage, generateText, LanguageModelV1, Tool } from "ai";
+import { directAgentTools } from "../agent/directTools.js";
+import type { AIProviderName } from "../constants/enums.js";
+import { IMAGE_GENERATION_MODELS } from "../core/constants.js";
 import type { EvaluationData } from "../index.js";
 import { MiddlewareFactory } from "../middleware/factory.js";
+import type { NeuroLink } from "../neurolink.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
+import type {
+  AIProvider,
+  AnalyticsData,
+  EnhancedGenerateResult,
+  TextGenerationOptions,
+  TextGenerationResult,
+} from "../types/index.js";
 import type { MiddlewareFactoryOptions } from "../types/middlewareTypes.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { JsonValue, UnknownRecord } from "../types/common.js";
+import type {
+  StandardRecord,
+  ValidationSchema,
+  ZodUnknownSchema,
+} from "../types/typeAliases.js";
 import { logger } from "../utils/logger.js";
-import { IMAGE_GENERATION_MODELS } from "../core/constants.js";
-import { directAgentTools } from "../agent/directTools.js";
 import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
-import type { NeuroLink } from "../neurolink.js";
-import { getKeysAsString, getKeyCount } from "../utils/transformationUtils.js";
-
+import { getKeyCount, getKeysAsString } from "../utils/transformationUtils.js";
+import { TTSProcessor } from "../utils/ttsProcessor.js";
+import { GenerationHandler } from "./modules/GenerationHandler.js";
 // Import modules for composition
 import { MessageBuilder } from "./modules/MessageBuilder.js";
 import { StreamHandler } from "./modules/StreamHandler.js";
-import { GenerationHandler } from "./modules/GenerationHandler.js";
 import { TelemetryHandler } from "./modules/TelemetryHandler.js";
-import { Utilities } from "./modules/Utilities.js";
 import { ToolsManager } from "./modules/ToolsManager.js";
-import { TTSProcessor } from "../utils/ttsProcessor.js";
+import { Utilities } from "./modules/Utilities.js";
 
 /**
  * Abstract base class for all AI providers
@@ -145,7 +142,7 @@ export abstract class BaseProvider implements AIProvider {
     optionsOrPrompt: StreamOptions | string,
     analysisSchema?: ValidationSchema,
   ): Promise<StreamResult> {
-    const options = this.normalizeStreamOptions(optionsOrPrompt);
+    let options = this.normalizeStreamOptions(optionsOrPrompt);
 
     logger.info(`Starting stream`, {
       provider: this.providerName,
@@ -174,6 +171,23 @@ export abstract class BaseProvider implements AIProvider {
 
       // Skip real streaming, go directly to fake streaming
       return await this.executeFakeStreaming(options, analysisSchema);
+    }
+
+    // Central tool merge: Pre-merge base tools (MCP/built-in) with user-provided
+    // tools (e.g. RAG tools) into options.tools. This way, every provider's
+    // executeStream() can simply use options.tools (or getAllTools() + options.tools)
+    // and get the complete tool set without needing per-provider merge logic.
+    if (!options.disableTools && this.supportsTools()) {
+      const baseTools = await this.getAllTools();
+      const externalTools = (options.tools || {}) as Record<string, Tool>;
+      const mergedTools = { ...baseTools, ...externalTools };
+      options = { ...options, tools: mergedTools };
+      logger.debug(`Central tool merge for stream`, {
+        provider: this.providerName,
+        baseToolCount: Object.keys(baseTools).length,
+        externalToolCount: Object.keys(externalTools).length,
+        totalToolCount: Object.keys(mergedTools).length,
+      });
     }
 
     // CRITICAL FIX: Always prefer real streaming over fake streaming
@@ -243,6 +257,7 @@ export abstract class BaseProvider implements AIProvider {
         systemPrompt: options.systemPrompt,
         temperature: options.temperature,
         maxTokens: options.maxTokens,
+        tools: options.tools, // 🔧 FIX: Pass user-provided tools (including RAG tools) to generation pipeline
         disableTools: false,
         maxSteps: options.maxSteps || 5,
         provider: options.provider as AIProviderName | undefined,
@@ -380,6 +395,34 @@ export abstract class BaseProvider implements AIProvider {
 
     const model = await this.getAISDKModelWithMiddleware(options);
     return { tools, model };
+  }
+
+  /**
+   * Get merged tools for streaming: combines base tools (MCP/built-in) with
+   * user-provided tools (e.g., RAG tools passed via options.tools).
+   *
+   * This is the canonical tool-merge pattern for executeStream() implementations.
+   * All providers should call this instead of getAllTools() directly.
+   */
+  protected async getToolsForStream(
+    options: StreamOptions | TextGenerationOptions,
+  ): Promise<Record<string, Tool>> {
+    const shouldUseTools = !options.disableTools && this.supportsTools();
+    if (!shouldUseTools) {
+      return {};
+    }
+    const baseTools = await this.getAllTools();
+    const externalTools = (options.tools || {}) as Record<string, Tool>;
+    const merged = { ...baseTools, ...externalTools };
+
+    logger.debug(`Tools prepared for streaming`, {
+      provider: this.providerName,
+      baseToolCount: Object.keys(baseTools).length,
+      externalToolCount: Object.keys(externalTools).length,
+      totalToolCount: Object.keys(merged).length,
+    });
+
+    return merged;
   }
 
   /**
@@ -521,15 +564,8 @@ export abstract class BaseProvider implements AIProvider {
     try {
       // ===== VIDEO GENERATION MODE =====
       // Generate video from image + prompt using Veo 3.1
-      if (options.output?.mode === "video" || options.output?.video) {
+      if (options.output?.mode === "video") {
         return await this.handleVideoGeneration(options, startTime);
-      }
-
-      // ===== PPT GENERATION MODE =====
-      // Generate PowerPoint presentation from topic using AI content planning
-      // Triggered by mode="ppt" OR presence of ppt config block
-      if (options.output?.mode === "ppt" || options.output?.ppt) {
-        return await this.handlePPTGeneration(options, startTime);
       }
 
       // ===== IMAGE GENERATION MODE =====
@@ -717,6 +753,53 @@ export abstract class BaseProvider implements AIProvider {
       evaluation: result.evaluation,
       audio: result.audio,
     };
+  }
+
+  /**
+   * Generate embeddings for text
+   *
+   * This is a default implementation that throws an error.
+   * Providers that support embeddings (OpenAI, Google Vertex, Amazon Bedrock)
+   * should override this method with their specific implementation.
+   *
+   * @param text - The text to embed
+   * @param _modelName - Optional embedding model name (provider-specific)
+   * @returns Promise resolving to the embedding vector (array of numbers)
+   * @throws Error if the provider does not support embeddings
+   *
+   * @example
+   * ```typescript
+   * const provider = await ProviderFactory.createProvider('openai', 'text-embedding-3-small');
+   * const embedding = await provider.embed('Hello world');
+   * console.log(embedding); // [0.123, -0.456, ...]
+   * ```
+   */
+  async embed(text: string, _modelName?: string): Promise<number[]> {
+    logger.warn(
+      `embed() called on ${this.providerName} which does not have a native implementation`,
+      {
+        textLength: text.length,
+      },
+    );
+    throw new Error(
+      `Embedding generation is not supported by the ${this.providerName} provider. ` +
+        `Supported providers: openai, vertex/google, bedrock. ` +
+        `Use an embedding model like text-embedding-3-small (OpenAI), text-embedding-004 (Vertex), ` +
+        `or amazon.titan-embed-text-v2:0 (Bedrock).`,
+    );
+  }
+
+  /**
+   * Get the default embedding model for this provider
+   *
+   * Override in subclasses to provide provider-specific defaults.
+   * Returns undefined for providers that don't support embeddings.
+   *
+   * @returns The default embedding model name, or undefined if not supported
+   */
+  protected getDefaultEmbeddingModel(): string | undefined {
+    // Default implementation returns undefined - providers override this
+    return undefined;
   }
 
   // ===================
@@ -1056,9 +1139,8 @@ export abstract class BaseProvider implements AIProvider {
   ): Promise<EnhancedGenerateResult> {
     const responseTime = Date.now() - startTime;
 
+    // CRITICAL FIX: Store imageOutput separately to ensure it's preserved
     const imageOutput = result.imageOutput;
-    const ppt = result.ppt;
-    const video = result.video;
 
     let enhancedResult = { ...result };
 
@@ -1069,14 +1151,8 @@ export abstract class BaseProvider implements AIProvider {
           responseTime,
           options,
         );
-        // Preserve ALL fields when adding analytics
-        enhancedResult = {
-          ...enhancedResult,
-          analytics,
-          imageOutput,
-          ppt,
-          video,
-        };
+        // Preserve ALL fields including imageOutput when adding analytics
+        enhancedResult = { ...enhancedResult, analytics, imageOutput };
       } catch (error) {
         logger.warn(
           `Analytics creation failed for ${this.providerName}:`,
@@ -1088,14 +1164,8 @@ export abstract class BaseProvider implements AIProvider {
     if (options.enableEvaluation) {
       try {
         const evaluation = await this.createEvaluation(result, options);
-        // Preserve ALL fields when adding evaluation
-        enhancedResult = {
-          ...enhancedResult,
-          evaluation,
-          imageOutput,
-          ppt,
-          video,
-        };
+        // Preserve ALL fields including imageOutput when adding evaluation
+        enhancedResult = { ...enhancedResult, evaluation, imageOutput };
       } catch (error) {
         logger.warn(
           `Evaluation creation failed for ${this.providerName}:`,
@@ -1104,14 +1174,9 @@ export abstract class BaseProvider implements AIProvider {
       }
     }
 
+    // CRITICAL FIX: Always restore imageOutput if it existed in the original result
     if (imageOutput) {
       enhancedResult.imageOutput = imageOutput;
-    }
-    if (ppt) {
-      enhancedResult.ppt = ppt;
-    }
-    if (video) {
-      enhancedResult.video = video;
     }
 
     return enhancedResult;
@@ -1275,7 +1340,10 @@ export abstract class BaseProvider implements AIProvider {
       throw ErrorFactory.invalidParameters(
         "video-generation",
         new Error(imageValidation.message),
-        { field: "input.images[0]", validation: imageValidation },
+        {
+          field: "input.images[0]",
+          validation: imageValidation,
+        },
       );
     }
 
@@ -1315,146 +1383,6 @@ export abstract class BaseProvider implements AIProvider {
     };
 
     return await this.enhanceResult(baseResult, options, startTime);
-  }
-
-  /**
-   * Handle PPT generation mode
-   *
-   * Generates a complete PowerPoint presentation using AI content planning
-   * and slide generation. This method orchestrates:
-   * 1. Input validation
-   * 2. Content planning via AI
-   * 3. Individual slide generation (with optional images)
-   * 4. PPTX assembly and file output
-   *
-   * @param options - Text generation options with PPT config
-   * @param startTime - Generation start timestamp for metrics
-   * @returns Enhanced result with PPT data
-   *
-   * @example
-   * ```typescript
-   * const result = await provider.generate({
-   *   input: { text: "Introducing Our New Product" },
-   *   output: { mode: "ppt", ppt: { pages: 10, theme: "modern" } }
-   * });
-   * // result.ppt contains the generated presentation info
-   * ```
-   */
-  private async handlePPTGeneration(
-    options: TextGenerationOptions,
-    startTime: number,
-  ): Promise<EnhancedGenerateResult> {
-    // Dynamic imports to avoid loading PPT dependencies unless needed
-    const { generatePresentation } = await import(
-      "../features/ppt/presentationOrchestrator.js"
-    );
-    const { PPT_GENERATION_TIMEOUT_MS } = await import(
-      "../features/ppt/constants.js"
-    );
-    const { validatePPTGenerationInput } = await import(
-      "../utils/parameterValidation.js"
-    );
-    const { ErrorFactory, withTimeout } = await import(
-      "../utils/errorHandling.js"
-    );
-    const { extractPPTContext, getEffectivePPTProvider } = await import(
-      "../features/ppt/utils.js"
-    );
-
-    // Get effective PPT provider (handles validation and auto-selection)
-    const effective = await getEffectivePPTProvider(
-      this,
-      this.providerName,
-      this.modelName,
-      this.neurolink,
-    );
-
-    // Build input from prompt or input.text (preserve images for logo)
-    const inputText = options.input?.text || options.prompt || "";
-    const generateOptions: GenerateOptions = {
-      input: {
-        text: inputText,
-        images: options.input?.images, // Pass through images for logo
-      },
-      output: options.output,
-      provider: effective.providerName,
-      model: options.model,
-    };
-
-    // Validate PPT generation input
-    const validation = validatePPTGenerationInput(generateOptions);
-
-    if (!validation.isValid) {
-      const errorMessages = validation.errors.map((e) => e.message).join("; ");
-      throw ErrorFactory.invalidParameters(
-        "ppt-generation",
-        new Error(errorMessages),
-        { errors: validation.errors },
-      );
-    }
-
-    // Log warnings
-    for (const warning of validation.warnings) {
-      logger.warn(`PPT generation warning: ${warning}`);
-    }
-
-    // Extract context with all PPT options (including images for logo)
-    const context = extractPPTContext({
-      input: {
-        text: inputText,
-        images: options.input?.images, // Pass through images for logo
-      },
-      output: generateOptions.output,
-      provider: effective.providerName,
-      model: effective.modelName,
-    });
-
-    logger.info("Starting PPT generation", {
-      provider: effective.providerName,
-      model: effective.modelName,
-      topic: context.topic.substring(0, 100),
-      pages: context.pages,
-      theme: context.theme,
-      generateAIImages: context.generateAIImages,
-    });
-
-    // Generate presentation using orchestrator (with timeout)
-    const pptResult = await withTimeout(
-      generatePresentation({
-        context,
-        provider: effective.provider as AIProvider,
-        providerName: effective.providerName,
-        modelName: effective.modelName,
-        neurolink: this.neurolink,
-        imageProvider: effective.providerName,
-        imageModel: effective.modelName,
-      }),
-      PPT_GENERATION_TIMEOUT_MS,
-      ErrorFactory.toolTimeout("pptGeneration", PPT_GENERATION_TIMEOUT_MS),
-    );
-
-    logger.info("PPT generation complete", {
-      filePath: pptResult.filePath,
-      totalSlides: pptResult.totalSlides,
-      processingTime: Date.now() - startTime,
-    });
-
-    // Ensure we always have model name - fallback to this provider's modelName or default
-    const finalModelName =
-      effective.modelName || this.modelName || this.getDefaultModel();
-
-    // Build result
-    return await this.enhanceResult(
-      {
-        content: context.topic,
-        provider: effective.providerName,
-        model: finalModelName,
-        usage: { input: 0, output: 0, total: 0 },
-        ppt: pptResult,
-      },
-      options,
-      startTime,
-    );
   }
 
   /**

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "chunk-1",
+    "text": "NeuroLink is a universal AI development platform that enables developers to build, deploy, and scale intelligent applications. It provides a unified interface for working with multiple AI models, vector databases, and retrieval systems. The platform supports both cloud and on-premise deployments.",
+    "metadata": {
+      "source": "readme",
+      "section": "intro",
+      "documentId": "doc-001",
+      "position": 0
+    }
+  },
+  {
+    "id": "chunk-2",
+    "text": "The NeuroLink architecture consists of three main components: the Model Gateway for routing requests to different AI providers, the Vector Store for managing embeddings and semantic search, and the Context Manager for orchestrating retrieval-augmented generation workflows.",
+    "metadata": {
+      "source": "readme",
+      "section": "architecture",
+      "documentId": "doc-001",
+      "position": 1
+    }
+  },
+  {
+    "id": "chunk-3",
+    "text": "RAG (Retrieval-Augmented Generation) in NeuroLink works by first converting user queries into embeddings, then searching the vector store for semantically similar chunks, and finally combining the retrieved context with the original query to generate more accurate and grounded responses.",
+    "metadata": {
+      "source": "docs",
+      "section": "rag-overview",
+      "documentId": "doc-002",
+      "position": 0
+    }
+  },
+  {
+    "id": "chunk-4",
+    "text": "To configure the embedding model, set the EMBEDDING_PROVIDER environment variable to your preferred provider (openai, cohere, or local). The embedding dimension must match your vector store configuration. Default dimension is 1536 for OpenAI ada-002 embeddings.",
+    "metadata": {
+      "source": "docs",
+      "section": "configuration",
+      "documentId": "doc-003",
+      "position": 0
+    }
+  },
+  {
+    "id": "chunk-5",
+    "text": "Chunking strategies in NeuroLink include character-based, sentence-based, and semantic chunking. For most use cases, semantic chunking with a max size of 500 tokens and 50 token overlap provides the best balance between context preservation and retrieval precision.",
+    "metadata": {
+      "source": "docs",
+      "section": "chunking",
+      "documentId": "doc-003",
+      "position": 1
+    }
+  },
+  {
+    "id": "chunk-6",
+    "text": "The streaming API endpoint /api/v1/generate/stream supports real-time token generation with RAG context. Set the stream parameter to true and provide a ragConfig object with topK (number of chunks to retrieve) and minScore (minimum similarity threshold) options.",
+    "metadata": {
+      "source": "api-reference",
+      "section": "streaming",
+      "documentId": "doc-004",
+      "position": 0
+    }
+  },
+  {
+    "id": "chunk-7",
+    "text": "Error handling in NeuroLink follows standard HTTP conventions. A 400 status indicates invalid input parameters, 401 for authentication failures, 429 for rate limiting, and 500 for internal server errors. All error responses include a code and message field for debugging.",
+    "metadata": {
+      "source": "api-reference",
+      "section": "errors",
+      "documentId": "doc-004",
+      "position": 1
+    }
+  },
+  {
+    "id": "chunk-8",
+    "text": "Vector similarity search uses cosine similarity by default, but euclidean and dot product metrics are also supported. For normalized embeddings, cosine and dot product produce identical rankings. Choose euclidean distance when magnitude differences are meaningful.",
+    "metadata": {
+      "source": "docs",
+      "section": "vector-search",
+      "documentId": "doc-005",
+      "position": 0
+    }
+  },
+  {
+    "id": "chunk-9",
+    "text": "The reranking module improves retrieval quality by rescoring initial search results using cross-encoder models or LLM-based relevance scoring. Enable reranking by setting rerank: true in your search config. This adds latency but significantly improves precision for complex queries.",
+    "metadata": {
+      "source": "docs",
+      "section": "reranking",
+      "documentId": "doc-005",
+      "position": 1
+    }
+  },
+  {
+    "id": "chunk-10",
+    "text": "NeuroLink supports multiple LLM providers including OpenAI, Anthropic, Cohere, and local models via Ollama. The unified API allows switching between providers without code changes. Simply update the provider configuration in your environment or runtime settings.",
+    "metadata": {
+      "source": "docs",
+      "section": "providers",
+      "documentId": "doc-006",
+      "position": 0
+    }
+  },
+  {
+    "id": "chunk-11",
+    "text": "For production deployments, NeuroLink recommends using connection pooling for database connections, implementing circuit breakers for external API calls, and setting up health checks on the /health endpoint. Monitor memory usage when loading large embedding models locally.",
+    "metadata": {
+      "source": "docs",
+      "section": "production",
+      "documentId": "doc-006",
+      "position": 1
+    }
+  },
+  {
+    "id": "chunk-12",
+    "text": "The context window management feature automatically truncates retrieved chunks to fit within the model's context limit. It prioritizes chunks by relevance score and preserves complete sentences at truncation boundaries. Configure max_context_tokens in your generation request.",
+    "metadata": {
+      "source": "docs",
+      "section": "context-management",
+      "documentId": "doc-007",
+      "position": 0
+    }
+  }
+]

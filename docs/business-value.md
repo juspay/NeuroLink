@@ -1,14 +1,9 @@
----
-title: Business Value Guide - Analytics & Evaluation
-description: Real-world ROI, cost optimization, and business impact examples for NeuroLink analytics and evaluation features
----
-
 # 💰 Business Value Guide: Analytics & Evaluation Features
 
 <!-- TOC -->
 
-- [✅ Performance Monitoring Achieved:](#-performance-monitoring-achieved)
-- [🎯 Next Steps](#-next-steps)
+- [✅ Performance Monitoring Achieved:](#performance-monitoring-achieved)
+- [🎯 Next Steps](#next-steps)
 <!-- /TOC -->
 
 NeuroLink's analytics and evaluation features deliver measurable business value through cost optimization, quality improvement, and performance monitoring. This guide shows real-world examples of business impact and ROI.
@@ -340,7 +335,7 @@ npx @juspay/neurolink generate "Business content" \
 - [ ] Manual review time reduced 70%+
 - [ ] Compliance requirements met consistently
 
-### ✅ Performance Monitoring Achieved:
+### Performance Monitoring Achieved:
 
 - [ ] Real-time performance dashboards
 - [ ] Quality trend analysis
@@ -348,7 +343,7 @@ npx @juspay/neurolink generate "Business content" \
 - [ ] Provider reliability monitoring
 - [ ] Business intelligence reporting
 
-## 🎯 Next Steps
+## Next Steps
 
 1. **Implement Analytics**: Start with cost tracking
 2. **Add Quality Control**: Implement evaluation scoring

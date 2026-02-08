@@ -88,7 +88,7 @@ Each error has a severity level for logging and alerting:
 All server adapter errors extend this base class:
 
 ```typescript
-import { ServerAdapterError } from "@juspay/neurolink/server";
+import { ServerAdapterError } from "@juspay/neurolink";
 
 class ServerAdapterError extends Error {
   readonly code: string; // Unique error code
@@ -114,7 +114,7 @@ class ServerAdapterError extends Error {
 Thrown when server configuration is invalid.
 
 ```typescript
-import { ConfigurationError } from "@juspay/neurolink/server";
+import { ConfigurationError } from "@juspay/neurolink";
 
 throw new ConfigurationError(
   "Invalid port number: must be between 1 and 65535",
@@ -135,7 +135,7 @@ throw new ConfigurationError(
 Thrown when a required framework dependency is not installed.
 
 ```typescript
-import { MissingDependencyError } from "@juspay/neurolink/server";
+import { MissingDependencyError } from "@juspay/neurolink";
 
 throw new MissingDependencyError("express", "Express", "npm install express");
 ```
@@ -155,7 +155,7 @@ throw new MissingDependencyError("express", "Express", "npm install express");
 Thrown when registering a route that conflicts with an existing route.
 
 ```typescript
-import { RouteConflictError } from "@juspay/neurolink/server";
+import { RouteConflictError } from "@juspay/neurolink";
 
 throw new RouteConflictError("/api/users/:id", "GET", "/api/users/:userId");
 ```
@@ -173,7 +173,7 @@ throw new RouteConflictError("/api/users/:id", "GET", "/api/users/:userId");
 Thrown when a requested route does not exist.
 
 ```typescript
-import { RouteNotFoundError } from "@juspay/neurolink/server";
+import { RouteNotFoundError } from "@juspay/neurolink";
 
 throw new RouteNotFoundError("/api/unknown", "GET", "req-123");
 ```
@@ -193,7 +193,7 @@ throw new RouteNotFoundError("/api/unknown", "GET", "req-123");
 Thrown when request validation fails.
 
 ```typescript
-import { ValidationError } from "@juspay/neurolink/server";
+import { ValidationError } from "@juspay/neurolink";
 
 throw new ValidationError(
   [
@@ -219,7 +219,7 @@ throw new ValidationError(
 Thrown when authentication is required but not provided.
 
 ```typescript
-import { AuthenticationError } from "@juspay/neurolink/server";
+import { AuthenticationError } from "@juspay/neurolink";
 
 throw new AuthenticationError("Bearer token required", "req-123");
 ```
@@ -237,7 +237,7 @@ throw new AuthenticationError("Bearer token required", "req-123");
 Thrown when provided authentication credentials are invalid.
 
 ```typescript
-import { InvalidAuthenticationError } from "@juspay/neurolink/server";
+import { InvalidAuthenticationError } from "@juspay/neurolink";
 
 throw new InvalidAuthenticationError("Token expired", "req-123");
 ```
@@ -255,7 +255,7 @@ throw new InvalidAuthenticationError("Token expired", "req-123");
 Thrown when the authenticated user lacks required permissions.
 
 ```typescript
-import { AuthorizationError } from "@juspay/neurolink/server";
+import { AuthorizationError } from "@juspay/neurolink";
 
 throw new AuthorizationError(
   "Insufficient permissions to access this resource",
@@ -279,7 +279,7 @@ throw new AuthorizationError(
 Thrown when request rate limits are exceeded.
 
 ```typescript
-import { RateLimitError } from "@juspay/neurolink/server";
+import { RateLimitError } from "@juspay/neurolink";
 
 throw new RateLimitError(
   60000, // retry after 60 seconds
@@ -303,7 +303,7 @@ throw new RateLimitError(
 Thrown when an operation exceeds its timeout.
 
 ```typescript
-import { TimeoutError } from "@juspay/neurolink/server";
+import { TimeoutError } from "@juspay/neurolink";
 
 throw new TimeoutError(30000, "AI generation", "req-123");
 ```
@@ -321,7 +321,7 @@ throw new TimeoutError(30000, "AI generation", "req-123");
 Thrown when a route handler fails during execution.
 
 ```typescript
-import { HandlerError } from "@juspay/neurolink/server";
+import { HandlerError } from "@juspay/neurolink";
 
 throw new HandlerError(
   "Failed to process request",
@@ -347,7 +347,7 @@ throw new HandlerError(
 Thrown when a streaming operation fails.
 
 ```typescript
-import { StreamingError } from "@juspay/neurolink/server";
+import { StreamingError } from "@juspay/neurolink";
 
 throw new StreamingError("Stream write failed", originalError, "req-123");
 ```
@@ -365,7 +365,7 @@ throw new StreamingError("Stream write failed", originalError, "req-123");
 Thrown when a client aborts a streaming connection.
 
 ```typescript
-import { StreamAbortedError } from "@juspay/neurolink/server";
+import { StreamAbortedError } from "@juspay/neurolink";
 
 throw new StreamAbortedError("Client disconnected", "req-123");
 ```
@@ -385,7 +385,7 @@ throw new StreamAbortedError("Client disconnected", "req-123");
 General WebSocket operation errors.
 
 ```typescript
-import { WebSocketError } from "@juspay/neurolink/server";
+import { WebSocketError } from "@juspay/neurolink";
 
 throw new WebSocketError("Message send failed", originalError, "ws-conn-123");
 ```
@@ -403,7 +403,7 @@ throw new WebSocketError("Message send failed", originalError, "ws-conn-123");
 Thrown when WebSocket connection establishment fails.
 
 ```typescript
-import { WebSocketConnectionError } from "@juspay/neurolink/server";
+import { WebSocketConnectionError } from "@juspay/neurolink";
 
 throw new WebSocketConnectionError("Handshake failed", originalError);
 ```
@@ -423,7 +423,7 @@ throw new WebSocketConnectionError("Handshake failed", originalError);
 Thrown when the server fails to start.
 
 ```typescript
-import { ServerStartError } from "@juspay/neurolink/server";
+import { ServerStartError } from "@juspay/neurolink";
 
 throw new ServerStartError(
   "Port already in use",
@@ -446,7 +446,7 @@ throw new ServerStartError(
 Thrown when the server fails to stop cleanly.
 
 ```typescript
-import { ServerStopError } from "@juspay/neurolink/server";
+import { ServerStopError } from "@juspay/neurolink";
 
 throw new ServerStopError("Failed to close connections", originalError);
 ```
@@ -464,7 +464,7 @@ throw new ServerStopError("Failed to close connections", originalError);
 Thrown when attempting to start an already running server.
 
 ```typescript
-import { AlreadyRunningError } from "@juspay/neurolink/server";
+import { AlreadyRunningError } from "@juspay/neurolink";
 
 throw new AlreadyRunningError(3000, "0.0.0.0");
 ```
@@ -482,7 +482,7 @@ throw new AlreadyRunningError(3000, "0.0.0.0");
 Thrown when attempting to stop a server that is not running.
 
 ```typescript
-import { NotRunningError } from "@juspay/neurolink/server";
+import { NotRunningError } from "@juspay/neurolink";
 
 throw new NotRunningError();
 ```
@@ -500,7 +500,7 @@ throw new NotRunningError();
 Thrown when graceful shutdown exceeds the configured timeout.
 
 ```typescript
-import { ShutdownTimeoutError } from "@juspay/neurolink/server";
+import { ShutdownTimeoutError } from "@juspay/neurolink";
 
 throw new ShutdownTimeoutError(30000, 5); // 30s timeout, 5 remaining connections
 ```
@@ -518,7 +518,7 @@ throw new ShutdownTimeoutError(30000, 5); // 30s timeout, 5 remaining connection
 Thrown when connection draining exceeds the configured timeout.
 
 ```typescript
-import { DrainTimeoutError } from "@juspay/neurolink/server";
+import { DrainTimeoutError } from "@juspay/neurolink";
 
 throw new DrainTimeoutError(10000, 3); // 10s timeout, 3 remaining connections
 ```
@@ -536,7 +536,7 @@ throw new DrainTimeoutError(10000, 3); // 10s timeout, 3 remaining connections
 Thrown when an operation is attempted in an invalid server state.
 
 ```typescript
-import { InvalidLifecycleStateError } from "@juspay/neurolink/server";
+import { InvalidLifecycleStateError } from "@juspay/neurolink";
 
 throw new InvalidLifecycleStateError("start", "stopping", [
   "stopped",
@@ -685,11 +685,7 @@ const ErrorRecoveryStrategies = {
 Register a global error handler for custom error processing:
 
 ```typescript
-import {
-  createServer,
-  ServerAdapterError,
-  wrapError,
-} from "@juspay/neurolink/server";
+import { createServer, ServerAdapterError, wrapError } from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "hono",
@@ -774,7 +770,7 @@ server.registerRoute({
 The `wrapError` utility converts unknown errors to `ServerAdapterError`:
 
 ```typescript
-import { wrapError, ServerAdapterError } from "@juspay/neurolink/server";
+import { wrapError, ServerAdapterError } from "@juspay/neurolink";
 
 function handleError(error: unknown, requestId: string): ServerAdapterError {
   // Already a ServerAdapterError - return as-is
@@ -792,10 +788,7 @@ function handleError(error: unknown, requestId: string): ServerAdapterError {
 Use recovery strategies for automatic retry:
 
 ```typescript
-import {
-  ErrorRecoveryStrategies,
-  ServerAdapterError,
-} from "@juspay/neurolink/server";
+import { ErrorRecoveryStrategies, ServerAdapterError } from "@juspay/neurolink";
 
 async function executeWithRetry<T>(
   operation: () => Promise<T>,

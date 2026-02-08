@@ -12,13 +12,14 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 
 ## Latest Features (Q1 2026)
 
-| Feature                                                                                            | Description                                                                                                                             |
-| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| :material-video: **Video Generation** :material-clock-outline:{ .coming-soon title="Coming Soon" } | Generate videos from text prompts using RunwayML (ML5, ML6 Turbo models). _Coming Soon_                                                 |
-| :material-image-plus: **[Image Generation with Gemini](../image-generation-streaming.md)**         | Native image generation using Gemini 2.0 Flash Experimental with imagen-3.0-generate-002 model.                                         |
-| :material-web: **[HTTP/Streamable HTTP Transport for MCP](../mcp-http-transport.md)**              | Connect to remote MCP servers via HTTP with authentication, rate limiting, retry support, and session management.                       |
-| :material-microphone: **[Audio Input](audio-input.md)**                                            | Real-time voice conversations with Gemini Live and audio streaming capabilities.                                                        |
-| :material-server: **[Server Adapters](../guides/server-adapters/index.md)**                        | Expose NeuroLink AI agents as HTTP APIs with Hono, Express, Fastify, and Koa. Production-ready with auth, rate limiting, and streaming. |
+| Feature                                                                                            | Description                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| :material-video: **Video Generation** :material-clock-outline:{ .coming-soon title="Coming Soon" } | Generate videos from text prompts using RunwayML (ML5, ML6 Turbo models). _Coming Soon_                                                     |
+| :material-image-plus: **[Image Generation with Gemini](../image-generation-streaming.md)**         | Native image generation using Gemini 2.0 Flash Experimental with imagen-3.0-generate-002 model.                                             |
+| :material-web: **[HTTP/Streamable HTTP Transport for MCP](../mcp-http-transport.md)**              | Connect to remote MCP servers via HTTP with authentication, rate limiting, retry support, and session management.                           |
+| :material-microphone: **[Audio Input](audio-input.md)**                                            | Real-time voice conversations with Gemini Live and audio streaming capabilities.                                                            |
+| :material-server: **[Server Adapters](../guides/server-adapters/index.md)**                        | Expose NeuroLink AI agents as HTTP APIs with Hono, Express, Fastify, and Koa. Production-ready with auth, rate limiting, and streaming.     |
+| :material-database-search: **[RAG Document Processing](rag.md)**                                   | Comprehensive document chunking (10 strategies), hybrid search (BM25 + vector), and reranking (5 types) for retrieval-augmented generation. |
 
 **Q1 2026 Highlights:**
 
@@ -27,6 +28,7 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 - **Remote MCP Servers**: HTTP/Streamable HTTP transport enables connecting to cloud-hosted MCP servers with Bearer token authentication, configurable rate limits, automatic retry with exponential backoff, and session management via `Mcp-Session-Id` header
 - **Audio Input**: Real-time voice conversations with Gemini Live API enabling bidirectional audio streaming for interactive voice-based AI experiences
 - **Server Adapters**: Deploy NeuroLink as production HTTP APIs with support for Hono (recommended), Express, Fastify, and Koa frameworks. Includes built-in authentication, rate limiting, caching, validation middleware, and SSE streaming support.
+- **RAG Document Processing**: Full-featured retrieval-augmented generation with 10 chunking strategies (character, recursive, sentence, token, markdown, html, json, latex, semantic, semantic-markdown), hybrid search combining BM25 and vector similarity, 5 reranking types (simple, LLM, batch, cross-encoder, Cohere), and integration with Pinecone, Weaviate, and Chroma vector stores.
 
 ---
 

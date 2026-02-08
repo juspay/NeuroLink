@@ -1,0 +1,178 @@
+{
+  "apiVersion": "1.0",
+  "service": "NeuroLink",
+  "documentation": {
+    "title": "NeuroLink Configuration Reference",
+    "version": "8.38.0",
+    "lastUpdated": "2024-01-15"
+  },
+  "providers": [
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "models": [
+        {
+          "id": "gpt-4o",
+          "name": "GPT-4o",
+          "contextWindow": 128000,
+          "maxOutput": 4096,
+          "capabilities": ["text", "vision", "function_calling"]
+        },
+        {
+          "id": "gpt-4o-mini",
+          "name": "GPT-4o Mini",
+          "contextWindow": 128000,
+          "maxOutput": 16384,
+          "capabilities": ["text", "vision", "function_calling"]
+        },
+        {
+          "id": "text-embedding-3-small",
+          "name": "Text Embedding 3 Small",
+          "dimensions": 1536,
+          "capabilities": ["embedding"]
+        }
+      ],
+      "authentication": {
+        "type": "api_key",
+        "headerName": "Authorization",
+        "headerFormat": "Bearer {key}",
+        "envVariable": "OPENAI_API_KEY"
+      },
+      "endpoints": {
+        "chat": "https://api.openai.com/v1/chat/completions",
+        "embeddings": "https://api.openai.com/v1/embeddings"
+      }
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "models": [
+        {
+          "id": "claude-3-5-sonnet-20241022",
+          "name": "Claude 3.5 Sonnet",
+          "contextWindow": 200000,
+          "maxOutput": 8192,
+          "capabilities": ["text", "vision", "function_calling"]
+        },
+        {
+          "id": "claude-3-5-haiku-20241022",
+          "name": "Claude 3.5 Haiku",
+          "contextWindow": 200000,
+          "maxOutput": 8192,
+          "capabilities": ["text", "function_calling"]
+        }
+      ],
+      "authentication": {
+        "type": "api_key",
+        "headerName": "x-api-key",
+        "envVariable": "ANTHROPIC_API_KEY"
+      },
+      "endpoints": {
+        "messages": "https://api.anthropic.com/v1/messages"
+      }
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (Local)",
+      "models": [
+        {
+          "id": "llama3.2",
+          "name": "Llama 3.2",
+          "contextWindow": 128000,
+          "capabilities": ["text"]
+        },
+        {
+          "id": "nomic-embed-text",
+          "name": "Nomic Embed Text",
+          "dimensions": 768,
+          "capabilities": ["embedding"]
+        }
+      ],
+      "authentication": {
+        "type": "none"
+      },
+      "endpoints": {
+        "generate": "http://localhost:11434/api/generate",
+        "embeddings": "http://localhost:11434/api/embeddings"
+      }
+    }
+  ],
+  "ragConfiguration": {
+    "chunking": {
+      "defaultStrategy": "recursive",
+      "strategies": {
+        "character": {
+          "description": "Fixed-size character-based chunking",
+          "defaultMaxSize": 500,
+          "defaultOverlap": 50
+        },
+        "recursive": {
+          "description": "Recursive splitting using separators",
+          "defaultMaxSize": 1000,
+          "defaultOverlap": 200,
+          "separators": ["\n\n", "\n", ". ", " "]
+        },
+        "sentence": {
+          "description": "Sentence boundary-aware chunking",
+          "defaultMaxSize": 500,
+          "minSentences": 1,
+          "maxSentences": 10
+        },
+        "markdown": {
+          "description": "Markdown structure-aware chunking",
+          "defaultMaxSize": 1000,
+          "preserveCodeBlocks": true,
+          "headerLevels": [1, 2, 3]
+        },
+        "json": {
+          "description": "JSON structure-aware chunking",
+          "defaultMaxSize": 500,
+          "maxDepth": 5,
+          "includeJsonPath": true
+        }
+      }
+    },
+    "retrieval": {
+      "defaultTopK": 5,
+      "defaultMinScore": 0.5,
+      "similarityMetrics": ["cosine", "euclidean", "dot_product"],
+      "hybridSearch": {
+        "enabled": true,
+        "rrfK": 60,
+        "vectorWeight": 0.5,
+        "bm25Weight": 0.5
+      }
+    },
+    "reranking": {
+      "enabled": false,
+      "defaultType": "simple",
+      "types": {
+        "simple": {
+          "description": "Position and score-based reranking",
+          "requiresModel": false
+        },
+        "llm": {
+          "description": "LLM-powered semantic reranking",
+          "requiresModel": true,
+          "defaultModel": "gpt-4o-mini"
+        },
+        "cross-encoder": {
+          "description": "Cross-encoder model reranking",
+          "requiresModel": true,
+          "defaultModel": "ms-marco-MiniLM-L-6-v2"
+        }
+      }
+    }
+  },
+  "rateLimits": {
+    "requestsPerMinute": 60,
+    "tokensPerMinute": 100000,
+    "concurrentRequests": 10
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "includeTimestamp": true,
+    "includeDuration": true
+  }
+}

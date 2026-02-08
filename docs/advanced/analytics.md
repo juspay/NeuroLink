@@ -141,10 +141,7 @@ console.log(result.analytics);
 For application-wide analytics collection, use the analytics middleware:
 
 ```typescript
-import {
-  getAnalyticsMetrics,
-  clearAnalyticsMetrics,
-} from "@juspay/neurolink/middleware/builtin/analytics";
+import { getAnalyticsMetrics, clearAnalyticsMetrics } from "@juspay/neurolink";
 
 // Analytics are automatically collected by the middleware
 const metrics = getAnalyticsMetrics();
@@ -195,7 +192,7 @@ The following methods are available today for analytics and monitoring:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { getAnalyticsMetrics } from "@juspay/neurolink/middleware/builtin/analytics";
+import { getAnalyticsMetrics } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink();
 

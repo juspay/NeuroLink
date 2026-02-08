@@ -66,7 +66,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: process.env.DEFAULT_PROVIDER || "openai",
@@ -457,7 +457,7 @@ Hono is ideal for edge deployment:
 ```typescript
 // src/worker.ts
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -496,7 +496,7 @@ id = "your-kv-id"
 ```typescript
 // api/[[...route]].ts
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -521,7 +521,7 @@ export default server.getFrameworkInstance().fetch;
 ```typescript
 // handler.ts
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 import { handle } from "hono/aws-lambda";
 
 const neurolink = new NeuroLink({

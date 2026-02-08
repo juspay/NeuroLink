@@ -1,43 +1,42 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { streamText, type Schema, type LanguageModelV1, type Tool } from "ai";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import { type LanguageModelV1, type Schema, streamText, type Tool } from "ai";
 import {
-  AIProviderName,
-  GoogleAIModels,
+  type AIProviderName,
   ErrorCategory,
   ErrorSeverity,
+  GoogleAIModels,
 } from "../constants/enums.js";
-import { NeuroLinkError, ERROR_CODES } from "../utils/errorHandling.js";
-import type {
-  StreamOptions,
-  StreamResult,
-  AudioChunk,
-} from "../types/streamTypes.js";
-import type {
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../types/generateTypes.js";
-import type { UnknownRecord } from "../types/common.js";
-import type {
-  LiveServerMessage,
-  GenAIClient,
-  GoogleGenAIClass,
-} from "../types/providers.js";
-import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
-import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
+import {
+  DEFAULT_MAX_STEPS,
+  DEFAULT_TOOL_MAX_RETRIES,
+} from "../core/constants.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import type { NeuroLink } from "../neurolink.js";
+import type { UnknownRecord } from "../types/common.js";
 import {
   AuthenticationError,
   NetworkError,
   ProviderError,
   RateLimitError,
 } from "../types/errors.js";
-import {
-  DEFAULT_MAX_STEPS,
-  DEFAULT_TOOL_MAX_RETRIES,
-} from "../core/constants.js";
-import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import type {
+  EnhancedGenerateResult,
+  TextGenerationOptions,
+} from "../types/generateTypes.js";
+import type {
+  GenAIClient,
+  GoogleGenAIClass,
+  LiveServerMessage,
+} from "../types/providers.js";
+import type {
+  AudioChunk,
+  StreamOptions,
+  StreamResult,
+} from "../types/streamTypes.js";
+import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import { ERROR_CODES, NeuroLinkError } from "../utils/errorHandling.js";
+import { logger } from "../utils/logger.js";
 import { isGemini3Model } from "../utils/modelDetection.js";
 import {
   convertZodToJsonSchema,
@@ -45,6 +44,7 @@ import {
   isZodSchema,
 } from "../utils/schemaConversion.js";
 import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 
 // Google AI Live API types now imported from ../types/providerSpecific.js
 
@@ -560,9 +560,12 @@ export class GoogleAIStudioProvider extends BaseProvider {
     );
 
     try {
-      // Get tools consistently with generate method
+      // Get tools consistently with generate method (include user-provided RAG tools)
       const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools ? await this.getAllTools() : {};
+      const baseTools = shouldUseTools ? await this.getAllTools() : {};
+      const tools = shouldUseTools
+        ? { ...baseTools, ...(options.tools || {}) }
+        : {};
 
       // Build message array from options with multimodal support
       // Using protected helper from BaseProvider to eliminate code duplication

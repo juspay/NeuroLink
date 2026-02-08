@@ -1,50 +1,50 @@
 import {
+  BedrockClient,
+  ListFoundationModelsCommand,
+} from "@aws-sdk/client-bedrock";
+import type {
+  Tool as BedrockTool,
+  ContentBlock,
+  ConverseCommandInput,
+  ConverseCommandOutput,
+  ConverseStreamCommandInput,
+  Message,
+  ToolConfiguration,
+  ToolSpecification,
+} from "@aws-sdk/client-bedrock-runtime";
+import {
   BedrockRuntimeClient,
   ConverseCommand,
   ConverseStreamCommand,
   ImageFormat,
 } from "@aws-sdk/client-bedrock-runtime";
-import type {
-  ConverseCommandInput,
-  ConverseCommandOutput,
-  ConverseStreamCommandInput,
-  ToolConfiguration,
-  Message,
-  ContentBlock,
-  Tool as BedrockTool,
-  ToolSpecification,
-} from "@aws-sdk/client-bedrock-runtime";
-import {
-  BedrockClient,
-  ListFoundationModelsCommand,
-} from "@aws-sdk/client-bedrock";
+import type { DocumentType } from "@smithy/types";
+import path from "path";
+import type { AIProviderName } from "../constants/enums.js";
+import { createAnalytics } from "../core/analytics.js";
 import { BaseProvider } from "../core/baseProvider.js";
+import { DEFAULT_MAX_STEPS } from "../core/constants.js";
+import type { NeuroLink } from "../neurolink.js";
+import type { JsonValue } from "../types/common.js";
+import type {
+  MessageContent,
+  MultimodalChatMessage,
+} from "../types/conversation.js";
 import type {
   EnhancedGenerateResult,
   TextGenerationOptions,
 } from "../types/index.js";
-import { AIProviderName } from "../constants/enums.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { ToolDefinition, ToolArgs } from "../types/tools.js";
-import type { JsonValue } from "../types/common.js";
 import type {
   BedrockContentBlock,
   BedrockMessage,
 } from "../types/providers.js";
-import type { NeuroLink } from "../neurolink.js";
-import { logger } from "../utils/logger.js";
-import type { DocumentType } from "@smithy/types";
-import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type { ToolArgs, ToolDefinition } from "../types/tools.js";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import { logger } from "../utils/logger.js";
 import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
 import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
-import type {
-  MultimodalChatMessage,
-  MessageContent,
-} from "../types/conversation.js";
-import { DEFAULT_MAX_STEPS } from "../core/constants.js";
-import { createAnalytics } from "../core/analytics.js";
-import path from "path";
+import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
 
 // Bedrock-specific types now imported from ../types/providerSpecific.js
 
@@ -157,6 +157,18 @@ export class AmazonBedrockProvider extends BaseProvider {
   public getDefaultModel(): string {
     return (
       process.env.BEDROCK_MODEL || "anthropic.claude-3-sonnet-20240229-v1:0"
+    );
+  }
+
+  /**
+   * Get the default embedding model for Amazon Bedrock
+   * @returns The default Bedrock embedding model name
+   */
+  protected getDefaultEmbeddingModel(): string {
+    return (
+      process.env.BEDROCK_EMBEDDING_MODEL ||
+      process.env.AWS_EMBEDDING_MODEL ||
+      "amazon.titan-embed-text-v2:0"
     );
   }
 
@@ -276,7 +288,6 @@ export class AmazonBedrockProvider extends BaseProvider {
           logger.debug(
             `[AmazonBedrockProvider] Continuing conversation loop...`,
           );
-          continue;
         } else {
           logger.debug(
             `[AmazonBedrockProvider] Conversation completed with final text`,
@@ -1241,7 +1252,10 @@ export class AmazonBedrockProvider extends BaseProvider {
     });
 
     // Get all available tools
-    const aiTools = await this.getAllTools();
+    // BaseProvider.stream() pre-merges base tools + external tools into options.tools
+    const aiTools =
+      (options.tools as Record<string, import("ai").Tool>) ||
+      (await this.getAllTools());
     const allTools = this.convertAISDKToolsToToolDefinitions(aiTools);
     const toolConfig = this.formatToolsForBedrock(allTools);
 
@@ -1669,5 +1683,67 @@ export class AmazonBedrockProvider extends BaseProvider {
     }
 
     return new Error(`AWS Bedrock error: ${message}`);
+  }
+
+  /**
+   * Generate embeddings for text using Amazon Bedrock embedding models
+   * Uses the native AWS SDK InvokeModel command for Titan embeddings
+   * @param text - The text to embed
+   * @param modelName - The embedding model to use (default: amazon.titan-embed-text-v2:0)
+   * @returns Promise resolving to the embedding vector
+   */
+  async embed(text: string, modelName?: string): Promise<number[]> {
+    const embeddingModelName = modelName || "amazon.titan-embed-text-v2:0";
+
+    logger.debug("Generating embedding", {
+      provider: this.providerName,
+      model: embeddingModelName,
+      textLength: text.length,
+    });
+
+    try {
+      const { InvokeModelCommand } = await import(
+        "@aws-sdk/client-bedrock-runtime"
+      );
+
+      // Titan Embed models expect a specific input format
+      const requestBody = JSON.stringify({
+        inputText: text,
+      });
+
+      const command = new InvokeModelCommand({
+        modelId: embeddingModelName,
+        contentType: "application/json",
+        accept: "application/json",
+        body: requestBody,
+      });
+
+      const response = await this.bedrockClient.send(command);
+
+      // Parse the response
+      const responseBody = JSON.parse(
+        new TextDecoder().decode(response.body),
+      ) as { embedding: number[] };
+
+      if (!responseBody.embedding || !Array.isArray(responseBody.embedding)) {
+        throw new Error("Invalid embedding response from Bedrock");
+      }
+
+      logger.debug("Embedding generated successfully", {
+        provider: this.providerName,
+        model: embeddingModelName,
+        embeddingDimension: responseBody.embedding.length,
+      });
+
+      return responseBody.embedding;
+    } catch (error) {
+      logger.error("Embedding generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        model: embeddingModelName,
+        textLength: text.length,
+      });
+
+      throw this.handleProviderError(error);
+    }
   }
 }

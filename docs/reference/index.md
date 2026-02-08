@@ -32,12 +32,6 @@ This section provides comprehensive reference materials for advanced usage, conf
 
   Detailed comparison of all 12 supported AI providers with features, costs, and recommendations.
 
-- :material-compass: **[Provider Selection Guide](provider-selection.md)**
-
-  ***
-
-  Interactive guide to selecting the right AI provider based on use case, budget, and requirements.
-
 - :material-frequently-asked-questions: **[FAQ](faq.md)**
 
   ***
@@ -49,18 +43,6 @@ This section provides comprehensive reference materials for advanced usage, conf
   ***
 
   Complete error code reference with categorized codes, severity levels, and resolution guidance.
-
-- :material-chart-line: **[Analytics](analytics.md)**
-
-  ***
-
-  Comprehensive guide to NeuroLink analytics, metrics, token tracking, cost monitoring, and observability integration.
-
-- :material-server: **[Server Configuration](/reference/server-configuration)** :material-new-box:{ .new-badge }
-
-  ***
-
-  Configuration reference for server adapters including Hono, Express, Fastify, and Koa framework integration.
 
 </div>
 
@@ -115,14 +97,6 @@ neurolink config init              # Interactive setup
 neurolink mcp discover             # Find available servers
 neurolink mcp list                 # List installed servers
 neurolink mcp install <server>     # Install MCP server
-
-# Server Management
-neurolink serve                              # Start server (foreground)
-neurolink server start --port 3000           # Start server (background)
-neurolink server status                      # Check server status
-neurolink server routes                      # List API routes
-neurolink server config                      # View configuration
-neurolink server openapi -o api.json         # Generate OpenAPI spec
 ```
 
 ### SDK Quick Reference

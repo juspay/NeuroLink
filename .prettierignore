@@ -5,7 +5,6 @@ node_modules/
 dist/
 build/
 .svelte-kit/
-.docusaurus/
 .output/
 .vercel/
 .netlify/
@@ -44,9 +43,6 @@ scripts/
 memory-bank/
 archive/
 
-# Generated documentation (synced from /docs)
-docs-site/docs/
-
 # Package files
 *.tgz
 package-lock.json
@@ -57,3 +53,5 @@ pnpm-lock.yaml
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 action-dist/
+chunks.json
+test-reports/

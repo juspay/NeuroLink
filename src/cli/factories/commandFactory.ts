@@ -1,50 +1,50 @@
-import type { CommandModule, Argv } from "yargs";
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
+import chalk from "chalk";
+import ora from "ora";
+import type { Argv, CommandModule } from "yargs";
+import { ModelResolver } from "../../lib/models/modelResolver.js";
+import type { ChunkingStrategy } from "../../lib/rag/types.js";
 import { globalSession } from "../../lib/session/globalSessionState.js";
+import type {
+  BaseCommandArgs,
+  BatchCommandArgs,
+  GenerateCommandArgs,
+  GenerateResult,
+  StreamCommandArgs,
+} from "../../lib/types/cli.js";
 import type { JsonValue } from "../../lib/types/common.js";
+// Use TokenUsage from standard types - no local interface needed
+import {
+  type BaseContext,
+  type ContextConfig,
+  ContextFactory,
+} from "../../lib/types/contextTypes.js";
 import type {
   ConversationMemoryConfig,
   ConversationSummary,
 } from "../../lib/types/conversation.js";
-import type {
-  BaseCommandArgs,
-  GenerateCommandArgs,
-  StreamCommandArgs,
-  BatchCommandArgs,
-  GenerateResult,
-} from "../../lib/types/cli.js";
-import type { TokenUsage, AnalyticsData } from "../../lib/types/index.js";
-import { configManager } from "../commands/config.js";
-import { handleError } from "../errorHandler.js";
+import type { AnalyticsData, TokenUsage } from "../../lib/types/index.js";
+import { checkRedisAvailability } from "../../lib/utils/conversationMemoryUtils.js";
 import { normalizeEvaluationData } from "../../lib/utils/evaluationUtils.js";
+import { logger } from "../../lib/utils/logger.js";
 import { createThinkingConfigFromRecord } from "../../lib/utils/thinkingConfig.js";
+import { configManager } from "../commands/config.js";
+import { MCPCommandFactory } from "../commands/mcp.js";
+import { ModelsCommandFactory } from "../commands/models.js";
+import { handleSetup } from "../commands/setup.js";
+import { handleError } from "../errorHandler.js";
 import { LoopSession } from "../loop/session.js";
 import { initializeCliParser } from "../parser.js";
+import { formatFileSize, saveAudioToFile } from "../utils/audioFileUtils.js";
 import { resolveFilePaths } from "../utils/pathResolver.js";
-
-// Use TokenUsage from standard types - no local interface needed
 import {
-  ContextFactory,
-  type BaseContext,
-  type ContextConfig,
-} from "../../lib/types/contextTypes.js";
-import { ModelsCommandFactory } from "../commands/models.js";
-import { MCPCommandFactory } from "../commands/mcp.js";
-import { OllamaCommandFactory } from "./ollamaCommandFactory.js";
-import { SageMakerCommandFactory } from "./sagemakerCommandFactory.js";
-import { ModelResolver } from "../../lib/models/modelResolver.js";
-import ora from "ora";
-import chalk from "chalk";
-import { logger } from "../../lib/utils/logger.js";
-import { handleSetup } from "../commands/setup.js";
-import { checkRedisAvailability } from "../../lib/utils/conversationMemoryUtils.js";
-import { saveAudioToFile, formatFileSize } from "../utils/audioFileUtils.js";
-import {
-  saveVideoToFile,
   formatVideoFileSize,
   getVideoMetadataSummary,
+  saveVideoToFile,
 } from "../utils/videoFileUtils.js";
+import { OllamaCommandFactory } from "./ollamaCommandFactory.js";
+import { SageMakerCommandFactory } from "./sagemakerCommandFactory.js";
 
 /**
  * CLI Command Factory for generate commands
@@ -368,12 +368,57 @@ export class CLICommandFactory {
         "Vertex AI region (e.g., us-central1, europe-west1, asia-northeast1)",
       alias: "r",
     },
+
+    // RAG options
+    ragFiles: {
+      type: "array" as const,
+      description:
+        "File paths to load for RAG (Retrieval-Augmented Generation). AI will search these documents to answer your question.",
+      alias: "rag-files",
+      string: true,
+    },
+    ragStrategy: {
+      type: "string" as const,
+      description:
+        "Chunking strategy for RAG documents (auto-detected from file extension if not specified)",
+      alias: "rag-strategy",
+      choices: [
+        "character",
+        "recursive",
+        "sentence",
+        "token",
+        "markdown",
+        "html",
+        "json",
+        "latex",
+        "semantic",
+        "semantic-markdown",
+      ] as const,
+    },
+    ragChunkSize: {
+      type: "number" as const,
+      description: "Maximum chunk size in characters for RAG documents",
+      alias: "rag-chunk-size",
+      default: 1000,
+    },
+    ragChunkOverlap: {
+      type: "number" as const,
+      description: "Overlap between adjacent chunks for RAG documents",
+      alias: "rag-chunk-overlap",
+      default: 200,
+    },
+    ragTopK: {
+      type: "number" as const,
+      description: "Number of top results to retrieve for RAG",
+      alias: "rag-top-k",
+      default: 5,
+    },
   };
 
   // Helper method to build options for commands
   private static buildOptions(yargs: Argv, additionalOptions = {}) {
     return yargs.options({
-      ...this.commonOptions,
+      ...CLICommandFactory.commonOptions,
       ...additionalOptions,
     });
   }
@@ -633,7 +678,8 @@ export class CLICommandFactory {
 
         // Add analytics display for text mode when enabled
         if (options.enableAnalytics && generateResult.analytics) {
-          output += this.formatAnalyticsForTextMode(generateResult);
+          output +=
+            CLICommandFactory.formatAnalyticsForTextMode(generateResult);
         }
       } else if (result && typeof result === "object" && "text" in result) {
         output = (result as { text: string }).text;
@@ -867,7 +913,7 @@ export class CLICommandFactory {
 
   // Helper method to normalize token usage data to standard format
   private static normalizeTokenUsage(tokens: unknown): TokenUsage | null {
-    if (!this.isValidTokenUsage(tokens)) {
+    if (!CLICommandFactory.isValidTokenUsage(tokens)) {
       return null;
     }
 
@@ -924,7 +970,9 @@ export class CLICommandFactory {
     analyticsText += "\n";
 
     // Token usage with fallback handling
-    const normalizedTokens = this.normalizeTokenUsage(analytics.tokenUsage);
+    const normalizedTokens = CLICommandFactory.normalizeTokenUsage(
+      analytics.tokenUsage,
+    );
     if (normalizedTokens) {
       analyticsText += `   Tokens: ${normalizedTokens.input} input + ${normalizedTokens.output} output = ${normalizedTokens.total} total\n`;
     }
@@ -979,7 +1027,7 @@ export class CLICommandFactory {
       command: ["generate <input>", "gen <input>"],
       describe: "Generate content using AI providers",
       builder: (yargs) => {
-        return this.buildOptions(
+        return CLICommandFactory.buildOptions(
           yargs
             .positional("input", {
               type: "string" as const,
@@ -1025,7 +1073,7 @@ export class CLICommandFactory {
         );
       },
       handler: async (argv) =>
-        await this.executeGenerate(argv as GenerateCommandArgs),
+        await CLICommandFactory.executeGenerate(argv as GenerateCommandArgs),
     };
   }
 
@@ -1037,7 +1085,7 @@ export class CLICommandFactory {
       command: "stream <input>",
       describe: "Stream generation in real-time",
       builder: (yargs) => {
-        return this.buildOptions(
+        return CLICommandFactory.buildOptions(
           yargs
             .positional("input", {
               type: "string" as const,
@@ -1063,7 +1111,7 @@ export class CLICommandFactory {
         );
       },
       handler: async (argv) =>
-        await this.executeStream(argv as StreamCommandArgs),
+        await CLICommandFactory.executeStream(argv as StreamCommandArgs),
     };
   }
 
@@ -1075,7 +1123,7 @@ export class CLICommandFactory {
       command: "batch <file>",
       describe: "Process multiple prompts from a file",
       builder: (yargs) => {
-        return this.buildOptions(
+        return CLICommandFactory.buildOptions(
           yargs
             .positional("file", {
               type: "string" as const,
@@ -1098,7 +1146,7 @@ export class CLICommandFactory {
         );
       },
       handler: async (argv) =>
-        await this.executeBatch(argv as BatchCommandArgs),
+        await CLICommandFactory.executeBatch(argv as BatchCommandArgs),
     };
   }
 
@@ -1115,7 +1163,7 @@ export class CLICommandFactory {
             "status",
             "Check status of all configured AI providers",
             (y) =>
-              this.buildOptions(y)
+              CLICommandFactory.buildOptions(y)
                 .example("$0 provider status", "Check all provider status")
                 .example(
                   "$0 provider status --verbose",
@@ -1140,7 +1188,7 @@ export class CLICommandFactory {
       describe:
         "Check AI provider connectivity and performance (alias for provider status)",
       builder: (yargs) =>
-        this.buildOptions(yargs)
+        CLICommandFactory.buildOptions(yargs)
           .example("$0 status", "Quick provider status check")
           .example("$0 status --verbose", "Detailed connectivity diagnostics")
           .example("$0 status --format json", "Export status as JSON"),
@@ -1183,20 +1231,22 @@ export class CLICommandFactory {
             "stats",
             "Show conversation memory statistics",
             (y) =>
-              this.buildOptions(y)
+              CLICommandFactory.buildOptions(y)
                 .example("$0 memory stats", "Show memory usage statistics")
                 .example(
                   "$0 memory stats --format json",
                   "Export stats as JSON",
                 ),
             async (argv) =>
-              await this.executeMemoryStats(argv as BaseCommandArgs),
+              await CLICommandFactory.executeMemoryStats(
+                argv as BaseCommandArgs,
+              ),
           )
           .command(
             "history <sessionId>",
             "Show conversation history for a session",
             (y) =>
-              this.buildOptions(y)
+              CLICommandFactory.buildOptions(y)
                 .positional("sessionId", {
                   type: "string" as const,
                   description: "Session ID to retrieve history for",
@@ -1211,7 +1261,7 @@ export class CLICommandFactory {
                   "Export history as JSON",
                 ),
             async (argv) =>
-              await this.executeMemoryHistory(
+              await CLICommandFactory.executeMemoryHistory(
                 argv as BaseCommandArgs & { sessionId: string },
               ),
           )
@@ -1219,7 +1269,7 @@ export class CLICommandFactory {
             "clear [sessionId]",
             "Clear conversation history",
             (y) =>
-              this.buildOptions(y)
+              CLICommandFactory.buildOptions(y)
                 .positional("sessionId", {
                   type: "string" as const,
                   description:
@@ -1232,7 +1282,7 @@ export class CLICommandFactory {
                   "Clear specific session",
                 ),
             async (argv) =>
-              await this.executeMemoryClear(
+              await CLICommandFactory.executeMemoryClear(
                 argv as BaseCommandArgs & { sessionId?: string },
               ),
           )
@@ -1254,7 +1304,7 @@ export class CLICommandFactory {
           .command(
             "init",
             "Interactive configuration setup wizard",
-            (y) => this.buildOptions(y),
+            (y) => CLICommandFactory.buildOptions(y),
             async (_argv) => {
               await configManager.initInteractive();
             },
@@ -1262,7 +1312,7 @@ export class CLICommandFactory {
           .command(
             "show",
             "Display current configuration",
-            (y) => this.buildOptions(y),
+            (y) => CLICommandFactory.buildOptions(y),
             async (_argv) => {
               configManager.showConfig();
             },
@@ -1270,7 +1320,7 @@ export class CLICommandFactory {
           .command(
             "validate",
             "Validate current configuration",
-            (y) => this.buildOptions(y),
+            (y) => CLICommandFactory.buildOptions(y),
             async (_argv) => {
               const result = configManager.validateConfig();
               if (result.valid) {
@@ -1287,7 +1337,7 @@ export class CLICommandFactory {
           .command(
             "reset",
             "Reset configuration to defaults",
-            (y) => this.buildOptions(y),
+            (y) => CLICommandFactory.buildOptions(y),
             async (_argv) => {
               configManager.resetConfig();
             },
@@ -1295,8 +1345,9 @@ export class CLICommandFactory {
           .command(
             "export",
             "Export current configuration",
-            (y) => this.buildOptions(y),
-            (argv) => this.executeConfigExport(argv as BaseCommandArgs),
+            (y) => CLICommandFactory.buildOptions(y),
+            (argv) =>
+              CLICommandFactory.executeConfigExport(argv as BaseCommandArgs),
           )
           .demandCommand(1, "");
       },
@@ -1311,7 +1362,7 @@ export class CLICommandFactory {
     return {
       command: "validate",
       describe: "Validate current configuration (alias for 'config validate')",
-      builder: (yargs) => this.buildOptions(yargs),
+      builder: (yargs) => CLICommandFactory.buildOptions(yargs),
       handler: async (_argv) => {
         const result = configManager.validateConfig();
         if (result.valid) {
@@ -1335,12 +1386,12 @@ export class CLICommandFactory {
       command: "get-best-provider",
       describe: "Show the best available AI provider",
       builder: (yargs) =>
-        this.buildOptions(yargs)
+        CLICommandFactory.buildOptions(yargs)
           .example("$0 get-best-provider", "Get best available provider")
           .example("$0 get-best-provider --format json", "Get provider as JSON")
           .example("$0 get-best-provider --quiet", "Just the provider name"),
       handler: async (argv) =>
-        await this.executeGetBestProvider(argv as BaseCommandArgs),
+        await CLICommandFactory.executeGetBestProvider(argv as BaseCommandArgs),
     };
   }
 
@@ -1359,7 +1410,7 @@ export class CLICommandFactory {
       command: ["setup [provider]", "s [provider]"],
       describe: "Interactive AI provider setup wizard",
       builder: (yargs) => {
-        return this.buildOptions(
+        return CLICommandFactory.buildOptions(
           yargs
             .positional("provider", {
               type: "string" as const,
@@ -1421,7 +1472,7 @@ export class CLICommandFactory {
       describe:
         "Start an interactive loop session with conversation management",
       builder: (yargs) =>
-        this.buildOptions(yargs, {
+        CLICommandFactory.buildOptions(yargs, {
           "enable-conversation-memory": {
             type: "boolean",
             description: "Enable conversation memory for the loop session",
@@ -1606,7 +1657,7 @@ export class CLICommandFactory {
       command: "completion",
       describe: "Generate shell completion script",
       builder: (yargs) =>
-        this.buildOptions(yargs)
+        CLICommandFactory.buildOptions(yargs)
           .example("$0 completion", "Generate shell completion")
           .example(
             "$0 completion > ~/.neurolink-completion.sh",
@@ -1620,7 +1671,7 @@ export class CLICommandFactory {
             "Add the completion script to your shell profile for persistent completions",
           ),
       handler: async (argv) =>
-        await this.executeCompletion(argv as BaseCommandArgs),
+        await CLICommandFactory.executeCompletion(argv as BaseCommandArgs),
     };
   }
 
@@ -1769,7 +1820,7 @@ export class CLICommandFactory {
       );
     }
 
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
 
     // Determine if video generation mode is enabled
     const isVideoMode =
@@ -1857,7 +1908,7 @@ export class CLICommandFactory {
           spinner.succeed(chalk.green("✅ Dry-run completed successfully!"));
         }
 
-        this.handleOutput(mockResult, options);
+        CLICommandFactory.handleOutput(mockResult, options);
 
         if (options.debug) {
           logger.debug("\n" + chalk.yellow("Debug Information (Dry-run):"));
@@ -1867,7 +1918,7 @@ export class CLICommandFactory {
         }
 
         if (!globalSession.getCurrentSessionId()) {
-          await this.flushLangfuseTraces();
+          await CLICommandFactory.flushLangfuseTraces();
           process.exit(0);
         }
       }
@@ -1889,7 +1940,7 @@ export class CLICommandFactory {
 
       // Video generation doesn't support tools, so auto-disable them
       if (isVideoMode) {
-        this.configureVideoMode(enhancedOptions, argv, options);
+        CLICommandFactory.configureVideoMode(enhancedOptions, argv, options);
       }
 
       // Process CLI multimodal inputs
@@ -1983,6 +2034,16 @@ export class CLICommandFactory {
               validateDomainData: true,
             }
           : undefined,
+        // RAG configuration
+        rag: (argv.ragFiles as string[] | undefined)?.length
+          ? {
+              files: argv.ragFiles as string[],
+              strategy: argv.ragStrategy as ChunkingStrategy | undefined,
+              chunkSize: argv.ragChunkSize as number | undefined,
+              chunkOverlap: argv.ragChunkOverlap as number | undefined,
+              topK: argv.ragTopK as number | undefined,
+            }
+          : undefined,
       });
 
       if (spinner) {
@@ -2004,14 +2065,14 @@ export class CLICommandFactory {
 
       // Handle output with universal formatting (for text mode)
       if (!isVideoMode) {
-        this.handleOutput(result, options);
+        CLICommandFactory.handleOutput(result, options);
       }
 
       // Handle TTS audio file output if --tts-output is provided
-      await this.handleTTSOutput(result, options);
+      await CLICommandFactory.handleTTSOutput(result, options);
 
       // Handle video file output if --videoOutput is provided
-      await this.handleVideoOutput(result, options);
+      await CLICommandFactory.handleVideoOutput(result, options);
 
       if (options.debug) {
         logger.debug("\n" + chalk.yellow("Debug Information:"));
@@ -2029,7 +2090,7 @@ export class CLICommandFactory {
       }
 
       if (!globalSession.getCurrentSessionId()) {
-        await this.flushLangfuseTraces();
+        await CLICommandFactory.flushLangfuseTraces();
         process.exit(0);
       }
     } catch (error) {
@@ -2141,7 +2202,7 @@ export class CLICommandFactory {
       };
 
       const analyticsDisplay =
-        this.formatAnalyticsForTextMode(mockGenerateResult);
+        CLICommandFactory.formatAnalyticsForTextMode(mockGenerateResult);
       logger.always(analyticsDisplay);
     }
 
@@ -2171,7 +2232,7 @@ export class CLICommandFactory {
     }
 
     if (!globalSession.getCurrentSessionId()) {
-      await this.flushLangfuseTraces();
+      await CLICommandFactory.flushLangfuseTraces();
       process.exit(0);
     }
   }
@@ -2254,11 +2315,24 @@ export class CLICommandFactory {
             validateDomainData: true,
           }
         : undefined,
+      // RAG configuration
+      rag: (argv.ragFiles as string[] | undefined)?.length
+        ? {
+            files: argv.ragFiles as string[],
+            strategy: argv.ragStrategy as ChunkingStrategy | undefined,
+            chunkSize: argv.ragChunkSize as number | undefined,
+            chunkOverlap: argv.ragChunkOverlap as number | undefined,
+            topK: argv.ragTopK as number | undefined,
+          }
+        : undefined,
     });
 
-    const fullContent = await this.processStreamWithTimeout(stream, options);
+    const fullContent = await CLICommandFactory.processStreamWithTimeout(
+      stream,
+      options,
+    );
 
-    await this.displayStreamResults(stream, fullContent, options);
+    await CLICommandFactory.displayStreamResults(stream, fullContent, options);
 
     return fullContent;
   }
@@ -2418,7 +2492,7 @@ export class CLICommandFactory {
         model: stream.model,
         toolsUsed: stream.toolCalls?.map((tc) => tc.toolName) || [],
       };
-      const analyticsDisplay = this.formatAnalyticsForTextMode(
+      const analyticsDisplay = CLICommandFactory.formatAnalyticsForTextMode(
         streamAnalytics as unknown as GenerateResult,
       );
       logger.always(analyticsDisplay);
@@ -2473,7 +2547,7 @@ export class CLICommandFactory {
 
     // Debug output for streaming
     if (options.debug) {
-      await this.logStreamDebugInfo({
+      await CLICommandFactory.logStreamDebugInfo({
         provider: options.provider as string,
         model: options.model as string,
       });
@@ -2537,9 +2611,9 @@ export class CLICommandFactory {
    * Execute the stream command
    */
   private static async executeStream(argv: StreamCommandArgs) {
-    await this.handleStdinInput(argv);
+    await CLICommandFactory.handleStdinInput(argv);
 
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
 
     if (!options.quiet) {
       logger.always(chalk.blue("🔄 Streaming..."));
@@ -2551,28 +2625,26 @@ export class CLICommandFactory {
         await new Promise((resolve) => setTimeout(resolve, options.delay));
       }
 
-      const { inputText, contextMetadata } = await this.processStreamContext(
-        argv,
-        options,
-      );
+      const { inputText, contextMetadata } =
+        await CLICommandFactory.processStreamContext(argv, options);
 
       // Handle dry-run mode for testing
       if (options.dryRun) {
-        await this.executeDryRunStream(options, contextMetadata);
+        await CLICommandFactory.executeDryRunStream(options, contextMetadata);
         return;
       }
 
-      const fullContent = await this.executeRealStream(
+      const fullContent = await CLICommandFactory.executeRealStream(
         argv,
         options,
         inputText,
         contextMetadata,
       );
 
-      await this.handleStreamOutput(options, fullContent);
+      await CLICommandFactory.handleStreamOutput(options, fullContent);
 
       if (!globalSession.getCurrentSessionId()) {
-        await this.flushLangfuseTraces();
+        await CLICommandFactory.flushLangfuseTraces();
         process.exit(0);
       }
     } catch (error) {
@@ -2584,7 +2656,7 @@ export class CLICommandFactory {
    * Execute the batch command
    */
   private static async executeBatch(argv: BatchCommandArgs) {
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
     const spinner = options.quiet ? null : ora().start();
 
     try {
@@ -2729,10 +2801,10 @@ export class CLICommandFactory {
       }
 
       // Handle output with universal formatting
-      this.handleOutput(results, options);
+      CLICommandFactory.handleOutput(results, options);
 
       if (!globalSession.getCurrentSessionId()) {
-        await this.flushLangfuseTraces();
+        await CLICommandFactory.flushLangfuseTraces();
         process.exit(0);
       }
     } catch (error) {
@@ -2747,7 +2819,7 @@ export class CLICommandFactory {
    * Execute config export command
    */
   private static async executeConfigExport(argv: BaseCommandArgs) {
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
 
     try {
       const config = {
@@ -2774,7 +2846,7 @@ export class CLICommandFactory {
         timestamp: new Date().toISOString(),
       };
 
-      this.handleOutput(config, options);
+      CLICommandFactory.handleOutput(config, options);
     } catch (error) {
       handleError(error as Error, "Configuration export");
     }
@@ -2784,7 +2856,7 @@ export class CLICommandFactory {
    * Execute get best provider command
    */
   private static async executeGetBestProvider(argv: BaseCommandArgs) {
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
 
     try {
       const { getBestProvider } = await import(
@@ -2793,14 +2865,14 @@ export class CLICommandFactory {
       const bestProvider = await getBestProvider();
 
       if (options.format === "json") {
-        this.handleOutput({ provider: bestProvider }, options);
+        CLICommandFactory.handleOutput({ provider: bestProvider }, options);
       } else {
         if (!options.quiet) {
           logger.always(
             chalk.green(`🎯 Best available provider: ${bestProvider}`),
           );
         } else {
-          this.handleOutput(bestProvider, options);
+          CLICommandFactory.handleOutput(bestProvider, options);
         }
       }
     } catch (error) {
@@ -2812,7 +2884,7 @@ export class CLICommandFactory {
    * Execute memory stats command
    */
   private static async executeMemoryStats(argv: BaseCommandArgs) {
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
     const spinner = options.quiet
       ? null
       : ora("🧠 Getting memory stats...").start();
@@ -2832,7 +2904,7 @@ export class CLICommandFactory {
           spinner.succeed(chalk.green("✅ Memory stats retrieved (dry-run)"));
         }
 
-        this.handleOutput(mockStats, options);
+        CLICommandFactory.handleOutput(mockStats, options);
         return;
       }
 
@@ -2843,7 +2915,7 @@ export class CLICommandFactory {
       }
 
       if (options.format === "json") {
-        this.handleOutput(stats, options);
+        CLICommandFactory.handleOutput(stats, options);
       } else {
         logger.always(chalk.blue("📊 Conversation Memory Stats:"));
         logger.always(`   Total Sessions: ${stats.totalSessions}`);
@@ -2874,7 +2946,7 @@ export class CLICommandFactory {
   private static async executeMemoryHistory(
     argv: BaseCommandArgs & { sessionId: string },
   ) {
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
     const spinner = options.quiet
       ? null
       : ora(`🧠 Getting history for ${argv.sessionId}...`).start();
@@ -2903,7 +2975,7 @@ export class CLICommandFactory {
           );
         }
 
-        this.handleOutput(mockHistory, options);
+        CLICommandFactory.handleOutput(mockHistory, options);
         return;
       }
 
@@ -2925,7 +2997,7 @@ export class CLICommandFactory {
       }
 
       if (options.format === "json") {
-        this.handleOutput(history, options);
+        CLICommandFactory.handleOutput(history, options);
       } else {
         logger.always(
           chalk.blue(`💬 Conversation History (${argv.sessionId}):`),
@@ -2958,7 +3030,7 @@ export class CLICommandFactory {
   private static async executeMemoryClear(
     argv: BaseCommandArgs & { sessionId?: string },
   ) {
-    const options = this.processOptions(argv);
+    const options = CLICommandFactory.processOptions(argv);
     const isAllSessions = !argv.sessionId;
     const target = isAllSessions ? "all sessions" : `session ${argv.sessionId}`;
     const spinner = options.quiet
@@ -2985,7 +3057,7 @@ export class CLICommandFactory {
           message: `${isAllSessions ? "All sessions" : "Session"} would be cleared`,
         };
 
-        this.handleOutput(result, options);
+        CLICommandFactory.handleOutput(result, options);
         return;
       }
 
@@ -3025,7 +3097,7 @@ export class CLICommandFactory {
           action: isAllSessions ? "clear_all" : "clear_session",
           sessionId: argv.sessionId || null,
         };
-        this.handleOutput(result, options);
+        CLICommandFactory.handleOutput(result, options);
       } else if (!success && !isAllSessions) {
         logger.always(
           chalk.yellow(

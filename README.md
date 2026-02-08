@@ -35,14 +35,15 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 
 ## What's New (Q1 2026)
 
-| Feature                             | Version | Description                                                                                                                                    | Guide                                                         |
-| ----------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **External TracerProvider Support** | v8.43.0 | Integrate NeuroLink with existing OpenTelemetry instrumentation. Prevents duplicate registration conflicts.                                    | [Observability Guide](docs/features/observability.md)         |
-| **Server Adapters**                 | v8.43.0 | Multi-framework HTTP server with Hono, Express, Fastify, Koa support. Full CLI for server management with foreground/background modes.         | [Server Adapters Guide](docs/guides/server-adapters/index.md) |
-| **Title Generation Events**         | v8.38.0 | Emit `conversation:titleGenerated` event when conversation title is generated. Supports custom title prompts via `NEUROLINK_TITLE_PROMPT`.     | [Conversation Memory Guide](docs/conversation-memory.md)      |
-| **Video Generation with Veo**       | v8.32.0 | Video generation using Veo 3.1 (`veo-3.1`). Realistic video generation with many parameter options                                             | [Video Generation Guide](docs/features/video-generation.md)   |
-| **Image Generation with Gemini**    | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI. | [Image Generation Guide](docs/image-generation-streaming.md)  |
-| **HTTP/Streamable HTTP Transport**  | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.  | [HTTP Transport Guide](docs/mcp-http-transport.md)            |
+| Feature                             | Version | Description                                                                                                                                                   | Guide                                                         |
+| ----------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **External TracerProvider Support** | v8.43.0 | Integrate NeuroLink with existing OpenTelemetry instrumentation. Prevents duplicate registration conflicts.                                                   | [Observability Guide](docs/features/observability.md)         |
+| **Server Adapters**                 | v8.43.0 | Multi-framework HTTP server with Hono, Express, Fastify, Koa support. Full CLI for server management with foreground/background modes.                        | [Server Adapters Guide](docs/guides/server-adapters/index.md) |
+| **Title Generation Events**         | v8.38.0 | Emit `conversation:titleGenerated` event when conversation title is generated. Supports custom title prompts via `NEUROLINK_TITLE_PROMPT`.                    | [Conversation Memory Guide](docs/conversation-memory.md)      |
+| **Video Generation with Veo**       | v8.32.0 | Video generation using Veo 3.1 (`veo-3.1`). Realistic video generation with many parameter options                                                            | [Video Generation Guide](docs/features/video-generation.md)   |
+| **Image Generation with Gemini**    | v8.31.0 | Native image generation using Gemini 2.0 Flash Experimental (`imagen-3.0-generate-002`). High-quality image synthesis directly from Google AI.                | [Image Generation Guide](docs/image-generation-streaming.md)  |
+| **RAG with generate()/stream()**    | v9.2.0  | Pass `rag: { files }` to generate/stream for automatic document chunking, embedding, and AI-powered search. 10 chunking strategies, hybrid search, reranking. | [RAG Guide](docs/features/rag.md)                             |
+| **HTTP/Streamable HTTP Transport**  | v8.29.0 | Connect to remote MCP servers via HTTP with authentication headers, automatic retry with exponential backoff, and configurable rate limiting.                 | [HTTP Transport Guide](docs/mcp-http-transport.md)            |
 
 - **External TracerProvider Support** – Integrate NeuroLink with applications that already have OpenTelemetry instrumentation. Supports auto-detection and manual configuration. → [Observability Guide](docs/features/observability.md)
 - **Server Adapters** – Deploy NeuroLink as an HTTP API server with your framework of choice (Hono, Express, Fastify, Koa). Full CLI support with `serve` and `server` commands for foreground/background modes, route management, and OpenAPI generation. → [Server Adapters Guide](docs/guides/server-adapters/index.md)
@@ -50,6 +51,7 @@ Extracted from production systems at Juspay and battle-tested at enterprise scal
 - **Custom Title Prompts** – Customize conversation title generation with `NEUROLINK_TITLE_PROMPT` environment variable. Use `${userMessage}` placeholder for dynamic prompts. → [Conversation Memory Guide](docs/conversation-memory.md#customizing-the-title-prompt)
 - **Video Generation** – Transform images into 8-second videos with synchronized audio using Google Veo 3.1 via Vertex AI. Supports 720p/1080p resolutions, portrait/landscape aspect ratios. → [Video Generation Guide](docs/features/video-generation.md)
 - **Image Generation** – Generate images from text prompts using Gemini models via Vertex AI or Google AI Studio. Supports streaming mode with automatic file saving. → [Image Generation Guide](docs/image-generation-streaming.md)
+- **RAG with generate()/stream()** – Just pass `rag: { files: ["./docs/guide.md"] }` to `generate()` or `stream()`. NeuroLink auto-chunks, embeds, and creates a search tool the AI can invoke. 10 chunking strategies, hybrid search, 5 reranker types. → [RAG Guide](docs/features/rag.md)
 - **HTTP/Streamable HTTP Transport for MCP** – Connect to remote MCP servers via HTTP with authentication headers, retry logic, and rate limiting. → [HTTP Transport Guide](docs/mcp-http-transport.md)
 - 🧠 **Gemini 3 Preview Support** - Full support for gemini-3-flash-preview and gemini-3-pro-preview with extended thinking capabilities
 - **Structured Output with Zod Schemas** – Type-safe JSON generation with automatic validation using `schema` + `output.format: "json"` in `generate()`. → [Structured Output Guide](docs/features/structured-output.md)
@@ -229,17 +231,18 @@ const result = await neurolink.generate({
 
 **SDK-First Design** with TypeScript, IntelliSense, and type safety:
 
-| Feature                     | Description                                                   | Documentation                                             |
-| --------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- |
-| **Auto Provider Selection** | Intelligent provider fallback                                 | [SDK Guide](docs/sdk/index.md#auto-selection)             |
-| **Streaming Responses**     | Real-time token streaming                                     | [Streaming Guide](docs/advanced/streaming.md)             |
-| **Conversation Memory**     | Automatic context management                                  | [Memory Guide](docs/sdk/index.md#memory)                  |
-| **Full Type Safety**        | Complete TypeScript types                                     | [Type Reference](docs/sdk/api-reference.md)               |
-| **Error Handling**          | Graceful provider fallback                                    | [Error Guide](docs/reference/troubleshooting.md)          |
-| **Analytics & Evaluation**  | Usage tracking, quality scores                                | [Analytics Guide](docs/advanced/analytics.md)             |
-| **Middleware System**       | Request/response hooks                                        | [Middleware Guide](docs/custom-middleware-guide.md)       |
-| **Framework Integration**   | Next.js, SvelteKit, Express                                   | [Framework Guides](docs/sdk/framework-integration.md)     |
-| **Extended Thinking**       | Native thinking/reasoning mode for Gemini 3 and Claude models | [Thinking Guide](docs/features/thinking-configuration.md) |
+| Feature                     | Description                                                                       | Documentation                                             |
+| --------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Auto Provider Selection** | Intelligent provider fallback                                                     | [SDK Guide](docs/sdk/index.md#auto-selection)             |
+| **Streaming Responses**     | Real-time token streaming                                                         | [Streaming Guide](docs/advanced/streaming.md)             |
+| **Conversation Memory**     | Automatic context management                                                      | [Memory Guide](docs/sdk/index.md#memory)                  |
+| **Full Type Safety**        | Complete TypeScript types                                                         | [Type Reference](docs/sdk/api-reference.md)               |
+| **Error Handling**          | Graceful provider fallback                                                        | [Error Guide](docs/reference/troubleshooting.md)          |
+| **Analytics & Evaluation**  | Usage tracking, quality scores                                                    | [Analytics Guide](docs/advanced/analytics.md)             |
+| **Middleware System**       | Request/response hooks                                                            | [Middleware Guide](docs/custom-middleware-guide.md)       |
+| **Framework Integration**   | Next.js, SvelteKit, Express                                                       | [Framework Guides](docs/sdk/framework-integration.md)     |
+| **Extended Thinking**       | Native thinking/reasoning mode for Gemini 3 and Claude models                     | [Thinking Guide](docs/features/thinking-configuration.md) |
+| **RAG Document Processing** | `rag: { files }` on generate/stream with 10 chunking strategies and hybrid search | [RAG Guide](docs/features/rag.md)                         |
 
 ---
 
@@ -399,6 +402,9 @@ node your-app.js
 | `server routes`  | List all registered API routes       | `neurolink server routes`  | [Server](docs/cli/commands.md#server)     |
 | `server config`  | View or modify server configuration  | `neurolink server config`  | [Server](docs/cli/commands.md#server)     |
 | `server openapi` | Generate OpenAPI specification       | `neurolink server openapi` | [Server](docs/cli/commands.md#server)     |
+| `rag chunk`      | Chunk documents for RAG              | `neurolink rag chunk f.md` | [RAG CLI](docs/cli/commands.md#rag)       |
+
+**RAG flags** are available on `generate` and `stream`: `--rag-files`, `--rag-strategy`, `--rag-chunk-size`, `--rag-chunk-overlap`, `--rag-top-k`
 
 **[📖 Complete CLI Reference](docs/cli/commands.md)** - All commands and options
 
@@ -529,6 +535,10 @@ npx @juspay/neurolink generate "Summarize customer feedback" \
 # Turn on analytics + evaluation for observability
 npx @juspay/neurolink generate "Draft release notes" \
   --enable-analytics --enable-evaluation --format json
+
+# RAG: Ask questions about your docs (auto-chunks, embeds, searches)
+npx @juspay/neurolink generate "What are the key features?" \
+  --rag-files ./docs/guide.md ./docs/api.md --rag-strategy markdown
 ```
 
 ```typescript
@@ -562,6 +572,17 @@ const result = await neurolink.generate({
 
 console.log(result.content);
 console.log(result.evaluation?.overallScore);
+
+// RAG: Ask questions about your documents
+const answer = await neurolink.generate({
+  prompt: "What are the main architectural decisions?",
+  rag: {
+    files: ["./docs/architecture.md", "./docs/decisions.md"],
+    strategy: "markdown",
+    topK: 5,
+  },
+});
+console.log(answer.content); // AI searches your docs and answers
 ```
 
 ### Gemini 3 with Extended Thinking
@@ -600,17 +621,18 @@ Full command and API breakdown lives in [`docs/cli/commands.md`](docs/cli/comman
 
 ## Documentation Map
 
-| Area            | When to Use                                           | Link                                                             |
-| --------------- | ----------------------------------------------------- | ---------------------------------------------------------------- |
-| Getting started | Install, configure, run first prompt                  | [`docs/getting-started/index.md`](docs/getting-started/index.md) |
-| Feature guides  | Understand new functionality front-to-back            | [`docs/features/index.md`](docs/features/index.md)               |
-| CLI reference   | Command syntax, flags, loop sessions                  | [`docs/cli/index.md`](docs/cli/index.md)                         |
-| SDK reference   | Classes, methods, options                             | [`docs/sdk/index.md`](docs/sdk/index.md)                         |
-| Integrations    | LiteLLM, SageMaker, MCP, Mem0                         | [`docs/litellm-integration.md`](docs/litellm-integration.md)     |
-| Advanced        | Middleware, architecture, streaming patterns          | [`docs/advanced/index.md`](docs/advanced/index.md)               |
-| Cookbook        | Practical recipes for common patterns                 | [`docs/cookbook/index.md`](docs/cookbook/index.md)               |
-| Guides          | Migration, Redis, troubleshooting, provider selection | [`docs/guides/index.md`](docs/guides/index.md)                   |
-| Operations      | Configuration, troubleshooting, provider matrix       | [`docs/reference/index.md`](docs/reference/index.md)             |
+| Area            | When to Use                                               | Link                                                             |
+| --------------- | --------------------------------------------------------- | ---------------------------------------------------------------- |
+| Getting started | Install, configure, run first prompt                      | [`docs/getting-started/index.md`](docs/getting-started/index.md) |
+| Feature guides  | Understand new functionality front-to-back                | [`docs/features/index.md`](docs/features/index.md)               |
+| CLI reference   | Command syntax, flags, loop sessions                      | [`docs/cli/index.md`](docs/cli/index.md)                         |
+| SDK reference   | Classes, methods, options                                 | [`docs/sdk/index.md`](docs/sdk/index.md)                         |
+| RAG             | Document chunking, hybrid search, reranking, `rag:{}` API | [`docs/features/rag.md`](docs/features/rag.md)                   |
+| Integrations    | LiteLLM, SageMaker, MCP, Mem0                             | [`docs/litellm-integration.md`](docs/litellm-integration.md)     |
+| Advanced        | Middleware, architecture, streaming patterns              | [`docs/advanced/index.md`](docs/advanced/index.md)               |
+| Cookbook        | Practical recipes for common patterns                     | [`docs/cookbook/index.md`](docs/cookbook/index.md)               |
+| Guides          | Migration, Redis, troubleshooting, provider selection     | [`docs/guides/index.md`](docs/guides/index.md)                   |
+| Operations      | Configuration, troubleshooting, provider matrix           | [`docs/reference/index.md`](docs/reference/index.md)             |
 
 ### New in 2026: Enhanced Documentation
 

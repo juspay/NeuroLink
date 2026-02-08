@@ -36,29 +36,27 @@
 import { AIProviderFactory } from "./core/factory.js";
 export { AIProviderFactory };
 
-// Export ALL types from the centralized type barrel
-export * from "./types/index.js";
-
-// Tool Registration utility
-export { validateTool } from "./sdk/toolRegistration.js";
-
+// Config Manager export
+export { NeuroLinkConfigManager as ConfigManager } from "./config/configManager.js";
 export {
   AIProviderName,
   BedrockModels,
   OpenAIModels,
   VertexModels,
 } from "./constants/enums.js";
-
-// Utility exports
-export {
-  getBestProvider,
-  getAvailableProviders,
-  isValidProvider,
-} from "./utils/providerUtils.js";
-
 // Dynamic Models exports
 export { dynamicModelProvider } from "./core/dynamicModels.js";
+// Tool Registration utility
+export { validateTool } from "./sdk/toolRegistration.js";
+// Export ALL types from the centralized type barrel
+export * from "./types/index.js";
 export type { DynamicModelConfig, ModelRegistry } from "./types/modelTypes.js";
+// Utility exports
+export {
+  getAvailableProviders,
+  getBestProvider,
+  isValidProvider,
+} from "./utils/providerUtils.js";
 
 // Main NeuroLink wrapper class and diagnostic types
 import { NeuroLink } from "./neurolink.js";
@@ -67,35 +65,35 @@ export type { MCPServerInfo } from "./types/mcpTypes.js";
 
 // Observability configuration types
 export type {
-  ObservabilityConfig,
   LangfuseConfig,
-  OpenTelemetryConfig,
   LangfuseSpanAttributes,
+  ObservabilityConfig,
+  OpenTelemetryConfig,
   TraceNameFormat,
 } from "./types/observability.js";
 
 export { buildObservabilityConfigFromEnv } from "./utils/observabilityHelpers.js";
 
 import {
-  initializeOpenTelemetry,
-  shutdownOpenTelemetry,
-  flushOpenTelemetry,
-  getLangfuseHealthStatus,
-  setLangfuseContext,
-  getLangfuseSpanProcessor,
-  getTracerProvider,
-  isOpenTelemetryInitialized,
-  // NEW EXPORTS - External TracerProvider Support
-  getSpanProcessors,
   createContextEnricher,
-  isUsingExternalTracerProvider,
+  flushOpenTelemetry,
   // Enhanced context and tracing
   getLangfuseContext,
+  getLangfuseHealthStatus,
+  getLangfuseSpanProcessor,
+  // NEW EXPORTS - External TracerProvider Support
+  getSpanProcessors,
   getTracer,
+  getTracerProvider,
+  initializeOpenTelemetry,
+  isOpenTelemetryInitialized,
+  isUsingExternalTracerProvider,
+  setLangfuseContext,
+  shutdownOpenTelemetry,
 } from "./services/server/ai/observability/instrumentation.js";
 import {
-  initializeTelemetry as init,
   getTelemetryStatus as getStatus,
+  initializeTelemetry as init,
 } from "./telemetry/index.js";
 
 export {
@@ -116,15 +114,21 @@ export {
   getTracer,
 };
 
+// Analytics Middleware exports
+export {
+  clearAnalyticsMetrics,
+  createAnalyticsMiddleware,
+  getAnalyticsMetrics,
+} from "./middleware/builtin/analytics.js";
+export { MiddlewareFactory } from "./middleware/factory.js";
 // Middleware exports
 export type {
-  NeuroLinkMiddleware,
+  MiddlewareConfig,
   MiddlewareContext,
   MiddlewareFactoryOptions,
   MiddlewarePreset,
-  MiddlewareConfig,
+  NeuroLinkMiddleware,
 } from "./types/middlewareTypes.js";
-export { MiddlewareFactory } from "./middleware/factory.js";
 
 // Version
 export const VERSION = "1.0.0";
@@ -298,56 +302,62 @@ export async function createBestAIProvider(
  * ```
  */
 export {
+  CircuitBreakerManager,
+  calculateExpiresAt,
+  // MCP Server Factory
+  createMCPServer,
+  createOAuthProviderFromConfig,
+  DEFAULT_HTTP_RETRY_CONFIG,
+  DEFAULT_RATE_LIMIT_CONFIG,
+  executeMCP,
+  FileTokenStorage,
+  getMCPStats,
+  getServerInfo,
+  globalCircuitBreakerManager,
+  globalRateLimiterManager,
+  // HTTP Transport utilities
+  HTTPRateLimiter,
+  // OAuth Authentication
+  InMemoryTokenStorage,
   // Core MCP ecosystem
   // Simplified MCP exports
   initializeMCPEcosystem,
-  listMCPs,
-  executeMCP,
-  getMCPStats,
-  mcpLogger,
-  // HTTP Transport utilities
-  HTTPRateLimiter,
-  RateLimiterManager,
-  globalRateLimiterManager,
-  DEFAULT_RATE_LIMIT_CONFIG,
-  DEFAULT_HTTP_RETRY_CONFIG,
-  isRetryableStatusCode,
   isRetryableHTTPError,
-  withHTTPRetry,
-  // OAuth Authentication
-  InMemoryTokenStorage,
-  FileTokenStorage,
+  isRetryableStatusCode,
   isTokenExpired,
-  calculateExpiresAt,
-  NeuroLinkOAuthProvider,
-  createOAuthProviderFromConfig,
+  listMCPs,
   // Circuit Breaker
   MCPCircuitBreaker,
-  CircuitBreakerManager,
-  globalCircuitBreakerManager,
+  mcpLogger,
+  NeuroLinkOAuthProvider,
+  RateLimiterManager,
+  validateServerTools,
+  validateTool as validateMCPTool,
+  withHTTPRetry,
 } from "./mcp/index.js";
 
 export type {
-  McpMetadata,
+  AuthorizationUrlResult,
   DiscoveredMcp,
+  HTTPRetryConfig,
+  MCPOAuthConfig,
+  McpMetadata,
+  OAuthClientInformation,
+  OAuthTokens,
   // HTTP Transport types
   RateLimitConfig,
-  HTTPRetryConfig,
-  OAuthTokens,
-  TokenStorage,
-  MCPOAuthConfig,
-  OAuthClientInformation,
-  AuthorizationUrlResult,
   TokenExchangeRequest,
+  TokenStorage,
 } from "./types/mcpTypes.js";
 
 export type {
   ExecutionContext,
-  ToolInfo,
   ToolExecutionResult,
+  ToolInfo,
 } from "./types/tools.js";
 
 export type { LogLevel } from "./types/utilities.js";
+export { logger } from "./utils/logger.js";
 
 // ============================================================================
 // REAL-TIME SERVICES & TELEMETRY - Enterprise Platform Features
@@ -383,10 +393,10 @@ export async function getTelemetryStatus(): Promise<{
 
 // Export legacy types for backward compatibility
 export type {
-  TextGenerationOptions,
-  TextGenerationResult,
   AnalyticsData,
   EvaluationData,
+  TextGenerationOptions,
+  TextGenerationResult,
 } from "./types/index.js";
 
 /**
@@ -444,6 +454,79 @@ export async function generateText(
 // SERVER ADAPTERS - HTTP API Framework Integration
 // ============================================================================
 
+// Server Types
+export type {
+  AgentExecuteRequest,
+  AgentExecuteResponse,
+  AuthConfig,
+  AuthenticatedUser,
+  AuthResult,
+  AuthStrategy,
+  BodyParserConfig,
+  CacheConfig,
+  CacheEntry,
+  CacheStore,
+  CORSConfig,
+  // Route Types
+  CreateRoutesOptions,
+  DataEvent,
+  DataStreamEvent,
+  DataStreamEventType,
+  DataStreamResponseConfig,
+  DataStreamWriter,
+  DataStreamWriterConfig,
+  // Error Types
+  ErrorCategoryType,
+  ErrorEvent,
+  ErrorResponse,
+  ErrorSeverityType,
+  FinishEvent,
+  HealthResponse,
+  HttpMethod,
+  LoggingConfig,
+  MCPServerStatusResponse,
+  MiddlewareDefinition,
+  MiddlewareHandler,
+  OpenAPIGeneratorConfig,
+  OpenAPISpec,
+  PropertySchema,
+  RateLimitConfig as ServerRateLimitConfig,
+  RateLimitMiddlewareConfig,
+  RateLimitStore,
+  ReadyResponse,
+  RequiredServerAdapterConfig,
+  RouteDefinition,
+  RouteGroup,
+  RouteHandler,
+  ServerAdapterConfig,
+  ServerAdapterErrorCodeType,
+  ServerAdapterErrorContext,
+  ServerAdapterEvents,
+  ServerAdapterFactoryOptions,
+  ServerContext,
+  ServerFramework,
+  ServerResponse,
+  ServerStatus,
+  SSEWriteOptions,
+  StreamingConfig,
+  TextDeltaEvent,
+  TextEndEvent,
+  TextStartEvent,
+  ToolCallEvent,
+  ToolExecuteRequest,
+  ToolExecuteResponse,
+  ToolResultEvent,
+  ValidationConfig,
+  ValidationResult,
+  ValidationSchema,
+  WebSocketAuthConfig,
+  // WebSocket Types
+  WebSocketConfig,
+  WebSocketConnection,
+  WebSocketHandler,
+  WebSocketMessage,
+  WebSocketMessageType,
+} from "./server/index.js";
 /**
  * Server Adapters for exposing NeuroLink as HTTP APIs
  *
@@ -463,169 +546,264 @@ export async function generateText(
  * ```
  */
 export {
-  // Server Factory
-  createServer,
-  ServerAdapterFactory,
-  // Framework Adapters
-  BaseServerAdapter,
-  HonoServerAdapter,
-  ExpressServerAdapter,
-  FastifyServerAdapter,
-  KoaServerAdapter,
-  // Routes
-  createAgentRoutes,
-  createAllRoutes,
-  createHealthRoutes,
-  createMCPRoutes,
-  createMemoryRoutes,
-  createToolRoutes,
-  registerAllRoutes,
-  // Middleware
-  createAuthMiddleware,
-  createRoleMiddleware,
-  createRateLimitMiddleware,
-  createSlidingWindowRateLimitMiddleware,
-  InMemoryRateLimitStore,
-  RateLimitError,
-  createCacheMiddleware,
-  createCacheInvalidator,
-  InMemoryCacheStore,
-  createRequestValidationMiddleware,
-  createFieldValidator,
-  ValidationError,
-  createTimingMiddleware,
-  createRequestIdMiddleware,
-  createErrorHandlingMiddleware,
-  createSecurityHeadersMiddleware,
-  createLoggingMiddleware,
-  createCompressionMiddleware,
   // Validation
   AgentExecuteRequestSchema,
+  AlreadyRunningError,
+  AuthenticationError,
+  AuthorizationError,
+  // Framework Adapters
+  BaseServerAdapter,
+  ConfigurationError,
+  // Routes
+  createAgentRoutes,
+  createAgentWebSocketHandler,
+  createAllRoutes,
+  // Middleware
+  createAuthMiddleware,
+  createCacheInvalidator,
+  createCacheMiddleware,
+  createCompressionMiddleware,
+  createDataStreamResponse,
+  // Streaming
+  createDataStreamWriter,
+  createErrorHandlingMiddleware,
   createErrorResponse,
+  createFieldValidator,
+  createHealthRoutes,
+  createLoggingMiddleware,
+  createMCPRoutes,
+  createMemoryRoutes,
+  createNDJSONHeaders,
+  createOpenAPIGenerator,
+  createRateLimitMiddleware,
+  createRequestIdMiddleware,
+  createRequestValidationMiddleware,
+  createRoleMiddleware,
+  createSecurityHeadersMiddleware,
+  // Server Factory
+  createServer,
+  createSlidingWindowRateLimitMiddleware,
+  createSSEHeaders,
+  createTimingMiddleware,
+  createToolRoutes,
+  DataStreamResponse,
+  // Error Constants
+  ErrorCategory,
+  ErrorRecoveryStrategies,
+  ErrorSeverity,
+  ExpressServerAdapter,
+  FastifyServerAdapter,
+  generateOpenAPIFromConfig,
+  generateOpenAPISpec,
+  HandlerError,
+  HonoServerAdapter,
+  InMemoryCacheStore,
+  InMemoryRateLimitStore,
+  InvalidAuthenticationError,
+  KoaServerAdapter,
+  MissingDependencyError,
+  NotRunningError,
+  // OpenAPI
+  OpenAPIGenerator,
+  pipeAsyncIterableToDataStream,
+  RateLimitError,
+  RouteConflictError,
+  RouteNotFoundError,
+  registerAllRoutes,
+  // Errors
+  ServerAdapterError,
+  ServerAdapterErrorCode,
+  ServerAdapterFactory,
   ServerNameParamSchema,
+  ServerRateLimitError,
+  ServerStartError,
+  ServerStopError,
+  ServerValidationError,
   SessionIdParamSchema,
+  StreamAbortedError,
+  StreamingError,
+  TimeoutError,
   ToolArgumentsSchema,
   ToolExecuteRequestSchema,
   ToolNameParamSchema,
   ToolSearchQuerySchema,
+  ValidationError,
   validateParams,
   validateQuery,
   validateRequest,
-  // OpenAPI
-  OpenAPIGenerator,
-  createOpenAPIGenerator,
-  generateOpenAPISpec,
-  generateOpenAPIFromConfig,
-  // Streaming
-  createDataStreamWriter,
-  DataStreamResponse,
-  createDataStreamResponse,
-  pipeAsyncIterableToDataStream,
-  createSSEHeaders,
-  createNDJSONHeaders,
+  WebSocketConnectionError,
   // WebSocket
   WebSocketConnectionManager,
-  WebSocketMessageRouter,
-  createAgentWebSocketHandler,
-  // Errors
-  ServerAdapterError,
-  ConfigurationError,
-  RouteConflictError,
-  RouteNotFoundError,
-  ServerValidationError,
-  AuthenticationError,
-  InvalidAuthenticationError,
-  AuthorizationError,
-  ServerRateLimitError,
-  TimeoutError,
-  HandlerError,
-  StreamingError,
-  StreamAbortedError,
   WebSocketError,
-  WebSocketConnectionError,
-  ServerStartError,
-  ServerStopError,
-  AlreadyRunningError,
-  NotRunningError,
-  MissingDependencyError,
-  ErrorRecoveryStrategies,
+  WebSocketMessageRouter,
   wrapError,
-  // Error Constants
-  ErrorCategory,
-  ErrorSeverity,
-  ServerAdapterErrorCode,
 } from "./server/index.js";
 
-// Server Types
+// ============================================================================
+// RAG DOCUMENT PROCESSING - Retrieval-Augmented Generation
+// ============================================================================
+
+// Export RAG types
 export type {
-  AgentExecuteRequest,
-  AgentExecuteResponse,
-  BodyParserConfig,
-  CORSConfig,
-  DataStreamWriter,
-  HealthResponse,
-  HttpMethod,
-  LoggingConfig,
-  MCPServerStatusResponse,
-  MiddlewareDefinition,
-  MiddlewareHandler,
-  RateLimitConfig as ServerRateLimitConfig,
-  ReadyResponse,
-  RequiredServerAdapterConfig,
-  RouteDefinition,
-  RouteGroup,
-  RouteHandler,
-  ServerAdapterConfig,
-  ServerAdapterEvents,
-  ServerAdapterFactoryOptions,
-  ServerContext,
-  ServerFramework,
-  ServerResponse,
-  ServerStatus,
-  SSEWriteOptions,
-  StreamingConfig,
-  ToolExecuteRequest,
-  ToolExecuteResponse,
-  ErrorResponse,
-  ValidationResult,
-  AuthConfig,
-  AuthResult,
-  RateLimitMiddlewareConfig,
-  RateLimitStore,
-  CacheConfig,
-  CacheEntry,
-  CacheStore,
-  ValidationConfig,
-  ValidationSchema,
-  PropertySchema,
-  OpenAPIGeneratorConfig,
-  OpenAPISpec,
-  DataStreamEventType,
-  DataStreamEvent,
-  TextStartEvent,
-  TextDeltaEvent,
-  TextEndEvent,
-  ToolCallEvent,
-  ToolResultEvent,
-  DataEvent,
-  ErrorEvent,
-  FinishEvent,
-  DataStreamWriterConfig,
-  DataStreamResponseConfig,
-  // WebSocket Types
-  WebSocketConfig,
-  WebSocketHandler,
-  WebSocketConnection,
-  WebSocketMessage,
-  WebSocketMessageType,
-  AuthenticatedUser,
-  WebSocketAuthConfig,
-  AuthStrategy,
-  // Error Types
-  ErrorCategoryType,
-  ErrorSeverityType,
-  ServerAdapterErrorCodeType,
-  ServerAdapterErrorContext,
-  // Route Types
-  CreateRoutesOptions,
-} from "./server/index.js";
+  // Chunker configs
+  BaseChunkerConfig,
+  BM25Result,
+  CharacterChunkerConfig,
+  Chunk,
+  ChunkingStrategy,
+  ChunkMetadata,
+  ChunkParams,
+  CitationFormat,
+  // Context
+  ContextAssemblyOptions,
+  ContextWindow,
+  CSVLoaderOptions,
+  // Document types
+  DocumentType,
+  EmbeddingModelConfig,
+  ExtractionResult,
+  // Metadata types
+  ExtractParams,
+  GenerationModelConfig,
+  GraphChunk,
+  GraphEdge,
+  GraphEmbedding,
+  // Graph RAG
+  GraphNode,
+  GraphQueryParams,
+  GraphRAGConfig,
+  GraphStats,
+  HTMLChunkerConfig,
+  // Hybrid search
+  HybridSearchConfig,
+  HybridSearchResult,
+  IngestOptions,
+  JSONChunkerConfig,
+  LaTeXChunkerConfig,
+  // Loader options
+  LoaderOptions,
+  MarkdownChunkerConfig,
+  MDocumentConfig,
+  MetadataFilter,
+  PDFLoaderOptions,
+  PipelineStats,
+  QueryOptions as RAGQueryOptions,
+  // CLI
+  RAGCommandArgs,
+  // RAG Integration
+  RAGConfig,
+  // Pipeline
+  RAGPipelineConfig,
+  RAGResponse,
+  RankedNode,
+  RecursiveChunkerConfig,
+  // Reranker
+  RerankerConfig,
+  RerankerOptions,
+  RerankResult,
+  SemanticChunkerConfig,
+  SentenceChunkerConfig,
+  TokenChunkerConfig,
+  VectorQueryResponse,
+  VectorQueryResult,
+  VectorQueryToolConfig,
+  // Vector types
+  VectorStore,
+  WebLoaderOptions,
+} from "./rag/index.js";
+/**
+ * RAG (Retrieval-Augmented Generation) Document Processing
+ *
+ * Comprehensive RAG system with document loading, chunking, embedding,
+ * retrieval, and context assembly capabilities.
+ *
+ * @example
+ * ```typescript
+ * import {
+ *   MDocument,
+ *   loadDocument,
+ *   RAGPipeline,
+ *   ChunkerRegistry
+ * } from '@juspay/neurolink';
+ *
+ * // Load and process a document
+ * const doc = await loadDocument('/path/to/document.md');
+ * await doc.chunk({ strategy: 'markdown', config: { maxSize: 1000 } });
+ *
+ * // Use the full RAG pipeline
+ * const pipeline = new RAGPipeline({
+ *   embeddingModel: { provider: 'openai', modelName: 'text-embedding-3-small' },
+ *   generationModel: { provider: 'openai', modelName: 'gpt-4o-mini' }
+ * });
+ * await pipeline.ingest(['./docs/*.md']);
+ * const response = await pipeline.query('What are the key features?');
+ * console.log(response.answer);
+ * ```
+ */
+export {
+  // Pipeline
+  assembleContext,
+  // Reranker
+  batchRerank,
+  // Chunking
+  CharacterChunker,
+  ChunkerRegistry,
+  CohereRelevanceScorer,
+  CrossEncoderReranker,
+  // Document Processing
+  CSVLoader,
+  chunkText,
+  createChunker,
+  createContextWindow,
+  // Retrieval
+  createHybridSearch,
+  createRAGPipeline,
+  createVectorQueryTool,
+  // Resilience
+  executeWithCircuitBreaker,
+  // Metadata Extraction
+  extractMetadata,
+  formatContextWithCitations,
+  // Graph RAG
+  GraphRAG,
+  getAvailableStrategies,
+  getCircuitBreaker,
+  getDefaultChunkerConfig,
+  getRecommendedStrategy,
+  HTMLChunker,
+  HTMLLoader,
+  InMemoryBM25Index,
+  InMemoryVectorStore,
+  JSONChunker as RAGJSONChunker,
+  JSONLoader,
+  LaTeXChunker,
+  LLMMetadataExtractor,
+  linearCombination,
+  loadDocument,
+  loadDocuments,
+  MarkdownChunker,
+  MarkdownLoader,
+  MDocument,
+  PDFLoader,
+  // RAG Integration for generate/stream
+  prepareRAGTool,
+  processDocument,
+  RAGCircuitBreaker,
+  type RAGCircuitBreakerConfig,
+  type RAGCircuitBreakerEvents,
+  RAGCircuitBreakerManager,
+  type RAGCircuitBreakerStats,
+  RAGPipeline,
+  RAGRetryHandler,
+  RecursiveChunker,
+  ragCircuitBreakerManager,
+  reciprocalRankFusion,
+  rerank,
+  SemanticChunker,
+  SentenceChunker,
+  simpleRerank,
+  summarizeContext,
+  TextLoader,
+  TokenChunker,
+  WebLoader,
+} from "./rag/index.js";

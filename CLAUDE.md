@@ -120,7 +120,7 @@ src/
 │   ├── memory/           # Conversation memory (Redis, in-memory)
 │   ├── middleware/       # Request/response middleware system
 │   ├── core/             # Core factory and constants
-│   │   └── infrastructure/ # Base factories, registries, errors (Mastra features)
+│   │   └── infrastructure/ # Base factories, registries, errors
 │   ├── config/           # Configuration management
 │   ├── hitl/             # Human-in-the-loop workflows
 │   └── models/           # Model definitions and utilities
@@ -132,7 +132,7 @@ src/
 └── test/                  # Test suites
 
 docs/
-└── mastra-features-implementation/  # Mastra feature docs and guides
+└── implementation-guides/  # Feature implementation docs and guides
 
 dist/                      # Build output (generated)
 ```
@@ -660,6 +660,247 @@ When host apps create wrapper spans before AI operations, auto-detection in `onS
 - In-memory store for development
 - Conversation summarization for long contexts
 
+### RAG Document Processing
+
+NeuroLink provides a comprehensive RAG (Retrieval-Augmented Generation) processing system for document chunking, hybrid search, and result reranking. The system follows the Factory + Registry pattern used throughout NeuroLink, enabling extensible and pluggable components for building production RAG pipelines.
+
+**Chunking Strategies:**
+
+NeuroLink supports 10 chunking strategies via `ChunkerFactory` and `ChunkerRegistry`:
+
+| Strategy            | Description                                     | Use Case                    |
+| ------------------- | ----------------------------------------------- | --------------------------- |
+| `character`         | Fixed character-count chunks with overlap       | Simple text, logs           |
+| `recursive`         | Hierarchical splitting by separators            | General-purpose documents   |
+| `sentence`          | Sentence-boundary aware splitting               | Natural language text       |
+| `token`             | Token-count based chunks (model-aware)          | LLM context optimization    |
+| `markdown`          | Markdown structure-aware (headers, code blocks) | Documentation, READMEs      |
+| `html`              | HTML element-aware parsing                      | Web content, scraped pages  |
+| `json`              | JSON structure-preserving chunks                | API responses, config files |
+| `latex`             | LaTeX document structure (sections, equations)  | Academic papers, math docs  |
+| `semantic`          | Semantic similarity-based chunking              | Context-aware splitting     |
+| `semantic-markdown` | Semantic sections within markdown               | Technical documentation     |
+
+**Reranker Types:**
+
+NeuroLink provides 5 reranker types via `RerankerFactory` and `RerankerRegistry`:
+
+| Type            | LLM Required | Status      | Description                                 |
+| --------------- | ------------ | ----------- | ------------------------------------------- |
+| `simple`        | No           | Functional  | Keyword/TF-IDF based scoring, fast and free |
+| `llm`           | Yes          | Functional  | Single LLM call for relevance scoring       |
+| `batch`         | Yes          | Functional  | Batched LLM calls for large result sets     |
+| `cross-encoder` | No           | Placeholder | Cross-encoder model integration (future)    |
+| `cohere`        | No           | Placeholder | Cohere Rerank API integration (future)      |
+
+**Hybrid Search:**
+
+Combines BM25 lexical search with vector similarity for improved retrieval accuracy:
+
+- **BM25 Index:** In-memory BM25 implementation (`InMemoryBM25Index`) for keyword matching
+- **Vector Search:** Integrates with NeuroLink's vector store adapters
+- **Fusion Methods:**
+  - `reciprocalRankFusion` (RRF) - Rank-based combination, robust to score scale differences
+  - `linearCombination` - Weighted score combination with configurable alpha
+
+**Key Exports:**
+
+```typescript
+// Chunking
+import {
+  createChunker,
+  ChunkerRegistry,
+  getAvailableStrategies,
+} from "@juspay/neurolink";
+
+// Reranking
+import {
+  createReranker,
+  RerankerRegistry,
+  simpleRerank,
+} from "@juspay/neurolink";
+
+// Hybrid Search
+import {
+  createHybridSearch,
+  InMemoryBM25Index,
+  reciprocalRankFusion,
+} from "@juspay/neurolink";
+
+// Pipeline
+import { RAGPipeline, MDocument, loadDocument } from "@juspay/neurolink";
+```
+
+**Example - Complete RAG Workflow:**
+
+```typescript
+import {
+  createChunker,
+  createHybridSearch,
+  createReranker,
+  MDocument,
+  InMemoryBM25Index,
+} from "@juspay/neurolink";
+
+// 1. Chunk documents
+const chunker = createChunker("recursive", {
+  chunkSize: 512,
+  chunkOverlap: 50,
+});
+
+const doc = new MDocument({ content: documentText, type: "text" });
+const chunks = await chunker.chunk(doc);
+
+// 2. Build search indices
+const bm25Index = new InMemoryBM25Index();
+await bm25Index.addDocuments(chunks.map((c) => c.content));
+
+// 3. Hybrid search (BM25 + vector)
+const hybridSearch = createHybridSearch({
+  bm25Index,
+  vectorStore, // Your configured vector store
+  fusionMethod: "rrf",
+  bm25Weight: 0.3,
+  vectorWeight: 0.7,
+});
+
+const searchResults = await hybridSearch.search(query, { topK: 20 });
+
+// 4. Rerank results
+const reranker = createReranker("simple", {
+  weights: { keywordMatch: 0.4, positionBoost: 0.3, lengthPenalty: 0.3 },
+});
+
+const rerankedResults = await reranker.rerank(query, searchResults, {
+  topK: 5,
+});
+
+// 5. Use top results for generation
+const context = rerankedResults.map((r) => r.content).join("\n\n");
+const response = await neurolink.generate({
+  prompt: `Context:\n${context}\n\nQuestion: ${query}`,
+});
+```
+
+**Key Files:**
+
+| File                                           | Purpose                                 |
+| ---------------------------------------------- | --------------------------------------- |
+| `src/lib/rag/ChunkerFactory.ts`                | Factory for creating chunker instances  |
+| `src/lib/rag/ChunkerRegistry.ts`               | Registry for chunking strategies        |
+| `src/lib/rag/reranker/RerankerFactory.ts`      | Factory for creating reranker instances |
+| `src/lib/rag/reranker/RerankerRegistry.ts`     | Registry for reranker types             |
+| `src/lib/rag/retrieval/hybridSearch.ts`        | Hybrid search implementation            |
+| `src/lib/rag/retrieval/vectorQueryTool.ts`     | createVectorQueryTool factory           |
+| `src/lib/rag/retrieval/InMemoryVectorStore.ts` | In-memory vector store for testing      |
+| `src/lib/rag/pipeline/RAGPipeline.ts`          | End-to-end RAG pipeline orchestration   |
+
+**Configuration Options:**
+
+Chunkers and rerankers can be configured via options:
+
+```typescript
+// Chunker options
+const chunker = createChunker("token", {
+  chunkSize: 256, // Target chunk size
+  chunkOverlap: 32, // Overlap between chunks
+  tokenizer: "cl100k_base", // Tokenizer for token-based chunking
+});
+
+// Reranker options
+const reranker = createReranker("llm", {
+  model: "gpt-4o-mini", // LLM model for scoring
+  batchSize: 10, // Documents per batch
+  scoreThreshold: 0.5, // Minimum relevance score
+});
+
+// Hybrid search options
+const hybridSearch = createHybridSearch({
+  fusionMethod: "linear", // 'rrf' or 'linear'
+  rrf_k: 60, // RRF constant (default: 60)
+  alpha: 0.5, // Linear combination weight for vector scores
+});
+```
+
+### RAG Integration with generate()/stream()
+
+**Simplified API (Recommended):** Pass `rag: { files: [...] }` directly to `generate()` or `stream()`. NeuroLink handles file loading, chunking, embedding, vector storage, and tool creation automatically. The AI model receives a `search_knowledge_base` tool it can invoke to search the indexed documents.
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+// Generate with RAG - just pass files
+const result = await neurolink.generate({
+  prompt: "What are the key features described in the docs?",
+  rag: {
+    files: ["./docs/guide.md", "./docs/api.md"],
+    strategy: "markdown", // Optional: auto-detected from extension
+    chunkSize: 512, // Optional: default 1000
+    chunkOverlap: 50, // Optional: default 200
+    topK: 5, // Optional: default 5
+  },
+});
+
+// Stream with RAG - same API
+const stream = await neurolink.stream({
+  prompt: "Summarize the architecture",
+  rag: { files: ["./docs/architecture.md"] },
+});
+```
+
+**`RAGConfig` type:**
+
+```typescript
+type RAGConfig = {
+  files: string[]; // Required: file paths to load
+  strategy?: ChunkingStrategy; // Default: auto-detected from file extension
+  chunkSize?: number; // Default: 1000
+  chunkOverlap?: number; // Default: 200
+  topK?: number; // Default: 5
+  toolName?: string; // Default: "search_knowledge_base"
+  toolDescription?: string; // Custom tool description for the AI
+  embeddingProvider?: string; // Defaults to generation provider
+  embeddingModel?: string; // Defaults to provider's default
+};
+```
+
+**CLI Usage:**
+
+```bash
+neurolink generate "What is this about?" --rag-files ./docs/guide.md
+neurolink generate "Explain chunking" --rag-files ./docs/guide.md --rag-strategy markdown --rag-chunk-size 512
+neurolink stream "Summarize" --rag-files ./docs/a.md ./docs/b.md --rag-top-k 10
+```
+
+**Advanced API:** For full control over embeddings and vector stores, use `createVectorQueryTool` directly:
+
+```typescript
+const ragTool = createVectorQueryTool(config, vectorStore);
+
+const result = await neurolink.generate({
+  input: { text: "query" },
+  tools: { [ragTool.name]: ragTool },
+});
+```
+
+**Streaming Tool Architecture:**
+
+`BaseProvider.stream()` centrally pre-merges base tools (MCP/built-in) with user-provided tools (including RAG) into `options.tools` before calling provider-specific `executeStream()`. All 10 providers now support external tools in streaming via this central merge pattern. Individual providers use `options.tools || await this.getAllTools()` as a defensive fallback.
+
+**Key Files:**
+
+| File                                           | Purpose                                      |
+| ---------------------------------------------- | -------------------------------------------- |
+| `src/lib/rag/ragIntegration.ts`                | `prepareRAGTool()` - auto RAG pipeline setup |
+| `src/lib/rag/types.ts`                         | `RAGConfig` type definition                  |
+| `src/lib/rag/retrieval/vectorQueryTool.ts`     | `createVectorQueryTool` factory (Zod params) |
+| `src/lib/rag/retrieval/InMemoryVectorStore.ts` | In-memory vector store for testing           |
+| `src/lib/core/baseProvider.ts`                 | Central tool merge in `stream()`             |
+| `src/lib/neurolink.ts`                         | RAG auto-injection in generate/stream        |
+| `src/cli/factories/commandFactory.ts`          | CLI `--rag-files` flags                      |
+
 ## Important Constraints
 
 1. **No Circular Dependencies:** All providers use dynamic imports in registry
@@ -718,7 +959,7 @@ NeuroLink has been enhanced with new set of features to transform it from a unif
 | **Server Adapters**          | 100%     | ✅ Complete | 4 adapters (Hono, Express, Fastify, Koa), 5 route groups                     |
 | **RAG Processing**           | 100%     | ✅ Complete | 9 chunkers, hybrid search, RerankerFactory/Registry                          |
 | **MCP Enhancements**         | 100%     | ✅ Complete | ToolRouter, ToolCache, RequestBatcher (1,702 new lines)                      |
-| **Streaming Architecture**   | 100%     | ✅ Complete | All 4 Mastra patterns, 24 event types, backpressure                          |
+| **Streaming Architecture**   | 100%     | ✅ Complete | All 4 streaming patterns, 24 event types, backpressure                       |
 | **Hooks/Events**             | 100%     | ✅ Complete | HooksManager (518 lines), PubSubManager (378 lines), 117 tests               |
 | **Storage Abstraction**      | 100%     | ✅ Complete | 8 adapters, 3 middleware, MigrationRunner, 282 tests                         |
 | **Dynamic Arguments**        | 100%     | ✅ Complete | CLI context flags, runtime resolution, 269 tests                             |
@@ -778,7 +1019,7 @@ src/lib/deployment/             # Deployment system (100% complete)
 
 ### Feature Documentation
 
-Full implementation guides in `docs/mastra-features-implementation/`:
+Full implementation guides in `docs/implementation-guides/`:
 
 | Document                            | Purpose                                        |
 | ----------------------------------- | ---------------------------------------------- |
@@ -819,6 +1060,6 @@ New core infrastructure in `src/lib/core/infrastructure/`:
 - Full documentation in `docs/` directory
 - README.md has comprehensive feature overview
 - Each major feature has dedicated guide in `docs/features/`
-- Mastra features in `docs/mastra-features-implementation/`
+- Implementation guides in `docs/implementation-guides/`
 - API reference in `docs/sdk/api-reference.md`
 - CLI reference in `docs/cli/commands.md`

@@ -1,0 +1,62 @@
+[
+  {
+    "query": "machine learning algorithms and techniques",
+    "expectedKeywords": ["machine", "learning", "algorithms"],
+    "minResults": 3,
+    "description": "General ML query covering algorithms"
+  },
+  {
+    "query": "neural network architecture layers",
+    "expectedKeywords": ["neural", "network", "layer"],
+    "minResults": 2,
+    "description": "Query about neural network structure"
+  },
+  {
+    "query": "data preprocessing pipeline",
+    "expectedKeywords": ["data", "preprocessing", "pipeline"],
+    "minResults": 2,
+    "description": "Data processing related query"
+  },
+  {
+    "query": "supervised learning classification",
+    "expectedKeywords": ["supervised", "learning", "classification"],
+    "minResults": 2,
+    "description": "Supervised learning focus query"
+  },
+  {
+    "query": "feature engineering techniques",
+    "expectedKeywords": ["feature", "engineering"],
+    "minResults": 1,
+    "description": "Feature engineering query"
+  },
+  {
+    "query": "model evaluation metrics accuracy",
+    "expectedKeywords": ["evaluation", "metrics", "accuracy"],
+    "minResults": 2,
+    "description": "Model evaluation query"
+  },
+  {
+    "query": "deep learning convolutional networks",
+    "expectedKeywords": ["deep", "learning", "convolutional"],
+    "minResults": 1,
+    "description": "Deep learning specific query"
+  },
+  {
+    "query": "clustering unsupervised learning",
+    "expectedKeywords": ["clustering", "unsupervised"],
+    "minResults": 1,
+    "description": "Unsupervised learning query"
+  },
+  {
+    "query": "reinforcement learning agents",
+    "expectedKeywords": ["reinforcement", "learning", "agent"],
+    "minResults": 1,
+    "description": "Reinforcement learning query"
+  },
+  {
+    "query": "production deployment monitoring",
+    "expectedKeywords": ["production", "deployment", "monitoring"],
+    "minResults": 1,
+    "description": "ML ops and production query"
+  }
+]

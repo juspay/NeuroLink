@@ -1,0 +1,57 @@
+[
+  {
+    "type": "simple",
+    "config": {
+      "topK": 3,
+      "weights": {
+        "vector": 0.8,
+        "position": 0.2
+      }
+    },
+    "description": "Simple position and vector score-based reranking"
+  },
+  {
+    "type": "llm",
+    "config": {
+      "topK": 3,
+      "weights": {
+        "semantic": 0.4,
+        "vector": 0.4,
+        "position": 0.2
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    "description": "LLM-powered semantic reranking"
+  },
+  {
+    "type": "cross-encoder",
+    "config": {
+      "topK": 3,
+      "model": "ms-marco-MiniLM-L-6-v2"
+    },
+    "description": "Cross-encoder model reranking"
+  },
+  {
+    "type": "cohere",
+    "config": {
+      "topK": 3,
+      "model": "rerank-v3.5"
+    },
+    "description": "Cohere Rerank API"
+  },
+  {
+    "type": "batch",
+    "config": {
+      "topK": 5,
+      "weights": {
+        "semantic": 0.4,
+        "vector": 0.4,
+        "position": 0.2
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    "description": "Batch LLM reranking for large result sets"
+  }
+]

@@ -588,6 +588,64 @@ neurolink server openapi --format yaml -o openapi.yaml
 - Combine with `--enableAnalytics --enableEvaluation` to capture usage costs and quality scores in automation pipelines.
 - Use `--output <file>` to persist raw responses alongside JSON logs.
 
+## rag \<subcommand\>
+
+Document processing and RAG pipeline commands.
+
+| Subcommand | Description                                 |
+| ---------- | ------------------------------------------- |
+| `chunk`    | Chunk a document using a specified strategy |
+| `index`    | Index documents into a vector store         |
+| `query`    | Query indexed documents                     |
+
+### rag chunk
+
+Chunk a document file into smaller pieces for RAG processing.
+
+```bash
+neurolink rag chunk <file> [options]
+```
+
+| Option            | Alias | Type   | Default     | Description                |
+| ----------------- | ----- | ------ | ----------- | -------------------------- |
+| `--strategy`      | `-s`  | string | `recursive` | Chunking strategy          |
+| `--chunk-size`    |       | number | `1000`      | Maximum chunk size         |
+| `--chunk-overlap` |       | number | `200`       | Overlap between chunks     |
+| `--output`        | `-o`  | string | stdout      | Output file path           |
+| `--format`        | `-f`  | string | `text`      | Output format (text, json) |
+
+**Chunking Strategies:** `character`, `recursive`, `sentence`, `token`, `markdown`, `html`, `json`, `latex`, `semantic`, `semantic-markdown`
+
+**Examples:**
+
+```bash
+# Default chunking
+neurolink rag chunk ./docs/guide.md
+
+# Markdown-aware chunking with JSON output
+neurolink rag chunk ./docs/guide.md --strategy markdown --format json
+
+# Custom size and overlap
+neurolink rag chunk ./docs/guide.md --chunk-size 512 --chunk-overlap 50 --output chunks.json
+```
+
+### RAG Flags on generate/stream
+
+RAG can also be used directly with `generate` and `stream` commands via `--rag-files`:
+
+```bash
+neurolink generate "What is this about?" --rag-files ./docs/guide.md
+neurolink stream "Summarize" --rag-files ./docs/a.md ./docs/b.md --rag-top-k 10
+```
+
+| Flag                  | Type     | Default       | Description                         |
+| --------------------- | -------- | ------------- | ----------------------------------- |
+| `--rag-files`         | string[] | -             | File paths to load for RAG context  |
+| `--rag-strategy`      | string   | auto-detected | Chunking strategy for RAG documents |
+| `--rag-chunk-size`    | number   | 1000          | Maximum chunk size in characters    |
+| `--rag-chunk-overlap` | number   | 200           | Overlap between adjacent chunks     |
+| `--rag-top-k`         | number   | 5             | Number of top results to retrieve   |
+
 ## Troubleshooting
 
 | Issue                              | Tip                                                                                                      |

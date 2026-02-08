@@ -1,32 +1,32 @@
-import { AIProviderName } from "../constants/enums.js";
 import type {
   LanguageModelV1,
   LanguageModelV1CallOptions,
   LanguageModelV1StreamPart,
+  Schema,
 } from "ai";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import type { Schema } from "ai";
+import type { AIProviderName } from "../constants/enums.js";
+import { createAnalytics } from "../core/analytics.js";
 import { BaseProvider } from "../core/baseProvider.js";
-import { logger } from "../utils/logger.js";
+import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { modelConfig } from "../core/modelConfiguration.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import { TimeoutError } from "../utils/timeout.js";
-import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
-import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
+import type { JsonValue } from "../types/common.js";
 import type {
-  MultimodalChatMessage,
   MessageContent,
+  MultimodalChatMessage,
 } from "../types/conversation.js";
 import type {
   OllamaMessage,
   OllamaToolCall,
   OllamaToolResult,
 } from "../types/providers.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { ToolArgs } from "../types/tools.js";
-import type { JsonValue } from "../types/common.js";
-import { DEFAULT_MAX_STEPS } from "../core/constants.js";
-import { createAnalytics } from "../core/analytics.js";
+import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import { logger } from "../utils/logger.js";
+import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
+import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
+import { TimeoutError } from "../utils/timeout.js";
 
 // Model version constants (configurable via environment)
 const DEFAULT_OLLAMA_MODEL = "llama3.1:8b";
@@ -813,7 +813,10 @@ export class OllamaProvider extends BaseProvider {
     let iteration = 0;
 
     // Get all available tools (direct + MCP + external)
-    const allTools = await this.getAllTools();
+    // BaseProvider.stream() pre-merges base tools + external tools into options.tools
+    const allTools =
+      (options.tools as Record<string, import("ai").Tool>) ||
+      (await this.getAllTools());
     // Convert tools to Ollama format
     const ollamaTools = this.convertToolsToOllamaFormat(allTools);
 
@@ -950,7 +953,6 @@ export class OllamaProvider extends BaseProvider {
               conversationHistory.push(toolMessage);
 
               iteration++;
-              continue; // Next iteration
             } else if (finishReason === "length") {
               // Max tokens reached, continue conversation
               logger.debug(`[OllamaProvider] Max tokens reached, continuing`);
@@ -959,7 +961,6 @@ export class OllamaProvider extends BaseProvider {
                 content: "Please continue.",
               });
               iteration++;
-              continue;
             } else {
               // Unknown finish reason, end conversation
               logger.warn(

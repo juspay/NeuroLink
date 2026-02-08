@@ -23,7 +23,7 @@ NeuroLink server adapters support multiple authentication strategies out of the 
 Bearer tokens (JWT, OAuth tokens) are the most common authentication method for APIs:
 
 ```typescript
-import { createServer, createAuthMiddleware } from "@juspay/neurolink/server";
+import { createServer, createAuthMiddleware } from "@juspay/neurolink";
 import jwt from "jsonwebtoken";
 
 const server = await createServer(neurolink, {
@@ -205,7 +205,7 @@ const server = await createServer(neurolink, {
 The default behavior limits requests by client IP:
 
 ```typescript
-import { createRateLimitMiddleware } from "@juspay/neurolink/server";
+import { createRateLimitMiddleware } from "@juspay/neurolink";
 
 server.registerMiddleware(
   createRateLimitMiddleware({
@@ -274,7 +274,7 @@ server.registerMiddleware(
 For smoother rate limiting that prevents burst-and-wait patterns:
 
 ```typescript
-import { createSlidingWindowRateLimitMiddleware } from "@juspay/neurolink/server";
+import { createSlidingWindowRateLimitMiddleware } from "@juspay/neurolink";
 
 server.registerMiddleware(
   createSlidingWindowRateLimitMiddleware({
@@ -371,7 +371,7 @@ const server = await createServer(neurolink, {
 For custom streaming routes:
 
 ```typescript
-import { createStreamRedactor } from "@juspay/neurolink/server";
+import { createStreamRedactor } from "@juspay/neurolink";
 
 const redactor = createStreamRedactor({
   enabled: true,
@@ -466,7 +466,7 @@ The recommended approach is to use NeuroLink's built-in security headers middlew
 import {
   createServer,
   createSecurityHeadersMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "hono", // Works with: hono, express, fastify, koa
@@ -521,7 +521,7 @@ import { NeuroLink } from "@juspay/neurolink";
 import {
   createServer,
   createSecurityHeadersMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({ defaultProvider: "openai" });
 
@@ -549,7 +549,7 @@ import { NeuroLink } from "@juspay/neurolink";
 import {
   createServer,
   createSecurityHeadersMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({ defaultProvider: "anthropic" });
 
@@ -579,7 +579,7 @@ import { NeuroLink } from "@juspay/neurolink";
 import {
   createServer,
   createSecurityHeadersMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({ defaultProvider: "openai" });
 
@@ -606,7 +606,7 @@ import { NeuroLink } from "@juspay/neurolink";
 import {
   createServer,
   createSecurityHeadersMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({ defaultProvider: "openai" });
 
@@ -839,7 +839,7 @@ import {
   createAuthMiddleware,
   createRateLimitMiddleware,
   createRoleMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",

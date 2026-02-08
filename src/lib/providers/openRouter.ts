@@ -1,22 +1,22 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { type LanguageModelV1, Output, type Schema, streamText } from "ai";
 import type { ZodType, ZodTypeDef } from "zod";
-import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
 import { AIProviderName } from "../constants/enums.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import { BaseProvider } from "../core/baseProvider.js";
+import { DEFAULT_MAX_STEPS } from "../core/constants.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import type { NeuroLink } from "../neurolink.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type { UnknownRecord } from "../types/common.js";
 import type {
   OpenRouterConfig,
-  OpenRouterModelsResponse,
   OpenRouterModelInfo,
+  OpenRouterModelsResponse,
 } from "../types/providers.js";
-import type { NeuroLink } from "../neurolink.js";
-import { BaseProvider } from "../core/baseProvider.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 import { getProviderModel } from "../utils/providerConfig.js";
-import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
-import { DEFAULT_MAX_STEPS } from "../core/constants.js";
-import { createProxyFetch } from "../proxy/proxyFetch.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 
 // Constants
 const MODELS_DISCOVERY_TIMEOUT_MS = 5000; // 5 seconds for model discovery
@@ -288,8 +288,12 @@ export class OpenRouterProvider extends BaseProvider {
       const model = await this.getAISDKModelWithMiddleware(options);
 
       // Get all available tools (direct + MCP + external) for streaming
+      // BaseProvider.stream() pre-merges base tools + external tools into options.tools
       const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools ? await this.getAllTools() : {};
+      const tools: Record<string, import("ai").Tool> = shouldUseTools
+        ? (options.tools as Record<string, import("ai").Tool>) ||
+          (await this.getAllTools())
+        : {};
 
       logger.debug(`OpenRouter: Tools for streaming`, {
         shouldUseTools,

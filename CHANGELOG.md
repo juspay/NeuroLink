@@ -2,7 +2,22 @@
 
 ### Features
 
+- **(rag):** add `rag: { files }` option to generate() and stream() for automatic RAG pipeline setup
+- **(rag):** add `--rag-files`, `--rag-strategy`, `--rag-chunk-size`, `--rag-chunk-overlap`, `--rag-top-k` CLI flags
+- **(rag):** add 10 chunking strategies with infinite loop protection and input validation
+- **(rag):** add RerankerFactory/Registry with 5 reranker types (simple, llm, batch, cross-encoder, cohere)
+- **(rag):** add hybrid search with BM25 + vector similarity (RRF and linear combination fusion)
+- **(rag):** migrate createVectorQueryTool parameters from JSON Schema to Zod for Vercel AI SDK compatibility
+- **(streaming):** add central tool merge in BaseProvider.stream() for all 10 providers
+- **(streaming):** fix external tool availability in streaming for openRouter, amazonBedrock, ollama, huggingFace, litellm, mistral, anthropic, openAI providers
 - **(multimodal):** add file processor system with 17+ file types and SVG text injection ([9a7b585](https://github.com/juspay/neurolink/commit/9a7b5851e562f7bd55164d1c3dca42d8f18cc827))
+
+### Bug Fixes
+
+- **(rag):** fix infinite loops in markdown, html, latex, semantic, recursive chunkers with forward progress guarantees
+- **(rag):** fix missing semantic-markdown strategy registration in ChunkerRegistry
+- **(rag):** fix BM25 division-by-zero guard and hybridSearch embed() validation
+- **(rag):** fix overlap >= maxSize validation across all chunkers
 
 ## [9.1.1](https://github.com/juspay/neurolink/compare/v9.1.0...v9.1.1) (2026-02-05)
 

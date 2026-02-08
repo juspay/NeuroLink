@@ -9,6 +9,7 @@ import { logger } from "../lib/utils/logger.js";
 import { SetupCommandFactory } from "./factories/setupCommandFactory.js";
 import { ServerCommandFactory } from "./commands/server.js";
 import { ServeCommandFactory } from "./commands/serve.js";
+import { ragCommand } from "./commands/rag.js";
 
 // Enhanced CLI with Professional UX
 export function initializeCliParser() {
@@ -202,5 +203,8 @@ export function initializeCliParser() {
 
       // Serve Command - Simplified server start - Using ServeCommandFactory
       .command(ServeCommandFactory.createServeCommands())
+
+      // RAG Document Processing Commands
+      .command(ragCommand)
   ); // Close the main return statement
 }

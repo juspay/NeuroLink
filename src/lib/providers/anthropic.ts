@@ -1,26 +1,26 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { streamText, type LanguageModelV1 } from "ai";
-import type { ValidationSchema } from "../types/typeAliases.js";
-import { AIProviderName, AnthropicModels } from "../constants/enums.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { UnknownRecord, JsonValue } from "../types/common.js";
-import type { NeuroLink } from "../neurolink.js";
+import { type LanguageModelV1, streamText, type Tool } from "ai";
+import { type AIProviderName, AnthropicModels } from "../constants/enums.js";
 import { BaseProvider } from "../core/baseProvider.js";
-import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
+import { DEFAULT_MAX_STEPS } from "../core/constants.js";
+import type { NeuroLink } from "../neurolink.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
+import type { JsonValue, UnknownRecord } from "../types/common.js";
 import {
   AuthenticationError,
   NetworkError,
   ProviderError,
   RateLimitError,
 } from "../types/errors.js";
-import { DEFAULT_MAX_STEPS } from "../core/constants.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type { ValidationSchema } from "../types/typeAliases.js";
+import { logger } from "../utils/logger.js";
 import {
-  validateApiKey,
   createAnthropicConfig,
   getProviderModel,
+  validateApiKey,
 } from "../utils/providerConfig.js";
-import { createProxyFetch } from "../proxy/proxyFetch.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 
 // Configuration helpers - now using consolidated utility
 const getAnthropicApiKey = (): string => {
@@ -152,9 +152,12 @@ export class AnthropicProvider extends BaseProvider {
     );
 
     try {
-      // ✅ Get tools for streaming (same as generate method)
+      // Get tools - options.tools is pre-merged by BaseProvider.stream() with
+      // base tools (MCP/built-in) + user-provided tools (RAG, etc.)
       const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools ? await this.getAllTools() : {};
+      const tools = shouldUseTools
+        ? (options.tools as Record<string, Tool>) || (await this.getAllTools())
+        : {};
 
       // Build message array from options with multimodal support
       // Using protected helper from BaseProvider to eliminate code duplication

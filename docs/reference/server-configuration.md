@@ -126,7 +126,7 @@ The Swagger UI provides an interactive interface where you can:
 ### Example: Basic Configuration
 
 ```typescript
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   config: {
@@ -394,7 +394,7 @@ const server = await createServer(neurolink, {
 ### Authentication Middleware
 
 ```typescript
-import { createAuthMiddleware } from "@juspay/neurolink/server";
+import { createAuthMiddleware } from "@juspay/neurolink";
 
 const authMiddleware = createAuthMiddleware({
   type: "bearer", // 'bearer' | 'api-key' | 'basic' | 'custom'
@@ -426,7 +426,7 @@ server.registerMiddleware(authMiddleware);
 import {
   createRateLimitMiddleware,
   createSlidingWindowRateLimitMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Fixed window rate limiter
 const rateLimiter = createRateLimitMiddleware({
@@ -448,10 +448,7 @@ server.registerMiddleware(rateLimiter);
 ### Cache Middleware
 
 ```typescript
-import {
-  createCacheMiddleware,
-  InMemoryCacheStore,
-} from "@juspay/neurolink/server";
+import { createCacheMiddleware, InMemoryCacheStore } from "@juspay/neurolink";
 
 const cacheMiddleware = createCacheMiddleware({
   ttlMs: 60 * 1000, // 1 minute cache
@@ -484,7 +481,7 @@ The cache middleware adds these headers to responses:
 import {
   createRequestValidationMiddleware,
   createFieldValidator,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // JSON Schema validation
 const validationMiddleware = createRequestValidationMiddleware({
@@ -514,7 +511,7 @@ server.registerMiddleware(validationMiddleware);
 ### Role-Based Access Control
 
 ```typescript
-import { createRoleMiddleware } from "@juspay/neurolink/server";
+import { createRoleMiddleware } from "@juspay/neurolink";
 
 // Require any of the specified roles
 const adminMiddleware = createRoleMiddleware({
@@ -535,7 +532,7 @@ const superAdminMiddleware = createRoleMiddleware({
 ### Hono
 
 ```typescript
-import { ServerAdapterFactory } from "@juspay/neurolink/server";
+import { ServerAdapterFactory } from "@juspay/neurolink";
 
 const server = await ServerAdapterFactory.createHono(neurolink, {
   port: 3000,
@@ -595,7 +592,7 @@ import {
   createAuthMiddleware,
   createRateLimitMiddleware,
   createCacheMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 import { NeuroLink } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
@@ -819,7 +816,7 @@ Any state ─────────► ┌────────────
 Attempting an operation in an invalid state throws `InvalidLifecycleStateError`:
 
 ```typescript
-import { InvalidLifecycleStateError } from "@juspay/neurolink/server";
+import { InvalidLifecycleStateError } from "@juspay/neurolink";
 
 try {
   await server.start(); // Called when already running
@@ -954,11 +951,8 @@ When `stop()` is called, the server follows this sequence:
 ### Shutdown Example
 
 ```typescript
-import { createServer } from "@juspay/neurolink/server";
-import {
-  ShutdownTimeoutError,
-  DrainTimeoutError,
-} from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
+import { ShutdownTimeoutError, DrainTimeoutError } from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "hono",
@@ -1141,7 +1135,7 @@ await server.start();
 ### Event-Based Metrics Collection
 
 ```typescript
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const metrics = {
   requests: 0,
@@ -1195,7 +1189,7 @@ NeuroLink includes a powerful OpenAPI 3.1 specification generator that creates c
 The `OpenAPIGenerator` class is the core component for generating OpenAPI specifications.
 
 ```typescript
-import { OpenAPIGenerator } from "@juspay/neurolink/server";
+import { OpenAPIGenerator } from "@juspay/neurolink";
 
 const generator = new OpenAPIGenerator({
   // Customize API info
@@ -1273,10 +1267,7 @@ NeuroLink provides pre-defined JSON schemas for common API types.
 #### Error and Response Schemas
 
 ```typescript
-import {
-  ErrorResponseSchema,
-  TokenUsageSchema,
-} from "@juspay/neurolink/server";
+import { ErrorResponseSchema, TokenUsageSchema } from "@juspay/neurolink";
 
 // ErrorResponseSchema
 // - error.code (string): Error code identifier
@@ -1303,7 +1294,7 @@ import {
   AgentExecuteResponseSchema,
   AgentInputSchema,
   ProviderInfoSchema,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // AgentExecuteRequestSchema
 // - input (string | object): Agent input
@@ -1335,7 +1326,7 @@ import {
   ToolExecuteResponseSchema,
   ToolListResponseSchema,
   ToolParameterSchema,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // ToolDefinitionSchema
 // - name (string): Tool name
@@ -1363,7 +1354,7 @@ import {
   MCPServerStatusSchema,
   MCPServersListResponseSchema,
   MCPServerToolSchema,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // MCPServerStatusSchema
 // - serverId (string): Server ID
@@ -1381,7 +1372,7 @@ import {
   HealthResponseSchema,
   ReadyResponseSchema,
   MetricsResponseSchema,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // HealthResponseSchema
 // - status (string): ok | degraded | unhealthy
@@ -1409,7 +1400,7 @@ import {
   createPostOperation,
   createStreamingPostOperation,
   createDeleteOperation,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // GET operation
 const getOp = createGetOperation(
@@ -1455,7 +1446,7 @@ import {
   createQueryParameter,
   createHeaderParameter,
   CommonParameters,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Path parameter
 const userIdParam = createPathParameter(
@@ -1494,7 +1485,7 @@ import {
   BearerSecurityScheme,
   ApiKeySecurityScheme,
   BasicSecurityScheme,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Bearer token (JWT)
 // {
@@ -1587,7 +1578,7 @@ import {
   createPathParameter,
   createQueryParameter,
   BearerSecurityScheme,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Create generator with full customization
 const generator = new OpenAPIGenerator({
@@ -1706,7 +1697,7 @@ import {
   createOpenAPIGenerator,
   generateOpenAPISpec,
   generateOpenAPIFromConfig,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Create generator with config
 const generator = createOpenAPIGenerator({
@@ -1729,7 +1720,7 @@ const spec = generateOpenAPIFromConfig(serverConfig, routes);
 The `OpenAPISchemas` registry provides access to all built-in schemas:
 
 ```typescript
-import { OpenAPISchemas } from "@juspay/neurolink/server";
+import { OpenAPISchemas } from "@juspay/neurolink";
 
 // Common
 OpenAPISchemas.ErrorResponse;

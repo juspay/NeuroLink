@@ -1,8 +1,3 @@
----
-title: Structured Output with JSON Schema
-description: Generate type-safe JSON responses using Zod schemas for validation and structure
----
-
 # Structured Output with JSON Schema
 
 ## Problem

@@ -1,5 +1,7 @@
 # MCP Concurrency Control Guide
 
+> ⚠️ **PLANNED FEATURE**: This documentation describes features that are planned but not yet implemented. The `SemaphoreManager` class referenced in this guide does not currently exist in the codebase. The code examples are illustrative of the intended API design.
+
 **NeuroLink Enhanced MCP Platform - Concurrency Management**
 
 ---
@@ -92,7 +94,7 @@ export class MCPOrchestrator {
 ### **Basic Usage**
 
 ```typescript
-import { SemaphoreManager } from "@juspay/neurolink/mcp";
+import { SemaphoreManager } from "@juspay/neurolink";
 
 const semaphoreManager = new SemaphoreManager();
 

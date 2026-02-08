@@ -95,7 +95,7 @@ NeuroLink defines 8 event types for comprehensive streaming:
 The `DataStreamWriter` interface provides methods for writing structured stream events:
 
 ```typescript
-import { createDataStreamWriter } from "@juspay/neurolink/server";
+import { createDataStreamWriter } from "@juspay/neurolink";
 
 const writer = createDataStreamWriter({
   write: (chunk: string) => res.write(chunk),
@@ -159,7 +159,7 @@ For convenience, use `DataStreamResponse` to create a complete streaming respons
 import {
   DataStreamResponse,
   createDataStreamResponse,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Option 1: Using the class directly
 const streamResponse = new DataStreamResponse({
@@ -301,10 +301,7 @@ while (true) {
 ### Header Helper Functions
 
 ```typescript
-import {
-  createSSEHeaders,
-  createNDJSONHeaders,
-} from "@juspay/neurolink/server";
+import { createSSEHeaders, createNDJSONHeaders } from "@juspay/neurolink";
 
 // SSE headers
 const sseHeaders = createSSEHeaders({
@@ -339,10 +336,7 @@ const ndjsonHeaders = createNDJSONHeaders({
 Configure streaming behavior in route definitions:
 
 ```typescript
-import type {
-  StreamingConfig,
-  RouteDefinition,
-} from "@juspay/neurolink/server";
+import type { StreamingConfig, RouteDefinition } from "@juspay/neurolink";
 
 const streamingConfig: StreamingConfig = {
   enabled: true,
@@ -379,7 +373,7 @@ const customStreamRoute: RouteDefinition = {
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer, DataStreamResponse } from "@juspay/neurolink/server";
+import { createServer, DataStreamResponse } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({ defaultProvider: "openai" });
 
@@ -444,7 +438,7 @@ await server.start();
 import {
   DataStreamResponse,
   pipeAsyncIterableToDataStream,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 server.registerRoute({
   method: "POST",
@@ -510,7 +504,7 @@ server.registerRoute({
 ### Error Handling in Streams
 
 ```typescript
-import { DataStreamResponse } from "@juspay/neurolink/server";
+import { DataStreamResponse } from "@juspay/neurolink";
 
 async function handleStreamWithErrors(
   neurolink: NeuroLink,
@@ -582,7 +576,7 @@ For simpler cases, use the helper function:
 import {
   DataStreamResponse,
   pipeAsyncIterableToDataStream,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 server.registerRoute({
   method: "POST",
@@ -846,7 +840,7 @@ function ChatComponent() {
 For simple SSE streaming without the full Data Stream Protocol:
 
 ```typescript
-import { WebStreamWriter, formatSSEEvent } from "@juspay/neurolink/server";
+import { WebStreamWriter, formatSSEEvent } from "@juspay/neurolink";
 
 const writer = new WebStreamWriter();
 

@@ -1,0 +1,83 @@
+[
+  {
+    "strategy": "character",
+    "config": {
+      "maxSize": 500,
+      "overlap": 50,
+      "minSize": 100
+    },
+    "description": "Fixed-size character-based chunking with overlap"
+  },
+  {
+    "strategy": "recursive",
+    "config": {
+      "maxSize": 500,
+      "overlap": 50,
+      "separators": ["\n\n", "\n", ". ", " ", ""]
+    },
+    "description": "Recursive splitting using paragraph and sentence boundaries"
+  },
+  {
+    "strategy": "sentence",
+    "config": {
+      "maxSize": 500,
+      "minSentences": 1,
+      "maxSentences": 5
+    },
+    "description": "Sentence-aware chunking preserving complete sentences"
+  },
+  {
+    "strategy": "token",
+    "config": {
+      "maxSize": 256,
+      "overlap": 25,
+      "tokenizer": "cl100k_base"
+    },
+    "description": "Token-based chunking for GPT model compatibility"
+  },
+  {
+    "strategy": "markdown",
+    "config": {
+      "maxSize": 500,
+      "headerLevels": [1, 2, 3],
+      "preserveCodeBlocks": true
+    },
+    "description": "Markdown-aware chunking splitting on headers"
+  },
+  {
+    "strategy": "html",
+    "config": {
+      "maxSize": 500,
+      "splitTags": ["div", "p", "section", "article"],
+      "extractTextOnly": true
+    },
+    "description": "HTML structure-aware chunking with tag awareness"
+  },
+  {
+    "strategy": "json",
+    "config": {
+      "maxSize": 500,
+      "maxDepth": 3,
+      "includeJsonPath": true
+    },
+    "description": "JSON structure-aware chunking by object boundaries"
+  },
+  {
+    "strategy": "latex",
+    "config": {
+      "maxSize": 500,
+      "splitEnvironments": ["section", "subsection", "chapter"],
+      "preserveMath": true
+    },
+    "description": "LaTeX document chunking by sections and environments"
+  },
+  {
+    "strategy": "semantic-markdown",
+    "config": {
+      "maxSize": 500,
+      "overlap": 100,
+      "similarityThreshold": 0.7
+    },
+    "description": "Semantic-aware markdown chunking with intelligent merging"
+  }
+]

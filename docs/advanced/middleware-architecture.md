@@ -310,7 +310,7 @@ const wrappedModel = factory.applyMiddleware(baseModel, context);
 
 ```typescript
 import { MiddlewareFactory } from "@juspay/neurolink";
-import { createAnalyticsMiddleware } from "@juspay/neurolink/middleware/builtin/analytics";
+import { createAnalyticsMiddleware } from "@juspay/neurolink";
 
 // Create factory with custom configuration
 const factory = new MiddlewareFactory({

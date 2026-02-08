@@ -61,7 +61,7 @@ npm install @juspay/neurolink koa @koa/router @koa/cors koa-bodyparser
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -101,7 +101,7 @@ For advanced customization, you can access the underlying Koa instance and route
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 import cors from "@koa/cors";
 import logger from "koa-logger";
 
@@ -232,7 +232,7 @@ import {
   createCacheMiddleware,
   createRequestIdMiddleware,
   createTimingMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "koa",
@@ -479,7 +479,7 @@ app.use(async (ctx, next) => {
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 describe("Koa API Server", () => {
   let server;

@@ -61,7 +61,7 @@ npm install @juspay/neurolink
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -101,7 +101,7 @@ For advanced customization, you can access the underlying Hono instance:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
@@ -206,7 +206,7 @@ import {
   createCacheMiddleware,
   createRequestIdMiddleware,
   createTimingMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "hono",
@@ -463,7 +463,7 @@ fetch("/api/agent/stream", {
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -486,7 +486,7 @@ export default {
 ```typescript
 // api/[[...route]].ts
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink();
 const server = await createServer(neurolink, { framework: "hono" });
@@ -500,7 +500,7 @@ export default server.getFrameworkInstance().fetch;
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink();
 const server = await createServer(neurolink, { framework: "hono" });
@@ -518,7 +518,7 @@ Deno.serve(server.getFrameworkInstance().fetch);
 ```typescript
 import { describe, it, expect } from "vitest";
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 describe("API Server", () => {
   it("should return health status", async () => {

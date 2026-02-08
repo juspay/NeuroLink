@@ -6,57 +6,57 @@ import {
   createVertexAnthropic,
   type GoogleVertexAnthropicProviderSettings,
 } from "@ai-sdk/google-vertex/anthropic";
-import type { ZodType, ZodTypeDef } from "zod";
 import {
-  streamText,
+  type LanguageModel,
+  type LanguageModelV1,
   Output,
   type Schema,
-  type LanguageModelV1,
-  type LanguageModel,
+  streamText,
   type Tool,
 } from "ai";
+import dns from "dns";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import type { ZodType, ZodTypeDef } from "zod";
 import {
-  AIProviderName,
+  type AIProviderName,
   ErrorCategory,
   ErrorSeverity,
 } from "../constants/enums.js";
-import { NeuroLinkError, ERROR_CODES } from "../utils/errorHandling.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { GenAIClient, GoogleGenAIClass } from "../types/providers.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import type {
-  TextGenerationOptions,
-  EnhancedGenerateResult,
-} from "../types/generateTypes.js";
-import type { NeuroLink } from "../neurolink.js";
 import { BaseProvider } from "../core/baseProvider.js";
-import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
-import { AuthenticationError, ProviderError } from "../types/errors.js";
 import {
   DEFAULT_MAX_STEPS,
-  GLOBAL_LOCATION_MODELS,
   DEFAULT_TOOL_MAX_RETRIES,
+  GLOBAL_LOCATION_MODELS,
 } from "../core/constants.js";
 import { ModelConfigurationManager } from "../core/modelConfiguration.js";
-import {
-  validateApiKey,
-  createVertexProjectConfig,
-  createGoogleAuthConfig,
-} from "../utils/providerConfig.js";
+import type { NeuroLink } from "../neurolink.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
+import type { UnknownRecord } from "../types/common.js";
+import { AuthenticationError, ProviderError } from "../types/errors.js";
+import type {
+  EnhancedGenerateResult,
+  TextGenerationOptions,
+} from "../types/generateTypes.js";
+import type { GenAIClient, GoogleGenAIClass } from "../types/providers.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import { ERROR_CODES, NeuroLinkError } from "../utils/errorHandling.js";
+import { FileDetector } from "../utils/fileDetector.js";
+import { logger } from "../utils/logger.js";
 import { isGemini3Model } from "../utils/modelDetection.js";
+import {
+  createGoogleAuthConfig,
+  createVertexProjectConfig,
+  validateApiKey,
+} from "../utils/providerConfig.js";
 import {
   convertZodToJsonSchema,
   inlineJsonSchema,
 } from "../utils/schemaConversion.js";
 import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
-import fs from "fs";
-import path from "path";
-import os from "os";
-import dns from "dns";
-import { createProxyFetch } from "../proxy/proxyFetch.js";
-import { FileDetector } from "../utils/fileDetector.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 
 // Import proper types for multimodal message handling
 
@@ -442,6 +442,18 @@ export class GoogleVertexProvider extends BaseProvider {
 
   protected getDefaultModel(): string {
     return getDefaultVertexModel();
+  }
+
+  /**
+   * Get the default embedding model for Google Vertex
+   * @returns The default Vertex AI embedding model name
+   */
+  protected getDefaultEmbeddingModel(): string {
+    return (
+      process.env.VERTEX_EMBEDDING_MODEL ||
+      process.env.GOOGLE_EMBEDDING_MODEL ||
+      "text-embedding-004"
+    );
   }
 
   /**
@@ -972,12 +984,17 @@ export class GoogleVertexProvider extends BaseProvider {
 
       const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
 
-      // Get all available tools (direct + MCP + external) for streaming
+      // Get all available tools (direct + MCP + external + user-provided RAG tools) for streaming
       const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools ? await this.getAllTools() : {};
+      const baseStreamTools = shouldUseTools ? await this.getAllTools() : {};
+      const tools = shouldUseTools
+        ? { ...baseStreamTools, ...(options.tools || {}) }
+        : {};
 
       logger.debug(`${functionTag}: Tools for streaming`, {
         shouldUseTools,
+        baseToolCount: Object.keys(baseStreamTools).length,
+        externalToolCount: Object.keys(options.tools || {}).length,
         toolCount: Object.keys(tools).length,
         toolNames: Object.keys(tools),
       });
@@ -3714,6 +3731,56 @@ export class GoogleVertexProvider extends BaseProvider {
         error: error instanceof Error ? error.message : String(error),
         model: imageModelName,
         prompt: prompt.substring(0, 100),
+      });
+
+      throw this.handleProviderError(error);
+    }
+  }
+
+  /**
+   * Generate embeddings for text using Google Vertex AI text-embedding models
+   * @param text - The text to embed
+   * @param modelName - The embedding model to use (default: text-embedding-004)
+   * @returns Promise resolving to the embedding vector
+   */
+  async embed(text: string, modelName?: string): Promise<number[]> {
+    const embeddingModelName = modelName || "text-embedding-004";
+
+    logger.debug("Generating embedding", {
+      provider: this.providerName,
+      model: embeddingModelName,
+      textLength: text.length,
+    });
+
+    try {
+      // Create embedding model using the AI SDK
+      const { embed } = await import("ai");
+
+      // Create the Vertex provider with current settings
+      const vertexSettings = await createVertexSettings(this.location);
+      const vertex = createVertex(vertexSettings);
+
+      // Get the text embedding model
+      const embeddingModel = vertex.textEmbeddingModel(embeddingModelName);
+
+      // Generate the embedding
+      const result = await embed({
+        model: embeddingModel,
+        value: text,
+      });
+
+      logger.debug("Embedding generated successfully", {
+        provider: this.providerName,
+        model: embeddingModelName,
+        embeddingDimension: result.embedding.length,
+      });
+
+      return result.embedding;
+    } catch (error) {
+      logger.error("Embedding generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        model: embeddingModelName,
+        textLength: text.length,
       });
 
       throw this.handleProviderError(error);

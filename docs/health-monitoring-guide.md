@@ -1,5 +1,7 @@
 # Health Monitoring & Auto-Recovery Guide
 
+> ⚠️ **PLANNED FEATURE**: This documentation describes features that are planned but not yet implemented. The `HealthMonitor` class referenced in this guide does not currently exist in the codebase. The code examples are illustrative of the intended API design.
+
 **NeuroLink Enhanced MCP Platform - Health Monitoring**
 
 ---
@@ -212,7 +214,7 @@ const connectionLifecycle = {
 ### **Basic Health Monitoring Setup**
 
 ```typescript
-import { HealthMonitor } from "@juspay/neurolink/mcp";
+import { HealthMonitor } from "@juspay/neurolink";
 
 // Initialize health monitor
 const healthMonitor = new HealthMonitor({
@@ -650,4 +652,4 @@ const optimizeMonitoring = {
 
 ---
 
-**STATUS**: Production-ready health monitoring system with comprehensive connection management, intelligent auto-recovery, and real-time analytics. Provides enterprise-grade reliability monitoring for all MCP servers with configurable thresholds and recovery strategies.
+**STATUS**: Planned health monitoring system (not yet implemented)

@@ -61,7 +61,7 @@ npm install @juspay/neurolink
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -101,7 +101,7 @@ For advanced customization, you can access the underlying Fastify instance:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink();
 
@@ -138,7 +138,7 @@ Fastify's plugin system allows you to encapsulate functionality:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 import fastifyHelmet from "@fastify/helmet";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
@@ -252,7 +252,7 @@ import {
   createCacheMiddleware,
   createRequestIdMiddleware,
   createTimingMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "fastify",
@@ -629,7 +629,7 @@ fastify.setNotFoundHandler((request, reply) => {
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 describe("API Server", () => {
   let server;

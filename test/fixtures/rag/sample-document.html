@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroLink API Reference</title>
+  </head>
+  <body>
+    <header>
+      <h1>NeuroLink API Reference</h1>
+      <nav>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#authentication">Authentication</a></li>
+          <li><a href="#endpoints">Endpoints</a></li>
+          <li><a href="#errors">Error Handling</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main>
+      <section id="overview">
+        <h2>Overview</h2>
+        <p>
+          The NeuroLink API provides a unified interface for AI-powered text
+          generation, embeddings, and retrieval-augmented generation (RAG). All
+          API requests use JSON format and require authentication.
+        </p>
+        <p>Base URL: <code>https://api.neurolink.ai/v1</code></p>
+      </section>
+
+      <section id="authentication">
+        <h2>Authentication</h2>
+        <p>Authenticate using Bearer tokens in the Authorization header:</p>
+        <pre><code>Authorization: Bearer YOUR_API_KEY</code></pre>
+        <p>
+          API keys can be generated from your dashboard at
+          <a href="https://dashboard.neurolink.ai">dashboard.neurolink.ai</a>.
+        </p>
+      </section>
+
+      <section id="endpoints">
+        <h2>API Endpoints</h2>
+
+        <article id="generate">
+          <h3>Generate Text</h3>
+          <p><strong>POST</strong> <code>/generate</code></p>
+          <p>Generate text completion using AI models.</p>
+
+          <h4>Request Body</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>messages</td>
+                <td>array</td>
+                <td>Yes</td>
+                <td>Array of message objects with role and content</td>
+              </tr>
+              <tr>
+                <td>model</td>
+                <td>string</td>
+                <td>No</td>
+                <td>Model identifier (default: gpt-4o-mini)</td>
+              </tr>
+              <tr>
+                <td>temperature</td>
+                <td>number</td>
+                <td>No</td>
+                <td>Sampling temperature (0-2, default: 0.7)</td>
+              </tr>
+              <tr>
+                <td>max_tokens</td>
+                <td>integer</td>
+                <td>No</td>
+                <td>Maximum tokens to generate</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4>Example Request</h4>
+          <pre><code>{
+  "messages": [
+    {"role": "user", "content": "What is machine learning?"}
+  ],
+  "model": "gpt-4o-mini",
+  "temperature": 0.7
+}</code></pre>
+        </article>
+
+        <article id="embed">
+          <h3>Create Embeddings</h3>
+          <p><strong>POST</strong> <code>/embed</code></p>
+          <p>Generate vector embeddings for text input.</p>
+
+          <h4>Request Body</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>input</td>
+                <td>string | array</td>
+                <td>Yes</td>
+                <td>Text or array of texts to embed</td>
+              </tr>
+              <tr>
+                <td>model</td>
+                <td>string</td>
+                <td>No</td>
+                <td>Embedding model (default: text-embedding-3-small)</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+
+        <article id="rag-query">
+          <h3>RAG Query</h3>
+          <p><strong>POST</strong> <code>/rag/query</code></p>
+          <p>Query indexed documents with semantic search.</p>
+
+          <h4>Request Body</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>query</td>
+                <td>string</td>
+                <td>Yes</td>
+                <td>Search query</td>
+              </tr>
+              <tr>
+                <td>index_name</td>
+                <td>string</td>
+                <td>Yes</td>
+                <td>Name of the index to search</td>
+              </tr>
+              <tr>
+                <td>top_k</td>
+                <td>integer</td>
+                <td>No</td>
+                <td>Number of results (default: 5)</td>
+              </tr>
+              <tr>
+                <td>min_score</td>
+                <td>number</td>
+                <td>No</td>
+                <td>Minimum similarity score (0-1)</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <section id="errors">
+        <h2>Error Handling</h2>
+        <p>The API uses standard HTTP status codes:</p>
+        <ul>
+          <li><strong>200</strong> - Success</li>
+          <li><strong>400</strong> - Bad Request (invalid parameters)</li>
+          <li><strong>401</strong> - Unauthorized (invalid API key)</li>
+          <li><strong>429</strong> - Too Many Requests (rate limited)</li>
+          <li><strong>500</strong> - Internal Server Error</li>
+        </ul>
+
+        <h3>Error Response Format</h3>
+        <pre><code>{
+  "error": {
+    "code": "invalid_request",
+    "message": "The 'messages' parameter is required"
+  }
+}</code></pre>
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2024 NeuroLink AI. All rights reserved.</p>
+    </footer>
+  </body>
+</html>

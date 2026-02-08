@@ -1,22 +1,23 @@
-import type { Tool, Schema } from "ai";
-import type {
-  ValidationSchema,
-  StandardRecord,
-  ZodUnknownSchema,
-} from "./typeAliases.js";
-import { AIProviderName } from "../constants/enums.js";
+import type { Schema, Tool } from "ai";
+import type { AIProviderName } from "../constants/enums.js";
+import type { RAGConfig } from "../rag/types.js";
 import type { AnalyticsData, TokenUsage } from "./analytics.js";
-import type { EvaluationData } from "./evaluation.js";
-import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
-import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type { JsonValue } from "./common.js";
 import type { Content, ImageWithAltText } from "./content.js";
-import type { TTSOptions, TTSResult } from "./ttsTypes.js";
-import type { PPTOutputOptions, PPTGenerationResult } from "./pptTypes.js";
+import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
+import type { EvaluationData } from "./evaluation.js";
+import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type {
-  VideoOutputOptions,
   VideoGenerationResult,
+  VideoOutputOptions,
 } from "./multimodal.js";
+import type { PPTGenerationResult, PPTOutputOptions } from "./pptTypes.js";
+import type { TTSOptions, TTSResult } from "./ttsTypes.js";
+import type {
+  StandardRecord,
+  ValidationSchema,
+  ZodUnknownSchema,
+} from "./typeAliases.js";
 
 /**
  * Generate function options type - Primary method for content generation
@@ -283,6 +284,40 @@ export type GenerateOptions = {
     enableProgress?: boolean;
     fallbackToGenerate?: boolean;
   };
+
+  /**
+   * RAG (Retrieval-Augmented Generation) configuration.
+   *
+   * When provided, NeuroLink automatically loads the specified files, chunks them,
+   * generates embeddings, and creates a search tool that the AI model can invoke
+   * on demand to find relevant context before answering.
+   *
+   * @example Basic RAG
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "What is RAG?" },
+   *   provider: "vertex",
+   *   rag: {
+   *     files: ["./docs/guide.md"],
+   *   }
+   * });
+   * ```
+   *
+   * @example Advanced RAG with options
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Explain chunking strategies" },
+   *   provider: "vertex",
+   *   rag: {
+   *     files: ["./docs/guide.md", "./docs/api.md"],
+   *     strategy: "markdown",
+   *     chunkSize: 512,
+   *     topK: 5,
+   *   }
+   * });
+   * ```
+   */
+  rag?: RAGConfig;
 };
 
 /**

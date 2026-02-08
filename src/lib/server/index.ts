@@ -27,15 +27,53 @@
 // Abstract Base Class
 // ============================================
 export { BaseServerAdapter } from "./abstract/baseServerAdapter.js";
-
+export { ExpressServerAdapter } from "./adapters/expressAdapter.js";
+export { FastifyServerAdapter } from "./adapters/fastifyAdapter.js";
 // ============================================
 // Framework Adapters
 // ============================================
 export { HonoServerAdapter } from "./adapters/honoAdapter.js";
-export { ExpressServerAdapter } from "./adapters/expressAdapter.js";
-export { FastifyServerAdapter } from "./adapters/fastifyAdapter.js";
 export { KoaServerAdapter } from "./adapters/koaAdapter.js";
-
+// ============================================
+// Errors
+// ============================================
+export {
+  AlreadyRunningError,
+  // Authentication/Authorization errors
+  AuthenticationError,
+  AuthorizationError,
+  // Configuration errors
+  ConfigurationError,
+  // Error recovery
+  ErrorRecoveryStrategies,
+  // Handler errors
+  HandlerError,
+  InvalidAuthenticationError,
+  // Dependency errors
+  MissingDependencyError,
+  NotRunningError,
+  // Rate limit errors
+  RateLimitError as ServerRateLimitError,
+  RouteConflictError,
+  RouteNotFoundError,
+  // Base error class
+  ServerAdapterError,
+  // Server lifecycle errors
+  ServerStartError,
+  ServerStopError,
+  StreamAbortedError,
+  // Streaming errors
+  StreamingError,
+  // Timeout errors
+  TimeoutError,
+  // Validation errors
+  ValidationError as ServerValidationError,
+  WebSocketConnectionError,
+  // WebSocket errors
+  WebSocketError,
+  // Utilities
+  wrapError,
+} from "./errors.js";
 // ============================================
 // Factory
 // ============================================
@@ -43,32 +81,45 @@ export {
   createServer,
   ServerAdapterFactory,
 } from "./factory/serverAdapterFactory.js";
-
-// ============================================
-// Routes
-// ============================================
 export {
-  createAgentRoutes,
-  createAllRoutes,
-  createHealthRoutes,
-  createMCPRoutes,
-  createMemoryRoutes,
-  createOpenApiRoutes,
-  createToolRoutes,
-  registerAllRoutes,
-  type CreateRoutesOptions,
-} from "./routes/index.js";
-
+  type AbortSignalMiddlewareOptions,
+  createAbortSignalMiddleware,
+  createExpressAbortMiddleware,
+} from "./middleware/abortSignal.js";
 // ============================================
 // Middleware
 // ============================================
 export {
-  createAuthMiddleware,
-  createRoleMiddleware,
   type AuthConfig,
   type AuthResult,
+  createAuthMiddleware,
+  createRoleMiddleware,
 } from "./middleware/auth.js";
 
+export {
+  type CacheConfig,
+  type CacheEntry,
+  type CacheStore,
+  createCacheInvalidator,
+  createCacheMiddleware,
+  InMemoryCacheStore,
+} from "./middleware/cache.js";
+export {
+  createCompressionMiddleware,
+  createErrorHandlingMiddleware,
+  createLoggingMiddleware,
+  createRequestIdMiddleware,
+  createSecurityHeadersMiddleware,
+  createTimingMiddleware,
+} from "./middleware/common.js";
+export {
+  createDeprecationMiddleware,
+  type DeprecationConfig,
+} from "./middleware/deprecation.js";
+export {
+  createMCPBodyAttachmentMiddleware,
+  fastifyMCPBodyHook,
+} from "./middleware/mcpBodyAttachment.js";
 export {
   createRateLimitMiddleware,
   createSlidingWindowRateLimitMiddleware,
@@ -77,43 +128,131 @@ export {
   type RateLimitMiddlewareConfig,
   type RateLimitStore,
 } from "./middleware/rateLimit.js";
-
 export {
-  createCacheMiddleware,
-  createCacheInvalidator,
-  InMemoryCacheStore,
-  type CacheConfig,
-  type CacheEntry,
-  type CacheStore,
-} from "./middleware/cache.js";
-
-export {
-  createRequestValidationMiddleware,
+  CommonSchemas,
   createFieldValidator,
-  ValidationError,
-  type ValidationConfig,
-  type ValidationSchema,
+  createRequestValidationMiddleware,
   type PropertySchema,
+  type ValidationConfig,
+  ValidationError,
+  type ValidationSchema,
 } from "./middleware/validation.js";
-
+// ============================================
+// OpenAPI
+// ============================================
 export {
-  createTimingMiddleware,
-  createRequestIdMiddleware,
-  createErrorHandlingMiddleware,
-  createSecurityHeadersMiddleware,
-  createLoggingMiddleware,
-  createCompressionMiddleware,
-} from "./middleware/common.js";
-
+  AgentExecuteRequestSchema as OpenAPIAgentExecuteRequestSchema,
+  AgentExecuteResponseSchema,
+  AgentInputSchema,
+  ApiKeySecurityScheme,
+  BasicSecurityScheme,
+  BearerSecurityScheme,
+  CommonParameters,
+  ConversationMessageSchema,
+  createApiInfo,
+  createDeleteOperation,
+  createErrorResponse as createOpenAPIErrorResponse,
+  createGetOperation,
+  createHeaderParameter,
+  createOpenAPIGenerator,
+  createPathParameter,
+  createPostOperation,
+  createQueryParameter,
+  createServer as createOpenAPIServer,
+  createStreamingPostOperation,
+  createStreamingResponse,
+  // Templates
+  createSuccessResponse,
+  DefaultServers,
+  // Schemas
+  ErrorResponseSchema,
+  generateOpenAPIFromConfig,
+  generateOpenAPISpec,
+  HealthResponseSchema,
+  MCPServerStatusSchema,
+  MCPServersListResponseSchema,
+  MCPServerToolSchema,
+  MetricsResponseSchema,
+  NeuroLinkApiInfo,
+  // Generator
+  OpenAPIGenerator,
+  type OpenAPIGeneratorConfig,
+  OpenAPISchemas,
+  type OpenAPISpec,
+  ProviderInfoSchema,
+  ReadyResponseSchema,
+  SessionSchema,
+  SessionsListResponseSchema,
+  StandardErrorResponses,
+  StandardTags,
+  TokenUsageSchema,
+  ToolCallSchema,
+  ToolDefinitionSchema,
+  ToolExecuteRequestSchema as OpenAPIToolExecuteRequestSchema,
+  ToolExecuteResponseSchema,
+  ToolListResponseSchema,
+  ToolParameterSchema,
+} from "./openapi/index.js";
+// ============================================
+// Routes
+// ============================================
+export {
+  type CreateRoutesOptions,
+  createAgentRoutes,
+  createAllRoutes,
+  createHealthRoutes,
+  createMCPRoutes,
+  createMemoryRoutes,
+  createOpenApiRoutes,
+  createToolRoutes,
+  registerAllRoutes,
+} from "./routes/index.js";
+// ============================================
+// Streaming
+// ============================================
+export {
+  BaseDataStreamWriter,
+  createDataStreamResponse,
+  createDataStreamWriter,
+  createNDJSONHeaders,
+  createSSEHeaders,
+  type DataEvent,
+  type DataStreamEvent,
+  // Types
+  type DataStreamEventType,
+  DataStreamResponse,
+  // Response
+  type DataStreamResponseConfig,
+  // Writer
+  type DataStreamWriterConfig,
+  type ErrorEvent,
+  type FinishEvent,
+  formatSSEEvent,
+  // Helpers
+  pipeAsyncIterableToDataStream,
+  type SSEEventOptions,
+  type TextDeltaEvent,
+  type TextEndEvent,
+  type TextStartEvent,
+  type ToolCallEvent,
+  type ToolResultEvent,
+  WebStreamWriter,
+} from "./streaming/index.js";
 // ============================================
 // Types
 // ============================================
 export type {
   AgentExecuteRequest,
   AgentExecuteResponse,
+  AuthConfig as WebSocketAuthConfig,
+  AuthenticatedUser,
+  AuthStrategy,
   BodyParserConfig,
   CORSConfig,
   DataStreamWriter,
+  // Error Types
+  ErrorCategoryType,
+  ErrorSeverityType,
   HealthResponse,
   HttpMethod,
   LoggingConfig,
@@ -127,6 +266,8 @@ export type {
   RouteGroup,
   RouteHandler,
   ServerAdapterConfig,
+  ServerAdapterErrorCodeType,
+  ServerAdapterErrorContext,
   ServerAdapterEvents,
   ServerAdapterFactoryOptions,
   ServerContext,
@@ -139,27 +280,18 @@ export type {
   ToolExecuteResponse,
   // WebSocket Types
   WebSocketConfig,
-  WebSocketHandler,
   WebSocketConnection,
+  WebSocketHandler,
   WebSocketMessage,
   WebSocketMessageType,
-  AuthenticatedUser,
-  AuthConfig as WebSocketAuthConfig,
-  AuthStrategy,
-  // Error Types
-  ErrorCategoryType,
-  ErrorSeverityType,
-  ServerAdapterErrorCodeType,
-  ServerAdapterErrorContext,
 } from "./types.js";
-
 // Export error constants
 export {
   ErrorCategory,
   ErrorSeverity,
   ServerAdapterErrorCode,
 } from "./types.js";
-
+export { createStreamRedactor, redactStreamChunk } from "./utils/redaction.js";
 // ============================================
 // Validation Utilities
 // ============================================
@@ -177,143 +309,11 @@ export {
   validateQuery,
   validateRequest,
 } from "./utils/validation.js";
-
-// ============================================
-// OpenAPI
-// ============================================
-export {
-  // Generator
-  OpenAPIGenerator,
-  createOpenAPIGenerator,
-  generateOpenAPISpec,
-  generateOpenAPIFromConfig,
-  type OpenAPIGeneratorConfig,
-  type OpenAPISpec,
-
-  // Schemas
-  ErrorResponseSchema,
-  TokenUsageSchema,
-  AgentInputSchema,
-  AgentExecuteRequestSchema as OpenAPIAgentExecuteRequestSchema,
-  AgentExecuteResponseSchema,
-  ToolCallSchema,
-  ProviderInfoSchema,
-  ToolParameterSchema,
-  ToolDefinitionSchema,
-  ToolListResponseSchema,
-  ToolExecuteRequestSchema as OpenAPIToolExecuteRequestSchema,
-  ToolExecuteResponseSchema,
-  MCPServerToolSchema,
-  MCPServerStatusSchema,
-  MCPServersListResponseSchema,
-  ConversationMessageSchema,
-  SessionSchema,
-  SessionsListResponseSchema,
-  HealthResponseSchema,
-  ReadyResponseSchema,
-  MetricsResponseSchema,
-  OpenAPISchemas,
-
-  // Templates
-  createSuccessResponse,
-  createErrorResponse as createOpenAPIErrorResponse,
-  createStreamingResponse,
-  StandardErrorResponses,
-  createPathParameter,
-  createQueryParameter,
-  createHeaderParameter,
-  CommonParameters,
-  createGetOperation,
-  createPostOperation,
-  createStreamingPostOperation,
-  createDeleteOperation,
-  BearerSecurityScheme,
-  ApiKeySecurityScheme,
-  BasicSecurityScheme,
-  StandardTags,
-  createServer as createOpenAPIServer,
-  DefaultServers,
-  createApiInfo,
-  NeuroLinkApiInfo,
-} from "./openapi/index.js";
-
-// ============================================
-// Streaming
-// ============================================
-export {
-  // Types
-  type DataStreamEventType,
-  type DataStreamEvent,
-  type TextStartEvent,
-  type TextDeltaEvent,
-  type TextEndEvent,
-  type ToolCallEvent,
-  type ToolResultEvent,
-  type DataEvent,
-  type ErrorEvent,
-  type FinishEvent,
-
-  // Writer
-  type DataStreamWriterConfig,
-  createDataStreamWriter,
-
-  // Response
-  type DataStreamResponseConfig,
-  DataStreamResponse,
-  createDataStreamResponse,
-
-  // Helpers
-  pipeAsyncIterableToDataStream,
-  createSSEHeaders,
-  createNDJSONHeaders,
-} from "./streaming/index.js";
-
 // ============================================
 // WebSocket
 // ============================================
 export {
+  createAgentWebSocketHandler,
   WebSocketConnectionManager,
   WebSocketMessageRouter,
-  createAgentWebSocketHandler,
 } from "./websocket/index.js";
-
-// ============================================
-// Errors
-// ============================================
-export {
-  // Base error class
-  ServerAdapterError,
-  // Configuration errors
-  ConfigurationError,
-  RouteConflictError,
-  RouteNotFoundError,
-  // Validation errors
-  ValidationError as ServerValidationError,
-  // Authentication/Authorization errors
-  AuthenticationError,
-  InvalidAuthenticationError,
-  AuthorizationError,
-  // Rate limit errors
-  RateLimitError as ServerRateLimitError,
-  // Timeout errors
-  TimeoutError,
-  // Handler errors
-  HandlerError,
-  // Streaming errors
-  StreamingError,
-  StreamAbortedError,
-  // WebSocket errors
-  WebSocketError,
-  WebSocketConnectionError,
-  // Server lifecycle errors
-  ServerStartError,
-  ServerStopError,
-  AlreadyRunningError,
-  NotRunningError,
-  // Dependency errors
-  MissingDependencyError,
-  // Error recovery
-  ErrorRecoveryStrategies,
-  // Utilities
-  wrapError,
-} from "./errors.js";

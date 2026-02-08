@@ -1,17 +1,23 @@
 import { createOpenAI } from "@ai-sdk/openai";
+import {
+  type LanguageModelV1,
+  Output,
+  type Schema,
+  streamText,
+  type Tool,
+} from "ai";
 import type { ZodType, ZodTypeDef } from "zod";
-import { streamText, Output, type Schema, type LanguageModelV1 } from "ai";
-import { AIProviderName } from "../constants/enums.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { NeuroLink } from "../neurolink.js";
+import type { AIProviderName } from "../constants/enums.js";
 import { BaseProvider } from "../core/baseProvider.js";
-import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
-import { getProviderModel } from "../utils/providerConfig.js";
-import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
+import type { UnknownRecord } from "../types/common.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import { logger } from "../utils/logger.js";
+import { getProviderModel } from "../utils/providerConfig.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 
 // Configuration helpers
 const getLiteLLMConfig = () => {
@@ -181,9 +187,11 @@ export class LiteLLMProvider extends BaseProvider {
 
       const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
 
-      // Get all available tools (direct + MCP + external) for streaming - matching Vertex pattern
+      // Get tools - options.tools is pre-merged by BaseProvider.stream()
       const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools ? await this.getAllTools() : {};
+      const tools = shouldUseTools
+        ? (options.tools as Record<string, Tool>) || (await this.getAllTools())
+        : {};
 
       logger.debug(`LiteLLM: Tools for streaming`, {
         shouldUseTools,
@@ -305,10 +313,7 @@ export class LiteLLMProvider extends BaseProvider {
                 errorDetails: errorChunk.error,
               });
               throw new Error(
-                `LiteLLM streaming error: ${
-                  (errorChunk.error as Record<string, unknown>)?.message ||
-                  "Unknown error"
-                }`,
+                `LiteLLM streaming error: ${(errorChunk.error as Record<string, unknown>)?.message || "Unknown error"}`,
               );
             }
 

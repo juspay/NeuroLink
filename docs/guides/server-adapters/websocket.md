@@ -31,10 +31,7 @@ NeuroLink server adapters include built-in WebSocket support for real-time, bidi
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import {
-  createServer,
-  WebSocketConnectionManager,
-} from "@juspay/neurolink/server";
+import { createServer, WebSocketConnectionManager } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -480,7 +477,7 @@ For structured message handling, use the `WebSocketMessageRouter`:
 import {
   WebSocketConnectionManager,
   WebSocketMessageRouter,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const wsManager = new WebSocketConnectionManager({ path: "/ws" });
 const router = new WebSocketMessageRouter();
@@ -579,7 +576,7 @@ NeuroLink provides a pre-built handler for AI agent interactions:
 import {
   WebSocketConnectionManager,
   createAgentWebSocketHandler,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({ defaultProvider: "openai" });
 
@@ -664,10 +661,7 @@ ws.onmessage = (event) => {
 NeuroLink provides typed errors for WebSocket operations:
 
 ```typescript
-import {
-  WebSocketError,
-  WebSocketConnectionError,
-} from "@juspay/neurolink/server";
+import { WebSocketError, WebSocketConnectionError } from "@juspay/neurolink";
 
 wsManager.registerHandler("/ws", {
   onMessage: async (connection, message) => {

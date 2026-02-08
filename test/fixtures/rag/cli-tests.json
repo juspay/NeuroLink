@@ -1,0 +1,56 @@
+[
+  {
+    "id": "cli-chunk-markdown",
+    "command": "neurolink rag chunk sample-document.md --strategy markdown",
+    "expectedMinChunks": 5,
+    "expectedMaxChunks": 20,
+    "description": "Chunk markdown document"
+  },
+  {
+    "id": "cli-chunk-html",
+    "command": "neurolink rag chunk sample-document.html --strategy html",
+    "expectedMinChunks": 3,
+    "expectedMaxChunks": 15,
+    "description": "Chunk HTML document"
+  },
+  {
+    "id": "cli-chunk-json",
+    "command": "neurolink rag chunk sample-document.json --strategy json",
+    "expectedMinChunks": 2,
+    "expectedMaxChunks": 10,
+    "description": "Chunk JSON document"
+  },
+  {
+    "id": "cli-chunk-latex",
+    "command": "neurolink rag chunk sample-document.tex --strategy latex",
+    "expectedMinChunks": 3,
+    "expectedMaxChunks": 15,
+    "description": "Chunk LaTeX document"
+  },
+  {
+    "id": "cli-chunk-recursive",
+    "command": "neurolink rag chunk sample-documents.txt --strategy recursive",
+    "expectedMinChunks": 5,
+    "expectedMaxChunks": 30,
+    "description": "Chunk text with recursive strategy"
+  },
+  {
+    "id": "cli-chunk-sentence",
+    "command": "neurolink rag chunk sample-documents.txt --strategy sentence",
+    "expectedMinChunks": 10,
+    "expectedMaxChunks": 50,
+    "description": "Chunk text with sentence strategy"
+  },
+  {
+    "id": "cli-chunk-output-json",
+    "command": "neurolink rag chunk sample-document.md --format json --output chunks.json",
+    "expectedOutput": "chunks.json",
+    "description": "Chunk and save to JSON file"
+  },
+  {
+    "id": "cli-chunk-custom-size",
+    "command": "neurolink rag chunk sample-document.md --maxSize 200 --overlap 50",
+    "expectedMinChunks": 10,
+    "description": "Chunk with custom size parameters"
+  }
+]

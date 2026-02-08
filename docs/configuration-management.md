@@ -22,7 +22,7 @@ NeuroLink's enterprise configuration system provides:
 ### **Basic Configuration Setup**
 
 ```typescript
-import { ConfigManager } from "@juspay/neurolink/config";
+import { ConfigManager } from "@juspay/neurolink";
 
 // Initialize config manager
 const configManager = new ConfigManager();

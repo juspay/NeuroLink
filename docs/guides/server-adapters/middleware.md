@@ -41,7 +41,7 @@ Measures request duration and adds timing headers to responses.
 ### Usage
 
 ```typescript
-import { createTimingMiddleware } from "@juspay/neurolink/server";
+import { createTimingMiddleware } from "@juspay/neurolink";
 
 server.registerMiddleware(createTimingMiddleware());
 ```
@@ -81,7 +81,7 @@ type RequestIdOptions = {
 ### Usage
 
 ```typescript
-import { createRequestIdMiddleware } from "@juspay/neurolink/server";
+import { createRequestIdMiddleware } from "@juspay/neurolink";
 
 // Basic usage
 server.registerMiddleware(createRequestIdMiddleware());
@@ -132,7 +132,7 @@ type ErrorHandlingOptions = {
 ### Usage
 
 ```typescript
-import { createErrorHandlingMiddleware } from "@juspay/neurolink/server";
+import { createErrorHandlingMiddleware } from "@juspay/neurolink";
 
 // Basic usage
 server.registerMiddleware(createErrorHandlingMiddleware());
@@ -210,7 +210,7 @@ type SecurityHeadersOptions = {
 ### Usage
 
 ```typescript
-import { createSecurityHeadersMiddleware } from "@juspay/neurolink/server";
+import { createSecurityHeadersMiddleware } from "@juspay/neurolink";
 
 // Basic usage with defaults
 server.registerMiddleware(createSecurityHeadersMiddleware());
@@ -274,7 +274,7 @@ type LoggingOptions = {
 ### Usage
 
 ```typescript
-import { createLoggingMiddleware } from "@juspay/neurolink/server";
+import { createLoggingMiddleware } from "@juspay/neurolink";
 
 // Basic usage
 server.registerMiddleware(createLoggingMiddleware());
@@ -349,7 +349,7 @@ type CompressionOptions = {
 ### Usage
 
 ```typescript
-import { createCompressionMiddleware } from "@juspay/neurolink/server";
+import { createCompressionMiddleware } from "@juspay/neurolink";
 
 // Basic usage
 server.registerMiddleware(createCompressionMiddleware());
@@ -394,7 +394,7 @@ type AbortSignalMiddlewareOptions = {
 ### Usage
 
 ```typescript
-import { createAbortSignalMiddleware } from "@juspay/neurolink/server";
+import { createAbortSignalMiddleware } from "@juspay/neurolink";
 
 // Basic usage
 server.registerMiddleware(createAbortSignalMiddleware());
@@ -437,7 +437,7 @@ server.registerRoute({
 For Express applications, use the specialized Express middleware:
 
 ```typescript
-import { createExpressAbortMiddleware } from "@juspay/neurolink/server";
+import { createExpressAbortMiddleware } from "@juspay/neurolink";
 
 app.use(
   createExpressAbortMiddleware({
@@ -467,7 +467,7 @@ Bridges the gap between Fastify's body parsing and the MCP SDK's body access pat
 ### Usage
 
 ```typescript
-import { createMCPBodyAttachmentMiddleware } from "@juspay/neurolink/server";
+import { createMCPBodyAttachmentMiddleware } from "@juspay/neurolink";
 
 // General middleware for any adapter
 server.registerMiddleware(createMCPBodyAttachmentMiddleware());
@@ -478,7 +478,7 @@ server.registerMiddleware(createMCPBodyAttachmentMiddleware());
 For optimal Fastify integration, use the dedicated preHandler hook:
 
 ```typescript
-import { fastifyMCPBodyHook } from "@juspay/neurolink/server";
+import { fastifyMCPBodyHook } from "@juspay/neurolink";
 
 fastify.addHook("preHandler", fastifyMCPBodyHook);
 ```
@@ -523,7 +523,7 @@ type RouteDeprecation = {
 ### Usage
 
 ```typescript
-import { createDeprecationMiddleware } from "@juspay/neurolink/server";
+import { createDeprecationMiddleware } from "@juspay/neurolink";
 
 const routes = [
   {
@@ -593,7 +593,7 @@ import {
   createRateLimitMiddleware,
   createSlidingWindowRateLimitMiddleware,
   InMemoryRateLimitStore,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Fixed window rate limiting
 server.registerMiddleware(
@@ -637,7 +637,7 @@ server.registerMiddleware(
 
 ```typescript
 import Redis from "ioredis";
-import type { RateLimitStore, RateLimitEntry } from "@juspay/neurolink/server";
+import type { RateLimitStore, RateLimitEntry } from "@juspay/neurolink";
 
 class RedisRateLimitStore implements RateLimitStore {
   constructor(private redis: Redis) {}
@@ -729,7 +729,7 @@ import {
   createApiKeyAuthMiddleware,
   createRoleMiddleware,
   ApiKeyStore,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Bearer token authentication
 server.registerMiddleware(
@@ -839,7 +839,7 @@ import {
   createBodyValidationMiddleware,
   createQueryValidationMiddleware,
   CommonSchemas,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Full validation
 server.registerMiddleware(
@@ -908,7 +908,7 @@ server.registerMiddleware(
 Pre-built schemas for common validation patterns:
 
 ```typescript
-import { CommonSchemas } from "@juspay/neurolink/server";
+import { CommonSchemas } from "@juspay/neurolink";
 
 // Use pagination schema
 server.registerMiddleware(
@@ -971,7 +971,7 @@ import {
   createCacheMiddleware,
   InMemoryCacheStore,
   ResponseCacheStore,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Basic caching
 server.registerMiddleware(
@@ -1032,7 +1032,7 @@ import {
   createAuthMiddleware,
   createRequestValidationMiddleware,
   createCacheMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Register middleware in recommended order
 const middlewares = [

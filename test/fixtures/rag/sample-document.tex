@@ -1,0 +1,148 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+
+\title{Mathematical Foundations of RAG Systems}
+\author{NeuroLink Research Team}
+\date{January 2024}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper presents the mathematical foundations underlying Retrieval-Augmented Generation (RAG) systems, including vector similarity measures, embedding spaces, and fusion algorithms.
+\end{abstract}
+
+\section{Introduction}
+
+Retrieval-Augmented Generation (RAG) combines the strengths of retrieval systems with generative language models. The core idea is to augment the input to a language model with relevant information retrieved from an external knowledge base.
+
+Let $\mathcal{D} = \{d_1, d_2, \ldots, d_n\}$ be a document collection and $q$ be a query. The RAG system performs:
+
+\begin{equation}
+P(y|q) = \sum_{d \in \mathcal{D}} P(d|q) \cdot P(y|q, d)
+\end{equation}
+
+where $P(d|q)$ is the retrieval probability and $P(y|q,d)$ is the generation probability given the retrieved document.
+
+\section{Vector Embeddings}
+
+Documents and queries are mapped to a high-dimensional vector space using embedding functions.
+
+\subsection{Embedding Function}
+
+Let $E: \mathcal{T} \rightarrow \mathbb{R}^d$ be an embedding function mapping text to $d$-dimensional vectors:
+
+\begin{equation}
+\mathbf{v} = E(t), \quad \mathbf{v} \in \mathbb{R}^d
+\end{equation}
+
+Common embedding models produce vectors with $d \in \{384, 768, 1536, 3072\}$ dimensions.
+
+\subsection{Similarity Measures}
+
+Given query embedding $\mathbf{q}$ and document embedding $\mathbf{d}$:
+
+\textbf{Cosine Similarity:}
+\begin{equation}
+\text{cos}(\mathbf{q}, \mathbf{d}) = \frac{\mathbf{q} \cdot \mathbf{d}}{\|\mathbf{q}\| \|\mathbf{d}\|}
+\end{equation}
+
+\textbf{Euclidean Distance:}
+\begin{equation}
+\text{eucl}(\mathbf{q}, \mathbf{d}) = \|\mathbf{q} - \mathbf{d}\|_2 = \sqrt{\sum_{i=1}^{d} (q_i - d_i)^2}
+\end{equation}
+
+\textbf{Dot Product:}
+\begin{equation}
+\text{dot}(\mathbf{q}, \mathbf{d}) = \mathbf{q} \cdot \mathbf{d} = \sum_{i=1}^{d} q_i d_i
+\end{equation}
+
+For normalized vectors ($\|\mathbf{v}\| = 1$), cosine similarity equals dot product.
+
+\section{BM25 Scoring}
+
+BM25 is a probabilistic ranking function for keyword-based retrieval:
+
+\begin{equation}
+\text{BM25}(q, d) = \sum_{t \in q} \text{IDF}(t) \cdot \frac{f(t, d) \cdot (k_1 + 1)}{f(t, d) + k_1 \cdot (1 - b + b \cdot \frac{|d|}{\text{avgdl}})}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $f(t, d)$ is the term frequency of $t$ in document $d$
+    \item $|d|$ is the document length
+    \item $\text{avgdl}$ is the average document length
+    \item $k_1$ and $b$ are tuning parameters (typically $k_1 = 1.5$, $b = 0.75$)
+\end{itemize}
+
+The inverse document frequency is:
+\begin{equation}
+\text{IDF}(t) = \log \frac{N - n(t) + 0.5}{n(t) + 0.5}
+\end{equation}
+
+\section{Reciprocal Rank Fusion}
+
+RRF combines rankings from multiple retrieval methods:
+
+\begin{equation}
+\text{RRF}(d) = \sum_{r \in R} \frac{1}{k + r(d)}
+\end{equation}
+
+where $R$ is the set of ranking methods, $r(d)$ is the rank of document $d$ in ranking $r$, and $k$ is a constant (typically $k = 60$).
+
+\subsection{Properties of RRF}
+
+\begin{itemize}
+    \item Bounded: $\text{RRF}(d) \leq \frac{|R|}{k+1}$
+    \item Rank-based: Only considers position, not scores
+    \item Robust: Less sensitive to score scale differences
+\end{itemize}
+
+\section{Linear Score Combination}
+
+An alternative to RRF is weighted linear combination of normalized scores:
+
+\begin{equation}
+\text{score}(d) = \alpha \cdot \hat{s}_{\text{vec}}(d) + (1-\alpha) \cdot \hat{s}_{\text{bm25}}(d)
+\end{equation}
+
+where $\hat{s}$ denotes min-max normalized scores:
+
+\begin{equation}
+\hat{s}(d) = \frac{s(d) - s_{\min}}{s_{\max} - s_{\min}}
+\end{equation}
+
+\section{Chunking Theory}
+
+Optimal chunk size balances context preservation with retrieval precision.
+
+\subsection{Overlap Calculation}
+
+For chunks of size $c$ with overlap $o$, the number of chunks for a document of length $L$ is:
+
+\begin{equation}
+n = \left\lceil \frac{L - o}{c - o} \right\rceil
+\end{equation}
+
+\subsection{Information Loss}
+
+Information loss at chunk boundaries can be minimized with overlap ratio:
+
+\begin{equation}
+\text{overlap\_ratio} = \frac{o}{c} \approx 0.1 \text{ to } 0.2
+\end{equation}
+
+\section{Conclusion}
+
+The mathematical framework presented here provides the foundation for implementing efficient and effective RAG systems. Key considerations include choosing appropriate similarity metrics, balancing retrieval methods through fusion, and optimizing chunk sizes for the target domain.
+
+\begin{thebibliography}{9}
+\bibitem{rag} Lewis et al., "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks," NeurIPS 2020.
+\bibitem{bm25} Robertson and Zaragoza, "The Probabilistic Relevance Framework: BM25 and Beyond," 2009.
+\bibitem{rrf} Cormack et al., "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods," SIGIR 2009.
+\end{thebibliography}
+
+\end{document}

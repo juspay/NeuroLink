@@ -295,7 +295,7 @@ git push origin feat/your-feature-name
 
 - **[Factory Pattern Guide](factory-migration.md)** - Understanding the core architecture
 - **[MCP Integration](../advanced/mcp-integration.md)** - Tool system implementation
-- **[Provider Development](../deployment/configuration.md)** - Adding new AI providers
+- **[Provider Development](../reference/configuration.md)** - Adding new AI providers
 
 ### Best Practices
 

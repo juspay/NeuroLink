@@ -305,7 +305,7 @@ export DEBUG=neurolink:sagemaker:*
 Or in code:
 
 ```typescript
-import { logger } from "@juspay/neurolink/lib/utils/logger";
+import { logger } from "@juspay/neurolink";
 logger.level = "debug";
 ```
 

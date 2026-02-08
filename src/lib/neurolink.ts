@@ -15,137 +15,141 @@ try {
   // Environment variables should be set externally in production
 }
 
-import type {
-  TextGenerationOptions,
-  TextGenerationResult,
-  AnalyticsData,
-  ProviderStatus,
-} from "./types/index.js";
-import { AIProviderFactory } from "./core/factory.js";
-import { isNonNullObject } from "./utils/typeUtils.js";
-import { isZodSchema } from "./utils/schemaConversion.js";
+import { EventEmitter } from "events";
 import type { MemoryClient } from "mem0ai";
-import { AIProviderName } from "./constants/enums.js";
-import { mcpLogger } from "./utils/logger.js";
-import { SYSTEM_LIMITS } from "./core/constants.js";
+import pLimit from "p-limit";
+import type { AIProviderName } from "./constants/enums.js";
 import {
-  NANOSECOND_TO_MS_DIVISOR,
-  TOOL_TIMEOUTS,
-  RETRY_ATTEMPTS,
-  RETRY_DELAYS,
   CIRCUIT_BREAKER,
   CIRCUIT_BREAKER_RESET_MS,
   MEMORY_THRESHOLDS,
-  PROVIDER_TIMEOUTS,
+  NANOSECOND_TO_MS_DIVISOR,
   PERFORMANCE_THRESHOLDS,
+  PROVIDER_TIMEOUTS,
+  RETRY_ATTEMPTS,
+  RETRY_DELAYS,
+  TOOL_TIMEOUTS,
 } from "./constants/index.js";
-import pLimit from "p-limit";
-import { MCPToolRegistry } from "./mcp/toolRegistry.js";
-import { logger } from "./utils/logger.js";
-import { getBestProvider } from "./utils/providerUtils.js";
+import { SYSTEM_LIMITS } from "./core/constants.js";
+import type { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
+import { AIProviderFactory } from "./core/factory.js";
+import type { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
 import { ProviderRegistry } from "./factories/providerRegistry.js";
+import { HITLManager } from "./hitl/hitlManager.js";
+import { ExternalServerManager } from "./mcp/externalServerManager.js";
+// Import direct tools server for automatic registration
+import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
+import { MCPToolRegistry } from "./mcp/toolRegistry.js";
+import { initializeMem0, type Mem0Config } from "./memory/mem0Initializer.js";
+import {
+  flushOpenTelemetry,
+  getLangfuseHealthStatus,
+  initializeOpenTelemetry,
+  isOpenTelemetryInitialized,
+  setLangfuseContext,
+  shutdownOpenTelemetry,
+} from "./services/server/ai/observability/instrumentation.js";
+import type {
+  JsonObject,
+  JsonValue,
+  NeuroLinkEvents,
+  TypedEventEmitter,
+  UnknownRecord,
+} from "./types/common.js";
+import type { NeurolinkConstructorConfig } from "./types/configTypes.js";
+import type {
+  ChatMessage,
+  ConversationMemoryConfig,
+  ProviderDetails,
+} from "./types/conversation.js";
+import type {
+  ExternalMCPOperationResult,
+  ExternalMCPServerInstance,
+  ExternalMCPToolInfo,
+} from "./types/externalMcp.js";
 // NEW: Generate function imports
 import type { GenerateOptions, GenerateResult } from "./types/generateTypes.js";
 import type {
-  StreamOptions,
-  StreamResult,
-  ToolCall,
-  ToolResult,
-  AudioChunk,
-} from "./types/streamTypes.js";
-import type { TokenUsage, EvaluationData } from "./types/index.js";
+  ConfirmationResponseEvent,
+  HITLConfig,
+} from "./types/hitlTypes.js";
+import type {
+  AnalyticsData,
+  EvaluationData,
+  ProviderStatus,
+  TextGenerationOptions,
+  TextGenerationResult,
+  TokenUsage,
+} from "./types/index.js";
 import type {
   MCPExecutableTool,
   MCPServerCategory,
   MCPServerInfo,
   MCPStatus,
 } from "./types/mcpTypes.js";
-import type { ToolInfo } from "./types/tools.js";
-import type { NeuroLinkEvents, TypedEventEmitter } from "./types/common.js";
-import {
-  createCustomToolServerInfo,
-  detectCategory,
-} from "./utils/mcpDefaults.js";
+import type { ObservabilityConfig } from "./types/observability.js";
+import type {
+  AudioChunk,
+  StreamOptions,
+  StreamResult,
+  ToolCall,
+  ToolResult,
+} from "./types/streamTypes.js";
 import type {
   ToolExecutionContext,
   ToolExecutionSummary,
+  ToolInfo,
 } from "./types/tools.js";
-import type { JsonValue, JsonObject, UnknownRecord } from "./types/common.js";
 import type {
-  ToolExecutionResult,
   BatchOperationResult,
+  ToolExecutionResult,
 } from "./types/typeAliases.js";
-// Factory processing imports
-import {
-  processFactoryOptions,
-  enhanceTextGenerationOptions,
-  validateFactoryConfig,
-  processStreamingFactoryOptions,
-  createCleanStreamOptions,
-} from "./utils/factoryProcessing.js";
-// Tool detection and execution imports
-// Transformation utilities
-import {
-  transformToolExecutions,
-  transformToolExecutionsForMCP,
-  transformAvailableTools,
-  transformToolsForMCP,
-  transformToolsToExpectedFormat,
-  transformToolsToDescriptions,
-  extractToolNames,
-  transformParamsForLogging,
-  optimizeToolForCollection,
-} from "./utils/transformationUtils.js";
-// Enhanced error handling imports
-import {
-  ErrorFactory,
-  NeuroLinkError,
-  withTimeout,
-  withRetry,
-  isRetriableError,
-  logStructuredError,
-  CircuitBreaker,
-} from "./utils/errorHandling.js";
-import { EventEmitter } from "events";
-import type {
-  ConversationMemoryConfig,
-  ChatMessage,
-  ProviderDetails,
-} from "./types/conversation.js";
-import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
-import { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
 import {
   getConversationMessages,
   storeConversationTurn,
 } from "./utils/conversationMemory.js";
-import { ExternalServerManager } from "./mcp/externalServerManager.js";
-import type {
-  HITLConfig,
-  ConfirmationResponseEvent,
-} from "./types/hitlTypes.js";
-import { HITLManager } from "./hitl/hitlManager.js";
-import type {
-  ExternalMCPServerInstance,
-  ExternalMCPOperationResult,
-  ExternalMCPToolInfo,
-} from "./types/externalMcp.js";
-// Import direct tools server for automatic registration
-import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
+// Enhanced error handling imports
+import {
+  CircuitBreaker,
+  ErrorFactory,
+  isRetriableError,
+  logStructuredError,
+  NeuroLinkError,
+  withRetry,
+  withTimeout,
+} from "./utils/errorHandling.js";
+// Factory processing imports
+import {
+  createCleanStreamOptions,
+  enhanceTextGenerationOptions,
+  processFactoryOptions,
+  processStreamingFactoryOptions,
+  validateFactoryConfig,
+} from "./utils/factoryProcessing.js";
+import { logger, mcpLogger } from "./utils/logger.js";
+import {
+  createCustomToolServerInfo,
+  detectCategory,
+} from "./utils/mcpDefaults.js";
 // Import orchestration components
 import { ModelRouter } from "./utils/modelRouter.js";
+import { getBestProvider } from "./utils/providerUtils.js";
+import { isZodSchema } from "./utils/schemaConversion.js";
 import { BinaryTaskClassifier } from "./utils/taskClassifier.js";
+// Tool detection and execution imports
+// Transformation utilities
 import {
-  initializeOpenTelemetry,
-  shutdownOpenTelemetry,
-  flushOpenTelemetry,
-  getLangfuseHealthStatus,
-  setLangfuseContext,
-  isOpenTelemetryInitialized,
-} from "./services/server/ai/observability/instrumentation.js";
-import type { ObservabilityConfig } from "./types/observability.js";
-import type { NeurolinkConstructorConfig } from "./types/configTypes.js";
-
-import { initializeMem0, type Mem0Config } from "./memory/mem0Initializer.js";
+  extractToolNames,
+  optimizeToolForCollection,
+  transformAvailableTools,
+  transformParamsForLogging,
+  transformToolExecutions,
+  transformToolExecutionsForMCP,
+  transformToolsForMCP,
+  transformToolsToDescriptions,
+  transformToolsToExpectedFormat,
+} from "./utils/transformationUtils.js";
+import { isNonNullObject } from "./utils/typeUtils.js";
 
 /**
  * NeuroLink - Universal AI Development Platform
@@ -1938,6 +1942,48 @@ Current user's request: ${currentInput}`;
         }
       }
 
+      // RAG Integration: If rag config is provided, prepare the RAG search tool
+      if (options.rag?.files?.length) {
+        try {
+          const { prepareRAGTool } = await import("./rag/ragIntegration.js");
+          const ragResult = await prepareRAGTool(
+            options.rag,
+            options.provider as string | undefined,
+          );
+
+          // Inject the RAG tool into the tools record
+          if (!options.tools) {
+            options.tools = {};
+          }
+          (options.tools as Record<string, unknown>)[ragResult.toolName] =
+            ragResult.tool;
+
+          // Inject RAG-aware system prompt so the AI uses the RAG tool first
+          const ragSystemInstruction = [
+            `\n\nIMPORTANT: You have a tool called "${ragResult.toolName}" that searches through`,
+            `${ragResult.filesLoaded} loaded document(s) containing ${ragResult.chunksIndexed} indexed chunks.`,
+            `ALWAYS use the "${ragResult.toolName}" tool FIRST to answer the user's question before using any other tools.`,
+            `This tool searches your local knowledge base of pre-loaded documents and is the primary source of truth.`,
+            `Do NOT use websearchGrounding or any web search tools when the answer can be found in the loaded documents.`,
+          ].join(" ");
+          options.systemPrompt =
+            (options.systemPrompt || "") + ragSystemInstruction;
+
+          logger.info("[RAG] Tool injected into generate()", {
+            toolName: ragResult.toolName,
+            filesLoaded: ragResult.filesLoaded,
+            chunksIndexed: ragResult.chunksIndexed,
+          });
+        } catch (error) {
+          logger.warn(
+            "[RAG] Failed to prepare RAG tool, continuing without RAG",
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
+        }
+      }
+
       // 🔧 CRITICAL FIX: Convert to TextGenerationOptions while preserving the input object for multimodal support
       const baseOptions: TextGenerationOptions = {
         prompt: options.input.text,
@@ -1948,6 +1994,7 @@ Current user's request: ${currentInput}`;
         systemPrompt: options.systemPrompt,
         schema: options.schema,
         output: options.output,
+        tools: options.tools, // Includes RAG tools if rag config was provided
         disableTools: options.disableTools,
         enableAnalytics: options.enableAnalytics,
         enableEvaluation: options.enableEvaluation,
@@ -2990,6 +3037,48 @@ Current user's request: ${currentInput}`;
           }
         }
 
+        // RAG Integration: If rag config is provided, prepare the RAG search tool (stream)
+        if (options.rag?.files?.length) {
+          try {
+            const { prepareRAGTool } = await import("./rag/ragIntegration.js");
+            const ragResult = await prepareRAGTool(
+              options.rag,
+              options.provider as string | undefined,
+            );
+
+            // Inject the RAG tool into the tools record
+            if (!options.tools) {
+              options.tools = {};
+            }
+            (options.tools as Record<string, unknown>)[ragResult.toolName] =
+              ragResult.tool;
+
+            // Inject RAG-aware system prompt so the AI uses the RAG tool first
+            const ragStreamInstruction = [
+              `\n\nIMPORTANT: You have a tool called "${ragResult.toolName}" that searches through`,
+              `${ragResult.filesLoaded} loaded document(s) containing ${ragResult.chunksIndexed} indexed chunks.`,
+              `ALWAYS use the "${ragResult.toolName}" tool FIRST to answer the user's question before using any other tools.`,
+              `This tool searches your local knowledge base of pre-loaded documents and is the primary source of truth.`,
+              `Do NOT use websearchGrounding or any web search tools when the answer can be found in the loaded documents.`,
+            ].join(" ");
+            options.systemPrompt =
+              (options.systemPrompt || "") + ragStreamInstruction;
+
+            logger.info("[RAG] Tool injected into stream()", {
+              toolName: ragResult.toolName,
+              filesLoaded: ragResult.filesLoaded,
+              chunksIndexed: ragResult.chunksIndexed,
+            });
+          } catch (error) {
+            logger.warn(
+              "[RAG] Failed to prepare RAG tool, continuing without RAG",
+              {
+                error: error instanceof Error ? error.message : String(error),
+              },
+            );
+          }
+        }
+
         factoryResult = processStreamingFactoryOptions(options);
         enhancedOptions = createCleanStreamOptions(options);
         if (options.input?.text) {
@@ -3192,7 +3281,7 @@ Current user's request: ${currentInput}`;
               const userId = (
                 enhancedOptions.context as Record<string, unknown>
               )?.userId as string;
-              let providerDetails: ProviderDetails | undefined = undefined;
+              let providerDetails: ProviderDetails | undefined;
               if (enhancedOptions.model) {
                 providerDetails = {
                   provider: providerName,
@@ -3555,7 +3644,7 @@ Current user's request: ${currentInput}`;
           )?.sessionId as string;
           const userId = (enhancedOptions?.context as Record<string, unknown>)
             ?.userId as string;
-          let providerDetails: ProviderDetails | undefined = undefined;
+          let providerDetails: ProviderDetails | undefined;
           if (options.model) {
             providerDetails = {
               provider: providerName,
@@ -5242,7 +5331,10 @@ Current user's request: ${currentInput}`;
     try {
       const health = await ProviderHealthChecker.checkProviderHealth(
         providerName as AIProviderName,
-        { includeConnectivityTest: false, cacheResults: false },
+        {
+          includeConnectivityTest: false,
+          cacheResults: false,
+        },
       );
       return health.isConfigured && health.hasApiKey;
     } catch (error) {
@@ -6216,7 +6308,6 @@ Current user's request: ${currentInput}`;
       // Use the integration module to create the appropriate memory manager
       const memoryManager = await initializeConversationMemory(
         this.conversationMemoryConfig,
-        this.emitter,
       );
       // Assign to conversationMemory with proper type to handle both memory manager types
       this.conversationMemory = memoryManager;

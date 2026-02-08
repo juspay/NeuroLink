@@ -230,7 +230,7 @@ const aiTools = [
 import { lighthouse } from "@juspay/lighthouse";
 
 // After (NeuroLink MCP)
-import { createMCPServer } from "@juspay/neurolink/mcp";
+import { createMCPServer } from "@juspay/neurolink";
 ```
 
 ### Compatibility Features

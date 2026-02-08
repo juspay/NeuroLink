@@ -177,6 +177,9 @@ type GenerateOptions = {
 
   // Document processing options
   officeOptions?: OfficeProcessorOptions;
+
+  // RAG pipeline configuration
+  rag?: RAGConfig; // RAG pipeline config - pass files for automatic chunking and search
 };
 
 // Video output configuration (for Veo 3.1 via Vertex AI)
@@ -403,6 +406,7 @@ type StreamOptions = {
   temperature?: number;
   maxTokens?: number;
   timeout?: number | string;
+  rag?: RAGConfig; // RAG pipeline config - pass files for automatic chunking and search
 };
 ```
 
@@ -450,6 +454,47 @@ const result = await neurolink.gen({
   input: { text: "Hello" },
   provider: "openai",
 });
+```
+
+---
+
+### RAG Integration
+
+Pass `rag: { files: [...] }` to `generate()` or `stream()` for automatic RAG pipeline setup:
+
+```typescript
+const result = await neurolink.generate({
+  prompt: "What does this document say?",
+  rag: {
+    files: ["./docs/guide.md"],
+    strategy: "markdown", // Optional
+    topK: 5, // Optional
+  },
+});
+```
+
+**`RAGConfig` Type:**
+
+| Property            | Type               | Default                   | Description             |
+| ------------------- | ------------------ | ------------------------- | ----------------------- |
+| `files`             | `string[]`         | required                  | File paths to load      |
+| `strategy`          | `ChunkingStrategy` | auto-detected             | Chunking strategy       |
+| `chunkSize`         | `number`           | 1000                      | Max chunk size          |
+| `chunkOverlap`      | `number`           | 200                       | Chunk overlap           |
+| `topK`              | `number`           | 5                         | Top results to retrieve |
+| `toolName`          | `string`           | `"search_knowledge_base"` | Tool name for AI        |
+| `toolDescription`   | `string`           | auto-generated            | Tool description        |
+| `embeddingProvider` | `string`           | generation provider       | Embedding provider      |
+| `embeddingModel`    | `string`           | provider default          | Embedding model         |
+
+**Exports:**
+
+```typescript
+import {
+  prepareRAGTool,
+  type RAGConfig,
+  type RAGPreparedTool,
+} from "@juspay/neurolink";
 ```
 
 ---

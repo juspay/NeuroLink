@@ -465,7 +465,7 @@ export class AudioProcessor {
 }
 ```
 
-**Mastra AI Analysis**: Focused on agent workflows, limited multimodal (images + PDFs via data URIs). No significant patterns to adopt for file processing.
+**AI Analysis**: Focused on agent workflows, limited multimodal (images + PDFs via data URIs). No significant patterns to adopt for file processing.
 
 ---
 

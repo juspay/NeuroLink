@@ -456,7 +456,7 @@ const registry = factory.createRegistry({
 ### **Lighthouse Compatibility (99%)**
 ```typescript
 // NeuroLink MCP Factory
-import { createMCPServer } from '@juspay/neurolink/mcp';
+import { createMCPServer } from '@juspay/neurolink';
 
 // Lighthouse MCP Factory (almost identical)
 // import { createMCPServer } from '@lighthouse/mcp'; // Just change import!

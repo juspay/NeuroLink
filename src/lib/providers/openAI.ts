@@ -1,11 +1,12 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, type LanguageModelV1, type Tool } from "ai";
-import type { ValidationSchema } from "../types/typeAliases.js";
+import { type LanguageModelV1, streamText, type Tool } from "ai";
 import { AIProviderName } from "../constants/enums.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { BaseProvider } from "../core/baseProvider.js";
-import { logger } from "../utils/logger.js";
-import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
+import { DEFAULT_MAX_STEPS } from "../core/constants.js";
+import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
+import type { NeuroLink } from "../neurolink.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
+import type { UnknownRecord } from "../types/common.js";
 import {
   AuthenticationError,
   InvalidModelError,
@@ -13,17 +14,16 @@ import {
   ProviderError,
   RateLimitError,
 } from "../types/errors.js";
-import { DEFAULT_MAX_STEPS } from "../core/constants.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { NeuroLink } from "../neurolink.js";
+import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type { ValidationSchema } from "../types/typeAliases.js";
+import { logger } from "../utils/logger.js";
 import {
-  validateApiKey,
   createOpenAIConfig,
   getProviderModel,
+  validateApiKey,
 } from "../utils/providerConfig.js";
-import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
-import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { isZodSchema } from "../utils/schemaConversion.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
 
 // Configuration helpers - now using consolidated utility
 const getOpenAIApiKey = (): string => {
@@ -78,6 +78,14 @@ export class OpenAIProvider extends BaseProvider {
 
   public getDefaultModel(): string {
     return getOpenAIModel();
+  }
+
+  /**
+   * Get the default embedding model for OpenAI
+   * @returns The default OpenAI embedding model name
+   */
+  protected getDefaultEmbeddingModel(): string {
+    return process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small";
   }
 
   /**
@@ -305,9 +313,12 @@ export class OpenAIProvider extends BaseProvider {
     );
 
     try {
-      // Get tools consistently with generate method
+      // Get tools - options.tools is pre-merged by BaseProvider.stream() with
+      // base tools (MCP/built-in) + user-provided tools (RAG, etc.)
       const shouldUseTools = !options.disableTools && this.supportsTools();
-      const allTools = shouldUseTools ? await this.getAllTools() : {};
+      const allTools = shouldUseTools
+        ? (options.tools as Record<string, Tool>) || (await this.getAllTools())
+        : {};
 
       // OpenAI-specific fix: Validate tools format and filter out problematic ones
       let tools = this.validateAndFilterToolsForOpenAI(allTools);
@@ -580,6 +591,58 @@ export class OpenAIProvider extends BaseProvider {
       };
     } catch (error) {
       timeoutController?.cleanup();
+      throw this.handleProviderError(error);
+    }
+  }
+
+  /**
+   * Generate embeddings for text using OpenAI text-embedding models
+   * @param text - The text to embed
+   * @param modelName - The embedding model to use (default: text-embedding-3-small)
+   * @returns Promise resolving to the embedding vector
+   */
+  async embed(text: string, modelName?: string): Promise<number[]> {
+    const embeddingModelName = modelName || "text-embedding-3-small";
+
+    logger.debug("Generating embedding", {
+      provider: this.providerName,
+      model: embeddingModelName,
+      textLength: text.length,
+    });
+
+    try {
+      // Create embedding model using the AI SDK
+      const { embed } = await import("ai");
+
+      // Create the OpenAI provider
+      const openai = createOpenAI({
+        apiKey: getOpenAIApiKey(),
+        fetch: createProxyFetch(),
+      });
+
+      // Get the text embedding model
+      const embeddingModel = openai.textEmbeddingModel(embeddingModelName);
+
+      // Generate the embedding
+      const result = await embed({
+        model: embeddingModel,
+        value: text,
+      });
+
+      logger.debug("Embedding generated successfully", {
+        provider: this.providerName,
+        model: embeddingModelName,
+        embeddingDimension: result.embedding.length,
+      });
+
+      return result.embedding;
+    } catch (error) {
+      logger.error("Embedding generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        model: embeddingModelName,
+        textLength: text.length,
+      });
+
       throw this.handleProviderError(error);
     }
   }

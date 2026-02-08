@@ -1,5 +1,7 @@
 # AI-Driven Tool Orchestration Guide
 
+> ⚠️ **PLANNED FEATURE**: This documentation describes features that are planned but not yet implemented. The `DynamicOrchestrator` class referenced in this guide does not currently exist in the codebase. The code examples are illustrative of the intended API design.
+
 **NeuroLink Enhanced MCP Platform - AI Orchestration**
 
 ---
@@ -228,7 +230,7 @@ const DATA_FETCHING_RULE: PlanningRule = {
 ### **Basic AI Orchestration**
 
 ```typescript
-import { DynamicOrchestrator } from "@juspay/neurolink/mcp";
+import { DynamicOrchestrator } from "@juspay/neurolink";
 
 // Initialize orchestrator
 const orchestrator = new DynamicOrchestrator({

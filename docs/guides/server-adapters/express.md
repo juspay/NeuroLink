@@ -60,7 +60,7 @@ npm install @juspay/neurolink express
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 const neurolink = new NeuroLink({
   defaultProvider: "openai",
@@ -100,7 +100,7 @@ For advanced customization, you can access the underlying Express application:
 
 ```typescript
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 import helmet from "helmet";
 import morgan from "morgan";
 
@@ -204,7 +204,7 @@ import {
   createCacheMiddleware,
   createRequestIdMiddleware,
   createTimingMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 const server = await createServer(neurolink, {
   framework: "express",
@@ -383,7 +383,7 @@ The abort signal middleware allows detecting when clients disconnect during long
 import {
   createAbortSignalMiddleware,
   createExpressAbortMiddleware,
-} from "@juspay/neurolink/server";
+} from "@juspay/neurolink";
 
 // Option 1: Universal middleware (works with ServerContext)
 const abortMiddleware = createAbortSignalMiddleware({
@@ -498,7 +498,7 @@ If you already have an Express application, you can integrate NeuroLink routes:
 ```typescript
 import express from "express";
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 // Your existing Express app
 const existingApp = express();
@@ -540,7 +540,7 @@ existingApp.listen(3000, () => {
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { NeuroLink } from "@juspay/neurolink";
-import { createServer } from "@juspay/neurolink/server";
+import { createServer } from "@juspay/neurolink";
 
 describe("API Server", () => {
   let server;

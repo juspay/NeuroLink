@@ -1,5 +1,7 @@
 # 🔍 MCP Auto-Discovery System (v1.7.1 Status)
 
+> ⚠️ **PARTIAL IMPLEMENTATION**: Some features in this documentation are planned but not yet implemented. The `discoverMCPServers` function referenced in code examples is not currently exported from `@juspay/neurolink`. CLI-based discovery (`npx neurolink mcp discover`) is functional, but the programmatic API is in development.
+
 ## Overview
 
 The **MCP Auto-Discovery System** is a revolutionary feature in NeuroLink that automatically discovers and catalogs MCP (Model Context Protocol) server configurations from all major AI development tools on your system. This breakthrough eliminates the need for manual configuration and provides instant access to your existing MCP ecosystem.
@@ -69,7 +71,7 @@ Direct external tool execution (in development):
 npx neurolink mcp exec filesystem read_file --params '{"path": "README.md"}'
 ```
 ```javascript
-const { discoverMCPServers } = require('@juspay/neurolink/mcp');
+const { discoverMCPServers } = require('@juspay/neurolink');
 const servers = await discoverMCPServers();
 ```
 

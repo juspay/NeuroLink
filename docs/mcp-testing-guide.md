@@ -1,5 +1,7 @@
 # 🧪 MCP Foundation Testing Guide
 
+> ⚠️ **PLANNED FEATURE**: This documentation describes features that are planned but not yet implemented. The `ContextManager` class referenced in this guide does not currently exist in the codebase. The code examples are illustrative of the intended API design.
+
 **NeuroLink v1.3.0 MCP Foundation** - Comprehensive guide for testing MCP functionality and adding custom MCP servers.
 
 ---
@@ -31,12 +33,12 @@ Create a test file to explore MCP functionality:
 
 ```typescript
 // test-mcp.ts
-import { createMCPServer } from "@juspay/neurolink/mcp";
+import { createMCPServer } from "@juspay/neurolink";
 import {
   NeuroLinkMCPTool,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "@juspay/neurolink/mcp";
+} from "@juspay/neurolink";
 
 // Create a custom MCP server
 const testServer = createMCPServer({
@@ -77,8 +79,8 @@ console.log("Available tools:", Object.keys(testServer.tools));
 
 ```typescript
 // test-ai-core.ts
-import { aiCoreServer } from "@juspay/neurolink/mcp/servers/aiProviders/aiCoreServer";
-import { ContextManager } from "@juspay/neurolink/mcp";
+import { aiCoreServer } from "@juspay/neurolink";
+import { ContextManager } from "@juspay/neurolink";
 
 async function testAICoreServer() {
   // Create execution context
@@ -149,10 +151,10 @@ testAICoreServer();
 
 ```typescript
 // test-orchestration.ts
-import { MCPRegistry } from "@juspay/neurolink/mcp";
-import { ToolOrchestrator } from "@juspay/neurolink/mcp";
-import { ContextManager } from "@juspay/neurolink/mcp";
-import { aiCoreServer } from "@juspay/neurolink/mcp/servers/aiProviders/aiCoreServer";
+import { MCPRegistry } from "@juspay/neurolink";
+import { ToolOrchestrator } from "@juspay/neurolink";
+import { ContextManager } from "@juspay/neurolink";
+import { aiCoreServer } from "@juspay/neurolink";
 
 async function testOrchestration() {
   // Initialize registry and orchestrator
@@ -223,12 +225,9 @@ testOrchestration();
 
 ```typescript
 // servers/dev-tools-server.ts
-import { createMCPServer } from "@juspay/neurolink/mcp";
+import { createMCPServer } from "@juspay/neurolink";
 import { z } from "zod";
-import type {
-  NeuroLinkExecutionContext,
-  ToolResult,
-} from "@juspay/neurolink/mcp";
+import type { NeuroLinkExecutionContext, ToolResult } from "@juspay/neurolink";
 
 // Create development tools server
 export const devToolsServer = createMCPServer({
@@ -381,12 +380,9 @@ console.log(
 
 ```typescript
 // servers/content-server.ts
-import { createMCPServer } from "@juspay/neurolink/mcp";
+import { createMCPServer } from "@juspay/neurolink";
 import { z } from "zod";
-import type {
-  NeuroLinkExecutionContext,
-  ToolResult,
-} from "@juspay/neurolink/mcp";
+import type { NeuroLinkExecutionContext, ToolResult } from "@juspay/neurolink";
 
 export const contentServer = createMCPServer({
   id: "neurolink-content",
@@ -603,7 +599,7 @@ Create and run a test file:
 ```bash
 # Create test file
 cat > test-custom-mcp.ts << 'EOF'
-import { createMCPServer } from '@juspay/neurolink/mcp';
+import { createMCPServer } from '@juspay/neurolink';
 
 const myServer = createMCPServer({
   id: 'test-server',
@@ -631,7 +627,7 @@ npx ts-node test-custom-mcp.ts
 node -r ts-node/register
 
 # In REPL:
-> const { createMCPServer } = require('@juspay/neurolink/mcp');
+> const { createMCPServer } = require('@juspay/neurolink');
 > const server = createMCPServer({ id: 'repl-test', title: 'REPL Test' });
 > console.log('Server created:', server.id);
 ```
