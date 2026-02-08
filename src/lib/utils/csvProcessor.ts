@@ -106,12 +106,7 @@ function detectValueType(value: string): CSVColumnDataType {
     return "empty";
   }
 
-  // Check boolean first (before numbers since "1" and "0" could be both)
-  if (BOOLEAN_VALUES.has(trimmed.toLowerCase())) {
-    return "boolean";
-  }
-
-  // Check integer
+  // Check integer (before boolean since "1"/"0" are in BOOLEAN_VALUES)
   if (INTEGER_REGEX.test(trimmed)) {
     return "integer";
   }
@@ -119,6 +114,11 @@ function detectValueType(value: string): CSVColumnDataType {
   // Check float
   if (FLOAT_REGEX.test(trimmed)) {
     return "float";
+  }
+
+  // Check boolean (after numeric checks so "1"/"0" are classified as integers)
+  if (BOOLEAN_VALUES.has(trimmed.toLowerCase())) {
+    return "boolean";
   }
 
   // Check email
@@ -515,11 +515,13 @@ function detectHasHeaders(
 
   const textRatio = textLikeCount / nonEmptyHeaders;
 
-  // Check 2: Headers should be unique
-  const uniqueHeaders = new Set(
-    headerValues.map((v) => v?.trim().toLowerCase()),
-  );
-  const hasUniqueHeaders = uniqueHeaders.size === headerValues.length;
+  // Check 2: Headers should be unique (empty/blank names excluded from uniqueness check)
+  const normalizedNonEmptyHeaders = headerValues
+    .map((v) => v?.trim().toLowerCase())
+    .filter((v) => v !== "");
+  const uniqueHeaders = new Set(normalizedNonEmptyHeaders);
+  const hasUniqueHeaders =
+    uniqueHeaders.size === normalizedNonEmptyHeaders.length;
 
   // Check 3: Compare with data rows if available
   if (dataRows && dataRows.length > 0) {
@@ -679,7 +681,6 @@ export class CSVProcessor {
       logger.info("[CSVProcessor] ✅ Processed CSV file", {
         formatStyle: "raw",
         rowCount,
-        columnCount: (limitedLines[0] || "").split(",").length,
         truncated: wasTruncated,
       });
 
@@ -690,6 +691,20 @@ export class CSVProcessor {
       );
       const { columnMetadata, dataQualityWarnings, dataQualityScore } =
         analyzeColumns(sampleForAnalysis);
+
+      // Derive headers from the properly parsed sample (handles quoted/escaped commas correctly)
+      const parsedHeaders =
+        sampleForAnalysis.length > 0 &&
+        sampleForAnalysis[0] &&
+        typeof sampleForAnalysis[0] === "object"
+          ? Object.keys(sampleForAnalysis[0] as Record<string, unknown>)
+          : (limitedLines[0] || "").split(",");
+      const parsedColumnCount = parsedHeaders.length;
+
+      // Detect delimiter from sep= metadata line if present, otherwise assume comma
+      const firstLineTrimmed = (limitedLines[0] || "").trim();
+      const sepMatch = firstLineTrimmed.match(/^sep=(.)/i);
+      const detectedDelimiter = sepMatch ? sepMatch[1] : ",";
 
       // Log data quality summary
       if (dataQualityWarnings.length > 0) {
@@ -708,16 +723,18 @@ export class CSVProcessor {
           size: content.length,
           rowCount,
           totalLines: limitedLines.length,
-          columnCount: (limitedLines[0] || "").split(",").length,
+          columnCount: parsedColumnCount,
           extension,
           columnMetadata,
           dataQualityWarnings,
           dataQualityScore,
           hasHeaders: detectHasHeaders(
-            (limitedLines[0] || "").split(","),
-            undefined,
+            parsedHeaders.map(String),
+            sampleForAnalysis.length > 0
+              ? (sampleForAnalysis as Record<string, unknown>[])
+              : undefined,
           ),
-          detectedDelimiter: ",",
+          detectedDelimiter,
         },
       };
     }

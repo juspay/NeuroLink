@@ -192,10 +192,12 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = new Error("Invalid API key");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("Invalid OpenRouter API key");
-      expect(handledError.message).toContain("https://openrouter.ai/keys");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /Invalid OpenRouter API key/,
+      );
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /https:\/\/openrouter\.ai\/keys/,
+      );
     });
 
     it("should handle API_KEY_INVALID error specifically", () => {
@@ -204,10 +206,12 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = new Error("API_KEY_INVALID");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("Invalid OpenRouter API key");
-      expect(handledError.message).toContain("https://openrouter.ai/keys");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /Invalid OpenRouter API key/,
+      );
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /https:\/\/openrouter\.ai\/keys/,
+      );
     });
 
     it("should handle Unauthorized error", () => {
@@ -216,9 +220,9 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = new Error("Unauthorized");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("Invalid OpenRouter API key");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /Invalid OpenRouter API key/,
+      );
     });
 
     it("should handle rate limit error", () => {
@@ -227,10 +231,12 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = new Error("rate limit exceeded");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("rate limit exceeded");
-      expect(handledError.message).toContain("https://openrouter.ai/credits");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /rate limit exceeded/,
+      );
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /https:\/\/openrouter\.ai\/credits/,
+      );
     });
 
     it("should handle model not found error", () => {
@@ -239,10 +245,12 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider("invalid/model");
 
       const error = new Error("model not found");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("not available on OpenRouter");
-      expect(handledError.message).toContain("https://openrouter.ai/models");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /not available on OpenRouter/,
+      );
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /https:\/\/openrouter\.ai\/models/,
+      );
     });
 
     it("should handle insufficient credits error", () => {
@@ -251,10 +259,12 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = new Error("insufficient_credits");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("Insufficient OpenRouter credits");
-      expect(handledError.message).toContain("https://openrouter.ai/credits");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /Insufficient OpenRouter credits/,
+      );
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /https:\/\/openrouter\.ai\/credits/,
+      );
     });
 
     it("should handle network connection error", () => {
@@ -263,10 +273,12 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = new Error("ECONNREFUSED");
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("not available");
-      expect(handledError.message).toContain("network connection");
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /not available/,
+      );
+      expect(() => provider.handleProviderError(error)).toThrow(
+        /network connection/,
+      );
     });
 
     it("should handle timeout error", () => {
@@ -275,9 +287,7 @@ describe("OpenRouter Provider Integration Tests", () => {
       const provider = new OpenRouterProvider();
 
       const error = { name: "TimeoutError", message: "Request timed out" };
-      const handledError = provider.handleProviderError(error);
-
-      expect(handledError.message).toContain("timed out");
+      expect(() => provider.handleProviderError(error)).toThrow(/timed out/);
     });
   });
 

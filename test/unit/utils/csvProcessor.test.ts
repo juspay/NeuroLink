@@ -583,8 +583,8 @@ Charlie,35,Chicago`;
 
     it("should consolidate integers and floats as number type", async () => {
       // Mix of integers and floats should be classified as "number", not "mixed"
-      // Using values > 1 to avoid boolean detection (0 and 1 are treated as boolean)
-      const csvData = Buffer.from("value\n10\n2.5\n30\n4.5\n50\n6.5\n70\n8.5");
+      // 0 and 1 are now correctly detected as integers (numeric check runs before boolean)
+      const csvData = Buffer.from("value\n0\n2.5\n1\n4.5\n50\n6.5\n70\n8.5");
       const result = await CSVProcessor.process(csvData, {
         formatStyle: "raw",
       });
