@@ -899,6 +899,8 @@ const LINK_MAPPINGS: Record<string, string> = {
   "troubleshooting.md": "/reference/troubleshooting",
   "provider-comparison": "/reference/provider-comparison",
   "provider-behavior": "/reference/provider-behavior",
+  "provider-feature-compatibility": "/reference/provider-feature-compatibility",
+  "provider-feature-compatibility.md": "/reference/provider-feature-compatibility",
   "factory-pattern-migration": "/development/factory-migration",
   "factory-pattern-migration.md": "/development/factory-migration",
 
@@ -917,6 +919,10 @@ const LINK_MAPPINGS: Record<string, string> = {
   "real-time-speech-agents": "/features/speech-agents",
   streaming: "/advanced/streaming",
   "features/streaming": "/advanced/streaming",
+  "context-compaction": "/features/context-compaction",
+  "context-compaction.md": "/features/context-compaction",
+  "thinking-configuration": "/features/thinking-configuration",
+  "thinking-configuration.md": "/features/thinking-configuration",
 
   // Provider guides -> getting-started/providers
   "ollama-setup": "/getting-started/providers/ollama",
@@ -1086,6 +1092,45 @@ const LINK_MAPPINGS: Record<string, string> = {
   GenerateResult: "/api/type-aliases/GenerateResult",
   ExecutionContext: "/api/type-aliases/ExecutionContext",
   AIModelProviderConfig: "/api/type-aliases/AIModelProviderConfig",
+
+  // Server Adapters - bare names (from relative ./hono.md links within server-adapters/)
+  hono: "/guides/server-adapters/hono",
+  "hono.md": "/guides/server-adapters/hono",
+  security: "/guides/server-adapters/security",
+  "security.md": "/guides/server-adapters/security",
+  deployment: "/guides/server-adapters/deployment",
+  "deployment.md": "/guides/server-adapters/deployment",
+  koa: "/guides/server-adapters/koa",
+  "koa.md": "/guides/server-adapters/koa",
+  websocket: "/guides/server-adapters/websocket",
+  "websocket.md": "/guides/server-adapters/websocket",
+  errors: "/guides/server-adapters/errors",
+  "errors.md": "/guides/server-adapters/errors",
+
+  // Server Adapters - prefixed paths (from relative ./server-adapters/X links)
+  "server-adapters": "/guides/server-adapters",
+  "server-adapters/index": "/guides/server-adapters",
+  "server-adapters/index.md": "/guides/server-adapters",
+  "server-adapters/hono": "/guides/server-adapters/hono",
+  "server-adapters/hono.md": "/guides/server-adapters/hono",
+  "server-adapters/express": "/guides/server-adapters/express",
+  "server-adapters/express.md": "/guides/server-adapters/express",
+  "server-adapters/fastify": "/guides/server-adapters/fastify",
+  "server-adapters/fastify.md": "/guides/server-adapters/fastify",
+  "server-adapters/koa": "/guides/server-adapters/koa",
+  "server-adapters/koa.md": "/guides/server-adapters/koa",
+  "server-adapters/security": "/guides/server-adapters/security",
+  "server-adapters/security.md": "/guides/server-adapters/security",
+  "server-adapters/deployment": "/guides/server-adapters/deployment",
+  "server-adapters/deployment.md": "/guides/server-adapters/deployment",
+  "server-adapters/streaming": "/guides/server-adapters/streaming",
+  "server-adapters/streaming.md": "/guides/server-adapters/streaming",
+  "server-adapters/websocket": "/guides/server-adapters/websocket",
+  "server-adapters/websocket.md": "/guides/server-adapters/websocket",
+  "server-adapters/errors": "/guides/server-adapters/errors",
+  "server-adapters/errors.md": "/guides/server-adapters/errors",
+  "server-adapters/middleware": "/guides/server-adapters/middleware",
+  "server-adapters/middleware.md": "/guides/server-adapters/middleware",
 
   // Server Adapters - path-prefixed versions for explicit reference
   // NOTE: Simple names like "hono", "express" etc. should use guides/server-adapters/ paths
