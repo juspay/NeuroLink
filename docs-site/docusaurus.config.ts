@@ -54,13 +54,6 @@ const config: Config = {
         crossorigin: "anonymous",
       },
     },
-    {
-      tagName: "link",
-      attributes: {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Hack:wght@400;700&display=swap",
-      },
-    },
   ],
 
   markdown: {
@@ -94,15 +87,17 @@ const config: Config = {
       "classic",
       {
         docs: {
-          routeBasePath: "/docs", // Serve docs from /docs, landing page at /
+          routeBasePath: "docs", // Docs at /docs, root redirects to getting-started
           sidebarPath: "./sidebars.ts",
-          editUrl: "https://github.com/juspay/neurolink/tree/main/docs-site/",
+          editUrl:
+            "https://github.com/juspay/neurolink/tree/release/docs-site/",
           exclude: [
             "**/api/**",
             "**/cli-guide.md",
             "**/package-overrides.md",
             "**/mcp/concurrency.md",
             "**/features/interactive-cli.md",
+            "**/mastra-features-implementation/**",
           ],
           showLastUpdateAuthor: true,
           showLastUpdateTime: true,
@@ -130,14 +125,13 @@ const config: Config = {
           priority: 0.5,
           filename: "sitemap.xml",
         },
-        ...(process.env.GA_TRACKING_ID
-          ? {
-              gtag: {
-                trackingID: process.env.GA_TRACKING_ID,
-                anonymizeIP: true,
-              },
-            }
-          : {}),
+        ...(process.env.NODE_ENV === "production" &&
+          process.env.GA_TRACKING_ID && {
+            gtag: {
+              trackingID: process.env.GA_TRACKING_ID,
+              anonymizeIP: true,
+            },
+          }),
       } satisfies Preset.Options,
     ],
   ],
@@ -243,7 +237,7 @@ const config: Config = {
             { label: "Juspay", href: "https://juspay.io" },
             {
               label: "Contributing",
-              href: "https://github.com/juspay/neurolink/blob/main/CONTRIBUTING.md",
+              href: "https://github.com/juspay/neurolink/blob/release/CONTRIBUTING.md",
             },
           ],
         },

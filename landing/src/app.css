@@ -1,0 +1,375 @@
+@import "tailwindcss";
+
+/* ===========================================
+   NEUROLINK DESIGN SYSTEM TOKENS
+   =========================================== */
+
+@theme {
+  /* Brand Colors - Official NeuroLink Palette */
+  --color-nl-accent: #016fb9;
+  --color-nl-accent-dark: #014a7a;
+  --color-nl-accent-light: #0190e0;
+  --color-nl-accent-lighter: #4db5e8;
+  --color-nl-saffron: #ff9505;
+  --color-nl-paprika: #ec4e20;
+  --color-nl-charcoal: #353531;
+  --color-nl-charcoal-light: #3d3d38;
+  --color-nl-charcoal-dark: #2a2a27;
+
+  /* Semantic Colors */
+  --color-nl-success: #22c55e;
+  --color-nl-warning: #eab308;
+  --color-nl-error: #ef4444;
+  --color-nl-info: #3b82f6;
+
+  /* Secondary Accents */
+  --color-nl-orange: #ff9505;
+  --color-nl-red: #ec4e20;
+  --color-nl-purple: #a855f7;
+  --color-nl-pink: #ec4899;
+  --color-nl-cyan: #06b6d4;
+  --color-nl-green: #22c55e;
+
+  /* Gradient accents */
+  --color-gradient-start: #016fb9;
+  --color-gradient-end: #4db5e8;
+  --color-gradient-warm-start: #ff9505;
+  --color-gradient-warm-end: #ec4e20;
+
+  /* Surfaces - Dark */
+  --color-ds-bg: #0a0a0a;
+  --color-ds-surface-1: #111111;
+  --color-ds-surface-2: #161616;
+  --color-ds-surface-3: #1f1f1f;
+  --color-ds-surface-4: #262626;
+  --color-ds-surface-hover: #2a2a2a;
+
+  /* Text - Dark */
+  --color-ds-text-primary: #fafafa;
+  --color-ds-text-secondary: #e5e5e5;
+  --color-ds-text-tertiary: #a0a0a0;
+  --color-ds-text-muted: #666666;
+
+  /* Borders - Dark */
+  --color-ds-border: #2a2a2a;
+  --color-ds-border-subtle: #1f1f1f;
+  --color-ds-border-hover: #3d3d3d;
+
+  /* Layout */
+  --width-ds-content: 1200px;
+  --width-ds-header: 1400px;
+
+  /* Border Radius */
+  --radius-ds-sm: 0.375rem;
+  --radius-ds-md: 0.5rem;
+  --radius-ds-lg: 0.75rem;
+  --radius-ds-xl: 1rem;
+  --radius-ds-2xl: 1.25rem;
+  --radius-ds-full: 9999px;
+
+  /* Shadows */
+  --shadow-ds-sm: 0 1px 2px rgb(0 0 0 / 20%);
+  --shadow-ds-md: 0 4px 6px rgb(0 0 0 / 25%);
+  --shadow-ds-lg: 0 4px 12px rgb(0 0 0 / 30%);
+  --shadow-ds-xl: 0 8px 24px rgb(0 0 0 / 40%);
+  --shadow-ds-glow: 0 0 20px hsl(217deg 91% 60% / 30%);
+  --shadow-glow-blue: 0 0 80px rgb(1 111 185 / 15%);
+  --shadow-glow-blue-strong: 0 34px 84px -30px rgb(1 111 185 / 25%);
+  --shadow-card-hover: 0 20px 60px -15px rgb(1 111 185 / 20%);
+
+  /* Animations */
+  --animate-color-ripple: color-ripple 6s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
+  --animate-bounce-down: bounce-down 2s ease-in-out infinite;
+}
+
+/* ===========================================
+   KEYFRAMES
+   =========================================== */
+
+@keyframes color-ripple {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce-down {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(8px);
+    opacity: 1;
+  }
+}
+
+@keyframes mesh-shift {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shine-rotate {
+  to {
+    --shine-angle: 360deg;
+  }
+}
+
+/* ===========================================
+   CUSTOM PROPERTIES FOR ANIMATIONS
+   =========================================== */
+
+@property --shine-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ===========================================
+   BASE STYLES
+   =========================================== */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html.lenis {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto;
+}
+
+body {
+  background: var(--color-ds-bg);
+  color: var(--color-ds-text-primary);
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+::selection {
+  background: hsl(217deg 91% 60% / 30%);
+  color: #fff;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: "Hack", "JetBrains Mono", "Fira Code", Consolas, monospace;
+}
+
+/* ===========================================
+   TYPOGRAPHY UTILITIES
+   =========================================== */
+
+.hero-headline {
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.section-headline {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.eyebrow {
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ===========================================
+   SHINE BORDER EFFECT
+   =========================================== */
+
+.shine-border {
+  position: relative;
+  border-radius: 12px;
+  padding: 1px;
+  background:
+    linear-gradient(var(--color-ds-surface-2), var(--color-ds-surface-2))
+      padding-box,
+    conic-gradient(
+        from var(--shine-angle, 0deg),
+        transparent 70%,
+        rgb(1 111 185 / 50%) 85%,
+        rgb(1 111 185 / 80%) 90%,
+        rgb(77 181 232 / 50%) 95%,
+        transparent 100%
+      )
+      border-box;
+  animation: shine-rotate 15s linear infinite;
+}
+
+.shine-border-hover {
+  --shine-angle: 0deg;
+  animation: none;
+}
+
+.shine-border-hover:hover {
+  animation: shine-rotate 8s linear infinite;
+}
+
+/* ===========================================
+   HERO GRADIENT MESH
+   =========================================== */
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse at 20% 50%,
+      rgb(1 111 185 / 8%) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 80% 30%,
+      rgb(255 149 5 / 5%) 0%,
+      transparent 50%
+    ),
+    radial-gradient(ellipse at 60% 80%, rgb(236 78 32 / 4%) 0%, transparent 50%);
+  animation: mesh-shift 20s ease infinite;
+}
+
+/* ===========================================
+   SCROLLBAR
+   =========================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-ds-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-ds-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ds-border-hover);
+}
+
+/* ===========================================
+   FOOTER LINK HOVER UNDERLINE
+   =========================================== */
+
+.footer-link {
+  position: relative;
+}
+
+.footer-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: currentcolor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease-out;
+}
+
+.footer-link:hover::after {
+  transform: scaleX(1);
+}
+
+/* ===========================================
+   MARQUEE PAUSE ON HOVER
+   =========================================== */
+
+.marquee-container:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* ===========================================
+   REDUCED MOTION
+   =========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

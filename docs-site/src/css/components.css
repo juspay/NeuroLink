@@ -348,7 +348,7 @@ button[class*="copyButton"]:hover {
 
 /* Line highlighting in code blocks */
 .docusaurus-highlight-code-line {
-  background-color: hsla(217, 91%, 60%, 0.15);
+  background-color: rgb(1 111 185 / 15%);
   display: block;
   margin: 0 calc(-1 * var(--ifm-pre-padding));
   padding: 0 var(--ifm-pre-padding);
@@ -1101,7 +1101,7 @@ div[class*="announcementBar"] a {
   margin-top: var(--spacing-10);
   margin-bottom: var(--spacing-4);
   padding-bottom: var(--spacing-2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
   letter-spacing: -0.02em;
   color: var(--neurolink-text-primary);
 }

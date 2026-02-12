@@ -49,7 +49,7 @@ const theme: PrismTheme = {
         "inserted", // Overridden below for diff blocks
       ],
       style: {
-        color: "#60a5fa", // Blue (NeuroLink accent)
+        color: "#4db5e8", // Blue (NeuroLink accent)
       },
     },
     {
@@ -85,7 +85,7 @@ const theme: PrismTheme = {
     {
       types: ["builtin", "char"],
       style: {
-        color: "#60a5fa",
+        color: "#4db5e8",
       },
     },
     {

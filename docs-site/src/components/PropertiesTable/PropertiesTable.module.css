@@ -112,5 +112,5 @@
 }
 
 [data-theme="dark"] .type {
-  background: rgba(59, 130, 246, 0.15) !important;
+  background: var(--neurolink-accent-hover-dark) !important;
 }

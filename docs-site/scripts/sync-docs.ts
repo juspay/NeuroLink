@@ -374,33 +374,108 @@ function removeAttributeSyntax(content: string): string {
  */
 function convertGridCards(content: string): string {
   // Unwrap <div class="grid cards" markdown> containers, keeping inner content
-  // This preserves the content while removing the container divs
+  // This preserves the content while removing the container divs and *** separators
   return content.replace(
     /<div\s+class="grid\s+cards"[^>]*markdown>\s*([\s\S]*?)\s*<\/div>/gi,
     (match, innerContent) => {
-      return innerContent.trim();
+      // Remove *** thematic breaks used as card separators in MkDocs grid cards
+      return innerContent.replace(/^\s*\*\*\*\s*$/gm, "").trim();
     },
   );
 }
 
 /**
- * Convert material icons to text or emoji alternatives
- * :material-icon-name: -> descriptive text
+ * Convert material icons to Unicode emoji alternatives
+ * :material-icon-name: -> Unicode emoji
+ * Also strips MkDocs attribute syntax like { .class title="..." }
  */
 function convertMaterialIcons(content: string): string {
   const iconMap: Record<string, string> = {
-    "material-clock-fast": "clock:",
-    "material-download": "download:",
-    "material-key": "key:",
-    "material-cog": "settings:",
-    "material-check": "check:",
-    "material-close": "close:",
-    "material-alert": "alert:",
-    "material-information": "info:",
+    "material-clock-fast": "⏱️",
+    "material-clock-outline": "🕐",
+    "material-download": "📥",
+    "material-key": "🔑",
+    "material-cog": "⚙️",
+    "material-check": "✅",
+    "material-close": "❌",
+    "material-alert": "⚠️",
+    "material-alert-circle": "⚠️",
+    "material-information": "ℹ️",
+    "material-rocket": "🚀",
+    "material-console": "💻",
+    "material-console-line": "💻",
+    "material-code": "💻",
+    "material-code-block-tags": "📝",
+    "material-star": "⭐",
+    "material-lightbulb": "💡",
+    "material-briefcase": "💼",
+    "material-help-circle": "❓",
+    "material-frequently-asked-questions": "❓",
+    "material-shield-check": "🛡️",
+    "material-shield-lock": "🔐",
+    "material-compare": "⚖️",
+    "material-camera": "📷",
+    "material-play-circle": "▶️",
+    "material-web": "🌐",
+    "material-book-open": "📖",
+    "material-heart": "❤️",
+    "material-test-tube": "🧪",
+    "material-sitemap": "🗺️",
+    "material-factory": "🏭",
+    "material-tag-multiple": "🏷️",
+    "material-link-variant": "🔗",
+    "material-connection": "🔌",
+    "material-chart-line": "📈",
+    "material-chart-timeline": "📊",
+    "material-chart-box": "📊",
+    "material-refresh": "🔄",
+    "material-wave": "🌊",
+    "material-middleware": "🔧",
+    "material-video": "🎬",
+    "material-image": "🖼️",
+    "material-image-plus": "🖼️",
+    "material-image-text": "🖼️",
+    "material-microphone": "🎤",
+    "material-server": "🖥️",
+    "material-server-network": "🌐",
+    "material-database-search": "🔍",
+    "material-database-export": "📤",
+    "material-database-cog": "🗄️",
+    "material-security": "🔒",
+    "material-tools": "🛠️",
+    "material-hand-pointing-up": "👆",
+    "material-brain": "🧠",
+    "material-brain-circuit": "🧠",
+    "material-aws": "☁️",
+    "material-table-large": "📊",
+    "material-file-pdf-box": "📄",
+    "material-file-word": "📝",
+    "material-earth": "🌍",
+    "material-speedometer": "⚡",
+    "material-flash": "⚡",
+    "material-new-box": "🆕",
+    "material-api": "📡",
   };
 
+  // First strip MkDocs attribute syntax: { .class title="..." }
+  content = content.replace(/:material-[a-z-]+:\{[^}]*\}/g, (match) => {
+    const iconMatch = match.match(/:material-([a-z-]+):/);
+    if (iconMatch) {
+      const replacement = iconMap[`material-${iconMatch[1]}`];
+      if (!replacement) {
+        console.warn(`  ⚠️  Unmapped material icon: :material-${iconMatch[1]}:`);
+      }
+      return replacement || "";
+    }
+    return "";
+  });
+
+  // Then convert remaining material icons
   return content.replace(/:material-([a-z-]+):/g, (match, iconName) => {
     const replacement = iconMap[`material-${iconName}`];
+    if (!replacement) {
+      console.warn(`  ⚠️  Unmapped material icon: :material-${iconName}:`);
+    }
     return replacement || "";
   });
 }

@@ -2,7 +2,7 @@
 
 > Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI
 
-Generated: 2026-02-08T20:46:14.402Z
+Generated: 2026-02-12T20:23:20.826Z
 Full documentation: https://docs.neurolink.ink/llms-full.txt
 
 ---
@@ -169,15 +169,11 @@ Welcome to NeuroLink! This section will help you get up and running quickly with
 
 ##  What You'll Learn
 
-- clock: **[Quick Start](/docs/getting-started/quick-start)**
-
-  ***
+- ⏱️ **[Quick Start](/docs/getting-started/quick-start)**
 
   Get NeuroLink working in under 2 minutes with basic examples for both CLI and SDK usage.
 
-- download: **[Installation](/docs/getting-started/installation)**
-
-  ***
+- 📥 **[Installation](/docs/getting-started/installation)**
 
   Detailed installation instructions for different environments and package managers.
 
@@ -1370,13 +1366,9 @@ This section contains practical implementations, use cases, and tutorials to hel
 
 -  **[Basic Usage](/docs/examples/basic-usage)**
 
-  ***
-
   Fundamental examples for both CLI and SDK usage, covering core functionality and common patterns.
 
--  **[Advanced Examples](/docs/advanced)**
-
-  ***
+- ⭐ **[Advanced Examples](/docs/advanced)**
 
 
 

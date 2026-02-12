@@ -7,11 +7,11 @@
   /* =========================================
      PRIMARY BRAND COLORS - Blue Accent
      ========================================= */
-  --neurolink-accent: hsl(217, 91%, 60%);
-  --neurolink-accent-dark: hsl(217, 91%, 50%);
-  --neurolink-accent-light: hsl(217, 91%, 70%);
-  --neurolink-accent-lighter: hsl(217, 91%, 80%);
-  --neurolink-accent-subtle: hsl(217, 91%, 95%);
+  --neurolink-accent: #016fb9;
+  --neurolink-accent-dark: #014a7a;
+  --neurolink-accent-light: #0190e0;
+  --neurolink-accent-lighter: #4db5e8;
+  --neurolink-accent-subtle: rgb(1 111 185 / 10%);
 
   /* =========================================
      TEXT COLORS - 6 Levels (Light Mode)
@@ -27,11 +27,11 @@
      ICON COLORS - 6 Levels (Light Mode)
      Note: Numbering starts at 2 to align with text color hierarchy
      ========================================= */
-  --neurolink-icons-2: hsla(0, 0%, 44%, 1);
+  --neurolink-icons-2: hsl(0deg 0% 44%);
   --neurolink-icons-3: #949494;
-  --neurolink-icons-4: hsla(0, 0%, 66%, 1);
-  --neurolink-icons-5: hsla(0, 0%, 90%, 1);
-  --neurolink-icons-6: hsla(0, 0%, 100%, 1);
+  --neurolink-icons-4: hsl(0deg 0% 66%);
+  --neurolink-icons-5: hsl(0deg 0% 90%);
+  --neurolink-icons-6: hsl(0deg 0% 100%);
   --neurolink-icons-7: #808080;
 
   /* =========================================
@@ -41,15 +41,15 @@
   --neurolink-surface-2: #f2f2f2;
   --neurolink-surface-3: #ededed;
   --neurolink-surface-4: #ebebeb;
-  --neurolink-surface-5: hsla(0, 0%, 88%, 0.9);
+  --neurolink-surface-5: hsl(0deg 0% 88% / 90%);
 
   /* =========================================
      BORDER COLORS (Light Mode)
      ========================================= */
   --border: #ccc;
-  --border-subtle: hsla(0, 0%, 80%, 1);
+  --border-subtle: hsl(0deg 0% 80%);
   --border-code: #b8b8b8;
-  --border-secondary: hsla(0, 0%, 72%, 1);
+  --border-secondary: hsl(0deg 0% 72%);
   --sidebar-border: oklch(92.8% 0.006 264.531);
   --border-sm: 0.5px;
 
@@ -77,31 +77,31 @@
      ========================================= */
   /* Success */
   --neurolink-success: #22c55e;
-  --neurolink-success-bg: rgba(34, 197, 94, 0.1);
-  --neurolink-success-border: rgba(34, 197, 94, 0.3);
+  --neurolink-success-bg: rgb(34 197 94 / 10%);
+  --neurolink-success-border: rgb(34 197 94 / 30%);
   --neurolink-success-text: #15803d;
 
   /* Warning */
   --neurolink-warning: #eab308;
-  --neurolink-warning-bg: rgba(234, 179, 8, 0.1);
-  --neurolink-warning-border: rgba(234, 179, 8, 0.3);
+  --neurolink-warning-bg: rgb(234 179 8 / 10%);
+  --neurolink-warning-border: rgb(234 179 8 / 30%);
   --neurolink-warning-text: #b45309;
 
   /* Error/Danger */
   --neurolink-error: #ef4444;
-  --neurolink-error-bg: rgba(239, 68, 68, 0.1);
-  --neurolink-error-border: rgba(239, 68, 68, 0.3);
+  --neurolink-error-bg: rgb(239 68 68 / 10%);
+  --neurolink-error-border: rgb(239 68 68 / 30%);
   --neurolink-error-text: #b91c1c;
 
   /* Info */
-  --neurolink-info: #3b82f6;
-  --neurolink-info-bg: rgba(59, 130, 246, 0.1);
-  --neurolink-info-border: rgba(59, 130, 246, 0.3);
-  --neurolink-info-text: #1d4ed8;
+  --neurolink-info: #016fb9;
+  --neurolink-info-bg: rgb(1 111 185 / 10%);
+  --neurolink-info-border: rgb(1 111 185 / 30%);
+  --neurolink-info-text: #014a7a;
 
   /* Note */
-  --neurolink-note-bg: rgba(107, 114, 128, 0.1);
-  --neurolink-note-border: rgba(107, 114, 128, 0.3);
+  --neurolink-note-bg: rgb(107 114 128 / 10%);
+  --neurolink-note-border: rgb(107 114 128 / 30%);
   --neurolink-note-text: #4b5563;
 
   /* =========================================
@@ -133,10 +133,10 @@
   /* =========================================
      SHADOWS (Light Mode)
      ========================================= */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 5%);
+  --shadow-md: 0 4px 6px rgb(0 0 0 / 5%);
+  --shadow-lg: 0 4px 12px rgb(0 0 0 / 10%);
+  --shadow-xl: 0 8px 24px rgb(0 0 0 / 12%);
 
   /* =========================================
      TRANSITIONS
@@ -150,12 +150,12 @@
   /* =========================================
      HOVER STATES
      ========================================= */
-  --neurolink-accent-hover-dark: rgba(59, 130, 246, 0.15);
+  --neurolink-accent-hover-dark: rgb(1 111 185 / 15%);
 
   /* =========================================
      NAVBAR COLORS
      ========================================= */
-  --neurolink-navbar-bg-dark: rgba(10, 10, 10, 0.85);
+  --neurolink-navbar-bg-dark: rgb(10 10 10 / 85%);
 
   /* =========================================
      Z-INDEX SCALE
@@ -186,29 +186,29 @@
   /* =========================================
      ICON COLORS - 6 Levels (Dark Mode)
      ========================================= */
-  --neurolink-icons-2: hsla(0, 0%, 65%, 1);
+  --neurolink-icons-2: hsl(0deg 0% 65%);
   --neurolink-icons-3: #a3a3a3;
-  --neurolink-icons-4: hsla(0, 0%, 50%, 1);
-  --neurolink-icons-5: hsla(0, 0%, 30%, 1);
-  --neurolink-icons-6: hsla(0, 0%, 20%, 1);
+  --neurolink-icons-4: hsl(0deg 0% 50%);
+  --neurolink-icons-5: hsl(0deg 0% 30%);
+  --neurolink-icons-6: hsl(0deg 0% 20%);
   --neurolink-icons-7: #9a9a9a;
 
   /* =========================================
      SURFACE COLORS - 5 Levels (Dark Mode)
      ========================================= */
-  --neurolink-surface-1: #1a1a1a;
-  --neurolink-surface-2: #1f1f1f;
-  --neurolink-surface-3: #262626;
-  --neurolink-surface-4: #2d2d2d;
-  --neurolink-surface-5: hsla(0, 0%, 22%, 0.9);
+  --neurolink-surface-1: #111111;
+  --neurolink-surface-2: #161616;
+  --neurolink-surface-3: #1f1f1f;
+  --neurolink-surface-4: #262626;
+  --neurolink-surface-5: #2a2a2a;
 
   /* =========================================
      BORDER COLORS (Dark Mode)
      ========================================= */
   --border: #3d3d3d;
-  --border-subtle: hsla(0, 0%, 30%, 1);
+  --border-subtle: hsl(0deg 0% 30%);
   --border-code: #4a4a4a;
-  --border-secondary: hsla(0, 0%, 35%, 1);
+  --border-secondary: hsl(0deg 0% 35%);
   --sidebar-border: oklch(25% 0.006 264.531);
 
   /* =========================================
@@ -234,35 +234,35 @@
      SEMANTIC COLORS (Dark Mode)
      ========================================= */
   /* Success */
-  --neurolink-success-bg: rgba(34, 197, 94, 0.15);
-  --neurolink-success-border: rgba(34, 197, 94, 0.4);
+  --neurolink-success-bg: rgb(34 197 94 / 15%);
+  --neurolink-success-border: rgb(34 197 94 / 40%);
   --neurolink-success-text: #4ade80;
 
   /* Warning */
-  --neurolink-warning-bg: rgba(234, 179, 8, 0.15);
-  --neurolink-warning-border: rgba(234, 179, 8, 0.4);
+  --neurolink-warning-bg: rgb(234 179 8 / 15%);
+  --neurolink-warning-border: rgb(234 179 8 / 40%);
   --neurolink-warning-text: #fbbf24;
 
   /* Error/Danger */
-  --neurolink-error-bg: rgba(239, 68, 68, 0.15);
-  --neurolink-error-border: rgba(239, 68, 68, 0.4);
+  --neurolink-error-bg: rgb(239 68 68 / 15%);
+  --neurolink-error-border: rgb(239 68 68 / 40%);
   --neurolink-error-text: #f87171;
 
   /* Info */
-  --neurolink-info-bg: rgba(59, 130, 246, 0.15);
-  --neurolink-info-border: rgba(59, 130, 246, 0.4);
-  --neurolink-info-text: #60a5fa;
+  --neurolink-info-bg: rgb(1 111 185 / 15%);
+  --neurolink-info-border: rgb(1 111 185 / 40%);
+  --neurolink-info-text: #4db5e8;
 
   /* Note */
-  --neurolink-note-bg: rgba(107, 114, 128, 0.15);
-  --neurolink-note-border: rgba(107, 114, 128, 0.4);
+  --neurolink-note-bg: rgb(107 114 128 / 15%);
+  --neurolink-note-border: rgb(107 114 128 / 40%);
   --neurolink-note-text: #9ca3af;
 
   /* =========================================
      SHADOWS (Dark Mode)
      ========================================= */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 20%);
+  --shadow-md: 0 4px 6px rgb(0 0 0 / 25%);
+  --shadow-lg: 0 4px 12px rgb(0 0 0 / 30%);
+  --shadow-xl: 0 8px 24px rgb(0 0 0 / 40%);
 }

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://neurolink.ink/" />
+    <meta property="og:title" content="NeuroLink - The Enterprise AI SDK" />
+    <meta
+      property="og:description"
+      content="Universal AI integration platform unifying 13 providers and 100+ models under one consistent API. Battle-tested at enterprise scale."
+    />
+    <meta
+      property="og:image"
+      content="https://neurolink.ink/img/og-default.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:image"
+      content="https://neurolink.ink/img/og-default.png"
+    />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/hack-font@3/build/web/hack.css"
+    />
+
+    <!-- Google Analytics + Meta Pixel (consent-gated) -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem("trackingConsent") !== "granted") return;
+        } catch (e) {
+          return;
+        }
+
+        // Google tag (gtag.js)
+        var gs = document.createElement("script");
+        gs.async = true;
+        gs.src = "https://www.googletagmanager.com/gtag/js?id=G-LVT5YKZZXV";
+        document.head.appendChild(gs);
+        window.dataLayer = window.dataLayer || [];
+        function gtag() {
+          dataLayer.push(arguments);
+        }
+        gtag("js", new Date());
+        gtag("config", "G-LVT5YKZZXV");
+
+        // Meta Pixel Code
+        !(function (f, b, e, v, n, t, s) {
+          if (f.fbq) return;
+          n = f.fbq = function () {
+            n.callMethod
+              ? n.callMethod.apply(n, arguments)
+              : n.queue.push(arguments);
+          };
+          if (!f._fbq) f._fbq = n;
+          n.push = n;
+          n.loaded = !0;
+          n.version = "2.0";
+          n.queue = [];
+          t = b.createElement(e);
+          t.async = !0;
+          t.src = v;
+          s = b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t, s);
+        })(
+          window,
+          document,
+          "script",
+          "https://connect.facebook.net/en_US/fbevents.js",
+        );
+        fbq("init", "886334757655006");
+        fbq("track", "PageView");
+      })();
+    </script>
+
+    <title>NeuroLink - The Enterprise AI SDK</title>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover" class="antialiased">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

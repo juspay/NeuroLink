@@ -4,12 +4,7 @@
 
 /* ---- Selection Styling ---- */
 ::selection {
-  background-color: hsla(217, 91%, 60%, 0.3);
-  color: inherit;
-}
-
-::-moz-selection {
-  background-color: hsla(217, 91%, 60%, 0.3);
+  background-color: rgb(1 111 185 / 30%);
   color: inherit;
 }
 
@@ -196,14 +191,14 @@ abbr[title] {
 
 /* ---- Mark/Highlight ---- */
 mark {
-  background-color: hsla(217, 91%, 60%, 0.2);
+  background-color: rgb(1 111 185 / 20%);
   color: inherit;
   padding: 0.1em 0.2em;
   border-radius: var(--radius-sm);
 }
 
 [data-theme="dark"] mark {
-  background-color: hsla(217, 91%, 60%, 0.3);
+  background-color: rgb(1 111 185 / 30%);
 }
 
 /* ---- Small Text ---- */
