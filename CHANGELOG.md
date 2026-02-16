@@ -1,3 +1,9 @@
+## [9.7.0](https://github.com/juspay/neurolink/compare/v9.6.0...v9.7.0) (2026-02-16)
+
+### Features
+
+- **(core):** add abort signal composition, tool filtering, provider hardening, and shared utilities ([805e8fe](https://github.com/juspay/neurolink/commit/805e8fe98184d3b57360ce751d61806450fe0ab8))
+
 ## [9.6.0](https://github.com/juspay/neurolink/compare/v9.5.3...v9.6.0) (2026-02-14)
 
 ### Features
