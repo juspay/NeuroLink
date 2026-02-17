@@ -5,6 +5,10 @@ import { IMAGE_GENERATION_MODELS } from "../core/constants.js";
 import type { EvaluationData } from "../index.js";
 import { MiddlewareFactory } from "../middleware/factory.js";
 import type { NeuroLink } from "../neurolink.js";
+import {
+  AUDIO_EXTENSIONS,
+  type AudioExtension,
+} from "../processors/config/fileTypes.js";
 import type { JsonValue, UnknownRecord } from "../types/common.js";
 import type {
   AIProvider,
@@ -30,6 +34,11 @@ import {
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
 import { getKeyCount, getKeysAsString } from "../utils/transformationUtils.js";
 import { TTSProcessor } from "../utils/ttsProcessor.js";
+import { STTProcessor } from "../utils/sttProcessor.js";
+import type { STTOptions, STTResult } from "../types/sttTypes.js";
+import type { FileWithMetadata } from "../types/fileTypes.js";
+import { withTimeout } from "../utils/timeout.js";
+import { ErrorFactory } from "../utils/errorHandling.js";
 import {
   hasVideoFrames,
   executeVideoAnalysis,
@@ -602,6 +611,247 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
+   * Auto-detect audio files in the files array and enable STT mode.
+   * Keeps audio files in the generic files array for transcription.
+   * Also supports backward compatibility with audioFiles array.
+   *
+   * @param options - Generate options to modify
+   * @private
+   */
+  protected async detectAndEnableSTT(
+    options: TextGenerationOptions,
+  ): Promise<void> {
+    // Skip if STT is already explicitly enabled
+    if ((options as unknown as { stt?: STTOptions }).stt) {
+      return;
+    }
+
+    // Check both files and audioFiles arrays
+    const filesArray = options.input?.files;
+    const audioFilesArray = (
+      options.input as { audioFiles?: unknown[] } | undefined
+    )?.audioFiles;
+
+    // If neither array has files, skip detection
+    if (
+      (!filesArray || filesArray.length === 0) &&
+      (!audioFilesArray || audioFilesArray.length === 0)
+    ) {
+      return;
+    }
+
+    // Check if any files are audio files
+    let audioFileCount = 0;
+
+    // Check files array
+    if (filesArray) {
+      for (const file of filesArray) {
+        let isAudio = false;
+
+        if (typeof file === "string") {
+          // Check file extension
+          const ext = file.toLowerCase().split(".").pop();
+          if (ext && AUDIO_EXTENSIONS.includes(`.${ext}` as AudioExtension)) {
+            isAudio = true;
+          }
+        } else if (typeof file === "object" && "filename" in file) {
+          // FileWithMetadata - check filename
+          const ext = file.filename.toLowerCase().split(".").pop();
+          if (ext && AUDIO_EXTENSIONS.includes(`.${ext}` as AudioExtension)) {
+            isAudio = true;
+          }
+        }
+        // For plain buffers, we can't easily detect format, assume other files
+        // (MessageBuilder will handle buffer detection later)
+
+        if (isAudio) {
+          audioFileCount++;
+        }
+      }
+    }
+
+    // Check audioFiles array (backward compatibility)
+    if (audioFilesArray) {
+      audioFileCount += audioFilesArray.length;
+    }
+
+    // If audio files detected, enable STT mode automatically
+    if (audioFileCount > 0) {
+      logger.info(
+        `[BaseProvider] Auto-detected ${audioFileCount} audio file(s), enabling STT mode`,
+      );
+
+      // Enable STT with default configuration if not already set
+      (options as unknown as { stt?: STTOptions }).stt = {
+        languageCode: "en-US", // Default language
+        enableAutomaticPunctuation: true,
+      };
+
+      // Ensure provider is set (defaults to google-ai for STT)
+      if (!options.provider) {
+        options.provider = "google-ai" as AIProviderName;
+      }
+    }
+  }
+
+  /**
+   * Read audio file from path or buffer
+   * Internal helper for STT processing
+   *
+   * @param audioFile - Audio file as Buffer, string path, or FileWithMetadata
+   * @returns Audio buffer
+   * @private
+   */
+  protected async readAudioFile(
+    audioFile: Buffer | string | FileWithMetadata,
+  ): Promise<Buffer> {
+    if (Buffer.isBuffer(audioFile)) {
+      return audioFile;
+    } else if (typeof audioFile === "string") {
+      const fs = await import("fs/promises");
+      const fileReadTimeoutMs = 30_000;
+      return await withTimeout(
+        fs.readFile(audioFile),
+        fileReadTimeoutMs,
+        this.providerName,
+        "generate",
+      );
+    } else if (typeof audioFile === "object" && "buffer" in audioFile) {
+      // FileWithMetadata
+      return audioFile.buffer;
+    } else {
+      throw ErrorFactory.invalidParameters(
+        "audioFiles",
+        new Error("Invalid audio file format"),
+        audioFile,
+      );
+    }
+  }
+
+  /**
+   * Handle STT transcription
+   * Internal method called when STT options are provided to generate()
+   *
+   * @param options - Generate options with STT configuration
+   * @param startTime - Generation start timestamp
+   * @returns Enhanced result with transcription
+   * @private
+   */
+  protected async handleSTTTranscription(
+    options: TextGenerationOptions,
+    startTime: number,
+  ): Promise<EnhancedGenerateResult | null> {
+    const sttOptions = (options as unknown as { stt: STTOptions }).stt;
+    if (!sttOptions) {
+      throw ErrorFactory.invalidParameters(
+        "stt",
+        new Error("STT options are required"),
+        sttOptions,
+      );
+    }
+
+    const provider = options.provider || ("google-ai" as AIProviderName);
+
+    // Get audio buffer from input
+    let audioBuffer: Buffer;
+
+    // Check both input.files (new way) and input.audioFiles (backward compatibility)
+    const filesArray = options.input?.files as
+      | Array<Buffer | string | FileWithMetadata>
+      | undefined;
+    const audioFilesArray = (
+      options.input as { audioFiles?: unknown[] } | undefined
+    )?.audioFiles as Array<Buffer | string | FileWithMetadata> | undefined;
+
+    // Prefer audioFiles for explicit audio, fallback to files for auto-detection
+    const sourceArray = audioFilesArray || filesArray;
+
+    if (sourceArray && sourceArray.length > 0) {
+      // Find the first audio file
+      let audioFile: Buffer | string | FileWithMetadata | undefined;
+
+      for (const file of sourceArray) {
+        let isAudio = false;
+
+        if (typeof file === "string") {
+          const ext = file.toLowerCase().split(".").pop();
+          if (ext && AUDIO_EXTENSIONS.includes(`.${ext}` as AudioExtension)) {
+            isAudio = true;
+          }
+        } else if (typeof file === "object" && "filename" in file) {
+          const ext = file.filename.toLowerCase().split(".").pop();
+          if (ext && AUDIO_EXTENSIONS.includes(`.${ext}` as AudioExtension)) {
+            isAudio = true;
+          }
+        } else if (Buffer.isBuffer(file)) {
+          // For buffers, assume it's audio if STT is enabled
+          isAudio = true;
+        }
+
+        if (isAudio) {
+          audioFile = file;
+          break;
+        }
+      }
+
+      if (!audioFile) {
+        throw ErrorFactory.invalidParameters(
+          "files",
+          new Error("No audio file found in files/audioFiles array for STT"),
+          sourceArray,
+        );
+      }
+
+      audioBuffer = await this.readAudioFile(audioFile);
+    } else {
+      throw ErrorFactory.invalidParameters(
+        "files",
+        new Error(
+          "Audio input is required for STT (provide files or audioFiles array)",
+        ),
+      );
+    }
+
+    // Call STT processor
+    const sttTimeoutMs = 60_000;
+    const sttResult: STTResult = await withTimeout(
+      STTProcessor.transcribe(audioBuffer, provider, sttOptions),
+      sttTimeoutMs,
+      provider,
+      "generate",
+    );
+
+    const responseTime = Date.now() - startTime;
+
+    // Return as EnhancedGenerateResult
+    const result: EnhancedGenerateResult = {
+      content: sttResult.text,
+      provider,
+      model: sttResult.metadata.model,
+      usage: { input: 0, output: 0, total: 0 },
+      responseTime,
+      transcription: sttResult,
+    };
+
+    return result;
+  }
+
+  /**
+   * Get available STT models for this provider
+   *
+   * @returns Promise resolving to list of available model identifiers
+   *
+   * @example
+   * ```typescript
+   * const models = await provider.getSTTModels();
+   * console.log(models); // ['default', 'phone_call', 'video', ...]
+   * ```
+   */
+  async getSTTModels(): Promise<string[]> {
+    return STTProcessor.getModels(this.providerName);
+  }
+
+  /**
    * Text generation method - implements AIProvider interface
    * Tools are always available unless explicitly disabled
    *
@@ -609,15 +859,19 @@ export abstract class BaseProvider implements AIProvider {
    * 1. Direct synthesis (default): TTS synthesizes the input text without AI generation
    * 2. AI response synthesis: TTS synthesizes the AI-generated response after generation
    *
+   * Supports Speech-to-Text (STT) transcription when audio files are detected or STT is explicitly enabled.
+   *
    * When TTS is enabled with useAiResponse=false (default), the method returns early with
    * only the audio result, skipping AI generation entirely for optimal performance.
    *
    * When TTS is enabled with useAiResponse=true, the method performs full AI generation
    * and then synthesizes the AI response to audio.
    *
+   * When STT is enabled, the method transcribes the audio file and returns the transcription result.
+   *
    * @param optionsOrPrompt - Generation options or prompt string
    * @param _analysisSchema - Optional analysis schema (not used)
-   * @returns Enhanced result with optional audio field containing TTSResult
+   * @returns Enhanced result with optional audio field containing TTSResult or transcription field containing STTResult
    *
    * IMPLEMENTATION NOTE: Uses streamText() under the hood and accumulates results
    * for consistency and better performance
@@ -629,6 +883,24 @@ export abstract class BaseProvider implements AIProvider {
     const options = this.normalizeTextOptions(optionsOrPrompt);
     this.validateOptions(options);
     const startTime = Date.now();
+
+    // Auto-detect audio files and enable STT mode
+    await this.detectAndEnableSTT(options);
+
+    // Check if STT transcription is requested
+    const sttOptionsValue = (options as unknown as { stt?: STTOptions }).stt;
+    logger.debug("[BaseProvider.generate] STT check", {
+      hasSttOptions: !!sttOptionsValue,
+      sttOptions: sttOptionsValue,
+      provider: this.providerName,
+    });
+
+    if (sttOptionsValue) {
+      logger.info("[BaseProvider.generate] Routing to STT transcription", {
+        provider: this.providerName,
+      });
+      return this.handleSTTTranscription(options, startTime);
+    }
 
     try {
       // ===== VIDEO GENERATION MODE =====

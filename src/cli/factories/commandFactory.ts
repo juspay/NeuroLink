@@ -4,6 +4,10 @@ import chalk from "chalk";
 import ora from "ora";
 import type { Argv, CommandModule } from "yargs";
 import { ModelResolver } from "../../lib/models/modelResolver.js";
+import {
+  AUDIO_EXTENSIONS,
+  type AudioExtension,
+} from "../../lib/processors/config/fileTypes.js";
 import type { ChunkingStrategy } from "../../lib/rag/types.js";
 import { globalSession } from "../../lib/session/globalSessionState.js";
 import type {
@@ -13,7 +17,6 @@ import type {
   GenerateResult,
   StreamCommandArgs,
 } from "../../lib/types/cli.js";
-import type { JsonValue } from "../../lib/types/common.js";
 // Use TokenUsage from standard types - no local interface needed
 import {
   type BaseContext,
@@ -24,11 +27,12 @@ import type {
   ConversationMemoryConfig,
   ConversationSummary,
 } from "../../lib/types/conversation.js";
-import type { AnalyticsData, TokenUsage } from "../../lib/types/index.js";
-
+import type {
+  AnalyticsData,
+  JsonValue,
+  TokenUsage,
+} from "../../lib/types/index.js";
 import { checkRedisAvailability } from "../../lib/utils/conversationMemory.js";
-
-import { normalizeEvaluationData } from "../../lib/utils/evaluationUtils.js";
 import { logger } from "../../lib/utils/logger.js";
 import { createThinkingConfigFromRecord } from "../../lib/utils/thinkingConfig.js";
 import { configManager } from "../commands/config.js";
@@ -124,7 +128,7 @@ export class CLICommandFactory {
     file: {
       type: "string" as const,
       description:
-        "Add file with auto-detection (CSV, image, etc. - can be used multiple times)",
+        "Add file with auto-detection (CSV, image, audio, etc. - can be used multiple times)",
     },
     csvMaxRows: {
       type: "number" as const,
@@ -307,6 +311,62 @@ export class CLICommandFactory {
       type: "boolean" as const,
       default: false,
       description: "Auto-play generated audio",
+    },
+
+    // Speech-to-Text (STT) options
+    sttLanguage: {
+      type: "string" as const,
+      alias: "stt-lang",
+      description:
+        "STT language code (optional, auto-detects if not specified)",
+    },
+    sttModel: {
+      type: "string" as const,
+      default: "default",
+      choices: [
+        "default",
+        "command_and_search",
+        "phone_call",
+        "video",
+        "medical_dictation",
+        "latest_long",
+        "latest_short",
+      ],
+      description: "STT model to use",
+    },
+    sttEnhanced: {
+      type: "boolean" as const,
+      default: false,
+      description: "Use enhanced STT model (higher accuracy, higher cost)",
+    },
+    sttMaxAlternatives: {
+      type: "number" as const,
+      default: 1,
+      description: "Maximum number of alternative transcriptions (1-30)",
+    },
+    sttEnablePunctuation: {
+      type: "boolean" as const,
+      default: true,
+      description: "Enable automatic punctuation in transcription",
+    },
+    sttEnableTimestamps: {
+      type: "boolean" as const,
+      default: false,
+      description: "Enable word-level timestamps",
+    },
+    sttEnableConfidence: {
+      type: "boolean" as const,
+      default: false,
+      description: "Enable word-level confidence scores",
+    },
+    sttEnableDiarization: {
+      type: "boolean" as const,
+      default: false,
+      description: "Enable speaker diarization (who spoke when)",
+    },
+    sttSpeakerCount: {
+      type: "number" as const,
+      description: "Expected number of speakers for diarization",
     },
 
     // Video Generation options (Veo 3.1)
@@ -493,6 +553,26 @@ export class CLICommandFactory {
     return resolveFilePaths(paths);
   }
 
+  // Helper method to detect if files array contains audio files
+  private static detectAudioFiles(files?: Array<Buffer | string>): boolean {
+    if (!files || files.length === 0) {
+      return false;
+    }
+
+    for (const file of files) {
+      if (typeof file === "string") {
+        const ext = file.toLowerCase().split(".").pop();
+        if (ext && AUDIO_EXTENSIONS.includes(`.${ext}` as AudioExtension)) {
+          return true;
+        }
+      }
+      // Buffers can't be easily detected as audio without inspecting content
+      // So we rely on file path detection
+    }
+
+    return false;
+  }
+
   // Helper method to process common options
   private static processOptions(
     argv: BaseCommandArgs & Record<string, unknown>,
@@ -581,6 +661,16 @@ export class CLICommandFactory {
       ttsQuality: argv.ttsQuality as "standard" | "hd" | undefined,
       ttsOutput: argv.ttsOutput as string | undefined,
       ttsPlay: argv.ttsPlay as boolean | undefined,
+      // STT options
+      sttLanguage: argv.sttLanguage as string | undefined,
+      sttModel: argv.sttModel as string | undefined,
+      sttEnhanced: argv.sttEnhanced as boolean | undefined,
+      sttMaxAlternatives: argv.sttMaxAlternatives as number | undefined,
+      sttEnablePunctuation: argv.sttEnablePunctuation as boolean | undefined,
+      sttEnableTimestamps: argv.sttEnableTimestamps as boolean | undefined,
+      sttEnableConfidence: argv.sttEnableConfidence as boolean | undefined,
+      sttEnableDiarization: argv.sttEnableDiarization as boolean | undefined,
+      sttSpeakerCount: argv.sttSpeakerCount as number | undefined,
       // Video generation options (Veo 3.1)
       outputMode: argv.outputMode as "text" | "video" | undefined,
       videoOutput: argv.videoOutput as string | undefined,
@@ -1071,6 +1161,18 @@ export class CLICommandFactory {
             .example(
               '$0 generate "Smooth camera movement" --image ./input.jpg --provider vertex --model veo-3.1-generate-001 --outputMode video --videoResolution 720p --videoLength 6 --videoAspectRatio 16:9 --videoOutput ./output.mp4',
               "Video generation with full options",
+            )
+            .example(
+              '$0 generate "Transcribe this audio" --file audio.mp3',
+              "Transcribe audio to text (auto-detected)",
+            )
+            .example(
+              '$0 generate "Transcribe this meeting" --file meeting.wav --stt-language en-US --stt-enable-timestamps --stt-enable-diarization',
+              "Transcribe with timestamps and speaker detection",
+            )
+            .example(
+              '$0 generate "Transcribe this call" --file call.mp3 --stt-model phone_call -o transcript.txt',
+              "Transcribe phone call with custom model",
             ),
         );
       },
@@ -1218,6 +1320,94 @@ export class CLICommandFactory {
    */
   static createDiscoverCommand(): CommandModule {
     return MCPCommandFactory.createDiscoverCommand();
+  }
+
+  /**
+   * Create STT discovery commands
+   */
+  static createSTTCommands(): CommandModule {
+    return {
+      command: "stt <subcommand>",
+      describe: "Speech-to-Text discovery and information",
+      builder: (yargs) => {
+        return yargs
+          .command(
+            "models [provider]",
+            "List available STT models",
+            (y) =>
+              y
+                .positional("provider", {
+                  type: "string",
+                  description: "Provider name (e.g., google-ai, vertex)",
+                  default: "google-ai",
+                })
+                .example("$0 stt models", "List models for default provider")
+                .example(
+                  "$0 stt models google-ai",
+                  "List Google AI STT models",
+                ),
+            async (argv) => {
+              try {
+                const { NeuroLink } = await import("../../lib/neurolink.js");
+                const sdk = new NeuroLink();
+
+                const spinner = ora(
+                  `Fetching STT models for ${argv.provider}...`,
+                ).start();
+
+                const models = await sdk.getSTTModels(argv.provider as string);
+
+                spinner.succeed(`Found ${models.length} available models`);
+
+                logger.always(chalk.cyan("\n🎙️ Available STT Models:\n"));
+
+                models.forEach((model) => {
+                  let description = "";
+                  switch (model) {
+                    case "default":
+                      description = "General model for most use cases";
+                      break;
+                    case "command_and_search":
+                      description = "Optimized for short queries and commands";
+                      break;
+                    case "phone_call":
+                      description = "Optimized for audio from phone calls";
+                      break;
+                    case "video":
+                      description = "Optimized for audio from video files";
+                      break;
+                    case "medical_dictation":
+                      description = "Specialized for medical terminology";
+                      break;
+                    case "latest_long":
+                      description = "Latest model for long-form audio";
+                      break;
+                    case "latest_short":
+                      description = "Latest model for short audio";
+                      break;
+                  }
+                  logger.always(chalk.bold(`  ${model}`));
+                  if (description) {
+                    logger.always(chalk.dim(`    ${description}`));
+                  }
+                });
+
+                logger.always(
+                  chalk.dim(
+                    "\n💡 Usage: neurolink generate <prompt> --file audio.mp3 --stt-model <model>",
+                  ),
+                );
+              } catch (err) {
+                handleError(err as Error, "STT Models Error");
+              }
+            },
+          )
+          .demandCommand(1, "You must specify a subcommand");
+      },
+      handler: () => {
+        // Parent command handler - subcommands handle execution
+      },
+    };
   }
 
   /**
@@ -1638,6 +1828,7 @@ export class CLICommandFactory {
           } finally {
             await conversationSelector.close();
           }
+          await CLICommandFactory.flushLangfuseTraces();
           return;
         }
 
@@ -1818,10 +2009,11 @@ export class CLICommandFactory {
   }
 
   /**
-   * Execute the generate command
+   * Handle stdin input for generate command
    */
-  private static async executeGenerate(argv: GenerateCommandArgs) {
-    // Handle stdin input if no input provided
+  private static async handleGenerateStdinInput(
+    argv: GenerateCommandArgs,
+  ): Promise<void> {
     if (!argv.input && !process.stdin.isTTY) {
       let stdinData = "";
       process.stdin.setEncoding("utf8");
@@ -1837,117 +2029,415 @@ export class CLICommandFactory {
         'Input required. Use: neurolink generate "your prompt" or echo "prompt" | neurolink generate',
       );
     }
+  }
 
-    const options = CLICommandFactory.processOptions(argv);
+  /**
+   * Process multimodal CLI inputs (images, CSVs, PDFs, videos, STT audio, files)
+   */
+  private static processMultimodalInputs(argv: GenerateCommandArgs): {
+    imageBuffers?: Array<Buffer | string>;
+    csvFiles?: Array<Buffer | string>;
+    pdfFiles?: Array<Buffer | string>;
+    videoFiles?: Array<Buffer | string>;
+    files?: Array<Buffer | string>;
+  } {
+    return {
+      imageBuffers: CLICommandFactory.processCliImages(
+        argv.image as string | string[] | undefined,
+      ),
+      csvFiles: CLICommandFactory.processCliCSVFiles(
+        argv.csv as string | string[] | undefined,
+      ),
+      pdfFiles: CLICommandFactory.processCliPDFFiles(
+        argv.pdf as string | string[] | undefined,
+      ),
+      videoFiles: CLICommandFactory.processCliVideoFiles(
+        argv.video as string | string[] | undefined,
+      ),
+      files: CLICommandFactory.processCliFiles(
+        argv.file as string | string[] | undefined,
+      ),
+    };
+  }
 
-    // Determine if video generation mode is enabled
+  /**
+   * Process context for generate command
+   */
+  private static processGenerateContext(
+    argv: GenerateCommandArgs,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): {
+    inputText: string;
+    contextMetadata?: Partial<BaseContext>;
+  } {
+    let inputText = argv.input as string;
+    let contextMetadata: Partial<BaseContext> | undefined;
+
+    if (options.context && options.contextConfig) {
+      const processedContextResult = ContextFactory.processContext(
+        options.context as BaseContext,
+        options.contextConfig,
+      );
+
+      if (processedContextResult.processedContext) {
+        inputText = `${processedContextResult.processedContext}\n\n${inputText}`;
+      }
+
+      contextMetadata = {
+        ...ContextFactory.extractAnalyticsContext(
+          options.context as BaseContext,
+        ),
+        contextMode: processedContextResult.config.mode,
+        contextTruncated: processedContextResult.metadata.truncated,
+      };
+
+      if (options.debug) {
+        logger.debug("Context processed:", {
+          mode: processedContextResult.config.mode,
+          truncated: processedContextResult.metadata.truncated,
+        });
+      }
+    }
+
+    return { inputText, contextMetadata };
+  }
+
+  /**
+   * Execute dry-run for generate command
+   */
+  private static async executeDryRunGenerate(
+    options: BaseCommandArgs & Record<string, unknown>,
+    contextMetadata?: Partial<BaseContext>,
+  ): Promise<void> {
+    if (!options.quiet) {
+      logger.always(
+        chalk.blue("🧪 Dry-run mode enabled. No API calls will be made."),
+      );
+    }
+
+    const mockResult = {
+      content: "Mock response for testing purposes",
+      analytics: {
+        provider: options.provider || "auto",
+        model: options.model || "auto-selected",
+        tokenUsage: { input: 100, output: 50, total: 150 },
+        cost: 0.002,
+        requestDuration: 1500,
+      },
+      ...(contextMetadata && { context: contextMetadata }),
+    };
+
+    if (options.debug) {
+      logger.debug("Dry-run options:", options);
+    }
+
+    CLICommandFactory.handleOutput(mockResult, options);
+
+    if (options.enableAnalytics && !options.quiet) {
+      logger.always("\n" + chalk.cyan("📊 Analytics (Dry-run):"));
+      logger.always(JSON.stringify(mockResult.analytics, null, 2));
+    }
+
+    if (options.enableEvaluation && !options.quiet) {
+      logger.always("\n" + chalk.cyan("✅ Evaluation (Dry-run):"));
+      logger.always("Mock evaluation data would appear here");
+    }
+
+    if (!globalSession.getCurrentSessionId()) {
+      await CLICommandFactory.flushLangfuseTraces();
+      process.exit(0);
+    }
+  }
+
+  /**
+   * Build SDK generate options from command arguments
+   */
+  private static buildGenerateOptions(
+    argv: GenerateCommandArgs,
+    options: BaseCommandArgs & Record<string, unknown>,
+    multimodalInputs: {
+      imageBuffers?: Array<Buffer | string>;
+      csvFiles?: Array<Buffer | string>;
+      pdfFiles?: Array<Buffer | string>;
+      videoFiles?: Array<Buffer | string>;
+      files?: Array<Buffer | string>;
+    },
+    inputText: string,
+    context?: Partial<BaseContext>,
+  ): {
+    isVideoMode: boolean;
+    isSTTMode: boolean;
+    generateInput: { text: string; [key: string]: unknown };
+    sdkOptions: Record<string, unknown>;
+  } {
+    const sessionVariables = globalSession.getSessionVariables();
+    const enhancedOptions = { ...options, ...sessionVariables };
+
     const isVideoMode =
       (options as Record<string, unknown>).outputMode === "video";
+
+    // Detect STT mode by checking for audio files in the files array
+    const isSTTMode = this.detectAudioFiles(multimodalInputs.files);
+
+    if (isVideoMode) {
+      CLICommandFactory.configureVideoMode(enhancedOptions, argv, options);
+    }
+
+    const generateInput = {
+      text: inputText,
+      ...(multimodalInputs.imageBuffers && {
+        images: multimodalInputs.imageBuffers,
+      }),
+      ...(multimodalInputs.csvFiles && { csvFiles: multimodalInputs.csvFiles }),
+      ...(multimodalInputs.pdfFiles && { pdfFiles: multimodalInputs.pdfFiles }),
+      ...(multimodalInputs.videoFiles && {
+        videoFiles: multimodalInputs.videoFiles,
+      }),
+      ...(multimodalInputs.files && { files: multimodalInputs.files }),
+    };
+
+    const sdkOptions = {
+      csvOptions: {
+        maxRows: argv.csvMaxRows as number | undefined,
+        formatStyle: argv.csvFormat as "raw" | "markdown" | "json" | undefined,
+      },
+      videoOptions: {
+        frames: argv.videoFrames as number | undefined,
+        quality: argv.videoQuality as number | undefined,
+        format: argv.videoFormat as "jpeg" | "png" | undefined,
+        transcribeAudio: argv.transcribeAudio as boolean | undefined,
+      },
+      output: isVideoMode
+        ? {
+            mode: "video" as const,
+            video: {
+              resolution: enhancedOptions.videoResolution as
+                | "720p"
+                | "1080p"
+                | undefined,
+              length: enhancedOptions.videoLength as 4 | 6 | 8 | undefined,
+              aspectRatio: enhancedOptions.videoAspectRatio as
+                | "9:16"
+                | "16:9"
+                | undefined,
+              audio: enhancedOptions.videoAudio as boolean | undefined,
+            },
+          }
+        : undefined,
+      provider: enhancedOptions.provider,
+      model: enhancedOptions.model,
+      temperature: enhancedOptions.temperature,
+      maxTokens: enhancedOptions.maxTokens,
+      systemPrompt: enhancedOptions.systemPrompt,
+      timeout: enhancedOptions.timeout
+        ? (enhancedOptions.timeout as number) * 1000
+        : undefined,
+      disableTools: enhancedOptions.disableTools,
+      enableAnalytics: enhancedOptions.enableAnalytics,
+      enableEvaluation: enhancedOptions.enableEvaluation,
+      evaluationDomain: enhancedOptions.evaluationDomain as string | undefined,
+      toolUsageContext: enhancedOptions.toolUsageContext as string | undefined,
+      context,
+      region: (options as Record<string, unknown>).region as string | undefined,
+      thinkingConfig: createThinkingConfigFromRecord(
+        options as Record<string, unknown>,
+      ),
+      factoryConfig: enhancedOptions.domain
+        ? {
+            domainType: enhancedOptions.domain,
+            enhancementType: "domain-configuration",
+            validateDomainData: true,
+          }
+        : undefined,
+      stt: isSTTMode
+        ? {
+            languageCode: enhancedOptions.sttLanguage as string | undefined,
+            model: enhancedOptions.sttModel as string | undefined,
+            useEnhanced: enhancedOptions.sttEnhanced as boolean | undefined,
+            maxAlternatives: enhancedOptions.sttMaxAlternatives as
+              | number
+              | undefined,
+            enableAutomaticPunctuation: enhancedOptions.sttEnablePunctuation as
+              | boolean
+              | undefined,
+            enableWordTimeOffsets: enhancedOptions.sttEnableTimestamps as
+              | boolean
+              | undefined,
+            enableWordConfidence: enhancedOptions.sttEnableConfidence as
+              | boolean
+              | undefined,
+            enableSpeakerDiarization: enhancedOptions.sttEnableDiarization as
+              | boolean
+              | undefined,
+            diarizationSpeakerCount: enhancedOptions.sttSpeakerCount as
+              | number
+              | undefined,
+          }
+        : undefined,
+      rag: (argv.ragFiles as string[] | undefined)?.length
+        ? {
+            files: argv.ragFiles as string[],
+            strategy: argv.ragStrategy as ChunkingStrategy | undefined,
+            chunkSize: argv.ragChunkSize as number | undefined,
+            chunkOverlap: argv.ragChunkOverlap as number | undefined,
+            topK: argv.ragTopK as number | undefined,
+          }
+        : undefined,
+    };
+
+    return { isVideoMode, isSTTMode, generateInput, sdkOptions };
+  }
+
+  /**
+   * Handle STT transcription output
+   */
+  private static async handleSTTOutput(
+    result: { transcription?: unknown } & Record<string, unknown>,
+    options: BaseCommandArgs & Record<string, unknown>,
+  ): Promise<void> {
+    if (!result.transcription) {
+      return;
+    }
+
+    const transcription = result.transcription as {
+      text: string;
+      confidence: number;
+      languageCode?: string;
+      duration?: number;
+      metadata: { provider: string; latency: number };
+      alternatives?: Array<{ confidence: number; transcript: string }>;
+      words?: Array<{
+        startTime: number;
+        endTime: number;
+        word: string;
+        confidence?: number;
+        speakerTag?: number;
+      }>;
+    };
+
+    // Save to file if output specified
+    if (options.output) {
+      if (options.format === "json") {
+        fs.writeFileSync(
+          options.output as string,
+          JSON.stringify(transcription, null, 2),
+        );
+      } else {
+        fs.writeFileSync(options.output as string, transcription.text);
+      }
+      if (!options.quiet) {
+        logger.always(`\n✓ Saved to: ${options.output}`);
+      }
+    } else if (options.format === "json") {
+      // Write JSON to stdout when no output file specified (regardless of quiet mode)
+      process.stdout.write(JSON.stringify(transcription, null, 2) + "\n");
+    } else {
+      // Always emit plain transcription text when no file and format is not JSON
+      logger.always(transcription.text);
+    }
+
+    // Decorative metadata output (suppressed when quiet or JSON format)
+    if (!options.quiet && options.format !== "json" && !options.output) {
+      logger.always("\n" + "═".repeat(70));
+      logger.always("📄 TRANSCRIPTION METADATA");
+      logger.always("═".repeat(70));
+      logger.always(
+        `✓ Confidence: ${(transcription.confidence * 100).toFixed(1)}%`,
+      );
+      logger.always(`✓ Language: ${transcription.languageCode}`);
+      if (transcription.duration) {
+        logger.always(`✓ Duration: ${transcription.duration.toFixed(2)}s`);
+      }
+      logger.always(`✓ Provider: ${transcription.metadata.provider}`);
+      logger.always(`✓ Latency: ${transcription.metadata.latency}ms`);
+      logger.always("═".repeat(70));
+
+      // Show alternatives if available
+      if (transcription.alternatives && transcription.alternatives.length > 0) {
+        logger.always("\nALTERNATIVE TRANSCRIPTIONS:");
+        transcription.alternatives.forEach(
+          (alt: { confidence: number; transcript: string }, idx: number) => {
+            logger.always(
+              `${idx + 1}. [${(alt.confidence * 100).toFixed(1)}%] ${alt.transcript}`,
+            );
+          },
+        );
+      }
+
+      // Show word-level details if enabled
+      if (
+        transcription.words &&
+        transcription.words.length > 0 &&
+        options.sttEnableTimestamps
+      ) {
+        logger.always("\nWORD TIMESTAMPS:");
+        logger.always("─".repeat(70));
+        transcription.words.forEach(
+          (word: {
+            startTime: number;
+            endTime: number;
+            word: string;
+            confidence?: number;
+            speakerTag?: number;
+          }) => {
+            const conf = word.confidence
+              ? ` (${(word.confidence * 100).toFixed(0)}%)`
+              : "";
+            const speaker = word.speakerTag
+              ? ` [Speaker ${word.speakerTag}]`
+              : "";
+            logger.always(
+              `  ${word.startTime.toFixed(2)}s - ${word.endTime.toFixed(2)}s: ${word.word}${conf}${speaker}`,
+            );
+          },
+        );
+        logger.always("═".repeat(70));
+      }
+    }
+  }
+
+  /**
+   * Execute the generate command
+   */
+  private static async executeGenerate(argv: GenerateCommandArgs) {
+    // Handle stdin input if no input provided
+    await this.handleGenerateStdinInput(argv);
+
+    const options = this.processOptions(argv);
+
+    const isVideoMode =
+      (options as Record<string, unknown>).outputMode === "video";
+
     const spinnerMessage = isVideoMode
       ? "🎬 Generating video... (this may take 1-2 minutes)"
       : "🤖 Generating text...";
+
     const spinner = argv.quiet ? null : ora(spinnerMessage).start();
 
     try {
-      // Add delay if specified
       if (options.delay) {
-        await new Promise((resolve) => setTimeout(resolve, options.delay));
-      }
-
-      // Process context if provided
-      let inputText = argv.input as string;
-      let contextMetadata: Partial<BaseContext> | undefined;
-
-      if (options.context && options.contextConfig) {
-        const processedContextResult = ContextFactory.processContext(
-          options.context,
-          options.contextConfig,
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.delay as number),
         );
-
-        // Integrate context into prompt if configured
-        if (processedContextResult.processedContext) {
-          inputText = processedContextResult.processedContext + inputText;
-        }
-
-        // Add context metadata for analytics
-        contextMetadata = {
-          ...ContextFactory.extractAnalyticsContext(
-            options.context as BaseContext,
-          ),
-          contextMode: processedContextResult.config.mode,
-          contextTruncated: processedContextResult.metadata.truncated,
-        };
-
-        if (options.debug) {
-          logger.debug("Context processed:", {
-            mode: processedContextResult.config.mode,
-            truncated: processedContextResult.metadata.truncated,
-            processingTime: processedContextResult.metadata.processingTime,
-          });
-        }
       }
 
-      // Handle dry-run mode for testing
+      const { inputText, contextMetadata } = this.processGenerateContext(
+        argv,
+        options,
+      );
+
       if (options.dryRun) {
-        const mockResult = {
-          content: "Mock response for testing purposes",
-          provider: options.provider || "auto",
-          model: options.model || "test-model",
-          usage: {
-            input: 10,
-            output: 15,
-            total: 25,
-          },
-          responseTime: 150,
-          analytics: options.enableAnalytics
-            ? {
-                provider: options.provider || "auto",
-                model: options.model || "test-model",
-                tokenUsage: { input: 10, output: 15, total: 25 },
-                cost: 0.00025,
-                requestDuration: 150,
-                context: contextMetadata,
-              }
-            : undefined,
-          evaluation: options.enableEvaluation
-            ? normalizeEvaluationData({
-                relevance: 8,
-                accuracy: 9,
-                completeness: 8,
-                overall: 8.3,
-                reasoning: "Test evaluation response",
-                evaluationModel: "test-evaluator",
-                evaluationTime: 50,
-              })
-            : undefined,
-        };
-
-        if (spinner) {
-          spinner.succeed(chalk.green("✅ Dry-run completed successfully!"));
-        }
-
-        CLICommandFactory.handleOutput(mockResult, options);
-
-        if (options.debug) {
-          logger.debug("\n" + chalk.yellow("Debug Information (Dry-run):"));
-          logger.debug("Provider:", mockResult.provider);
-          logger.debug("Model:", mockResult.model);
-          logger.debug("Mode: DRY-RUN (no actual API calls made)");
-        }
-
-        if (!globalSession.getCurrentSessionId()) {
-          await CLICommandFactory.flushLangfuseTraces();
-          process.exit(0);
-        }
+        await this.executeDryRunGenerate(options, contextMetadata);
+        spinner?.succeed(chalk.green("✅ Dry-run completed!"));
+        return;
       }
 
       const sdk = globalSession.getOrCreateNeuroLink();
-      const sessionVariables = globalSession.getSessionVariables();
-      const enhancedOptions = { ...options, ...sessionVariables };
       const sessionId = globalSession.getCurrentSessionId();
+
       const context = sessionId
-        ? { ...options.context, sessionId }
-        : options.context;
+        ? { ...contextMetadata, sessionId }
+        : contextMetadata;
 
       if (options.debug) {
         logger.debug("CLI Tools configuration:", {
@@ -1956,165 +2446,55 @@ export class CLICommandFactory {
         });
       }
 
-      // Video generation doesn't support tools, so auto-disable them
-      if (isVideoMode) {
-        CLICommandFactory.configureVideoMode(enhancedOptions, argv, options);
-      }
+      const multimodalInputs = this.processMultimodalInputs(argv);
 
-      // Process CLI multimodal inputs
-      const imageBuffers = CLICommandFactory.processCliImages(
-        argv.image as string | string[] | undefined,
-      );
-      const csvFiles = CLICommandFactory.processCliCSVFiles(
-        argv.csv as string | string[] | undefined,
-      );
-      const pdfFiles = CLICommandFactory.processCliPDFFiles(
-        argv.pdf as string | string[] | undefined,
-      );
-      const videoFiles = CLICommandFactory.processCliVideoFiles(
-        argv.video as string | string[] | undefined,
-      );
-      const files = CLICommandFactory.processCliFiles(
-        argv.file as string | string[] | undefined,
-      );
-
-      const generateInput = {
-        text: inputText,
-        ...(imageBuffers && { images: imageBuffers }),
-        ...(csvFiles && { csvFiles }),
-        ...(pdfFiles && { pdfFiles }),
-        ...(videoFiles && { videoFiles }),
-        ...(files && { files }),
-      };
+      const { isSTTMode, generateInput, sdkOptions } =
+        this.buildGenerateOptions(
+          argv,
+          options,
+          multimodalInputs,
+          inputText,
+          context,
+        );
 
       const result = await sdk.generate({
         input: generateInput,
-        csvOptions: {
-          maxRows: argv.csvMaxRows as number | undefined,
-          formatStyle: argv.csvFormat as
-            | "raw"
-            | "markdown"
-            | "json"
-            | undefined,
-        },
-        videoOptions: {
-          frames: argv.videoFrames as number | undefined,
-          quality: argv.videoQuality as number | undefined,
-          format: argv.videoFormat as "jpeg" | "png" | undefined,
-          transcribeAudio: argv.transcribeAudio as boolean | undefined,
-        },
-        // Video generation output configuration
-        output: isVideoMode
-          ? {
-              mode: "video" as const,
-              video: {
-                resolution: enhancedOptions.videoResolution as
-                  | "720p"
-                  | "1080p"
-                  | undefined,
-                length: enhancedOptions.videoLength as 4 | 6 | 8 | undefined,
-                aspectRatio: enhancedOptions.videoAspectRatio as
-                  | "9:16"
-                  | "16:9"
-                  | undefined,
-                audio: enhancedOptions.videoAudio as boolean | undefined,
-              },
-            }
-          : undefined,
-        provider: enhancedOptions.provider,
-        model: enhancedOptions.model,
-        temperature: enhancedOptions.temperature,
-        maxTokens: enhancedOptions.maxTokens,
-        systemPrompt: enhancedOptions.systemPrompt,
-        timeout: enhancedOptions.timeout
-          ? enhancedOptions.timeout * 1000
-          : undefined,
-        disableTools: enhancedOptions.disableTools,
-        enableAnalytics: enhancedOptions.enableAnalytics,
-        enableEvaluation: enhancedOptions.enableEvaluation,
-        evaluationDomain: enhancedOptions.evaluationDomain as
-          | string
-          | undefined,
-        toolUsageContext: enhancedOptions.toolUsageContext as
-          | string
-          | undefined,
-        context: context,
-        region: (options as Record<string, unknown>).region as
-          | string
-          | undefined,
-        thinkingConfig: createThinkingConfigFromRecord(
-          options as Record<string, unknown>,
-        ),
-        factoryConfig: enhancedOptions.domain
-          ? {
-              domainType: enhancedOptions.domain,
-              enhancementType: "domain-configuration",
-              validateDomainData: true,
-            }
-          : undefined,
-        // RAG configuration
-        rag: (argv.ragFiles as string[] | undefined)?.length
-          ? {
-              files: argv.ragFiles as string[],
-              strategy: argv.ragStrategy as ChunkingStrategy | undefined,
-              chunkSize: argv.ragChunkSize as number | undefined,
-              chunkOverlap: argv.ragChunkOverlap as number | undefined,
-              topK: argv.ragTopK as number | undefined,
-            }
-          : undefined,
+        ...sdkOptions,
       });
 
-      if (spinner) {
-        if (isVideoMode) {
-          spinner.succeed(chalk.green("✅ Video generated successfully!"));
-        } else {
-          spinner.succeed(chalk.green("✅ Text generated successfully!"));
-        }
+      if (isVideoMode) {
+        spinner?.succeed(chalk.green("✅ Video generated successfully!"));
+      } else if (isSTTMode) {
+        spinner?.succeed(chalk.green("✅ Audio transcribed successfully!"));
+      } else {
+        spinner?.succeed(chalk.green("✅ Text generated successfully!"));
       }
 
-      // Display provider and model info by default (unless quiet mode)
       if (!options.quiet) {
-        const providerInfo = result.provider || "auto";
-        const modelInfo = result.model || "default";
         logger.always(
-          chalk.gray(`🔧 Provider: ${providerInfo} | Model: ${modelInfo}`),
+          chalk.gray(
+            `🔧 Provider: ${result.provider || "auto"} | Model: ${result.model || "default"}`,
+          ),
         );
       }
 
-      // Handle output with universal formatting (for text mode)
-      if (!isVideoMode) {
-        CLICommandFactory.handleOutput(result, options);
+      if (isSTTMode && result.transcription) {
+        await this.handleSTTOutput(result, options);
       }
 
-      // Handle TTS audio file output if --tts-output is provided
-      await CLICommandFactory.handleTTSOutput(result, options);
-
-      // Handle video file output if --videoOutput is provided
-      await CLICommandFactory.handleVideoOutput(result, options);
-
-      if (options.debug) {
-        logger.debug("\n" + chalk.yellow("Debug Information:"));
-        logger.debug("Provider:", result.provider);
-        logger.debug("Model:", result.model);
-        if (result.analytics) {
-          logger.debug("Analytics:", JSON.stringify(result.analytics, null, 2));
-        }
-        if (result.evaluation) {
-          logger.debug(
-            "Evaluation:",
-            JSON.stringify(result.evaluation, null, 2),
-          );
-        }
+      if (!isVideoMode && !isSTTMode) {
+        this.handleOutput(result, options);
       }
+
+      await this.handleTTSOutput(result, options);
+      await this.handleVideoOutput(result, options);
 
       if (!globalSession.getCurrentSessionId()) {
-        await CLICommandFactory.flushLangfuseTraces();
+        await this.flushLangfuseTraces();
         process.exit(0);
       }
     } catch (error) {
-      if (spinner) {
-        spinner.fail();
-      }
+      spinner?.fail();
       handleError(error as Error, "Generation");
     }
   }
@@ -2746,7 +3126,7 @@ export class CLICommandFactory {
             );
 
             if (processedContextResult.processedContext) {
-              inputText = processedContextResult.processedContext + inputText;
+              inputText = `${processedContextResult.processedContext}\n\n${inputText}`;
             }
 
             contextMetadata = {

@@ -234,9 +234,15 @@ export type StreamOptions = {
      * ```
      */
     images?: Array<Buffer | string | ImageWithAltText>;
-    csvFiles?: Array<Buffer | string>; // Explicit CSV files (converted to text)
-    pdfFiles?: Array<Buffer | string>; // Explicit PDF files (processed as binary documents, not converted to text)
-    videoFiles?: Array<Buffer | string>; // Explicit video files
+    csvFiles?: Array<
+      Buffer | string | import("./fileTypes.js").FileWithMetadata
+    >; // Explicit CSV files (converted to text)
+    pdfFiles?: Array<
+      Buffer | string | import("./fileTypes.js").FileWithMetadata
+    >; // Explicit PDF files (processed as binary documents, not converted to text)
+    videoFiles?: Array<
+      Buffer | string | import("./fileTypes.js").FileWithMetadata
+    >; // Explicit video files
     files?: Array<Buffer | string | import("./fileTypes.js").FileWithMetadata>; // Auto-detect file types
     content?: Content[]; // Advanced multimodal content
   };

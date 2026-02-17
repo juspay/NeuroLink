@@ -171,6 +171,9 @@ export function initializeCliParser() {
       // Discover Command - Using CLICommandFactory
       .command(CLICommandFactory.createDiscoverCommand())
 
+      // STT Command Group - Using CLICommandFactory
+      .command(CLICommandFactory.createSTTCommands())
+
       // Configuration Command Group - Using CLICommandFactory
       .command(CLICommandFactory.createConfigCommands())
 

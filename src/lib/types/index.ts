@@ -230,6 +230,9 @@ export * from "./ttsTypes.js";
 // Utilities Types - Utility module types (selective export to avoid conflicts)
 export * from "./utilities.js";
 
+// STT (Speech-to-Text) types
+export * from "./sttTypes.js";
+
 // Workflow types
 export * from "./workflowTypes.js";
 

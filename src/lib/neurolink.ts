@@ -487,6 +487,7 @@ export class NeuroLink {
       constructorStartTime,
       constructorHrTimeStart,
     );
+
     this.initializeConversationMemory(
       config,
       constructorId,
@@ -1837,6 +1838,34 @@ Current user's request: ${currentInput}`;
   }
 
   /**
+   * Get available STT models for a provider
+   *
+   * @param providerName - Provider name (e.g., 'google-ai', 'vertex'). Defaults to primary provider.
+   * @returns Promise resolving to list of available model identifiers
+   *
+   * @example
+   * ```typescript
+   * const models = await neurolink.getSTTModels('google-ai');
+   * console.log(models); // ['default', 'phone_call', 'video', ...]
+   * ```
+   *
+   * @since 1.0.0
+   */
+  async getSTTModels(providerName?: string): Promise<string[]> {
+    // Initialize provider registry if needed (but not full MCP)
+    if (!this.mcpInitialized) {
+      await this.initializeProviderRegistryInternal();
+    }
+
+    // Use provided provider name or default to google-ai for STT
+    const provider = providerName || "google-ai";
+
+    // Use STTProcessor directly to get models
+    const { STTProcessor } = await import("./utils/sttProcessor.js");
+    return STTProcessor.getModels(provider);
+  }
+
+  /**
    * Generate AI response with comprehensive feature support.
    *
    * Primary method for AI generation with support for all NeuroLink features:
@@ -2109,6 +2138,7 @@ Current user's request: ${currentInput}`;
         input: options.input, // This includes text, images, and content arrays
         region: options.region,
         tts: options.tts,
+        stt: options.stt, // Pass through STT options
         fileRegistry: this.fileRegistry,
         abortSignal: options.abortSignal,
         skipToolPromptInjection: options.skipToolPromptInjection,
@@ -2213,6 +2243,7 @@ Current user's request: ${currentInput}`;
             }
           : undefined,
         audio: textResult.audio,
+        transcription: textResult.transcription, // CRITICAL FIX: Include STT transcription result
         video: textResult.video,
         ppt: textResult.ppt,
       };
@@ -3204,7 +3235,7 @@ Current user's request: ${currentInput}`;
 
       // Return enhanced result with preserved tool information
       return {
-        content: result.content || "", // Ensure content is never undefined
+        content: result.content || "",
         provider: providerName,
         model: result.model,
         usage: result.usage,
@@ -3217,8 +3248,10 @@ Current user's request: ${currentInput}`;
           transformToolsToExpectedFormat(availableTools),
         ),
         audio: result.audio,
+        transcription: result.transcription,
         video: result.video,
         ppt: result.ppt,
+        imageOutput: result.imageOutput,
         // Include analytics and evaluation from BaseProvider
         analytics: result.analytics,
         evaluation: result.evaluation,
@@ -3402,6 +3435,7 @@ Current user's request: ${currentInput}`;
           analytics: result.analytics,
           evaluation: result.evaluation,
           audio: result.audio,
+          transcription: result.transcription, // CRITICAL: Pass through STT result
           video: result.video,
           ppt: result.ppt,
           // CRITICAL FIX: Include imageOutput for image generation models
@@ -4644,6 +4678,11 @@ Current user's request: ${currentInput}`;
    *   console.log(`Reason: ${event.reason || 'Unknown'}`);
    * });
    *
+   * emitter.on('externalMCP:serverFailed', (event) => {
+   *   console.log(`External MCP server failed: ${event.serverId}`);
+   *   console.log(`Reason: ${event.error || 'Unknown'}`);
+   * });
+   *
    * emitter.on('externalMCP:toolDiscovered', (event) => {
    *   console.log(`New tool discovered: ${event.toolName} from ${event.serverId}`);
    * });
@@ -5865,7 +5904,6 @@ Current user's request: ${currentInput}`;
   // ============================================================================
   // PROVIDER DIAGNOSTICS - SDK-First Architecture
   // ============================================================================
-
   /**
    * Get comprehensive status of all AI providers
    * Primary method for provider health checking and diagnostics
@@ -6120,7 +6158,6 @@ Current user's request: ${currentInput}`;
   // ============================================================================
   // MCP DIAGNOSTICS - SDK-First Architecture
   // ============================================================================
-
   /**
    * Get comprehensive MCP (Model Context Protocol) status information
    * @returns Promise resolving to MCP status details
@@ -6640,7 +6677,6 @@ Current user's request: ${currentInput}`;
   // ============================================================================
   // CONVERSATION MEMORY PUBLIC API
   // ============================================================================
-
   /**
    * Initialize conversation memory if enabled (public method for explicit initialization)
    * This is useful for testing or when you want to ensure conversation memory is ready

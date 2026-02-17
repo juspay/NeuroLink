@@ -232,7 +232,7 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
             model: "attempted-override",
             toolsEnabled: false as unknown as string,
             neurolink: false as unknown as string,
-            operationType: "attempted-override",
+            operationType: "attempted-override" as unknown as string,
             originalProvider: "attempted-override",
           },
         },
@@ -267,7 +267,6 @@ describe("TelemetryHandler - Custom Metadata Support", () => {
       const disabledNeurolink: MockNeuroLink = {
         isTelemetryEnabled: () => false,
       };
-
       const disabledHandler = new TelemetryHandler(
         AIProviderName.ANTHROPIC,
         "claude-3",

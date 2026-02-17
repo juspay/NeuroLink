@@ -30,6 +30,301 @@ export class ProviderRegistry {
   };
 
   /**
+   * Register core language model providers
+   */
+  private static async registerCoreProviders(): Promise<void> {
+    // Register Google AI Studio Provider (our validated baseline)
+    ProviderFactory.registerProvider(
+      AIProviderName.GOOGLE_AI,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { GoogleAIStudioProvider } = await import(
+          "../providers/googleAiStudio.js"
+        );
+        return new GoogleAIStudioProvider(
+          modelName,
+          sdk as NeuroLink | undefined,
+        );
+      },
+      GoogleAIModels.GEMINI_2_5_FLASH,
+      ["googleAiStudio", "google", "gemini", "google-ai", "google-ai-studio"],
+    );
+
+    // Register OpenAI provider
+    ProviderFactory.registerProvider(
+      AIProviderName.OPENAI,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { OpenAIProvider } = await import("../providers/openAI.js");
+        return new OpenAIProvider(modelName, sdk as NeuroLink | undefined);
+      },
+      OpenAIModels.GPT_4O_MINI,
+      ["gpt", "chatgpt"],
+    );
+
+    // Register Anthropic provider
+    ProviderFactory.registerProvider(
+      AIProviderName.ANTHROPIC,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { AnthropicProvider } = await import("../providers/anthropic.js");
+        return new AnthropicProvider(modelName, sdk as NeuroLink | undefined);
+      },
+      AnthropicModels.CLAUDE_SONNET_4_0,
+      ["claude", "anthropic"],
+    );
+
+    // Register Amazon Bedrock provider
+    ProviderFactory.registerProvider(
+      AIProviderName.BEDROCK,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+        region?: string,
+      ) => {
+        const { AmazonBedrockProvider } = await import(
+          "../providers/amazonBedrock.js"
+        );
+        return new AmazonBedrockProvider(
+          modelName,
+          sdk as NeuroLink | undefined,
+          region,
+        );
+      },
+      undefined, // Let provider read BEDROCK_MODEL from .env
+      ["bedrock", "aws"],
+    );
+
+    // Register Azure OpenAI provider
+    ProviderFactory.registerProvider(
+      AIProviderName.AZURE,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { AzureOpenAIProvider } = await import(
+          "../providers/azureOpenai.js"
+        );
+        return new AzureOpenAIProvider(modelName, sdk as NeuroLink | undefined);
+      },
+      process.env.AZURE_MODEL ||
+        process.env.AZURE_OPENAI_MODEL ||
+        process.env.AZURE_OPENAI_DEPLOYMENT ||
+        process.env.AZURE_OPENAI_DEPLOYMENT_ID ||
+        "gpt-4o-mini",
+      ["azure", "azureOpenai"],
+    );
+
+    // Register Google Vertex AI provider
+    ProviderFactory.registerProvider(
+      AIProviderName.VERTEX,
+      async (
+        modelName?: string,
+        providerName?: string,
+        sdk?: UnknownRecord,
+        region?: string,
+      ) => {
+        const { GoogleVertexProvider } = await import(
+          "../providers/googleVertex.js"
+        );
+        return new GoogleVertexProvider(
+          modelName,
+          providerName,
+          sdk as NeuroLink | undefined,
+          region,
+        );
+      },
+      VertexModels.CLAUDE_4_0_SONNET,
+      ["vertex", "googleVertex"],
+    );
+  }
+
+  /**
+   * Register specialized and open-source providers
+   */
+  private static async registerSpecializedProviders(): Promise<void> {
+    // Register Hugging Face provider (Unified Router implementation)
+    ProviderFactory.registerProvider(
+      AIProviderName.HUGGINGFACE,
+      async (modelName?: string) => {
+        const { HuggingFaceProvider } = await import(
+          "../providers/huggingFace.js"
+        );
+        return new HuggingFaceProvider(modelName);
+      },
+      process.env.HUGGINGFACE_MODEL || HuggingFaceModels.QWEN_2_5_72B_INSTRUCT,
+      ["huggingface", "hf"],
+    );
+
+    // Register Mistral AI provider
+    ProviderFactory.registerProvider(
+      AIProviderName.MISTRAL,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { MistralProvider } = await import("../providers/mistral.js");
+        return new MistralProvider(
+          modelName,
+          sdk as MistralProviderType | undefined,
+        );
+      },
+      MistralModels.MISTRAL_LARGE_LATEST,
+      ["mistral"],
+    );
+
+    // Register Ollama provider
+    ProviderFactory.registerProvider(
+      AIProviderName.OLLAMA,
+      async (modelName?: string) => {
+        const { OllamaProvider } = await import("../providers/ollama.js");
+        return new OllamaProvider(modelName);
+      },
+      process.env.OLLAMA_MODEL || OllamaModels.LLAMA3_2_LATEST,
+      ["ollama", "local"],
+    );
+
+    // Register LiteLLM provider
+    ProviderFactory.registerProvider(
+      AIProviderName.LITELLM,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { LiteLLMProvider } = await import("../providers/litellm.js");
+        return new LiteLLMProvider(modelName, sdk as NeuroLink | undefined);
+      },
+      process.env.LITELLM_MODEL || LiteLLMModels.OPENAI_GPT_4O_MINI,
+      ["litellm"],
+    );
+
+    // Register OpenAI Compatible provider
+    ProviderFactory.registerProvider(
+      AIProviderName.OPENAI_COMPATIBLE,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { OpenAICompatibleProvider } = await import(
+          "../providers/openaiCompatible.js"
+        );
+        return new OpenAICompatibleProvider(
+          modelName,
+          sdk as NeuroLink | undefined,
+        );
+      },
+      process.env.OPENAI_COMPATIBLE_MODEL || undefined, // Enable auto-discovery when no model specified
+      ["openai-compatible", "vllm", "compatible"],
+    );
+
+    // Register OpenRouter provider (300+ models from 60+ providers)
+    ProviderFactory.registerProvider(
+      AIProviderName.OPENROUTER,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        sdk?: UnknownRecord,
+      ) => {
+        const { OpenRouterProvider } = await import(
+          "../providers/openRouter.js"
+        );
+        return new OpenRouterProvider(modelName, sdk as NeuroLink | undefined);
+      },
+      process.env.OPENROUTER_MODEL || "anthropic/claude-3-5-sonnet",
+      ["openrouter", "or"],
+    );
+
+    // Register Amazon SageMaker provider
+    ProviderFactory.registerProvider(
+      AIProviderName.SAGEMAKER,
+      async (
+        modelName?: string,
+        _providerName?: string,
+        _sdk?: UnknownRecord,
+        region?: string,
+      ) => {
+        const { AmazonSageMakerProvider } = await import(
+          "../providers/amazonSagemaker.js"
+        );
+        return new AmazonSageMakerProvider(modelName, undefined, region);
+      },
+      process.env.SAGEMAKER_MODEL || "sagemaker-model",
+      ["sagemaker", "aws-sagemaker"],
+    );
+  }
+
+  /**
+   * Register TTS and STT handlers
+   */
+  private static async registerAudioHandlers(): Promise<void> {
+    // ===== TTS HANDLER REGISTRATION =====
+    try {
+      // Create handler instance and register explicitly
+      const { GoogleTTSHandler } = await import(
+        "../adapters/tts/googleTTSHandler.js"
+      );
+      const { TTSProcessor } = await import("../utils/ttsProcessor.js");
+
+      const googleHandler = new GoogleTTSHandler();
+      TTSProcessor.registerHandler("google-ai", googleHandler);
+      TTSProcessor.registerHandler("vertex", googleHandler);
+
+      logger.debug("TTS handlers registered successfully", {
+        providers: ["google-ai", "vertex"],
+      });
+    } catch (ttsError) {
+      logger.warn(
+        "Failed to register TTS handlers - TTS functionality will be unavailable",
+        {
+          error:
+            ttsError instanceof Error ? ttsError.message : String(ttsError),
+        },
+      );
+      // Don't throw - TTS is optional functionality
+    }
+
+    // ===== STT HANDLER REGISTRATION =====
+    try {
+      // Create handler instance and register explicitly
+      const { GoogleSTTHandler } = await import(
+        "../adapters/stt/googleSTTHandler.js"
+      );
+      const { STTProcessor } = await import("../utils/sttProcessor.js");
+
+      const googleSTTHandler = new GoogleSTTHandler();
+      STTProcessor.registerHandler("google-ai", googleSTTHandler);
+      STTProcessor.registerHandler("vertex", googleSTTHandler);
+
+      logger.debug("STT handlers registered successfully", {
+        providers: ["google-ai", "vertex"],
+      });
+    } catch (sttError) {
+      logger.warn(
+        "Failed to register STT handlers - STT functionality will be unavailable",
+        {
+          error:
+            sttError instanceof Error ? sttError.message : String(sttError),
+        },
+      );
+      // Don't throw - STT is optional functionality
+    }
+  }
+
+  /**
    * Register all providers with the factory
    */
   static async registerAllProviders(): Promise<void> {
@@ -39,273 +334,14 @@ export class ProviderRegistry {
 
     try {
       // Register providers with dynamic import factory functions
-      const { ProviderFactory } = await import("./providerFactory.js");
+      await import("./providerFactory.js");
 
-      // Register Google AI Studio Provider (our validated baseline)
-      ProviderFactory.registerProvider(
-        AIProviderName.GOOGLE_AI,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { GoogleAIStudioProvider } = await import(
-            "../providers/googleAiStudio.js"
-          );
-          return new GoogleAIStudioProvider(
-            modelName,
-            sdk as NeuroLink | undefined,
-          );
-        },
-        GoogleAIModels.GEMINI_2_5_FLASH,
-        ["googleAiStudio", "google", "gemini", "google-ai", "google-ai-studio"],
-      );
-
-      // Register OpenAI provider
-      ProviderFactory.registerProvider(
-        AIProviderName.OPENAI,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { OpenAIProvider } = await import("../providers/openAI.js");
-          return new OpenAIProvider(modelName, sdk as NeuroLink | undefined);
-        },
-        OpenAIModels.GPT_4O_MINI,
-        ["gpt", "chatgpt"],
-      );
-
-      // Register Anthropic provider
-      ProviderFactory.registerProvider(
-        AIProviderName.ANTHROPIC,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { AnthropicProvider } = await import(
-            "../providers/anthropic.js"
-          );
-          return new AnthropicProvider(modelName, sdk as NeuroLink | undefined);
-        },
-        AnthropicModels.CLAUDE_SONNET_4_0,
-        ["claude", "anthropic"],
-      );
-
-      // Register Amazon Bedrock provider
-      ProviderFactory.registerProvider(
-        AIProviderName.BEDROCK,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-          region?: string,
-        ) => {
-          const { AmazonBedrockProvider } = await import(
-            "../providers/amazonBedrock.js"
-          );
-          return new AmazonBedrockProvider(
-            modelName,
-            sdk as NeuroLink | undefined,
-            region,
-          );
-        },
-        undefined, // Let provider read BEDROCK_MODEL from .env
-        ["bedrock", "aws"],
-      );
-
-      // Register Azure OpenAI provider
-      ProviderFactory.registerProvider(
-        AIProviderName.AZURE,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { AzureOpenAIProvider } = await import(
-            "../providers/azureOpenai.js"
-          );
-          return new AzureOpenAIProvider(
-            modelName,
-            sdk as NeuroLink | undefined,
-          );
-        },
-        process.env.AZURE_MODEL ||
-          process.env.AZURE_OPENAI_MODEL ||
-          process.env.AZURE_OPENAI_DEPLOYMENT ||
-          process.env.AZURE_OPENAI_DEPLOYMENT_ID ||
-          "gpt-4o-mini",
-        ["azure", "azureOpenai"],
-      );
-
-      // Register Google Vertex AI provider
-      ProviderFactory.registerProvider(
-        AIProviderName.VERTEX,
-        async (
-          modelName?: string,
-          providerName?: string,
-          sdk?: UnknownRecord,
-          region?: string,
-        ) => {
-          const { GoogleVertexProvider } = await import(
-            "../providers/googleVertex.js"
-          );
-          return new GoogleVertexProvider(
-            modelName,
-            providerName,
-            sdk as NeuroLink | undefined,
-            region,
-          );
-        },
-        VertexModels.CLAUDE_4_0_SONNET,
-        ["vertex", "googleVertex"],
-      );
-
-      // Register Hugging Face provider (Unified Router implementation)
-      ProviderFactory.registerProvider(
-        AIProviderName.HUGGINGFACE,
-        async (modelName?: string) => {
-          const { HuggingFaceProvider } = await import(
-            "../providers/huggingFace.js"
-          );
-          return new HuggingFaceProvider(modelName);
-        },
-        process.env.HUGGINGFACE_MODEL ||
-          HuggingFaceModels.QWEN_2_5_72B_INSTRUCT,
-        ["huggingface", "hf"],
-      );
-
-      // Register Mistral AI provider
-      ProviderFactory.registerProvider(
-        AIProviderName.MISTRAL,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { MistralProvider } = await import("../providers/mistral.js");
-          return new MistralProvider(
-            modelName,
-            sdk as MistralProviderType | undefined,
-          );
-        },
-        MistralModels.MISTRAL_LARGE_LATEST,
-        ["mistral"],
-      );
-
-      // Register Ollama provider
-      ProviderFactory.registerProvider(
-        AIProviderName.OLLAMA,
-        async (modelName?: string) => {
-          const { OllamaProvider } = await import("../providers/ollama.js");
-          return new OllamaProvider(modelName);
-        },
-        process.env.OLLAMA_MODEL || OllamaModels.LLAMA3_2_LATEST,
-        ["ollama", "local"],
-      );
-
-      // Register LiteLLM provider
-      ProviderFactory.registerProvider(
-        AIProviderName.LITELLM,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { LiteLLMProvider } = await import("../providers/litellm.js");
-          return new LiteLLMProvider(modelName, sdk as NeuroLink | undefined);
-        },
-        process.env.LITELLM_MODEL || LiteLLMModels.OPENAI_GPT_4O_MINI,
-        ["litellm"],
-      );
-
-      // Register OpenAI Compatible provider
-      ProviderFactory.registerProvider(
-        AIProviderName.OPENAI_COMPATIBLE,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { OpenAICompatibleProvider } = await import(
-            "../providers/openaiCompatible.js"
-          );
-          return new OpenAICompatibleProvider(
-            modelName,
-            sdk as NeuroLink | undefined,
-          );
-        },
-        process.env.OPENAI_COMPATIBLE_MODEL || undefined, // Enable auto-discovery when no model specified
-        ["openai-compatible", "vllm", "compatible"],
-      );
-
-      // Register OpenRouter provider (300+ models from 60+ providers)
-      ProviderFactory.registerProvider(
-        AIProviderName.OPENROUTER,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          sdk?: UnknownRecord,
-        ) => {
-          const { OpenRouterProvider } = await import(
-            "../providers/openRouter.js"
-          );
-          return new OpenRouterProvider(
-            modelName,
-            sdk as NeuroLink | undefined,
-          );
-        },
-        process.env.OPENROUTER_MODEL || "anthropic/claude-3-5-sonnet",
-        ["openrouter", "or"],
-      );
-
-      // Register Amazon SageMaker provider
-      ProviderFactory.registerProvider(
-        AIProviderName.SAGEMAKER,
-        async (
-          modelName?: string,
-          _providerName?: string,
-          _sdk?: UnknownRecord,
-          region?: string,
-        ) => {
-          const { AmazonSageMakerProvider } = await import(
-            "../providers/amazonSagemaker.js"
-          );
-          return new AmazonSageMakerProvider(modelName, undefined, region);
-        },
-        process.env.SAGEMAKER_MODEL || "sagemaker-model",
-        ["sagemaker", "aws-sagemaker"],
-      );
+      await this.registerCoreProviders();
+      await this.registerSpecializedProviders();
+      await this.registerAudioHandlers();
 
       logger.debug("All providers registered successfully");
       this.registered = true;
-
-      // ===== TTS HANDLER REGISTRATION =====
-      try {
-        // Create handler instance and register explicitly
-        const { GoogleTTSHandler } = await import(
-          "../adapters/tts/googleTTSHandler.js"
-        );
-        const { TTSProcessor } = await import("../utils/ttsProcessor.js");
-
-        const googleHandler = new GoogleTTSHandler();
-        TTSProcessor.registerHandler("google-ai", googleHandler);
-        TTSProcessor.registerHandler("vertex", googleHandler);
-
-        logger.debug("TTS handlers registered successfully", {
-          providers: ["google-ai", "vertex"],
-        });
-      } catch (ttsError) {
-        logger.warn(
-          "Failed to register TTS handlers - TTS functionality will be unavailable",
-          {
-            error:
-              ttsError instanceof Error ? ttsError.message : String(ttsError),
-          },
-        );
-        // Don't throw - TTS is optional functionality
-      }
     } catch (error) {
       logger.error("Failed to register providers:", error);
       throw error;

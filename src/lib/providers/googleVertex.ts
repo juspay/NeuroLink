@@ -2907,7 +2907,9 @@ export class GoogleVertexProvider extends BaseProvider {
    */
   private buildImageGenerationParts(
     prompt: string,
-    pdfFiles: Array<Buffer | string>,
+    pdfFiles: Array<
+      Buffer | string | import("../types/fileTypes.js").FileWithMetadata
+    >,
     inputImages: Array<Buffer | string>,
   ): Array<{
     text?: string;
@@ -2928,6 +2930,9 @@ export class GoogleVertexProvider extends BaseProvider {
 
       if (Buffer.isBuffer(pdfFile)) {
         pdfBase64 = pdfFile.toString("base64");
+      } else if (typeof pdfFile === "object" && "buffer" in pdfFile) {
+        // Handle FileWithMetadata
+        pdfBase64 = pdfFile.buffer.toString("base64");
       } else if (typeof pdfFile === "string") {
         const isFilePath =
           pdfFile.startsWith("/") ||

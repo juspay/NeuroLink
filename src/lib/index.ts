@@ -135,6 +135,18 @@ export type {
   NeuroLinkMiddleware,
 } from "./types/middlewareTypes.js";
 
+// STT & TTS Processors
+export {
+  STTProcessor,
+  STTError,
+  STT_ERROR_CODES,
+} from "./utils/sttProcessor.js";
+export {
+  TTSProcessor,
+  TTSError,
+  TTS_ERROR_CODES,
+} from "./utils/ttsProcessor.js";
+
 // Version
 export const VERSION = "1.0.0";
 

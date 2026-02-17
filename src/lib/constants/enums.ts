@@ -767,6 +767,7 @@ export enum ErrorCategory {
   CONFIGURATION = "configuration",
   EXECUTION = "execution",
   SYSTEM = "system",
+  STT = "stt",
 }
 
 // Error severity levels

@@ -26,6 +26,7 @@ export const textGenerationOptionsSchema: Record<
     | "region"
     | "csvOptions"
     | "tts"
+    | "stt"
     | "thinkingConfig" // Complex object, use thinking/thinkingBudget instead
     | "fileRegistry" // Internal: set by SDK, not by CLI
     | "abortSignal" // Runtime object, not CLI-settable

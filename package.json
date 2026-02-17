@@ -1,6 +1,6 @@
 {
   "name": "@juspay/neurolink",
-  "version": "9.8.0",
+  "version": "9.9.0",
   "description": "Universal AI Development Platform with working MCP integration, multi-provider support, and professional CLI. Built-in tools operational, 58+ external MCP servers discoverable. Connect to filesystem, GitHub, database operations, and more. Build, test, and deploy AI applications with 13 providers: OpenAI, Anthropic, Google AI, AWS Bedrock, Azure, Hugging Face, Ollama, and Mistral AI.",
   "author": {
     "name": "Juspay Technologies",
@@ -177,6 +177,7 @@
     "@aws-sdk/client-sagemaker-runtime": "^3.886.0",
     "@aws-sdk/credential-provider-node": "^3.886.0",
     "@aws-sdk/types": "^3.862.0",
+    "@google-cloud/speech": "^7.2.1",
     "@google-cloud/text-to-speech": "^5.0.0",
     "@google-cloud/vertexai": "^1.10.0",
     "@google/genai": "^1.34.0",

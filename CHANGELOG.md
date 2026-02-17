@@ -1,3 +1,9 @@
+## [9.9.0](https://github.com/juspay/neurolink/compare/v9.8.0...v9.9.0) (2026-02-17)
+
+### Features
+
+- **(video-analysis):** add video-analysis support in neurolink ([c35f8a8](https://github.com/juspay/neurolink/commit/c35f8a8d52cc1366e10b8701285e1bec52e27d98))
+
 ## [9.8.0](https://github.com/juspay/neurolink/compare/v9.7.0...v9.8.0) (2026-02-17)
 
 ### Features

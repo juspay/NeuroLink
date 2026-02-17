@@ -847,9 +847,17 @@ function appendDetectedFileResult(
     }
     logger.info(`[FileDetector] ✅ Video: ${filename}`);
   } else if (result.type === "audio") {
+    // Keep audio in files array for STT transcription (auto-detection will handle it)
+    logger.info(
+      `[FileDetector] ✅ Audio: ${filename} (kept in files for STT auto-detection)`,
+    );
+
+    // Also add metadata to text for context
     if (result.content) {
       options.input.text += `\n\n## Audio File: "${filename}"\n${result.content}\n`;
     }
+
+    // Add cover art if present
     if (result.images && result.images.length > 0) {
       options.input.images = [
         ...(options.input.images || []),
@@ -857,7 +865,6 @@ function appendDetectedFileResult(
       ];
       logger.info(`[FileDetector] Added audio cover art as image`);
     }
-    logger.info(`[FileDetector] ✅ Audio: ${filename}`);
   } else if (result.type === "archive") {
     if (result.content) {
       options.input.text += `\n\n## Archive File: "${filename}"\n${result.content}\n`;
