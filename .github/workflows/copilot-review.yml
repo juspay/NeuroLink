@@ -56,8 +56,8 @@ jobs:
             src/**/*.jsx
             test/**/*.ts
             test/**/*.tsx
-            scripts/**/*.js
-            scripts/**/*.cjs
+            scripts/**/*.{js,ts}
+            scripts/**/*.{cjs,ts}
             .github/workflows/*.yml
             *.md
             package.json
@@ -125,7 +125,7 @@ jobs:
           git log --oneline origin/release..HEAD | while read commit; do
             commit_msg=$(echo "$commit" | cut -d' ' -f2-)
             echo "Checking: $commit_msg"
-            node scripts/commit-validation.cjs "$commit_msg" || echo "⚠️ Commit message needs attention"
+            pnpm exec tsx scripts/commit-validation.ts "$commit_msg" || echo "⚠️ Commit message needs attention"
           done
 
       - name: Check Comment Permissions

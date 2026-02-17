@@ -4,16 +4,16 @@
   "description": "Comprehensive demo application showcasing NeuroLink AI toolkit capabilities",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "test": "node test-providers.js",
-    "test:config": "node test-providers.js --config",
-    "test:api": "node test-providers.js --api",
-    "test:fallback": "node test-providers.js --fallback",
-    "test:performance": "node test-providers.js --performance",
-    "test:streaming": "node test-providers.js --streaming",
-    "test:errors": "node test-providers.js --errors",
-    "test:web": "node test-providers.js --web",
-    "dev": "nodemon server.js"
+    "start": "tsx server.ts",
+    "test": "tsx test-providers.ts",
+    "test:config": "tsx test-providers.ts --config",
+    "test:api": "tsx test-providers.ts --api",
+    "test:fallback": "tsx test-providers.ts --fallback",
+    "test:performance": "tsx test-providers.ts --performance",
+    "test:streaming": "tsx test-providers.ts --streaming",
+    "test:errors": "tsx test-providers.ts --errors",
+    "test:web": "tsx test-providers.ts --web",
+    "dev": "tsx watch server.ts"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^2.2.0",
@@ -26,7 +26,8 @@
     "playwright": "^1.52.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "tsx": "^4.19.0"
   },
   "keywords": [
     "ai",

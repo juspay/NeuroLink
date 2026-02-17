@@ -232,7 +232,7 @@ jobs:
           # Get the commit message for validation and pass it to the validator
           COMMIT_MSG=$(git log -1 --pretty=format:"%s")
           echo "Validating: $COMMIT_MSG"
-          node scripts/commit-validation.cjs "$COMMIT_MSG"
+          pnpm exec tsx scripts/commit-validation.ts "$COMMIT_MSG"
 
       - name: 🌍 Environment Validation
         run: |

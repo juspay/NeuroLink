@@ -47,7 +47,7 @@ The formatting is configured in `.releaserc.json`:
 
 ### Format Changelog Script
 
-**Location**: `scripts/format-changelog.cjs`
+**Location**: `scripts/format-changelog.ts`
 
 Standalone script that formats CHANGELOG.md using Prettier:
 
@@ -56,7 +56,7 @@ Standalone script that formats CHANGELOG.md using Prettier:
 pnpm run format:changelog
 
 # Or directly
-node scripts/format-changelog.cjs
+tsx scripts/format-changelog.ts
 ```
 
 **Features**:

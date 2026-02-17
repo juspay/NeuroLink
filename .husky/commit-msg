@@ -2,4 +2,4 @@
 . "$(dirname -- "$0")/_/husky.sh"
 
 # Validate commit message format
-node scripts/commit-validation.cjs
+npx tsx scripts/commit-validation.ts

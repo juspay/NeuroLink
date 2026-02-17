@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "tools/**/*.ts",
+    "examples/**/*.ts",
+    "neurolink-demo/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
