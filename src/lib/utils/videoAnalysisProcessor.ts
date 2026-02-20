@@ -12,12 +12,17 @@ import { logger } from "./logger.js";
 
 /**
  * Check if messages contain video frames (images)
+ * Only checks user messages to match buildContentParts behavior
  *
  * @param messages - Array of CoreMessage objects
- * @returns true if video frames are present
+ * @returns true if video frames are present in user messages
  */
 export function hasVideoFrames(messages: CoreMessage[]): boolean {
   return messages.some((msg) => {
+    // Only check user messages to match buildContentParts behavior
+    if (msg.role !== "user") {
+      return false;
+    }
     if (Array.isArray(msg.content)) {
       return msg.content.some(
         (part) =>
@@ -63,7 +68,7 @@ export async function executeVideoAnalysis(
         ? AIProviderName.VERTEX
         : AIProviderName.AUTO;
 
-  const videoAnalysisText = await analyzeVideo(messages[0], {
+  const videoAnalysisText = await analyzeVideo(messages, {
     provider: provider as AIProviderName,
     project: options.region
       ? undefined

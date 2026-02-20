@@ -14,7 +14,7 @@ import {
 } from "../../constants/enums.js";
 import { logger } from "../../utils/logger.js";
 import { readFile } from "node:fs/promises";
-import { NeuroLinkError } from "../../utils/errorHandling.js";
+import { NeuroLinkError, ErrorFactory } from "../../utils/errorHandling.js";
 import type { CoreMessage } from "ai";
 
 // ---------------------------------------------------------------------------
@@ -25,43 +25,72 @@ const DEFAULT_MODEL = "gemini-2.0-flash";
 const DEFAULT_LOCATION = "us-central1";
 
 /**
+ * Extract content items from user messages
+ *
+ * @param messages - Array of CoreMessage objects
+ * @returns Flattened array of content items from user messages
+ */
+function extractUserContent(messages: CoreMessage[]) {
+  const userMessages = messages.filter((msg) => msg.role === "user");
+  return userMessages.flatMap((msg) =>
+    Array.isArray(msg.content) ? msg.content : [],
+  );
+}
+
+/**
  * Convert CoreMessage content array to Gemini parts format
  *
- * @param contentArray - Array of content items from CoreMessage
+ * @param messages - Array of CoreMessage objects
  * @returns Array of parts in Gemini API format
  */
 function buildContentParts(
-  frames: CoreMessage,
+  messages: CoreMessage[],
 ): Array<
   { text: string } | { inlineData: { mimeType: string; data: string } }
 > {
-  const contentArray = Array.isArray(frames.content) ? frames.content : [];
-  return contentArray.map((item) => {
-    if (item.type === "text" && item.text) {
-      return { text: item.text };
-    } else if (item.type === "image" && item.image) {
-      let base64Data: string;
-      // Handle Buffer or Uint8Array
-      if (Buffer.isBuffer(item.image) || item.image instanceof Uint8Array) {
-        base64Data = Buffer.from(item.image).toString("base64");
-      } else if (typeof item.image === "string") {
-        // Strip data URI prefix if present (e.g., "data:image/jpeg;base64,")
-        base64Data = item.image.replace(/^data:image\/[a-z]+;base64,/, "");
-      } else {
-        throw new Error(
-          `Invalid image data type: expected string, Buffer, or Uint8Array, got ${typeof item.image}`,
-        );
-      }
+  const allContent = extractUserContent(messages);
 
-      return {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Data,
-        },
-      };
-    }
-    throw new Error(`Invalid content type: ${item.type}`);
-  });
+  return allContent
+    .map((item) => {
+      if (item.type === "text") {
+        // Accept text parts regardless of whether text is empty
+        return { text: item.text || "" };
+      } else if (item.type === "image" && item.image) {
+        let base64Data: string;
+        // Handle Buffer or Uint8Array
+        if (Buffer.isBuffer(item.image) || item.image instanceof Uint8Array) {
+          base64Data = Buffer.from(item.image).toString("base64");
+        } else if (typeof item.image === "string") {
+          // Strip data URI prefix if present (e.g., "data:image/jpeg;base64,")
+          base64Data = item.image.replace(/^data:image\/[a-z]+;base64,/, "");
+        } else {
+          throw ErrorFactory.invalidConfiguration(
+            "image data type",
+            `expected string, Buffer, or Uint8Array, got ${typeof item.image}`,
+            { itemType: item.type, dataType: typeof item.image },
+          );
+        }
+
+        return {
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: base64Data,
+          },
+        };
+      } else if (item.type === "file") {
+        // Skip file parts - not supported in Gemini parts format
+        return null;
+      }
+      // Return null for unsupported types
+      return null;
+    })
+    .filter(
+      (
+        part,
+      ): part is
+        | { text: string }
+        | { inlineData: { mimeType: string; data: string } } => part !== null,
+    );
 }
 
 /**
@@ -105,7 +134,7 @@ Ensure the final response is fully self-sufficient and does not reference extern
 // ---------------------------------------------------------------------------
 
 export async function analyzeVideoWithVertexAI(
-  frames: CoreMessage,
+  messages: CoreMessage[],
   options: {
     project?: string;
     location?: string;
@@ -121,10 +150,10 @@ export async function analyzeVideoWithVertexAI(
   const location = options.location ?? config.location;
   const model = options.model || DEFAULT_MODEL;
 
-  // Extract content array from CoreMessage
-  const contentArray = Array.isArray(frames.content) ? frames.content : [];
-  const frameCount = contentArray.filter(
-    (item) => item.type === "image",
+  // Convert frames content to parts array for Gemini
+  const parts = buildContentParts(messages);
+  const frameCount = parts.filter(
+    (part) => "inlineData" in part && part.inlineData,
   ).length;
 
   logger.debug("[GeminiVideoAnalyzer] Analyzing video with Vertex AI", {
@@ -134,9 +163,6 @@ export async function analyzeVideoWithVertexAI(
     frameCount,
   });
   const ai = new GoogleGenAI({ vertexai: true, project, location });
-
-  // Convert frames content to parts array for Gemini
-  const parts = buildContentParts(frames);
   const response = await ai.models.generateContent({
     model,
     config: buildConfig(),
@@ -164,7 +190,7 @@ export async function analyzeVideoWithVertexAI(
 // ---------------------------------------------------------------------------
 
 export async function analyzeVideoWithGeminiAPI(
-  frames: CoreMessage,
+  messages: CoreMessage[],
   options: {
     apiKey?: string;
     model?: string;
@@ -182,10 +208,10 @@ export async function analyzeVideoWithGeminiAPI(
     );
   }
 
-  // Extract content array from CoreMessage
-  const contentArray = Array.isArray(frames.content) ? frames.content : [];
-  const frameCount = contentArray.filter(
-    (item) => item.type === "image",
+  // Convert frames content to parts array for Gemini
+  const parts = buildContentParts(messages);
+  const frameCount = parts.filter(
+    (part) => "inlineData" in part && part.inlineData,
   ).length;
 
   logger.debug("[GeminiVideoAnalyzer] Analyzing video with Gemini API", {
@@ -194,9 +220,6 @@ export async function analyzeVideoWithGeminiAPI(
   });
 
   const ai = new GoogleGenAI({ apiKey });
-
-  // Convert frames content to parts array for Gemini
-  const parts = buildContentParts(frames);
 
   logger.debug("[GeminiVideoAnalyzer] Generating analysis with frames");
 
@@ -275,7 +298,7 @@ async function getVertexConfig(): Promise<{
 }
 
 export async function analyzeVideo(
-  frames: CoreMessage,
+  messages: CoreMessage[],
   options: {
     provider?: AIProviderName;
     project?: string;
@@ -285,15 +308,14 @@ export async function analyzeVideo(
   } = {},
 ): Promise<string> {
   const provider = options.provider || AIProviderName.AUTO;
-
   // Vertex — only when GOOGLE_VERTEX_PROJECT is explicitly set
   if (provider === AIProviderName.VERTEX || provider === AIProviderName.AUTO) {
-    return analyzeVideoWithVertexAI(frames, options);
+    return analyzeVideoWithVertexAI(messages, options);
   }
 
   // Gemini API — when GOOGLE_AI_API_KEY is set
   if (provider === AIProviderName.GOOGLE_AI && process.env.GOOGLE_AI_API_KEY) {
-    return analyzeVideoWithGeminiAPI(frames, options);
+    return analyzeVideoWithGeminiAPI(messages, options);
   }
 
   throw new Error(

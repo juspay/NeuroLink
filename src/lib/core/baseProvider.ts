@@ -164,6 +164,25 @@ export abstract class BaseProvider implements AIProvider {
       timestamp: Date.now(),
     });
 
+    // ===== EARLY MULTIMODAL DETECTION =====
+    const hasFileInput =
+      !!options.input?.files?.length || !!options.input?.videoFiles?.length;
+    if (hasFileInput) {
+      // ===== VIDEO ANALYSIS DETECTION =====
+      // Check if video frames are present and handle with fake streaming
+      const messages = await this.buildMessagesForStream(options);
+      if (hasVideoFrames(messages)) {
+        logger.info(
+          `Video frames detected in stream, using fake streaming for video analysis`,
+          {
+            provider: this.providerName,
+            model: this.modelName,
+          },
+        );
+        return await this.executeFakeStreaming(options, analysisSchema);
+      }
+    }
+
     // 🔧 CRITICAL: Image generation models don't support real streaming
     // Force fake streaming for image models to ensure image output is yielded
     const isImageModel = IMAGE_GENERATION_MODELS.some((m) =>
@@ -290,7 +309,6 @@ export abstract class BaseProvider implements AIProvider {
       });
 
       const result = await this.generate(textOptions, analysisSchema);
-
       logger.info(`Generate completed for fake streaming`, {
         provider: this.providerName,
         hasContent: !!result?.content,
