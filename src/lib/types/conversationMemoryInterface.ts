@@ -36,6 +36,7 @@ export type IConversationMemoryManager = {
     sessionId: string,
     userId?: string,
     enableSummarization?: boolean,
+    requestId?: string,
   ): Promise<ChatMessage[]> | ChatMessage[];
 
   /** Clear a specific session */
@@ -46,4 +47,17 @@ export type IConversationMemoryManager = {
 
   /** Get memory statistics */
   getStats(): Promise<ConversationMemoryStats> | ConversationMemoryStats;
+
+  /** Get raw messages array for a session (no context filtering or summarization) */
+  getSessionMessages(
+    sessionId: string,
+    userId?: string,
+  ): Promise<ChatMessage[]>;
+
+  /** Replace the entire messages array for a session */
+  setSessionMessages(
+    sessionId: string,
+    messages: ChatMessage[],
+    userId?: string,
+  ): Promise<void>;
 };

@@ -960,6 +960,11 @@ export class CircuitBreaker {
 /**
  * Detect AbortError from any source (DOMException, plain Error, or message-based).
  * Used to short-circuit retry/fallback loops when an abort signal fires.
+ *
+ * Uses `includes()` for message checks because provider error handlers
+ * (e.g., googleVertex.formatProviderError) wrap the original AbortError
+ * in a formatted error like "❌ Provider Error\n\nThis operation was aborted\n\n..."
+ * which destroys the exact message match.
  */
 export function isAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === "AbortError") {
@@ -970,8 +975,8 @@ export function isAbortError(error: unknown): boolean {
   }
   if (
     error instanceof Error &&
-    (error.message === "This operation was aborted" ||
-      error.message === "The operation was aborted" ||
+    (error.message?.includes("This operation was aborted") ||
+      error.message?.includes("The operation was aborted") ||
       error.message?.includes("The user aborted a request"))
   ) {
     return true;

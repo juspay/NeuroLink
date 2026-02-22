@@ -138,8 +138,10 @@ export async function storeConversationTurn(
   originalOptions: TextGenerationOptions,
   result: TextGenerationResult,
   startTimeStamp?: Date | undefined,
+  requestId?: string,
 ): Promise<void> {
   logger.debug("[conversationMemoryUtils] storeConversationTurn called", {
+    requestId,
     hasMemory: !!conversationMemory,
     memoryType: conversationMemory?.constructor?.name || "NONE",
     hasContext: !!originalOptions.context,
@@ -162,6 +164,7 @@ export async function storeConversationTurn(
   logger.debug(
     "[conversationMemoryUtils] Extracted session details from context",
     {
+      requestId,
       sessionId,
       userId,
       contextKeys: Object.keys(context),
@@ -222,6 +225,7 @@ export async function storeConversationTurn(
       startTimeStamp,
       providerDetails,
       enableSummarization: originalOptions.enableSummarization,
+      requestId,
       tokenUsage: result.usage
         ? {
             inputTokens: result.usage.input,
@@ -236,6 +240,7 @@ export async function storeConversationTurn(
     logger.debug(
       "[conversationMemoryUtils] Conversation turn stored successfully",
       {
+        requestId,
         sessionId,
         userId,
         memoryType: conversationMemory.constructor.name,
@@ -244,11 +249,14 @@ export async function storeConversationTurn(
       },
     );
   } catch (error) {
+    const details = (error as { details?: { error?: string } })?.details;
     logger.warn("[conversationMemoryUtils] Failed to store conversation turn", {
       sessionId,
       userId,
       memoryType: conversationMemory.constructor.name,
       error: error instanceof Error ? error.message : String(error),
+      innerError: details?.error || "none",
+      errorCode: (error as { code?: string })?.code || "unknown",
       stack: error instanceof Error ? error.stack : undefined,
     });
   }
@@ -260,8 +268,23 @@ export async function storeConversationTurn(
  * @param session - Session memory with pointer
  * @returns Context messages to send to LLM
  */
-export function buildContextFromPointer(session: SessionMemory): ChatMessage[] {
+export function buildContextFromPointer(
+  session: SessionMemory,
+  requestId?: string,
+): ChatMessage[] {
   if (!session.summarizedUpToMessageId || !session.summarizedMessage) {
+    // Log context built for LLM (no summary)
+    const totalChars = session.messages.reduce(
+      (sum, msg) => sum + msg.content.length,
+      0,
+    );
+    logger.info("[ConversationMemory] Context built for LLM", {
+      requestId,
+      sessionId: session.sessionId,
+      contextMessages: session.messages.length,
+      summaryPrepended: false,
+      estimatedTokens: Math.ceil(totalChars / 4),
+    });
     return session.messages;
   }
 
@@ -275,6 +298,18 @@ export function buildContextFromPointer(session: SessionMemory): ChatMessage[] {
       sessionId: session.sessionId,
       pointer: session.summarizedUpToMessageId,
       totalMessages: session.messages.length,
+    });
+    // Log context built for LLM (pointer not found fallback)
+    const totalChars = session.messages.reduce(
+      (sum, msg) => sum + msg.content.length,
+      0,
+    );
+    logger.info("[ConversationMemory] Context built for LLM", {
+      requestId,
+      sessionId: session.sessionId,
+      contextMessages: session.messages.length,
+      summaryPrepended: false,
+      estimatedTokens: Math.ceil(totalChars / 4),
     });
     return session.messages;
   }
@@ -301,7 +336,22 @@ export function buildContextFromPointer(session: SessionMemory): ChatMessage[] {
     summaryLength: session.summarizedMessage.length,
   });
 
-  return [summaryMessage, ...messagesAfterPointer];
+  const contextMessages = [summaryMessage, ...messagesAfterPointer];
+
+  // Log context built for LLM with structural metadata
+  const totalChars = contextMessages.reduce(
+    (sum, msg) => sum + msg.content.length,
+    0,
+  );
+  logger.info("[ConversationMemory] Context built for LLM", {
+    requestId,
+    sessionId: session.sessionId,
+    contextMessages: contextMessages.length,
+    summaryPrepended: true,
+    estimatedTokens: Math.ceil(totalChars / 4),
+  });
+
+  return contextMessages;
 }
 
 /**
@@ -403,6 +453,7 @@ export function getEffectiveTokenThreshold(
  * @param config - Conversation memory configuration containing provider/model settings
  * @param previousSummary - Optional previous summary to build upon
  * @param logPrefix - Prefix for log messages (e.g., "[ConversationMemory]" or "[RedisConversationMemoryManager]")
+ * @param requestId - Optional request ID for request-scoped tracing
  * @returns Summary text or null if generation fails
  */
 export async function generateSummary(
@@ -410,6 +461,7 @@ export async function generateSummary(
   config: Partial<ConversationMemoryConfig>,
   logPrefix = "[ConversationMemory]",
   previousSummary?: string,
+  requestId?: string,
 ): Promise<string | null> {
   const summarizationPrompt = createSummarizationPrompt(
     messages,
@@ -421,7 +473,9 @@ export async function generateSummary(
 
   try {
     if (!config.summarizationProvider || !config.summarizationModel) {
-      logger.error(`${logPrefix} Missing summarization provider`);
+      logger.error(`${logPrefix} Missing summarization provider`, {
+        requestId,
+      });
       return null;
     }
 
@@ -434,7 +488,7 @@ export async function generateSummary(
 
     return summaryResult.content || null;
   } catch (error) {
-    logger.error(`${logPrefix} Error generating summary`, { error });
+    logger.error(`${logPrefix} Error generating summary`, { requestId, error });
     return null;
   }
 }

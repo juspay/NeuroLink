@@ -280,7 +280,7 @@ export abstract class BaseProvider implements AIProvider {
         temperature: options.temperature,
         maxTokens: options.maxTokens,
         tools: options.tools, // 🔧 FIX: Pass user-provided tools (including RAG tools) to generation pipeline
-        disableTools: false,
+        disableTools: !!options.disableTools,
         maxSteps: options.maxSteps || 5,
         provider: options.provider as AIProviderName | undefined,
         model: options.model,
@@ -1116,9 +1116,27 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * Provider-specific error handling
+   * Provider-specific error formatting.
+   * Subclasses implement this to produce human-readable error messages
+   * (e.g., "❌ Google Vertex AI Provider Error\n\n...").
    */
-  protected abstract handleProviderError(error: unknown): Error;
+  protected abstract formatProviderError(error: unknown): Error;
+
+  /**
+   * Handle provider errors with abort passthrough.
+   * AbortErrors are never wrapped — they must propagate with their
+   * original identity so that isAbortError() can detect them in
+   * retry/fallback loops (directProviderGeneration, performMCPGenerationRetries).
+   */
+  protected handleProviderError(error: unknown): Error {
+    if (isAbortError(error)) {
+      // Preserve AbortError identity — never wrap in provider-specific formatting
+      return error instanceof Error
+        ? error
+        : new DOMException("The operation was aborted", "AbortError");
+    }
+    return this.formatProviderError(error);
+  }
 
   /**
    * Image generation method. Providers that support it should override this.

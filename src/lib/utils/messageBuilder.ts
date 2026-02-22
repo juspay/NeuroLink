@@ -570,6 +570,65 @@ function shouldUseStructuredOutput(options: {
 }
 
 /**
+ * Log structural metadata about a composed message array without logging content.
+ * Per-message breakdown is behind logger.debug() to avoid production spam.
+ */
+function logMessageComposition(
+  messages: Array<{ role: string; content: unknown }>,
+  requestId?: string,
+): void {
+  // Skip entirely if neither info nor debug is enabled
+  if (!logger.shouldLog("info")) {
+    return;
+  }
+
+  const roles: Record<string, number> = {};
+  let totalChars = 0;
+
+  for (const msg of messages) {
+    // Avoid JSON.stringify on multimodal content for the info-level summary;
+    // accurate per-message breakdown (with sizes) is computed only when debug
+    // logging is active (see below).
+    const chars = typeof msg.content === "string" ? msg.content.length : 0;
+    roles[msg.role] = (roles[msg.role] || 0) + 1;
+    totalChars += chars;
+  }
+
+  logger.info("[MessageBuilder] Composed", {
+    requestId,
+    totalMessages: messages.length,
+    roles,
+    totalChars,
+    estimatedTokens: Math.ceil(totalChars / 4),
+  });
+
+  if (logger.shouldLog("debug")) {
+    const breakdown = messages.map((msg, i) => {
+      let chars: number;
+      if (typeof msg.content === "string") {
+        chars = msg.content.length;
+      } else {
+        try {
+          chars = JSON.stringify(msg.content).length;
+        } catch {
+          chars = String(msg.content).length;
+        }
+      }
+      return {
+        index: i,
+        role: msg.role,
+        chars,
+        estimatedTokens: Math.ceil(chars / 4),
+      };
+    });
+    logger.debug("[MessageBuilder] Per-message breakdown", {
+      requestId,
+      breakdown,
+    });
+  }
+}
+
+/**
  * Build a properly formatted message array for AI providers
  * Combines system prompt, conversation history, and current user prompt
  * Supports both TextGenerationOptions and StreamOptions
@@ -602,6 +661,9 @@ export async function buildMessagesArray(
     messages.push({
       role: "system",
       content: systemPrompt.trim(),
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
     });
   }
 
@@ -719,6 +781,9 @@ export async function buildMessagesArray(
     });
   }
 
+  const reqId = (options.context as Record<string, unknown> | undefined)
+    ?.requestId as string | undefined;
+  logMessageComposition(messages, reqId);
   return messages;
 }
 
@@ -1268,13 +1333,15 @@ export async function buildMultimodalMessagesArray(
     const standardMessages = await buildMessagesArray(
       options as TextGenerationOptions,
     );
-    return standardMessages.map(
-      (msg) =>
-        ({
-          role: msg.role,
-          content: typeof msg.content === "string" ? msg.content : msg.content,
-        }) as MultimodalChatMessage,
-    );
+    return standardMessages.map((msg) => {
+      const msgProviderOptions = (msg as Record<string, unknown>)
+        .providerOptions as Record<string, unknown> | undefined;
+      return {
+        role: msg.role,
+        content: msg.content,
+        ...(msgProviderOptions && { providerOptions: msgProviderOptions }),
+      } as MultimodalChatMessage;
+    });
   }
 
   // Validate provider supports vision
@@ -1297,7 +1364,10 @@ export async function buildMultimodalMessagesArray(
     messages.push({
       role: "system",
       content: systemPrompt.trim(),
-    });
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
+    } as MultimodalChatMessage);
   }
 
   // Add conversation history if available
@@ -1349,6 +1419,9 @@ export async function buildMultimodalMessagesArray(
       });
     }
 
+    const reqId = (options.context as Record<string, unknown> | undefined)
+      ?.requestId as string | undefined;
+    logMessageComposition(messages, reqId);
     return messages;
   } catch (error) {
     MultimodalLogger.logError("MULTIMODAL_BUILD", error as Error, {

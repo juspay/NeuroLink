@@ -33,7 +33,13 @@ import { ModelConfigurationManager } from "../core/modelConfiguration.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type { UnknownRecord } from "../types/common.js";
-import { AuthenticationError, ProviderError } from "../types/errors.js";
+import {
+  AuthenticationError,
+  NetworkError,
+  ProviderError,
+  RateLimitError,
+  InvalidModelError,
+} from "../types/errors.js";
 import type {
   EnhancedGenerateResult,
   TextGenerationOptions,
@@ -72,6 +78,17 @@ import {
 } from "./googleNativeGemini3.js";
 
 // Import proper types for multimodal message handling
+
+// Keep-alive note: Node.js native fetch and undici (used by createProxyFetch)
+// handle HTTP keep-alive internally. The fetchWithRetry wrapper in proxyFetch.ts
+// provides retry protection for transient ECONNRESET/ETIMEDOUT errors.
+//
+// Auth isolation note: @ai-sdk/google-vertex resolves auth tokens (via
+// generateAuthToken → google-auth-library) BEFORE applying the user AbortSignal
+// to the main API call. Auth token refresh uses gaxios internally, not our
+// custom fetch, so it is inherently isolated from user cancellation signals.
+// The image generation path (getImageGenerationAccessToken) has an additional
+// explicit 15s timeout per attempt for direct REST API calls.
 
 // Enhanced Anthropic support with direct imports
 // Using the dual provider architecture from Vercel AI SDK
@@ -1876,15 +1893,23 @@ export class GoogleVertexProvider extends BaseProvider {
     return super.generate(optionsOrPrompt);
   }
 
-  protected handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
+    // Pass through AbortError as-is so callers can detect cancellation
     const errorRecord = error as UnknownRecord;
+    if (
+      typeof errorRecord?.name === "string" &&
+      errorRecord.name === "AbortError"
+    ) {
+      return error as Error;
+    }
+
     if (
       typeof errorRecord?.name === "string" &&
       errorRecord.name === "TimeoutError"
     ) {
-      return new TimeoutError(
+      return new NetworkError(
         `Google Vertex AI request timed out. Consider increasing timeout or using a lighter model.`,
-        this.defaultTimeout,
+        this.providerName,
       );
     }
 
@@ -1893,33 +1918,55 @@ export class GoogleVertexProvider extends BaseProvider {
         ? errorRecord.message
         : "Unknown error occurred";
 
+    const code =
+      typeof errorRecord?.code === "string" ? errorRecord.code : undefined;
+    if (
+      code === "ECONNRESET" ||
+      code === "ENOTFOUND" ||
+      code === "ECONNREFUSED" ||
+      message.includes("ECONNRESET") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("connect ETIMEDOUT")
+    ) {
+      return new NetworkError(
+        `Google Vertex AI network error: ${message}`,
+        this.providerName,
+      );
+    }
+
     if (message.includes("PERMISSION_DENIED")) {
-      return new Error(
+      return new AuthenticationError(
         `❌ Google Vertex AI Permission Denied\n\nYour Google Cloud credentials don't have permission to access Vertex AI.\n\nRequired Steps:\n1. Ensure your service account has Vertex AI User role\n2. Check if Vertex AI API is enabled in your project\n3. Verify your project ID is correct\n4. Confirm your location/region has Vertex AI available`,
+        this.providerName,
       );
     }
 
     if (message.includes("NOT_FOUND")) {
       const modelSuggestions = this.getModelSuggestions(this.modelName);
-      return new Error(
+      return new InvalidModelError(
         `❌ Google Vertex AI Model Not Found\n\n${message}\n\nModel '${this.modelName}' is not available.\n\nSuggested alternatives:\n${modelSuggestions}\n\nTroubleshooting:\n1. Check model name spelling and format\n2. Verify model is available in your region (${this.location})\n3. Ensure your project has access to the model\n4. For Claude models, enable Anthropic integration in Google Cloud Console`,
+        this.providerName,
       );
     }
 
     if (message.includes("QUOTA_EXCEEDED")) {
-      return new Error(
+      return new RateLimitError(
         `❌ Google Vertex AI Quota Exceeded\n\n${message}\n\nSolutions:\n1. Check your Vertex AI quotas in Google Cloud Console\n2. Request quota increase if needed\n3. Try a different model or reduce request frequency\n4. Consider using a different region`,
+        this.providerName,
       );
     }
 
     if (message.includes("INVALID_ARGUMENT")) {
-      return new Error(
+      return new ProviderError(
         `❌ Google Vertex AI Invalid Request\n\n${message}\n\nCheck:\n1. Request parameters are within model limits\n2. Input text is properly formatted\n3. Temperature and other settings are valid\n4. Model supports your request type`,
+        this.providerName,
       );
     }
 
-    return new Error(
+    return new ProviderError(
       `❌ Google Vertex AI Provider Error\n\n${message}\n\nTroubleshooting:\n1. Check Google Cloud credentials and permissions\n2. Verify project ID and location settings\n3. Ensure Vertex AI API is enabled\n4. Check network connectivity`,
+      this.providerName,
     );
   }
 
@@ -2877,6 +2924,10 @@ export class GoogleVertexProvider extends BaseProvider {
    * Obtain a Google Auth access token for Vertex AI REST API calls.
    */
   private async getImageGenerationAccessToken(): Promise<string> {
+    const maxRetries = 3;
+    const baseDelay = 500;
+    const authTimeoutMs = 15000;
+
     const { GoogleAuth } = await import("google-auth-library");
 
     // Priority: GOOGLE_APPLICATION_CREDENTIALS_NEUROLINK > GOOGLE_APPLICATION_CREDENTIALS
@@ -2884,22 +2935,61 @@ export class GoogleVertexProvider extends BaseProvider {
       process.env.GOOGLE_APPLICATION_CREDENTIALS_NEUROLINK ||
       process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-    const auth = new GoogleAuth({
-      ...(credentialsPath && { keyFilename: credentialsPath }),
-      scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-    });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Enforce per-attempt timeout with AbortController
+      const controller = new AbortController();
+      const authTimer = setTimeout(() => {
+        controller.abort();
+        logger.warn(
+          `[GoogleVertexProvider] Auth token refresh exceeded ${authTimeoutMs}ms timeout (attempt ${attempt}/${maxRetries})`,
+        );
+      }, authTimeoutMs);
 
-    const client = await auth.getClient();
-    const accessToken = await client.getAccessToken();
+      try {
+        const auth = new GoogleAuth({
+          ...(credentialsPath && { keyFilename: credentialsPath }),
+          scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+        });
 
-    if (!accessToken.token) {
-      throw new AuthenticationError(
-        "Failed to obtain access token from Google Auth",
-        this.providerName,
-      );
+        const client = await auth.getClient();
+        const accessToken = await client.getAccessToken();
+
+        if (!accessToken.token) {
+          throw new AuthenticationError(
+            "Failed to obtain access token from Google Auth",
+            this.providerName,
+          );
+        }
+
+        return accessToken.token;
+      } catch (error: unknown) {
+        const err = error as { code?: string; message?: string };
+        const isRetryable =
+          controller.signal.aborted ||
+          err?.code === "ECONNRESET" ||
+          err?.code === "ETIMEDOUT" ||
+          err?.code === "ENOTFOUND" ||
+          err?.message?.includes("socket hang up") ||
+          err?.message?.includes("network socket disconnected");
+
+        if (!isRetryable || attempt === maxRetries) {
+          throw error;
+        }
+
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        logger.warn(
+          `[GoogleVertexProvider] Auth token transient error (${err?.code || err?.message}), retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`,
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      } finally {
+        clearTimeout(authTimer);
+      }
     }
 
-    return accessToken.token;
+    throw new AuthenticationError(
+      "Failed to obtain access token after retries",
+      this.providerName,
+    );
   }
 
   /**

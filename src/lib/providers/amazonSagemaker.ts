@@ -100,7 +100,7 @@ export class AmazonSageMakerProvider extends BaseProvider {
     }
   }
 
-  protected handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     if (error instanceof SageMakerError) {
       return error;
     }

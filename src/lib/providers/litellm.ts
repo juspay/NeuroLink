@@ -14,6 +14,13 @@ import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type { UnknownRecord } from "../types/common.js";
+import {
+  AuthenticationError,
+  InvalidModelError,
+  NetworkError,
+  ProviderError,
+  RateLimitError,
+} from "../types/errors.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { isAbortError } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
@@ -101,9 +108,12 @@ export class LiteLLMProvider extends BaseProvider {
     return this.model;
   }
 
-  public handleProviderError(error: unknown): Error {
+  public formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
-      return new Error(`LiteLLM request timed out: ${error.message}`);
+      return new NetworkError(
+        `Request timed out: ${error.message}`,
+        this.providerName,
+      );
     }
 
     // Check for timeout by error name and message as fallback
@@ -111,10 +121,11 @@ export class LiteLLMProvider extends BaseProvider {
     if (
       errorRecord?.name === "TimeoutError" ||
       (typeof errorRecord?.message === "string" &&
-        errorRecord.message.includes("Timeout"))
+        errorRecord.message.toLowerCase().includes("timeout"))
     ) {
-      return new Error(
-        `LiteLLM request timed out: ${errorRecord?.message || "Unknown timeout"}`,
+      return new NetworkError(
+        `Request timed out: ${errorRecord?.message || "Unknown timeout"}`,
+        this.providerName,
       );
     }
     if (typeof errorRecord?.message === "string") {
@@ -122,9 +133,10 @@ export class LiteLLMProvider extends BaseProvider {
         errorRecord.message.includes("ECONNREFUSED") ||
         errorRecord.message.includes("Failed to fetch")
       ) {
-        return new Error(
+        return new NetworkError(
           "LiteLLM proxy server not available. Please start the LiteLLM proxy server at " +
             `${process.env.LITELLM_BASE_URL || "http://localhost:4000"}`,
+          this.providerName,
         );
       }
 
@@ -132,30 +144,34 @@ export class LiteLLMProvider extends BaseProvider {
         errorRecord.message.includes("API_KEY_INVALID") ||
         errorRecord.message.includes("Invalid API key")
       ) {
-        return new Error(
+        return new AuthenticationError(
           "Invalid LiteLLM configuration. Please check your LITELLM_API_KEY environment variable.",
+          this.providerName,
         );
       }
 
-      if (errorRecord.message.includes("rate limit")) {
-        return new Error(
+      if (errorRecord.message.toLowerCase().includes("rate limit")) {
+        return new RateLimitError(
           "LiteLLM rate limit exceeded. Please try again later.",
+          this.providerName,
         );
       }
 
       if (
-        errorRecord.message.includes("model") &&
-        errorRecord.message.includes("not found")
+        errorRecord.message.toLowerCase().includes("model") &&
+        errorRecord.message.toLowerCase().includes("not found")
       ) {
-        return new Error(
+        return new InvalidModelError(
           `Model '${this.modelName}' not available in LiteLLM proxy. ` +
             "Please check your LiteLLM configuration and ensure the model is configured.",
+          this.providerName,
         );
       }
     }
 
-    return new Error(
+    return new ProviderError(
       `LiteLLM error: ${errorRecord?.message || "Unknown error"}`,
+      this.providerName,
     );
   }
 
@@ -359,7 +375,9 @@ export class LiteLLMProvider extends BaseProvider {
         result,
         Date.now() - startTime,
         {
-          requestId: `litellm-stream-${Date.now()}`,
+          requestId:
+            (options as { requestId?: string }).requestId ??
+            `litellm-stream-${Date.now()}`,
           streamingMode: true,
         },
       );
@@ -502,7 +520,10 @@ export class LiteLLMProvider extends BaseProvider {
       clearTimeout(timeoutId);
 
       if (isAbortError(error)) {
-        throw new Error("Request timed out after 5 seconds");
+        throw new NetworkError(
+          "Request timed out after 5 seconds",
+          this.providerName,
+        );
       }
 
       throw error;

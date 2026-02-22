@@ -83,7 +83,7 @@ export class AzureOpenAIProvider extends BaseProvider {
     return this.azureProvider(this.deployment);
   }
 
-  public handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`Azure OpenAI request timed out: ${error.message}`);
     }

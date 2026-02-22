@@ -252,9 +252,9 @@ export class OpenAIProvider extends BaseProvider {
     return true;
   }
 
-  public handleProviderError(error: unknown): Error {
+  public formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
-      throw new NetworkError(error.message, this.providerName);
+      return new NetworkError(error.message, this.providerName);
     }
 
     const errorObj = error as UnknownRecord;
@@ -272,28 +272,28 @@ export class OpenAIProvider extends BaseProvider {
       message.includes("Invalid API key") ||
       errorType === "invalid_api_key"
     ) {
-      throw new AuthenticationError(
+      return new AuthenticationError(
         "Invalid OpenAI API key. Please check your OPENAI_API_KEY environment variable.",
         this.providerName,
       );
     }
 
     if (message.includes("rate limit") || errorType === "rate_limit_error") {
-      throw new RateLimitError(
+      return new RateLimitError(
         "OpenAI rate limit exceeded. Please try again later.",
         this.providerName,
       );
     }
 
     if (message.includes("model_not_found")) {
-      throw new InvalidModelError(
+      return new InvalidModelError(
         `Model not found: ${this.modelName}`,
         this.providerName,
       );
     }
 
     // Generic provider error
-    throw new ProviderError(`OpenAI error: ${message}`, this.providerName);
+    return new ProviderError(`OpenAI error: ${message}`, this.providerName);
   }
 
   /**

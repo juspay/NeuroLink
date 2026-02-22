@@ -37,6 +37,7 @@ export class TelemetryService {
   private aiRequestDuration?: Histogram;
   private aiTokensUsed?: Counter;
   private aiProviderErrors?: Counter;
+  private aiCostUsd?: Counter;
   private mcpToolCalls?: Counter;
   private connectionCounter?: Counter;
   private responseTimeHistogram?: Histogram;
@@ -123,6 +124,10 @@ export class TelemetryService {
       description: "Total number of AI tokens used",
     });
 
+    this.aiCostUsd = this.meter.createCounter("ai_cost_usd_total", {
+      description: "Total accumulated AI cost in USD",
+    });
+
     this.aiProviderErrors = this.meter.createCounter(
       "ai_provider_errors_total",
       {
@@ -201,6 +206,7 @@ export class TelemetryService {
     model: string,
     tokens: number,
     duration: number,
+    cost?: number,
   ): void {
     // Track runtime metrics
     this.requestCount++;
@@ -216,6 +222,10 @@ export class TelemetryService {
     this.aiRequestCounter.add(1, labels);
     this.aiRequestDuration?.record(duration, labels);
     this.aiTokensUsed?.add(tokens, labels);
+
+    if (cost !== undefined && Number.isFinite(cost) && cost > 0) {
+      this.aiCostUsd?.add(cost, labels);
+    }
   }
 
   recordAIError(provider: string, error: Error): void {

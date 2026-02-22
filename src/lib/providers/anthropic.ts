@@ -82,9 +82,9 @@ export class AnthropicProvider extends BaseProvider {
     return this.model;
   }
 
-  public handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
-      throw new NetworkError(
+      return new NetworkError(
         `Request timed out after ${error.timeout}ms`,
         this.providerName,
       );
@@ -100,7 +100,7 @@ export class AnthropicProvider extends BaseProvider {
       message.includes("API_KEY_INVALID") ||
       message.includes("Invalid API key")
     ) {
-      throw new AuthenticationError(
+      return new AuthenticationError(
         "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable.",
         this.providerName,
       );
@@ -111,7 +111,7 @@ export class AnthropicProvider extends BaseProvider {
       message.includes("too_many_requests") ||
       message.includes("429")
     ) {
-      throw new RateLimitError(
+      return new RateLimitError(
         "Anthropic rate limit exceeded. Please try again later.",
         this.providerName,
       );
@@ -124,7 +124,10 @@ export class AnthropicProvider extends BaseProvider {
       message.includes("network") ||
       message.includes("connection")
     ) {
-      throw new NetworkError(`Connection error: ${message}`, this.providerName);
+      return new NetworkError(
+        `Connection error: ${message}`,
+        this.providerName,
+      );
     }
 
     if (
@@ -134,10 +137,10 @@ export class AnthropicProvider extends BaseProvider {
       message.includes("504") ||
       message.includes("server error")
     ) {
-      throw new ProviderError(`Server error: ${message}`, this.providerName);
+      return new ProviderError(`Server error: ${message}`, this.providerName);
     }
 
-    throw new ProviderError(`Anthropic error: ${message}`, this.providerName);
+    return new ProviderError(`Anthropic error: ${message}`, this.providerName);
   }
 
   // executeGenerate removed - BaseProvider handles all generation with tools

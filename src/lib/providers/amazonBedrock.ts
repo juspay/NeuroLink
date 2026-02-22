@@ -41,6 +41,7 @@ import type {
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { ToolArgs, ToolDefinition } from "../types/tools.js";
 import type { ZodUnknownSchema } from "../types/typeAliases.js";
+import { AuthenticationError, ProviderError } from "../types/errors.js";
 import { isAbortError } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
 import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
@@ -374,80 +375,87 @@ export class AmazonBedrockProvider extends BaseProvider {
 
       // Create command and attempt API call
       const command = new ConverseCommand(commandInput);
-      logger.info(
-        `⏳ [AmazonBedrockProvider] Sending ConverseCommand to Bedrock...`,
-      );
+
+      logger.debug("[Observability] Bedrock API request", {
+        model: commandInput.modelId,
+        region: region,
+        messageCount: commandInput.messages?.length || 0,
+        toolCount: commandInput.toolConfig?.tools?.length || 0,
+        maxTokens: commandInput.inferenceConfig?.maxTokens,
+      });
 
       const apiCallStartTime = Date.now();
       const response = await this.bedrockClient.send(command);
       const apiCallDuration = Date.now() - apiCallStartTime;
 
-      logger.info(`✅ [AmazonBedrockProvider] Bedrock API call successful!`);
+      logger.debug("[Observability] Bedrock API response", {
+        model: commandInput.modelId,
+        durationMs: apiCallDuration,
+        hasContent: !!response.output?.message?.content?.length,
+        stopReason: response.stopReason,
+        usage: response.usage
+          ? {
+              inputTokens: response.usage.inputTokens,
+              outputTokens: response.usage.outputTokens,
+              totalTokens:
+                (response.usage.inputTokens || 0) +
+                (response.usage.outputTokens || 0),
+            }
+          : undefined,
+      });
+
+      logger.info(`[AmazonBedrockProvider] Bedrock API call successful`);
       logger.info(
-        `⏱️ [AmazonBedrockProvider] API call duration: ${apiCallDuration}ms`,
+        `[AmazonBedrockProvider] API call duration: ${apiCallDuration}ms`,
       );
-      logger.info(`📊 [AmazonBedrockProvider] Response metadata:`);
-      logger.info(`  - Stop reason: ${response.stopReason}`);
-      logger.info(`  - Usage tokens: ${JSON.stringify(response.usage || {})}`);
-      logger.info(`  - Metrics: ${JSON.stringify(response.metrics || {})}`);
 
       const totalDuration = Date.now() - startTime;
       logger.info(
-        `🎯 [AmazonBedrockProvider] Total callBedrock duration: ${totalDuration}ms`,
+        `[AmazonBedrockProvider] Total callBedrock duration: ${totalDuration}ms`,
       );
 
       return response;
     } catch (error) {
       const errorDuration = Date.now() - startTime;
+
+      // Extract AWS metadata for structured logging
+      const awsError =
+        error && typeof error === "object"
+          ? (error as Record<string, unknown>)
+          : null;
+      const metadata =
+        awsError?.$metadata && typeof awsError.$metadata === "object"
+          ? (awsError.$metadata as Record<string, unknown>)
+          : null;
+
+      logger.debug("[Observability] Bedrock API request failed", {
+        model: this.modelName || this.getDefaultModel(),
+        durationMs: errorDuration,
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : undefined,
+        httpStatus: metadata?.httpStatusCode,
+        awsRequestId: metadata?.requestId,
+        awsErrorCode: awsError?.Code,
+      });
+
       logger.error(
-        `❌ [AmazonBedrockProvider] Bedrock API call failed after ${errorDuration}ms`,
+        `[AmazonBedrockProvider] Bedrock API call failed after ${errorDuration}ms`,
       );
-      logger.error(`🔍 [AmazonBedrockProvider] Error details:`);
 
       if (error instanceof Error) {
-        logger.error(`  - Error name: ${error.name}`);
-        logger.error(`  - Error message: ${error.message}`);
-        logger.error(`  - Error stack: ${error.stack}`);
+        logger.error(
+          `[AmazonBedrockProvider] Error: ${error.name} - ${error.message}`,
+        );
       }
 
-      // Log AWS SDK specific error details
-      if (error && typeof error === "object") {
-        const awsError = error as Record<string, unknown>;
-        if (awsError.$metadata && typeof awsError.$metadata === "object") {
-          const metadata = awsError.$metadata as Record<string, unknown>;
-          logger.error(`🏭 [AmazonBedrockProvider] AWS SDK metadata:`);
-          logger.error(`  - HTTP status: ${metadata.httpStatusCode}`);
-          logger.error(`  - Request ID: ${metadata.requestId}`);
-          logger.error(`  - Attempts: ${metadata.attempts}`);
-          logger.error(`  - Total retry delay: ${metadata.totalRetryDelay}`);
-        }
-
-        if (awsError.Code) {
-          logger.error(`  - AWS Error Code: ${awsError.Code}`);
-        }
-
-        if (awsError.Type) {
-          logger.error(`  - AWS Error Type: ${awsError.Type}`);
-        }
-
-        if (awsError.Fault) {
-          logger.error(`  - AWS Fault: ${awsError.Fault}`);
-        }
+      if (metadata) {
+        logger.error(`[AmazonBedrockProvider] AWS SDK metadata`, {
+          httpStatus: metadata.httpStatusCode,
+          requestId: metadata.requestId,
+          attempts: metadata.attempts,
+          totalRetryDelay: metadata.totalRetryDelay,
+        });
       }
-
-      // Log environment details for debugging
-      logger.error(`🌍 [AmazonBedrockProvider] Environment diagnostics:`);
-      logger.error(`  - AWS_REGION: ${process.env.AWS_REGION || "not set"}`);
-      logger.error(`  - AWS_PROFILE: ${process.env.AWS_PROFILE || "not set"}`);
-      logger.error(
-        `  - AWS_ACCESS_KEY_ID: ${process.env.AWS_ACCESS_KEY_ID ? "set" : "not set"}`,
-      );
-      logger.error(
-        `  - AWS_SECRET_ACCESS_KEY: ${process.env.AWS_SECRET_ACCESS_KEY ? "set" : "not set"}`,
-      );
-      logger.error(
-        `  - AWS_SESSION_TOKEN: ${process.env.AWS_SESSION_TOKEN ? "set" : "not set"}`,
-      );
 
       throw error;
     }
@@ -1048,6 +1056,10 @@ export class AmazonBedrockProvider extends BaseProvider {
         // Fallback to generate method and convert to streaming format
         const generateResult = await this.generate({
           prompt: options.input.text,
+          input: options.input,
+          maxTokens: options.maxTokens,
+          temperature: options.temperature,
+          systemPrompt: options.systemPrompt,
         });
 
         if (!generateResult) {
@@ -1120,9 +1132,23 @@ export class AmazonBedrockProvider extends BaseProvider {
       );
       const commandInput = await this.prepareStreamCommand(options);
       const command = new ConverseStreamCommand(commandInput);
+
+      logger.debug("[Observability] Bedrock streaming API request", {
+        model: commandInput.modelId,
+        messageCount: commandInput.messages?.length || 0,
+        toolCount: commandInput.toolConfig?.tools?.length || 0,
+      });
+
+      const streamStartTime = Date.now();
       const response = await this.bedrockClient.send(command);
+
       logger.debug(
-        "🟦 [TRACE] streamingConversationLoop - first streaming call SUCCESS",
+        "[Observability] Bedrock streaming API connection established",
+        {
+          model: commandInput.modelId,
+          durationMs: Date.now() - streamStartTime,
+          hasStream: !!response.stream,
+        },
       );
 
       // Process the first response immediately to avoid waste
@@ -1316,7 +1342,25 @@ export class AmazonBedrockProvider extends BaseProvider {
     controller: ReadableStreamDefaultController,
   ): Promise<{ stopReason: string; assistantMessage: BedrockMessage }> {
     const command = new ConverseStreamCommand(commandInput);
+
+    logger.debug(
+      "[Observability] Bedrock streaming API request (continuation)",
+      {
+        model: commandInput.modelId,
+        messageCount: commandInput.messages?.length || 0,
+      },
+    );
+
+    const iterationStartTime = Date.now();
     const response = await this.bedrockClient.send(command);
+
+    logger.debug(
+      "[Observability] Bedrock streaming API connection established (continuation)",
+      {
+        model: commandInput.modelId,
+        durationMs: Date.now() - iterationStartTime,
+      },
+    );
 
     if (!response.stream) {
       throw new Error("No stream returned from Bedrock");
@@ -1669,21 +1713,28 @@ export class AmazonBedrockProvider extends BaseProvider {
     }
   }
 
-  public handleProviderError(error: unknown): Error {
+  public formatProviderError(error: unknown): Error {
     // Handle AWS SDK specific errors
     const message = error instanceof Error ? error.message : String(error);
 
     if (message.includes("AccessDeniedException")) {
-      return new Error(
+      return new AuthenticationError(
         "AWS Bedrock access denied. Check your credentials and permissions.",
+        this.providerName,
       );
     }
 
     if (message.includes("ValidationException")) {
-      return new Error(`AWS Bedrock validation error: ${message}`);
+      return new ProviderError(
+        `Validation error: ${message}`,
+        this.providerName,
+      );
     }
 
-    return new Error(`AWS Bedrock error: ${message}`);
+    return new ProviderError(
+      `AWS Bedrock error: ${message}`,
+      this.providerName,
+    );
   }
 
   /**

@@ -1,75 +1,74 @@
 import { describe, it, expect } from "vitest";
 import {
-  truncateToolOutput,
-  MAX_TOOL_OUTPUT_LINES,
+  generateToolOutputPreview,
+  DEFAULT_MAX_PREVIEW_LINES,
 } from "../../../src/lib/context/toolOutputLimits.js";
 
 describe("Tool Output Limits", () => {
   it("should not truncate small outputs", () => {
-    const result = truncateToolOutput("Hello, world!");
+    const result = generateToolOutputPreview("Hello, world!");
     expect(result.truncated).toBe(false);
-    expect(result.content).toBe("Hello, world!");
+    expect(result.preview).toBe("Hello, world!");
   });
 
   it("should truncate outputs exceeding byte limit", () => {
     const largeOutput = "x".repeat(100 * 1024); // 100KB
-    const result = truncateToolOutput(largeOutput);
+    const result = generateToolOutputPreview(largeOutput);
     expect(result.truncated).toBe(true);
-    expect(result.content.length).toBeLessThan(largeOutput.length);
-    expect(result.content).toContain("[Output truncated");
+    expect(result.preview.length).toBeLessThan(largeOutput.length);
+    expect(result.preview).toContain("bytes omitted");
   });
 
   it("should truncate outputs exceeding line limit", () => {
     const manyLines = Array.from({ length: 5000 }, (_, i) => `Line ${i}`).join(
       "\n",
     );
-    const result = truncateToolOutput(manyLines);
+    const result = generateToolOutputPreview(manyLines);
     expect(result.truncated).toBe(true);
-    expect(result.content.split("\n").length).toBeLessThanOrEqual(
-      MAX_TOOL_OUTPUT_LINES + 5,
-    ); // +5 for notice
+    // Head/tail preview should be well under original line count
+    expect(result.preview.split("\n").length).toBeLessThan(
+      manyLines.split("\n").length,
+    );
   });
 
-  it("should support head direction", () => {
+  it("should preserve head lines (first 25%)", () => {
     const manyLines = Array.from({ length: 3000 }, (_, i) => `Line ${i}`).join(
       "\n",
     );
-    const result = truncateToolOutput(manyLines, {
-      direction: "head",
+    const result = generateToolOutputPreview(manyLines, {
       maxLines: 100,
     });
     expect(result.truncated).toBe(true);
-    expect(result.content).toContain("Line 0");
-    expect(result.content).toContain("[Output truncated");
+    expect(result.preview).toContain("Line 0");
+    expect(result.preview).toContain("bytes omitted");
   });
 
-  it("should support tail direction (default)", () => {
+  it("should preserve tail lines (last 75%)", () => {
     const manyLines = Array.from({ length: 3000 }, (_, i) => `Line ${i}`).join(
       "\n",
     );
-    const result = truncateToolOutput(manyLines, {
-      direction: "tail",
+    const result = generateToolOutputPreview(manyLines, {
       maxLines: 100,
     });
     expect(result.truncated).toBe(true);
-    expect(result.content).toContain("Line 2999");
+    expect(result.preview).toContain("Line 2999");
   });
 
   it("should report original size", () => {
     const content = "x".repeat(100_000);
-    const result = truncateToolOutput(content);
-    expect(result.originalSize).toBe(100_000);
+    const result = generateToolOutputPreview(content);
+    expect(result.originalSize).toBe(Buffer.byteLength(content, "utf-8"));
   });
 
   it("should respect custom maxBytes", () => {
     const content = "x".repeat(10_000);
-    const result = truncateToolOutput(content, { maxBytes: 5_000 });
+    const result = generateToolOutputPreview(content, { maxBytes: 5_000 });
     expect(result.truncated).toBe(true);
   });
 
   it("should respect custom maxLines", () => {
     const lines = Array.from({ length: 100 }, (_, i) => `Line ${i}`).join("\n");
-    const result = truncateToolOutput(lines, { maxLines: 50 });
+    const result = generateToolOutputPreview(lines, { maxLines: 50 });
     expect(result.truncated).toBe(true);
   });
 });

@@ -146,7 +146,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
     return this.model;
   }
 
-  protected handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`OpenAI Compatible request timed out: ${error.message}`);
     }

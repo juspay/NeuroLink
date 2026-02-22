@@ -370,6 +370,9 @@ export type MultimodalChatMessage = {
 
   /** Content of the message - can be text or multimodal content array */
   content: string | MessageContent[];
+
+  /** Provider-specific options (e.g. Anthropic cache_control) */
+  providerOptions?: Record<string, unknown>;
 };
 
 /**

@@ -98,23 +98,42 @@ export class MessageBuilder {
     }
 
     // Convert messages to Vercel AI SDK format
+    // Preserve providerOptions (e.g. Anthropic cache_control) through conversion
     return messages.map((msg) => {
+      const providerOptions = (msg as Record<string, unknown>)
+        .providerOptions as Record<string, unknown> | undefined;
       if (typeof msg.content === "string") {
         return {
           role: msg.role as "user" | "assistant" | "system",
           content: msg.content,
+          ...(providerOptions && { providerOptions }),
         } as CoreMessage;
       } else {
         return {
           role: msg.role as "user" | "assistant" | "system",
           content: msg.content.map((item) => {
+            const itemProviderOptions = (item as Record<string, unknown>)
+              .providerOptions as Record<string, unknown> | undefined;
             if (item.type === "text") {
-              return { type: "text", text: item.text || "" };
+              return {
+                type: "text",
+                text: item.text || "",
+                ...(itemProviderOptions && {
+                  providerOptions: itemProviderOptions,
+                }),
+              };
             } else if (item.type === "image") {
-              return { type: "image", image: item.image || "" };
+              return {
+                type: "image",
+                image: item.image || "",
+                ...(itemProviderOptions && {
+                  providerOptions: itemProviderOptions,
+                }),
+              };
             }
             return item;
           }),
+          ...(providerOptions && { providerOptions }),
         } as CoreMessage;
       }
     });
@@ -196,23 +215,42 @@ export class MessageBuilder {
     }
 
     // Convert messages to Vercel AI SDK format
+    // Preserve providerOptions (e.g. Anthropic cache_control) through conversion
     return messages.map((msg) => {
+      const providerOptions = (msg as Record<string, unknown>)
+        .providerOptions as Record<string, unknown> | undefined;
       if (typeof msg.content === "string") {
         return {
           role: msg.role as "user" | "assistant" | "system",
           content: msg.content,
+          ...(providerOptions && { providerOptions }),
         } as CoreMessage;
       } else {
         return {
           role: msg.role as "user" | "assistant" | "system",
           content: msg.content.map((item) => {
+            const itemProviderOptions = (item as Record<string, unknown>)
+              .providerOptions as Record<string, unknown> | undefined;
             if (item.type === "text") {
-              return { type: "text", text: item.text || "" };
+              return {
+                type: "text",
+                text: item.text || "",
+                ...(itemProviderOptions && {
+                  providerOptions: itemProviderOptions,
+                }),
+              };
             } else if (item.type === "image") {
-              return { type: "image", image: item.image || "" };
+              return {
+                type: "image",
+                image: item.image || "",
+                ...(itemProviderOptions && {
+                  providerOptions: itemProviderOptions,
+                }),
+              };
             }
             return item;
           }),
+          ...(providerOptions && { providerOptions }),
         } as CoreMessage;
       }
     });

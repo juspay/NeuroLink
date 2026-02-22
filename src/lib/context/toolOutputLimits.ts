@@ -1,101 +1,108 @@
 /**
- * Tool Output Size Limits
- *
- * Truncates tool outputs exceeding size limits.
- * Can save full output to disk with a pointer.
- * Modeled on OpenCode's approach.
+ * Tool output preview generation.
+ * Generates head/tail previews of large tool outputs for context-efficient LLM calls.
+ * @module
  */
 
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
-import { randomUUID } from "crypto";
-import { tmpdir } from "os";
+import type {
+  ToolOutputPreviewOptions,
+  ToolOutputPreviewResult,
+} from "../types/contextTypes.js";
+export type {
+  ToolOutputPreviewOptions,
+  ToolOutputPreviewResult,
+} from "../types/contextTypes.js";
 
-/** Maximum tool output size in bytes (50KB) */
-export const MAX_TOOL_OUTPUT_BYTES = 50 * 1024;
+/** Default maximum preview size in bytes (50KB) */
+export const DEFAULT_MAX_PREVIEW_BYTES = 50 * 1024;
 
-/** Maximum tool output lines */
-export const MAX_TOOL_OUTPUT_LINES = 2_000;
+/** Default maximum preview lines */
+export const DEFAULT_MAX_PREVIEW_LINES = 2_000;
 
-import type { TruncateOptions, TruncateResult } from "../types/contextTypes.js";
+/** Default head ratio (25% of preview budget) */
+export const DEFAULT_HEAD_RATIO = 0.25;
 
-export type { TruncateOptions, TruncateResult } from "../types/contextTypes.js";
+/** Tool name referenced in truncation notices for on-demand full-output access */
+export const RETRIEVE_CONTEXT_TOOL_NAME = "retrieve_context";
+
+/** Default tail ratio (75% of preview budget) */
+export const DEFAULT_TAIL_RATIO = 0.75;
 
 /**
- * Truncate tool output if it exceeds size limits.
+ * Generate a head/tail preview of a tool output string.
+ * If the output is within limits, returns it unchanged with truncated: false.
+ * If over limits, keeps the first 25% and last 75% with an omission notice.
+ *
+ * Industry pattern: 25/75 head/tail split. Head captures schema/headers/structure,
+ * tail captures the most recent and typically most relevant data.
  */
-export function truncateToolOutput(
+export function generateToolOutputPreview(
   output: string,
-  options?: TruncateOptions,
-): TruncateResult {
-  const maxBytes = options?.maxBytes ?? MAX_TOOL_OUTPUT_BYTES;
-  const maxLines = options?.maxLines ?? MAX_TOOL_OUTPUT_LINES;
-  const direction = options?.direction ?? "tail";
-  const saveToDisk = options?.saveToDisk ?? false;
+  options?: ToolOutputPreviewOptions,
+): ToolOutputPreviewResult {
+  const maxBytes = options?.maxBytes ?? DEFAULT_MAX_PREVIEW_BYTES;
+  const maxLines = options?.maxLines ?? DEFAULT_MAX_PREVIEW_LINES;
+  const rawHeadRatio = options?.headRatio ?? DEFAULT_HEAD_RATIO;
+  const rawTailRatio = options?.tailRatio ?? DEFAULT_TAIL_RATIO;
+  // Clamp ratios to valid range to avoid negative omittedBytes
+  const headRatio = Math.max(0, Math.min(1, rawHeadRatio));
+  const tailRatio = Math.max(0, Math.min(1, rawTailRatio));
   const originalSize = Buffer.byteLength(output, "utf-8");
 
-  // Check byte limit
-  const exceedsBytes = originalSize > maxBytes;
-
-  // Check line limit
   const lines = output.split("\n");
+  const exceedsBytes = originalSize > maxBytes;
   const exceedsLines = lines.length > maxLines;
 
   if (!exceedsBytes && !exceedsLines) {
-    return { content: output, truncated: false, originalSize };
+    return { preview: output, truncated: false, originalSize };
   }
 
-  // Save to disk if requested
-  let savedPath: string | undefined;
-  if (saveToDisk) {
-    try {
-      const saveDir =
-        options?.saveDir ?? join(tmpdir(), "neurolink-tool-output");
-      mkdirSync(saveDir, { recursive: true });
-      savedPath = join(saveDir, `tool-output-${randomUUID()}.txt`);
-      writeFileSync(savedPath, output, "utf-8");
-    } catch {
-      // Silently fail disk save
-    }
-  }
+  // Line-based split
+  const headLineCount = Math.max(1, Math.floor(maxLines * headRatio));
+  const tailLineCount = Math.max(1, maxLines - headLineCount);
 
-  // Apply truncation
-  let truncated: string;
+  let head: string;
+  let tail: string;
 
   if (exceedsLines) {
-    if (direction === "head") {
-      truncated = lines.slice(0, maxLines).join("\n");
-    } else {
-      truncated = lines.slice(-maxLines).join("\n");
-    }
+    head = lines.slice(0, headLineCount).join("\n");
+    tail = lines.slice(-tailLineCount).join("\n");
   } else {
-    truncated = output;
+    head = lines
+      .slice(0, Math.max(1, Math.floor(lines.length * headRatio)))
+      .join("\n");
+    tail = lines
+      .slice(-Math.max(1, Math.ceil(lines.length * tailRatio)))
+      .join("\n");
   }
 
-  // Apply byte limit
-  if (Buffer.byteLength(truncated, "utf-8") > maxBytes) {
-    if (direction === "head") {
-      truncated = truncated.slice(0, maxBytes);
-    } else {
-      truncated = truncated.slice(-maxBytes);
-    }
+  // Byte-based cap on each portion
+  const headMaxBytes = Math.floor(maxBytes * headRatio);
+  const tailMaxBytes = maxBytes - headMaxBytes;
+
+  if (Buffer.byteLength(head, "utf-8") > headMaxBytes) {
+    head = Buffer.from(head, "utf-8")
+      .subarray(0, headMaxBytes)
+      .toString("utf-8");
+  }
+  if (Buffer.byteLength(tail, "utf-8") > tailMaxBytes) {
+    const tailBuf = Buffer.from(tail, "utf-8");
+    tail = tailBuf.subarray(tailBuf.length - tailMaxBytes).toString("utf-8");
   }
 
-  // Add truncation notice
-  const notice = savedPath
-    ? `\n\n[Output truncated from ${originalSize} bytes to ${Buffer.byteLength(truncated, "utf-8")} bytes. Full output saved to: ${savedPath}]`
-    : `\n\n[Output truncated from ${originalSize} bytes to ${Buffer.byteLength(truncated, "utf-8")} bytes]`;
-
-  if (direction === "head") {
-    truncated = truncated + notice;
-  } else {
-    truncated = notice + "\n" + truncated;
-  }
+  const omittedBytes = Math.max(
+    0,
+    originalSize -
+      Buffer.byteLength(head, "utf-8") -
+      Buffer.byteLength(tail, "utf-8"),
+  );
+  const notice =
+    `\n\n[... ${omittedBytes} bytes omitted. ` +
+    `Use ${RETRIEVE_CONTEXT_TOOL_NAME} tool to access full output ...]\n\n`;
 
   return {
-    content: truncated,
+    preview: head + notice + tail,
     truncated: true,
-    savedPath,
     originalSize,
   };
 }

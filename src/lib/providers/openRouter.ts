@@ -130,7 +130,7 @@ export class OpenRouterProvider extends BaseProvider {
     return this.model;
   }
 
-  public handleProviderError(error: unknown): Error {
+  public formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`OpenRouter request timed out: ${error.message}`);
     }
@@ -361,7 +361,13 @@ export class OpenRouterProvider extends BaseProvider {
         },
 
         onStepFinish: ({ toolCalls, toolResults }) => {
-          logger.info("Tool execution completed", { toolResults, toolCalls });
+          logger.info("Tool execution completed", {
+            toolCallCount: toolCalls?.length || 0,
+            toolResultCount: toolResults?.length || 0,
+            toolNames: toolCalls?.map(
+              (tc: { toolName: string }) => tc.toolName,
+            ),
+          });
 
           this.handleToolExecutionStorage(
             toolCalls,

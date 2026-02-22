@@ -26,6 +26,11 @@ import type { ZodUnknownSchema } from "../types/typeAliases.js";
 import { logger } from "../utils/logger.js";
 import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
 import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
+import {
+  InvalidModelError,
+  NetworkError,
+  ProviderError,
+} from "../types/errors.js";
 import { TimeoutError } from "../utils/timeout.js";
 
 // Model version constants (configurable via environment)
@@ -1892,11 +1897,11 @@ export class OllamaProvider extends BaseProvider {
     }
   }
 
-  protected handleProviderError(error: unknown): Error {
-    if ((error as Error).name === "TimeoutError") {
+  protected formatProviderError(error: unknown): Error {
+    if (error instanceof TimeoutError) {
       return new TimeoutError(
         `Ollama request timed out. The model might be loading or the request is too complex.`,
-        this.defaultTimeout,
+        this.timeout,
       );
     }
 
@@ -1904,8 +1909,9 @@ export class OllamaProvider extends BaseProvider {
       (error as Error).message?.includes("ECONNREFUSED") ||
       (error as Error).message?.includes("fetch failed")
     ) {
-      return new Error(
+      return new NetworkError(
         `❌ Ollama Service Not Running\n\nCannot connect to Ollama at ${this.baseUrl}\n\n🔧 Steps to Fix:\n1. Install Ollama: https://ollama.ai/\n2. Start Ollama service: 'ollama serve'\n3. Verify it's running: 'curl ${this.baseUrl}/api/version'\n4. Try again`,
+        this.providerName,
       );
     }
 
@@ -1913,19 +1919,22 @@ export class OllamaProvider extends BaseProvider {
       (error as Error).message?.includes("model") &&
       (error as Error).message?.includes("not found")
     ) {
-      return new Error(
+      return new InvalidModelError(
         `❌ Ollama Model Not Found\n\nModel '${this.modelName}' is not available locally.\n\n🔧 Install Model:\n1. Run: ollama pull ${this.modelName}\n2. Or try a different model:\n   - ollama pull ${FALLBACK_OLLAMA_MODEL}\n   - ollama pull mistral:latest\n   - ollama pull codellama:latest\n\n🔧 List Available Models:\nollama list`,
+        this.providerName,
       );
     }
 
     if ((error as Error).message?.includes("404")) {
-      return new Error(
+      return new NetworkError(
         `❌ Ollama API Endpoint Not Found\n\nThe API endpoint might have changed or Ollama version is incompatible.\n\n🔧 Check:\n1. Ollama version: 'ollama --version'\n2. Update Ollama to latest version\n3. Verify API is available: 'curl ${this.baseUrl}/api/version'`,
+        this.providerName,
       );
     }
 
-    return new Error(
+    return new ProviderError(
       `❌ Ollama Provider Error\n\n${(error as Error).message || "Unknown error occurred"}\n\n🔧 Troubleshooting:\n1. Check if Ollama service is running\n2. Verify model is installed: 'ollama list'\n3. Check network connectivity to ${this.baseUrl}\n4. Review Ollama logs for details`,
+      this.providerName,
     );
   }
 

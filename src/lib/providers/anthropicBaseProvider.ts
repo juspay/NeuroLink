@@ -4,6 +4,12 @@ import { streamText, type Schema, type LanguageModelV1, type Tool } from "ai";
 import { AIProviderName, AnthropicModels } from "../constants/enums.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { BaseProvider } from "../core/baseProvider.js";
+import {
+  AuthenticationError,
+  NetworkError,
+  ProviderError,
+  RateLimitError,
+} from "../types/errors.js";
 import { logger } from "../utils/logger.js";
 import {
   composeAbortSignals,
@@ -50,33 +56,40 @@ export class AnthropicProviderV2 extends BaseProvider {
     return anthropic(this.modelName);
   }
 
-  protected handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
-      return new Error(`Anthropic request timed out: ${error.message}`);
+      return new NetworkError(
+        `Request timed out: ${error.message}`,
+        this.providerName,
+      );
     }
 
     const errorWithStatus = error as { status?: number; message?: string };
 
     if (errorWithStatus?.status === 401) {
-      return new Error(
+      return new AuthenticationError(
         "Invalid Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable.",
+        this.providerName,
       );
     }
 
     if (errorWithStatus?.status === 429) {
-      return new Error(
+      return new RateLimitError(
         "Anthropic rate limit exceeded. Please try again later.",
+        this.providerName,
       );
     }
 
     if (errorWithStatus?.status === 400) {
-      return new Error(
-        `Anthropic bad request: ${errorWithStatus?.message || "Invalid request parameters"}`,
+      return new ProviderError(
+        `Bad request: ${errorWithStatus?.message || "Invalid request parameters"}`,
+        this.providerName,
       );
     }
 
-    return new Error(
+    return new ProviderError(
       `Anthropic error: ${errorWithStatus?.message || String(error) || "Unknown error"}`,
+      this.providerName,
     );
   }
 

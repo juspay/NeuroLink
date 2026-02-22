@@ -31,6 +31,7 @@ import {
   recordProviderPerformanceFromMetrics,
 } from "../evaluationProviders.js";
 import { modelConfig } from "../modelConfiguration.js";
+import { TelemetryService } from "../../telemetry/telemetryService.js";
 
 /**
  * TelemetryHandler class - Handles analytics and telemetry for AI providers
@@ -115,6 +116,15 @@ export class TelemetryHandler {
         cost: actualCost,
         success: true,
       });
+
+      // Wire TelemetryService metrics so OTEL counters/histograms are populated
+      TelemetryService.getInstance().recordAIRequest(
+        this.providerName,
+        this.modelName,
+        usage?.totalTokens || 0,
+        responseTime,
+        actualCost > 0 ? actualCost : undefined,
+      );
 
       const optimizedProvider = getPerformanceOptimizedProvider("speed");
       logger.debug(`🚀 Performance recorded for ${this.providerName}:`, {
@@ -211,7 +221,8 @@ export class TelemetryHandler {
       isEnabled: true,
       functionId,
       metadata,
-      recordInputs: false,
+      recordInputs:
+        process.env.NEUROLINK_RECORD_INPUTS?.toLowerCase() === "true",
       recordOutputs: true,
     };
   }

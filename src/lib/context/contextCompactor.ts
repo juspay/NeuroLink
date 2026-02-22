@@ -18,6 +18,7 @@ import type {
   CompactionConfig,
 } from "../types/contextTypes.js";
 import { estimateMessagesTokens } from "../utils/tokenEstimation.js";
+import { logger } from "../utils/logger.js";
 import { pruneToolOutputs } from "./stages/toolOutputPruner.js";
 import { deduplicateFileReads } from "./stages/fileReadDeduplicator.js";
 import { summarizeMessages } from "./stages/structuredSummarizer.js";
@@ -63,17 +64,29 @@ export class ContextCompactor {
     messages: ChatMessage[],
     targetTokens: number,
     memoryConfig?: Partial<ConversationMemoryConfig>,
+    requestId?: string,
   ): Promise<CompactionResult> {
+    const compactionStartTime = Date.now();
     const provider = this.config.provider || undefined;
     const tokensBefore = estimateMessagesTokens(messages, provider);
     const stagesUsed: CompactionStage[] = [];
     let currentMessages = [...messages];
+
+    logger.info("[Compaction] Starting", {
+      requestId,
+      estimatedTokens: tokensBefore,
+      budgetTokens: targetTokens,
+    });
 
     // Stage 1: Tool Output Pruning
     if (
       this.config.enablePrune &&
       estimateMessagesTokens(currentMessages, provider) > targetTokens
     ) {
+      const stageTokensBefore = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
       const pruneResult = pruneToolOutputs(currentMessages, {
         protectTokens: this.config.pruneProtectTokens,
         minimumSavings: this.config.pruneMinimumSavings,
@@ -84,6 +97,17 @@ export class ContextCompactor {
         currentMessages = pruneResult.messages;
         stagesUsed.push("prune");
       }
+      const stageTokensAfter = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
+      logger.info("[Compaction] Stage 1 (prune)", {
+        requestId,
+        ran: pruneResult.pruned,
+        tokensBefore: stageTokensBefore,
+        tokensAfter: stageTokensAfter,
+        saved: stageTokensBefore - stageTokensAfter,
+      });
     }
 
     // Stage 2: File Read Deduplication
@@ -91,11 +115,26 @@ export class ContextCompactor {
       this.config.enableDeduplicate &&
       estimateMessagesTokens(currentMessages, provider) > targetTokens
     ) {
+      const stageTokensBefore = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
       const dedupResult = deduplicateFileReads(currentMessages);
       if (dedupResult.deduplicated) {
         currentMessages = dedupResult.messages;
         stagesUsed.push("deduplicate");
       }
+      const stageTokensAfter = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
+      logger.info("[Compaction] Stage 2 (deduplicate)", {
+        requestId,
+        ran: dedupResult.deduplicated,
+        tokensBefore: stageTokensBefore,
+        tokensAfter: stageTokensAfter,
+        saved: stageTokensBefore - stageTokensAfter,
+      });
     }
 
     // Stage 3: LLM Summarization
@@ -103,6 +142,10 @@ export class ContextCompactor {
       this.config.enableSummarize &&
       estimateMessagesTokens(currentMessages, provider) > targetTokens
     ) {
+      const stageTokensBefore = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
       try {
         const summarizeResult = await summarizeMessages(currentMessages, {
           provider: this.config.summarizationProvider,
@@ -114,7 +157,25 @@ export class ContextCompactor {
           currentMessages = summarizeResult.messages;
           stagesUsed.push("summarize");
         }
+        const stageTokensAfter = estimateMessagesTokens(
+          currentMessages,
+          provider,
+        );
+        logger.info("[Compaction] Stage 3 (summarize)", {
+          requestId,
+          ran: summarizeResult.summarized,
+          tokensBefore: stageTokensBefore,
+          tokensAfter: stageTokensAfter,
+          saved: stageTokensBefore - stageTokensAfter,
+        });
       } catch {
+        logger.info("[Compaction] Stage 3 (summarize)", {
+          requestId,
+          ran: false,
+          tokensBefore: stageTokensBefore,
+          tokensAfter: stageTokensBefore,
+          saved: 0,
+        });
         // Summarization failed, fall through to truncation
       }
     }
@@ -124,6 +185,10 @@ export class ContextCompactor {
       this.config.enableTruncate &&
       estimateMessagesTokens(currentMessages, provider) > targetTokens
     ) {
+      const stageTokensBefore = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
       const truncResult = truncateWithSlidingWindow(currentMessages, {
         fraction: this.config.truncationFraction,
       });
@@ -131,9 +196,29 @@ export class ContextCompactor {
         currentMessages = truncResult.messages;
         stagesUsed.push("truncate");
       }
+      const stageTokensAfter = estimateMessagesTokens(
+        currentMessages,
+        provider,
+      );
+      logger.info("[Compaction] Stage 4 (truncate)", {
+        requestId,
+        ran: truncResult.truncated,
+        tokensBefore: stageTokensBefore,
+        tokensAfter: stageTokensAfter,
+        saved: stageTokensBefore - stageTokensAfter,
+      });
     }
 
     const tokensAfter = estimateMessagesTokens(currentMessages, provider);
+
+    logger.info("[Compaction] Complete", {
+      requestId,
+      tokensBefore,
+      tokensAfter,
+      totalSaved: tokensBefore - tokensAfter,
+      stagesUsed,
+      durationMs: Date.now() - compactionStartTime,
+    });
 
     return {
       compacted: stagesUsed.length > 0,

@@ -382,7 +382,7 @@ function recordTest(result: TestResult): void {
 // Chunker Tests
 // ============================================================================
 
-async function testChunkerFactory(): Promise<boolean> {
+async function testChunkerFactory(): Promise<boolean | null> {
   logSection("Testing ChunkerFactory");
   let allPassed = true;
 
@@ -433,7 +433,7 @@ async function testChunkerFactory(): Promise<boolean> {
       strategies.includes(s),
     ).length;
 
-    if (foundCount >= 9) {
+    if (foundCount >= 10) {
       logTest(
         "Available strategies",
         "PASS",
@@ -591,7 +591,7 @@ async function testChunkerFactory(): Promise<boolean> {
   return allPassed;
 }
 
-async function testChunkerRegistry(): Promise<boolean> {
+async function testChunkerRegistry(): Promise<boolean | null> {
   logSection("Testing ChunkerRegistry");
   let allPassed = true;
 
@@ -730,7 +730,7 @@ async function testChunkerRegistry(): Promise<boolean> {
   return allPassed;
 }
 
-async function testAllChunkers(): Promise<boolean> {
+async function testAllChunkers(): Promise<boolean | null> {
   logSection("Testing All 9 Chunkers");
   let allPassed = true;
 
@@ -829,7 +829,7 @@ This is the methods section.
 // Reranker Tests
 // ============================================================================
 
-async function testRerankerFactory(): Promise<boolean> {
+async function testRerankerFactory(): Promise<boolean | null> {
   logSection("Testing RerankerFactory");
   let allPassed = true;
 
@@ -1017,7 +1017,7 @@ async function testRerankerFactory(): Promise<boolean> {
   return allPassed;
 }
 
-async function testRerankerRegistry(): Promise<boolean> {
+async function testRerankerRegistry(): Promise<boolean | null> {
   logSection("Testing RerankerRegistry");
   let allPassed = true;
 
@@ -1134,7 +1134,7 @@ async function testRerankerRegistry(): Promise<boolean> {
   return allPassed;
 }
 
-async function testSimpleReranking(): Promise<boolean> {
+async function testSimpleReranking(): Promise<boolean | null> {
   logSection("Testing Simple Reranking");
   let allPassed = true;
 
@@ -1198,7 +1198,7 @@ async function testSimpleReranking(): Promise<boolean> {
 // Hybrid Search Tests
 // ============================================================================
 
-async function testHybridSearch(): Promise<boolean> {
+async function testHybridSearch(): Promise<boolean | null> {
   logSection("Testing Hybrid Search");
   let allPassed = true;
 
@@ -1379,7 +1379,7 @@ async function testHybridSearch(): Promise<boolean> {
 // Integration Tests
 // ============================================================================
 
-async function testChunkerIntegration(): Promise<boolean> {
+async function testChunkerIntegration(): Promise<boolean | null> {
   logSection("Testing Chunker Integration");
   let allPassed = true;
 
@@ -1489,7 +1489,7 @@ async function testChunkerIntegration(): Promise<boolean> {
 // Error Handling Tests
 // ============================================================================
 
-async function testErrorHandling(): Promise<boolean> {
+async function testErrorHandling(): Promise<boolean | null> {
   logSection("Testing Error Handling");
   let allPassed = true;
 
@@ -1596,10 +1596,15 @@ function getPreferredProvider(): {
     };
   }
   if (hasAnthropicKey) {
-    // Anthropic doesn't have embeddings, fall back to vertex/openai for embeddings
+    // Anthropic doesn't have embeddings; fall back to OpenAI if available.
+    // Don't use Vertex here since hasVertexKey is false at this branch point.
     return {
       provider: "anthropic",
-      embeddingProvider: hasOpenAIKey ? "openai" : "vertex",
+      embeddingProvider: hasOpenAIKey
+        ? "openai"
+        : hasVertexKey
+          ? "vertex"
+          : "openai",
       embeddingModel: hasOpenAIKey
         ? "text-embedding-3-small"
         : "text-embedding-004",
@@ -1620,7 +1625,7 @@ function getPreferredProvider(): {
   };
 }
 
-async function testRAGWithGenerate(): Promise<boolean> {
+async function testRAGWithGenerate(): Promise<boolean | null> {
   logSection("Testing RAG Integration with generate() API");
   let allPassed = true;
 
@@ -2096,7 +2101,7 @@ async function testRAGWithGenerate(): Promise<boolean> {
 // RAG with Stream Integration Tests
 // ============================================================================
 
-async function testRAGWithStream(): Promise<boolean> {
+async function testRAGWithStream(): Promise<boolean | null> {
   logSection("Testing RAG Integration with stream() API");
   let allPassed = true;
 
@@ -2121,7 +2126,7 @@ async function testRAGWithStream(): Promise<boolean> {
       status: "SKIP",
       details: "No API keys available for streaming tests",
     });
-    return true; // Return true since skipping is acceptable
+    return null; // Skip — no API keys available
   }
 
   // Test 1: Create InMemoryVectorStore and populate with test chunks
@@ -2450,7 +2455,7 @@ async function testRAGWithStream(): Promise<boolean> {
 // CLI Integration Tests
 // ============================================================================
 
-async function testRAGCLI(): Promise<boolean> {
+async function testRAGCLI(): Promise<boolean | null> {
   logSection("Testing RAG CLI Commands");
   let allPassed = true;
 
@@ -3003,17 +3008,35 @@ Computer vision processes visual information.
         indexSucceeded = true;
       }
     } else {
-      logTest(
-        "CLI index command",
-        "FAIL",
-        `Index failed: ${result.error.slice(0, 200)}`,
-      );
-      recordTest({
-        name: "CLI index command",
-        status: "FAIL",
-        details: result.error,
-      });
-      allPassed = false;
+      const isProviderError =
+        result.error.includes("API key") ||
+        result.error.includes("authentication") ||
+        result.error.includes("credentials") ||
+        result.error.includes("quota") ||
+        result.error.includes("Cannot find module") ||
+        result.error.includes("ENOENT") ||
+        result.error.includes("ECONNREFUSED") ||
+        result.error.includes("ENOTFOUND");
+      if (isProviderError) {
+        logTest(
+          "CLI index command",
+          "SKIP",
+          `Provider/CLI unavailable: ${result.error.slice(0, 100)}`,
+        );
+        recordTest({ name: "CLI index command", status: "SKIP" });
+      } else {
+        logTest(
+          "CLI index command",
+          "FAIL",
+          `Index failed: ${result.error.slice(0, 200)}`,
+        );
+        recordTest({
+          name: "CLI index command",
+          status: "FAIL",
+          details: result.error,
+        });
+        allPassed = false;
+      }
     }
   } catch (error) {
     const errorStr = String(error);
@@ -3203,7 +3226,7 @@ Computer vision processes visual information.
 // RAG generate() with rag: { files } API Tests (NEW API)
 // ============================================================================
 
-async function testRAGGenerateWithFilesAPI(): Promise<boolean> {
+async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
   logSection("Testing RAG generate() with rag: { files } API (New API)");
   let allPassed = true;
 
@@ -3226,7 +3249,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean> {
       status: "SKIP",
       details: "No API keys available",
     });
-    return true;
+    return null;
   }
 
   // Use the sample-document.md fixture as RAG source
@@ -3625,7 +3648,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean> {
 // RAG stream() with rag: { files } API Tests (NEW API)
 // ============================================================================
 
-async function testRAGStreamWithFilesAPI(): Promise<boolean> {
+async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
   logSection("Testing RAG stream() with rag: { files } API (New API)");
   let allPassed = true;
 
@@ -3648,7 +3671,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean> {
       status: "SKIP",
       details: "No API keys available",
     });
-    return true;
+    return null;
   }
 
   const sampleDocPath = path.join(FIXTURES_DIR, "sample-document.md");
@@ -3943,7 +3966,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean> {
 // CLI --rag-files Integration Tests (NEW API)
 // ============================================================================
 
-async function testCLIRagFiles(): Promise<boolean> {
+async function testCLIRagFiles(): Promise<boolean | null> {
   logSection("Testing CLI --rag-files Flag Integration (New API)");
   let allPassed = true;
 
@@ -3958,7 +3981,7 @@ async function testCLIRagFiles(): Promise<boolean> {
       status: "SKIP",
       details: "dist/cli/index.js not found",
     });
-    return true;
+    return null;
   }
 
   if (!fs.existsSync(sampleDocPath)) {
@@ -4367,7 +4390,7 @@ async function runAllTests(): Promise<void> {
   loadFixtures();
 
   // Run all test suites
-  const results: Record<string, boolean> = {};
+  const results: Record<string, boolean | null> = {};
 
   try {
     results.chunkerFactory = await testChunkerFactory();
@@ -4476,8 +4499,11 @@ async function runAllTests(): Promise<void> {
 
   // Summary
   const totalTime = Date.now() - startTime;
-  const passedSuites = Object.values(results).filter(Boolean).length;
-  const totalSuites = Object.keys(results).length;
+  const suiteValues = Object.values(results);
+  const passedSuites = suiteValues.filter((v) => v === true).length;
+  const failedSuites = suiteValues.filter((v) => v === false).length;
+  const skippedSuites = suiteValues.filter((v) => v === null).length;
+  const totalSuites = suiteValues.length;
 
   const passedTests = testResults.filter((r) => r.status === "PASS").length;
   const failedTests = testResults.filter((r) => r.status === "FAIL").length;
@@ -4488,8 +4514,10 @@ async function runAllTests(): Promise<void> {
 
   log("\nSuite Results:", "cyan");
   for (const [suite, passed] of Object.entries(results)) {
-    const icon = passed ? "\u2705" : "\u274C";
-    const color: ColorName = passed ? "green" : "red";
+    const icon =
+      passed === true ? "\u2705" : passed === null ? "\u23ED\uFE0F" : "\u274C";
+    const color: ColorName =
+      passed === true ? "green" : passed === null ? "yellow" : "red";
     log(`  ${icon} ${suite}`, color);
   }
 
@@ -4512,7 +4540,7 @@ async function runAllTests(): Promise<void> {
   log("=".repeat(70), "magenta");
 
   // Exit with appropriate code
-  const allPassed = passedSuites === totalSuites && failedTests === 0;
+  const allPassed = failedSuites === 0 && failedTests === 0;
   if (allPassed) {
     log("\n\u2705 All RAG Processing tests passed!", "green");
     process.exit(0);

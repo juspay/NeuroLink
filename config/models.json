@@ -395,6 +395,71 @@
         }
       }
     },
+    "vertex": {
+      "claude-sonnet-4-5": {
+        "id": "claude-sonnet-4-5-20250929",
+        "displayName": "Claude 4.5 Sonnet (Vertex)",
+        "capabilities": [
+          "function-calling",
+          "vision",
+          "analysis",
+          "code",
+          "advanced-reasoning"
+        ],
+        "deprecated": false,
+        "pricing": { "input": 0.003, "output": 0.015 },
+        "contextWindow": 200000,
+        "releaseDate": "2025-09-29"
+      },
+      "claude-sonnet-4-5@20250929": {
+        "id": "claude-sonnet-4-5-20250929",
+        "displayName": "Claude 4.5 Sonnet (Vertex)",
+        "capabilities": [
+          "function-calling",
+          "vision",
+          "analysis",
+          "code",
+          "advanced-reasoning"
+        ],
+        "deprecated": false,
+        "pricing": { "input": 0.003, "output": 0.015 },
+        "contextWindow": 200000,
+        "releaseDate": "2025-09-29"
+      },
+      "claude-opus-4-5": {
+        "id": "claude-opus-4-5-20251124",
+        "displayName": "Claude 4.5 Opus (Vertex)",
+        "capabilities": [
+          "function-calling",
+          "vision",
+          "analysis",
+          "research",
+          "advanced-reasoning"
+        ],
+        "deprecated": false,
+        "pricing": { "input": 0.015, "output": 0.075 },
+        "contextWindow": 200000,
+        "releaseDate": "2025-11-24"
+      },
+      "claude-haiku-4-5": {
+        "id": "claude-haiku-4-5-20251001",
+        "displayName": "Claude 4.5 Haiku (Vertex)",
+        "capabilities": ["function-calling", "vision"],
+        "deprecated": false,
+        "pricing": { "input": 0.00025, "output": 0.00125 },
+        "contextWindow": 200000,
+        "releaseDate": "2025-10-01"
+      },
+      "claude-3-5-sonnet": {
+        "id": "claude-3-5-sonnet-20241022",
+        "displayName": "Claude 3.5 Sonnet (Vertex)",
+        "capabilities": ["function-calling", "vision", "analysis", "code"],
+        "deprecated": false,
+        "pricing": { "input": 0.003, "output": 0.015 },
+        "contextWindow": 200000,
+        "releaseDate": "2024-10-22"
+      }
+    },
     "mistral": {
       "codestral-25.01": {
         "id": "codestral-25.01",
@@ -452,7 +517,9 @@
     "best-multimodal": "google/gemini-3-pro-preview",
     "fastest": "google/gemini-2.0-flash-lite",
     "cheapest": "google/gemini-2.0-flash-lite",
-    "best-enterprise": "bedrock/claude-4.5-sonnet"
+    "best-enterprise": "bedrock/claude-4.5-sonnet",
+    "claude-sonnet-4-5": "anthropic/claude-4.5-sonnet",
+    "claude-sonnet-4-5@20250929": "anthropic/claude-4.5-sonnet"
   },
   "defaults": {
     "anthropic": "claude-4.5-sonnet",
@@ -460,6 +527,7 @@
     "google": "gemini-2.5-pro",
     "bedrock": "claude-4.5-sonnet",
     "azure": "gpt-4o-mini",
-    "mistral": "mistral-small"
+    "mistral": "mistral-small",
+    "vertex": "claude-sonnet-4-5"
   }
 }

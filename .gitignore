@@ -131,3 +131,4 @@ quality-metrics.json
 *.key
 *.pem
 test-output/
+docs/mastra-features-implementation

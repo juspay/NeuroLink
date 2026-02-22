@@ -11,6 +11,9 @@
  * - Others: Provider documentation as of Feb 2026
  */
 
+import { DynamicModelProvider } from "../core/dynamicModels.js";
+import { logger } from "../utils/logger.js";
+
 /** Default context window when provider/model is unknown */
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
 
@@ -71,6 +74,10 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, Record<string, number>> = {
     "gemini-2.0-flash": 1_048_576,
     "gemini-1.5-pro": 2_097_152,
     "gemini-1.5-flash": 1_048_576,
+    "claude-sonnet-4-5": 200_000,
+    "claude-sonnet-4-20250514": 200_000,
+    "claude-opus-4": 200_000,
+    "claude-opus-4-20250514": 200_000,
   },
   bedrock: {
     _default: 200_000,
@@ -114,11 +121,34 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, Record<string, number>> = {
  * Resolve context window size for a provider/model combination.
  *
  * Priority:
- *  1. Exact model match under provider
- *  2. Provider's _default
- *  3. Global DEFAULT_CONTEXT_WINDOW
+ *  0. Dynamic model registry (DynamicModelProvider) — resolves cross-provider
+ *     models (e.g. Claude on Vertex) that the static table cannot handle
+ *  1. Exact model match under provider in static registry
+ *  2. Prefix match under provider in static registry
+ *  3. Provider's _default in static registry
+ *  4. Global DEFAULT_CONTEXT_WINDOW
  */
 export function getContextWindowSize(provider: string, model?: string): number {
+  // Step 0: Check dynamic model registry first.
+  // This resolves cases where the runtime provider differs from the model's
+  // origin (e.g. Claude running via Vertex would hit Vertex's Gemini default
+  // in the static table). The dynamic registry knows the actual model metadata.
+  if (model) {
+    try {
+      const dynamicProvider = DynamicModelProvider.getInstance();
+      const modelConfig = dynamicProvider.resolveModel(provider, model);
+      if (modelConfig?.contextWindow) {
+        logger.debug(
+          `[ContextWindow] Resolved via dynamic registry: provider=${provider}, model=${model}, contextWindow=${modelConfig.contextWindow}`,
+        );
+        return modelConfig.contextWindow;
+      }
+    } catch {
+      // Dynamic registry not initialized yet — fall through to static lookup
+    }
+  }
+
+  // Static fallback chain
   const providerWindows = MODEL_CONTEXT_WINDOWS[provider];
   if (!providerWindows) {
     return DEFAULT_CONTEXT_WINDOW;

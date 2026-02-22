@@ -112,6 +112,17 @@ export type LangfuseConfig = {
    */
   autoDetectExternalProvider?: boolean;
 
+  /**
+   * If true, NeuroLink will NOT register its own LangfuseSpanProcessor with the
+   * global TracerProvider when using external provider mode. Only the ContextEnricher
+   * will be registered. Use this when the host application already registers a
+   * LangfuseSpanProcessor (e.g., via a DeferredSpanProcessor) to prevent duplicate
+   * trace exports to Langfuse.
+   *
+   * @default false
+   */
+  skipLangfuseSpanProcessor?: boolean;
+
   // Operation Name Support
 
   /**

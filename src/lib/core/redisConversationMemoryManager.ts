@@ -5,10 +5,13 @@
 
 import { randomUUID } from "crypto";
 import { MESSAGES_PER_TURN } from "../config/conversationMemory.js";
+import { generateToolOutputPreview } from "../context/toolOutputLimits.js";
 import { SummarizationEngine } from "../context/summarizationEngine.js";
 import { NeuroLink } from "../neurolink.js";
 import type {
   ChatMessage,
+  ChatMessageMetadata,
+  ToolResultData,
   ConversationMemoryConfig,
   ConversationMemoryStats,
   RedisConversationObject,
@@ -171,6 +174,7 @@ export class RedisConversationMemoryManager
   public async getSession(
     sessionId: string,
     userId?: string,
+    requestId?: string,
   ): Promise<SessionMemory | undefined> {
     await this.ensureInitialized();
     if (!this.redisClient) {
@@ -183,6 +187,41 @@ export class RedisConversationMemoryManager
       if (!conversation) {
         return undefined;
       }
+
+      // Log session load metadata for observability
+      const blobSizeBytes = conversationData
+        ? Buffer.byteLength(conversationData, "utf8")
+        : 0;
+      const messageCount = conversation.messages.length;
+      const hasSummary = !!conversation.summarizedUpToMessageId;
+      const pointerIndex = hasSummary
+        ? conversation.messages.findIndex(
+            (msg) => msg.id === conversation.summarizedUpToMessageId,
+          )
+        : -1;
+      const recentMessageCount =
+        hasSummary && pointerIndex !== -1
+          ? messageCount - pointerIndex - 1
+          : messageCount;
+
+      logger.info("[ConversationMemory] Session loaded", {
+        requestId,
+        sessionId,
+        blobSizeBytes,
+        messageCount,
+        hasSummary,
+        recentMessageCount,
+      });
+
+      if (blobSizeBytes > 512 * 1024) {
+        logger.warn("[ConversationMemory] Large session blob", {
+          requestId,
+          sessionId,
+          blobSizeBytes,
+          messageCount,
+        });
+      }
+
       return {
         sessionId: conversation.sessionId,
         userId: conversation.userId,
@@ -203,6 +242,36 @@ export class RedisConversationMemoryManager
         error: error instanceof Error ? error.message : String(error),
       });
       return undefined;
+    }
+  }
+
+  /**
+   * Get raw session data without any filtering or transformation.
+   * Used by the memory retrieval tool and internal APIs that need
+   * access to full message data including unmodified tool outputs.
+   */
+  async getSessionRaw(
+    sessionId: string,
+    userId?: string,
+  ): Promise<RedisConversationObject | null> {
+    try {
+      await this.ensureInitialized();
+      if (!this.redisClient) {
+        return null;
+      }
+      const redisKey = getSessionKey(this.redisConfig, sessionId, userId);
+      const conversationData = await this.redisClient.get(redisKey);
+      return deserializeConversation(conversationData || null);
+    } catch (error) {
+      logger.error(
+        "[RedisConversationMemoryManager] Failed to get raw session",
+        {
+          sessionId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return null;
     }
   }
 
@@ -563,6 +632,7 @@ export class RedisConversationMemoryManager
                 tokenThreshold,
                 options.sessionId,
                 options.userId,
+                options.requestId,
               );
             } catch (error) {
               logger.error("Background summarization failed", {
@@ -584,6 +654,26 @@ export class RedisConversationMemoryManager
 
       const serializedData = serializeConversation(conversation);
       await this.redisClient.set(redisKey, serializedData);
+
+      // Log turn storage metadata for observability
+      const blobSizeBytes = Buffer.byteLength(serializedData, "utf8");
+      logger.info("[ConversationMemory] Turn stored", {
+        requestId: options.requestId,
+        sessionId: options.sessionId,
+        blobSizeBytes,
+        totalMessages: conversation.messages.length,
+        userMsgChars: options.userMessage.length,
+        assistantMsgChars: options.aiResponse.length,
+      });
+
+      if (blobSizeBytes > 512 * 1024) {
+        logger.warn("[ConversationMemory] Large session blob", {
+          requestId: options.requestId,
+          sessionId: options.sessionId,
+          blobSizeBytes,
+          messageCount: conversation.messages.length,
+        });
+      }
 
       if (this.redisConfig.ttl > 0) {
         await this.redisClient.expire(redisKey, this.redisConfig.ttl);
@@ -621,6 +711,7 @@ export class RedisConversationMemoryManager
     threshold: number,
     sessionId: string,
     userId?: string,
+    requestId?: string,
   ): Promise<void> {
     const normalizedUserId = userId || "randomUser";
     const summarizationKey = `${sessionId}:${normalizedUserId}`;
@@ -657,6 +748,7 @@ export class RedisConversationMemoryManager
         threshold,
         this.config,
         "[RedisConversationMemoryManager]",
+        requestId,
       );
 
       conversation.lastTokenCount = session.lastTokenCount;
@@ -688,12 +780,13 @@ export class RedisConversationMemoryManager
   /**
    * Build context messages for AI prompt injection (TOKEN-BASED)
    * Returns messages from pointer onwards (or all if no pointer)
-   * Filters out tool_call and tool_result messages when summarization is enabled
+   * Applies sendToolPreview toggle and hydrates result.result for backward compat
    */
   async buildContextMessages(
     sessionId: string,
     userId?: string,
     enableSummarization?: boolean,
+    requestId?: string,
   ): Promise<ChatMessage[]> {
     logger.info("[RedisConversationMemoryManager] Building context messages", {
       sessionId,
@@ -722,18 +815,41 @@ export class RedisConversationMemoryManager
       lastActivity: new Date(conversation.updatedAt).getTime(),
     };
 
-    const contextMessages = buildContextFromPointer(session);
-    const isSummarizationEnabled =
-      enableSummarization !== undefined
-        ? enableSummarization
-        : this.config.enableSummarization === true;
+    const contextMessages = buildContextFromPointer(session, requestId);
 
-    let finalMessages = contextMessages;
-    if (isSummarizationEnabled) {
-      finalMessages = contextMessages.filter(
-        (msg) => msg.role !== "tool_call" && msg.role !== "tool_result",
-      );
-    }
+    const sendToolPreview =
+      this.config?.contextCompaction?.sendToolPreview === true;
+
+    // Map tool_result messages: apply preview toggle + hydrate result.result
+    const finalMessages = contextMessages.map((msg) => {
+      if (msg.role !== "tool_result") {
+        return msg;
+      }
+
+      // Toggle: swap content to preview if enabled AND a preview exists
+      const content =
+        sendToolPreview && msg.metadata?.toolOutputPreview
+          ? msg.metadata.toolOutputPreview
+          : msg.content;
+
+      // Hydrate result.result from content for backward compatibility
+      // (result.result is no longer stored — inferred from content at read time)
+      let hydratedResult = msg.result;
+      if (msg.result && msg.result.result === undefined) {
+        let parsedResult: unknown = content;
+        try {
+          parsedResult = JSON.parse(content);
+        } catch {
+          /* plain text — use as-is */
+        }
+        hydratedResult = { ...msg.result, result: parsedResult };
+      }
+
+      return { ...msg, content, result: hydratedResult };
+    });
+
+    // Tool messages now have real content and participate in context properly.
+    // The tool output pruner (Stage 1) handles bounding old tool outputs.
 
     logger.info("[RedisConversationMemoryManager] Retrieved context messages", {
       sessionId,
@@ -1084,6 +1200,107 @@ User message: "${userMessage}"`;
   }
 
   /**
+   * Get the raw messages array for a session.
+   * Returns the full messages list without context filtering or summarization.
+   */
+  async getSessionMessages(
+    sessionId: string,
+    userId?: string,
+  ): Promise<ChatMessage[]> {
+    await this.ensureInitialized();
+    if (!this.redisClient) {
+      return [];
+    }
+
+    try {
+      const redisKey = getSessionKey(this.redisConfig, sessionId, userId);
+      const conversationData = await this.redisClient.get(redisKey);
+      const conversation = deserializeConversation(conversationData || null);
+      return conversation?.messages ?? [];
+    } catch (error) {
+      logger.error(
+        "[RedisConversationMemoryManager] Failed to get session messages",
+        {
+          sessionId,
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Replace the entire messages array for a session.
+   * The session must already exist in Redis.
+   */
+  async setSessionMessages(
+    sessionId: string,
+    messages: ChatMessage[],
+    userId?: string,
+  ): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.redisClient) {
+      throw new ConversationMemoryError(
+        "Redis client not initialized",
+        "STORAGE_ERROR",
+        { sessionId },
+      );
+    }
+
+    try {
+      const redisKey = getSessionKey(this.redisConfig, sessionId, userId);
+      const conversationData = await this.redisClient.get(redisKey);
+      const conversation = deserializeConversation(conversationData || null);
+
+      if (!conversation) {
+        throw new ConversationMemoryError(
+          `Session ${sessionId} not found`,
+          "STORAGE_ERROR",
+          { sessionId },
+        );
+      }
+
+      conversation.messages = messages;
+      conversation.updatedAt = new Date().toISOString();
+      // Reset summarization pointers — the old summary no longer applies
+      // to the replaced messages array
+      conversation.summarizedUpToMessageId = undefined;
+      conversation.summarizedMessage = undefined;
+      conversation.lastTokenCount = undefined;
+      conversation.lastCountedAt = undefined;
+
+      const serializedData = serializeConversation(conversation);
+      await this.redisClient.set(redisKey, serializedData);
+
+      if (this.redisConfig.ttl > 0) {
+        await this.redisClient.expire(redisKey, this.redisConfig.ttl);
+      }
+
+      logger.debug(
+        "[RedisConversationMemoryManager] Session messages replaced",
+        {
+          sessionId,
+          userId,
+          messageCount: messages.length,
+        },
+      );
+    } catch (error) {
+      if (error instanceof ConversationMemoryError) {
+        throw error;
+      }
+      throw new ConversationMemoryError(
+        `Failed to set session messages for session ${sessionId}`,
+        "STORAGE_ERROR",
+        {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
+    }
+  }
+
+  /**
    * Close Redis connection
    */
   public async close(): Promise<void> {
@@ -1375,68 +1592,107 @@ User message: "${userMessage}"`;
       },
     );
 
-    // Create a mapping from toolCallId to toolName for matching tool results
-    const toolCallMap = new Map<string, string>();
+    try {
+      // Create a mapping from toolCallId to toolName for matching tool results
+      const toolCallMap = new Map<string, string>();
 
-    // Create separate messages for tool calls and build the mapping
-    for (const toolCall of pendingData.toolCalls) {
-      const toolCallId = String(toolCall.toolCallId);
-      const toolName = String(toolCall.toolName);
+      // Create separate messages for tool calls and build the mapping
+      for (const toolCall of pendingData.toolCalls) {
+        const toolCallId = toolCall.toolCallId ?? "";
+        const toolName = toolCall.toolName ?? "";
 
-      // Store in mapping for tool results
-      toolCallMap.set(toolCallId, toolName);
+        // Store in mapping for tool results
+        toolCallMap.set(toolCallId, toolName);
 
-      const toolCallMessage: ChatMessage = {
-        id: randomUUID(),
-        timestamp:
-          toolCall.timestamp?.toISOString() || this.generateTimestamp(),
-        role: "tool_call",
-        content: "", // Can be empty for tool calls
-        tool: toolName,
-        args: (toolCall.args ||
-          toolCall.arguments ||
-          toolCall.parameters ||
-          {}) as Record<string, unknown>,
-      };
-      conversation.messages.push(toolCallMessage);
-    }
+        const toolCallMessage: ChatMessage = {
+          id: randomUUID(),
+          timestamp:
+            toolCall.timestamp?.toISOString() || this.generateTimestamp(),
+          role: "tool_call",
+          content: "", // Can be empty for tool calls
+          tool: toolName,
+          args: (toolCall.args ||
+            toolCall.arguments ||
+            toolCall.parameters ||
+            {}) as Record<string, unknown>,
+        };
+        conversation.messages.push(toolCallMessage);
+      }
 
-    // Create separate messages for tool results using the mapping
-    for (const toolResult of pendingData.toolResults) {
-      const toolCallId = String(
-        toolResult.toolCallId || toolResult.id || "unknown",
-      );
-      const toolName = toolCallMap.get(toolCallId) || "unknown";
+      // Create separate messages for tool results using the mapping
+      for (const toolResult of pendingData.toolResults) {
+        const toolCallId = String(
+          toolResult.toolCallId || toolResult.id || "unknown",
+        );
+        const toolName = toolCallMap.get(toolCallId) || "unknown";
 
-      const toolResultMessage: ChatMessage = {
-        id: randomUUID(),
-        timestamp:
-          toolResult.timestamp?.toISOString() || this.generateTimestamp(),
-        role: "tool_result",
-        content: "", // Can be empty for tool results
-        tool: toolName, // Now correctly extracted from tool call mapping
-        result: {
+        // Serialize the tool result to string for content field
+        let serializedResult: string;
+        if (typeof toolResult.result === "string") {
+          serializedResult = toolResult.result;
+        } else if (
+          toolResult.result === undefined ||
+          toolResult.result === null
+        ) {
+          serializedResult = String(toolResult.result ?? "null");
+        } else {
+          try {
+            serializedResult = JSON.stringify(toolResult.result, null, 2);
+          } catch (serializeError) {
+            serializedResult = `[Serialization failed: ${serializeError instanceof Error ? serializeError.message : String(serializeError)}]`;
+          }
+        }
+
+        // Generate preview (uses existing config fields that were previously unused)
+        const { preview, truncated, originalSize } = generateToolOutputPreview(
+          serializedResult,
+          {
+            maxBytes: this.config?.contextCompaction?.maxToolOutputBytes,
+            maxLines: this.config?.contextCompaction?.maxToolOutputLines,
+          },
+        );
+
+        // Build metadata — only store preview when truncation occurred (no duplication)
+        const metadata: ChatMessageMetadata = {
+          truncated,
+          ...(truncated && { toolOutputPreview: preview }),
+          ...(truncated && { originalSize }),
+        };
+
+        // Build result — success/error metadata only, NOT the output data
+        const result: ToolResultData = {
           success: !toolResult.error,
-          result: toolResult.result,
+          // result.result intentionally NOT stored — inferred from content at read time
           error: toolResult.error ? String(toolResult.error) : undefined,
+        };
+
+        const toolResultMessage: ChatMessage = {
+          id: randomUUID(),
+          timestamp:
+            toolResult.timestamp?.toISOString() || this.generateTimestamp(),
+          role: "tool_result",
+          content: serializedResult, // Full output (was "")
+          tool: toolName,
+          result,
+          metadata,
+        };
+
+        conversation.messages.push(toolResultMessage);
+      }
+
+      logger.debug(
+        "[RedisConversationMemoryManager] Successfully flushed pending tool data",
+        {
+          sessionId,
+          userId,
+          toolMessagesAdded:
+            pendingData.toolCalls.length + pendingData.toolResults.length,
+          totalMessages: conversation.messages.length,
         },
-      };
-
-      conversation.messages.push(toolResultMessage);
+      );
+    } finally {
+      // Always clean up pending data, even on failure, to prevent infinite retry loops
+      this.pendingToolExecutions.delete(pendingKey);
     }
-
-    // Remove the pending data now that it's been flushed
-    this.pendingToolExecutions.delete(pendingKey);
-
-    logger.debug(
-      "[RedisConversationMemoryManager] Successfully flushed pending tool data",
-      {
-        sessionId,
-        userId,
-        toolMessagesAdded:
-          pendingData.toolCalls.length + pendingData.toolResults.length,
-        totalMessages: conversation.messages.length,
-      },
-    );
   }
 }

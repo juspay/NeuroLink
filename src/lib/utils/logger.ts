@@ -116,7 +116,59 @@ class NeuroLinkLogger {
   }
 
   /**
+   * Safely serialize data to fully expanded JSON string.
+   * Handles circular references and non-serializable values.
+   * Zero truncation — all nested objects and arrays are fully expanded.
+   */
+  private serializeData(data: unknown): string {
+    if (data === undefined || data === null) {
+      return String(data);
+    }
+    if (typeof data !== "object") {
+      return String(data);
+    }
+    try {
+      return JSON.stringify(data, (_key, value) => {
+        if (value instanceof Error) {
+          return {
+            name: value.name,
+            message: value.message,
+            stack: value.stack,
+          };
+        }
+        return value;
+      });
+    } catch {
+      // Handle circular references using a stack-based approach
+      // to avoid false "[Circular]" on diamond (shared) references
+      const ancestors: object[] = [];
+      try {
+        return JSON.stringify(data, function (_key, value) {
+          if (value instanceof Error) {
+            return {
+              name: value.name,
+              message: value.message,
+              stack: value.stack,
+            };
+          }
+          if (typeof value === "object" && value !== null) {
+            // Only flag actual circular (ancestor) references
+            if (ancestors.includes(value)) {
+              return "[Circular]";
+            }
+            ancestors.push(value);
+          }
+          return value;
+        });
+      } catch {
+        return "[Unserializable Object]";
+      }
+    }
+  }
+
+  /**
    * Outputs a log entry to the console based on the log level.
+   * Data is fully serialized to JSON — no [Object] or [Array] truncation.
    *
    * @param level - The log level (debug, info, warn, error).
    * @param prefix - The formatted log prefix.
@@ -136,7 +188,7 @@ class NeuroLinkLogger {
       error: console.error,
     }[level];
     if (data !== undefined && data !== null) {
-      logMethod(prefix, message, data);
+      logMethod(prefix, message, this.serializeData(data));
     } else {
       logMethod(prefix, message);
     }
@@ -390,6 +442,8 @@ export const logger = {
   table: (data: unknown) => {
     neuroLinkLogger.table(data);
   },
+  // Expose log-level check for gating expensive operations
+  shouldLog: (level: LogLevel) => neuroLinkLogger.shouldLog(level),
   // Expose structured logging methods
   setLogLevel: (level: LogLevel) => neuroLinkLogger.setLogLevel(level),
   getLogs: (level?: LogLevel) => neuroLinkLogger.getLogs(level),

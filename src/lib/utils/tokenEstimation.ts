@@ -89,10 +89,23 @@ export function estimateTokens(
  * Includes message framing overhead.
  */
 export function estimateMessageTokens(
-  message: ChatMessage | { role: string; content: string },
+  message: ChatMessage | { role: string; content: unknown },
   provider?: string,
 ): number {
-  const contentTokens = estimateTokens(message.content || "", provider);
+  let contentStr = "";
+  if (message.content) {
+    if (typeof message.content === "string") {
+      contentStr = message.content;
+    } else {
+      try {
+        contentStr = JSON.stringify(message.content);
+      } catch {
+        // Fallback for circular references or non-serializable content
+        contentStr = String(message.content);
+      }
+    }
+  }
+  const contentTokens = estimateTokens(contentStr, provider);
   return contentTokens + TOKENS_PER_MESSAGE;
 }
 
@@ -101,7 +114,7 @@ export function estimateMessageTokens(
  * Includes conversation-level overhead.
  */
 export function estimateMessagesTokens(
-  messages: Array<ChatMessage | { role: string; content: string }>,
+  messages: Array<ChatMessage | { role: string; content: unknown }>,
   provider?: string,
 ): number {
   if (!messages || messages.length === 0) {

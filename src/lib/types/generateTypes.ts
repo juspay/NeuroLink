@@ -395,6 +395,28 @@ export type GenerateOptions = {
   rag?: RAGConfig;
 
   /**
+   * Maximum budget in USD for this session. When the accumulated cost of all
+   * generate() calls on this NeuroLink instance exceeds this value, subsequent
+   * calls will throw a budget-exceeded error before making the API request.
+   *
+   * @example
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Summarize this" },
+   *   maxBudgetUsd: 1.00
+   * });
+   * ```
+   */
+  maxBudgetUsd?: number;
+
+  /**
+   * Optional request identifier for observability and log correlation.
+   * When provided, this ID is forwarded to spans, logs, and telemetry so
+   * callers can correlate generation traces back to their own request lifecycle.
+   */
+  requestId?: string;
+
+  /**
    * File reference registry for on-demand file processing.
    *
    * When set, files above the "tiny" size tier (>10KB) will be registered
@@ -907,6 +929,13 @@ export type TextGenerationOptions = {
     /** Thinking level (Gemini 3: minimal|low|medium|high). Ignored for Anthropic. */
     thinkingLevel?: "minimal" | "low" | "medium" | "high";
   };
+
+  /**
+   * Optional request identifier for observability and log correlation.
+   * When provided, this ID is forwarded to spans, logs, and telemetry so
+   * callers can correlate generation traces back to their own request lifecycle.
+   */
+  requestId?: string;
 };
 
 /**

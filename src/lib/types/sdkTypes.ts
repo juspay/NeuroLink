@@ -97,6 +97,8 @@ export type {
 // Conversation Memory types
 export type {
   ChatMessage,
+  ChatMessageMetadata,
+  ToolResultData,
   ConversationMemoryConfig,
   ConversationMemoryError,
   ConversationMemoryEvents,

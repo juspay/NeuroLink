@@ -777,7 +777,9 @@ export type BudgetFileInput = {
   fileType?: string;
 };
 
-/** Options for tool output truncation. */
+/**
+ * @deprecated Use ToolOutputPreviewOptions instead.
+ */
 export type TruncateOptions = {
   maxBytes?: number;
   maxLines?: number;
@@ -786,11 +788,35 @@ export type TruncateOptions = {
   saveDir?: string;
 };
 
-/** Result of tool output truncation. */
+/**
+ * @deprecated Use ToolOutputPreviewResult instead.
+ */
 export type TruncateResult = {
   content: string;
   truncated: boolean;
   savedPath?: string;
+  originalSize: number;
+};
+
+/** Options for tool output preview generation. */
+export type ToolOutputPreviewOptions = {
+  /** Maximum bytes for the preview (default: 50KB) */
+  maxBytes?: number;
+  /** Maximum lines for the preview (default: 2000) */
+  maxLines?: number;
+  /** Fraction of preview budget allocated to the head (default: 0.25) */
+  headRatio?: number;
+  /** Fraction of preview budget allocated to the tail (default: 0.75) */
+  tailRatio?: number;
+};
+
+/** Result of tool output preview generation. */
+export type ToolOutputPreviewResult = {
+  /** The preview string (or full output if under limits) */
+  preview: string;
+  /** Whether truncation was applied */
+  truncated: boolean;
+  /** Original byte size of the full output */
   originalSize: number;
 };
 

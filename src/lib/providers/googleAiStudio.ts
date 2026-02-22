@@ -147,9 +147,9 @@ export class GoogleAIStudioProvider extends BaseProvider {
     return google(this.modelName);
   }
 
-  public handleProviderError(error: unknown): Error {
+  protected formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
-      throw new NetworkError(error.message, this.providerName);
+      return new NetworkError(error.message, this.providerName);
     }
 
     const errorRecord = error as UnknownRecord;
@@ -159,20 +159,20 @@ export class GoogleAIStudioProvider extends BaseProvider {
         : "Unknown error";
 
     if (message.includes("API_KEY_INVALID")) {
-      throw new AuthenticationError(
+      return new AuthenticationError(
         "Invalid Google AI API key. Please check your GOOGLE_AI_API_KEY environment variable.",
         this.providerName,
       );
     }
 
     if (message.includes("RATE_LIMIT_EXCEEDED")) {
-      throw new RateLimitError(
+      return new RateLimitError(
         "Google AI rate limit exceeded. Please try again later.",
         this.providerName,
       );
     }
 
-    throw new ProviderError(`Google AI error: ${message}`, this.providerName);
+    return new ProviderError(`Google AI error: ${message}`, this.providerName);
   }
 
   /**

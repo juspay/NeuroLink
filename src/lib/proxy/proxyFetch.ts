@@ -10,43 +10,144 @@ import { shouldBypassProxy } from "./utils/noProxyUtils.js";
 import type { ParsedProxyConfig } from "../types/utilities.js";
 
 /**
- * Mask credentials in proxy URLs for secure logging
- * Replaces user:password@ with [CREDENTIALS_MASKED]@
+ * Retry-aware fetch wrapper for transient network errors (ECONNRESET, ETIMEDOUT, socket hang up).
+ * Protects all LLM API calls and token refreshes that go through createProxyFetch().
  */
-function maskProxyCredentials(proxyUrl: string | undefined): string {
-  if (!proxyUrl || proxyUrl === "NOT_SET") {
-    return proxyUrl || "NOT_SET";
-  }
+async function fetchWithRetry(
+  url: string | URL | RequestInfo,
+  init: RequestInit | undefined,
+  maxRetries = 3,
+  baseDelay = 500,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fetch(url as RequestInfo | URL, init);
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      const isRetryable =
+        err?.code === "ECONNRESET" ||
+        err?.code === "ETIMEDOUT" ||
+        err?.message?.includes("socket hang up") ||
+        err?.message?.includes("network socket disconnected");
 
-  try {
-    // Handle URLs with credentials: http://user:password@proxy:port
-    const credentialPattern = /(:\/\/)([^@:]+):([^@]+)@/;
-    if (credentialPattern.test(proxyUrl)) {
-      return proxyUrl.replace(credentialPattern, "$1[CREDENTIALS_MASKED]@");
+      if (!isRetryable || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delay = baseDelay * Math.pow(2, attempt);
+      logger.debug(
+        `[fetchWithRetry] Transient error (${err?.code || err?.message}), retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
     }
-
-    // Return original URL if no credentials found
-    return proxyUrl;
-  } catch {
-    // If URL parsing fails, still mask potential credentials pattern
-    return proxyUrl.replace(
-      /(:\/\/)([^@:]+):([^@]+)@/,
-      "$1[CREDENTIALS_MASKED]@",
-    );
   }
+  throw new Error("fetchWithRetry exhausted"); // unreachable
 }
 
 /**
- * Mask all proxy credentials in an environment variables object
+ * Parse request body to readable format for debug logging
  */
-function maskProxyEnvVars(
-  envVars: Record<string, string>,
-): Record<string, string> {
-  const masked: Record<string, string> = {};
-  for (const [key, value] of Object.entries(envVars)) {
-    masked[key] = maskProxyCredentials(value);
+function parseBody(body: BodyInit | null | undefined): {
+  parsed: unknown;
+  size: number;
+  type: string;
+} {
+  if (!body) {
+    return { parsed: null, size: 0, type: "empty" };
   }
-  return masked;
+  if (typeof body === "string") {
+    try {
+      return { parsed: JSON.parse(body), size: body.length, type: "json" };
+    } catch {
+      return { parsed: body, size: body.length, type: "text" };
+    }
+  }
+  if (body instanceof ArrayBuffer) {
+    return {
+      parsed: "[ArrayBuffer]",
+      size: body.byteLength,
+      type: "arraybuffer",
+    };
+  }
+  if (body instanceof Uint8Array) {
+    return { parsed: "[Uint8Array]", size: body.length, type: "uint8array" };
+  }
+  return { parsed: "[Stream]", size: -1, type: "stream" };
+}
+
+/**
+ * Sensitive header names whose values should be redacted in logs
+ */
+const SENSITIVE_HEADERS = new Set([
+  "authorization",
+  "x-api-key",
+  "api-key",
+  "x-goog-api-key",
+  "proxy-authorization",
+  "cookie",
+  "set-cookie",
+]);
+
+/**
+ * Extract all headers as plain object with sensitive values redacted
+ */
+function getAllHeaders(
+  headers: HeadersInit | undefined,
+): Record<string, string> {
+  if (!headers) {
+    return {};
+  }
+  const entries: [string, string][] =
+    headers instanceof Headers
+      ? [...headers.entries()]
+      : Array.isArray(headers)
+        ? headers
+        : Object.entries(headers as Record<string, string>);
+  return Object.fromEntries(
+    entries.map(([key, value]) =>
+      SENSITIVE_HEADERS.has(key.toLowerCase())
+        ? [key, `${value.substring(0, 4)}***`]
+        : [key, value],
+    ),
+  );
+}
+
+/**
+ * Clone response and read body + headers for debug logging
+ */
+async function readResponseBody(response: Response): Promise<{
+  parsed: unknown;
+  size: number;
+  type: string;
+  headers: Record<string, string>;
+}> {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = SENSITIVE_HEADERS.has(key.toLowerCase())
+      ? `${value.substring(0, 4)}***`
+      : value;
+  });
+  try {
+    const cloned = response.clone();
+    const text = await cloned.text();
+    try {
+      return {
+        parsed: JSON.parse(text),
+        size: text.length,
+        type: "json",
+        headers,
+      };
+    } catch {
+      return { parsed: text, size: text.length, type: "text", headers };
+    }
+  } catch {
+    return {
+      parsed: "[unable to read body]",
+      size: -1,
+      type: "error",
+      headers,
+    };
+  }
 }
 
 // ==================== LIGHTWEIGHT PROXY IMPLEMENTATIONS ====================
@@ -77,11 +178,21 @@ function parseProxyUrl(proxyUrl: string): ParsedProxyConfig {
 
     return config;
   } catch (error) {
+    // Sanitize proxy URL to avoid leaking credentials in logs/errors
+    let safeUrl: string;
+    try {
+      const u = new URL(proxyUrl);
+      u.username = "";
+      u.password = "";
+      safeUrl = u.toString();
+    } catch {
+      safeUrl = "[invalid-url]";
+    }
     logger.error("[Proxy] Failed to parse proxy URL", {
-      proxyUrl: maskProxyCredentials(proxyUrl),
+      proxyUrl: safeUrl,
       error,
     });
-    throw new Error(`Invalid proxy URL: ${maskProxyCredentials(proxyUrl)}`);
+    throw new Error(`Invalid proxy URL: ${safeUrl}`);
   }
 }
 
@@ -190,63 +301,112 @@ export function createProxyFetch(): typeof fetch {
   const socksProxy = process.env.SOCKS_PROXY || process.env.socks_proxy;
   const noProxy = process.env.NO_PROXY || process.env.no_proxy;
 
-  // ENHANCED LOGGING: Capture ALL enhanced proxy-related environment variables with credential masking
-  logger.debug("[Proxy Fetch] 🔍 ENHANCED_PROXY_ENV_DETECTION", {
-    // Enhanced proxy environment variables (credentials masked)
-    httpProxy: maskProxyCredentials(httpProxy || "NOT_SET"),
-    httpsProxy: maskProxyCredentials(httpsProxy || "NOT_SET"),
-    allProxy: maskProxyCredentials(allProxy || "NOT_SET"),
-    socksProxy: maskProxyCredentials(socksProxy || "NOT_SET"),
-    noProxy: noProxy || "NOT_SET", // NO_PROXY doesn't contain credentials
+  // ENHANCED LOGGING: Capture ALL proxy-related environment variables — credentials redacted
+  // Reuse module-level maskProxyUrl, defaulting to "NOT_SET" for undefined values
+  const sanitizeProxyUrl = (url: string | undefined): string =>
+    maskProxyUrl(url) ?? "NOT_SET";
 
-    // Legacy variables for compatibility (credentials masked)
-    originalNodejsHttpProxy: maskProxyCredentials(
-      process.env.nodejs_http_proxy || "NOT_SET",
-    ),
-    originalNodejsHttpsProxy: maskProxyCredentials(
-      process.env.nodejs_https_proxy || "NOT_SET",
-    ),
+  if (logger.shouldLog("debug")) {
+    const allProxyRelatedEnvVars = Object.keys(process.env)
+      .filter((key) => key.toLowerCase().includes("proxy"))
+      .reduce(
+        (acc, key) => {
+          const val = process.env[key] || "NOT_SET";
+          acc[key] =
+            key.toLowerCase() === "no_proxy" ? val : sanitizeProxyUrl(val);
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
+    logger.debug("[Proxy Fetch] ENHANCED_PROXY_ENV_DETECTION", {
+      httpProxy: sanitizeProxyUrl(httpProxy),
+      httpsProxy: sanitizeProxyUrl(httpsProxy),
+      allProxy: sanitizeProxyUrl(allProxy),
+      socksProxy: sanitizeProxyUrl(socksProxy),
+      noProxy: noProxy || "NOT_SET",
+      allProxyRelatedEnvVars,
+      message: "Enhanced proxy environment detection — credentials redacted",
+    });
+  }
 
-    // All potential proxy-related environment variables (credentials masked)
-    allProxyRelatedEnvVars: maskProxyEnvVars(
-      Object.keys(process.env)
-        .filter((key) => key.toLowerCase().includes("proxy"))
-        .reduce(
-          (acc, key) => {
-            acc[key] = process.env[key] || "NOT_SET";
-            return acc;
-          },
-          {} as Record<string, string>,
-        ),
-    ),
-
-    message:
-      "Enhanced proxy environment detection with SOCKS, authentication, and NO_PROXY support (credentials masked for security)",
-  });
-
-  // If no proxy configured, return standard fetch
+  // If no proxy configured, return instrumented standard fetch
   if (!httpsProxy && !httpProxy && !allProxy && !socksProxy) {
     logger.debug(
       "[Proxy Fetch] No proxy environment variables found - using standard fetch",
     );
-    return fetch;
+    return async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      const reqId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      const startTs = Date.now();
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : (input as Request).url;
+
+      if (logger.shouldLog("debug")) {
+        const {
+          parsed: requestBody,
+          size: bodySize,
+          type: bodyType,
+        } = parseBody(init?.body);
+        logger.debug("[Observability] HTTP request to LLM provider", {
+          requestId: reqId,
+          url,
+          method: init?.method || "POST",
+          headers: getAllHeaders(init?.headers),
+          body: requestBody,
+          bodySize,
+          bodyType,
+        });
+      }
+
+      try {
+        const response = await fetchWithRetry(input, init);
+
+        if (logger.shouldLog("debug")) {
+          const {
+            parsed: responseBody,
+            size: responseSize,
+            type: responseType,
+            headers: responseHeaders,
+          } = await readResponseBody(response);
+          logger.debug("[Observability] HTTP response from LLM provider", {
+            requestId: reqId,
+            url,
+            status: response.status,
+            statusText: response.statusText,
+            durationMs: Date.now() - startTs,
+            headers: responseHeaders,
+            body: responseBody,
+            bodySize: responseSize,
+            bodyType: responseType,
+          });
+        }
+
+        return response;
+      } catch (error: unknown) {
+        logger.debug("[Observability] HTTP request failed", {
+          requestId: reqId,
+          url,
+          error: error instanceof Error ? error.message : String(error),
+          durationMs: Date.now() - startTs,
+        });
+        throw error;
+      }
+    };
   }
 
   logger.debug(
     `[Proxy Fetch] Configuring enhanced proxy with multiple protocol support`,
   );
-  logger.debug(
-    `[Proxy Fetch] HTTP_PROXY: ${maskProxyCredentials(httpProxy || "not set")}`,
-  );
-  logger.debug(
-    `[Proxy Fetch] HTTPS_PROXY: ${maskProxyCredentials(httpsProxy || "not set")}`,
-  );
-  logger.debug(
-    `[Proxy Fetch] ALL_PROXY: ${maskProxyCredentials(allProxy || "not set")}`,
-  );
-  logger.debug(
-    `[Proxy Fetch] SOCKS_PROXY: ${maskProxyCredentials(socksProxy || "not set")}`,
-  );
+  logger.debug(`[Proxy Fetch] HTTP_PROXY: ${sanitizeProxyUrl(httpProxy)}`);
+  logger.debug(`[Proxy Fetch] HTTPS_PROXY: ${sanitizeProxyUrl(httpsProxy)}`);
+  logger.debug(`[Proxy Fetch] ALL_PROXY: ${sanitizeProxyUrl(allProxy)}`);
+  logger.debug(`[Proxy Fetch] SOCKS_PROXY: ${sanitizeProxyUrl(socksProxy)}`);
   logger.debug(`[Proxy Fetch] NO_PROXY: ${noProxy || "not set"}`);
 
   // Return enhanced proxy-aware fetch function
@@ -255,6 +415,7 @@ export function createProxyFetch(): typeof fetch {
     init?: RequestInit,
   ): Promise<Response> => {
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const requestStartTime = Date.now();
 
     // Determine target URL
     const targetUrl =
@@ -264,15 +425,32 @@ export function createProxyFetch(): typeof fetch {
           ? input.href
           : (input as Request).url;
 
-    logger.debug(`[Proxy Fetch] 🚀 ENHANCED REQUEST START`, {
+    // Request logging with sensitive header redaction — gated behind debug check
+    if (logger.shouldLog("debug")) {
+      const {
+        parsed: requestBody,
+        size: bodySize,
+        type: bodyType,
+      } = parseBody(init?.body);
+      logger.debug("[Observability] HTTP request to LLM provider", {
+        requestId,
+        url: targetUrl,
+        method: init?.method || "POST",
+        headers: getAllHeaders(init?.headers),
+        body: requestBody,
+        bodySize,
+        bodyType,
+      });
+    }
+
+    logger.debug(`[Proxy Fetch] ENHANCED REQUEST START`, {
       requestId,
       targetUrl,
       timestamp: new Date().toISOString(),
-      httpProxy: httpProxy || "NOT_SET",
-      httpsProxy: httpsProxy || "NOT_SET",
-      allProxy: allProxy || "NOT_SET",
-      socksProxy: socksProxy || "NOT_SET",
-      initHeaders: init?.headers || "NO_HEADERS",
+      httpProxy: sanitizeProxyUrl(httpProxy),
+      httpsProxy: sanitizeProxyUrl(httpsProxy),
+      allProxy: sanitizeProxyUrl(allProxy),
+      socksProxy: sanitizeProxyUrl(socksProxy),
       initMethod: init?.method || "GET",
     });
 
@@ -283,19 +461,20 @@ export function createProxyFetch(): typeof fetch {
       if (proxyUrl) {
         const url = new URL(targetUrl);
 
+        const sanitizedProxy = sanitizeProxyUrl(proxyUrl);
         logger.debug(`[Proxy Fetch] 🔗 ENHANCED URL ANALYSIS`, {
           requestId,
           targetUrl,
           urlHostname: url.hostname,
           urlProtocol: url.protocol,
           urlPort: url.port,
-          selectedProxyUrl: maskProxyCredentials(proxyUrl), // Hide credentials in logs
+          selectedProxyUrl: sanitizedProxy,
           timestamp: new Date().toISOString(),
         });
 
         logger.debug(`[Proxy Fetch] 🎯 ENHANCED PROXY AGENT CREATION`, {
           requestId,
-          proxyUrl: maskProxyCredentials(proxyUrl), // Hide credentials
+          proxyUrl: sanitizedProxy,
           targetHostname: url.hostname,
           targetProtocol: url.protocol,
           aboutToCreateProxyAgent: true,
@@ -314,9 +493,10 @@ export function createProxyFetch(): typeof fetch {
               __NL_PROXY_AGENT_CACHE__: Map<string, ProxyAgent>;
             }
           ).__NL_PROXY_AGENT_CACHE__ = new Map());
+        const cacheKey = maskProxyUrl(proxyUrl) ?? proxyUrl; // credentials stripped for key
         const dispatcher =
-          agentCache.get(proxyUrl) || (await createProxyAgent(proxyUrl));
-        agentCache.set(proxyUrl, dispatcher);
+          agentCache.get(cacheKey) || (await createProxyAgent(proxyUrl));
+        agentCache.set(cacheKey, dispatcher);
 
         logger.debug(`[Proxy Fetch] ✅ ENHANCED PROXY AGENT CREATED`, {
           requestId,
@@ -349,7 +529,28 @@ export function createProxyFetch(): typeof fetch {
           dispatcher: dispatcher,
         } as unknown as import("undici").RequestInit);
 
-        logger.debug(`[Proxy Fetch] 🎉 ENHANCED PROXY SUCCESS`, {
+        if (logger.shouldLog("debug")) {
+          const {
+            parsed: responseBody,
+            size: responseSize,
+            type: responseType,
+            headers: responseHeaders,
+          } = await readResponseBody(response as unknown as Response);
+          logger.debug("[Observability] HTTP response from LLM provider", {
+            requestId,
+            url: targetUrl,
+            status: response?.status,
+            statusText: response?.statusText,
+            durationMs: Date.now() - requestStartTime,
+            headers: responseHeaders,
+            body: responseBody,
+            bodySize: responseSize,
+            bodyType: responseType,
+            proxied: true,
+          });
+        }
+
+        logger.debug(`[Proxy Fetch] ENHANCED PROXY SUCCESS`, {
           requestId,
           responseStatus: response?.status,
           responseOk: response?.ok,
@@ -357,16 +558,20 @@ export function createProxyFetch(): typeof fetch {
           timestamp: new Date().toISOString(),
         });
 
-        logger.debug(
-          `[Proxy Fetch] ✅ Request proxied successfully via enhanced proxy`,
-        );
         return response as unknown as Response;
       }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      logger.debug(`[Proxy Fetch] 💥 ENHANCED ERROR ANALYSIS`, {
+      logger.debug("[Observability] HTTP request failed", {
+        requestId,
+        url: targetUrl,
+        error: errorMessage,
+        durationMs: Date.now() - requestStartTime,
+      });
+
+      logger.debug(`[Proxy Fetch] ENHANCED ERROR ANALYSIS`, {
         requestId,
         error: errorMessage,
         errorType:
@@ -381,14 +586,72 @@ export function createProxyFetch(): typeof fetch {
     }
 
     // Fallback to standard fetch
-    logger.debug(`[Proxy Fetch] 🔄 ENHANCED FALLBACK TO STANDARD FETCH`, {
+    logger.debug(`[Proxy Fetch] ENHANCED FALLBACK TO STANDARD FETCH`, {
       requestId,
       fallbackReason: "No proxy configured or proxy failed",
       timestamp: new Date().toISOString(),
     });
 
-    return fetch(input, init);
+    try {
+      const response = await fetchWithRetry(input, init);
+
+      if (logger.shouldLog("debug")) {
+        const {
+          parsed: responseBody,
+          size: responseSize,
+          type: responseType,
+          headers: responseHeaders,
+        } = await readResponseBody(response);
+        logger.debug("[Observability] HTTP response from LLM provider", {
+          requestId,
+          url: targetUrl,
+          status: response.status,
+          statusText: response.statusText,
+          durationMs: Date.now() - requestStartTime,
+          headers: responseHeaders,
+          body: responseBody,
+          bodySize: responseSize,
+          bodyType: responseType,
+          proxied: false,
+        });
+      }
+
+      return response;
+    } catch (fallbackError: unknown) {
+      const fallbackMessage =
+        fallbackError instanceof Error
+          ? fallbackError.message
+          : String(fallbackError);
+
+      logger.debug("[Observability] HTTP request failed", {
+        requestId,
+        url: targetUrl,
+        error: fallbackMessage,
+        durationMs: Date.now() - requestStartTime,
+      });
+
+      throw fallbackError;
+    }
   };
+}
+
+/**
+ * Mask credentials in a proxy URL for safe logging/reporting.
+ */
+function maskProxyUrl(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  try {
+    const u = new URL(url);
+    if (u.username || u.password) {
+      u.username = "***";
+      u.password = "***";
+    }
+    return u.toString();
+  } catch {
+    return "[invalid-url]";
+  }
 }
 
 /**
@@ -403,10 +666,10 @@ export function getProxyStatus() {
 
   return {
     enabled: !!(httpsProxy || httpProxy || allProxy || socksProxy),
-    httpProxy: httpProxy || null,
-    httpsProxy: httpsProxy || null,
-    allProxy: allProxy || null,
-    socksProxy: socksProxy || null,
+    httpProxy: maskProxyUrl(httpProxy),
+    httpsProxy: maskProxyUrl(httpsProxy),
+    allProxy: maskProxyUrl(allProxy),
+    socksProxy: maskProxyUrl(socksProxy),
     noProxy: noProxy || null,
     method: "enhanced-proxy-agent",
     capabilities: [

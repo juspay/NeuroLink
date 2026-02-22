@@ -19,6 +19,7 @@ import { EventEmitter } from "events";
 import type { MemoryClient } from "mem0ai";
 import pLimit from "p-limit";
 import type { AIProviderName } from "./constants/enums.js";
+import { ErrorCategory, ErrorSeverity } from "./constants/enums.js";
 import {
   CIRCUIT_BREAKER,
   CIRCUIT_BREAKER_RESET_MS,
@@ -39,7 +40,7 @@ import {
 import { isContextOverflowError } from "./context/errorDetection.js";
 import { repairToolPairs } from "./context/toolPairRepair.js";
 import { SYSTEM_LIMITS } from "./core/constants.js";
-import type { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
+import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
 import { AIProviderFactory } from "./core/factory.js";
 import type { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
 import { ProviderRegistry } from "./factories/providerRegistry.js";
@@ -51,6 +52,7 @@ import { ExternalServerManager } from "./mcp/externalServerManager.js";
 import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
 import { MCPToolRegistry } from "./mcp/toolRegistry.js";
 import { initializeMem0, type Mem0Config } from "./memory/mem0Initializer.js";
+import { createMemoryRetrievalTools } from "./memory/memoryRetrievalTools.js";
 import {
   flushOpenTelemetry,
   getLangfuseHealthStatus,
@@ -121,6 +123,7 @@ import {
 // Enhanced error handling imports
 import {
   CircuitBreaker,
+  ERROR_CODES,
   ErrorFactory,
   isAbortError,
   isRetriableError,
@@ -321,6 +324,9 @@ export class NeuroLink {
   private mem0Instance?: MemoryClient | null;
   private mem0Config?: Mem0Config;
 
+  // Accumulated cost in USD across all generate() calls on this instance
+  private _sessionCostUsd: number = 0;
+
   // File Reference Registry for lazy on-demand file processing
   private fileRegistry: FileReferenceRegistry;
 
@@ -341,13 +347,55 @@ export class NeuroLink {
     ) {
       try {
         const ctx = options.context as Record<string, unknown>;
-        if (ctx.userId || ctx.sessionId) {
+        // Trigger context scoping if any meaningful Langfuse field is present
+        if (
+          ctx.userId ||
+          ctx.sessionId ||
+          ctx.conversationId ||
+          ctx.requestId ||
+          ctx.traceName ||
+          ctx.metadata
+        ) {
+          // Build customAttributes from top-level metadata string/number/boolean fields
+          let customAttributes:
+            | Record<string, string | number | boolean>
+            | undefined;
+          if (ctx.metadata && typeof ctx.metadata === "object") {
+            const metaObj = ctx.metadata as Record<string, unknown>;
+            const attrs: Record<string, string | number | boolean> = {};
+            for (const [k, v] of Object.entries(metaObj)) {
+              if (
+                typeof v === "string" ||
+                typeof v === "number" ||
+                typeof v === "boolean"
+              ) {
+                attrs[k] = v;
+              }
+            }
+            if (Object.keys(attrs).length > 0) {
+              customAttributes = attrs;
+            }
+          }
+
           return await new Promise<T>((resolve, reject) => {
             setLangfuseContext(
               {
                 userId: typeof ctx.userId === "string" ? ctx.userId : null,
                 sessionId:
                   typeof ctx.sessionId === "string" ? ctx.sessionId : null,
+                conversationId:
+                  typeof ctx.conversationId === "string"
+                    ? ctx.conversationId
+                    : null,
+                requestId:
+                  typeof ctx.requestId === "string" ? ctx.requestId : null,
+                traceName:
+                  typeof ctx.traceName === "string" ? ctx.traceName : null,
+                metadata:
+                  ctx.metadata && typeof ctx.metadata === "object"
+                    ? (ctx.metadata as Record<string, unknown>)
+                    : null,
+                ...(customAttributes !== undefined && { customAttributes }),
               },
               async () => {
                 try {
@@ -505,6 +553,7 @@ export class NeuroLink {
       constructorHrTimeStart,
     );
     this.registerFileTools();
+    this.registerMemoryRetrievalTools();
     this.initializeLangfuse(
       constructorId,
       constructorStartTime,
@@ -786,6 +835,125 @@ export class NeuroLink {
       logger.debug(
         `[NeuroLink] Registered ${Object.keys(fileTools).length} file reference tools`,
       );
+    });
+  }
+
+  /**
+   * Register memory retrieval tools that allow the AI to access
+   * conversation history, including full tool outputs.
+   * Only registered when Redis conversation memory is active.
+   */
+  private registerMemoryRetrievalTools(): void {
+    // Check if conversation memory is configured
+    // Memory retrieval tool requires Redis (getSessionRaw) but registration
+    // is deferred — the execute handler checks at runtime whether the actual
+    // memory manager supports getSessionRaw.
+    const memConfig = this.conversationMemoryConfig?.conversationMemory;
+    const hasRedisConfig =
+      !!memConfig?.redisConfig ||
+      (memConfig &&
+        "redis" in memConfig &&
+        !!(memConfig as { redis?: unknown }).redis) ||
+      process.env.STORAGE_TYPE === "redis";
+    if (!memConfig?.enabled || !hasRedisConfig) {
+      logger.debug(
+        "[NeuroLink] Skipping memory retrieval tools — requires Redis conversation memory",
+      );
+      return;
+    }
+
+    // Defer registration until conversation memory is actually initialized
+    // We register a placeholder that will use the lazy-initialized memory manager
+    const self = this;
+
+    const tools = {
+      retrieve_context: {
+        description:
+          "Retrieve messages from conversation memory. Use this to access full tool " +
+          "outputs when a result was truncated, review previous assistant responses, " +
+          "or search through conversation history.",
+        execute: async (params: unknown) => {
+          // Lazy access: conversationMemory is initialized on first generate() call
+          const memoryManager = self.conversationMemory;
+          if (!memoryManager || !("getSessionRaw" in memoryManager)) {
+            return {
+              success: false,
+              error:
+                "Memory retrieval not available — Redis memory manager not initialized",
+              metadata: {
+                toolName: "retrieve_context",
+                serverId: "direct",
+                executionTime: 0,
+              },
+            };
+          }
+
+          const actualTools = createMemoryRetrievalTools(
+            memoryManager as import("./core/redisConversationMemoryManager.js").RedisConversationMemoryManager,
+          );
+          const result = await (
+            actualTools.retrieve_context.execute as (
+              params: unknown,
+              ctx: unknown,
+            ) => Promise<unknown>
+          )(params, {
+            toolCallId: "memory-retrieval",
+            messages: [],
+          });
+          // Check if the tool itself reported an error
+          const hasError =
+            result &&
+            typeof result === "object" &&
+            "error" in result &&
+            !("messages" in result);
+          const errorMsg = hasError
+            ? (result as { error: string }).error
+            : undefined;
+          return {
+            success: !hasError,
+            data: result,
+            ...(errorMsg ? { error: errorMsg } : {}),
+            metadata: {
+              toolName: "retrieve_context",
+              serverId: "direct",
+              executionTime: 0,
+            },
+          };
+        },
+      },
+    };
+
+    const registrations = Object.entries(tools).map(
+      async ([toolName, toolDef]) => {
+        const toolId = `direct.${toolName}`;
+        const toolInfo: ToolInfo = {
+          name: toolName,
+          description: toolDef.description,
+          inputSchema: {},
+          serverId: "direct",
+          category: "built-in" as MCPServerCategory,
+        };
+
+        await this.toolRegistry.registerTool(toolId, toolInfo, {
+          execute: async (params: unknown) => {
+            try {
+              return await toolDef.execute(params);
+            } catch (error) {
+              return {
+                success: false,
+                error: error instanceof Error ? error.message : String(error),
+                metadata: { toolName, serverId: "direct", executionTime: 0 },
+              };
+            }
+          },
+          description: toolDef.description,
+          inputSchema: {},
+        });
+      },
+    );
+
+    void Promise.all(registrations).then(() => {
+      logger.info("[NeuroLink] Memory retrieval tools registered");
     });
   }
 
@@ -1951,9 +2119,33 @@ Current user's request: ${currentInput}`;
       throw new Error("Input text is required and must be a non-empty string");
     }
 
+    // Check budget limit before making API call
+    if (
+      options.maxBudgetUsd !== undefined &&
+      options.maxBudgetUsd > 0 &&
+      this._sessionCostUsd >= options.maxBudgetUsd
+    ) {
+      throw new NeuroLinkError({
+        code: "SESSION_BUDGET_EXCEEDED",
+        message: `Session budget exceeded: spent $${this._sessionCostUsd.toFixed(4)} of $${options.maxBudgetUsd.toFixed(4)} limit`,
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+        context: {
+          spent: this._sessionCostUsd,
+          limit: options.maxBudgetUsd,
+        },
+      });
+    }
+
     // Check if workflow is requested
     if (options.workflow || options.workflowConfig) {
       return await this.generateWithWorkflow(options);
+    }
+
+    // Check if PPT output mode is requested
+    if (options.output?.mode === "ppt") {
+      return await this.generateWithPPT(options);
     }
 
     // Set session and user IDs from context for Langfuse spans and execute with proper async scoping
@@ -2117,6 +2309,21 @@ Current user's request: ${currentInput}`;
         skipToolPromptInjection: options.skipToolPromptInjection,
       };
 
+      // Auto-map top-level sessionId/userId to context for convenience
+      // Tests and users may pass sessionId/userId as top-level options
+      const extraContext = options as Record<string, unknown>;
+      if (extraContext.sessionId || extraContext.userId) {
+        baseOptions.context = {
+          ...baseOptions.context,
+          ...(extraContext.sessionId && !baseOptions.context?.sessionId
+            ? { sessionId: extraContext.sessionId as JsonValue }
+            : {}),
+          ...(extraContext.userId && !baseOptions.context?.userId
+            ? { userId: extraContext.userId as JsonValue }
+            : {}),
+        };
+      }
+
       // Apply factory enhancement using centralized utilities
       const textOptions = enhanceTextGenerationOptions(
         baseOptions,
@@ -2220,6 +2427,11 @@ Current user's request: ${currentInput}`;
         ppt: textResult.ppt,
       };
 
+      // Accumulate session cost for budget tracking
+      if (generateResult.analytics?.cost && generateResult.analytics.cost > 0) {
+        this._sessionCostUsd += generateResult.analytics.cost;
+      }
+
       this.scheduleGenerateMem0Storage(options, originalPrompt, generateResult);
 
       return generateResult;
@@ -2259,6 +2471,64 @@ Current user's request: ${currentInput}`;
         }
       });
     }
+  }
+
+  /**
+   * Handle PPT generation mode
+   */
+  private async generateWithPPT(
+    options: GenerateOptions,
+  ): Promise<GenerateResult> {
+    const startTime = Date.now();
+
+    // Dynamic import to avoid circular deps (same pattern as RAG)
+    const { generatePresentation } = await import(
+      "./features/ppt/presentationOrchestrator.js"
+    );
+    const { extractPPTContext, getEffectivePPTProvider } = await import(
+      "./features/ppt/utils.js"
+    );
+
+    // Get provider instance for content planning
+    const requestedProvider = (options.provider || "vertex") as AIProviderName;
+    const provider = await AIProviderFactory.createProvider(
+      requestedProvider,
+      options.model,
+      true,
+      this as unknown as Record<string, unknown>,
+    );
+
+    // Resolve effective PPT provider (may auto-select if current is not PPT-compatible)
+    const effectiveProvider = await getEffectivePPTProvider(
+      provider,
+      requestedProvider as string,
+      options.model || "default",
+      this,
+    );
+
+    // Extract PPT context from options
+    const pptContext = extractPPTContext(options);
+
+    // Generate the presentation
+    const pptResult = await generatePresentation({
+      context: pptContext,
+      provider:
+        effectiveProvider.provider as import("./types/providers.js").AIProvider,
+      providerName: effectiveProvider.providerName,
+      modelName: effectiveProvider.modelName,
+      neurolink: this,
+    });
+
+    // Map PPT result to GenerateResult
+    return {
+      content: `Presentation generated: ${pptResult.filePath} (${pptResult.totalSlides} slides)`,
+      finishReason: "stop",
+      provider: pptResult.provider || (requestedProvider as string),
+      model: pptResult.model || options.model || "default",
+      usage: undefined,
+      responseTime: Date.now() - startTime,
+      ppt: pptResult,
+    };
   }
 
   /**
@@ -2587,6 +2857,14 @@ Current user's request: ${currentInput}`;
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult> {
     const generateInternalId = `generate-internal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const existingRequestId = (
+      options.context as Record<string, unknown> | undefined
+    )?.requestId;
+    const requestId =
+      typeof existingRequestId === "string" && existingRequestId
+        ? existingRequestId
+        : `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    options.context = { ...options.context, requestId };
     const generateInternalStartTime = Date.now();
     const generateInternalHrTimeStart = process.hrtime.bigint();
     const functionTag = "NeuroLink.generateTextInternal";
@@ -2623,6 +2901,15 @@ Current user's request: ${currentInput}`;
             responseTimeMs: Date.now() - generateInternalStartTime,
             tokensUsed: mcpResult.usage?.total || 0,
             toolsUsed: mcpResult.toolsUsed?.length || 0,
+            ...(mcpResult.usage?.cacheCreationTokens !== undefined && {
+              cacheCreationTokens: mcpResult.usage.cacheCreationTokens,
+            }),
+            ...(mcpResult.usage?.cacheReadTokens !== undefined && {
+              cacheReadTokens: mcpResult.usage.cacheReadTokens,
+            }),
+            ...(mcpResult.usage?.cacheSavingsPercent !== undefined && {
+              cacheSavingsPercent: mcpResult.usage.cacheSavingsPercent,
+            }),
           },
         );
         await storeConversationTurn(
@@ -2630,9 +2917,14 @@ Current user's request: ${currentInput}`;
           options,
           mcpResult,
           new Date(generateInternalStartTime),
+          requestId,
         );
         this.emitter.emit("response:end", mcpResult.content || "");
         return mcpResult;
+      }
+
+      if (options.abortSignal?.aborted) {
+        throw new DOMException("The operation was aborted", "AbortError");
       }
 
       const directResult = await this.directProviderGeneration(options);
@@ -2645,6 +2937,15 @@ Current user's request: ${currentInput}`;
           responseTimeMs: Date.now() - generateInternalStartTime,
           tokensUsed: directResult.usage?.total || 0,
           toolsUsed: directResult.toolsUsed?.length || 0,
+          ...(directResult.usage?.cacheCreationTokens !== undefined && {
+            cacheCreationTokens: directResult.usage.cacheCreationTokens,
+          }),
+          ...(directResult.usage?.cacheReadTokens !== undefined && {
+            cacheReadTokens: directResult.usage.cacheReadTokens,
+          }),
+          ...(directResult.usage?.cacheSavingsPercent !== undefined && {
+            cacheSavingsPercent: directResult.usage.cacheSavingsPercent,
+          }),
         },
       );
 
@@ -2653,6 +2954,7 @@ Current user's request: ${currentInput}`;
         options,
         directResult,
         new Date(generateInternalStartTime),
+        requestId,
       );
       this.emitter.emit("response:end", directResult.content || "");
       this.emitter.emit("message", `Text generation completed successfully`);
@@ -2694,6 +2996,10 @@ Current user's request: ${currentInput}`;
           const compactionResult = await compactor.compact(
             conversationMessages as import("./types/conversation.js").ChatMessage[],
             compactionTarget,
+            undefined,
+            (options.context as Record<string, unknown>)?.requestId as
+              | string
+              | undefined,
           );
 
           if (compactionResult.compacted) {
@@ -2751,6 +3057,7 @@ Current user's request: ${currentInput}`;
               options,
               abortedResult,
               new Date(generateInternalStartTime),
+              requestId,
             ),
             5000, // 5 second timeout for Redis storage
           );
@@ -2844,7 +3151,24 @@ Current user's request: ${currentInput}`;
         },
       );
 
-      await this.conversationMemory.initialize();
+      try {
+        await this.conversationMemory.initialize();
+      } catch (err) {
+        logger.warn(
+          "[NEUROLINK] Redis memory init failed, falling back to in-memory",
+          {
+            error: err instanceof Error ? err.message : String(err),
+            generateInternalId,
+          },
+        );
+        const memCfg = this.conversationMemoryConfig?.conversationMemory;
+        this.conversationMemory = new ConversationMemoryManager({
+          enabled: true,
+          maxSessions: memCfg?.maxSessions ?? 100,
+          maxTurnsPerSession: memCfg?.maxTurnsPerSession ?? 50,
+        });
+        await this.conversationMemory.initialize();
+      }
 
       const conversationMemoryEndTime = process.hrtime.bigint();
       const conversationMemoryDurationNs =
@@ -2909,6 +3233,13 @@ Current user's request: ${currentInput}`;
 
     const maxAttempts = maxMcpRetries + 1;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (options.abortSignal?.aborted) {
+        logger.debug(
+          `[${functionTag}] Abort signal already fired before attempt ${attempt}, stopping retries`,
+        );
+        throw new DOMException("The operation was aborted", "AbortError");
+      }
+
       try {
         logger.debug(
           `[${functionTag}] Attempting MCP generation (attempt ${attempt}/${maxAttempts})...`,
@@ -2991,7 +3322,21 @@ Current user's request: ${currentInput}`;
           break;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 500);
+          if (options.abortSignal) {
+            const onAbort = () => {
+              clearTimeout(timer);
+              resolve();
+            };
+            options.abortSignal.addEventListener("abort", onAbort, {
+              once: true,
+            });
+          }
+        });
+        if (options.abortSignal?.aborted) {
+          throw new DOMException("The operation was aborted", "AbortError");
+        }
       }
     }
 
@@ -3004,7 +3349,14 @@ Current user's request: ${currentInput}`;
   private async tryMCPGeneration(
     options: TextGenerationOptions,
   ): Promise<TextGenerationResult | null> {
+    if (options.abortSignal?.aborted) {
+      throw new DOMException("The operation was aborted", "AbortError");
+    }
+
     // 🚀 EXHAUSTIVE LOGGING POINT T001: TRY MCP GENERATION ENTRY
+    const requestId =
+      ((options.context as Record<string, unknown>)?.requestId as string) ||
+      "unknown";
     const tryMCPId = `try-mcp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const tryMCPStartTime = Date.now();
     const tryMCPHrTimeStart = process.hrtime.bigint();
@@ -3074,6 +3426,7 @@ Current user's request: ${currentInput}`;
             availableTools,
           );
       logger.debug("Tool-aware system prompt created", {
+        requestId,
         originalPromptLength: options.systemPrompt?.length || 0,
         enhancedPromptLength: enhancedSystemPrompt.length,
         skippedToolInjection: !!options.skipToolPromptInjection,
@@ -3085,6 +3438,46 @@ Current user's request: ${currentInput}`;
         this.conversationMemory,
         options,
       );
+
+      if (logger.shouldLog("debug")) {
+        try {
+          logger.debug("[Observability] Conversation history summary", {
+            requestId,
+            messageCount: conversationMessages?.length || 0,
+            messages: conversationMessages?.map(
+              (msg: { role: string; content: unknown }, i: number) => {
+                let contentLength: number;
+                if (typeof msg.content === "string") {
+                  contentLength = msg.content.length;
+                } else {
+                  try {
+                    contentLength = JSON.stringify(msg.content).length;
+                  } catch {
+                    contentLength = 0;
+                  }
+                }
+                return {
+                  index: i,
+                  role: msg.role,
+                  contentLength,
+                  contentPreview:
+                    typeof msg.content === "string"
+                      ? msg.content.substring(0, 200)
+                      : "[multimodal]",
+                };
+              },
+            ),
+          });
+        } catch {
+          // Ignore serialization errors in debug logging
+        }
+      }
+
+      logger.debug("[Observability] Available tools for LLM", {
+        requestId,
+        toolCount: availableTools?.length || 0,
+        toolNames: availableTools?.map((t: { name: string }) => t.name) || [],
+      });
 
       // Pre-generation budget check
       const budgetResult = checkContextBudget({
@@ -3098,6 +3491,20 @@ Current user's request: ${currentInput}`;
         }>,
         currentPrompt: options.prompt,
         toolDefinitions: availableTools,
+      });
+
+      logger.info("[TokenBudget] Token breakdown", {
+        requestId,
+        system: budgetResult.breakdown?.systemPrompt || 0,
+        history: budgetResult.breakdown?.conversationHistory || 0,
+        tools: budgetResult.breakdown?.toolDefinitions || 0,
+        currentPrompt: budgetResult.breakdown?.currentPrompt || 0,
+        files: budgetResult.breakdown?.fileAttachments || 0,
+        total: budgetResult.estimatedInputTokens,
+        budget: budgetResult.availableInputTokens,
+        usagePercent: Math.round(budgetResult.usageRatio * 1000) / 10,
+        conversationMessageCount: conversationMessages?.length || 0,
+        shouldCompact: budgetResult.shouldCompact,
       });
 
       if (budgetResult.shouldCompact && this.conversationMemory) {
@@ -3124,6 +3531,7 @@ Current user's request: ${currentInput}`;
           conversationMessages as import("./types/conversation.js").ChatMessage[],
           budgetResult.availableInputTokens,
           this.conversationMemoryConfig?.conversationMemory,
+          requestId,
         );
 
         if (compactionResult.compacted) {
@@ -3160,6 +3568,17 @@ Current user's request: ${currentInput}`;
         },
         functionTag,
       );
+
+      logger.debug("[Observability] User input to LLM", {
+        requestId,
+        promptPreview: options.prompt?.substring(0, 200),
+        promptLength: options.prompt?.length || 0,
+        model: options.model,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        maxSteps: options.maxSteps,
+        skipToolPromptInjection: options.skipToolPromptInjection,
+      });
 
       const result = await provider.generate({
         ...options,
@@ -3314,6 +3733,10 @@ Current user's request: ${currentInput}`;
 
     // Try each provider in order
     for (const providerName of tryProviders) {
+      if (options.abortSignal?.aborted) {
+        throw new DOMException("The operation was aborted", "AbortError");
+      }
+
       try {
         logger.debug(`[${functionTag}] Attempting provider: ${providerName}`);
 
@@ -3347,6 +3770,10 @@ Current user's request: ${currentInput}`;
           const compactionResult = await compactor.compact(
             conversationMessages as import("./types/conversation.js").ChatMessage[],
             budgetCheck.availableInputTokens,
+            undefined,
+            (options.context as Record<string, unknown>)?.requestId as
+              | string
+              | undefined,
           );
           if (compactionResult.compacted) {
             const repairedResult = repairToolPairs(compactionResult.messages);
@@ -4179,6 +4606,8 @@ Current user's request: ${currentInput}`;
           providerDetails,
           enableSummarization: enhancedOptions.enableSummarization,
           events: eventSequence.length > 0 ? eventSequence : undefined,
+          requestId: (enhancedOptions.context as Record<string, unknown>)
+            ?.requestId as string | undefined,
         });
 
         logger.debug(
@@ -4342,6 +4771,10 @@ Current user's request: ${currentInput}`;
       const compactionResult = await compactor.compact(
         conversationMessages as import("./types/conversation.js").ChatMessage[],
         streamBudget.availableInputTokens,
+        undefined,
+        (options.context as Record<string, unknown> | undefined)?.requestId as
+          | string
+          | undefined,
       );
       if (compactionResult.compacted) {
         const repairedResult = repairToolPairs(compactionResult.messages);
@@ -4554,6 +4987,14 @@ Current user's request: ${currentInput}`;
               startTimeStamp: new Date(startTime),
               providerDetails,
               enableSummarization: enhancedOptions?.enableSummarization,
+              requestId:
+                ((
+                  enhancedOptions?.context as
+                    | Record<string, unknown>
+                    | undefined
+                )?.requestId as string | undefined) ||
+                ((options.context as Record<string, unknown> | undefined)
+                  ?.requestId as string | undefined),
             });
           } catch (error) {
             logger.warn("Failed to store fallback stream conversation turn", {
@@ -6679,7 +7120,13 @@ Current user's request: ${currentInput}`;
     );
 
     if (!this.conversationMemory) {
-      throw new Error("Conversation memory is not enabled");
+      throw new NeuroLinkError({
+        code: ERROR_CODES.MISSING_CONFIGURATION,
+        message: "Conversation memory is not enabled",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
     }
 
     return await this.conversationMemory.getStats();
@@ -6700,11 +7147,24 @@ Current user's request: ${currentInput}`;
     );
 
     if (!this.conversationMemory) {
-      throw new Error("Conversation memory is not enabled");
+      throw new NeuroLinkError({
+        code: ERROR_CODES.MISSING_CONFIGURATION,
+        message: "Conversation memory is not enabled",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
     }
 
     if (!sessionId || typeof sessionId !== "string") {
-      throw new Error("Session ID must be a non-empty string");
+      throw new NeuroLinkError({
+        code: ERROR_CODES.INVALID_PARAMETERS,
+        message: "Session ID must be a non-empty string",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.MEDIUM,
+        retriable: false,
+        context: { sessionId },
+      });
     }
 
     try {
@@ -6743,7 +7203,13 @@ Current user's request: ${currentInput}`;
     );
 
     if (!this.conversationMemory) {
-      throw new Error("Conversation memory is not enabled");
+      throw new NeuroLinkError({
+        code: ERROR_CODES.MISSING_CONFIGURATION,
+        message: "Conversation memory is not enabled",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
     }
 
     return await this.conversationMemory.clearSession(sessionId);
@@ -6762,7 +7228,13 @@ Current user's request: ${currentInput}`;
     );
 
     if (!this.conversationMemory) {
-      throw new Error("Conversation memory is not enabled");
+      throw new NeuroLinkError({
+        code: ERROR_CODES.MISSING_CONFIGURATION,
+        message: "Conversation memory is not enabled",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
     }
 
     await this.conversationMemory.clearAllSessions();
@@ -6841,6 +7313,123 @@ Current user's request: ${currentInput}`;
         "RedisConversationMemoryManager";
 
     return !!(isRedisStorage && hasRedisConversationMemory);
+  }
+
+  /**
+   * Get the raw messages array for a session.
+   * Returns the full messages list without context filtering or summarization.
+   * @param sessionId - The session ID to retrieve messages for
+   * @returns Array of ChatMessage objects, or empty array if session doesn't exist
+   */
+  async getSessionMessages(
+    sessionId: string,
+    userId?: string,
+  ): Promise<ChatMessage[]> {
+    const initId = `get-msgs-init-${Date.now()}`;
+    await this.initializeConversationMemoryForGeneration(
+      initId,
+      Date.now(),
+      process.hrtime.bigint(),
+    );
+
+    if (!this.conversationMemory) {
+      throw new NeuroLinkError({
+        code: ERROR_CODES.MISSING_CONFIGURATION,
+        message: "Conversation memory is not enabled",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
+    }
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new NeuroLinkError({
+        code: ERROR_CODES.INVALID_PARAMETERS,
+        message: "Session ID must be a non-empty string",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.MEDIUM,
+        retriable: false,
+        context: { sessionId },
+      });
+    }
+
+    return await this.conversationMemory.getSessionMessages(sessionId, userId);
+  }
+
+  /**
+   * Replace the entire messages array for a session.
+   * @param sessionId - The session ID to update
+   * @param messages - The new messages array
+   * @param userId - Optional user ID for scoped Redis key lookup
+   */
+  async setSessionMessages(
+    sessionId: string,
+    messages: ChatMessage[],
+    userId?: string,
+  ): Promise<void> {
+    const initId = `set-msgs-init-${Date.now()}`;
+    await this.initializeConversationMemoryForGeneration(
+      initId,
+      Date.now(),
+      process.hrtime.bigint(),
+    );
+
+    if (!this.conversationMemory) {
+      throw new NeuroLinkError({
+        code: ERROR_CODES.MISSING_CONFIGURATION,
+        message: "Conversation memory is not enabled",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.HIGH,
+        retriable: false,
+      });
+    }
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new NeuroLinkError({
+        code: ERROR_CODES.INVALID_PARAMETERS,
+        message: "Session ID must be a non-empty string",
+        category: ErrorCategory.VALIDATION,
+        severity: ErrorSeverity.MEDIUM,
+        retriable: false,
+        context: { sessionId },
+      });
+    }
+
+    await this.conversationMemory.setSessionMessages(
+      sessionId,
+      messages,
+      userId,
+    );
+  }
+
+  /**
+   * Modify the last assistant message in a session using a transformer function.
+   * Convenience wrapper around getSessionMessages/setSessionMessages.
+   * @param sessionId - The session ID to modify
+   * @param transformer - Function that receives the last assistant message content and returns the modified content
+   * @param userId - Optional user ID for scoped Redis key lookup
+   * @returns true if a message was modified, false if no assistant message was found
+   */
+  async modifyLastAssistantMessage(
+    sessionId: string,
+    transformer: (content: string) => string,
+    userId?: string,
+  ): Promise<boolean> {
+    const messages = await this.getSessionMessages(sessionId, userId);
+
+    // Find the last assistant message (searching from the end)
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") {
+        messages[i] = {
+          ...messages[i],
+          content: transformer(messages[i].content),
+        };
+        await this.setSessionMessages(sessionId, messages, userId);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // ===== EXTERNAL MCP SERVER METHODS =====

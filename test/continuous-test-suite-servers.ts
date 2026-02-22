@@ -18,7 +18,7 @@ import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import type { TestFunction, TestResult } from "../dist/index.js";
+// TestFunction/TestResult types replaced with inline types "../dist/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,7 +100,11 @@ function logTest(
 // Test Result Tracking (types imported from @juspay/neurolink)
 // ============================================
 
-const testResults: TestResult[] = [];
+const testResults: Array<{
+  name: string;
+  result: boolean | null;
+  error: string | null;
+}> = [];
 
 // ============================================
 // HTTP Request Helpers
@@ -168,7 +172,7 @@ function httpRequest(
 // Server Adapter Factory Tests
 // ============================================
 
-async function testServerAdapterFactory(): Promise<boolean> {
+async function testServerAdapterFactory(): Promise<boolean | null> {
   logSection("Testing Server Adapter Factory");
 
   try {
@@ -249,7 +253,7 @@ async function testServerAdapterFactory(): Promise<boolean> {
 // Framework Adapter Tests
 // ============================================
 
-async function testHonoAdapter(): Promise<boolean> {
+async function testHonoAdapter(): Promise<boolean | null> {
   logSection("Testing Hono Server Adapter");
 
   try {
@@ -347,7 +351,7 @@ async function testHonoAdapter(): Promise<boolean> {
   }
 }
 
-async function testExpressAdapter(): Promise<boolean> {
+async function testExpressAdapter(): Promise<boolean | null> {
   logSection("Testing Express Server Adapter");
 
   try {
@@ -422,7 +426,7 @@ async function testExpressAdapter(): Promise<boolean> {
   }
 }
 
-async function testFastifyAdapter(): Promise<boolean> {
+async function testFastifyAdapter(): Promise<boolean | null> {
   logSection("Testing Fastify Server Adapter");
 
   try {
@@ -485,7 +489,7 @@ async function testFastifyAdapter(): Promise<boolean> {
   }
 }
 
-async function testKoaAdapter(): Promise<boolean> {
+async function testKoaAdapter(): Promise<boolean | null> {
   logSection("Testing Koa Server Adapter");
 
   try {
@@ -553,7 +557,7 @@ async function testKoaAdapter(): Promise<boolean> {
 // Route Group Tests
 // ============================================
 
-async function testAgentRoutes(): Promise<boolean> {
+async function testAgentRoutes(): Promise<boolean | null> {
   logSection("Testing Agent Routes");
 
   try {
@@ -618,7 +622,7 @@ async function testAgentRoutes(): Promise<boolean> {
   }
 }
 
-async function testToolRoutes(): Promise<boolean> {
+async function testToolRoutes(): Promise<boolean | null> {
   logSection("Testing Tool Routes");
 
   try {
@@ -683,7 +687,7 @@ async function testToolRoutes(): Promise<boolean> {
   }
 }
 
-async function testMCPRoutes(): Promise<boolean> {
+async function testMCPRoutes(): Promise<boolean | null> {
   logSection("Testing MCP Routes");
 
   try {
@@ -739,7 +743,7 @@ async function testMCPRoutes(): Promise<boolean> {
   }
 }
 
-async function testMemoryRoutes(): Promise<boolean> {
+async function testMemoryRoutes(): Promise<boolean | null> {
   logSection("Testing Memory Routes");
 
   try {
@@ -787,7 +791,7 @@ async function testMemoryRoutes(): Promise<boolean> {
   }
 }
 
-async function testHealthRoutes(): Promise<boolean> {
+async function testHealthRoutes(): Promise<boolean | null> {
   logSection("Testing Health Routes");
 
   try {
@@ -844,7 +848,7 @@ async function testHealthRoutes(): Promise<boolean> {
 // Middleware Tests
 // ============================================
 
-async function testAuthMiddleware(): Promise<boolean> {
+async function testAuthMiddleware(): Promise<boolean | null> {
   logSection("Testing Auth Middleware");
 
   try {
@@ -899,7 +903,7 @@ async function testAuthMiddleware(): Promise<boolean> {
   }
 }
 
-async function testRateLimitMiddleware(): Promise<boolean> {
+async function testRateLimitMiddleware(): Promise<boolean | null> {
   logSection("Testing Rate Limit Middleware");
 
   try {
@@ -967,7 +971,7 @@ async function testRateLimitMiddleware(): Promise<boolean> {
   }
 }
 
-async function testCacheMiddleware(): Promise<boolean> {
+async function testCacheMiddleware(): Promise<boolean | null> {
   logSection("Testing Cache Middleware");
 
   try {
@@ -1015,7 +1019,7 @@ async function testCacheMiddleware(): Promise<boolean> {
   }
 }
 
-async function testValidationMiddleware(): Promise<boolean> {
+async function testValidationMiddleware(): Promise<boolean | null> {
   logSection("Testing Validation Middleware");
 
   try {
@@ -1071,7 +1075,7 @@ async function testValidationMiddleware(): Promise<boolean> {
   }
 }
 
-async function testCommonMiddleware(): Promise<boolean> {
+async function testCommonMiddleware(): Promise<boolean | null> {
   logSection("Testing Common Middleware");
 
   try {
@@ -1141,7 +1145,7 @@ async function testCommonMiddleware(): Promise<boolean> {
 // Type System Tests
 // ============================================
 
-async function testTypeSystem(): Promise<boolean> {
+async function testTypeSystem(): Promise<boolean | null> {
   logSection("Testing Type System");
 
   try {
@@ -1245,7 +1249,7 @@ async function testTypeSystem(): Promise<boolean> {
 // Index Exports Tests
 // ============================================
 
-async function testIndexExports(): Promise<boolean> {
+async function testIndexExports(): Promise<boolean | null> {
   logSection("Testing Index Exports");
 
   try {
@@ -1317,7 +1321,7 @@ async function testIndexExports(): Promise<boolean> {
 // OpenAPI/Swagger Tests
 // ============================================
 
-async function testOpenAPISupport(): Promise<boolean> {
+async function testOpenAPISupport(): Promise<boolean | null> {
   logSection("Testing OpenAPI Support");
 
   try {
@@ -1367,7 +1371,7 @@ async function testOpenAPISupport(): Promise<boolean> {
 // Streaming Support Tests
 // ============================================
 
-async function testStreamingSupport(): Promise<boolean> {
+async function testStreamingSupport(): Promise<boolean | null> {
   logSection("Testing Streaming Support");
 
   try {
@@ -1415,7 +1419,7 @@ async function testStreamingSupport(): Promise<boolean> {
 // WebSocket Support Tests
 // ============================================
 
-async function testWebSocketSupport(): Promise<boolean> {
+async function testWebSocketSupport(): Promise<boolean | null> {
   logSection("Testing WebSocket Support");
 
   try {
@@ -1467,7 +1471,7 @@ async function testWebSocketSupport(): Promise<boolean> {
 // Error Handling Tests
 // ============================================
 
-async function testErrorHandling(): Promise<boolean> {
+async function testErrorHandling(): Promise<boolean | null> {
   logSection("Testing Error Handling");
 
   try {
@@ -1533,7 +1537,7 @@ async function testErrorHandling(): Promise<boolean> {
 // Configuration Tests
 // ============================================
 
-async function testCoreConfiguration(): Promise<boolean> {
+async function testCoreConfiguration(): Promise<boolean | null> {
   logSection("Testing Core Configuration Options");
 
   try {
@@ -1623,7 +1627,7 @@ async function testCoreConfiguration(): Promise<boolean> {
   }
 }
 
-async function testCORSConfiguration(): Promise<boolean> {
+async function testCORSConfiguration(): Promise<boolean | null> {
   logSection("Testing CORS Configuration Options");
 
   try {
@@ -1717,7 +1721,7 @@ async function testCORSConfiguration(): Promise<boolean> {
   }
 }
 
-async function testRateLimitConfiguration(): Promise<boolean> {
+async function testRateLimitConfiguration(): Promise<boolean | null> {
   logSection("Testing Rate Limit Configuration Options");
 
   try {
@@ -1816,7 +1820,7 @@ async function testRateLimitConfiguration(): Promise<boolean> {
   }
 }
 
-async function testBodyParserConfiguration(): Promise<boolean> {
+async function testBodyParserConfiguration(): Promise<boolean | null> {
   logSection("Testing Body Parser Configuration Options");
 
   try {
@@ -1895,7 +1899,7 @@ async function testBodyParserConfiguration(): Promise<boolean> {
   }
 }
 
-async function testLoggingConfiguration(): Promise<boolean> {
+async function testLoggingConfiguration(): Promise<boolean | null> {
   logSection("Testing Logging Configuration Options");
 
   try {
@@ -1971,7 +1975,7 @@ async function testLoggingConfiguration(): Promise<boolean> {
   }
 }
 
-async function testCacheConfiguration(): Promise<boolean> {
+async function testCacheConfiguration(): Promise<boolean | null> {
   logSection("Testing Cache Configuration Options");
 
   try {
@@ -2041,7 +2045,7 @@ async function testCacheConfiguration(): Promise<boolean> {
   }
 }
 
-async function testTimeoutConfiguration(): Promise<boolean> {
+async function testTimeoutConfiguration(): Promise<boolean | null> {
   logSection("Testing Timeout Configuration");
 
   try {
@@ -2088,7 +2092,7 @@ async function testTimeoutConfiguration(): Promise<boolean> {
   }
 }
 
-async function testMetricsConfiguration(): Promise<boolean> {
+async function testMetricsConfiguration(): Promise<boolean | null> {
   logSection("Testing Metrics Configuration");
 
   try {
@@ -2157,7 +2161,7 @@ async function testMetricsConfiguration(): Promise<boolean> {
   }
 }
 
-async function testSwaggerConfiguration(): Promise<boolean> {
+async function testSwaggerConfiguration(): Promise<boolean | null> {
   logSection("Testing Swagger/OpenAPI Configuration");
 
   try {
@@ -2209,7 +2213,7 @@ async function testSwaggerConfiguration(): Promise<boolean> {
   }
 }
 
-async function testEnvironmentVariables(): Promise<boolean> {
+async function testEnvironmentVariables(): Promise<boolean | null> {
   logSection("Testing Environment Variables Support");
 
   try {
@@ -2279,7 +2283,7 @@ async function testEnvironmentVariables(): Promise<boolean> {
   }
 }
 
-async function testConfigurationValidation(): Promise<boolean> {
+async function testConfigurationValidation(): Promise<boolean | null> {
   logSection("Testing Configuration Validation");
 
   try {
@@ -2360,7 +2364,7 @@ async function testConfigurationValidation(): Promise<boolean> {
   }
 }
 
-async function testFrameworkSpecificConfig(): Promise<boolean> {
+async function testFrameworkSpecificConfig(): Promise<boolean | null> {
   logSection("Testing Framework-Specific Configuration");
 
   try {
@@ -2429,7 +2433,7 @@ async function testFrameworkSpecificConfig(): Promise<boolean> {
 // CLI Coverage Test (GAP Detection)
 // ============================================
 
-async function testCLICoverage(): Promise<boolean> {
+async function testCLICoverage(): Promise<boolean | null> {
   logSection("Testing CLI Coverage for Server Adapters");
 
   try {
@@ -2561,7 +2565,7 @@ async function testCLICoverage(): Promise<boolean> {
 // CLI Routes Command Tests
 // ============================================
 
-async function testCLIRoutesCommand(): Promise<boolean> {
+async function testCLIRoutesCommand(): Promise<boolean | null> {
   logSection("Testing CLI Routes Command");
 
   try {
@@ -2658,7 +2662,7 @@ async function testCLIRoutesCommand(): Promise<boolean> {
 // CLI Config Command Tests
 // ============================================
 
-async function testCLIConfigCommand(): Promise<boolean> {
+async function testCLIConfigCommand(): Promise<boolean | null> {
   logSection("Testing CLI Config Command");
 
   try {
@@ -2769,7 +2773,7 @@ async function testCLIConfigCommand(): Promise<boolean> {
 // Integration Test: Route Registration
 // ============================================
 
-async function testRouteRegistration(): Promise<boolean> {
+async function testRouteRegistration(): Promise<boolean | null> {
   logSection("Testing Route Registration Integration");
 
   try {
@@ -2857,7 +2861,7 @@ async function testRouteRegistration(): Promise<boolean> {
 // Base Server Adapter Tests
 // ============================================
 
-async function testBaseServerAdapter(): Promise<boolean> {
+async function testBaseServerAdapter(): Promise<boolean | null> {
   logSection("Testing Base Server Adapter");
 
   try {
@@ -2952,7 +2956,7 @@ async function testBaseServerAdapter(): Promise<boolean> {
 // Validation Utilities Tests
 // ============================================
 
-async function testValidationUtilities(): Promise<boolean> {
+async function testValidationUtilities(): Promise<boolean | null> {
   logSection("Testing Validation Utilities");
 
   try {
@@ -3036,7 +3040,7 @@ async function runAllTests(): Promise<void> {
   log("\u2705 Server directory found\n", "green");
 
   // Define all tests
-  const tests: TestFunction[] = [
+  const tests: Array<{ name: string; fn: () => Promise<boolean | null> }> = [
     // Factory Tests
     { name: "Server Adapter Factory", fn: testServerAdapterFactory },
 
@@ -3123,12 +3127,14 @@ async function runAllTests(): Promise<void> {
   // Summary
   logSection("Test Results Summary");
 
-  const passed = testResults.filter((r) => r.result).length;
-  const failed = testResults.filter((r) => !r.result).length;
+  const passed = testResults.filter((r) => r.result === true).length;
+  const failed = testResults.filter((r) => r.result === false).length;
+  const skipped = testResults.filter((r) => r.result === null).length;
   const total = testResults.length;
 
   testResults.forEach((test) => {
-    const status: "PASS" | "FAIL" = test.result ? "PASS" : "FAIL";
+    const status =
+      test.result === null ? "SKIP" : test.result === true ? "PASS" : "FAIL";
     const details = test.error ? test.error : `${test.duration}ms`;
     logTest(test.name, status, details);
   });
@@ -3136,7 +3142,8 @@ async function runAllTests(): Promise<void> {
   const duration = Math.round((Date.now() - startTime) / 1000);
 
   log(
-    `\n\uD83D\uDCCA Final Results: ${passed}/${total} tests passed in ${duration}s`,
+    `
+Final Results: ${passed} passed, ${failed} failed, ${skipped} skipped (${testResults.length} total) in ${duration}s`,
     "bright",
   );
 

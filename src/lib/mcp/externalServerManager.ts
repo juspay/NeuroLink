@@ -72,6 +72,46 @@ function substituteEnvVariables<T>(value: T): T {
 }
 
 /**
+ * Sensitive CLI flag patterns whose following value should be masked in logs.
+ */
+const SENSITIVE_ARG_PATTERNS =
+  /^--(api-key|token|secret|password|key|figma-api-key|access-token|auth|credential)$/i;
+
+/**
+ * Redact values that follow sensitive flags in a CLI args array.
+ * Handles: "--api-key sk-abc", "--api-key=sk-abc", consecutive flags.
+ * E.g. ["--api-key", "sk-abc123"] → ["--api-key", "[REDACTED]"]
+ *      ["--api-key=sk-abc123"]    → ["--api-key=[REDACTED]"]
+ */
+function redactSensitiveArgs(args?: string[]): string[] | undefined {
+  if (!args || args.length === 0) {
+    return args;
+  }
+  const redacted = [...args];
+  for (let i = 0; i < redacted.length; i++) {
+    // Handle --flag=value inline form
+    const eqIdx = redacted[i].indexOf("=");
+    if (eqIdx !== -1) {
+      const flag = redacted[i].substring(0, eqIdx);
+      if (SENSITIVE_ARG_PATTERNS.test(flag)) {
+        redacted[i] = `${flag}=[REDACTED]`;
+      }
+      continue;
+    }
+    // Handle --flag value (two-part form)
+    if (
+      SENSITIVE_ARG_PATTERNS.test(redacted[i]) &&
+      i + 1 < redacted.length &&
+      !redacted[i + 1].startsWith("--")
+    ) {
+      redacted[i + 1] = "[REDACTED]";
+      i++; // skip the redacted value
+    }
+  }
+  return redacted;
+}
+
+/**
  * Type guard to validate if an object can be safely used as Record<string, JsonValue>
  */
 function isValidJsonRecord(value: unknown): value is Record<string, JsonValue> {
@@ -939,7 +979,7 @@ export class ExternalServerManager extends EventEmitter {
 
       mcpLogger.debug(`[ExternalServerManager] Starting server: ${serverId}`, {
         command: config.command,
-        args: config.args,
+        args: redactSensitiveArgs(config.args),
         transport: config.transport,
       });
 

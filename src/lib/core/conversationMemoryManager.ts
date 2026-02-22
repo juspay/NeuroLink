@@ -143,10 +143,15 @@ export class ConversationMemoryManager implements IConversationMemoryManager {
         if (!this.summarizationInProgress.has(options.sessionId)) {
           setImmediate(async () => {
             try {
-              await this.checkAndSummarize(session, tokenThreshold);
+              await this.checkAndSummarize(
+                session,
+                tokenThreshold,
+                options.requestId,
+              );
             } catch (error) {
               logger.error("Background summarization failed", {
                 sessionId: session.sessionId,
+                requestId: options.requestId,
                 error: error instanceof Error ? error.message : String(error),
               });
             }
@@ -226,6 +231,7 @@ export class ConversationMemoryManager implements IConversationMemoryManager {
   private async checkAndSummarize(
     session: SessionMemory,
     threshold: number,
+    requestId?: string,
   ): Promise<void> {
     // Acquire lock - if already in progress, skip
     if (this.summarizationInProgress.has(session.sessionId)) {
@@ -246,6 +252,7 @@ export class ConversationMemoryManager implements IConversationMemoryManager {
         threshold,
         this.config,
         "[ConversationMemory]",
+        requestId,
       );
     } catch (error) {
       logger.error("Token counting or summarization failed", {
@@ -277,9 +284,14 @@ export class ConversationMemoryManager implements IConversationMemoryManager {
    * Returns messages from pointer onwards (or all if no pointer)
    * Now consistently async to match Redis implementation
    */
-  async buildContextMessages(sessionId: string): Promise<ChatMessage[]> {
+  async buildContextMessages(
+    sessionId: string,
+    _userId?: string,
+    _enableSummarization?: boolean,
+    requestId?: string,
+  ): Promise<ChatMessage[]> {
     const session = this.sessions.get(sessionId);
-    return session ? buildContextFromPointer(session) : [];
+    return session ? buildContextFromPointer(session, requestId) : [];
   }
 
   public getSession(
@@ -371,5 +383,44 @@ export class ConversationMemoryManager implements IConversationMemoryManager {
     const sessionIds = Array.from(this.sessions.keys());
     this.sessions.clear();
     logger.info("All sessions cleared", { clearedCount: sessionIds.length });
+  }
+
+  /**
+   * Get the raw messages array for a session.
+   * Returns the full messages list without context filtering or summarization.
+   * Returns a deep copy to prevent external mutation of internal state.
+   */
+  async getSessionMessages(
+    sessionId: string,
+    _userId?: string,
+  ): Promise<ChatMessage[]> {
+    await this.ensureInitialized();
+    const session = this.sessions.get(sessionId);
+    return session ? session.messages.map((msg) => ({ ...msg })) : [];
+  }
+
+  /**
+   * Replace the entire messages array for a session.
+   * Creates the session if it does not exist.
+   * Resets summary pointers since old pointers may reference messages that no longer exist.
+   */
+  async setSessionMessages(
+    sessionId: string,
+    messages: ChatMessage[],
+    userId?: string,
+  ): Promise<void> {
+    await this.ensureInitialized();
+    let session = this.sessions.get(sessionId);
+    if (!session) {
+      session = this.createNewSession(sessionId, userId);
+      this.sessions.set(sessionId, session);
+      this.enforceSessionLimit();
+    }
+    session.messages = [...messages];
+    session.summarizedUpToMessageId = undefined;
+    session.summarizedMessage = undefined;
+    session.lastTokenCount = undefined;
+    session.lastCountedAt = undefined;
+    session.lastActivity = Date.now();
   }
 }

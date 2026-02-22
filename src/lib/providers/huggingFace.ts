@@ -366,7 +366,7 @@ Available tools will be provided in the function calling format. Use them when t
   /**
    * Enhanced error handling with HuggingFace-specific guidance
    */
-  public handleProviderError(error: unknown): Error {
+  public formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`HuggingFace request timed out: ${error.message}`);
     }

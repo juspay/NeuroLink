@@ -36,22 +36,30 @@ export class SummarizationEngine {
     threshold: number,
     config: Partial<ConversationMemoryConfig>,
     logPrefix = "[SummarizationEngine]",
+    requestId?: string,
   ): Promise<boolean> {
-    const contextMessages = buildContextFromPointer(session);
+    const contextMessages = buildContextFromPointer(session, requestId);
     const tokenCount = this.estimateTokens(contextMessages);
 
     session.lastTokenCount = tokenCount;
     session.lastCountedAt = Date.now();
 
-    logger.debug(`${logPrefix} Token count check`, {
+    logger.info("[Summarization] Check", {
+      requestId,
       sessionId: session.sessionId,
       tokenCount,
       threshold,
-      needsSummarization: tokenCount >= threshold,
+      willSummarize: tokenCount >= threshold,
     });
 
     if (tokenCount >= threshold) {
-      await this.summarizeSession(session, threshold, config, logPrefix);
+      await this.summarizeSession(
+        session,
+        threshold,
+        config,
+        logPrefix,
+        requestId,
+      );
       return true;
     }
 
@@ -71,7 +79,9 @@ export class SummarizationEngine {
     threshold: number,
     config: Partial<ConversationMemoryConfig>,
     logPrefix = "[SummarizationEngine]",
+    requestId?: string,
   ): Promise<void> {
+    const startTime = Date.now();
     const startIndex = session.summarizedUpToMessageId
       ? session.messages.findIndex(
           (m) => m.id === session.summarizedUpToMessageId,
@@ -94,29 +104,56 @@ export class SummarizationEngine {
       return;
     }
 
-    const summary = await generateSummary(
-      messagesToSummarize,
-      config,
-      logPrefix,
-      session.summarizedMessage,
-    );
+    const recentToKeep = recentMessages.length - messagesToSummarize.length;
 
-    if (!summary) {
-      logger.warn(`${logPrefix} Summary generation failed`, {
-        sessionId: session.sessionId,
-      });
-      return;
-    }
-
-    const lastSummarized = messagesToSummarize[messagesToSummarize.length - 1];
-    session.summarizedUpToMessageId = lastSummarized.id;
-    session.summarizedMessage = summary;
-
-    logger.info(`${logPrefix} Summarization complete`, {
+    logger.info("[Summarization] Starting", {
+      requestId,
       sessionId: session.sessionId,
-      summarizedCount: messagesToSummarize.length,
-      totalMessages: session.messages.length,
+      messagesToSummarize: messagesToSummarize.length,
+      recentToKeep,
+      hasPreviousSummary: !!session.summarizedMessage,
     });
+
+    try {
+      const summary = await generateSummary(
+        messagesToSummarize,
+        config,
+        logPrefix,
+        session.summarizedMessage,
+        requestId,
+      );
+
+      if (!summary) {
+        logger.warn(`${logPrefix} Summary generation failed`, {
+          requestId,
+          sessionId: session.sessionId,
+          durationMs: Date.now() - startTime,
+        });
+        return;
+      }
+
+      const lastSummarized =
+        messagesToSummarize[messagesToSummarize.length - 1];
+      session.summarizedUpToMessageId = lastSummarized.id;
+      session.summarizedMessage = summary;
+
+      logger.info("[Summarization] Complete", {
+        requestId,
+        sessionId: session.sessionId,
+        summaryChars: summary.length,
+        newPointerId: lastSummarized.id,
+        durationMs: Date.now() - startTime,
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      logger.error("[Summarization] Error", {
+        requestId,
+        sessionId: session.sessionId,
+        error: errorMessage,
+        durationMs: Date.now() - startTime,
+      });
+      throw err;
+    }
   }
 
   /**

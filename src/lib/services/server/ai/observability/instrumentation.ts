@@ -579,14 +579,23 @@ export function initializeOpenTelemetry(config: LangfuseConfig): void {
           // Add ContextEnricher for trace name enrichment
           provider.addSpanProcessor(new ContextEnricher());
 
-          // Also add LangfuseSpanProcessor so traces are sent to Langfuse
-          provider.addSpanProcessor(langfuseProcessor);
+          // Only add LangfuseSpanProcessor if the host has not already registered one.
+          // When skipLangfuseSpanProcessor is true, the host (e.g. Curator) already
+          // registers its own LangfuseSpanProcessor via a DeferredSpanProcessor, so
+          // adding another one here would cause duplicate trace exports to Langfuse.
+          const skipLangfuse = config.skipLangfuseSpanProcessor === true;
+          if (!skipLangfuse) {
+            provider.addSpanProcessor(langfuseProcessor);
+          }
 
           logger.info(
             `${LOG_PREFIX} Auto-registered processors with global TracerProvider`,
             {
-              processors: ["ContextEnricher", "LangfuseSpanProcessor"],
+              processors: skipLangfuse
+                ? ["ContextEnricher"]
+                : ["ContextEnricher", "LangfuseSpanProcessor"],
               reason: "External provider mode with auto-registration",
+              skippedLangfuseSpanProcessor: skipLangfuse,
             },
           );
         } else {

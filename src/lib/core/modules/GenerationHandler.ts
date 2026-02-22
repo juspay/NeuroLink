@@ -26,8 +26,29 @@ import type {
 import type { ToolCallObject, ToolResult } from "../../types/tools.js";
 import type { UnknownRecord } from "../../types/common.js";
 import { logger } from "../../utils/logger.js";
-import { extractTokenUsage } from "../../utils/tokenUtils.js";
+import {
+  extractTokenUsage,
+  extractCacheCreationTokens,
+  extractCacheReadTokens,
+  calculateCacheSavingsPercent,
+} from "../../utils/tokenUtils.js";
 import { DEFAULT_MAX_STEPS } from "../constants.js";
+
+/**
+ * Safely preview-serialize a value for debug logging.
+ * Handles undefined, circular references, and non-serializable values.
+ */
+function safePreview(v: unknown): string {
+  if (v === undefined) {
+    return "";
+  }
+  try {
+    const text = typeof v === "string" ? v : JSON.stringify(v);
+    return (text ?? "").substring(0, 200);
+  } catch {
+    return "[unserializable]";
+  }
+}
 
 /**
  * GenerationHandler class - Handles text generation operations for AI providers
@@ -71,9 +92,11 @@ export class GenerationHandler {
     const isGoogleProvider =
       this.providerName === "google-ai" || this.providerName === "vertex";
 
-    // Check if this is an Anthropic provider
+    // Check if this is an Anthropic provider (includes Vertex+Claude)
     const isAnthropicProvider =
-      this.providerName === "anthropic" || this.providerName === "bedrock";
+      this.providerName === "anthropic" ||
+      this.providerName === "bedrock" ||
+      (this.providerName === "vertex" && this.modelName?.startsWith("claude-"));
 
     const useStructuredOutput =
       includeStructuredOutput &&
@@ -81,10 +104,41 @@ export class GenerationHandler {
       (options.output?.format === "json" ||
         options.output?.format === "structured");
 
+    // Annotate the last tool with cache_control so the full tool-definition
+    // block becomes a cache breakpoint for Anthropic-family providers.
+    // Non-Anthropic providers harmlessly ignore unknown providerOptions.
+    // Note: The AI SDK Tool type doesn't yet include providerOptions, so we
+    // use a type assertion. The Anthropic adapter reads this at runtime.
+    const toolsWithCache: Record<
+      string,
+      Tool & { providerOptions?: Record<string, unknown> }
+    > = { ...tools };
+    if (
+      isAnthropicProvider &&
+      shouldUseTools &&
+      Object.keys(toolsWithCache).length > 0
+    ) {
+      const toolNames = Object.keys(toolsWithCache);
+      const lastToolName = toolNames[toolNames.length - 1];
+      if (lastToolName && toolsWithCache[lastToolName]) {
+        const lastTool = toolsWithCache[lastToolName] as Tool & {
+          providerOptions?: Record<string, unknown>;
+        };
+        toolsWithCache[lastToolName] = {
+          ...lastTool,
+          providerOptions: {
+            ...(lastTool.providerOptions ?? {}),
+            anthropic: { cacheControl: { type: "ephemeral" } },
+          },
+        };
+      }
+    }
+
     return await generateText({
       model,
       messages,
-      ...(shouldUseTools && Object.keys(tools).length > 0 && { tools }),
+      ...(shouldUseTools &&
+        Object.keys(toolsWithCache).length > 0 && { tools: toolsWithCache }),
       maxSteps: options.maxSteps ?? DEFAULT_MAX_STEPS,
       ...(shouldUseTools &&
         options.toolChoice && { toolChoice: options.toolChoice }),
@@ -167,8 +221,53 @@ export class GenerationHandler {
       (options.output?.format === "json" ||
         options.output?.format === "structured");
 
+    const requestId =
+      options.requestId ||
+      ((options.context as Record<string, unknown>)?.requestId as string) ||
+      "unknown";
+
+    logger.info("[GenerationHandler] Calling generateText", {
+      requestId,
+      model: model.modelId || "unknown",
+      messageCount: messages.length,
+      toolCount: Object.keys(tools || {}).length,
+      maxSteps: options.maxSteps,
+      temperature: options.temperature,
+    });
+
+    if (logger.shouldLog("debug")) {
+      try {
+        logger.debug("[Observability] Full generateText parameters", {
+          requestId,
+          model: model.modelId || "unknown",
+          messageCount: messages.length,
+          messages: messages.map((msg, i) => ({
+            index: i,
+            role: msg.role,
+            contentLength:
+              typeof msg.content === "string"
+                ? msg.content.length
+                : safePreview(msg.content).length,
+            contentPreview:
+              typeof msg.content === "string"
+                ? msg.content.substring(0, 200)
+                : "[multimodal]",
+          })),
+          toolNames: Object.keys(tools || {}),
+          toolCount: Object.keys(tools || {}).length,
+          maxSteps: options.maxSteps,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+        });
+      } catch {
+        // Ignore serialization errors in debug logging
+      }
+    }
+
+    const genStartTime = Date.now();
+
     try {
-      return await this.callGenerateText(
+      const result = await this.callGenerateText(
         model,
         messages,
         tools,
@@ -176,6 +275,72 @@ export class GenerationHandler {
         shouldUseTools,
         true, // includeStructuredOutput
       );
+
+      logger.info("[GenerationHandler] generateText returned", {
+        requestId,
+        durationMs: Date.now() - genStartTime,
+        finishReason: result.finishReason,
+        steps: result.steps?.length || 1,
+        toolCallsTotal: result.toolCalls?.length || 0,
+        responseChars: result.text?.length || 0,
+      });
+
+      if (logger.shouldLog("debug")) {
+        logger.debug("[Observability] Full LLM response", {
+          requestId,
+          finishReason: result.finishReason,
+          responseTextPreview: result.text?.substring(0, 200) || "",
+          responseTextLength: result.text?.length || 0,
+          toolCalls: result.toolCalls?.map(
+            (tc: { toolName: string; args: unknown }) => ({
+              toolName: tc.toolName,
+              argsPreview: safePreview(tc.args),
+            }),
+          ),
+          toolResults: result.toolResults?.map(
+            (tr: { toolName: string; result: unknown }) => ({
+              toolName: tr.toolName,
+              resultPreview: safePreview(tr.result),
+            }),
+          ),
+          steps: result.steps?.map(
+            (
+              step: {
+                stepType?: string;
+                text?: string;
+                toolCalls?: Array<{ toolName: string; args: unknown }>;
+                toolResults?: Array<{ toolName: string; result: unknown }>;
+                finishReason?: string;
+              },
+              i: number,
+            ) => ({
+              stepIndex: i,
+              stepType: step.stepType,
+              textPreview: step.text?.substring(0, 200),
+              textLength: step.text?.length || 0,
+              toolCalls: step.toolCalls?.map(
+                (tc: { toolName: string; args: unknown }) => ({
+                  toolName: tc.toolName,
+                  argsPreview: safePreview(tc.args),
+                }),
+              ),
+              toolResults: step.toolResults?.map(
+                (tr: { toolName: string; result: unknown }) => ({
+                  toolName: tr.toolName,
+                  resultPreview: safePreview(tr.result),
+                }),
+              ),
+              finishReason: step.finishReason,
+            }),
+          ),
+          usage: result.usage,
+          providerMetadata:
+            result.experimental_providerMetadata ||
+            (result as unknown as Record<string, unknown>).providerMetadata,
+        });
+      }
+
+      return result;
     } catch (error) {
       // If NoObjectGeneratedError is thrown when using schema + tools together,
       // fall back to generating without experimental_output and extract JSON manually
@@ -191,7 +356,7 @@ export class GenerationHandler {
 
         // Retry without experimental_output - the formatEnhancedResult method
         // will extract JSON from the text response
-        return await this.callGenerateText(
+        const result = await this.callGenerateText(
           model,
           messages,
           tools,
@@ -199,6 +364,17 @@ export class GenerationHandler {
           shouldUseTools,
           false, // includeStructuredOutput - intentionally omitted
         );
+
+        logger.info("[GenerationHandler] generateText returned (fallback)", {
+          requestId,
+          durationMs: Date.now() - genStartTime,
+          finishReason: result.finishReason,
+          steps: result.steps?.length || 1,
+          toolCallsTotal: result.toolCalls?.length || 0,
+          responseChars: result.text?.length || 0,
+        });
+
+        return result;
       }
 
       // Re-throw other errors
@@ -207,11 +383,52 @@ export class GenerationHandler {
   }
 
   /**
+   * Extract cache metrics from provider metadata (e.g. Anthropic's providerMetadata.anthropic)
+   * The Vercel AI SDK's LanguageModelUsage only has promptTokens/completionTokens/totalTokens.
+   * Cache metrics are surfaced via providerMetadata by provider-specific SDK adapters.
+   */
+  private extractCacheMetricsFromProviderMetadata(
+    generateResult: Awaited<ReturnType<typeof generateText>>,
+  ): { cacheCreationTokens?: number; cacheReadTokens?: number } {
+    const providerMeta =
+      ((generateResult as unknown as Record<string, unknown>)
+        .providerMetadata as Record<string, unknown> | undefined) ||
+      (generateResult.experimental_providerMetadata as
+        | Record<string, unknown>
+        | undefined);
+    if (!providerMeta) {
+      return {};
+    }
+
+    // Anthropic surfaces cache metrics under providerMetadata.anthropic
+    const anthropicMeta = providerMeta.anthropic as
+      | Record<string, unknown>
+      | undefined;
+    if (anthropicMeta) {
+      const cacheCreationTokens = extractCacheCreationTokens(
+        anthropicMeta as Parameters<typeof extractCacheCreationTokens>[0],
+      );
+      const cacheReadTokens = extractCacheReadTokens(
+        anthropicMeta as Parameters<typeof extractCacheReadTokens>[0],
+      );
+      return {
+        ...(cacheCreationTokens !== undefined && { cacheCreationTokens }),
+        ...(cacheReadTokens !== undefined && { cacheReadTokens }),
+      };
+    }
+
+    return {};
+  }
+
+  /**
    * Log generation completion information
    */
   logGenerationComplete(
     generateResult: Awaited<ReturnType<typeof generateText>>,
   ): void {
+    const cacheMetrics =
+      this.extractCacheMetricsFromProviderMetadata(generateResult);
+
     logger.debug(`generateText completed`, {
       provider: this.providerName,
       model: this.modelName,
@@ -219,6 +436,12 @@ export class GenerationHandler {
       toolResultsCount: generateResult.toolResults?.length || 0,
       finishReason: generateResult.finishReason,
       usage: generateResult.usage,
+      ...(cacheMetrics.cacheCreationTokens !== undefined && {
+        cacheCreationTokens: cacheMetrics.cacheCreationTokens,
+      }),
+      ...(cacheMetrics.cacheReadTokens !== undefined && {
+        cacheReadTokens: cacheMetrics.cacheReadTokens,
+      }),
       timestamp: Date.now(),
     });
   }
@@ -387,6 +610,39 @@ export class GenerationHandler {
     // Separate reasoningTokens tracking will work when/if the AI SDK adds support.
     const usage = extractTokenUsage(generateResult.usage);
 
+    // Merge cache metrics from providerMetadata if not already present in usage
+    // The AI SDK's LanguageModelUsage doesn't include cache tokens; they come from
+    // provider-specific metadata (e.g. Anthropic's providerMetadata.anthropic)
+    if (
+      usage.cacheCreationTokens === undefined ||
+      usage.cacheReadTokens === undefined
+    ) {
+      const cacheMetrics =
+        this.extractCacheMetricsFromProviderMetadata(generateResult);
+      if (
+        usage.cacheCreationTokens === undefined &&
+        cacheMetrics.cacheCreationTokens !== undefined
+      ) {
+        usage.cacheCreationTokens = cacheMetrics.cacheCreationTokens;
+      }
+      if (
+        usage.cacheReadTokens === undefined &&
+        cacheMetrics.cacheReadTokens !== undefined
+      ) {
+        usage.cacheReadTokens = cacheMetrics.cacheReadTokens;
+      }
+      // Recalculate cache savings if we added cache metrics
+      if (usage.cacheReadTokens !== undefined) {
+        const savingsPercent = calculateCacheSavingsPercent(
+          usage.cacheReadTokens,
+          usage.input,
+        );
+        if (savingsPercent !== undefined) {
+          usage.cacheSavingsPercent = savingsPercent;
+        }
+      }
+    }
+
     return {
       content,
       usage,
@@ -423,7 +679,7 @@ export class GenerationHandler {
       provider: this.providerName,
       model: this.modelName,
       responseTextLength: (result.text as string)?.length || 0,
-      responsePreview: (result.text as string)?.substring(0, 500) + "...",
+      responsePreview: (result.text as string)?.substring(0, 500) ?? "",
       finishReason: result.finishReason,
       usage: result.usage,
     });

@@ -21,7 +21,7 @@ export const RETRY_ATTEMPTS = {
   CRITICAL: 5, // 5 attempts - High-importance operations
 
   /** Quick operations that should fail fast */
-  QUICK: 2, // 2 attempts - Fast operations, minimal retry
+  QUICK: 1, // 1 attempt, no retries — fail fast
 
   /** Network operations prone to transient failures */
   NETWORK: 4, // 4 attempts - Network operations

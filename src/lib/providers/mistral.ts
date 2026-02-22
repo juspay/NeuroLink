@@ -174,7 +174,7 @@ export class MistralProvider extends BaseProvider {
     return this.model;
   }
 
-  public handleProviderError(error: unknown): Error {
+  public formatProviderError(error: unknown): Error {
     if (error instanceof TimeoutError) {
       return new Error(`Mistral request timed out: ${error.message}`);
     }

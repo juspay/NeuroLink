@@ -14,6 +14,8 @@ import type {
 // Redis client type
 type RedisClient = ReturnType<typeof createClient>;
 
+const SESSION_ONLY_PREFIX = "session-only:";
+
 // Connection pool - keyed by host:port:db
 const connectionPool = new Map<
   string,
@@ -208,7 +210,12 @@ export function getSessionKey(
   sessionId: string,
   userId?: string,
 ): string {
-  const key = `${config.keyPrefix}${userId || "randomUser"}:${sessionId}`;
+  if (!userId) {
+    logger.warn("[REDIS] getSessionKey called without userId", { sessionId });
+    return `${config.keyPrefix}${SESSION_ONLY_PREFIX}${sessionId}`;
+  }
+
+  const key = `${config.keyPrefix}${userId}:${sessionId}`;
 
   logger.debug("[redisUtils] Generated session key", {
     sessionId,

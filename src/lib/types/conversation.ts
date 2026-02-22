@@ -82,6 +82,16 @@ export type ConversationMemoryConfig = {
     maxToolOutputBytes?: number;
     /** Tool output max lines (default: 2000) */
     maxToolOutputLines?: number;
+
+    /**
+     * When true, buildContextMessages() returns the head/tail preview instead of
+     * the full tool output for tool_result messages. Default: false (full output sent to LLM).
+     * When false (default), the AI receives the complete tool output in content.
+     * When true, the AI receives the truncated preview and can use the retrieve_context
+     * tool to access full output if needed.
+     */
+    sendToolPreview?: boolean;
+
     /** File read budget as fraction of remaining context (default: 0.60) */
     fileReadBudgetPercent?: number;
   };
@@ -200,6 +210,69 @@ export type StreamEventSequence = {
   [key: string]: unknown;
 };
 
+/** Structured metadata for tool_result messages. */
+export type ToolResultData = {
+  /** Whether the tool execution succeeded */
+  success?: boolean;
+  /** Expression that was evaluated (for calculation tools) */
+  expression?: string;
+  /**
+   * The tool execution result.
+   * @deprecated Read from ChatMessage.content instead. This field is dynamically
+   * populated from content for backward compatibility and will be removed in a future version.
+   */
+  result?: unknown;
+  /** Result type hint */
+  type?: string;
+  /** Error message if execution failed */
+  error?: string;
+};
+
+/** Metadata associated with a ChatMessage. */
+export type ChatMessageMetadata = {
+  /** Is this a summary message? */
+  isSummary?: boolean;
+  /** First message ID that this summary covers */
+  summarizesFrom?: string;
+  /** Last message ID that this summary covers */
+  summarizesTo?: string;
+  /** Was this message truncated due to token limits? */
+  truncated?: boolean;
+  /** Source of the message (e.g., provider name, user input) */
+  source?: string;
+  /** Language of the message content */
+  language?: string;
+  /** Confidence score for AI-generated content */
+  confidence?: number;
+  /**
+   * Numeric timestamp for internal tracking and efficient comparisons.
+   * Format: Unix epoch milliseconds (number).
+   * Complements the ISO string `ChatMessage.timestamp` field.
+   * Use this for sorting, filtering, and performance-critical operations.
+   */
+  timestamp?: number;
+  /** Model used to generate this message */
+  modelUsed?: string;
+  /** Unique signature identifying thought/reasoning patterns */
+  thoughtSignature?: string;
+  /** Hash of the thinking/reasoning content for deduplication */
+  thoughtHash?: string;
+  /** Whether extended thinking was used for this message */
+  thinkingExpanded?: boolean;
+
+  // --- Tool output management (SDK-2) ---
+
+  /**
+   * Head/tail preview of a large tool output.
+   * Only present on tool_result messages where the output exceeded truncation limits.
+   * When `sendToolPreview` is enabled in config, `buildContextMessages()` returns
+   * this value as the message content instead of the full output.
+   */
+  toolOutputPreview?: string;
+  /** Original byte size of the full tool output before any truncation */
+  originalSize?: number;
+};
+
 /**
  * Chat message format for conversation history
  */
@@ -227,14 +300,8 @@ export type ChatMessage = {
   /** Tool arguments (optional) - for tool_call messages */
   args?: Record<string, unknown>;
 
-  /** Tool result (optional) - for tool_result messages */
-  result?: {
-    success?: boolean;
-    expression?: string;
-    result?: unknown;
-    type?: string;
-    error?: string;
-  };
+  /** Tool result metadata (optional) - for tool_result messages */
+  result?: ToolResultData;
 
   /**
    * Event sequence for rich history reconstruction
@@ -244,38 +311,8 @@ export type ChatMessage = {
    */
   events?: StreamEventSequence[];
 
-  /** Message metadata (NEW - for token-based memory) */
-  metadata?: {
-    /** Is this a summary message? */
-    isSummary?: boolean;
-    /** First message ID that this summary covers */
-    summarizesFrom?: string;
-    /** Last message ID that this summary covers */
-    summarizesTo?: string;
-    /** Was this message truncated due to token limits? */
-    truncated?: boolean;
-    /** Source of the message (e.g., provider name, user input) */
-    source?: string;
-    /** Language of the message content */
-    language?: string;
-    /** Confidence score for AI-generated content */
-    confidence?: number;
-    /**
-     * Numeric timestamp for internal tracking and efficient comparisons.
-     * Format: Unix epoch milliseconds (number).
-     * Complements the ISO string `ChatMessage.timestamp` field.
-     * Use this for sorting, filtering, and performance-critical operations.
-     */
-    timestamp?: number;
-    /** Model used to generate this message */
-    modelUsed?: string;
-    /** Unique signature identifying thought/reasoning patterns */
-    thoughtSignature?: string;
-    /** Hash of the thinking/reasoning content for deduplication */
-    thoughtHash?: string;
-    /** Whether extended thinking was used for this message */
-    thinkingExpanded?: boolean;
-  };
+  /** Message metadata */
+  metadata?: ChatMessageMetadata;
 
   /** UUID identifying this condensation group */
   condenseId?: string;
@@ -385,6 +422,8 @@ export type StoreConversationTurnOptions = {
   providerDetails?: ProviderDetails;
   enableSummarization?: boolean;
   events?: StreamEventSequence[];
+  /** Observability request identifier for log correlation */
+  requestId?: string;
   /** API-reported token usage from provider response */
   tokenUsage?: {
     inputTokens?: number;

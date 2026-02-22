@@ -61,6 +61,9 @@ export {
 export { calculateCost, hasPricing } from "./utils/pricing.js";
 // Error utilities
 export { isAbortError } from "./utils/errorHandling.js";
+// TTS utilities
+export { TTSProcessor } from "./utils/ttsProcessor.js";
+export { GoogleTTSHandler } from "./adapters/tts/googleTTSHandler.js";
 
 // Main NeuroLink wrapper class and diagnostic types
 import { NeuroLink } from "./neurolink.js";
