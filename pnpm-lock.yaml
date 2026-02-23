@@ -219,18 +219,6 @@ importers:
       '@eslint/js':
         specifier: ^9.35.0
         version: 9.37.0
-      '@fastify/cors':
-        specifier: ^11.2.0
-        version: 11.2.0
-      '@fastify/rate-limit':
-        specifier: ^10.3.0
-        version: 10.3.0
-      '@koa/cors':
-        specifier: ^5.0.0
-        version: 5.0.0
-      '@koa/router':
-        specifier: ^15.3.0
-        version: 15.3.0(koa@3.1.1)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -330,27 +318,12 @@ importers:
       conventional-changelog-conventionalcommits:
         specifier: ^9.1.0
         version: 9.1.0
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
       eslint:
         specifier: ^9.35.0
         version: 9.37.0
-      express:
-        specifier: ^5.1.0
-        version: 5.1.0
-      fastify:
-        specifier: ^5.7.2
-        version: 5.7.4
       husky:
         specifier: ^9.1.7
         version: 9.1.7
-      koa:
-        specifier: ^3.1.1
-        version: 3.1.1
-      koa-bodyparser:
-        specifier: ^4.4.1
-        version: 4.4.1
       lint-staged:
         specifier: ^16.1.6
         version: 16.2.3
@@ -403,21 +376,48 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2
     optionalDependencies:
+      '@fastify/cors':
+        specifier: ^11.2.0
+        version: 11.2.0
+      '@fastify/rate-limit':
+        specifier: ^10.3.0
+        version: 10.3.0
       '@hono/node-server':
         specifier: ^1.13.0
         version: 1.19.9(hono@4.11.7)
+      '@koa/cors':
+        specifier: ^5.0.0
+        version: 5.0.0
+      '@koa/router':
+        specifier: ^15.3.0
+        version: 15.3.0(koa@3.1.1)
       canvas:
         specifier: ^3.2.0
         version: 3.2.0
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^5.1.0
+        version: 5.1.0
       express-rate-limit:
         specifier: ^7.4.0
         version: 7.5.1(express@5.1.0)
+      fastify:
+        specifier: ^5.7.2
+        version: 5.7.4
       ffmpeg-static:
         specifier: ^5.3.0
         version: 5.3.0
       ffprobe-static:
         specifier: ^3.1.0
         version: 3.1.0
+      koa:
+        specifier: ^3.1.1
+        version: 3.1.1
+      koa-bodyparser:
+        specifier: ^4.4.1
+        version: 4.4.1
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -8626,6 +8626,7 @@ snapshots:
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       fast-uri: 3.1.0
+    optional: true
 
   '@fastify/busboy@2.1.1': {}
 
@@ -8633,29 +8634,36 @@ snapshots:
     dependencies:
       fastify-plugin: 5.1.0
       toad-cache: 3.7.0
+    optional: true
 
-  '@fastify/error@4.2.0': {}
+  '@fastify/error@4.2.0':
+    optional: true
 
   '@fastify/fast-json-stringify-compiler@5.0.3':
     dependencies:
       fast-json-stringify: 6.2.0
+    optional: true
 
-  '@fastify/forwarded@3.0.1': {}
+  '@fastify/forwarded@3.0.1':
+    optional: true
 
   '@fastify/merge-json-schemas@0.2.1':
     dependencies:
       dequal: 2.0.3
+    optional: true
 
   '@fastify/proxy-addr@5.1.0':
     dependencies:
       '@fastify/forwarded': 3.0.1
       ipaddr.js: 2.3.0
+    optional: true
 
   '@fastify/rate-limit@10.3.0':
     dependencies:
       '@lukeed/ms': 2.0.2
       fastify-plugin: 5.1.0
       toad-cache: 3.7.0
+    optional: true
 
   '@gar/promisify@1.1.3':
     optional: true
@@ -8714,7 +8722,8 @@ snapshots:
       protobufjs: 7.5.4
       yargs: 17.7.2
 
-  '@hapi/bourne@3.0.0': {}
+  '@hapi/bourne@3.0.0':
+    optional: true
 
   '@hono/node-server@1.19.9(hono@4.11.7)':
     dependencies:
@@ -8901,6 +8910,7 @@ snapshots:
   '@koa/cors@5.0.0':
     dependencies:
       vary: 1.1.2
+    optional: true
 
   '@koa/router@15.3.0(koa@3.1.1)':
     dependencies:
@@ -8911,6 +8921,7 @@ snapshots:
       path-to-regexp: 8.3.0
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   '@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.57.2(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.18.3)(zod@3.25.76))':
     dependencies:
@@ -8942,7 +8953,8 @@ snapshots:
       '@opentelemetry/exporter-trace-otlp-http': 0.202.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.1.0(@opentelemetry/api@1.9.0)
 
-  '@lukeed/ms@2.0.2': {}
+  '@lukeed/ms@2.0.2':
+    optional: true
 
   '@manypkg/find-root@1.1.0':
     dependencies:
@@ -10125,7 +10137,8 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 1.30.1(@opentelemetry/api@1.9.0)
 
-  '@pinojs/redact@0.4.0': {}
+  '@pinojs/redact@0.4.0':
+    optional: true
 
   '@pnpm/config.env-replace@1.1.0': {}
 
@@ -11249,12 +11262,14 @@ snapshots:
     dependencies:
       event-target-shim: 5.0.1
 
-  abstract-logging@2.0.1: {}
+  abstract-logging@2.0.1:
+    optional: true
 
   accepts@1.3.8:
     dependencies:
       mime-types: 2.1.35
       negotiator: 0.6.3
+    optional: true
 
   accepts@2.0.0:
     dependencies:
@@ -11424,12 +11439,14 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  atomic-sleep@1.0.0: {}
+  atomic-sleep@1.0.0:
+    optional: true
 
   avvio@9.1.0:
     dependencies:
       '@fastify/error': 4.2.0
       fastq: 1.19.1
+    optional: true
 
   axios@1.12.2:
     dependencies:
@@ -11534,6 +11551,7 @@ snapshots:
       type-is: 2.0.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   body-parser@2.2.2:
     dependencies:
@@ -11770,6 +11788,7 @@ snapshots:
       qs: 6.14.0
       raw-body: 2.5.3
       type-is: 1.6.18
+    optional: true
 
   color-convert@1.9.3:
     dependencies:
@@ -11845,10 +11864,12 @@ snapshots:
   content-disposition@0.5.4:
     dependencies:
       safe-buffer: 5.2.1
+    optional: true
 
   content-disposition@1.0.0:
     dependencies:
       safe-buffer: 5.2.1
+    optional: true
 
   content-disposition@1.0.1: {}
 
@@ -11887,8 +11908,10 @@ snapshots:
     dependencies:
       depd: 2.0.0
       keygrip: 1.1.0
+    optional: true
 
-  copy-to@2.0.1: {}
+  copy-to@2.0.1:
+    optional: true
 
   core-util-is@1.0.3: {}
 
@@ -11955,7 +11978,8 @@ snapshots:
 
   deep-eql@5.0.2: {}
 
-  deep-equal@1.0.1: {}
+  deep-equal@1.0.1:
+    optional: true
 
   deep-extend@0.6.0: {}
 
@@ -11975,9 +11999,11 @@ snapshots:
 
   delayed-stream@1.0.0: {}
 
-  delegates@1.0.0: {}
+  delegates@1.0.0:
+    optional: true
 
-  depd@1.1.2: {}
+  depd@1.1.2:
+    optional: true
 
   depd@2.0.0: {}
 
@@ -11985,7 +12011,8 @@ snapshots:
 
   dequal@2.0.3: {}
 
-  destroy@1.2.0: {}
+  destroy@1.2.0:
+    optional: true
 
   detect-indent@6.1.0: {}
 
@@ -12387,6 +12414,7 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   express@5.2.1:
     dependencies:
@@ -12442,7 +12470,8 @@ snapshots:
       '@fast-csv/format': 4.3.5
       '@fast-csv/parse': 4.3.6
 
-  fast-decode-uri-component@1.0.1: {}
+  fast-decode-uri-component@1.0.1:
+    optional: true
 
   fast-deep-equal@3.1.3: {}
 
@@ -12466,12 +12495,14 @@ snapshots:
       fast-uri: 3.1.0
       json-schema-ref-resolver: 3.0.0
       rfdc: 1.4.1
+    optional: true
 
   fast-levenshtein@2.0.6: {}
 
   fast-querystring@1.1.2:
     dependencies:
       fast-decode-uri-component: 1.0.1
+    optional: true
 
   fast-uri@3.1.0: {}
 
@@ -12479,7 +12510,8 @@ snapshots:
     dependencies:
       strnum: 2.1.1
 
-  fastify-plugin@5.1.0: {}
+  fastify-plugin@5.1.0:
+    optional: true
 
   fastify@5.7.4:
     dependencies:
@@ -12498,6 +12530,7 @@ snapshots:
       secure-json-parse: 4.1.0
       semver: 7.7.3
       toad-cache: 3.7.0
+    optional: true
 
   fastq@1.19.1:
     dependencies:
@@ -12566,6 +12599,7 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   finalhandler@2.1.1:
     dependencies:
@@ -12583,6 +12617,7 @@ snapshots:
       fast-deep-equal: 3.1.3
       fast-querystring: 1.1.2
       safe-regex2: 5.0.0
+    optional: true
 
   find-up-simple@1.0.1: {}
 
@@ -12658,7 +12693,8 @@ snapshots:
 
   fraction.js@5.3.4: {}
 
-  fresh@0.5.2: {}
+  fresh@0.5.2:
+    optional: true
 
   fresh@2.0.0: {}
 
@@ -12989,6 +13025,7 @@ snapshots:
     dependencies:
       deep-equal: 1.0.1
       http-errors: 1.8.1
+    optional: true
 
   http-cache-semantics@4.2.0:
     optional: true
@@ -13000,6 +13037,7 @@ snapshots:
       setprototypeof: 1.2.0
       statuses: 1.5.0
       toidentifier: 1.0.1
+    optional: true
 
   http-errors@2.0.0:
     dependencies:
@@ -13008,6 +13046,7 @@ snapshots:
       setprototypeof: 1.2.0
       statuses: 2.0.1
       toidentifier: 1.0.1
+    optional: true
 
   http-errors@2.0.1:
     dependencies:
@@ -13079,10 +13118,12 @@ snapshots:
   iconv-lite@0.4.24:
     dependencies:
       safer-buffer: 2.1.2
+    optional: true
 
   iconv-lite@0.6.3:
     dependencies:
       safer-buffer: 2.1.2
+    optional: true
 
   iconv-lite@0.7.0:
     dependencies:
@@ -13136,7 +13177,8 @@ snapshots:
   infer-owner@1.0.4:
     optional: true
 
-  inflation@2.1.0: {}
+  inflation@2.1.0:
+    optional: true
 
   inflight@1.0.6:
     dependencies:
@@ -13175,7 +13217,8 @@ snapshots:
 
   ipaddr.js@1.9.1: {}
 
-  ipaddr.js@2.3.0: {}
+  ipaddr.js@2.3.0:
+    optional: true
 
   is-arrayish@0.2.1: {}
 
@@ -13342,6 +13385,7 @@ snapshots:
   json-schema-ref-resolver@3.0.0:
     dependencies:
       dequal: 2.0.3
+    optional: true
 
   json-schema-to-zod@2.6.1: {}
 
@@ -13392,6 +13436,7 @@ snapshots:
   keygrip@1.1.0:
     dependencies:
       tsscmp: 1.0.6
+    optional: true
 
   keyv@4.5.4:
     dependencies:
@@ -13404,8 +13449,10 @@ snapshots:
       co-body: 6.2.0
       copy-to: 2.0.1
       type-is: 1.6.18
+    optional: true
 
-  koa-compose@4.1.0: {}
+  koa-compose@4.1.0:
+    optional: true
 
   koa@3.1.1:
     dependencies:
@@ -13427,6 +13474,7 @@ snapshots:
       statuses: 2.0.2
       type-is: 2.0.1
       vary: 1.1.2
+    optional: true
 
   langsmith@0.3.87(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.57.2(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.18.3)(zod@3.25.76)):
     dependencies:
@@ -13460,6 +13508,7 @@ snapshots:
       cookie: 1.0.2
       process-warning: 4.0.1
       set-cookie-parser: 2.7.1
+    optional: true
 
   lines-and-columns@1.2.4: {}
 
@@ -13687,7 +13736,8 @@ snapshots:
 
   mdurl@2.0.0: {}
 
-  media-typer@0.3.0: {}
+  media-typer@0.3.0:
+    optional: true
 
   media-typer@1.1.0: {}
 
@@ -13871,7 +13921,8 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  negotiator@0.6.3: {}
+  negotiator@0.6.3:
+    optional: true
 
   negotiator@0.6.4:
     optional: true
@@ -14006,7 +14057,8 @@ snapshots:
     dependencies:
       whatwg-fetch: 3.6.20
 
-  on-exit-leak-free@2.1.2: {}
+  on-exit-leak-free@2.1.2:
+    optional: true
 
   on-finished@2.4.1:
     dependencies:
@@ -14328,8 +14380,10 @@ snapshots:
   pino-abstract-transport@3.0.0:
     dependencies:
       split2: 4.2.0
+    optional: true
 
-  pino-std-serializers@7.1.0: {}
+  pino-std-serializers@7.1.0:
+    optional: true
 
   pino@10.3.0:
     dependencies:
@@ -14344,6 +14398,7 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.0
       thread-stream: 4.0.0
+    optional: true
 
   pkce-challenge@5.0.1: {}
 
@@ -14428,9 +14483,11 @@ snapshots:
 
   process-nextick-args@2.0.1: {}
 
-  process-warning@4.0.1: {}
+  process-warning@4.0.1:
+    optional: true
 
-  process-warning@5.0.0: {}
+  process-warning@5.0.0:
+    optional: true
 
   progress@2.0.3: {}
 
@@ -14535,6 +14592,7 @@ snapshots:
   qs@6.14.0:
     dependencies:
       side-channel: 1.1.0
+    optional: true
 
   qs@6.14.1:
     dependencies:
@@ -14548,7 +14606,8 @@ snapshots:
     dependencies:
       inherits: 2.0.4
 
-  quick-format-unescaped@4.0.4: {}
+  quick-format-unescaped@4.0.4:
+    optional: true
 
   range-parser@1.2.1: {}
 
@@ -14558,6 +14617,7 @@ snapshots:
       http-errors: 2.0.1
       iconv-lite: 0.4.24
       unpipe: 1.0.0
+    optional: true
 
   raw-body@3.0.2:
     dependencies:
@@ -14628,7 +14688,8 @@ snapshots:
 
   readdirp@4.1.2: {}
 
-  real-require@0.2.0: {}
+  real-require@0.2.0:
+    optional: true
 
   reconnecting-eventsource@1.6.4: {}
 
@@ -14683,7 +14744,8 @@ snapshots:
       onetime: 7.0.0
       signal-exit: 4.1.0
 
-  ret@0.5.0: {}
+  ret@0.5.0:
+    optional: true
 
   retry-request@7.0.2(encoding@0.1.13):
     dependencies:
@@ -14775,8 +14837,10 @@ snapshots:
   safe-regex2@5.0.0:
     dependencies:
       ret: 0.5.0
+    optional: true
 
-  safe-stable-stringify@2.5.0: {}
+  safe-stable-stringify@2.5.0:
+    optional: true
 
   safer-buffer@2.1.2: {}
 
@@ -14790,7 +14854,8 @@ snapshots:
 
   secure-json-parse@2.7.0: {}
 
-  secure-json-parse@4.1.0: {}
+  secure-json-parse@4.1.0:
+    optional: true
 
   seedrandom@3.0.5: {}
 
@@ -14854,6 +14919,7 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   send@1.2.1:
     dependencies:
@@ -14879,6 +14945,7 @@ snapshots:
       send: 1.2.0
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   serve-static@2.2.1:
     dependencies:
@@ -15034,6 +15101,7 @@ snapshots:
   sonic-boom@4.2.0:
     dependencies:
       atomic-sleep: 1.0.0
+    optional: true
 
   source-map-js@1.2.1: {}
 
@@ -15093,9 +15161,11 @@ snapshots:
 
   stackback@0.0.2: {}
 
-  statuses@1.5.0: {}
+  statuses@1.5.0:
+    optional: true
 
-  statuses@2.0.1: {}
+  statuses@2.0.1:
+    optional: true
 
   statuses@2.0.2: {}
 
@@ -15347,6 +15417,7 @@ snapshots:
   thread-stream@4.0.0:
     dependencies:
       real-require: 0.2.0
+    optional: true
 
   throttleit@2.1.0: {}
 
@@ -15382,7 +15453,8 @@ snapshots:
     dependencies:
       is-number: 7.0.0
 
-  toad-cache@3.7.0: {}
+  toad-cache@3.7.0:
+    optional: true
 
   toidentifier@1.0.1: {}
 
@@ -15408,7 +15480,8 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  tsscmp@1.0.6: {}
+  tsscmp@1.0.6:
+    optional: true
 
   tsx@4.21.0:
     dependencies:
@@ -15443,6 +15516,7 @@ snapshots:
     dependencies:
       media-typer: 0.3.0
       mime-types: 2.1.35
+    optional: true
 
   type-is@2.0.1:
     dependencies:
