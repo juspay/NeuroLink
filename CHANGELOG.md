@@ -1,3 +1,13 @@
+## [9.12.0](https://github.com/juspay/neurolink/compare/v9.11.0...v9.12.0) (2026-02-23)
+
+### Features
+
+- **(core):** implement SDK boundary items — context windows, caching, tool output management ([75a07a4](https://github.com/juspay/neurolink/commit/75a07a4f6d8eaec2fefe577dc62428e759bb52ce))
+
+### Bug Fixes
+
+- **(mcp):** missing gap for mcp cli ([79b51a8](https://github.com/juspay/neurolink/commit/79b51a88fa8f79809917e6159106278114f86636))
+
 ## [9.11.0](https://github.com/juspay/neurolink/compare/v9.10.1...v9.11.0) (2026-02-22)
 
 ### Features
