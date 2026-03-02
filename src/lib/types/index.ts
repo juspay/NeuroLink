@@ -225,6 +225,8 @@ export type {
   ToolCalls,
   ToolResult as StreamToolResult, // Renamed to avoid conflict with tools.js ToolResult
 } from "./streamTypes.js";
+// STT (Speech-to-Text) types
+export * from "./sttTypes.js";
 // TTS (Text-to-Speech) types
 export * from "./ttsTypes.js";
 // Utilities Types - Utility module types (selective export to avoid conflicts)

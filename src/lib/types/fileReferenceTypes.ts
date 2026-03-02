@@ -103,6 +103,11 @@ export type FileReference = {
   totalLines?: number;
   /** File extension (e.g., 'py', 'xlsx', 'mp4') */
   extension?: string;
+  /** Processing options (STT settings, provider) stored at registration time */
+  processingOptions?: {
+    sttOptions?: import("./sttTypes.js").STTOptions;
+    provider?: string;
+  };
 };
 
 /**

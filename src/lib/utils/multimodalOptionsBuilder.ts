@@ -57,6 +57,7 @@ export function buildMultimodalOptions(
       pdfFiles: options.input?.pdfFiles,
     },
     csvOptions: options.csvOptions,
+    sttOptions: options.sttOptions,
     systemPrompt: options.systemPrompt,
     conversationHistory: options.conversationMessages,
     provider: providerName,

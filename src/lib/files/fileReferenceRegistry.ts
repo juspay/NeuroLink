@@ -31,6 +31,7 @@ import type {
   SizeTier,
 } from "./types.js";
 import { SIZE_TIER_THRESHOLDS } from "./types.js";
+import type { STTOptions } from "../types/sttTypes.js";
 
 /** Default maximum files in registry before LRU eviction */
 const DEFAULT_MAX_FILES = 100;
@@ -99,12 +100,14 @@ export class FileReferenceRegistry {
    * @param buffer - File content as Buffer
    * @param source - How the file was provided ('buffer', 'url', 'path', 'datauri')
    * @param options - Registration options
+   * @param processingOptions - Request-scoped STT and provider options
    * @returns FileReference with metadata and preview
    */
   async register(
     buffer: Buffer,
     source: FileSource = "buffer",
     options: FileRegistrationOptions = {},
+    processingOptions?: { sttOptions?: STTOptions; provider?: string },
   ): Promise<FileReference> {
     const sizeBytes = buffer.length;
 
@@ -160,6 +163,7 @@ export class FileReferenceRegistry {
       registeredAt: Date.now(),
       lastAccessedAt: Date.now(),
       extension: ext || undefined,
+      processingOptions,
     };
 
     // Persist buffer to temp directory (unless skipped or tiny)
@@ -1076,7 +1080,12 @@ export class FileReferenceRegistry {
           extractedText = await this.extractVideoContent(buffer, ref);
           break;
         case "audio":
-          extractedText = await this.extractAudioContent(buffer, ref);
+          extractedText = await this.extractAudioContent(
+            buffer,
+            ref,
+            ref.processingOptions?.sttOptions,
+            ref.processingOptions?.provider,
+          );
           break;
         case "archive":
           extractedText = await this.extractArchiveContent(buffer, ref);
@@ -1323,18 +1332,26 @@ export class FileReferenceRegistry {
   private async extractAudioContent(
     buffer: Buffer,
     ref: FileReference,
+    sttOptions?: import("../types/sttTypes.js").STTOptions,
+    provider?: string,
   ): Promise<string | null> {
     try {
       const { processAudio } = await import(
         "../processors/media/AudioProcessor.js"
       );
-      const result = await processAudio({
-        id: ref.id,
-        name: ref.filename,
-        mimetype: ref.mimeType,
-        size: ref.sizeBytes,
-        buffer,
-      });
+      const result = await processAudio(
+        {
+          id: ref.id,
+          name: ref.filename,
+          mimetype: ref.mimeType,
+          size: ref.sizeBytes,
+          buffer,
+        },
+        {
+          sttOptions,
+          provider,
+        },
+      );
       if (!result.success || !result.data) {
         return null;
       }

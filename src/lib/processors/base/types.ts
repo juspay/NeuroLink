@@ -8,6 +8,7 @@
  */
 
 import type { FileErrorCode } from "../errors/FileErrorCode.js";
+import type { STTOptions } from "../../types/sttTypes.js";
 
 // =============================================================================
 // FILE INFORMATION
@@ -186,6 +187,10 @@ export type ProcessOptions = {
   timeout?: number;
   /** Retry configuration for transient failures */
   retryConfig?: RetryConfig;
+  /** Speech-to-Text options for audio files */
+  sttOptions?: STTOptions;
+  /** Provider string for contextual operations */
+  provider?: string;
 };
 
 // =============================================================================

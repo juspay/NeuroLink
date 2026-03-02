@@ -12,6 +12,7 @@ import type {
   VideoOutputOptions,
 } from "./multimodal.js";
 import type { PPTGenerationResult, PPTOutputOptions } from "./pptTypes.js";
+import type { STTOptions } from "./sttTypes.js";
 import type { TTSOptions, TTSResult } from "./ttsTypes.js";
 import type {
   StandardRecord,
@@ -107,6 +108,59 @@ export type GenerateOptions = {
     format?: "jpeg" | "png"; // Frame format (default: jpeg)
     transcribeAudio?: boolean; // Extract and transcribe audio (default: false)
   };
+
+  /**
+   * Speech-to-Text (STT) configuration
+   *
+   * Enable audio transcription using Google Cloud Speech-to-Text v1 API.
+   * Audio files passed via `input.files` will be automatically transcribed
+   * and injected into the prompt (or returned directly).
+   *
+   * **Authentication**: Requires `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+   * pointing to a service account JSON key file with `roles/speech.client` permission.
+   *
+   * @example Basic transcription with AI summary
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Summarize this meeting", files: ["meeting.mp3"] },
+   *   provider: "google-ai",
+   *   sttOptions: {
+   *     language: "en-IN",
+   *     model: "default"
+   *   }
+   * });
+   * console.log(result.content); // AI-generated summary of transcript
+   * ```
+   *
+   * @example Direct transcription (no AI processing)
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "", files: ["audio.wav"] },
+   *   provider: "vertex",
+   *   sttOptions: {
+   *     language: "hi-IN",
+   *     model: "latest_long",
+   *     useAIResponse: false  // Return raw transcript directly
+   *   }
+   * });
+   * console.log(result.content); // Raw transcript text
+   * ```
+   *
+   * @example Advanced options
+   * ```typescript
+   * const result = await neurolink.generate({
+   *   input: { text: "Extract action items", files: ["call.m4a"] },
+   *   sttOptions: {
+   *     language: "en-US",
+   *     model: "latest_short",
+   *     enableAutomaticPunctuation: true,
+   *     profanityFilter: false,
+   *     sampleRateHertz: 16000
+   *   }
+   * });
+   * ```
+   */
+  sttOptions?: STTOptions;
 
   /**
    * Text-to-Speech (TTS) configuration
@@ -816,6 +870,17 @@ export type TextGenerationOptions = {
     maxRows?: number;
     formatStyle?: "raw" | "markdown" | "json";
     includeHeaders?: boolean;
+  };
+
+  // STT Processing Options
+  sttOptions?: STTOptions;
+
+  // Video Processing Options
+  videoOptions?: {
+    frames?: number;
+    quality?: number;
+    format?: "jpeg" | "png";
+    transcribeAudio?: boolean;
   };
 
   enableSummarization?: boolean; // Enable/disable summarization for this specific request

@@ -84,6 +84,45 @@ export class MessageBuilder {
   ) {}
 
   /**
+   * Build multimodal options object from TextGenerationOptions or StreamOptions
+   * Extracted to avoid duplication between buildMessages and buildMessagesForStream
+   */
+  private buildMultimodalOptions(
+    options: TextGenerationOptions | StreamOptions,
+  ): Parameters<typeof buildMultimodalMessagesArray>[0] {
+    const input = options.input as MultimodalInput | undefined;
+    return {
+      input: {
+        text:
+          (options as TextGenerationOptions).prompt ||
+          options.input?.text ||
+          "",
+        images: input?.images,
+        content: input?.content,
+        csvFiles: input?.csvFiles,
+        pdfFiles: input?.pdfFiles,
+        files: input?.files,
+      },
+      csvOptions: options.csvOptions,
+      provider: options.provider,
+      model: options.model,
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      systemPrompt: options.systemPrompt,
+      enableAnalytics: options.enableAnalytics,
+      enableEvaluation: options.enableEvaluation,
+      context: options.context,
+      conversationHistory: (options as TextGenerationOptions)
+        .conversationMessages,
+      schema: options.schema,
+      output: options.output,
+      fileRegistry: (options as Record<string, unknown>).fileRegistry,
+      sttOptions: options.sttOptions,
+      videoOptions: options.videoOptions,
+    };
+  }
+
+  /**
    * Build messages array for generation
    * Detects multimodal input and routes to appropriate message builder
    */
@@ -109,30 +148,7 @@ export class MessageBuilder {
             );
           }
 
-          const input = options.input as MultimodalInput | undefined;
-          const multimodalOptions = {
-            input: {
-              text: options.prompt || options.input?.text || "",
-              images: input?.images,
-              content: input?.content,
-              csvFiles: input?.csvFiles,
-              pdfFiles: input?.pdfFiles,
-              files: input?.files,
-            },
-            csvOptions: options.csvOptions,
-            provider: options.provider,
-            model: options.model,
-            temperature: options.temperature,
-            maxTokens: options.maxTokens,
-            systemPrompt: options.systemPrompt,
-            enableAnalytics: options.enableAnalytics,
-            enableEvaluation: options.enableEvaluation,
-            context: options.context,
-            conversationHistory: options.conversationMessages,
-            schema: options.schema,
-            output: options.output,
-            fileRegistry: options.fileRegistry,
-          };
+          const multimodalOptions = this.buildMultimodalOptions(options);
 
           messages = await buildMultimodalMessagesArray(
             multimodalOptions,
@@ -235,34 +251,7 @@ export class MessageBuilder {
             );
           }
 
-          const input = options.input as MultimodalInput | undefined;
-          const multimodalOptions = {
-            input: {
-              text:
-                (options as TextGenerationOptions).prompt ||
-                options.input?.text ||
-                "",
-              images: input?.images,
-              content: input?.content,
-              csvFiles: input?.csvFiles,
-              pdfFiles: input?.pdfFiles,
-              files: input?.files,
-            },
-            csvOptions: options.csvOptions,
-            provider: options.provider,
-            model: options.model,
-            temperature: options.temperature,
-            maxTokens: options.maxTokens,
-            systemPrompt: options.systemPrompt,
-            enableAnalytics: options.enableAnalytics,
-            enableEvaluation: options.enableEvaluation,
-            context: options.context,
-            conversationHistory: (options as TextGenerationOptions)
-              .conversationMessages,
-            schema: options.schema,
-            output: options.output,
-            fileRegistry: (options as Record<string, unknown>).fileRegistry,
-          };
+          const multimodalOptions = this.buildMultimodalOptions(options);
 
           messages = await buildMultimodalMessagesArray(
             multimodalOptions,

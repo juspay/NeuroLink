@@ -39,6 +39,13 @@
 
 import { parseBuffer, selectCover } from "music-metadata";
 
+import {
+  hasGoogleCloudCredentials,
+  transcribe,
+  validateSTTOptions,
+} from "../../stt/index.js";
+import type { STTOptions } from "../../types/sttTypes.js";
+import { logger } from "../../utils/logger.js";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
@@ -328,12 +335,13 @@ export class AudioProcessor extends BaseFileProcessor<ProcessedAudio> {
       // Step 6: Extract embedded cover art if present
       const coverArt = this.extractCoverArt(audioMetadata);
 
-      // Step 7: Attempt transcription if API key is available
+      // Step 7: Attempt transcription if STT options or API key is available
       const filename = this.getFilename(fileInfo);
       const transcriptionResult = await this.attemptTranscription(
         buffer,
         filename,
         fileInfo.mimetype,
+        options?.sttOptions,
       );
 
       // Step 8: Build LLM-friendly text content (includes transcript if available)
@@ -396,13 +404,12 @@ export class AudioProcessor extends BaseFileProcessor<ProcessedAudio> {
   // ===========================================================================
 
   /**
-   * Attempt to transcribe audio using the Vercel AI SDK's `transcribe()` function
-   * with the OpenAI Whisper model.
+   * Attempt to transcribe audio using Google Cloud STT v1 or OpenAI Whisper.
    *
-   * Transcription is attempted when:
-   * 1. `OPENAI_API_KEY` environment variable is set
-   * 2. File size is within Whisper's 25MB limit
-   * 3. File format is supported by Whisper
+   * Transcription priority:
+   * 1. Google Cloud STT v1 (if sttOptions provided and GOOGLE_APPLICATION_CREDENTIALS available)
+   * 2. OpenAI Whisper (if OPENAI_API_KEY available, automatic fallback)
+   * 3. No transcription (metadata-only)
    *
    * Gracefully degrades: if transcription fails for any reason, metadata-only
    * output is returned (transcription is additive, never blocks processing).
@@ -410,34 +417,143 @@ export class AudioProcessor extends BaseFileProcessor<ProcessedAudio> {
    * @param buffer - Audio file content
    * @param filename - Original filename (used for format detection)
    * @param mimetype - MIME type of the audio file
+   * @param sttOptions - Optional Google Cloud STT v1 configuration
    * @returns Transcription result with transcript text, or empty result
    */
   private async attemptTranscription(
     buffer: Buffer,
     filename: string,
     mimetype: string | undefined,
+    sttOptions?: STTOptions,
   ): Promise<{
     transcript: string | undefined;
     hasTranscript: boolean;
     transcriptionProvider: string | undefined;
   }> {
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-1] Starting attemptTranscription",
+      {
+        filename,
+        mimetype,
+        bufferSize: buffer.length,
+        bufferSizeMB: (buffer.length / (1024 * 1024)).toFixed(2),
+        hasSttOptions: !!sttOptions,
+        sttOptions,
+      },
+    );
+
     const emptyResult = {
       transcript: undefined,
       hasTranscript: false,
       transcriptionProvider: undefined,
     };
 
-    // Check if OPENAI_API_KEY is available
+    // Priority 1: Try Google Cloud STT v1 if options and credentials are available
+    if (sttOptions) {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-2] STT options provided, validating...",
+      );
+      validateSTTOptions(sttOptions); // fail fast on invalid config
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-3] STT options validated successfully",
+      );
+    }
+
+    const hasCredentials = hasGoogleCloudCredentials();
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-4] Checking Google Cloud credentials",
+      {
+        hasCredentials,
+        GOOGLE_APPLICATION_CREDENTIALS:
+          process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      },
+    );
+
+    if (sttOptions && hasCredentials) {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-5] Attempting Google Cloud STT transcription",
+        {
+          language: sttOptions.language,
+          model: sttOptions.model,
+          useAIResponse: sttOptions.useAIResponse,
+        },
+      );
+      try {
+        const result = await transcribe(buffer, sttOptions);
+        logger.info(
+          "[AUDIO-PROCESSOR-STT-CHECKPOINT-6] Google Cloud STT transcription completed",
+          {
+            hasTranscript: !!result.transcript,
+            transcriptLength: result.transcript?.length || 0,
+            confidence: result.confidence,
+          },
+        );
+        const transcript = result.transcript?.trim();
+        if (transcript) {
+          logger.info(
+            "[AUDIO-PROCESSOR-STT-CHECKPOINT-7] Returning Google Cloud STT result",
+          );
+          return {
+            transcript,
+            hasTranscript: true,
+            transcriptionProvider: "google-cloud-stt",
+          };
+        } else {
+          logger.info(
+            "[AUDIO-PROCESSOR-STT-CHECKPOINT-8] Google Cloud STT returned empty transcript",
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          `[AUDIO-PROCESSOR-STT-CHECKPOINT-9] Google Cloud STT failed, falling back to Whisper`,
+          err,
+        );
+      }
+    } else {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-10] Skipping Google Cloud STT",
+        {
+          hasSttOptions: !!sttOptions,
+          hasCredentials,
+          reason: !sttOptions ? "No STT options provided" : "No credentials",
+        },
+      );
+    }
+
+    // Priority 2: Fallback to OpenAI Whisper if API key is available
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-11] Attempting Whisper fallback",
+    );
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-12] No OpenAI API key available, returning empty result",
+      );
       return emptyResult;
     }
 
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-13] OpenAI API key found, checking file size",
+    );
     // Check file size (Whisper limit is 25MB)
     const fileSizeMB = buffer.length / (1024 * 1024);
     if (fileSizeMB > AUDIO_CONFIG.WHISPER_MAX_SIZE_MB) {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-14] File too large for Whisper",
+        {
+          fileSizeMB: fileSizeMB.toFixed(2),
+          maxSizeMB: AUDIO_CONFIG.WHISPER_MAX_SIZE_MB,
+        },
+      );
       return emptyResult;
     }
+
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-15] File size acceptable for Whisper",
+      {
+        fileSizeMB: fileSizeMB.toFixed(2),
+      },
+    );
 
     // Check if file format is supported by Whisper
     const ext = filename.split(".").pop()?.toLowerCase();
@@ -453,25 +569,60 @@ export class AudioProcessor extends BaseFileProcessor<ProcessedAudio> {
         mimetype.startsWith("audio/ogg") ||
         mimetype.startsWith("audio/x-m4a"));
 
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-16] Checking Whisper format support",
+      {
+        ext,
+        isFormatSupported,
+        isMimeSupported,
+        mimetype,
+      },
+    );
+
     if (!isFormatSupported && !isMimeSupported) {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-17] Format not supported by Whisper, returning empty result",
+      );
       return emptyResult;
     }
 
+    logger.info(
+      "[AUDIO-PROCESSOR-STT-CHECKPOINT-18] Format supported by Whisper, attempting transcription",
+    );
+
     try {
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-19] Loading Whisper dependencies dynamically",
+      );
       // Dynamic imports to avoid loading these modules when transcription is not needed
       const [{ createOpenAI }, { experimental_transcribe }] = await Promise.all(
         [import("@ai-sdk/openai"), import("ai")],
       );
 
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-20] Creating OpenAI client for Whisper",
+      );
       const openai = createOpenAI({ apiKey });
       const model = openai.transcription("whisper-1");
 
+      logger.info("[AUDIO-PROCESSOR-STT-CHECKPOINT-21] Calling Whisper API");
       const result = await experimental_transcribe({
         model,
         audio: buffer,
       });
 
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-22] Whisper API call completed",
+        {
+          hasText: !!result.text,
+          textLength: result.text?.length || 0,
+        },
+      );
+
       if (result.text && result.text.trim().length > 0) {
+        logger.info(
+          "[AUDIO-PROCESSOR-STT-CHECKPOINT-23] Returning Whisper transcription result",
+        );
         return {
           transcript: result.text.trim(),
           hasTranscript: true,
@@ -479,10 +630,17 @@ export class AudioProcessor extends BaseFileProcessor<ProcessedAudio> {
         };
       }
 
+      logger.info(
+        "[AUDIO-PROCESSOR-STT-CHECKPOINT-24] Whisper returned empty transcript",
+      );
       return emptyResult;
-    } catch {
+    } catch (error) {
       // Transcription is best-effort — never fail the entire processing pipeline
       // Common failures: rate limiting, network issues, unsupported audio encoding
+      logger.warn(
+        `[AUDIO-PROCESSOR-STT-CHECKPOINT-25] Whisper transcription failed for ${filename}:`,
+        error,
+      );
       return emptyResult;
     }
   }

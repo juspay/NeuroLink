@@ -888,6 +888,41 @@ function appendDetectedFileResult(
     }
     logger.info(`[FileDetector] ✅ Video: ${filename}`);
   } else if (result.type === "audio") {
+    // Track ALL transcripts for direct return mode (useAIResponse: false)
+    // This includes both Google Cloud STT and Whisper fallback transcripts
+    logger.debug(
+      `[MessageBuilder] Audio file detected: hasTranscript=${result.metadata?.hasTranscript}, contentLength=${result.content?.toString().length || 0}, provider=${result.metadata?.transcriptionProvider}`,
+    );
+
+    if (result.metadata?.hasTranscript && result.metadata.rawTranscript) {
+      // Store transcript separately for direct STT mode
+      const optionsWithTranscripts = options as GenerateOptions & {
+        _sttTranscripts?: Array<{
+          filename: string;
+          transcript: string;
+          provider: string;
+        }>;
+      };
+
+      if (!optionsWithTranscripts._sttTranscripts) {
+        optionsWithTranscripts._sttTranscripts = [];
+      }
+      optionsWithTranscripts._sttTranscripts.push({
+        filename,
+        transcript: result.metadata.rawTranscript as string,
+        provider:
+          (result.metadata.transcriptionProvider as string | undefined) ||
+          "unknown",
+      });
+      logger.info(
+        `[MessageBuilder] Tracked transcript for direct mode: ${result.metadata.transcriptionProvider}, length: ${(result.metadata.rawTranscript as string).length}`,
+      );
+    } else {
+      logger.warn(
+        `[MessageBuilder] Audio file has no transcript: hasTranscript=${result.metadata?.hasTranscript}, contentExists=${!!result.content}, metadata=${JSON.stringify(result.metadata)}`,
+      );
+    }
+
     if (result.content) {
       options.input.text += `\n\n## Audio File: "${filename}"\n${result.content}\n`;
     }
@@ -982,17 +1017,34 @@ async function processUnifiedFilesArray(
     | FileReferenceRegistry
     | undefined;
 
+  // Processing options for STT transcription (passed per-file to registry)
+  const processingOptions =
+    options.sttOptions || provider
+      ? {
+          sttOptions: options.sttOptions,
+          provider: provider,
+        }
+      : undefined;
+
   for (let fileIdx = 0; fileIdx < options.input.files.length; fileIdx++) {
     const file = options.input.files[fileIdx];
     try {
       // ─── Lazy file registration path ──────────────────────────────
+      // IMPORTANT: Skip lazy registration if STT transcription is required
+      // (lazy registration bypasses full processing, which prevents transcription)
+      const requiresSTTProcessing = !!options.sttOptions;
       const fileSize = fileRegistry ? getFileSize(file) : 0;
-      if (fileRegistry && fileSize > SIZE_TIER_THRESHOLDS.TINY_MAX) {
+      if (
+        fileRegistry &&
+        fileSize > SIZE_TIER_THRESHOLDS.TINY_MAX &&
+        !requiresSTTProcessing
+      ) {
         const registered = await tryRegisterFileReference(
           file,
           fileSize,
           fileRegistry,
           fileIdx,
+          processingOptions,
         );
         if (registered) {
           continue;
@@ -1019,6 +1071,7 @@ async function processUnifiedFilesArray(
           "unknown",
         ],
         csvOptions: options.csvOptions,
+        sttOptions: options.sttOptions,
         provider: provider,
       });
 
@@ -1935,6 +1988,10 @@ async function tryRegisterFileReference(
   fileSize: number,
   registry: FileReferenceRegistry,
   index: number = 0,
+  processingOptions?: {
+    sttOptions?: import("../types/sttTypes.js").STTOptions;
+    provider?: string;
+  },
 ): Promise<boolean> {
   try {
     const buffer = await getFileBuffer(file);
@@ -1942,7 +1999,12 @@ async function tryRegisterFileReference(
       return false;
     }
     const filename = extractFilename(file, index);
-    await registry.register(buffer, getFileSource(file), { filename });
+    await registry.register(
+      buffer,
+      getFileSource(file),
+      { filename },
+      processingOptions,
+    );
     logger.info(
       `[FileDetector] Registered "${filename}" (${(fileSize / 1024).toFixed(0)} KB) ` +
         `as lazy reference — skipping upfront processing`,

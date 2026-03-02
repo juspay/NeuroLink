@@ -25,6 +25,8 @@ export const textGenerationOptionsSchema: Record<
     | "evaluationCriteria"
     | "region"
     | "csvOptions"
+    | "sttOptions"
+    | "videoOptions"
     | "tts"
     | "thinkingConfig" // Complex object, use thinking/thinkingBudget instead
     | "requestId" // Observability ID, not CLI-settable

@@ -151,7 +151,36 @@ export class CLICommandFactory {
     file: {
       type: "string" as const,
       description:
-        "Add file with auto-detection (CSV, image, etc. - can be used multiple times)",
+        "Add file with auto-detection (CSV, image, audio, etc. - can be used multiple times)",
+    },
+    "stt-language": {
+      type: "string" as const,
+      default: "en-IN",
+      description:
+        "Language code for audio transcription (e.g., en-IN, hi-IN, en-US)",
+    },
+    "stt-model": {
+      type: "string" as const,
+      choices: ["default", "latest_long", "latest_short", "command_and_search"],
+      default: "default",
+      description:
+        "Google Cloud STT v1 model (default, latest_long, latest_short, command_and_search)",
+    },
+    "stt-punctuation": {
+      type: "boolean" as const,
+      default: true,
+      description: "Enable automatic punctuation in transcription",
+    },
+    "stt-filter": {
+      type: "boolean" as const,
+      default: false,
+      description: "Filter profanity in transcription",
+    },
+    "stt-direct": {
+      type: "boolean" as const,
+      default: false,
+      description:
+        "Return raw transcript without AI processing (useAIResponse: false)",
     },
     csvMaxRows: {
       type: "number" as const,
@@ -2134,6 +2163,55 @@ export class CLICommandFactory {
         ...(files && { files }),
       };
 
+      // Build STT options only if meaningful values are present
+      logger.info(
+        "[CLI-STT-CHECKPOINT-1] Building STT options from CLI arguments",
+        {
+          sttLanguage: argv.sttLanguage,
+          sttModel: argv.sttModel,
+          sttPunctuation: argv.sttPunctuation,
+          sttFilter: argv.sttFilter,
+          sttDirect: argv.sttDirect,
+        },
+      );
+
+      const sttOptions: Record<string, unknown> = {};
+      if (argv.sttLanguage !== undefined) {
+        sttOptions.language = argv.sttLanguage;
+      }
+      if (argv.sttModel !== undefined && argv.sttModel !== "default") {
+        sttOptions.model = argv.sttModel;
+      }
+      if (argv.sttPunctuation !== undefined) {
+        sttOptions.enableAutomaticPunctuation = argv.sttPunctuation;
+      }
+      if (argv.sttFilter !== undefined) {
+        sttOptions.profanityFilter = argv.sttFilter;
+      }
+      if (argv.sttDirect === true) {
+        sttOptions.useAIResponse = false;
+        logger.info(
+          "[CLI-STT-CHECKPOINT-2] STT Direct mode enabled - AI response will be skipped",
+        );
+      }
+
+      logger.info("[CLI-STT-CHECKPOINT-3] Final STT options object:", {
+        sttOptions,
+        hasOptions: Object.keys(sttOptions).length > 0,
+        willBePassed: Object.keys(sttOptions).length > 0,
+      });
+
+      if (options.debug || argv.debug) {
+        logger.debug("[CLI] STT Configuration:", {
+          sttLanguage: argv.sttLanguage,
+          sttModel: argv.sttModel,
+          sttPunctuation: argv.sttPunctuation,
+          sttFilter: argv.sttFilter,
+          sttDirect: argv.sttDirect,
+          sttOptions,
+        });
+      }
+
       const result = await sdk.generate({
         input: generateInput,
         csvOptions: {
@@ -2144,6 +2222,7 @@ export class CLICommandFactory {
             | "json"
             | undefined,
         },
+        sttOptions: Object.keys(sttOptions).length > 0 ? sttOptions : undefined,
         videoOptions: {
           frames: argv.videoFrames as number | undefined,
           quality: argv.videoQuality as number | undefined,
@@ -2454,6 +2533,58 @@ export class CLICommandFactory {
       argv.file as string | string[] | undefined,
     );
 
+    // Build STT options only if meaningful values are present
+    logger.info(
+      "[CLI-STREAM-STT-CHECKPOINT-1] Building STT options for stream from CLI arguments",
+      {
+        sttLanguage: argv.sttLanguage,
+        sttModel: argv.sttModel,
+        sttPunctuation: argv.sttPunctuation,
+        sttFilter: argv.sttFilter,
+        sttDirect: argv.sttDirect,
+      },
+    );
+
+    const streamSttOptions: Record<string, unknown> = {};
+    if (argv.sttLanguage !== undefined) {
+      streamSttOptions.language = argv.sttLanguage;
+    }
+    if (argv.sttModel !== undefined && argv.sttModel !== "default") {
+      streamSttOptions.model = argv.sttModel;
+    }
+    if (argv.sttPunctuation !== undefined) {
+      streamSttOptions.enableAutomaticPunctuation = argv.sttPunctuation;
+    }
+    if (argv.sttFilter !== undefined) {
+      streamSttOptions.profanityFilter = argv.sttFilter;
+    }
+    if (argv.sttDirect === true) {
+      streamSttOptions.useAIResponse = false;
+      logger.info(
+        "[CLI-STREAM-STT-CHECKPOINT-2] STT Direct mode enabled for stream - AI response will be skipped",
+      );
+    }
+
+    logger.info(
+      "[CLI-STREAM-STT-CHECKPOINT-3] Final stream STT options object:",
+      {
+        sttOptions: streamSttOptions,
+        hasOptions: Object.keys(streamSttOptions).length > 0,
+        willBePassed: Object.keys(streamSttOptions).length > 0,
+      },
+    );
+
+    if (options.debug || argv.debug) {
+      logger.debug("[CLI] Stream STT Configuration:", {
+        sttLanguage: argv.sttLanguage,
+        sttModel: argv.sttModel,
+        sttPunctuation: argv.sttPunctuation,
+        sttFilter: argv.sttFilter,
+        sttDirect: argv.sttDirect,
+        sttOptions: streamSttOptions,
+      });
+    }
+
     const stream = await sdk.stream({
       input: {
         text: inputText,
@@ -2467,6 +2598,8 @@ export class CLICommandFactory {
         maxRows: argv.csvMaxRows as number | undefined,
         formatStyle: argv.csvFormat as "raw" | "markdown" | "json" | undefined,
       },
+      sttOptions:
+        Object.keys(streamSttOptions).length > 0 ? streamSttOptions : undefined,
       videoOptions: {
         frames: argv.videoFrames as number | undefined,
         quality: argv.videoQuality as number | undefined,
@@ -3001,6 +3134,24 @@ export class CLICommandFactory {
             ? { ...contextMetadata, sessionId }
             : contextMetadata;
 
+          // Build STT options only if meaningful values are present
+          const batchSttOptions: Record<string, unknown> = {};
+          if (argv.sttLanguage !== undefined) {
+            batchSttOptions.language = argv.sttLanguage;
+          }
+          if (argv.sttModel !== undefined && argv.sttModel !== "default") {
+            batchSttOptions.model = argv.sttModel;
+          }
+          if (argv.sttPunctuation !== undefined) {
+            batchSttOptions.enableAutomaticPunctuation = argv.sttPunctuation;
+          }
+          if (argv.sttFilter !== undefined) {
+            batchSttOptions.profanityFilter = argv.sttFilter;
+          }
+          if (argv.sttDirect === true) {
+            batchSttOptions.useAIResponse = false;
+          }
+
           const result = await sdk.generate({
             input: { text: inputText },
             provider: enhancedOptions.provider,
@@ -3012,6 +3163,10 @@ export class CLICommandFactory {
               ? enhancedOptions.timeout * 1000
               : undefined,
             disableTools: enhancedOptions.disableTools,
+            sttOptions:
+              Object.keys(batchSttOptions).length > 0
+                ? batchSttOptions
+                : undefined,
             evaluationDomain: enhancedOptions.evaluationDomain as
               | string
               | undefined,

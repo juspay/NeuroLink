@@ -119,6 +119,10 @@ export type FileProcessingResult = {
     // Video-specific metadata
     frameCount?: number;
     hasKeyframes?: boolean;
+    // Audio STT metadata
+    hasTranscript?: boolean;
+    transcriptionProvider?: string;
+    rawTranscript?: string; // Raw transcript text for direct mode
   };
 };
 
@@ -355,6 +359,8 @@ export type FileDetectorOptions = {
   officeOptions?: OfficeProcessorOptions;
   confidenceThreshold?: number;
   provider?: string;
+  /** Speech-to-Text options for audio files */
+  sttOptions?: import("./sttTypes.js").STTOptions;
   /** Maximum number of retry attempts for network requests (default: 3) */
   maxRetries?: number;
   /** Initial retry delay in milliseconds with exponential backoff (default: 1000) */

@@ -18,6 +18,7 @@ import type {
   FileSource,
   FileType,
 } from "../types/fileTypes.js";
+import type { STTOptions } from "../types/sttTypes.js";
 import { CSVProcessor } from "./csvProcessor.js";
 import { ImageProcessor } from "./imageProcessor.js";
 import { logger } from "./logger.js";
@@ -281,26 +282,12 @@ export class FileDetector {
         `[FileDetector] All fallback parsing failed for type "${detection.type}". ` +
           `Attempted: ${options.allowedTypes.join(", ")}. Falling through to universal handler.`,
       );
-      const csvOptions: CSVProcessorOptions | undefined = options?.csvOptions;
-      return await FileDetector.processFile(
-        content,
-        detection,
-        csvOptions,
-        options?.provider,
-      );
+      return await FileDetector.processFile(content, detection, options);
     }
 
     const content = await FileDetector.loadContent(input, detection, options);
 
-    // Extract CSV-specific options from FileDetectorOptions
-    const csvOptions: CSVProcessorOptions | undefined = options?.csvOptions;
-
-    return await FileDetector.processFile(
-      content,
-      detection,
-      csvOptions,
-      options?.provider,
-    );
+    return await FileDetector.processFile(content, detection, options);
   }
 
   /**
@@ -959,16 +946,19 @@ export class FileDetector {
   private static async processFile(
     content: Buffer,
     detection: FileDetectionResult,
-    options?: CSVProcessorOptions,
-    provider?: string,
+    options?: FileDetectorOptions,
   ): Promise<FileProcessingResult> {
+    const csvOptions = options?.csvOptions;
+    const provider = options?.provider;
+    const sttOptions = options?.sttOptions;
+
     switch (detection.type) {
       case "csv":
         // Pass original extension through to CSV processor; if detection has none,
         // fall back to any extension provided in csvOptions.
         return await CSVProcessor.process(content, {
-          ...options,
-          extension: detection.extension ?? options?.extension,
+          ...csvOptions,
+          extension: detection.extension ?? csvOptions?.extension,
         });
       case "image":
         return await ImageProcessor.process(content);
@@ -981,7 +971,12 @@ export class FileDetector {
       case "video":
         return await FileDetector.processVideoFile(content, detection);
       case "audio":
-        return await FileDetector.processAudioFile(content, detection);
+        return await FileDetector.processAudioFile(
+          content,
+          detection,
+          sttOptions,
+          provider,
+        );
       case "archive":
         return await FileDetector.processArchiveFile(content, detection);
       case "xlsx":
@@ -1108,16 +1103,24 @@ export class FileDetector {
   private static async processAudioFile(
     content: Buffer,
     detection: FileDetectionResult,
+    sttOptions?: STTOptions,
+    provider?: string,
   ): Promise<FileProcessingResult> {
     const audioFilename = detection.metadata.filename || "audio";
     try {
-      const audioResult = await audioProcessor.processFile({
-        id: audioFilename,
-        name: audioFilename,
-        mimetype: detection.mimeType || "audio/mpeg",
-        size: content.length,
-        buffer: content,
-      });
+      const audioResult = await audioProcessor.processFile(
+        {
+          id: audioFilename,
+          name: audioFilename,
+          mimetype: detection.mimeType || "audio/mpeg",
+          size: content.length,
+          buffer: content,
+        },
+        {
+          sttOptions,
+          provider,
+        },
+      );
       if (audioResult.success && audioResult.data) {
         return {
           type: "audio",
@@ -1134,7 +1137,12 @@ export class FileDetector {
           images: audioResult.data.coverArt
             ? [audioResult.data.coverArt]
             : undefined,
-          metadata: detection.metadata,
+          metadata: {
+            ...detection.metadata,
+            hasTranscript: audioResult.data.hasTranscript,
+            transcriptionProvider: audioResult.data.transcriptionProvider,
+            rawTranscript: audioResult.data.transcript, // Pass raw transcript for direct mode
+          },
         };
       }
     } catch (audioError) {

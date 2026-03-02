@@ -13,6 +13,7 @@ import type { JsonValue, UnknownRecord } from "./common.js";
 import type { Content, ImageWithAltText } from "./content.js";
 import type { ChatMessage } from "./conversation.js";
 import type { AIModelProviderConfig } from "./providers.js";
+import type { STTOptions } from "./sttTypes.js";
 import type { TTSChunk, TTSOptions } from "./ttsTypes.js";
 import type { StandardRecord, ValidationSchema } from "./typeAliases.js";
 
@@ -263,6 +264,34 @@ export type StreamOptions = {
     format?: "jpeg" | "png"; // Frame format (default: jpeg)
     transcribeAudio?: boolean; // Extract and transcribe audio (default: false)
   };
+
+  /**
+   * Speech-to-Text (STT) configuration
+   *
+   * Enable audio transcription using Google Cloud Speech-to-Text v1 API.
+   * Audio files passed via `input.files` will be automatically transcribed
+   * and injected into the prompt (or returned directly).
+   *
+   * **Authentication**: Requires `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+   * pointing to a service account JSON key file with `roles/speech.client` permission.
+   *
+   * @example Basic streaming with transcribed audio
+   * ```typescript
+   * const result = await neurolink.stream({
+   *   input: { text: "Summarize this meeting", files: ["meeting.mp3"] },
+   *   provider: "google-ai",
+   *   sttOptions: {
+   *     language: "en-IN",
+   *     model: "default"
+   *   }
+   * });
+   *
+   * for await (const chunk of result.stream) {
+   *   process.stdout.write(chunk.content);
+   * }
+   * ```
+   */
+  sttOptions?: STTOptions;
 
   /**
    * Text-to-Speech (TTS) configuration for streaming

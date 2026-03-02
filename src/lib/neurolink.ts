@@ -2307,6 +2307,16 @@ Current user's request: ${currentInput}`;
               ? { input: { text: optionsOrPrompt } }
               : optionsOrPrompt;
 
+          // Clear any previous STT transcripts to prevent accumulation across calls
+          // This prevents the bug where reusing the same options object causes old transcripts to persist
+          if ((options as Record<string, unknown>)._sttTranscripts) {
+            delete (options as Record<string, unknown>)._sttTranscripts;
+          }
+
+          // Clear file registry to prevent file accumulation across generate() calls
+          // Files should be request-scoped, not persistent across multiple API calls
+          await this.fileRegistry.clear();
+
           // Set span attributes for observability
           generateSpan.setAttribute(
             "neurolink.provider",
@@ -2565,6 +2575,7 @@ Current user's request: ${currentInput}`;
               input: options.input, // This includes text, images, and content arrays
               region: options.region,
               tts: options.tts,
+              sttOptions: options.sttOptions,
               fileRegistry: this.fileRegistry,
               abortSignal: options.abortSignal,
               skipToolPromptInjection: options.skipToolPromptInjection,
@@ -2591,12 +2602,83 @@ Current user's request: ${currentInput}`;
               factoryResult,
             );
 
-            // Pass conversation memory config if available
-            if (this.conversationMemory) {
-              textOptions.conversationMemoryConfig =
-                this.conversationMemory.config;
-              // Include original prompt for context summarization
+            // Pass conversation memory config if available (works for lazy-init path too)
+            const memoryConfig =
+              this.conversationMemory?.config ??
+              this.conversationMemoryConfig?.conversationMemory;
+            if (memoryConfig) {
+              textOptions.conversationMemoryConfig = memoryConfig;
               textOptions.originalPrompt = originalPrompt;
+            }
+
+            // STT Direct Mode: When useAIResponse is false and we have STT options, process and return the files without AI generation
+            if (
+              options.sttOptions?.useAIResponse === false &&
+              options.input.files?.length
+            ) {
+              logger.debug(
+                "[STT] Direct transcription mode enabled (useAIResponse: false)",
+              );
+
+              // Process files to trigger transcription
+              // We need to build messages to process files, but won't use the messages for AI
+              const { buildMultimodalMessagesArray } = await import(
+                "./utils/messageBuilder.js"
+              );
+              // Add fileRegistry directly to options so _sttTranscripts gets added to the original object
+              options.fileRegistry = this.fileRegistry;
+              await withTimeout(
+                buildMultimodalMessagesArray(
+                  options,
+                  textOptions.provider || "google-ai",
+                  textOptions.model || "gemini-2.0-flash-exp",
+                ),
+                30_000,
+                ErrorFactory.toolTimeout("stt-transcription", 30_000),
+              );
+
+              // Check if we have STT transcripts
+              const sttTranscripts = (options as Record<string, unknown>)
+                ._sttTranscripts as
+                | Array<{
+                    filename: string;
+                    transcript: string;
+                    provider: string;
+                  }>
+                | undefined;
+
+              // Guard clause: Early return if no transcripts in direct mode
+              if (!sttTranscripts || sttTranscripts.length === 0) {
+                logger.error(
+                  "[STT] Direct mode enabled but no transcripts found",
+                );
+                return {
+                  content:
+                    "ERROR: STT direct mode enabled but no transcripts were generated. Please check your audio file and STT configuration.",
+                  finishReason: "error",
+                  provider: "google-cloud-stt",
+                  model: "google-cloud-stt-v1",
+                  usage: { input: 0, output: 0, total: 0 },
+                  responseTime: Date.now() - startTime,
+                  _sttOnly: true,
+                  _sttError: true,
+                };
+              }
+
+              // Return transcripts directly without AI processing
+              const transcriptContent = sttTranscripts
+                .map((t) => `[${t.filename}]\n${t.transcript}`)
+                .join("\n\n");
+
+              return {
+                content: transcriptContent,
+                finishReason: "stop",
+                provider: sttTranscripts[0].provider || "google-cloud-stt",
+                model: "google-cloud-stt-v1",
+                usage: { input: 0, output: 0, total: 0 },
+                responseTime: Date.now() - startTime,
+                _sttOnly: true,
+              };
             }
 
             // Detect and execute domain-specific tools
@@ -4731,6 +4813,16 @@ Current user's request: ${currentInput}`;
     const spanStartTime = Date.now();
 
     try {
+      // Clear any previous STT transcripts to prevent accumulation across calls
+      // This prevents the bug where reusing the same options object causes old transcripts to persist
+      if ((options as Record<string, unknown>)._sttTranscripts) {
+        delete (options as Record<string, unknown>)._sttTranscripts;
+      }
+
+      // Clear file registry to prevent file accumulation across stream() calls
+      // Files should be request-scoped, not persistent across multiple API calls
+      await this.fileRegistry.clear();
+
       const startTime = Date.now();
       const hrTimeStart = process.hrtime.bigint();
       const streamId = `neurolink-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -4785,6 +4877,112 @@ Current user's request: ${currentInput}`;
               startTime,
               hrTimeStart,
             );
+
+          // STT Direct Mode: When useAIResponse is false and we have STT options, process and return the transcripts without AI generation
+          if (
+            options.sttOptions?.useAIResponse === false &&
+            options.input.files?.length
+          ) {
+            logger.debug(
+              "[STT] Direct transcription mode enabled in stream (useAIResponse: false)",
+            );
+
+            // Process files to trigger transcription
+            // We need to build messages to process files, but won't use the messages for AI
+            const { buildMultimodalMessagesArray } = await import(
+              "./utils/messageBuilder.js"
+            );
+            // Add fileRegistry directly to options so _sttTranscripts gets added to the original object
+            options.fileRegistry = this.fileRegistry;
+            await withTimeout(
+              buildMultimodalMessagesArray(
+                options,
+                enhancedOptions.provider || "google-ai",
+                enhancedOptions.model || "gemini-2.0-flash-exp",
+              ),
+              30_000,
+              ErrorFactory.toolTimeout("stt-transcription", 30_000),
+            );
+
+            // Check if we have STT transcripts
+            const sttTranscripts = (options as Record<string, unknown>)
+              ._sttTranscripts as
+              | Array<{
+                  filename: string;
+                  transcript: string;
+                  provider: string;
+                }>
+              | undefined;
+
+            // Guard clause: Early return if no transcripts in direct mode
+            if (!sttTranscripts || sttTranscripts.length === 0) {
+              logger.error(
+                "[STT] Direct mode enabled in stream but no transcripts found",
+              );
+
+              // Return StreamResult with error message
+              const errorContent =
+                "ERROR: STT direct mode enabled but no transcripts were generated. Please check your audio file and STT configuration.";
+
+              return {
+                stream: (async function* () {
+                  yield { content: errorContent };
+                })(),
+                provider: "google-cloud-stt",
+                model: "google-cloud-stt-v1",
+                finishReason: "error",
+                usage: { input: 0, output: 0, total: 0 },
+                metadata: {
+                  streamId,
+                  startTime,
+                  responseTime: Date.now() - startTime,
+                  totalChunks: 1,
+                  error: "No STT transcripts generated",
+                },
+              } as StreamResult;
+            }
+
+            // Return transcripts directly without AI processing
+            const transcriptContent = sttTranscripts
+              .map((t) => `[${t.filename}]\n${t.transcript}`)
+              .join("\n\n");
+
+            logger.info("[STT] Returning direct transcription in stream mode", {
+              provider: sttTranscripts[0].provider,
+              transcriptLength: transcriptContent.length,
+              fileCount: sttTranscripts.length,
+            });
+
+            // End the span since we're returning early
+            streamSpan.setAttribute(
+              "neurolink.response_time_ms",
+              Date.now() - spanStartTime,
+            );
+            streamSpan.setAttribute(
+              ATTR.NL_OUTPUT_LENGTH,
+              transcriptContent.length,
+            );
+            streamSpan.setAttribute(ATTR.GEN_AI_FINISH_REASON, "stop");
+            streamSpan.setStatus({ code: SpanStatusCode.OK });
+            streamSpan.end();
+
+            // Return StreamResult with transcripts
+            return {
+              stream: (async function* () {
+                yield { content: transcriptContent };
+              })(),
+              provider: sttTranscripts[0].provider || "google-cloud-stt",
+              model: "google-cloud-stt-v1",
+              finishReason: "stop",
+              usage: { input: 0, output: 0, total: 0 },
+              metadata: {
+                streamId,
+                startTime,
+                responseTime: Date.now() - startTime,
+                totalChunks: 1,
+              },
+            } as StreamResult;
+          }
 
           const { stream: mcpStream, provider: providerName } =
             await this.createMCPStream(enhancedOptions);
