@@ -1,101 +1,220 @@
 <script lang="ts">
-  import {
-    Layers,
-    Wrench,
-    Activity,
-    ShieldCheck,
-    FileImage,
-    Database,
-  } from "lucide-svelte";
-  import { reveal } from "$lib/actions/reveal";
+  import { onMount, onDestroy } from "svelte";
+  import { activeSection } from "$lib/stores/canvasState";
 
-  const features = [
+  let sectionEl: HTMLElement;
+  let observer: IntersectionObserver;
+
+  onMount(() => {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) activeSection.set("streams");
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(sectionEl);
+  });
+
+  onDestroy(() => {
+    observer?.disconnect();
+  });
+
+  const STREAMS = [
     {
-      icon: Layers,
-      iconColor: "#016fb9",
-      iconBg: "rgb(1 111 185 / 12%)",
-      title: "13 AI Providers",
-      description:
-        "OpenAI, Anthropic, Google, AWS Bedrock, Azure, Mistral, LiteLLM, and more through one unified API.",
+      label: "TOKENS",
+      items: [
+        "anthropic",
+        "openai",
+        "gemini",
+        "bedrock",
+        "mistral",
+        "vertex",
+        "azure",
+        "ollama",
+        "litellm",
+        "hugging face",
+        "sagemaker",
+        "···",
+      ],
     },
     {
-      icon: Wrench,
-      iconColor: "#ff9505",
-      iconBg: "rgb(255 149 5 / 12%)",
-      title: "58+ MCP Tools",
-      description:
-        "Connect to GitHub, Slack, databases, file systems, and 50+ external servers via the Model Context Protocol.",
+      label: "TOOLS",
+      items: [
+        "github",
+        "postgres",
+        "slack",
+        "google drive",
+        "jira",
+        "filesystem",
+        "web search",
+        "notion",
+        "linear",
+        "stripe",
+        "58+ servers",
+        "···",
+      ],
     },
     {
-      icon: Activity,
-      iconColor: "#22c55e",
-      iconBg: "rgb(34 197 94 / 12%)",
-      title: "Streaming & Real-time",
-      description:
-        "First-class streaming with backpressure control, 24 event types, and real-time voice processing.",
+      label: "MEMORY",
+      items: [
+        "conversation",
+        "semantic recall",
+        "working memory",
+        "redis",
+        "vector index",
+        "context window",
+        "compaction",
+        "summarization",
+        "···",
+      ],
     },
     {
-      icon: ShieldCheck,
-      iconColor: "#a855f7",
-      iconBg: "rgb(168 85 247 / 12%)",
-      title: "Enterprise Security",
-      description:
-        "Production-grade auth providers, rate limiting, telemetry, Redis memory, and Langfuse observability.",
+      label: "KNOWLEDGE",
+      items: [
+        "pdf",
+        "markdown",
+        "xlsx",
+        "docx",
+        "csv",
+        "html",
+        "mp4",
+        "zip",
+        "svg",
+        "json",
+        "50+ formats",
+        "···",
+      ],
     },
     {
-      icon: FileImage,
-      iconColor: "#ec4899",
-      iconBg: "rgb(236 72 153 / 12%)",
-      title: "Multimodal Support",
-      description:
-        "Process images, PDFs, CSV, Excel, Word, code files, and 50+ formats natively in your prompts.",
+      label: "VOICE",
+      items: [
+        "text to speech",
+        "real-time audio",
+        "google tts",
+        "stream in",
+        "stream out",
+        "multimodal",
+        "···",
+      ],
     },
     {
-      icon: Database,
-      iconColor: "#06b6d4",
-      iconBg: "rgb(6 182 212 / 12%)",
-      title: "Three-Layer Memory",
-      description:
-        "Conversation history, semantic vector recall, and persistent working memory with pluggable vector store support (Pinecone, pgVector, Chroma, and more).",
+      label: "REASONING",
+      items: [
+        "workflows",
+        "chains",
+        "multi-agent",
+        "hitl",
+        "checkpointing",
+        "reflections",
+        "evals",
+        "···",
+      ],
     },
   ];
 </script>
 
-<section class="max-w-[1200px] mx-auto px-4 md:px-6 py-16 md:py-24">
-  <div use:reveal={{ y: 40 }} class="mb-8 md:mb-14">
-    <p class="eyebrow text-ds-text-muted mb-4">02 — Capabilities</p>
-    <h2 class="section-headline text-ds-text-primary">
-      Everything you need to build AI apps in TypeScript
+<section
+  bind:this={sectionEl}
+  data-topology-phase="streams"
+  class="section-streams py-20"
+>
+  <!-- Section header -->
+  <div class="max-w-[960px] mx-auto px-6 mb-16">
+    <p class="label-eyebrow mb-4">STREAMS</p>
+    <h2 class="headline-section font-display">
+      Thirteen sources.<br />One stream.
     </h2>
-    <p class="mt-4 text-lg text-ds-text-tertiary max-w-2xl">
-      A complete platform for building production AI applications — from simple
-      chat to multi-agent systems.
+    <p class="body-text max-w-lg mt-5">
+      Every type of AI intelligence flows through the same pipe. Pick your
+      sources. Shape the signal. Deliver to any organ.
     </p>
   </div>
 
-  <div
-    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-    use:reveal={{ y: 40, stagger: 0.12 }}
-  >
-    {#each features as feature}
-      <div
-        class="group bg-ds-surface-2 border border-ds-border rounded-xl p-5 md:p-6 hover:-translate-y-1 hover:border-ds-border-hover hover:shadow-card-hover transition-all duration-300 cursor-default"
-      >
-        <!-- Icon -->
+  <!-- 6 stream marquee rows -->
+  <div>
+    {#each STREAMS as stream, i}
+      <div class="stream-row">
+        <span class="stream-label">{stream.label}</span>
         <div
-          class="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
-          style:background={feature.iconBg}
+          class="stream-track"
+          style="--dir: {i % 2 === 0 ? 'normal' : 'reverse'}"
         >
-          <feature.icon size={20} color={feature.iconColor} strokeWidth={2} />
+          <div class="stream-inner">
+            {#each [...stream.items, ...stream.items] as item}
+              <span class="stream-item">{item}</span>
+            {/each}
+          </div>
         </div>
-
-        <h3 class="text-base font-semibold text-ds-text-primary mb-2">
-          {feature.title}
-        </h3>
-        <p class="text-sm text-ds-text-tertiary leading-relaxed">
-          {feature.description}
-        </p>
       </div>
     {/each}
   </div>
 </section>
+
+<style>
+  .stream-row {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.25rem 0;
+    border-top: 1px solid rgba(0, 240, 255, 0.1);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(0, 240, 255, 0.02) 50%,
+      transparent
+    );
+    overflow: hidden;
+  }
+
+  .stream-row:last-child {
+    border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  }
+
+  .stream-label {
+    flex-shrink: 0;
+    width: 8rem;
+    padding-left: 2rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    color: var(--color-nl-accent-lighter);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 375px) {
+    .stream-label {
+      width: 5rem;
+      padding-left: 1rem;
+      font-size: 0.55rem;
+    }
+  }
+
+  .stream-track {
+    flex: 1;
+    overflow: hidden;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 10%,
+      black 90%,
+      transparent
+    );
+  }
+
+  .stream-inner {
+    display: flex;
+    gap: 3.5rem;
+    white-space: nowrap;
+    animation: marquee 35s linear infinite;
+    animation-direction: var(--dir, normal);
+  }
+
+  .stream-item {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--color-text-body);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+</style>

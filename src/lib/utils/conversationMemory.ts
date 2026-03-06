@@ -365,8 +365,8 @@ export function buildContextFromPointer(
   // Construct context: summary message + recent messages
   const summaryMessage: ChatMessage = {
     id: `summary-${session.summarizedUpToMessageId}`,
-    role: "system",
-    content: `Previous conversation summary: ${session.summarizedMessage}`,
+    role: "user",
+    content: `[Previous conversation summary]: ${session.summarizedMessage}`,
     timestamp: new Date().toISOString(),
     metadata: {
       isSummary: true,

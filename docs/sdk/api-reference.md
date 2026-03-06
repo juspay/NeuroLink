@@ -1,3 +1,16 @@
+import Head from '@docusaurus/Head';
+
+<Head>
+  <script type="application/ld+json">{JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "NeuroLink SDK — Real-time AI Streaming",
+    "programmingLanguage": "TypeScript",
+    "codeRepository": "https://github.com/juspay/neurolink",
+    "license": "https://opensource.org/licenses/MIT"
+  })}</script>
+</Head>
+
 # API Reference
 
 Complete reference for NeuroLink's TypeScript API.

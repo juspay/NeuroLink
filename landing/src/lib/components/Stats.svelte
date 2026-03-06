@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { reveal } from "$lib/actions/reveal";
 
   const stats = [
     { value: 13, suffix: "+", label: "AI Providers" },
@@ -57,7 +56,7 @@
       const tw = gsap.to(obj, {
         val: target,
         duration: 2,
-        delay: i * 0.12,
+        delay: i * 0.15,
         ease: "power2.out",
         onUpdate() {
           el.textContent = Math.round(obj.val).toString();
@@ -70,28 +69,87 @@
 
 <section
   bind:this={sectionEl}
-  class="max-w-[1200px] mx-auto px-4 md:px-6 py-12 md:py-16"
+  class="stats-strip max-w-[1200px] mx-auto px-4 md:px-6 py-10 md:py-14"
 >
-  <div
-    class="grid grid-cols-2 lg:grid-cols-4 gap-4"
-    use:reveal={{ y: 40, stagger: 0.12 }}
-  >
+  <div class="stats-row">
     {#each stats as stat, i}
-      <div class="shine-border-hover group cursor-default">
-        <div
-          class="bg-ds-surface-2 rounded-xl p-4 md:p-6 text-center hover:-translate-y-1 transition-all duration-300 hover:shadow-card-hover"
-        >
-          <div
-            class="text-2xl sm:text-3xl md:text-4xl font-bold text-nl-accent mb-2"
-            style="text-shadow: 0 0 40px rgb(1 111 185 / 30%);"
+      <div class="stat-item">
+        <div class="stat-number font-display">
+          <span bind:this={counterEls[i]}>0</span><span class="stat-suffix"
+            >{stat.suffix}</span
           >
-            <span bind:this={counterEls[i]}>0</span>{stat.suffix}
-          </div>
-          <div class="text-sm text-ds-text-tertiary font-medium">
-            {stat.label}
-          </div>
         </div>
+        <div class="stat-label">{stat.label}</div>
       </div>
+      {#if i < stats.length - 1}
+        <div class="stat-divider" aria-hidden="true"></div>
+      {/if}
     {/each}
   </div>
 </section>
+
+<style>
+  .stats-strip {
+    border-top: 1px solid rgba(0, 210, 255, 0.08);
+    border-bottom: 1px solid rgba(0, 210, 255, 0.08);
+  }
+
+  .stats-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-item {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: clamp(3rem, 5vw, 4.5rem);
+    line-height: 1;
+    color: #ffffff;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-suffix {
+    font-size: 0.55em;
+    color: var(--color-nl-sky);
+    vertical-align: super;
+    line-height: 0;
+  }
+
+  .stat-label {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(160, 174, 192, 0.5);
+  }
+
+  .stat-divider {
+    width: 1px;
+    height: 3rem;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      rgba(0, 210, 255, 0.2),
+      transparent
+    );
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 480px) {
+    .stats-row {
+      gap: 0.5rem;
+    }
+    .stat-divider {
+      display: none;
+    }
+  }
+</style>

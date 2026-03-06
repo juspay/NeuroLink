@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CustomCursor from "$lib/components/CustomCursor.svelte";
+  import NeuralTopology from "$lib/components/NeuralTopology.svelte";
   import Hero from "$lib/components/Hero.svelte";
   import LogoMarquee from "$lib/components/LogoMarquee.svelte";
   import Stats from "$lib/components/Stats.svelte";
@@ -13,6 +15,8 @@
   import Footer from "$lib/components/Footer.svelte";
 </script>
 
+<CustomCursor />
+<NeuralTopology />
 <Hero />
 <LogoMarquee />
 <Stats />

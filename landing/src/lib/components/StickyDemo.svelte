@@ -1,181 +1,325 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { reveal } from "$lib/actions/reveal";
-  import { snippets } from "$lib/data/codeSnippets";
+  import { onMount, onDestroy } from "svelte";
+  import { activeSection } from "$lib/stores/canvasState";
 
-  let activeIndex = $state(0);
   let sectionEl: HTMLElement;
+  let observer: IntersectionObserver;
 
-  const useCases = [
+  onMount(() => {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) activeSection.set("pipe");
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(sectionEl);
+  });
+
+  onDestroy(() => {
+    observer?.disconnect();
+  });
+
+  const STAGES = [
     {
-      title: snippets.generate.label,
-      description: snippets.generate.description,
-      code: snippets.generate.shortCode,
+      id: "context",
+      label: "1. Context Building",
+      tag: "RAG · Memory · Files",
+      desc: "RAG retrieval, memory lookup, and file processing merge into the prompt before the model fires.",
+      code: `const result = await pipe.generate({
+  prompt: query,
+  rag: { files: ['./docs/guide.md'] },
+  memory: { enabled: true },
+});`,
     },
     {
-      title: snippets.stream.label,
-      description: snippets.stream.description,
-      code: snippets.stream.shortCode,
+      id: "budget",
+      label: "2. Budget Check",
+      tag: "Context Window",
+      desc: "BudgetChecker validates the assembled context fits the model's window. Triggers auto-compaction when over 80%.",
+      code: `// Automatic — no config needed
+// Triggers when context > 80% of window
+// 4-stage: prune → dedup → summarize → truncate`,
     },
     {
-      title: snippets.rag.label,
-      description: snippets.rag.description,
-      code: snippets.rag.shortCode,
+      id: "dispatch",
+      label: "3. Provider Dispatch",
+      tag: "13 Stream Sources",
+      desc: "ProviderRegistry routes to the correct neuron. Switch providers with one line — the rest of the pipe is unchanged.",
+      code: `const pipe = new NeuroLink({ defaultProvider: 'anthropic' });
+// Switch instantly — same pipe, different neuron:
+// defaultProvider: 'openai' | 'gemini' | 'bedrock'`,
     },
     {
-      title: snippets.agents.label,
-      description: snippets.agents.description,
-      code: snippets.agents.shortCode,
+      id: "stream",
+      label: "4. Stream Emission",
+      tag: "Continuous Flow",
+      desc: "Tokens flow as an async iterable. generate() is stream() collected — there is only stream().",
+      code: `// Everything is a stream
+for await (const token of pipe.stream({ prompt })) {
+  process.stdout.write(token); // arrive one by one
+}`,
+    },
+    {
+      id: "tools",
+      label: "5. Tool Interception",
+      tag: "58+ MCP Servers",
+      desc: "When the model calls a tool, the stream pauses, the MCP tool executes, the result injects, and the stream continues.",
+      code: `await pipe.addExternalMCPServer('github', {
+  transport: 'stdio',
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-github'],
+});`,
+    },
+    {
+      id: "observe",
+      label: "6. Observability",
+      tag: "Langfuse · OpenTelemetry",
+      desc: "Every stage emits spans. Full trace: context build → model → tools → memory persistence.",
+      code: `const pipe = new NeuroLink({
+  observability: {
+    langfuse: { enabled: true, publicKey: '...', secretKey: '...' },
+  },
+});`,
     },
   ];
 
-  onMount(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (!sectionEl) return;
+  let activeIdx = $state(0);
+  let codeVisible = $state(true);
 
-    const blocks = sectionEl.querySelectorAll("[data-sticky-block]");
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const idx = Number(entry.target.getAttribute("data-sticky-block"));
-            activeIndex = idx;
-          }
-        });
-      },
-      { rootMargin: "-40% 0px -40% 0px", threshold: 0 },
-    );
-
-    blocks.forEach((block) => observer.observe(block));
-
-    return () => observer.disconnect();
-  });
+  function setActive(idx: number) {
+    if (idx === activeIdx) return;
+    codeVisible = false;
+    setTimeout(() => {
+      activeIdx = idx;
+      codeVisible = true;
+    }, 180);
+  }
 </script>
 
 <section
   bind:this={sectionEl}
-  class="max-w-[1200px] mx-auto px-4 md:px-6 py-16 md:py-24"
+  data-topology-phase="pipe"
+  data-pipe-section
+  class="section-pipe py-20"
 >
-  <div use:reveal={{ y: 40 }} class="mb-8 md:mb-14">
-    <p class="eyebrow text-ds-text-muted mb-4">03 — How it works</p>
-    <h2 class="section-headline text-ds-text-primary">
-      From four lines of TypeScript to production AI
+  <div class="max-w-[960px] mx-auto px-6">
+    <!-- Section header -->
+    <p class="label-eyebrow mb-4">THE PIPE</p>
+    <h2 class="headline-section font-display mb-4">
+      Six stages.<br />One continuous flow.
     </h2>
-    <p class="mt-4 text-lg text-ds-text-tertiary max-w-2xl">
-      From simple generation to multi-agent orchestration — the same SDK scales
-      with you.
+    <p class="body-text max-w-lg mb-16">
+      Every request travels the same pipe. Hover a stage to see how it works.
     </p>
-  </div>
 
-  <!-- Mobile: interleaved description + code pairs -->
-  <div class="lg:hidden space-y-10">
-    {#each useCases as useCase, i}
-      <div use:reveal={{ y: 40 }}>
-        <span class="eyebrow text-nl-accent">0{i + 1}</span>
-        <h3
-          class="text-2xl font-semibold text-ds-text-primary mt-3 tracking-tight"
-        >
-          {useCase.title}
-        </h3>
-        <p class="mt-3 text-ds-text-tertiary leading-relaxed">
-          {useCase.description}
-        </p>
-
-        <div
-          class="mt-5 bg-ds-surface-1 border border-ds-border rounded-xl overflow-hidden"
-        >
-          <div class="flex items-center border-b border-ds-border px-4 py-2">
-            <span class="text-xs font-mono text-nl-accent">{useCase.title}</span
-            >
-          </div>
-          <div class="p-4 font-mono text-xs leading-6 overflow-x-auto">
-            <pre><code>{@html useCase.code}</code></pre>
-          </div>
+    <!-- Main layout: pipeline left, code right -->
+    <div class="pipe-layout">
+      <!-- Left: pipeline diagram -->
+      <div class="pipe-diagram">
+        <!-- Single continuous connector line spanning all stages -->
+        <div class="pipe-line" aria-hidden="true">
+          <div class="pipe-signal-dot"></div>
         </div>
+
+        {#each STAGES as stage, i}
+          <button
+            class="pipe-stage"
+            class:pipe-stage--active={activeIdx === i}
+            onclick={() => setActive(i)}
+            type="button"
+          >
+            <div class="pipe-stage-inner">
+              <div
+                class="pipe-node"
+                class:pipe-node--active={activeIdx === i}
+              ></div>
+              <div class="pipe-stage-text">
+                <span class="pipe-stage-label">{stage.label}</span>
+                <span class="pipe-stage-tag">{stage.tag}</span>
+              </div>
+            </div>
+          </button>
+        {/each}
       </div>
-    {/each}
-  </div>
 
-  <!-- Desktop: sticky parallax layout -->
-  <div class="hidden lg:grid lg:grid-cols-2 gap-12">
-    <!-- Left: scrolling content blocks -->
-    <div class="space-y-[40vh] pb-[20vh]">
-      {#each useCases as useCase, i}
-        <div
-          data-sticky-block={i}
-          class="min-h-[40vh] flex items-center"
-          use:reveal={{ y: 40 }}
-        >
-          <div>
-            <span class="eyebrow text-nl-accent">0{i + 1}</span>
-            <h3
-              class="text-2xl font-semibold text-ds-text-primary mt-3 tracking-tight"
-            >
-              {useCase.title}
-            </h3>
-            <p class="mt-3 text-ds-text-tertiary leading-relaxed">
-              {useCase.description}
-            </p>
-          </div>
-        </div>
-      {/each}
-    </div>
-
-    <!-- Right: sticky code block -->
-    <div>
-      <div class="sticky top-[25vh]">
-        <div
-          class="bg-ds-surface-1 border border-ds-border rounded-xl overflow-hidden"
-        >
-          <!-- Tab bar -->
-          <div
-            class="flex border-b border-ds-border"
-            role="tablist"
-            tabindex="0"
-            onkeydown={(e) => {
-              if (e.key === "ArrowRight") {
-                activeIndex = (activeIndex + 1) % useCases.length;
-              } else if (e.key === "ArrowLeft") {
-                activeIndex =
-                  (activeIndex - 1 + useCases.length) % useCases.length;
-              }
-            }}
-          >
-            {#each useCases as uc, i}
-              <button
-                class="px-4 py-3 text-xs font-mono transition-colors duration-200 border-b-2"
-                class:text-nl-accent={activeIndex === i}
-                class:border-nl-accent={activeIndex === i}
-                class:text-ds-text-muted={activeIndex !== i}
-                class:border-transparent={activeIndex !== i}
-                role="tab"
-                aria-selected={activeIndex === i}
-                tabindex={activeIndex === i ? 0 : -1}
-                id="sticky-tab-{i}"
-                aria-controls="sticky-tabpanel"
-                onclick={() => (activeIndex = i)}
-              >
-                {uc.title}
-              </button>
-            {/each}
-          </div>
-
-          <!-- Code content -->
-          <div
-            class="p-6 font-mono text-sm leading-7 min-h-[240px]"
-            role="tabpanel"
-            id="sticky-tabpanel"
-            aria-labelledby="sticky-tab-{activeIndex}"
-          >
-            {#each useCases as uc, i}
-              {#if activeIndex === i}
-                <pre><code>{@html uc.code}</code></pre>
-              {/if}
-            {/each}
-          </div>
-        </div>
+      <!-- Right: code + description panel -->
+      <div class="pipe-panel" class:pipe-panel--visible={codeVisible}>
+        <p class="pipe-desc">{STAGES[activeIdx].desc}</p>
+        <pre class="pipe-code"><code>{STAGES[activeIdx].code}</code></pre>
       </div>
     </div>
   </div>
 </section>
+
+<style>
+  .pipe-layout {
+    display: flex;
+    gap: 4rem;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 767px) {
+    .pipe-layout {
+      flex-direction: column;
+      gap: 2rem;
+    }
+  }
+
+  /* --- Pipeline diagram --- */
+  .pipe-diagram {
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 380px;
+    position: relative;
+  }
+
+  /* Single vertical line spanning from first node centre to last node centre */
+  .pipe-line {
+    position: absolute;
+    left: calc(1rem + 5px);
+    top: calc(0.875rem + 6px);
+    bottom: calc(0.875rem + 6px);
+    width: 2px;
+    background: rgba(0, 240, 255, 0.2);
+    overflow: hidden;
+    z-index: 0;
+  }
+
+  .pipe-stage {
+    position: relative;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  .pipe-stage-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
+  }
+
+  .pipe-stage:hover .pipe-stage-inner,
+  .pipe-stage--active .pipe-stage-inner {
+    border-color: rgba(0, 240, 255, 0.45);
+    background: rgba(0, 240, 255, 0.08);
+    box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.05);
+  }
+
+  /* Animated signal dot travelling down the line */
+  .pipe-signal-dot {
+    width: 4px;
+    height: 12px;
+    border-radius: 4px;
+    background: var(--color-nl-sky);
+    box-shadow: 0 0 10px var(--color-nl-sky);
+    margin-left: -1px;
+    animation: pipe-flow 2.4s linear infinite;
+  }
+
+  @keyframes pipe-flow {
+    from {
+      transform: translateY(-4px);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    to {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+  }
+
+  /* Stage node dot */
+  .pipe-node {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 240, 255, 0.4);
+    background: rgba(0, 5, 15, 0.8);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .pipe-node--active,
+  .pipe-stage:hover .pipe-node {
+    border-color: var(--color-nl-sky);
+    box-shadow:
+      0 0 15px rgba(0, 240, 255, 0.5),
+      inset 0 0 8px rgba(0, 240, 255, 0.4);
+    background: rgba(0, 240, 255, 0.2);
+  }
+
+  .pipe-stage-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #ffffff;
+    letter-spacing: -0.005em;
+  }
+
+  .pipe-stage-tag {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-nl-accent-lighter);
+    margin-top: 4px;
+  }
+
+  /* --- Code / description panel (cross-fade on tab switch only) --- */
+  .pipe-panel {
+    flex: 1;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  .pipe-panel--visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .pipe-desc {
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--color-text-body);
+    margin-bottom: 1.25rem;
+  }
+
+  .pipe-code {
+    background: var(--color-ds-surface-1);
+    backdrop-filter: blur(12px);
+    border-left: 2px solid var(--color-nl-sky);
+    border-radius: 0 12px 12px 0;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    padding: 1.5rem 1.75rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--color-text-code);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    overflow-x: auto;
+    white-space: pre;
+  }
+</style>

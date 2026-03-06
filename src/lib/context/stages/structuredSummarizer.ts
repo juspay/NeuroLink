@@ -59,8 +59,8 @@ export async function summarizeMessages(
 
     const summaryMessage: ChatMessage = {
       id: `summary-${randomUUID()}`,
-      role: "system",
-      content: `Previous conversation summary:\n\n${summaryText}`,
+      role: "user",
+      content: `[Previous conversation summary]:\n\n${summaryText}`,
       timestamp: new Date().toISOString(),
       metadata: {
         isSummary: true,

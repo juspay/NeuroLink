@@ -86,6 +86,20 @@ const config: Config = {
         },
       }),
     },
+    {
+      tagName: "script",
+      attributes: {
+        type: "application/ld+json",
+      },
+      innerHTML: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        name: "NeuroLink SDK",
+        programmingLanguage: "TypeScript",
+        codeRepository: "https://github.com/juspay/neurolink",
+        license: "https://opensource.org/licenses/MIT",
+      }),
+    },
   ],
 
   markdown: {
@@ -212,6 +226,10 @@ const config: Config = {
       },
       { name: "twitter:site", content: "@jaborhey" },
       { name: "twitter:creator", content: "@jaborhey" },
+      {
+        name: "twitter:image",
+        content: "https://docs.neurolink.ink/img/neurolink-social-card.png",
+      },
     ],
 
     colorMode: {

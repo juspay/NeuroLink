@@ -17,12 +17,13 @@ const PROVIDERS = [
   "HuggingFace",
   "SageMaker",
   "OpenRouter",
+  "OpenAI-Compatible",
 ];
 
 const QUICK_LINKS = [
   {
     title: "SDK Guide",
-    description: "Unified API for 14+ providers",
+    description: "Unified API for 13+ providers",
     href: "/docs/sdk",
     icon: "📦",
   },
@@ -96,7 +97,7 @@ const FAQ_ITEMS = [
   {
     question: "What is NeuroLink?",
     answer:
-      "NeuroLink is an enterprise AI development platform that provides unified access to 14+ AI providers (OpenAI, Anthropic, Google AI, AWS Bedrock, Azure, and more) through a single TypeScript SDK and professional CLI. It is extracted from production systems at Juspay and battle-tested at enterprise scale.",
+      "NeuroLink is an enterprise AI development platform that provides unified access to 13+ AI providers (OpenAI, Anthropic, Google AI, AWS Bedrock, Azure, and more) through a single TypeScript SDK and professional CLI. It is extracted from production systems at Juspay and battle-tested at enterprise scale.",
   },
   {
     question: "How is NeuroLink different from LangChain or Vercel AI SDK?",
@@ -111,7 +112,7 @@ const FAQ_ITEMS = [
   {
     question: "What AI providers does NeuroLink support?",
     answer:
-      "NeuroLink supports 14+ providers including OpenAI, Anthropic, Google AI Studio, Google Vertex AI, AWS Bedrock, Azure OpenAI, Mistral, Ollama, LiteLLM, HuggingFace, SageMaker, OpenRouter, and any OpenAI-compatible endpoint. Switching providers requires changing a single parameter.",
+      "NeuroLink supports 13+ providers including OpenAI, Anthropic, Google AI Studio, Google Vertex AI, AWS Bedrock, Azure OpenAI, Mistral, Ollama, LiteLLM, HuggingFace, SageMaker, OpenRouter, and any OpenAI-compatible endpoint. Switching providers requires changing a single parameter.",
   },
   {
     question: "Does NeuroLink support MCP (Model Context Protocol)?",
@@ -148,35 +149,16 @@ export default function Home(): React.JSX.Element {
         <script type="application/ld+json">{JSON.stringify(FAQ_JSONLD)}</script>
       </Head>
       <main className={styles.main}>
-        {/* Hero */}
+        {/* Hero — nervous system concept first */}
         <section className={styles.hero}>
           <div className={styles.heroContent}>
             <h1 className={styles.heroTitle}>
-              Enterprise AI Development Platform
+              Find your path through the pipe.
             </h1>
             <p className={styles.heroSubtitle}>
-              One SDK. 14+ Providers. Zero Lock-in.
+              NeuroLink is the pipe layer for the AI nervous system. Choose your
+              entry point.
             </p>
-            <div className={styles.codePreview}>
-              <div className={styles.codeHeader}>
-                <span
-                  className={styles.codeDot}
-                  style={{ background: "#ff5f57" }}
-                />
-                <span
-                  className={styles.codeDot}
-                  style={{ background: "#febc2e" }}
-                />
-                <span
-                  className={styles.codeDot}
-                  style={{ background: "#28c840" }}
-                />
-                <span className={styles.codeFileName}>quickstart.ts</span>
-              </div>
-              <pre className={styles.codeBlock}>
-                <code>{CODE_EXAMPLE}</code>
-              </pre>
-            </div>
             <div className={styles.heroCtas}>
               <Link className={styles.ctaPrimary} to="/docs/getting-started">
                 Get Started
@@ -206,6 +188,68 @@ export default function Home(): React.JSX.Element {
           </div>
         </section>
 
+        {/* Three routing cards */}
+        <section className={styles.routingSection}>
+          <div className={styles.routingCards}>
+            <a
+              href="/docs/getting-started/quick-start"
+              className={styles.routingCard}
+            >
+              <span className={styles.routingCardLabel}>THE PIPE</span>
+              <p className={styles.routingCardTitle}>Start with the pipe</p>
+              <p className={styles.routingCardDesc}>
+                Unified API for 13+ AI providers. Token streams, memory, tools,
+                RAG — one consistent interface.
+              </p>
+            </a>
+            <a href="/docs/features/mcp-tools" className={styles.routingCard}>
+              <span className={styles.routingCardLabel}>BUILD CONNECTORS</span>
+              <p className={styles.routingCardTitle}>Build an organ</p>
+              <p className={styles.routingCardDesc}>
+                Every application built on NeuroLink is an organ. Connect to the
+                vascular layer and open a new gateway.
+              </p>
+            </a>
+            <a
+              href="/docs/connectors"
+              className={`${styles.routingCard} ${styles.routingCardAccent}`}
+            >
+              <span className={styles.routingCardLabel}>THE ECOSYSTEM</span>
+              <p className={styles.routingCardTitle}>Explore connectors</p>
+              <p className={styles.routingCardDesc}>
+                Automatic, Tara, Yama — production organs already flowing on
+                NeuroLink. Study them. Build yours.
+              </p>
+            </a>
+          </div>
+        </section>
+
+        {/* Connector ecosystem block — visible immediately */}
+        <section className={styles.connectorsBlock}>
+          <p className={styles.sectionLabel}>CONNECTORS BUILT ON NEUROLINK</p>
+          <div className={styles.connectorRow}>
+            <a
+              href="/docs/connectors/automatic"
+              className={`${styles.chip} ${styles.chipAmber}`}
+            >
+              ● automatic
+            </a>
+            <a
+              href="/docs/connectors/tara"
+              className={`${styles.chip} ${styles.chipAmber}`}
+            >
+              ● tara
+            </a>
+            <a
+              href="/docs/connectors/yama"
+              className={`${styles.chip} ${styles.chipRust}`}
+            >
+              ● yama
+            </a>
+            <span className={`${styles.chip} ${styles.chipDim}`}>○ ···</span>
+          </div>
+        </section>
+
         {/* Providers */}
         <section className={styles.providers}>
           <p className={styles.providersLabel}>
@@ -218,15 +262,6 @@ export default function Home(): React.JSX.Element {
               </span>
             ))}
           </div>
-        </section>
-
-        {/* Trust Signal */}
-        <section className={styles.trustSignal}>
-          <p className={styles.trustText}>
-            <span className={styles.trustBadge}>Production</span>
-            Extracted from production systems at Juspay — powering
-            enterprise-scale AI applications
-          </p>
         </section>
 
         {/* Quick Links */}
@@ -246,6 +281,26 @@ export default function Home(): React.JSX.Element {
         {/* Features */}
         <section className={styles.features}>
           <h2 className={styles.sectionTitle}>Built for Production</h2>
+          <div className={styles.codePreview}>
+            <div className={styles.codeHeader}>
+              <span
+                className={styles.codeDot}
+                style={{ background: "#ff5f57" }}
+              />
+              <span
+                className={styles.codeDot}
+                style={{ background: "#febc2e" }}
+              />
+              <span
+                className={styles.codeDot}
+                style={{ background: "#28c840" }}
+              />
+              <span className={styles.codeFileName}>quickstart.ts</span>
+            </div>
+            <pre className={styles.codeBlock}>
+              <code>{CODE_EXAMPLE}</code>
+            </pre>
+          </div>
           <div className={styles.featureGrid}>
             {FEATURES.map((f) => (
               <Link key={f.href} to={f.href} className={styles.featureCard}>
@@ -269,6 +324,18 @@ export default function Home(): React.JSX.Element {
               </details>
             ))}
           </div>
+        </section>
+
+        {/* Production Credentials / Stats — last */}
+        <section className={styles.trustSignal}>
+          <p className={styles.productionCredentialsLabel}>
+            PRODUCTION CREDENTIALS
+          </p>
+          <p className={styles.trustText}>
+            <span className={styles.trustBadge}>Production</span>
+            Extracted from production systems at Juspay — powering
+            enterprise-scale AI applications
+          </p>
         </section>
       </main>
     </Layout>

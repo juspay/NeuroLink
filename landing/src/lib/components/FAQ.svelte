@@ -86,36 +86,38 @@
   }
 </script>
 
-<section class="max-w-[800px] mx-auto px-4 md:px-6 py-16 md:py-24">
-  <div use:reveal={{ y: 40 }} class="text-center mb-8 md:mb-14">
-    <p class="eyebrow text-ds-text-muted mb-4">FAQ</p>
-    <h2 class="section-headline text-ds-text-primary">
+<section
+  class="max-w-[800px] mx-auto px-4 md:px-6 py-12 md:py-20 relative z-10"
+>
+  <div use:reveal={{ y: 40 }} class="text-center mb-10 md:mb-16">
+    <p class="eyebrow text-[var(--color-nl-accent-lighter)] mb-4">FAQ</p>
+    <h2 class="section-headline font-display text-white drop-shadow-lg">
       Frequently asked questions
     </h2>
   </div>
 
-  <div class="space-y-2" use:reveal={{ y: 30, stagger: 0.06 }}>
+  <div class="space-y-4" use:reveal={{ y: 30, stagger: 0.06 }}>
     {#each faqs as faq, i}
-      <div class="border border-ds-border rounded-xl overflow-hidden">
+      <div class="glass-panel overflow-hidden transition-all duration-300">
         <button
           onclick={() => toggle(i)}
-          class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-ds-surface-2 transition-colors duration-150"
+          class="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-[rgba(255,255,255,0.02)] transition-colors duration-150"
           aria-expanded={openIndex === i}
         >
-          <span class="text-sm font-medium text-ds-text-primary pr-4">
+          <span class="text-[15px] font-medium text-white pr-4 leading-relaxed">
             {faq.question}
           </span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="2"
+            stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="shrink-0 text-ds-text-muted transition-transform duration-200"
+            class="shrink-0 text-[var(--color-nl-sky)] transition-transform duration-300 drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]"
             class:rotate-180={openIndex === i}
           >
             <path d="m6 9 6 6 6-6" />
@@ -123,8 +125,12 @@
         </button>
 
         {#if openIndex === i}
-          <div class="px-5 pb-4">
-            <p class="text-sm text-ds-text-tertiary leading-relaxed">
+          <div
+            class="px-6 pb-6 pt-2 border-t border-[rgba(255,255,255,0.05)] bg-[rgba(0,0,0,0.2)]"
+          >
+            <p
+              class="text-[14.5px] text-[var(--color-text-body)] leading-relaxed mt-4"
+            >
               {faq.answer}
             </p>
           </div>

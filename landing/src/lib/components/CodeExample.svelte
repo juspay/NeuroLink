@@ -1,6 +1,25 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
+  import { activeSection } from "$lib/stores/canvasState";
   import { reveal } from "$lib/actions/reveal";
   import { snippets } from "$lib/data/codeSnippets";
+
+  let sectionEl: HTMLElement;
+  let observer: IntersectionObserver;
+
+  onMount(() => {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) activeSection.set("developer");
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(sectionEl);
+  });
+
+  onDestroy(() => {
+    observer?.disconnect();
+  });
 
   let activeTab = $state(0);
 
@@ -20,17 +39,23 @@
   ];
 </script>
 
-<section class="max-w-[1200px] mx-auto px-6 py-24">
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<section
+  bind:this={sectionEl}
+  data-topology-phase="observe"
+  class="max-w-[1200px] mx-auto px-6 py-20 relative"
+>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
     <!-- Left: checklist -->
-    <div use:reveal={{ y: 40 }}>
-      <p class="eyebrow text-ds-text-muted mb-4">05 — Developer experience</p>
-      <h2 class="section-headline text-ds-text-primary">
+    <div use:reveal={{ y: 40 }} class="relative z-10">
+      <p class="label-eyebrow mb-4">05 — DEVELOPER EXPERIENCE</p>
+      <h2 class="headline-section font-display text-white drop-shadow-lg">
         Developer-first TypeScript AI SDK experience
       </h2>
-      <p class="mt-4 text-ds-text-tertiary text-lg leading-relaxed max-w-md">
-        Get up and running in minutes. NeuroLink's SDK is designed for the way
-        you already work — intuitive, typed, and production-ready.
+      <p
+        class="mt-6 text-[var(--color-text-body)] text-lg leading-relaxed max-w-md"
+      >
+        Get up and running in minutes. NeuroLink's vascular SDK is designed for
+        the way you already work — intuitive, typed, and incredibly fast.
       </p>
 
       <ul class="mt-8 space-y-4" use:reveal={{ y: 20, stagger: 0.1 }}>
@@ -42,27 +67,27 @@
               height="20"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="currentColor"
+              stroke="var(--color-signal)"
               stroke-width="2.5"
               stroke-linecap="round"
               stroke-linejoin="round"
-              class="text-nl-success shrink-0 mt-0.5"
+              class="shrink-0 mt-0.5 drop-shadow-[0_0_8px_rgba(0,240,255,0.6)]"
             >
               <path d="M20 6 9 17l-5-5" />
             </svg>
-            <span class="text-ds-text-secondary text-sm leading-relaxed"
+            <span class="text-white text-[15px] font-medium leading-relaxed"
               >{item}</span
             >
           </li>
         {/each}
       </ul>
 
-      <div class="mt-10 flex flex-wrap gap-3">
+      <div class="mt-12 flex flex-wrap gap-4">
         <a
           href="https://docs.neurolink.ink/docs/sdk/api-reference"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-nl-accent hover:bg-nl-accent-dark rounded-ds-full transition-colors duration-200"
+          class="btn-signal inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white rounded-full"
         >
           SDK Reference
           <svg
@@ -84,7 +109,7 @@
           href="https://docs.neurolink.ink/docs/cli/commands"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-ds-text-tertiary border border-ds-border hover:border-ds-border-hover hover:text-ds-text-primary rounded-ds-full transition-colors duration-200"
+          class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-[var(--color-text-dim)] border border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)] hover:text-white rounded-full transition-colors duration-200"
         >
           CLI Guide
         </a>
@@ -93,20 +118,18 @@
 
     <!-- Right: code block with tabs -->
     <div use:reveal={{ y: 40, delay: 0.2 }}>
-      <div
-        class="bg-ds-surface-1 border border-ds-border rounded-xl overflow-hidden"
-      >
+      <div class="glass-panel overflow-hidden">
         <!-- Tab bar -->
         <div
-          class="flex border-b border-ds-border bg-ds-surface-2 overflow-x-auto scrollbar-hide tab-scroll-fade"
+          class="flex border-b border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] overflow-x-auto scrollbar-hide tab-scroll-fade"
           role="tablist"
         >
           {#each tabs as tab, i}
             <button
-              class="px-3 md:px-4 py-3 text-xs md:text-sm font-mono whitespace-nowrap shrink-0 transition-colors duration-200 border-b-2"
-              class:text-nl-accent={activeTab === i}
-              class:border-nl-accent={activeTab === i}
-              class:text-ds-text-muted={activeTab !== i}
+              class="px-4 md:px-5 py-4 text-[13px] font-mono whitespace-nowrap shrink-0 transition-colors duration-200 border-b-2"
+              class:text-[var(--color-signal)]={activeTab === i}
+              class:border-[var(--color-signal)]={activeTab === i}
+              class:text-[var(--color-text-dim)]={activeTab !== i}
               class:border-transparent={activeTab !== i}
               role="tab"
               aria-selected={activeTab === i}
@@ -121,14 +144,16 @@
 
         <!-- Code content -->
         <div
-          class="p-4 md:p-6 font-mono text-xs md:text-sm leading-6 md:leading-7 overflow-x-auto"
+          class="p-6 md:p-8 font-mono text-xs md:text-sm leading-7 overflow-x-auto bg-[#03050a]"
           role="tabpanel"
           id="code-tabpanel"
           aria-labelledby="code-tab-{activeTab}"
         >
           {#key activeTab}
             <!-- Static content only — safe for {@html} -->
-            <pre><code>{@html tabs[activeTab].code}</code></pre>
+            <pre><code class="text-[var(--color-text-code)]"
+                >{@html tabs[activeTab].code}</code
+              ></pre>
           {/key}
         </div>
       </div>

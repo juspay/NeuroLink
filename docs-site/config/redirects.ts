@@ -58,7 +58,8 @@ const sectionReorganizationRedirects: PluginOptions["redirects"] = [
   // Multimodal feature redirects
   { from: "/multimodal", to: "/docs/features/multimodal" },
   { from: "/docs/multimodal", to: "/docs/features/multimodal" },
-  { from: "/vision", to: "/docs/features/multimodal" },
+  { from: "/vision", to: "/docs/about/vision" },
+  { from: "/docs/vision", to: "/docs/about/vision" },
   { from: "/images", to: "/docs/features/multimodal" },
   { from: "/pdf", to: "/docs/features/pdf-support" },
   { from: "/docs/pdf", to: "/docs/features/pdf-support" },

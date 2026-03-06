@@ -26,3 +26,6 @@ Allow: /
 
 User-agent: Cohere-AI
 Allow: /
+
+# Cross-site sitemap reference
+Sitemap: https://docs.neurolink.ink/sitemap.xml

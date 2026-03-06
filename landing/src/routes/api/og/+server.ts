@@ -59,7 +59,7 @@ export const GET: RequestHandler = async ({ url }) => {
   const svg = await satori(vdom, {
     width: 1200,
     height: 630,
-    fonts,
+    fonts: fonts as any,
   });
 
   const resvg = new Resvg(svg, {
@@ -68,7 +68,7 @@ export const GET: RequestHandler = async ({ url }) => {
   const pngData = resvg.render();
   const pngBuffer = pngData.asPng();
 
-  return new Response(pngBuffer, {
+  return new Response(pngBuffer as any, {
     headers: {
       "Content-Type": "image/png",
       "Cache-Control": "public, max-age=86400, s-maxage=31536000, immutable",

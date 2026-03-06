@@ -1,44 +1,148 @@
 <script lang="ts">
-  import { reveal } from "$lib/actions/reveal";
+  import { onMount, onDestroy } from "svelte";
+  import { activeSection } from "$lib/stores/canvasState";
+  import { tilt } from "../actions/tilt.js";
 
-  const providers = [
-    "OpenAI",
-    "Anthropic",
-    "Google AI",
-    "Vertex AI",
-    "AWS Bedrock",
-    "Azure OpenAI",
-    "Mistral",
-    "LiteLLM",
-    "Ollama",
-    "Hugging Face",
-    "SageMaker",
-    "OpenRouter",
-    "OpenAI-Compatible",
+  let sectionEl: HTMLElement;
+  let observer: IntersectionObserver;
+
+  onMount(() => {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) activeSection.set("connectors");
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(sectionEl);
+  });
+
+  onDestroy(() => {
+    observer?.disconnect();
+  });
+
+  const CONNECTORS = [
+    {
+      name: "Automatic",
+      description:
+        "Consumer analysis and operations hub. Routes order data and payment context through the pipe to surface risk signals and recommendations.",
+      gateway: "Consumer control · Operations intelligence",
+      accentColor: "var(--color-nl-saffron)",
+      docsUrl: "/docs/connectors/automatic",
+    },
+    {
+      name: "Tara",
+      description:
+        "Self-evolving AI assistant. Receives Slack events, uses MCP tools to answer from code and docs, and improves itself through task loops.",
+      gateway: "Engineering assistance · Self-improvement",
+      accentColor: "var(--color-nl-saffron)",
+      docsUrl: "/docs/connectors/tara",
+    },
+    {
+      name: "Yama",
+      description:
+        "Code review judge. Streams PR diffs through the pipe, applies rule-driven analysis, and enforces quality gates before merge.",
+      gateway: "Code quality · Automated governance",
+      accentColor: "var(--color-nl-paprika)",
+      docsUrl: "/docs/connectors/yama",
+    },
   ];
 </script>
 
-<section class="max-w-[1200px] mx-auto px-4 md:px-6 py-16 md:py-24">
-  <div use:reveal={{ y: 40 }} class="text-center mb-8 md:mb-14">
-    <p class="eyebrow text-ds-text-muted mb-4">04 — Integrations</p>
-    <h2 class="section-headline text-ds-text-primary">
-      One TypeScript API. Every AI provider.
-    </h2>
-    <p class="mt-4 text-lg text-ds-text-tertiary max-w-2xl mx-auto">
-      Switch between providers instantly. No code changes, no vendor lock-in.
+<section
+  bind:this={sectionEl}
+  data-topology-phase="connectors"
+  class="section-connectors py-20 relative"
+>
+  <div class="max-w-[1200px] mx-auto px-6 relative z-10">
+    <p class="label-eyebrow text-[var(--color-nl-accent-lighter)] mb-4">
+      CONNECTORS
     </p>
-  </div>
+    <h2 class="headline-section font-display text-white mb-6 drop-shadow-lg">
+      Organs built on the pipe.
+    </h2>
+    <p class="body-text text-[var(--color-text-body)] text-lg max-w-xl mb-16">
+      Every application built on NeuroLink is an organ. It connects to the
+      vascular layer and opens a gateway — a new way for people to access and
+      experience AI.
+    </p>
 
-  <div
-    class="flex flex-wrap justify-center gap-3"
-    use:reveal={{ y: 30, stagger: 0.06 }}
-  >
-    {#each providers as provider}
-      <span
-        class="px-3 md:px-4 py-2 md:py-2.5 bg-ds-surface-2 border border-ds-border rounded-full text-xs md:text-sm font-medium text-ds-text-tertiary hover:border-nl-accent hover:text-nl-accent transition-all duration-200 cursor-default"
-      >
-        {provider}
-      </span>
-    {/each}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {#each CONNECTORS as c}
+        <div
+          use:tilt
+          class="connector-card glass-panel glass-panel-hover"
+          style="--card-accent: {c.accentColor}"
+        >
+          <div class="card-accent-bar"></div>
+          <div class="card-body">
+            <div class="flex items-center justify-between mb-8">
+              <span
+                class="text-[11px] font-[600] tracking-[0.15em] uppercase"
+                style="color: {c.accentColor}; text-shadow: 0 0 10px {c.accentColor};"
+                >● connected</span
+              >
+              <span
+                class="text-[10px] tracking-[0.1em] text-[var(--color-text-dim)] uppercase"
+                >organ</span
+              >
+            </div>
+            <h3
+              class="font-display text-[2rem] text-white mb-4 drop-shadow-md"
+              style="font-size: clamp(1.6rem, 2.5vw, 2.2rem); line-height: 1.1;"
+            >
+              {c.name}
+            </h3>
+            <p
+              class="text-[0.9rem] leading-[1.7] text-[var(--color-text-body)] mb-8"
+            >
+              {c.description}
+            </p>
+            <p
+              class="text-[11px] tracking-[0.1em] font-medium text-[var(--color-nl-sky)] uppercase"
+            >
+              {c.gateway}
+            </p>
+          </div>
+          <div class="card-footer">
+            <a
+              href={c.docsUrl}
+              class="text-[13px] font-medium text-[var(--color-text-dim)] hover:text-white transition-colors"
+            >
+              View connector docs <span
+                aria-hidden="true"
+                class="ml-1 text-[var(--color-nl-sky)]">→</span
+              >
+            </a>
+          </div>
+        </div>
+      {/each}
+    </div>
   </div>
 </section>
+
+<style>
+  .connector-card {
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+    overflow: hidden;
+  }
+
+  .card-accent-bar {
+    height: 3px;
+    background: linear-gradient(to right, var(--card-accent), transparent);
+    opacity: 0.9;
+    box-shadow: 0 0 15px var(--card-accent);
+  }
+
+  .card-body {
+    padding: 2.25rem 2rem 1.5rem;
+    flex: 1;
+  }
+
+  .card-footer {
+    padding: 1.5rem 2rem 1.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
+  }
+</style>

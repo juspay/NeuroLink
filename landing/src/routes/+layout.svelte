@@ -44,13 +44,10 @@
 </script>
 
 <svelte:head>
-  <title
-    >NeuroLink — The Complete TypeScript AI SDK | 13+ Providers, RAG, MCP,
-    Agents</title
-  >
+  <title>NeuroLink — The Nervous System Pipe for AI Streams</title>
   <meta
     name="description"
-    content="Unified TypeScript SDK for 13+ AI providers. Ships with RAG, MCP, agents, voice, workflows, and 50+ file types. MIT open source."
+    content="NeuroLink is the pipe layer for the AI nervous system — connecting live streams of tokens, data, tools, and context through pluggable connectors. TypeScript SDK. 13+ providers. Open source."
   />
   <link rel="canonical" href="https://neurolink.ink/" />
   <link rel="alternate" hreflang="en" href="https://neurolink.ink/" />
@@ -61,11 +58,11 @@
   <meta property="og:url" content="https://neurolink.ink/" />
   <meta
     property="og:title"
-    content="NeuroLink — The Complete TypeScript AI SDK"
+    content="NeuroLink — The Nervous System Pipe for AI Streams"
   />
   <meta
     property="og:description"
-    content="Unified TypeScript SDK for 13+ AI providers. Ships with RAG, MCP, agents, voice, workflows, and 50+ file types. MIT open source."
+    content="NeuroLink is the pipe layer for the AI nervous system — connecting live streams of tokens, data, tools, and context through pluggable connectors. TypeScript SDK. 13+ providers. Open source."
   />
   <meta property="og:image" content="https://neurolink.ink/api/og?type=home" />
   <meta property="og:site_name" content="NeuroLink" />
@@ -74,11 +71,11 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta
     name="twitter:title"
-    content="NeuroLink — The Complete TypeScript AI SDK"
+    content="NeuroLink — Real-time AI Streaming for Every Provider"
   />
   <meta
     name="twitter:description"
-    content="Unified TypeScript SDK for 13+ AI providers. Ships with RAG, MCP, agents, voice, workflows, and 50+ file types. MIT open source."
+    content="Stream AI responses in real-time across 13+ providers. 4 streaming patterns, 24 event types, backpressure control, voice, RAG, and MCP — one unified API."
   />
   <meta name="twitter:image" content="https://neurolink.ink/api/og?type=home" />
   <meta name="twitter:site" content="@jaborhey" />
@@ -124,7 +121,7 @@
             name: "What is NeuroLink?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "NeuroLink is an open-source TypeScript AI SDK that provides unified access to 13+ AI providers (OpenAI, Anthropic, Google, AWS Bedrock, Azure, Mistral, and more) through a single consistent API. It ships with RAG, MCP integration, multi-agent workflows, voice processing, and 50+ file type support.",
+              text: "NeuroLink is the pipe layer for the AI nervous system. It connects live streams of tokens, data, tools, and context from 13+ AI providers (the neurons) to the applications and connectors (the organs) that need them. Built in TypeScript. Extracted from production systems at Juspay.",
             },
           },
           {

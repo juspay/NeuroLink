@@ -55,6 +55,7 @@ export default defineConfig({
       "dist/",
       ".svelte-kit/",
       "test/continuous-test-suite.ts", // Existing file to be migrated
+      "test/multimodal/image-generation.test.ts", // Live Vertex AI API calls — run separately with pnpm test:integration
     ],
   },
 

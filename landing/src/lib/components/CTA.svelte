@@ -1,37 +1,64 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
+  import { activeSection } from "$lib/stores/canvasState";
   import { reveal } from "$lib/actions/reveal";
+
+  let sectionEl: HTMLElement;
+  let observer: IntersectionObserver;
+
+  onMount(() => {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) activeSection.set("cta");
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(sectionEl);
+  });
+
+  onDestroy(() => {
+    observer?.disconnect();
+  });
 </script>
 
-<section class="relative overflow-hidden">
-  <!-- Gradient mesh background -->
-  <div class="absolute inset-0 pointer-events-none">
+<section
+  bind:this={sectionEl}
+  data-topology-phase="cta"
+  class="section-cta relative overflow-hidden"
+>
+  <!-- Subtle glow background -->
+  <div class="absolute inset-0 pointer-events-none z-0">
     <div
       class="absolute inset-0"
-      style="background: radial-gradient(ellipse at 30% 50%, rgba(1, 111, 185, 0.1) 0%, transparent 60%), radial-gradient(ellipse at 70% 40%, rgba(255, 149, 5, 0.06) 0%, transparent 50%);"
+      style="background: radial-gradient(ellipse at 50% 60%, rgba(0, 210, 255, 0.07) 0%, transparent 65%);"
     ></div>
   </div>
 
   <div
-    class="relative max-w-[1200px] mx-auto px-4 md:px-6 py-16 md:py-32"
+    class="relative z-10 max-w-[1200px] mx-auto px-4 md:px-6 py-12 md:py-20"
     use:reveal={{ y: 40 }}
   >
-    <div class="text-center max-w-[700px] mx-auto">
-      <h2 class="section-headline text-ds-text-primary">
-        Start building AI apps with NeuroLink SDK
+    <div
+      class="glass-panel text-center max-w-[800px] mx-auto p-12 drop-shadow-2xl"
+    >
+      <h2
+        class="headline-section font-display text-transparent bg-clip-text bg-gradient-to-r from-white to-[var(--color-signal)] mb-6"
+      >
+        Ready to build the nervous system?
       </h2>
       <p
-        class="mt-4 text-ds-text-tertiary text-lg leading-relaxed max-w-md mx-auto"
+        class="text-[var(--color-text-body)] text-lg leading-relaxed max-w-lg mx-auto mb-10"
       >
         Stop juggling SDKs. Start building with a single, production-ready
-        interface to every major AI model.
+        vascular layer that perfectly routes all streams and tool calls.
       </p>
 
-      <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+      <div class="flex flex-wrap items-center justify-center gap-6">
         <a
           href="https://docs.neurolink.ink/docs/getting-started"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-nl-accent hover:bg-nl-accent-dark rounded-ds-full transition-colors duration-200 shadow-glow-blue"
+          class="btn-signal inline-flex items-center gap-2 px-8 py-4 text-sm font-semibold tracking-wide rounded-full text-white"
         >
           Get Started
           <svg
@@ -53,7 +80,7 @@
           href="https://github.com/juspay/neurolink"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-ds-text-tertiary border border-ds-border hover:border-ds-border-hover hover:text-ds-text-primary rounded-ds-full transition-colors duration-200"
+          class="inline-flex items-center gap-2 px-8 py-4 text-sm font-medium text-[var(--color-text-dim)] border border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)] hover:text-white rounded-full transition-all duration-300"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

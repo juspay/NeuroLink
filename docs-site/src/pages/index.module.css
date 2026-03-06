@@ -193,6 +193,181 @@
 }
 
 /* ===========================================
+   ROUTING CARDS
+   =========================================== */
+
+.routingSection {
+  padding: 2rem 0;
+}
+
+.routingCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.routingCard {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  text-decoration: none;
+  color: inherit;
+  background: var(--ifm-background-surface-color);
+  transition:
+    border-color var(--transition-normal),
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+.routingCard:hover {
+  border-color: var(--neurolink-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.routingCard:focus-visible {
+  outline: 2px solid var(--neurolink-accent);
+  outline-offset: 2px;
+}
+
+.routingCardAccent {
+  border-color: color-mix(in srgb, var(--neurolink-accent) 40%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--neurolink-accent) 5%,
+    var(--ifm-background-surface-color)
+  );
+}
+
+.routingCardAccent:hover {
+  border-color: var(--neurolink-accent);
+  background: color-mix(
+    in srgb,
+    var(--neurolink-accent) 8%,
+    var(--ifm-background-surface-color)
+  );
+}
+
+.routingCardLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--neurolink-accent);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.routingCardTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: var(--neurolink-text-primary);
+}
+
+.routingCardDesc {
+  font-size: 0.875rem;
+  color: var(--neurolink-text-tertiary);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ===========================================
+   CONNECTOR ECOSYSTEM BLOCK
+   =========================================== */
+
+.connectorsBlock {
+  padding: 1.75rem 0;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.sectionLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--neurolink-text-tertiary);
+  margin-bottom: 1rem;
+}
+
+.connectorRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: var(--ifm-font-family-monospace);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition:
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.chipAmber {
+  color: #d97706;
+  background: color-mix(in srgb, #d97706 10%, transparent);
+  border-color: color-mix(in srgb, #d97706 30%, transparent);
+}
+
+.chipAmber:hover {
+  border-color: #d97706;
+  color: #d97706;
+}
+
+.chipRust {
+  color: #b45309;
+  background: color-mix(in srgb, #b45309 10%, transparent);
+  border-color: color-mix(in srgb, #b45309 30%, transparent);
+}
+
+.chipRust:hover {
+  border-color: #b45309;
+  color: #b45309;
+}
+
+.chipDim {
+  color: var(--neurolink-text-tertiary);
+  background: var(--neurolink-surface-3);
+  border-color: var(--border);
+  cursor: default;
+}
+
+/* ===========================================
+   PRODUCTION CREDENTIALS LABEL
+   =========================================== */
+
+.productionCredentialsLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--neurolink-text-tertiary);
+  margin-bottom: 0.75rem;
+}
+
+/* ===========================================
    PROVIDERS STRIP
    =========================================== */
 
@@ -479,6 +654,11 @@
 @media (max-width: 768px) {
   .heroTitle {
     font-size: 2.25rem;
+  }
+
+  .routingCards {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
 
   .cardGrid {

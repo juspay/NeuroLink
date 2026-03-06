@@ -128,5 +128,70 @@ module.exports = function pluginSearchIndex(context, opts = {}) {
         );
       }
     },
+
+    async postBuild({ outDir }) {
+      const markdownFiles = collectMarkdownFiles(docsDir);
+      log(`postBuild: Found ${markdownFiles.length} markdown files`);
+
+      const documents = [];
+
+      for (const { fullPath, relPath } of markdownFiles) {
+        try {
+          const raw = fs.readFileSync(fullPath, "utf-8");
+          const { data: frontmatter, content } = matter(raw);
+
+          const title =
+            frontmatter.title ||
+            frontmatter.sidebar_label ||
+            path.basename(relPath, path.extname(relPath));
+          const description = frontmatter.description || "";
+          const tags = frontmatter.tags || [];
+          const section = getSection(relPath);
+          const docPath = relPath
+            .replace(/\\/g, "/")
+            .replace(/\.(md|mdx)$/, "")
+            .replace(/\/index$/, "");
+
+          documents.push({
+            id: docPath,
+            title,
+            description,
+            content: stripMarkdown(content).slice(0, 5000),
+            section,
+            tags: Array.isArray(tags) ? tags : [],
+            path: docPath,
+          });
+        } catch (err) {
+          console.warn(
+            `[search-index] postBuild: Error processing ${relPath}:`,
+            err.message,
+          );
+        }
+      }
+
+      const indexData = {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        documentCount: documents.length,
+        documents,
+      };
+
+      const buildOutputPath = path.resolve(
+        outDir,
+        opts.outputFile || "search-index.json",
+      );
+
+      try {
+        fs.mkdirSync(path.dirname(buildOutputPath), { recursive: true });
+        fs.writeFileSync(buildOutputPath, JSON.stringify(indexData));
+        log(
+          `postBuild: Wrote search index to ${buildOutputPath} (${documents.length} docs)`,
+        );
+      } catch (err) {
+        console.warn(
+          `[search-index] postBuild: Failed to write index to ${buildOutputPath}: ${err.message}`,
+        );
+      }
+    },
   };
 };

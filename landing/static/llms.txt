@@ -29,5 +29,5 @@
 
 - [npm Package](https://www.npmjs.com/package/@juspay/neurolink): @juspay/neurolink
 - [GitHub Repository](https://github.com/juspay/neurolink): Source code, issues, discussions
-- [Blog](https://blog.neurolink.ink): Technical articles and updates
+- [Blog](https://blog.neurolink.ink): Engineering insights on streaming, RAG, and production AI patterns
 - [Juspay](https://juspay.io): The company behind NeuroLink

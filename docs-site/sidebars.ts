@@ -3,6 +3,7 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     "index",
+    "about/vision",
     {
       type: "category",
       label: "Getting Started",
@@ -324,7 +325,6 @@ const sidebars: SidebarsConfig = {
         "community/contributing",
         "community/code-of-conduct",
         "community/changelog",
-        "about/vision",
       ],
     },
   ],

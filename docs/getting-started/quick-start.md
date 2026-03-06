@@ -1,3 +1,24 @@
+---
+description: Get NeuroLink running in under 2 minutes. Install the SDK, configure a provider, and stream your first AI response.
+---
+
+import Head from '@docusaurus/Head';
+
+<Head>
+  <script type="application/ld+json">{JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Quick Start with NeuroLink AI Streaming SDK",
+    "description": "Stream AI responses in real-time in under 2 minutes",
+    "totalTime": "PT2M",
+    "step": [
+      { "@type": "HowToStep", "position": 1, "name": "Install NeuroLink", "text": "Run: npm install @juspay/neurolink" },
+      { "@type": "HowToStep", "position": 2, "name": "Configure provider", "text": "Set your API key as an environment variable" },
+      { "@type": "HowToStep", "position": 3, "name": "Stream your first response", "text": "Use neurolink.stream() with your prompt and provider" }
+    ]
+  })}</script>
+</Head>
+
 # Quick Start
 
 Get NeuroLink running in under 2 minutes with this quick start guide.

@@ -1,23 +1,25 @@
-<div align="center">
-  <h1>🧠 NeuroLink</h1>
-  <p><strong>The Enterprise AI SDK for Production Applications</strong></p>
-  <p>13 Providers | 58+ MCP Tools | HITL Security | Redis Persistence</p>
-</div>
+# NeuroLink
 
-<div align="center">
+**The pipe layer for the AI nervous system.**
 
-[![npm version](https://badge.fury.io/js/%40juspay%2Fneurolink.svg)](https://www.npmjs.com/package/@juspay/neurolink)
-[![npm downloads](https://img.shields.io/npm/dw/@juspay/neurolink)](https://www.npmjs.com/package/@juspay/neurolink)
-[![Build Status](https://github.com/juspay/neurolink/actions/workflows/ci.yml/badge.svg)](https://github.com/juspay/neurolink/actions/workflows/ci.yml)
-[![Coverage Status](https://coveralls.io/repos/github/juspay/neurolink/badge.svg?branch=main)](https://coveralls.io/github/juspay/neurolink?branch=main)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![GitHub Stars](https://img.shields.io/github/stars/juspay/neurolink)](https://github.com/juspay/neurolink/stargazers)
-[![Discord](https://img.shields.io/discord/DISCORD_SERVER_ID?label=Discord&logo=discord)](https://discord.gg/neurolink)
+AI intelligence flows as streams — tokens, tool calls, memory, voice, documents.
+NeuroLink is the vascular layer that carries these streams from where they are
+generated (LLM providers: the neurons) to where they are needed (connectors: the organs).
 
-</div>
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
 
-Enterprise AI development platform with unified provider access, production-ready tooling, and an opinionated factory architecture. NeuroLink ships as both a TypeScript SDK and a professional CLI so teams can build, operate, and iterate on AI features quickly.
+const pipe = new NeuroLink({ defaultProvider: "anthropic" });
+
+// Everything is a stream
+for await (const token of pipe.stream({ prompt: "Hello" })) {
+  process.stdout.write(token);
+}
+```
+
+**[→ Docs](https://docs.neurolink.ink) · [→ Quick Start](https://docs.neurolink.ink/docs/getting-started/quick-start) · [→ npm](https://www.npmjs.com/package/@juspay/neurolink)**
+
+---
 
 ## 🧠 What is NeuroLink?
 
