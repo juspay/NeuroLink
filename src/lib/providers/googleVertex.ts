@@ -7,6 +7,8 @@ import {
   type GoogleVertexAnthropicProviderSettings,
 } from "@ai-sdk/google-vertex/anthropic";
 import {
+  embed,
+  embedMany,
   type LanguageModel,
   type LanguageModelV1,
   Output,
@@ -3778,9 +3780,6 @@ export class GoogleVertexProvider extends BaseProvider {
     });
 
     try {
-      // Create embedding model using the AI SDK
-      const { embed } = await import("ai");
-
       // Create the Vertex provider with current settings
       const vertexSettings = await createVertexSettings(this.location);
       const vertex = createVertex(vertexSettings);
@@ -3806,6 +3805,52 @@ export class GoogleVertexProvider extends BaseProvider {
         error: error instanceof Error ? error.message : String(error),
         model: embeddingModelName,
         textLength: text.length,
+      });
+
+      throw this.handleProviderError(error);
+    }
+  }
+
+  /**
+   * Generate embeddings for multiple texts in a single batch
+   * @param texts - The texts to embed
+   * @param modelName - The embedding model to use (default: text-embedding-004)
+   * @returns Promise resolving to an array of embedding vectors
+   */
+  async embedMany(texts: string[], modelName?: string): Promise<number[][]> {
+    const embeddingModelName =
+      modelName || this.getDefaultEmbeddingModel() || "text-embedding-004";
+
+    logger.debug("Generating batch embeddings", {
+      provider: this.providerName,
+      model: embeddingModelName,
+      count: texts.length,
+    });
+
+    try {
+      const vertexSettings = await createVertexSettings(this.location);
+      const vertex = createVertex(vertexSettings);
+
+      const embeddingModel = vertex.textEmbeddingModel(embeddingModelName);
+
+      const result = await embedMany({
+        model: embeddingModel,
+        values: texts,
+      });
+
+      logger.debug("Batch embeddings generated successfully", {
+        provider: this.providerName,
+        model: embeddingModelName,
+        count: result.embeddings.length,
+        embeddingDimension: result.embeddings[0]?.length,
+      });
+
+      return result.embeddings;
+    } catch (error) {
+      logger.error("Batch embedding generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        model: embeddingModelName,
+        count: texts.length,
       });
 
       throw this.handleProviderError(error);

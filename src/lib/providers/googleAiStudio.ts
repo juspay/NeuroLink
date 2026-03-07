@@ -1,5 +1,12 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { type LanguageModelV1, type Schema, streamText, type Tool } from "ai";
+import {
+  embed,
+  embedMany,
+  type LanguageModelV1,
+  type Schema,
+  streamText,
+  type Tool,
+} from "ai";
 import {
   type AIProviderName,
   ErrorCategory,
@@ -1416,6 +1423,105 @@ export class GoogleAIStudioProvider extends BaseProvider {
         streamId: `google-ai-audio-${Date.now()}`,
       },
     };
+  }
+
+  protected getDefaultEmbeddingModel(): string {
+    return (
+      process.env.GOOGLE_AI_EMBEDDING_MODEL ||
+      process.env.GOOGLE_EMBEDDING_MODEL ||
+      "gemini-embedding-001"
+    );
+  }
+
+  /**
+   * Generate embeddings for text using Google AI Studio embedding models
+   * @param text - The text to embed
+   * @param modelName - The embedding model to use (default: gemini-embedding-001)
+   * @returns Promise resolving to the embedding vector
+   */
+  async embed(text: string, modelName?: string): Promise<number[]> {
+    const embeddingModelName =
+      modelName || this.getDefaultEmbeddingModel() || "gemini-embedding-001";
+
+    logger.debug("Generating embedding", {
+      provider: this.providerName,
+      model: embeddingModelName,
+      textLength: text.length,
+    });
+
+    try {
+      const apiKey = this.getApiKey();
+      const google = createGoogleGenerativeAI({ apiKey });
+
+      const embeddingModel = google.textEmbeddingModel(embeddingModelName);
+
+      const result = await embed({
+        model: embeddingModel,
+        value: text,
+      });
+
+      logger.debug("Embedding generated successfully", {
+        provider: this.providerName,
+        model: embeddingModelName,
+        embeddingDimension: result.embedding.length,
+      });
+
+      return result.embedding;
+    } catch (error) {
+      logger.error("Embedding generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        model: embeddingModelName,
+        textLength: text.length,
+      });
+
+      throw this.handleProviderError(error);
+    }
+  }
+
+  /**
+   * Generate embeddings for multiple texts in a single batch
+   * @param texts - The texts to embed
+   * @param modelName - The embedding model to use (default: gemini-embedding-001)
+   * @returns Promise resolving to an array of embedding vectors
+   */
+  async embedMany(texts: string[], modelName?: string): Promise<number[][]> {
+    const embeddingModelName =
+      modelName || this.getDefaultEmbeddingModel() || "gemini-embedding-001";
+
+    logger.debug("Generating batch embeddings", {
+      provider: this.providerName,
+      model: embeddingModelName,
+      count: texts.length,
+    });
+
+    try {
+      const apiKey = this.getApiKey();
+      const google = createGoogleGenerativeAI({ apiKey });
+
+      const embeddingModel = google.textEmbeddingModel(embeddingModelName);
+
+      const result = await embedMany({
+        model: embeddingModel,
+        values: texts,
+      });
+
+      logger.debug("Batch embeddings generated successfully", {
+        provider: this.providerName,
+        model: embeddingModelName,
+        count: result.embeddings.length,
+        embeddingDimension: result.embeddings[0]?.length,
+      });
+
+      return result.embeddings;
+    } catch (error) {
+      logger.error("Batch embedding generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        model: embeddingModelName,
+        count: texts.length,
+      });
+
+      throw this.handleProviderError(error);
+    }
   }
 
   private getApiKey(): string {
