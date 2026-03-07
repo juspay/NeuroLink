@@ -42,7 +42,7 @@ function useSearch() {
     if (algoliaSearch.error && algoliaSearch.query) {
       localSearch.setQuery(algoliaSearch.query);
     }
-  }, [algoliaSearch.error, algoliaSearch.query, localSearch]);
+  }, [algoliaSearch.error, algoliaSearch.query, localSearch.setQuery]);
 
   // Fall back to local search if Algolia is not configured or errors out
   if (!hasAlgolia || algoliaSearch.error) {
