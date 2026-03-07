@@ -80,6 +80,7 @@ import {
   executeNativeToolCalls,
   handleMaxStepsTermination,
   pushModelResponseToHistory,
+  sanitizeToolsForGemini,
   type NativeToolsConfig,
 } from "./googleNativeGemini3.js";
 
@@ -1124,9 +1125,15 @@ export class GoogleVertexProvider extends BaseProvider {
       // Get all available tools (direct + MCP + external + user-provided RAG tools) for streaming
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const baseStreamTools = shouldUseTools ? await this.getAllTools() : {};
-      const tools = shouldUseTools
+      const rawTools = shouldUseTools
         ? { ...baseStreamTools, ...(options.tools || {}) }
         : {};
+      // Only sanitize for Gemini models (not Anthropic/Claude models routed through Vertex)
+      const isAnthropic = isAnthropicModel(gemini3CheckModelName);
+      const tools =
+        Object.keys(rawTools).length > 0 && !isAnthropic
+          ? sanitizeToolsForGemini(rawTools)
+          : rawTools;
 
       logger.debug(`${functionTag}: Tools for streaming`, {
         shouldUseTools,
@@ -1236,6 +1243,12 @@ export class GoogleVertexProvider extends BaseProvider {
 
       if (analysisSchema) {
         try {
+          // Gemini cannot use tools and JSON schema simultaneously
+          if (!isAnthropic) {
+            delete streamOptions.tools;
+            delete streamOptions.toolChoice;
+            delete streamOptions.maxSteps;
+          }
           streamOptions = {
             ...streamOptions,
             experimental_output: Output.object({

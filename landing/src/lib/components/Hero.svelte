@@ -118,7 +118,7 @@
     <div
       class="flex items-center justify-center gap-5 mt-10 text-[11px] tracking-[0.12em] uppercase flex-wrap"
     >
-      <span class="text-[rgba(168,216,255,0.30)]">CONNECTORS</span>
+      <span class="text-[rgba(168,216,255,0.30)]">CONNECTORS / RECEPTORS</span>
       <a
         href="https://docs.neurolink.ink/docs/connectors/automatic"
         class="connector-chip text-[var(--color-nl-saffron)] hover:opacity-80 transition-opacity hero-anim-chip"
@@ -151,46 +151,46 @@
     }
   }
 
-  /* Eyebrow label — 0.5s delay */
+  /* Eyebrow label */
   .hero-anim-label {
     opacity: 0;
-    animation: hero-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
+    animation: hero-fade-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards;
   }
 
-  /* Headline words — staggered from 0.9s, 0.06s apart per word */
+  /* Headline words */
   .hero-word {
     display: inline-block;
   }
 
   .hero-anim-word {
     opacity: 0;
-    animation: hero-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1)
-      calc(0.9s + var(--d, 0) * 0.06s) forwards;
+    animation: hero-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)
+      calc(0.45s + var(--d, 0) * 0.05s) forwards;
   }
 
-  /* Subtitle — 1.55s */
+  /* Subtitle */
   .hero-anim-sub {
     opacity: 0;
-    animation: hero-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 1.55s forwards;
+    animation: hero-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) 1s forwards;
   }
 
-  /* CTA row — 2.0s */
+  /* CTA row */
   .hero-anim-cta {
     opacity: 0;
-    animation: hero-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) 2s forwards;
+    animation: hero-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) 1.3s forwards;
   }
 
-  /* Install line — 2.3s */
+  /* Install line */
   .hero-anim-install {
     opacity: 0;
-    animation: hero-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) 2.3s forwards;
+    animation: hero-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) 1.52s forwards;
   }
 
-  /* Connector chips — 2.7s, staggered */
+  /* Connector chips */
   .hero-anim-chip {
     opacity: 0;
-    animation: hero-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1)
-      calc(2.7s + var(--d, 0) * 0.08s) forwards;
+    animation: hero-fade-up 0.26s cubic-bezier(0.22, 1, 0.36, 1)
+      calc(1.72s + var(--d, 0) * 0.07s) forwards;
   }
 
   /* Respect reduced motion — show everything immediately */

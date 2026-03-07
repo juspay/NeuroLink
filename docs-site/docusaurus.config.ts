@@ -284,6 +284,11 @@ const config: Config = {
           position: "left",
         },
         {
+          href: "https://blog.neurolink.ink",
+          label: "Blog",
+          position: "left",
+        },
+        {
           href: "https://www.npmjs.com/package/@juspay/neurolink",
           label: "NPM",
           position: "right",
@@ -322,6 +327,7 @@ const config: Config = {
         {
           title: "Community",
           items: [
+            { label: "Blog", href: "https://blog.neurolink.ink" },
             { label: "GitHub", href: "https://github.com/juspay/neurolink" },
             {
               label: "GitHub Discussions",

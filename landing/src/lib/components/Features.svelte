@@ -116,7 +116,7 @@
 <section
   bind:this={sectionEl}
   data-topology-phase="streams"
-  class="section-streams py-20"
+  class="section-streams py-24 md:py-36"
 >
   <!-- Section header -->
   <div class="max-w-[960px] mx-auto px-6 mb-16">

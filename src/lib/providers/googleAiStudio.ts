@@ -58,6 +58,7 @@ import {
   executeNativeToolCalls,
   handleMaxStepsTermination,
   pushModelResponseToHistory,
+  sanitizeToolsForGemini,
   type NativeToolsConfig,
 } from "./googleNativeGemini3.js";
 
@@ -602,9 +603,14 @@ export class GoogleAIStudioProvider extends BaseProvider {
       // Get tools consistently with generate method (include user-provided RAG tools)
       const shouldUseTools = !options.disableTools && this.supportsTools();
       const baseTools = shouldUseTools ? await this.getAllTools() : {};
-      const tools = shouldUseTools
+      const rawTools = shouldUseTools
         ? { ...baseTools, ...(options.tools || {}) }
         : {};
+      // Sanitize tool schemas for Gemini proto compatibility (converts anyOf/oneOf unions to string)
+      const tools =
+        Object.keys(rawTools).length > 0
+          ? sanitizeToolsForGemini(rawTools)
+          : rawTools;
 
       // Build message array from options with multimodal support
       // Using protected helper from BaseProvider to eliminate code duplication

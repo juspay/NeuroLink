@@ -173,7 +173,7 @@ export function truncateWithSlidingWindow(
     const keptAfterTruncation = remainingMessages.slice(evenRemoveCount);
     const truncationMarker: ChatMessage = {
       id: `truncation-${randomUUID()}`,
-      role: "system",
+      role: "user",
       content: TRUNCATION_MARKER_CONTENT,
       timestamp: new Date().toISOString(),
       metadata: { isSummary: false, truncated: true },
@@ -218,7 +218,7 @@ export function truncateWithSlidingWindow(
     const keptMessages = remainingMessages.slice(evenMaxRemove);
     const truncationMarker: ChatMessage = {
       id: `truncation-${randomUUID()}`,
-      role: "system",
+      role: "user",
       content: TRUNCATION_MARKER_CONTENT,
       timestamp: new Date().toISOString(),
       metadata: { isSummary: false, truncated: true },

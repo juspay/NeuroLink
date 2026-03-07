@@ -10,7 +10,7 @@
   onMount(() => {
     observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) activeSection.set("developer");
+        if (entries[0].isIntersecting) activeSection.set("observe");
       },
       { threshold: 0.4 },
     );
@@ -42,7 +42,7 @@
 <section
   bind:this={sectionEl}
   data-topology-phase="observe"
-  class="max-w-[1200px] mx-auto px-6 py-20 relative"
+  class="section-observe max-w-[1200px] mx-auto px-6 py-24 md:py-36 relative"
 >
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
     <!-- Left: checklist -->

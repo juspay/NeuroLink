@@ -62,7 +62,7 @@ const SECTION_CONFIGS: Record<string, SectionCanvasConfig> = {
     glowNodes: true,
     spinalActivity: 1.2,
   },
-  developer: {
+  observe: {
     intensity: 0.5,
     particleSpeed: 1.5,
     branchGrowth: 3,
@@ -70,6 +70,15 @@ const SECTION_CONFIGS: Record<string, SectionCanvasConfig> = {
     dominantColor: "#00f0ff",
     glowNodes: false,
     spinalActivity: 1.2,
+  },
+  ecosystem: {
+    intensity: 0.45,
+    particleSpeed: 1.2,
+    branchGrowth: 3,
+    signalDensity: 10,
+    dominantColor: "#00d2ff",
+    glowNodes: false,
+    spinalActivity: 1,
   },
   cta: {
     intensity: 0.3,

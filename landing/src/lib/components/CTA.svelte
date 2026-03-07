@@ -35,7 +35,7 @@
   </div>
 
   <div
-    class="relative z-10 max-w-[1200px] mx-auto px-4 md:px-6 py-12 md:py-20"
+    class="relative z-10 max-w-[1200px] mx-auto px-4 md:px-6 py-24 md:py-36"
     use:reveal={{ y: 40 }}
   >
     <div

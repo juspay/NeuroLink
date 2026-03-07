@@ -71,11 +71,11 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta
     name="twitter:title"
-    content="NeuroLink — Real-time AI Streaming for Every Provider"
+    content="NeuroLink — The Nervous System Pipe for AI Streams"
   />
   <meta
     name="twitter:description"
-    content="Stream AI responses in real-time across 13+ providers. 4 streaming patterns, 24 event types, backpressure control, voice, RAG, and MCP — one unified API."
+    content="NeuroLink is the pipe layer for the AI nervous system — connecting live streams of tokens, data, tools, and context through pluggable connectors. TypeScript SDK. 13+ providers. Open source."
   />
   <meta name="twitter:image" content="https://neurolink.ink/api/og?type=home" />
   <meta name="twitter:site" content="@jaborhey" />

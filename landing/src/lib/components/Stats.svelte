@@ -2,10 +2,10 @@
   import { onMount } from "svelte";
 
   const stats = [
-    { value: 13, suffix: "+", label: "AI Providers" },
-    { value: 100, suffix: "+", label: "Models" },
-    { value: 58, suffix: "+", label: "MCP Tools" },
-    { value: 50, suffix: "+", label: "File Types" },
+    { value: 13, suffix: "+", label: "Stream Sources" },
+    { value: 100, suffix: "+", label: "Active Neurons" },
+    { value: 58, suffix: "+", label: "Synapse Tools" },
+    { value: 50, suffix: "+", label: "Knowledge Formats" },
   ];
 
   let sectionEl: HTMLElement;
@@ -69,7 +69,7 @@
 
 <section
   bind:this={sectionEl}
-  class="stats-strip max-w-[1200px] mx-auto px-4 md:px-6 py-10 md:py-14"
+  class="stats-strip max-w-[1200px] mx-auto px-4 md:px-6 py-14 md:py-20"
 >
   <div class="stats-row">
     {#each stats as stat, i}

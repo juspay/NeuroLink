@@ -87,7 +87,8 @@
 </script>
 
 <section
-  class="max-w-[800px] mx-auto px-4 md:px-6 py-12 md:py-20 relative z-10"
+  data-topology-phase="ecosystem"
+  class="section-ecosystem max-w-[800px] mx-auto px-4 md:px-6 py-24 md:py-32 relative z-10"
 >
   <div use:reveal={{ y: 40 }} class="text-center mb-10 md:mb-16">
     <p class="eyebrow text-[var(--color-nl-accent-lighter)] mb-4">FAQ</p>

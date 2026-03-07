@@ -26,7 +26,10 @@
   ];
 </script>
 
-<section class="max-w-[1200px] mx-auto px-4 md:px-6 py-16 md:py-24">
+<section
+  data-topology-phase="ecosystem"
+  class="section-ecosystem max-w-[1200px] mx-auto px-4 md:px-6 py-24 md:py-32"
+>
   <div use:reveal={{ y: 40 }} class="text-center mb-8 md:mb-14">
     <p class="eyebrow text-ds-text-muted mb-4">From the team</p>
     <h2 class="section-headline text-ds-text-primary">
@@ -42,10 +45,15 @@
     class="grid grid-cols-1 md:grid-cols-3 gap-4"
     use:reveal={{ y: 40, stagger: 0.12 }}
   >
-    {#each testimonials as t}
+    {#each testimonials as t, i}
       <div
-        class="bg-ds-surface-2 border border-ds-border rounded-xl p-5 md:p-6 flex flex-col hover:border-ds-border-hover transition-colors duration-200"
+        class="testimonial-card flex flex-col"
+        style="--card-accent: {i === 2
+          ? 'var(--color-nl-paprika)'
+          : 'var(--color-nl-sky)'}"
       >
+        <div class="testimonial-link" aria-hidden="true"></div>
+        <div class="testimonial-node" aria-hidden="true"></div>
         <!-- Quote -->
         <blockquote class="flex-1">
           <svg
@@ -83,3 +91,69 @@
     {/each}
   </div>
 </section>
+
+<style>
+  .testimonial-card {
+    position: relative;
+    margin-top: 1rem;
+    border: 1px solid var(--color-ds-border);
+    border-radius: var(--radius-ds-lg);
+    padding: 1.25rem 1.25rem 1.4rem;
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        color-mix(in srgb, var(--card-accent) 12%, transparent) 0%,
+        transparent 60%
+      ),
+      var(--color-ds-surface-2);
+    transition:
+      transform 0.32s var(--ease-spring),
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .testimonial-card:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(
+      in srgb,
+      var(--card-accent) 58%,
+      var(--color-ds-border)
+    );
+    box-shadow:
+      0 14px 34px rgba(0, 0, 0, 0.36),
+      0 0 28px color-mix(in srgb, var(--card-accent) 20%, transparent);
+  }
+
+  .testimonial-link {
+    position: absolute;
+    top: -26px;
+    left: 50%;
+    width: 1.5px;
+    height: 26px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in srgb, var(--card-accent) 72%, #ffffff 28%)
+    );
+    opacity: 0.9;
+  }
+
+  .testimonial-node {
+    position: absolute;
+    top: -36px;
+    left: 50%;
+    width: 11px;
+    height: 11px;
+    transform: translateX(-50%);
+    border-radius: 9999px;
+    background: radial-gradient(
+      circle,
+      #fff 0 33%,
+      var(--card-accent) 34% 100%
+    );
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--card-accent) 22%, transparent),
+      0 0 15px color-mix(in srgb, var(--card-accent) 58%, transparent);
+  }
+</style>

@@ -100,7 +100,7 @@ for await (const token of pipe.stream({ prompt })) {
   bind:this={sectionEl}
   data-topology-phase="pipe"
   data-pipe-section
-  class="section-pipe py-20"
+  class="section-pipe py-24 md:py-36"
 >
   <div class="max-w-[960px] mx-auto px-6">
     <!-- Section header -->

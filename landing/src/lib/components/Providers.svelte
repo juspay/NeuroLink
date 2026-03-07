@@ -51,7 +51,7 @@
 <section
   bind:this={sectionEl}
   data-topology-phase="connectors"
-  class="section-connectors py-20 relative"
+  class="section-connectors py-24 md:py-36 relative"
 >
   <div class="max-w-[1200px] mx-auto px-6 relative z-10">
     <p class="label-eyebrow text-[var(--color-nl-accent-lighter)] mb-4">
@@ -73,6 +73,8 @@
           class="connector-card glass-panel glass-panel-hover"
           style="--card-accent: {c.accentColor}"
         >
+          <div class="connector-link" aria-hidden="true"></div>
+          <div class="connector-node" aria-hidden="true"></div>
           <div class="card-accent-bar"></div>
           <div class="card-body">
             <div class="flex items-center justify-between mb-8">
@@ -126,6 +128,42 @@
     flex-direction: column;
     will-change: transform;
     overflow: hidden;
+    position: relative;
+    margin-top: 1.25rem;
+  }
+
+  .connector-link {
+    position: absolute;
+    left: 50%;
+    top: -30px;
+    width: 1.5px;
+    height: 30px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in srgb, var(--card-accent) 80%, #ffffff 20%)
+    );
+    opacity: 0.85;
+    filter: drop-shadow(0 0 6px var(--card-accent));
+  }
+
+  .connector-node {
+    position: absolute;
+    left: 50%;
+    top: -40px;
+    width: 12px;
+    height: 12px;
+    transform: translateX(-50%);
+    border-radius: 9999px;
+    background: radial-gradient(
+      circle,
+      #fff 0 28%,
+      var(--card-accent) 30% 100%
+    );
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--card-accent) 20%, transparent),
+      0 0 14px color-mix(in srgb, var(--card-accent) 70%, transparent);
   }
 
   .card-accent-bar {

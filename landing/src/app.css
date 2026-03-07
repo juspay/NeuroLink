@@ -18,37 +18,36 @@
   --color-nl-charcoal-dark: #020306;
 
   /* Nervous System — Pipe colors */
-  --color-nl-sky: #00d2ff;
-  /* Electric cyan-blue */
-  --color-nl-deep: #012a4a;
-  --color-nl-light: #3a86ff;
+  --color-nl-sky: #0190e0;
+  --color-nl-deep: #014f87;
+  --color-nl-light: #3390d0;
 
   /* Connectors (organs) */
-  --color-nl-ember: #ff7b00;
+  --color-nl-ember: #c47d0e;
 
   /* Background system - Premium Pitch Black / Deep Navy Space */
-  --color-bg: #05080f;
-  --color-bg-deeper: #03050a;
-  --color-bg-warm: #0a0808;
-  --color-bg-darkest: #010203;
-  --color-bg-alt: #0a0b12;
+  --color-bg: #353531;
+  --color-bg-deeper: #2d2d2a;
+  --color-bg-warm: #342e29;
+  --color-bg-darkest: #1e1e1c;
+  --color-bg-alt: #05080f;
 
   /* Signal Streams - Neon */
-  --color-signal: #00f0ff;
-  --color-signal-bright: #ffffff;
+  --color-signal: #a8d8ff;
+  --color-signal-bright: #e8f4ff;
 
   /* Text system - High Contrast */
-  --color-text-primary: #ffffff;
-  --color-text-body: #a0aec0;
-  --color-text-dim: #718096;
-  --color-text-code: #e2e8f0;
+  --color-text-primary: #f0f4f8;
+  --color-text-body: #8a9ab5;
+  --color-text-dim: #5a6a80;
+  --color-text-code: #c5d8f0;
 
   /* Typography */
-  --font-display-weight: 400;
-  --font-body-weight: 300;
-  --font-label-tracking: 0.2em;
-  --line-height-display: 1.05;
-  --line-height-body: 1.6;
+  --font-display-weight: 300;
+  --font-body-weight: 350;
+  --font-label-tracking: 0.15em;
+  --line-height-display: 1.08;
+  --line-height-body: 1.75;
 
   /* Easing curves - Fluid cinematic */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -75,12 +74,16 @@
   --color-gradient-warm-end: #ff3d00;
 
   /* Surfaces - True Dark Glassmorphism */
-  --color-ds-bg: #05080f;
+  --color-ds-bg: #353531;
   --color-ds-surface-1: rgba(255, 255, 255, 0.02);
   --color-ds-surface-2: rgba(255, 255, 255, 0.04);
   --color-ds-surface-3: rgba(255, 255, 255, 0.08);
   --color-ds-surface-4: rgba(255, 255, 255, 0.12);
   --color-ds-surface-hover: rgba(255, 255, 255, 0.06);
+  --color-ds-text-primary: #f0f4f8;
+  --color-ds-text-secondary: #b7c6da;
+  --color-ds-text-tertiary: #8a9ab5;
+  --color-ds-text-muted: #5a6a80;
 
   /* Borders - Soft translucent */
   --color-ds-border: rgba(255, 255, 255, 0.08);
@@ -210,7 +213,7 @@ pre,
   font-family: "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.6875rem;
   font-weight: 500;
-  letter-spacing: 0.2em;
+  letter-spacing: var(--font-label-tracking);
   text-transform: uppercase;
   color: var(--color-nl-sky);
   opacity: 0.8;
@@ -245,21 +248,46 @@ pre,
 }
 
 .section-streams {
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    rgba(1, 144, 224, 0.02),
+    rgba(1, 144, 224, 0.01) 45%,
+    transparent
+  );
   position: relative;
   z-index: 1;
 }
 
 .section-pipe {
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    rgba(1, 111, 185, 0.05),
+    rgba(1, 111, 185, 0.02)
+  );
   position: relative;
   z-index: 1;
 }
 
 .section-connectors {
-  background: rgba(5, 8, 15, 0.5);
+  background: linear-gradient(
+    180deg,
+    rgba(52, 46, 41, 0.5),
+    rgba(45, 45, 42, 0.35)
+  );
   border-top: 1px solid rgba(0, 210, 255, 0.07);
   border-bottom: 1px solid rgba(0, 210, 255, 0.07);
+  position: relative;
+  z-index: 1;
+}
+
+.section-ecosystem,
+.section-observe {
+  background: linear-gradient(
+    180deg,
+    rgba(1, 111, 185, 0.02),
+    rgba(1, 111, 185, 0.01),
+    transparent
+  );
   position: relative;
   z-index: 1;
 }
@@ -331,6 +359,7 @@ pre,
     inset 0 0 10px rgba(0, 240, 255, 0.05);
   transition: all 0.4s var(--ease-out-expo);
   overflow: hidden;
+  animation: pulse-signal 3.4s infinite cubic-bezier(0.66, 0, 0, 1);
 }
 
 .btn-signal:hover {
@@ -361,6 +390,27 @@ pre,
 
 .btn-signal:hover::before {
   left: 150%;
+}
+
+@keyframes pulse-signal {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(1, 144, 224, 0.32),
+      0 0 20px rgba(0, 240, 255, 0.1),
+      inset 0 0 10px rgba(0, 240, 255, 0.05);
+  }
+  68% {
+    box-shadow:
+      0 0 0 11px rgba(1, 144, 224, 0),
+      0 0 30px rgba(0, 240, 255, 0.2),
+      inset 0 0 16px rgba(0, 240, 255, 0.08);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(1, 144, 224, 0),
+      0 0 20px rgba(0, 240, 255, 0.1),
+      inset 0 0 10px rgba(0, 240, 255, 0.05);
+  }
 }
 
 /* ===========================================
