@@ -125,7 +125,7 @@
       Thirteen sources.<br />One stream.
     </h2>
     <p class="body-text max-w-lg mt-5">
-      Every type of AI intelligence flows through the same pipe. Pick your
+      Every type of AI intelligence flows through the same stream layer. Pick your
       sources. Shape the signal. Deliver to any organ.
     </p>
   </div>

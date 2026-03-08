@@ -66,9 +66,7 @@
   class:-translate-y-full={!visible}
   class:border-transparent={!scrolled}
   class:border-ds-border={scrolled}
-  style:background={scrolled ? "rgba(10, 10, 10, 0.85)" : "transparent"}
-  style:backdrop-filter={scrolled ? "blur(24px)" : "none"}
-  style:-webkit-backdrop-filter={scrolled ? "blur(24px)" : "none"}
+  style:background={scrolled ? "rgba(10, 10, 10, 0.95)" : "transparent"}
 >
   <!-- Logo -->
   <a href="/" class="flex items-center gap-2.5 shrink-0">
@@ -207,7 +205,7 @@
 >
   <!-- Backdrop -->
   <button
-    class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+    class="absolute inset-0 bg-black/80"
     onclick={closeMobile}
     aria-label="Close navigation menu"
     tabindex="-1"

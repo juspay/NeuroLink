@@ -39,10 +39,11 @@
   ];
 </script>
 
+<div class="section-observe">
 <section
   bind:this={sectionEl}
   data-topology-phase="observe"
-  class="section-observe max-w-[1200px] mx-auto px-6 py-24 md:py-36 relative"
+  class="max-w-[1200px] mx-auto px-6 py-24 md:py-36 relative"
 >
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
     <!-- Left: checklist -->
@@ -160,6 +161,7 @@
     </div>
   </div>
 </section>
+</div>
 
 <style>
   :global(.tab-scroll-fade) {

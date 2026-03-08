@@ -33,9 +33,10 @@
   ];
 </script>
 
+<div class="section-ecosystem">
 <section
   data-topology-phase="ecosystem"
-  class="section-ecosystem max-w-[1200px] mx-auto px-4 md:px-6 py-24 md:py-32"
+  class="max-w-[1200px] mx-auto px-4 md:px-6 py-24 md:py-32"
 >
   <div use:reveal={{ y: 40 }} class="text-center mb-8 md:mb-14">
     <p class="label-eyebrow mb-4">BUILT AT SCALE</p>
@@ -70,7 +71,7 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mx-auto mb-3 text-nl-accent"
+            class="mx-auto mb-3" style="color: {signal.accent}"
           >
             <path
               d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
@@ -88,7 +89,7 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mx-auto mb-3 text-nl-saffron"
+            class="mx-auto mb-3" style="color: {signal.accent}"
           >
             <polyline points="16 18 22 12 16 6" />
             <polyline points="8 6 2 12 8 18" />
@@ -104,7 +105,7 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mx-auto mb-3 text-nl-success"
+            class="mx-auto mb-3" style="color: {signal.accent}"
           >
             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 9.9-1" />
@@ -120,7 +121,7 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mx-auto mb-3 text-nl-paprika"
+            class="mx-auto mb-3" style="color: {signal.accent}"
           >
             <path
               d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"
@@ -140,6 +141,7 @@
     {/each}
   </div>
 </section>
+</div>
 
 <style>
   .signal-card {

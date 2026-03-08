@@ -11,7 +11,7 @@
     },
     {
       quote:
-        "The RAG pipeline is incredibly simple. We pass files directly to generate() and NeuroLink handles chunking, embedding, and retrieval automatically. What used to take a week of integration work now takes an afternoon.",
+        "The RAG workflow is incredibly simple. We pass files directly to generate() and NeuroLink handles chunking, embedding, and retrieval automatically. What used to take a week of integration work now takes an afternoon.",
       name: "Backend Engineer",
       role: "Juspay — Developer Experience",
       initials: "BE",
@@ -26,9 +26,10 @@
   ];
 </script>
 
+<div class="section-ecosystem">
 <section
   data-topology-phase="ecosystem"
-  class="section-ecosystem max-w-[1200px] mx-auto px-4 md:px-6 py-24 md:py-32"
+  class="max-w-[1200px] mx-auto px-4 md:px-6 py-24 md:py-32"
 >
   <div use:reveal={{ y: 40 }} class="text-center mb-8 md:mb-14">
     <p class="eyebrow text-ds-text-muted mb-4">From the team</p>
@@ -91,6 +92,7 @@
     {/each}
   </div>
 </section>
+</div>
 
 <style>
   .testimonial-card {

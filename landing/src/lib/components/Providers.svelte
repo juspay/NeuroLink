@@ -24,7 +24,7 @@
     {
       name: "Automatic",
       description:
-        "Consumer analysis and operations hub. Routes order data and payment context through the pipe to surface risk signals and recommendations.",
+        "Consumer analysis and operations hub. Routes order data and payment context through the signal layer to surface risk signals and recommendations.",
       gateway: "Consumer control · Operations intelligence",
       accentColor: "var(--color-nl-saffron)",
       docsUrl: "/docs/connectors/automatic",
@@ -40,7 +40,7 @@
     {
       name: "Yama",
       description:
-        "Code review judge. Streams PR diffs through the pipe, applies rule-driven analysis, and enforces quality gates before merge.",
+        "Code review judge. Streams PR diffs through the signal layer, applies rule-driven analysis, and enforces quality gates before merge.",
       gateway: "Code quality · Automated governance",
       accentColor: "var(--color-nl-paprika)",
       docsUrl: "/docs/connectors/yama",
@@ -53,12 +53,12 @@
   data-topology-phase="connectors"
   class="section-connectors py-24 md:py-36 relative"
 >
-  <div class="max-w-[1200px] mx-auto px-6 relative z-10">
+  <div class="max-w-[1200px] mx-auto px-4 sm:px-6 relative z-10">
     <p class="label-eyebrow text-[var(--color-nl-accent-lighter)] mb-4">
       CONNECTORS
     </p>
     <h2 class="headline-section font-display text-white mb-6 drop-shadow-lg">
-      Organs built on the pipe.
+      Organs built on the stream layer.
     </h2>
     <p class="body-text text-[var(--color-text-body)] text-lg max-w-xl mb-16">
       Every application built on NeuroLink is an organ. It connects to the
@@ -90,7 +90,7 @@
             </div>
             <h3
               class="font-display text-[2rem] text-white mb-4 drop-shadow-md"
-              style="font-size: clamp(1.6rem, 2.5vw, 2.2rem); line-height: 1.1;"
+              style="font-size: clamp(1.5rem, 4vw, 2.2rem); line-height: 1.1;"
             >
               {c.name}
             </h3>
@@ -174,12 +174,18 @@
   }
 
   .card-body {
-    padding: 2.25rem 2rem 1.5rem;
+    padding: 1.5rem 1.25rem 1.25rem;
     flex: 1;
   }
 
+  @media (min-width: 768px) {
+    .card-body {
+      padding: 2.25rem 2rem 1.5rem;
+    }
+  }
+
   .card-footer {
-    padding: 1.5rem 2rem 1.75rem;
+    padding: 1.25rem 1.25rem 1.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     background: rgba(0, 0, 0, 0.2);
   }

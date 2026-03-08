@@ -1078,7 +1078,7 @@ export class GoogleVertexProvider extends BaseProvider {
       Object.keys(optionTools).length + Object.keys(sdkTools).length;
     const hasTools = gemini3CheckShouldUseTools && combinedToolCount > 0;
 
-    if (isGemini3Model(gemini3CheckModelName) && hasTools) {
+    if (isGemini3Model(gemini3CheckModelName) && hasTools && !analysisSchema) {
       // Process CSV files before routing to native SDK (bypasses normal message builder)
       const processedOptions = await this.processCSVFilesForNativeSDK(options);
 
@@ -1087,6 +1087,20 @@ export class GoogleVertexProvider extends BaseProvider {
         ...processedOptions,
         tools: { ...sdkTools, ...optionTools },
       };
+      // Gemini cannot use tools and JSON schema simultaneously
+      const wantsStructuredOutput =
+        analysisSchema ||
+        processedOptions.output?.format === "json" ||
+        processedOptions.schema;
+      if (wantsStructuredOutput) {
+        mergedOptions.tools = {};
+        (mergedOptions as Record<string, unknown>).toolChoice = undefined;
+        (mergedOptions as Record<string, unknown>).maxSteps = undefined;
+        logger.warn(
+          "[GoogleVertex] Structured output active — disabling tools for Gemini 3 (Gemini limitation).",
+        );
+      }
+
       logger.info(
         "[GoogleVertex] Routing Gemini 3 to native SDK for tool calling",
         {

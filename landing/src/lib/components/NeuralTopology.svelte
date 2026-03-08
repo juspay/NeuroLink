@@ -7,16 +7,10 @@
     scrollProgress,
     scrollVelocity,
     canvasConfig,
+    type SectionId,
   } from "$lib/stores/canvasState.js";
 
-  type Phase =
-    | "hero"
-    | "streams"
-    | "pipe"
-    | "connectors"
-    | "observe"
-    | "ecosystem"
-    | "cta";
+  type Phase = SectionId;
 
   type Neuron = {
     id: string;
@@ -63,6 +57,30 @@
     op: number;
   };
 
+  type PeripheralNode = {
+    xFrac: number;
+    pageFrac: number;
+    z: number;
+    color: string;
+    cluster: "spine" | "left" | "right" | "top" | "bottom";
+  };
+
+  type PeripheralEdge = {
+    a: number;
+    b: number;
+    color: string;
+    strength: "core" | "branch" | "cross";
+    bend: number;
+  };
+
+  type MeshSpark = {
+    edgeIdx: number;
+    t: number;
+    speed: number;
+    length: number;
+    color: string;
+  };
+
   let mouseX = $state(-9999);
   let mouseY = $state(-9999);
   let reduced = $state(false);
@@ -70,6 +88,7 @@
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D;
   let raf: number;
+  let sectionObserverTimer: ReturnType<typeof setTimeout>;
   let W = 0;
   let H = 0;
   let DPR = 1;
@@ -83,13 +102,19 @@
   let neurons: Neuron[] = [];
   let signals: Signal[] = [];
   let ambient: AmbientCell[] = [];
+  let peripheralNodes: PeripheralNode[] = [];
+  let peripheralEdges: PeripheralEdge[] = [];
+  let meshSparks: MeshSpark[] = [];
   let sectionObservers: IntersectionObserver[] = [];
   let onMouseMove: ((e: MouseEvent) => void) | null = null;
+  let onVisChange: (() => void) | null = null;
+  let mouseNX = 0;
+  let mouseNY = 0;
 
   let phaseCenters: Record<Phase, number> = {
     hero: 0.06,
     streams: 0.22,
-    pipe: 0.36,
+    flow: 0.36,
     connectors: 0.5,
     observe: 0.66,
     ecosystem: 0.8,
@@ -97,7 +122,7 @@
   };
 
   const C = {
-    pipe: "#0190e0",
+    flow: "#0190e0",
     sky: "#a8d8ff",
     signal: "#e8f4ff",
     warm: "#ff9505",
@@ -113,7 +138,7 @@
   const PHASES: Phase[] = [
     "hero",
     "streams",
-    "pipe",
+    "flow",
     "connectors",
     "observe",
     "ecosystem",
@@ -138,7 +163,7 @@
     { phaseOffset: 0.085, right: "REASONING", rightColor: C.red },
   ];
 
-  const PIPE_ROWS: Array<{
+  const FLOW_ROWS: Array<{
     phaseOffset: number;
     left?: string;
     right?: string;
@@ -151,12 +176,75 @@
     { phaseOffset: 0.09, right: "OBSERVE" },
   ];
 
+  const MESH_SPARK_COLORS = [C.signal, C.sky, C.cyan, C.amber, C.violet];
+
   function clamp(v: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, v));
   }
 
   function lerp(a: number, b: number, t: number): number {
     return a + (b - a) * t;
+  }
+
+  function createRng(seed: number): () => number {
+    let t = seed >>> 0;
+    return () => {
+      t += 0x6d2b79f5;
+      let r = Math.imul(t ^ (t >>> 15), t | 1);
+      r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function projectDepthPoint(x: number, y: number, z: number) {
+    const fov = 760;
+    const camZ = 420;
+    const px = mouseNX * (z / 260) * 34;
+    const py = mouseNY * (z / 260) * 24;
+    const scale = fov / (fov + camZ - z);
+    const cx = W / 2;
+    const cy = H / 2;
+    return {
+      sx: cx + (x - cx + px) * scale,
+      sy: cy + (y - cy + py) * scale,
+      scale,
+      depth: clamp((z + 260) / 520, 0, 1),
+    };
+  }
+
+  function meshControlPoint(
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    bend: number,
+  ) {
+    const mx = (ax + bx) / 2;
+    const my = (ay + by) / 2;
+    const nx = by - ay;
+    const ny = -(bx - ax);
+    const nl = Math.hypot(nx, ny) || 1;
+    const bendMag = Math.min(68, Math.hypot(bx - ax, by - ay) * 0.28);
+    return {
+      x: mx + (nx / nl) * bend * bendMag,
+      y: my + (ny / nl) * bend * bendMag,
+    };
+  }
+
+  function evalQuadraticPoint(
+    ax: number,
+    ay: number,
+    cx: number,
+    cy: number,
+    bx: number,
+    by: number,
+    t: number,
+  ) {
+    const mt = 1 - t;
+    return {
+      x: mt * mt * ax + 2 * mt * t * cx + t * t * bx,
+      y: mt * mt * ay + 2 * mt * t * cy + t * t * by,
+    };
   }
 
   function spinalCordX(py: number): number {
@@ -187,7 +275,7 @@
     const defaults: Record<Phase, number> = {
       hero: 0.06,
       streams: 0.22,
-      pipe: 0.36,
+      flow: 0.36,
       connectors: 0.5,
       observe: 0.66,
       ecosystem: 0.8,
@@ -217,8 +305,12 @@
     }
 
     defaults.streams = clamp(defaults.streams, defaults.hero + 0.08, 0.4);
-    defaults.pipe = clamp(defaults.pipe, defaults.streams + 0.08, 0.55);
-    defaults.connectors = clamp(defaults.connectors, defaults.pipe + 0.08, 0.7);
+    defaults.flow = clamp(defaults.flow, defaults.streams + 0.08, 0.55);
+    defaults.connectors = clamp(
+      defaults.connectors,
+      defaults.flow + 0.08,
+      0.7,
+    );
     defaults.observe = clamp(
       defaults.observe,
       defaults.connectors + 0.08,
@@ -244,7 +336,11 @@
       case "cta":
         return C.signal;
       default:
-        return cfg.dominantColor ?? C.pipe;
+        // NOTE: fallback reads canvasConfig which is keyed off the current
+        // activeSection, not the neuron's own phase. Acceptable because the
+        // explicit cases above cover all section-specific phases; this default
+        // only fires for phases whose color is intentionally ambient.
+        return cfg.dominantColor ?? C.flow;
     }
   }
 
@@ -278,7 +374,7 @@
       });
     };
 
-    pushRow(phaseCenters.hero - 0.02, "hero", "BRAIN", undefined, C.pipe);
+    pushRow(phaseCenters.hero - 0.02, "hero", "BRAIN", undefined, C.flow);
     pushRow(phaseCenters.hero + 0.03, "hero");
 
     pushRow((phaseCenters.hero + phaseCenters.streams) / 2, "streams");
@@ -294,13 +390,21 @@
       );
     }
 
-    pushRow((phaseCenters.streams + phaseCenters.pipe) / 2, "pipe");
+    pushRow((phaseCenters.streams + phaseCenters.flow) / 2, "flow");
 
-    for (const row of PIPE_ROWS) {
-      pushRow(phaseCenters.pipe + row.phaseOffset, "pipe", row.left, row.right);
+    for (const row of FLOW_ROWS) {
+      pushRow(
+        phaseCenters.flow + row.phaseOffset,
+        "flow",
+        row.left,
+        row.right,
+      );
     }
 
-    pushRow((phaseCenters.pipe + phaseCenters.connectors) / 2, "connectors");
+    pushRow(
+      (phaseCenters.flow + phaseCenters.connectors) / 2,
+      "connectors",
+    );
     pushRow(
       phaseCenters.connectors - 0.02,
       "connectors",
@@ -380,6 +484,220 @@
     neurons = next;
   }
 
+  function buildPeripheralMesh() {
+    const rand = createRng(
+      Math.floor(W * 11 + H * 17 + pageHeight * 0.19 + neurons.length * 43),
+    );
+    const nodes: PeripheralNode[] = [];
+    const edges: PeripheralEdge[] = [];
+    const edgeSet = new Set<string>();
+    const spineIdx: number[] = [];
+    const leftIdx: number[] = [];
+    const rightIdx: number[] = [];
+    const topIdx: number[] = [];
+    const bottomIdx: number[] = [];
+    const leftColors = [C.cyan, C.green, C.violet];
+    const rightColors = [C.amber, C.red, C.signal];
+
+    const addNode = (node: PeripheralNode): number => {
+      const idx = nodes.length;
+      nodes.push(node);
+      return idx;
+    };
+
+    const addEdge = (
+      a: number,
+      b: number,
+      color: string,
+      strength: PeripheralEdge["strength"],
+      bend: number,
+    ) => {
+      if (a === b || a < 0 || b < 0 || a >= nodes.length || b >= nodes.length)
+        return;
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      if (edgeSet.has(key)) return;
+      edgeSet.add(key);
+      edges.push({ a, b, color, strength, bend });
+    };
+
+    const rows = clamp(Math.round(pageHeight / 235), 24, 56);
+    for (let i = 0; i < rows; i++) {
+      const t = rows > 1 ? i / (rows - 1) : 0;
+      const yFrac = clamp(lerp(0.03, 0.97, t) + (rand() - 0.5) * 0.012, 0.02, 0.98);
+
+      const spineColor =
+        i % 6 === 0 ? C.signal : i % 2 === 0 ? C.sky : C.flow;
+      spineIdx.push(
+        addNode({
+          xFrac: clamp(0.5 + (rand() - 0.5) * 0.24, 0.34, 0.66),
+          pageFrac: yFrac,
+          z: -70 + rand() * 140,
+          color: spineColor,
+          cluster: "spine",
+        }),
+      );
+
+      const leftColor = leftColors[i % leftColors.length];
+      const rightColor = rightColors[i % rightColors.length];
+      leftIdx.push(
+        addNode({
+          xFrac: clamp(0.07 + rand() * 0.35, 0.05, 0.46),
+          pageFrac: clamp(yFrac + (rand() - 0.5) * 0.03, 0.02, 0.98),
+          z: -220 + rand() * 440,
+          color: leftColor,
+          cluster: "left",
+        }),
+      );
+      rightIdx.push(
+        addNode({
+          xFrac: clamp(0.58 + rand() * 0.35, 0.54, 0.95),
+          pageFrac: clamp(yFrac + (rand() - 0.5) * 0.03, 0.02, 0.98),
+          z: -220 + rand() * 440,
+          color: rightColor,
+          cluster: "right",
+        }),
+      );
+
+      if (i % 2 === 0) {
+        leftIdx.push(
+          addNode({
+            xFrac: clamp(0.2 + rand() * 0.23, 0.16, 0.48),
+            pageFrac: clamp(yFrac + (rand() - 0.5) * 0.038, 0.02, 0.98),
+            z: -170 + rand() * 340,
+            color: i % 4 === 0 ? C.sky : leftColor,
+            cluster: "left",
+          }),
+        );
+        rightIdx.push(
+          addNode({
+            xFrac: clamp(0.57 + rand() * 0.23, 0.52, 0.84),
+            pageFrac: clamp(yFrac + (rand() - 0.5) * 0.038, 0.02, 0.98),
+            z: -170 + rand() * 340,
+            color: i % 4 === 0 ? C.sky : rightColor,
+            cluster: "right",
+          }),
+        );
+      }
+    }
+
+    const capNodes = clamp(Math.round(W / 130), 9, 18);
+    for (let i = 0; i < capNodes; i++) {
+      const t = capNodes > 1 ? i / (capNodes - 1) : 0;
+      topIdx.push(
+        addNode({
+          xFrac: clamp(lerp(0.04, 0.96, t) + (rand() - 0.5) * 0.035, 0.02, 0.98),
+          pageFrac: clamp(0.018 + rand() * 0.07, 0.01, 0.11),
+          z: -210 + rand() * 360,
+          color: i % 2 === 0 ? C.signal : C.violet,
+          cluster: "top",
+        }),
+      );
+      bottomIdx.push(
+        addNode({
+          xFrac: clamp(lerp(0.04, 0.96, t) + (rand() - 0.5) * 0.035, 0.02, 0.98),
+          pageFrac: clamp(0.91 + rand() * 0.07, 0.88, 0.99),
+          z: -210 + rand() * 360,
+          color: i % 2 === 0 ? C.amber : C.red,
+          cluster: "bottom",
+        }),
+      );
+    }
+
+    const linkChain = (
+      arr: number[],
+      color: string,
+      strength: PeripheralEdge["strength"],
+      bendRange: number,
+    ) => {
+      for (let i = 1; i < arr.length; i++) {
+        addEdge(arr[i - 1], arr[i], color, strength, (rand() - 0.5) * bendRange);
+      }
+    };
+
+    for (let i = 1; i < spineIdx.length; i++) {
+      if (rand() < 0.32) {
+        addEdge(
+          spineIdx[i - 1],
+          spineIdx[i],
+          C.flow,
+          "cross",
+          (rand() - 0.5) * 0.35,
+        );
+      }
+    }
+    linkChain(leftIdx, C.cyan, "branch", 0.52);
+    linkChain(rightIdx, C.amber, "branch", 0.52);
+    linkChain(topIdx, C.signal, "cross", 0.25);
+    linkChain(bottomIdx, C.rust, "cross", 0.25);
+
+    const nearestSpine = (targetFrac: number): number => {
+      let best = spineIdx[0] ?? -1;
+      let bestDist = Infinity;
+      for (const idx of spineIdx) {
+        const d = Math.abs(nodes[idx].pageFrac - targetFrac);
+        if (d < bestDist) {
+          bestDist = d;
+          best = idx;
+        }
+      }
+      return best;
+    };
+
+    const spineOrder = new Map<number, number>();
+    spineIdx.forEach((idx, i) => {
+      spineOrder.set(idx, i);
+    });
+
+    const attachToSpine = (
+      arr: number[],
+      colorA: string,
+      colorB: string,
+      strength: PeripheralEdge["strength"],
+      bendRange: number,
+    ) => {
+      for (const idx of arr) {
+        const s = nearestSpine(nodes[idx].pageFrac);
+        if (s < 0) continue;
+        addEdge(idx, s, colorA, strength, (rand() - 0.5) * bendRange);
+        const pos = spineOrder.get(s) ?? -1;
+        if (pos > 0 && rand() < 0.42) {
+          addEdge(idx, spineIdx[pos - 1], colorB, "cross", (rand() - 0.5) * 0.3);
+        }
+        if (pos >= 0 && pos < spineIdx.length - 1 && rand() < 0.42) {
+          addEdge(idx, spineIdx[pos + 1], colorB, "cross", (rand() - 0.5) * 0.3);
+        }
+      }
+    };
+
+    attachToSpine(leftIdx, C.cyan, C.sky, "branch", 0.6);
+    attachToSpine(rightIdx, C.amber, C.signal, "branch", 0.6);
+    attachToSpine(topIdx, C.signal, C.sky, "cross", 0.45);
+    attachToSpine(bottomIdx, C.rust, C.amber, "cross", 0.45);
+
+    for (let i = 0; i < nodes.length; i++) {
+      const src = nodes[i];
+      const candidates = nodes
+        .map((n, j) => ({
+          j,
+          d: Math.hypot((n.xFrac - src.xFrac) * 1.05, (n.pageFrac - src.pageFrac) * 2.2),
+        }))
+        .filter(({ j, d }) => j !== i && d > 0.05 && d < 0.24)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 2);
+
+      for (const c of candidates) {
+        if (rand() < 0.58) {
+          const edgeColor = src.cluster === "right" ? C.amber : src.color;
+          addEdge(i, c.j, edgeColor, "cross", (rand() - 0.5) * 0.28);
+        }
+      }
+    }
+
+    peripheralNodes = nodes;
+    peripheralEdges = edges;
+    meshSparks = [];
+  }
+
   function initAmbient() {
     const count = reduced ? 10 : 28;
     ambient = Array.from({ length: count }, () => ({
@@ -407,6 +725,7 @@
 
     pageHeight = Math.max(document.documentElement.scrollHeight, 3000);
     buildNeuronLayout();
+    buildPeripheralMesh();
     preGenerateDendrites();
     initAmbient();
   }
@@ -425,6 +744,8 @@
     }
   }
 
+  // NOTE: This observer is the canonical source for activeSection.
+  // Hero.svelte and CTA.svelte also write to activeSection — consider removing those redundant observers.
   function setupSectionObservers() {
     sectionObservers.forEach((io) => {
       io.disconnect();
@@ -457,44 +778,225 @@
     sectionObservers.push(io);
   }
 
-  function drawSpinalCord(sy: number) {
-    const cfg = get(canvasConfig);
-    const color = cfg.dominantColor ?? C.pipe;
-    const activity = cfg.spinalActivity ?? 1;
+  function drawPeripheralMesh(sy: number) {
+    if (peripheralNodes.length === 0 || peripheralEdges.length === 0) return;
+    const section = get(activeSection) as Phase;
 
-    for (let layer = 0; layer < 4; layer++) {
+    const projected = peripheralNodes.map((node) => {
+      const pageY = node.pageFrac * pageHeight;
+      const vy = pageY - sy;
+      if (vy < -260 || vy > H + 260) return null;
+      const depthPt = projectDepthPoint(node.xFrac * W, vy, node.z);
+      return {
+        node,
+        pageY,
+        ...depthPt,
+      };
+    });
+
+    const visibleEdges: Array<{
+      idx: number;
+      edge: PeripheralEdge;
+      a: NonNullable<(typeof projected)[number]>;
+      b: NonNullable<(typeof projected)[number]>;
+      cpX: number;
+      cpY: number;
+      midDepth: number;
+      midX: number;
+      midY: number;
+    }> = [];
+
+    for (let i = 0; i < peripheralEdges.length; i++) {
+      const edge = peripheralEdges[i];
+      const a = projected[edge.a];
+      const b = projected[edge.b];
+      if (!a || !b) continue;
+      const cp = meshControlPoint(a.sx, a.sy, b.sx, b.sy, edge.bend);
+      visibleEdges.push({
+        idx: i,
+        edge,
+        a,
+        b,
+        cpX: cp.x,
+        cpY: cp.y,
+        midDepth: (a.depth + b.depth) / 2,
+        midX: (a.sx + b.sx) / 2,
+        midY: (a.sy + b.sy) / 2,
+      });
+    }
+
+    visibleEdges.sort((e1, e2) => e1.midDepth - e2.midDepth);
+
+    const sectionBoost =
+      section === "connectors" || section === "streams"
+        ? 1.16
+        : section === "hero" || section === "flow" || section === "observe"
+          ? 0.92
+          : 1;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    ctx.lineCap = "round";
+
+    for (const edge of visibleEdges) {
+      const fog = depthFog(edge.midX, edge.midY);
+      const yDistFromCenter = Math.abs(edge.midY - H * 0.5) / (H * 0.5);
+      const readability =
+        section === "hero" || section === "flow" || section === "observe"
+          ? clamp(0.42 + yDistFromCenter * 0.95, 0.42, 1)
+          : 1;
+
+      let strokeW = 1;
+      let alpha = 0.12;
+      let glowW = 2.4;
+      let glowAlpha = 0.04;
+
+      if (edge.edge.strength === "core") {
+        strokeW = 1.55;
+        alpha = 0.22;
+        glowW = 5.8;
+        glowAlpha = 0.085;
+      } else if (edge.edge.strength === "branch") {
+        strokeW = 1.08;
+        alpha = 0.15;
+        glowW = 3.6;
+        glowAlpha = 0.055;
+      }
+
+      const depthMul = lerp(0.28, 1.08, edge.midDepth);
+      const finalAlpha = alpha * depthMul * fog * readability * sectionBoost;
+      const finalGlowAlpha =
+        glowAlpha * depthMul * fog * readability * sectionBoost;
+      const finalWidth = strokeW * lerp(0.72, 1.24, edge.midDepth);
+
+      if (!reduced) {
+        ctx.beginPath();
+        ctx.moveTo(edge.a.sx, edge.a.sy);
+        ctx.quadraticCurveTo(edge.cpX, edge.cpY, edge.b.sx, edge.b.sy);
+        ctx.strokeStyle = edge.edge.color;
+        ctx.lineWidth = glowW * lerp(0.68, 1.22, edge.midDepth);
+        ctx.globalAlpha = finalGlowAlpha;
+        ctx.stroke();
+      }
+
       ctx.beginPath();
-      const steps = 72;
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const vy = t * H;
-        const py = vy + sy;
-        const x = spinalCordX(py);
-        if (i === 0) ctx.moveTo(x, vy);
-        else ctx.lineTo(x, vy);
-      }
-
-      if (layer === 0) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 13;
-        ctx.globalAlpha = 0.05 * activity;
-      } else if (layer === 1) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 4;
-        ctx.globalAlpha = 0.22 * activity;
-      } else if (layer === 2) {
-        ctx.strokeStyle = C.signal;
-        ctx.lineWidth = 1.2;
-        ctx.globalAlpha = 0.28;
-      } else {
-        ctx.strokeStyle = "rgba(255,255,255,0.55)";
-        ctx.lineWidth = 0.6;
-        ctx.globalAlpha = 0.2;
-      }
-
-      ctx.lineCap = "round";
+      ctx.moveTo(edge.a.sx, edge.a.sy);
+      ctx.quadraticCurveTo(edge.cpX, edge.cpY, edge.b.sx, edge.b.sy);
+      ctx.strokeStyle = edge.edge.color;
+      ctx.lineWidth = finalWidth;
+      ctx.globalAlpha = finalAlpha;
       ctx.stroke();
     }
+
+    const visibleNodes = projected
+      .filter((v): v is NonNullable<typeof v> => v !== null)
+      .sort((a, b) => a.depth - b.depth);
+
+    for (const p of visibleNodes) {
+      const yDistFromCenter = Math.abs(p.sy - H * 0.5) / (H * 0.5);
+      const readability =
+        section === "hero" || section === "flow" || section === "observe"
+          ? clamp(0.52 + yDistFromCenter * 0.82, 0.52, 1)
+          : 1;
+      const baseR =
+        p.node.cluster === "spine"
+          ? reduced
+            ? 2.2
+            : 2.8
+          : reduced
+            ? 1.6
+            : 2.1;
+      const r = baseR * lerp(0.62, 1.25, p.depth) * clamp(p.scale, 0.78, 1.24);
+      const nodeAlpha = lerp(0.22, 0.72, p.depth) * readability;
+
+      // Glow: simple larger circle instead of expensive radial gradient
+      if (!reduced) {
+        const glowR = r * (p.node.cluster === "spine" ? 2.4 : 1.8);
+        ctx.beginPath();
+        ctx.arc(p.sx, p.sy, glowR, 0, Math.PI * 2);
+        ctx.fillStyle = p.node.color;
+        ctx.globalAlpha = nodeAlpha * 0.12;
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(p.sx, p.sy, r, 0, Math.PI * 2);
+      ctx.fillStyle = p.node.color;
+      ctx.globalAlpha = nodeAlpha;
+      ctx.fill();
+    }
+
+    const sparkTarget = reduced ? 7 : 18;
+    if (meshSparks.length < sparkTarget && visibleEdges.length > 0 && Math.random() < 0.25) {
+      const pick = visibleEdges[Math.floor(Math.random() * visibleEdges.length)];
+      meshSparks.push({
+        edgeIdx: pick.idx,
+        t: 0,
+        speed: 0.006 + Math.random() * 0.012,
+        length: 0.08 + Math.random() * 0.14,
+        color:
+          MESH_SPARK_COLORS[Math.floor(Math.random() * MESH_SPARK_COLORS.length)],
+      });
+    }
+
+    const visibleByIdx = new Map<number, (typeof visibleEdges)[number]>();
+    for (const ve of visibleEdges) visibleByIdx.set(ve.idx, ve);
+
+    const nextSparks: MeshSpark[] = [];
+    for (const spark of meshSparks) {
+      spark.t += spark.speed * (1 + clamp(smoothedVelocity, 0, 26) * 0.006);
+      if (spark.t >= 1.14) continue;
+      const edge = visibleByIdx.get(spark.edgeIdx);
+      if (!edge) {
+        nextSparks.push(spark);
+        continue;
+      }
+
+      const headT = clamp(spark.t, 0, 1);
+      const tailT = clamp(headT - spark.length, 0, 1);
+      const steps = 9;
+      const depthMul = lerp(0.5, 1.1, edge.midDepth);
+
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t = lerp(tailT, headT, i / steps);
+        const pt = evalQuadraticPoint(
+          edge.a.sx,
+          edge.a.sy,
+          edge.cpX,
+          edge.cpY,
+          edge.b.sx,
+          edge.b.sy,
+          t,
+        );
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.strokeStyle = spark.color;
+      ctx.lineWidth = 1.6 * depthMul;
+      ctx.globalAlpha = 0.54 * depthMul;
+      ctx.stroke();
+
+      const head = evalQuadraticPoint(
+        edge.a.sx,
+        edge.a.sy,
+        edge.cpX,
+        edge.cpY,
+        edge.b.sx,
+        edge.b.sy,
+        headT,
+      );
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 2.1 * depthMul, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = 0.92;
+      ctx.fill();
+
+      nextSparks.push(spark);
+    }
+    meshSparks = nextSparks;
+
+    ctx.restore();
   }
 
   function drawAxons(sy: number) {
@@ -513,7 +1015,7 @@
       const cpY = lerp(vy, attachVY, 0.5) + (n.side === "left" ? -30 : 30);
 
       const p = proximity(x, vy);
-      const baseColor = n.color ?? cfg.dominantColor ?? C.pipe;
+      const baseColor = n.color ?? cfg.dominantColor ?? C.flow;
       const centerLane = Math.abs(vy - H / 2) < H * 0.28 ? 0.35 : 1;
 
       ctx.beginPath();
@@ -577,7 +1079,7 @@
       });
 
       const rotAngle = n.side === "left" ? -Math.PI / 2 : Math.PI / 2;
-      const c = n.color ?? cfg.dominantColor ?? C.pipe;
+      const c = n.color ?? cfg.dominantColor ?? C.flow;
       const localAlpha = clamp((cfg.branchGrowth ?? 3) / 5, 0.55, 1);
 
       ctx.save();
@@ -607,34 +1109,6 @@
       }
 
       ctx.restore();
-    }
-  }
-
-  function drawSynapses(sy: number) {
-    const cfg = get(canvasConfig);
-    for (const n of neurons) {
-      const attachPY = axonAttachPageY(n);
-      const vy = attachPY - sy;
-      if (vy < -70 || vy > H + 70) continue;
-
-      const x = spinalCordX(attachPY);
-      const c = n.color ?? cfg.dominantColor ?? C.pipe;
-      const p = proximity(x, vy);
-
-      ctx.beginPath();
-      ctx.arc(x, vy, reduced ? 4 : 5.5, 0, Math.PI * 2);
-      ctx.fillStyle = c;
-      ctx.shadowColor = c;
-      ctx.shadowBlur = 12;
-      ctx.globalAlpha = 0.3 * p;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      ctx.beginPath();
-      ctx.arc(x, vy, 1.8, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.globalAlpha = 0.8;
-      ctx.fill();
     }
   }
 
@@ -717,11 +1191,8 @@
         ctx.beginPath();
         ctx.arc(ex, ey, 4, 0, Math.PI * 2);
         ctx.fillStyle = color;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 14;
         ctx.globalAlpha = 0.72;
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.font = "600 10px 'JetBrains Mono', monospace";
         ctx.textAlign = "center";
@@ -835,11 +1306,8 @@
     ctx.beginPath();
     ctx.arc(head.x, headVY, 3.1, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
-    ctx.shadowColor = sig.color;
-    ctx.shadowBlur = 15;
     ctx.globalAlpha = 0.95;
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   function renderSpinalSig(sig: SpinalSig, sy: number) {
@@ -869,11 +1337,8 @@
     ctx.beginPath();
     ctx.arc(x, vy, 3.2, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
-    ctx.shadowColor = sig.color;
-    ctx.shadowBlur = 16;
     ctx.globalAlpha = 0.92;
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   function renderSignals(sy: number) {
@@ -886,64 +1351,32 @@
         .map((n, i) => ({ idx: i, vy: n.pageFrac * pageHeight - sy }))
         .filter(({ vy }) => vy > -380 && vy < H + 380);
 
-      if (candidates.length > 0 && Math.random() < 0.66) {
+      if (candidates.length > 0) {
         const pick = candidates[Math.floor(Math.random() * candidates.length)];
-        spawnAxonSig(pick.idx, "to-cord");
-      } else {
-        spawnSpinalSig();
+        const direction = Math.random() < 0.72 ? "to-cord" : "from-cord";
+        spawnAxonSig(pick.idx, direction);
       }
     }
 
     const speedMul =
       (cfg.particleSpeed ?? 1) * (1 + clamp(smoothedVelocity, 0, 28) * 0.004);
 
-    const toSpawn: Array<
-      | { type: "axon"; idx: number; dir: "to-cord" | "from-cord" }
-      | { type: "spinal"; py: number }
-    > = [];
-
     for (const sig of signals) {
-      if (sig.kind === "axon") {
-        sig.t = Math.min(1, sig.t + sig.speed * speedMul);
-
-        if (sig.direction === "to-cord" && sig.t >= 1) {
-          const n = neurons[sig.neuronIdx];
-          if (n) toSpawn.push({ type: "spinal", py: axonAttachPageY(n) });
-        }
-      } else {
-        const step = sig.speed * speedMul;
-        sig.py += sig.direction * step;
-        sig.distTraveled += step;
-
-        if (!sig.spawnedAxon && sig.distTraveled > sig.maxDist * 0.42) {
-          for (let i = 0; i < neurons.length; i++) {
-            const nPY = axonAttachPageY(neurons[i]);
-            if (Math.abs(nPY - sig.py) < 130 && Math.random() < 0.26) {
-              toSpawn.push({ type: "axon", idx: i, dir: "from-cord" });
-              sig.spawnedAxon = true;
-              break;
-            }
-          }
-        }
-      }
+      if (sig.kind !== "axon") continue;
+      sig.t = Math.min(1, sig.t + sig.speed * speedMul);
     }
 
-    for (const s of toSpawn) {
-      if (s.type === "spinal") spawnSpinalSig(s.py);
-      else spawnAxonSig(s.idx, s.dir);
-    }
-
-    signals = signals.filter((s) =>
-      s.kind === "axon" ? s.t < 1 : s.distTraveled < s.maxDist,
+    const axonSignals = signals.filter(
+      (s): s is AxonSig => s.kind === "axon" && s.t < 1,
     );
+    signals = axonSignals;
 
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.lineCap = "round";
 
-    for (const sig of signals) {
-      if (sig.kind === "axon") renderAxonSig(sig, sy);
-      else renderSpinalSig(sig, sy);
+    for (const sig of axonSignals) {
+      renderAxonSig(sig, sy);
     }
 
     ctx.restore();
@@ -964,28 +1397,6 @@
     }
   }
 
-  function drawHeartbeat(sy: number, time: number) {
-    const ctaY = phaseCenters.cta * pageHeight;
-    const heroY = phaseCenters.hero * pageHeight;
-    const pulseY = lerp(heroY, ctaY, (((time * 0.00008) % 1) + 1) % 1);
-    const vy = pulseY - sy;
-    if (vy < -120 || vy > H + 120) return;
-
-    const x = spinalCordX(pulseY);
-    const r = reduced ? 18 : 28;
-
-    const grad = ctx.createRadialGradient(x, vy, 0, x, vy, r);
-    grad.addColorStop(0, "rgba(232, 244, 255, 0.55)");
-    grad.addColorStop(0.4, "rgba(1, 144, 224, 0.25)");
-    grad.addColorStop(1, "transparent");
-
-    ctx.beginPath();
-    ctx.arc(x, vy, r, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.globalAlpha = 0.45;
-    ctx.fill();
-  }
-
   function drawLegibilityVeil() {
     const section = get(activeSection) as Phase;
     if (section === "connectors" || section === "streams") return;
@@ -1003,7 +1414,7 @@
     if (section === "hero") {
       masks.push({ x: 0.5, y: 0.44, rx: 0.34, ry: 0.22, alpha: 0.22 });
       masks.push({ x: 0.5, y: 0.6, rx: 0.26, ry: 0.14, alpha: 0.16 });
-    } else if (section === "pipe" || section === "observe") {
+    } else if (section === "flow" || section === "observe") {
       masks.push({ x: 0.5, y: 0.47, rx: 0.31, ry: 0.18, alpha: 0.16 });
     } else if (section === "ecosystem" || section === "cta") {
       masks.push({ x: 0.5, y: 0.42, rx: 0.3, ry: 0.17, alpha: 0.14 });
@@ -1027,12 +1438,29 @@
     ctx.restore();
   }
 
+  let lastFrameTime = 0;
+  const TARGET_INTERVAL = 1000 / 30; // cap at 30fps for performance
+  let isPageVisible = true;
+
   function render(time: number) {
+    const delta = time - lastFrameTime;
+    if (delta < TARGET_INTERVAL) {
+      raf = requestAnimationFrame(render);
+      return;
+    }
+    lastFrameTime = time - (delta % TARGET_INTERVAL);
+
     scrollY = window.scrollY;
     pageHeight = Math.max(document.documentElement.scrollHeight, 3000);
     const section = get(activeSection) as Phase;
     const heroBiasTarget = W >= 1024 && section === "hero" ? W * 0.05 : 0;
     spineBiasX = lerp(spineBiasX, heroBiasTarget, 0.08);
+    const targetMouseX =
+      mouseX < -9000 ? 0 : ((mouseX / Math.max(W, 1)) - 0.5) * 2;
+    const targetMouseY =
+      mouseY < -9000 ? 0 : ((mouseY / Math.max(H, 1)) - 0.5) * 2;
+    mouseNX = lerp(mouseNX, targetMouseX, 0.06);
+    mouseNY = lerp(mouseNY, targetMouseY, 0.06);
 
     const rawVel = Math.abs(scrollY - prevScrollY);
     smoothedVelocity = lerp(smoothedVelocity, rawVel, 0.13);
@@ -1044,6 +1472,7 @@
     if (Math.abs(pageHeight - lastKnownHeight) > 160) {
       lastKnownHeight = pageHeight;
       buildNeuronLayout();
+      buildPeripheralMesh();
       preGenerateDendrites();
     }
 
@@ -1052,14 +1481,12 @@
     ctx.fillStyle = "rgba(4, 8, 14, 0.17)";
     ctx.fillRect(0, 0, W, H);
 
-    drawSpinalCord(scrollY);
+    drawPeripheralMesh(scrollY);
     drawGatewayClusters(scrollY);
     drawAxons(scrollY);
-    drawSynapses(scrollY);
     drawDendrites(scrollY);
     drawAmbient(scrollY);
     renderSignals(scrollY);
-    drawHeartbeat(scrollY, time);
     drawLegibilityVeil();
 
     let near = false;
@@ -1093,11 +1520,28 @@
     };
     window.addEventListener("mousemove", onMouseMove);
 
-    setTimeout(setupSectionObservers, 120);
+    onVisChange = () => {
+      isPageVisible = !document.hidden;
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+      } else {
+        lastFrameTime = 0;
+        raf = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisChange);
+
+    sectionObserverTimer = setTimeout(setupSectionObservers, 120);
 
     lastKnownHeight = pageHeight;
     if (signals.length === 0) {
-      for (let i = 0; i < (reduced ? 2 : 5); i++) spawnSpinalSig();
+      const burst = reduced ? 3 : 8;
+      for (let i = 0; i < burst; i++) {
+        const idx = Math.floor(Math.random() * Math.max(neurons.length, 1));
+        if (neurons[idx]) {
+          spawnAxonSig(idx, Math.random() < 0.72 ? "to-cord" : "from-cord");
+        }
+      }
     }
 
     raf = requestAnimationFrame(render);
@@ -1109,6 +1553,8 @@
       window.removeEventListener("resize", resize);
       if (onMouseMove) window.removeEventListener("mousemove", onMouseMove);
     }
+    if (onVisChange) document.removeEventListener("visibilitychange", onVisChange);
+    clearTimeout(sectionObserverTimer);
     sectionObservers.forEach((io) => {
       io.disconnect();
     });
@@ -1119,7 +1565,7 @@
 <canvas
   bind:this={canvas}
   class="fixed inset-0 pointer-events-none"
-  style="z-index:-2"
+  style="z-index:-2; will-change: contents;"
   aria-hidden="true"
 ></canvas>
 <div

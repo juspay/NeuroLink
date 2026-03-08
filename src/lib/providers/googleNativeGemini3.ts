@@ -158,6 +158,23 @@ export function sanitizeSchemaForGemini(
     }
   }
 
+  // Recurse through composed schema branches
+  if (Array.isArray(result.allOf)) {
+    result.allOf = result.allOf.map((s: Record<string, unknown>) =>
+      sanitizeSchemaForGemini(s),
+    );
+  }
+  if (result.not && typeof result.not === "object") {
+    result.not = sanitizeSchemaForGemini(result.not as Record<string, unknown>);
+  }
+  for (const branch of ["if", "then", "else"] as const) {
+    if (result[branch] && typeof result[branch] === "object") {
+      result[branch] = sanitizeSchemaForGemini(
+        result[branch] as Record<string, unknown>,
+      );
+    }
+  }
+
   return result;
 }
 
@@ -189,7 +206,29 @@ export function sanitizeToolsForGemini(
           params as ZodUnknownSchema,
         ) as Record<string, unknown>;
         const inlined = inlineJsonSchema(rawJsonSchema);
+        // Gemini sanitization strips Zod-only features not supported by the Gemini API:
+        // union types (anyOf/oneOf) are collapsed to string, default values and
+        // additionalProperties are removed. The resulting schema is Gemini-compatible
+        // but loses some type constraints from the original Zod schema.
         const sanitizedSchema = sanitizeSchemaForGemini(inlined);
+
+        sanitized[name] = createAISDKTool({
+          description: tool.description || `Tool: ${name}`,
+          parameters: aiJsonSchema(sanitizedSchema),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          execute: tool.execute as any,
+        });
+      } else if (
+        params &&
+        typeof params === "object" &&
+        "jsonSchema" in params
+      ) {
+        // Non-Zod JSON schema (e.g., from ai SDK jsonSchema() helper) — still needs sanitization
+        const rawSchema = (params as Record<string, unknown>)
+          .jsonSchema as Record<string, unknown>;
+        const sanitizedSchema = sanitizeSchemaForGemini(
+          inlineJsonSchema(rawSchema),
+        );
 
         sanitized[name] = createAISDKTool({
           description: tool.description || `Tool: ${name}`,
@@ -202,10 +241,10 @@ export function sanitizeToolsForGemini(
       }
     } catch (error) {
       logger.warn(
-        `[Gemini] Failed to sanitize tool "${name}", using original`,
-        { error: error instanceof Error ? error.message : String(error) },
+        `[Gemini] Failed to sanitize tool "${name}", skipping: ${error instanceof Error ? error.message : String(error)}`,
       );
-      sanitized[name] = tool;
+      // Don't fall back to the original tool — an incompatible schema would fail the Gemini request
+      continue;
     }
   }
 

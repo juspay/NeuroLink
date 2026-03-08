@@ -17,13 +17,13 @@ import type {
   TruncationConfig,
   TruncationResult,
 } from "../../types/contextTypes.js";
-import { randomUUID } from "crypto";
 import {
   estimateTokens,
   estimateMessagesTokens,
   truncateToTokenBudget,
 } from "../../utils/tokenEstimation.js";
 import { logger } from "../../utils/logger.js";
+import { randomUUID } from "crypto";
 
 export type {
   TruncationConfig,
@@ -32,6 +32,20 @@ export type {
 
 const TRUNCATION_MARKER_CONTENT =
   "[Earlier conversation history was truncated to fit within context limits]";
+
+function validateRoleAlternation(messages: ChatMessage[]): void {
+  for (let i = 1; i < messages.length; i++) {
+    if (
+      messages[i].role === messages[i - 1].role &&
+      messages[i].role !== "system"
+    ) {
+      logger.warn(
+        `[SlidingWindowTruncator] Role alternation broken at index ${i}: consecutive "${messages[i].role}" messages`,
+      );
+      break;
+    }
+  }
+}
 
 /**
  * For conversations with <= 4 messages that exceed token budget,
@@ -171,19 +185,22 @@ export function truncateWithSlidingWindow(
     }
 
     const keptAfterTruncation = remainingMessages.slice(evenRemoveCount);
-    const truncationMarker: ChatMessage = {
-      id: `truncation-${randomUUID()}`,
-      role: "user",
+
+    // Insert a dedicated system-role truncation marker with machine-readable
+    // metadata so effectiveHistory.ts can detect it via isTruncationMarker /
+    // truncationId and removeTruncationTags can rewind it.
+    const truncId = randomUUID();
+    const marker: ChatMessage = {
+      id: `truncation-marker-${truncId}`,
+      role: "system",
       content: TRUNCATION_MARKER_CONTENT,
-      timestamp: new Date().toISOString(),
-      metadata: { isSummary: false, truncated: true },
+      isTruncationMarker: true,
+      truncationId: truncId,
     };
 
-    const candidateMessages = [
-      ...firstPair,
-      truncationMarker,
-      ...keptAfterTruncation,
-    ];
+    const candidateMessages = [...firstPair, marker, ...keptAfterTruncation];
+
+    validateRoleAlternation(candidateMessages);
 
     // If we have token targets, verify the result fits
     if (config?.targetTokens) {
@@ -216,16 +233,23 @@ export function truncateWithSlidingWindow(
   const evenMaxRemove = maxRemove - (maxRemove % 2);
   if (evenMaxRemove > 0) {
     const keptMessages = remainingMessages.slice(evenMaxRemove);
-    const truncationMarker: ChatMessage = {
-      id: `truncation-${randomUUID()}`,
-      role: "user",
+
+    // Insert a dedicated system-role truncation marker (see iterative block above)
+    const fallbackTruncId = randomUUID();
+    const fallbackMarker: ChatMessage = {
+      id: `truncation-marker-${fallbackTruncId}`,
+      role: "system",
       content: TRUNCATION_MARKER_CONTENT,
-      timestamp: new Date().toISOString(),
-      metadata: { isSummary: false, truncated: true },
+      isTruncationMarker: true,
+      truncationId: fallbackTruncId,
     };
+
+    const fallbackMessages = [...firstPair, fallbackMarker, ...keptMessages];
+    validateRoleAlternation(fallbackMessages);
+
     return {
       truncated: true,
-      messages: [...firstPair, truncationMarker, ...keptMessages],
+      messages: fallbackMessages,
       messagesRemoved: evenMaxRemove,
     };
   }

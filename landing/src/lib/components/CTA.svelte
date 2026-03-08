@@ -39,7 +39,7 @@
     use:reveal={{ y: 40 }}
   >
     <div
-      class="glass-panel text-center max-w-[800px] mx-auto p-12 drop-shadow-2xl"
+      class="glass-panel text-center max-w-[800px] mx-auto p-6 md:p-12 drop-shadow-2xl"
     >
       <h2
         class="headline-section font-display text-transparent bg-clip-text bg-gradient-to-r from-white to-[var(--color-signal)] mb-6"
@@ -53,7 +53,7 @@
         vascular layer that perfectly routes all streams and tool calls.
       </p>
 
-      <div class="flex flex-wrap items-center justify-center gap-6">
+      <div class="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 sm:gap-6">
         <a
           href="https://docs.neurolink.ink/docs/getting-started"
           target="_blank"

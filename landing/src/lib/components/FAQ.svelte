@@ -40,7 +40,7 @@
     {
       question: "Does NeuroLink support RAG (Retrieval-Augmented Generation)?",
       answer:
-        "Yes. NeuroLink includes a complete RAG pipeline with 9 chunking strategies (character, recursive, sentence, token, markdown, HTML, JSON, LaTeX, semantic), 22 vector store adapters, hybrid search combining BM25 lexical search with vector similarity, and 5 reranker types. Pass files directly to generate() and NeuroLink handles chunking, embedding, and retrieval automatically.",
+        "Yes. NeuroLink includes a complete RAG workflow with 10 chunking strategies (character, recursive, sentence, token, markdown, HTML, JSON, LaTeX, semantic, semantic-markdown), 22 vector store adapters, hybrid search combining BM25 lexical search with vector similarity, and 5 reranker types. Pass files directly to generate() and NeuroLink handles chunking, embedding, and retrieval automatically.",
     },
     {
       question: "What file types can NeuroLink process?",
@@ -55,7 +55,7 @@
     {
       question: "Can NeuroLink build multi-agent systems?",
       answer:
-        "Yes. NeuroLink supports 3 agent topologies: hub-spoke (coordinator delegates to specialists), mesh (peer-to-peer collaboration), and pipeline (sequential processing). The AgentNetwork orchestrator manages agent lifecycle, message routing, and shared context. Agents can use MCP tools, RAG, and memory independently.",
+        "Yes. NeuroLink supports 3 agent topologies: hub-spoke (coordinator delegates to specialists), mesh (peer-to-peer collaboration), and sequential flow (sequential processing). The AgentNetwork orchestrator manages agent lifecycle, message routing, and shared context. Agents can use MCP tools, RAG, and memory independently.",
     },
     {
       question: "What observability and monitoring does NeuroLink provide?",
@@ -70,7 +70,7 @@
     {
       question: "How does NeuroLink handle context window limits?",
       answer:
-        "NeuroLink includes a 4-stage context compaction pipeline that runs automatically: (1) tool output pruning — replaces old tool results with placeholders, (2) file read deduplication — keeps only the latest read of each file, (3) LLM summarization — structured 9-section summaries with iterative merging, and (4) sliding window truncation. The BudgetChecker triggers auto-compaction when context usage exceeds 80%.",
+        "NeuroLink includes a 4-stage context compaction workflow that runs automatically: (1) tool output pruning — replaces old tool results with placeholders, (2) file read deduplication — keeps only the latest read of each file, (3) LLM summarization — structured 9-section summaries with iterative merging, and (4) sliding window truncation. The BudgetChecker triggers auto-compaction when context usage exceeds 80%.",
     },
     {
       question: "Is NeuroLink production-ready?",
@@ -86,9 +86,10 @@
   }
 </script>
 
+<div class="section-ecosystem">
 <section
   data-topology-phase="ecosystem"
-  class="section-ecosystem max-w-[800px] mx-auto px-4 md:px-6 py-24 md:py-32 relative z-10"
+  class="max-w-[800px] mx-auto px-4 md:px-6 py-24 md:py-32 relative z-10"
 >
   <div use:reveal={{ y: 40 }} class="text-center mb-10 md:mb-16">
     <p class="eyebrow text-[var(--color-nl-accent-lighter)] mb-4">FAQ</p>
@@ -140,3 +141,4 @@
     {/each}
   </div>
 </section>
+</div>

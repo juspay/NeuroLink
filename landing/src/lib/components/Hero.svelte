@@ -31,8 +31,9 @@
     observer.observe(heroEl);
 
     // Typewriter runs at ~2.3s (matches CSS animation timeline)
-    const timer = setTimeout(typeInstallLine, 2300);
-    return () => clearTimeout(timer);
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = prefersReducedMotion ? null : setTimeout(typeInstallLine, 2300);
+    return () => { if (timer !== null) clearTimeout(timer); };
   });
 
   onDestroy(() => {
@@ -55,7 +56,7 @@
 
   <!-- Text layer -->
   <div
-    class="relative z-10 text-center px-6 max-w-4xl mx-auto mt-16 drop-shadow-xl"
+    class="relative z-10 text-center px-4 sm:px-6 max-w-4xl mx-auto mt-16 drop-shadow-xl"
   >
     <!-- Eyebrow label -->
     <p class="hero-label label-eyebrow mb-6 hero-anim-label">
@@ -67,17 +68,14 @@
       <span class="hero-word hero-anim-word" style="--d:0">The</span>
       <span class="hero-word hero-anim-word" style="--d:1">Nervous</span>
       <span class="hero-word hero-anim-word" style="--d:2">System</span>
-      <span class="hero-word text-gradient-pipe hero-anim-word" style="--d:3"
-        >Pipe</span
-      ><br class="hidden sm:block" />
-      <span class="hero-word hero-anim-word" style="--d:4">for</span>
-      <span class="hero-word hero-anim-word" style="--d:5">AI</span>
-      <span class="hero-word hero-anim-word" style="--d:6">Streams.</span>
+      <span class="hero-word hero-anim-word" style="--d:3">for</span>
+      <span class="hero-word hero-anim-word" style="--d:4">AI</span>
+      <span class="hero-word hero-anim-word" style="--d:5">Streams.</span>
     </h1>
 
     <!-- Subtitle — canonical positioning line -->
     <p class="hero-sub body-text max-w-xl mx-auto mb-12 hero-anim-sub">
-      NeuroLink is the pipe layer for the AI nervous system, connecting live
+      NeuroLink is the signal layer for the AI nervous system, connecting live
       streams of tokens, data, tools, and context through pluggable connectors.
     </p>
 
@@ -89,7 +87,7 @@
         href="https://docs.neurolink.ink/docs/getting-started"
         class="btn-signal inline-flex items-center gap-2 px-8 py-4 text-sm font-semibold tracking-wide rounded-full text-white"
       >
-        Build your first stream pathway
+        Connect to your first AI stream
         <span aria-hidden="true">→</span>
       </a>
       <a

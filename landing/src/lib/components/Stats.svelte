@@ -104,12 +104,12 @@
 
   .stat-item {
     flex: 1;
-    min-width: 120px;
+    min-width: 70px;
     text-align: center;
   }
 
   .stat-number {
-    font-size: clamp(3rem, 5vw, 4.5rem);
+    font-size: clamp(2rem, 5vw, 4.5rem);
     line-height: 1;
     color: #ffffff;
     letter-spacing: -0.03em;

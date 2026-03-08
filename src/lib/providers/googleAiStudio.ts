@@ -518,15 +518,20 @@ export class GoogleAIStudioProvider extends BaseProvider {
   // executeGenerate removed - BaseProvider handles all generation with tools
   protected async executeStream(
     options: StreamOptions,
-    _analysisSchema?: ZodUnknownSchema | Schema<unknown>,
+    analysisSchema?: ZodUnknownSchema | Schema<unknown>,
   ): Promise<StreamResult> {
     // Check if this is a Gemini 3 model with tools - use native SDK for thought_signature
     const gemini3CheckModelName = options.model || this.modelName;
 
+    // Structured output (analysisSchema, JSON format, or schema) is incompatible with tools on Gemini.
+    // Compute once and reuse in both the native Gemini 3 gate and the streamText fallback path.
+    const wantsStructuredOutput =
+      analysisSchema || options.output?.format === "json" || options.schema;
+
     // Check for tools from options AND from SDK (MCP tools)
     // Need to check early if we should route to native SDK
     const gemini3CheckShouldUseTools =
-      !options.disableTools && this.supportsTools();
+      !options.disableTools && this.supportsTools() && !wantsStructuredOutput;
     const optionTools = options.tools || {};
     const sdkTools = gemini3CheckShouldUseTools ? await this.getAllTools() : {};
     const combinedToolCount =
@@ -601,7 +606,18 @@ export class GoogleAIStudioProvider extends BaseProvider {
 
     try {
       // Get tools consistently with generate method (include user-provided RAG tools)
-      const shouldUseTools = !options.disableTools && this.supportsTools();
+      // wantsStructuredOutput already computed before the Gemini 3 native-routing gate
+      if (
+        wantsStructuredOutput &&
+        !options.disableTools &&
+        this.supportsTools()
+      ) {
+        logger.warn(
+          "[GoogleAIStudio] Structured output active — disabling tools (Gemini limitation).",
+        );
+      }
+      const shouldUseTools =
+        !options.disableTools && this.supportsTools() && !wantsStructuredOutput;
       const baseTools = shouldUseTools ? await this.getAllTools() : {};
       const rawTools = shouldUseTools
         ? { ...baseTools, ...(options.tools || {}) }
