@@ -4,7 +4,7 @@ description: Generate professional video content with audio using Google's Veo 3
 keywords: video generation, veo 3.1, google ai, multimodal, video synthesis, ai video, vertex ai
 ---
 
-# Video Generation with Veo 3.1
+## Video Generation with Veo 3.1
 
 NeuroLink integrates Google's Veo 3.1 model to enable AI-powered video generation with audio from image and text prompt inputs. Transform static images into dynamic, professional-quality video content with synchronized audio.
 
@@ -37,6 +37,7 @@ graph LR
 - **Buffer-based output** – Receive video as Buffer objects via `VideoGenerationResult` for flexible post-processing
 - **Multiple resolutions** – Support for 720p and 1080p output
 - **Aspect ratio control** – Choose between 9:16 (portrait) and 16:9 (landscape) formats
+- **Director Mode** – Chain multiple segments into one continuous video with AI-generated transitions (see [Video Director Mode](./video-director-mode))
 
 ## Supported Provider & Model
 
@@ -56,11 +57,12 @@ graph LR
 
 ### Known Limitations
 
-- Maximum video duration: 8 seconds (supports 4, 6, or 8 second clips)
+- Maximum video duration: 8 seconds per clip (supports 4, 6, or 8 second clips)
 - Input image required (text-only prompts not supported)
 - Audio is auto-generated based on video content (no custom audio input)
 - Processing time: 30-120 seconds depending on resolution
 - Concurrent request limit: 5 per project
+- For multi-segment videos with transitions, see [Video Director Mode](./video-director-mode)
 
 ## Prerequisites
 
@@ -886,14 +888,18 @@ type ErrorCategory =
   | "execution"
   | "system";
 
-// Video-specific error codes
+// Video-specific error codes (standard single-clip generation)
 const VIDEO_ERROR_CODES = {
   GENERATION_FAILED: "VIDEO_GENERATION_FAILED",
   PROVIDER_NOT_CONFIGURED: "VIDEO_PROVIDER_NOT_CONFIGURED",
   POLL_TIMEOUT: "VIDEO_POLL_TIMEOUT",
   INVALID_INPUT: "VIDEO_INVALID_INPUT",
+  // Director Mode adds additional codes (DIRECTOR_CLIP_FAILED, etc.)
+  // See Video Director Mode docs for the full list
 };
 ```
+
+> **Note:** Video errors are thrown as `VideoError` (extends `NeuroLinkError`) with the codes above. Director Mode introduces additional error codes — see [Video Director Mode – Error Types](./video-director-mode#error-types) for the complete list.
 
 ### Error Handling Example
 
@@ -1182,6 +1188,7 @@ describe("Video Generation Integration", () => {
 
 ## Related Features
 
+- [Video Director Mode](./video-director-mode) – Multi-segment video generation with AI transitions
 - [Multimodal Chat](./multimodal-chat.md) – Overview of multimodal capabilities and image support
 - [PDF Support](./pdf-support.md) – Document processing for visual analysis
 - [CSV Support](./csv-support.md) – Data file processing
@@ -1194,7 +1201,11 @@ The video generation feature is implemented across these files:
 | ---------------------------------------------- | ----------------------------------------------------------------------------- |
 | `src/lib/types/multimodal.ts`                  | Core types: `VideoOutputOptions`, `VideoGenerationResult`                     |
 | `src/lib/types/generateTypes.ts`               | Extended `GenerateOptions` with video output mode                             |
-| `src/lib/adapters/video/vertexVideoHandler.ts` | Vertex AI Veo 3.1 video generation handler                                    |
+| `src/lib/adapters/video/vertexVideoHandler.ts` | Vertex AI Veo 3.1 video generation handler, `VideoError`, `VIDEO_ERROR_CODES` |
+| `src/lib/adapters/video/ffmpegAdapter.ts`      | Shared FFmpeg adapter (binary resolution, temp files, buffer validation)      |
+| `src/lib/adapters/video/frameExtractor.ts`     | Frame extraction from MP4 buffers (used by Director Mode)                     |
+| `src/lib/adapters/video/videoMerger.ts`        | MP4 concatenation via FFmpeg concat demuxer (used by Director Mode)           |
+| `src/lib/adapters/video/directorPipeline.ts`   | Director Mode pipeline orchestrator (multi-segment generation)                |
 | `src/lib/core/baseProvider.ts`                 | Video generation routing in `generate()` method                               |
 | `src/lib/neurolink.ts`                         | Main SDK interface with video result handling                                 |
 | `src/lib/utils/parameterValidation.ts`         | Input validation: `validateVideoGenerationInput()`, `validateImageForVideo()` |
@@ -1203,8 +1214,10 @@ The video generation feature is implemented across these files:
 ### Key Functions
 
 - **`generateVideoWithVertex()`** - Main video generation function in `vertexVideoHandler.ts`
+- **`generateTransitionWithVertex()`** - Transition generation with first-and-last-frame API (Director Mode)
 - **`validateVideoGenerationInput()`** - Comprehensive input validation in `parameterValidation.ts`
 - **`validateImageForVideo()`** - Image format and size validation in `parameterValidation.ts`
 - **`handleVideoGeneration()`** - Private method in `BaseProvider` that orchestrates the video generation flow
+- **`executeDirectorPipeline()`** - Director Mode orchestrator (parallel clips, transitions, merge)
 
-**Next:** [Multimodal Chat Guide](./multimodal-chat.md) | [PDF Support](./pdf-support.md)
+**Next:** [Multimodal Chat Guide](./multimodal-chat.md) | [Video Director Mode](./video-director-mode)

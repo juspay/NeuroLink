@@ -25,6 +25,8 @@ export type {
   VideoContent,
   VideoOutputOptions,
   VideoGenerationResult,
+  DirectorSegment,
+  DirectorModeOptions,
   Content,
   ImageWithAltText,
   MultimodalInput,

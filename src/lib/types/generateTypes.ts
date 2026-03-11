@@ -8,6 +8,8 @@ import type { ChatMessage, ConversationMemoryConfig } from "./conversation.js";
 import type { EvaluationData } from "./evaluation.js";
 import type { MiddlewareFactoryOptions } from "./middlewareTypes.js";
 import type {
+  DirectorModeOptions,
+  DirectorSegment,
   VideoGenerationResult,
   VideoOutputOptions,
 } from "./multimodal.js";
@@ -49,6 +51,13 @@ export type GenerateOptions = {
     videoFiles?: Array<Buffer | string>; // Explicit video files
     files?: Array<Buffer | string | import("./fileTypes.js").FileWithMetadata>; // Auto-detect file types
     content?: Content[]; // Advanced multimodal content
+
+    /**
+     * Director Mode segments. When provided, Director Mode is activated automatically.
+     * Each segment contains its own prompt and image.
+     * Must contain 2-10 segments.
+     */
+    segments?: DirectorSegment[];
   };
   /**
    * Output configuration options
@@ -91,6 +100,11 @@ export type GenerateOptions = {
      * Generates slides based on text prompt
      */
     ppt?: PPTOutputOptions;
+    /**
+     * Director Mode configuration (only used when input.segments is provided)
+     * Controls transition prompts, durations, and concurrency.
+     */
+    director?: DirectorModeOptions;
   };
 
   // CSV processing options
@@ -654,6 +668,8 @@ export type TextGenerationOptions = {
     images?: Array<Buffer | string | import("./content.js").ImageWithAltText>;
     pdfFiles?: Array<Buffer | string>; // Support for PDF inputs (for image generation with Vertex AI)
     files?: Array<Buffer | string | import("./fileTypes.js").FileWithMetadata>; // Auto-detect file types (including video for analysis)
+    /** Director Mode segments (2-10). When provided, Director Mode is activated. */
+    segments?: import("./multimodal.js").DirectorSegment[];
   };
   provider?: AIProviderName;
   model?: string;
@@ -690,6 +706,10 @@ export type TextGenerationOptions = {
      * PowerPoint generation configuration (used when mode is "ppt")
      */
     ppt?: PPTOutputOptions;
+    /**
+     * Director Mode configuration (only used when input.segments is provided)
+     */
+    director?: DirectorModeOptions;
   };
   tools?: Record<string, Tool>; // Enable MCP tools integration
   timeout?: number | string; // Optional timeout (e.g., 30000, '30s', '2m', '1h')

@@ -13,6 +13,7 @@
 import { readFile } from "node:fs/promises";
 import { ErrorCategory, ErrorSeverity } from "../../constants/enums.js";
 import { TIMEOUTS } from "../../constants/timeouts.js";
+import { VIDEO_ERROR_CODES } from "../../constants/videoErrors.js";
 import type {
   VideoGenerationResult,
   VideoOutputOptions,
@@ -25,36 +26,14 @@ import {
 import { logger } from "../../utils/logger.js";
 
 // ============================================================================
-// VIDEO ERROR CODES
+// VIDEO ERROR CODES (Re-exported for backward compatibility)
 // ============================================================================
 
 /**
- * Video generation runtime error codes
- *
- * These are for runtime/execution errors during video generation.
- * Pure option/shape validation (missing image option, invalid config values, etc.)
- * is handled by parameterValidation.ts using ERROR_CODES from errorHandling.ts.
- *
- * Error categorization:
- * - INVALID_INPUT → ErrorCategory.execution (runtime I/O failures)
- * - parameterValidation errors → ErrorCategory.validation (schema/option issues)
- *
- * Following TTS pattern (TTS_ERROR_CODES + TTSError in ttsProcessor.ts)
+ * Video error codes - re-exported from constants module for backward compatibility.
+ * @see {@link VIDEO_ERROR_CODES} in constants/videoErrors.ts for definitions
  */
-export const VIDEO_ERROR_CODES = {
-  /** Video generation API call failed */
-  GENERATION_FAILED: "VIDEO_GENERATION_FAILED",
-  /** Provider (Vertex AI) not properly configured */
-  PROVIDER_NOT_CONFIGURED: "VIDEO_PROVIDER_NOT_CONFIGURED",
-  /** Polling for video completion timed out */
-  POLL_TIMEOUT: "VIDEO_POLL_TIMEOUT",
-  /**
-   * Runtime I/O error during input processing.
-   * Used for: failed URL fetch, failed file read, corrupt/unreadable buffer.
-   * NOT for: missing options or invalid config shapes (use parameterValidation).
-   */
-  INVALID_INPUT: "VIDEO_INVALID_INPUT",
-} as const;
+export { VIDEO_ERROR_CODES };
 
 /**
  * Video generation error class
@@ -95,6 +74,9 @@ const POLL_INTERVAL_MS = 5000;
 
 /** Full model name for Veo 3.1 (IMPORTANT: not just "veo-3.1") */
 const VEO_MODEL = "veo-3.1-generate-001";
+
+/** Full model name for Veo 3.1 Fast (used for transitions) */
+const VEO_FAST_MODEL = "veo-3.1-fast-generate-001";
 
 /** Default location for Vertex AI */
 const DEFAULT_LOCATION = "us-central1";
@@ -746,10 +728,211 @@ async function pollVideoOperation(
   location: string,
   timeoutMs: number,
 ): Promise<Buffer> {
+  return pollOperation(
+    VEO_MODEL,
+    operationName,
+    accessToken,
+    project,
+    location,
+    timeoutMs,
+  );
+}
+
+// ============================================================================
+// TRANSITION GENERATION (Director Mode)
+// ============================================================================
+
+/**
+ * Generate a transition clip using Veo 3.1 Fast's first-and-last-frame interpolation.
+ *
+ * This calls the Veo API with both `image` (first frame) and `lastFrame` (last frame),
+ * producing a video that smoothly interpolates between the two frames.
+ *
+ * @param firstFrame - JPEG buffer of the first frame (last frame of clip N)
+ * @param lastFrame - JPEG buffer of the last frame (first frame of clip N+1)
+ * @param prompt - Transition prompt describing desired visual flow
+ * @param options - Video output options (resolution, aspect ratio, audio)
+ * @param durationSeconds - Duration of the transition clip (4, 6, or 8)
+ * @param region - Vertex AI region override
+ * @returns Video buffer of the transition clip
+ *
+ * @throws {VideoError} When API returns an error or polling times out
+ */
+export async function generateTransitionWithVertex(
+  firstFrame: Buffer,
+  lastFrame: Buffer,
+  prompt: string,
+  options: {
+    aspectRatio?: "9:16" | "16:9";
+    resolution?: "720p" | "1080p";
+    audio?: boolean;
+  } = {},
+  durationSeconds: 4 | 6 | 8 = 4,
+  region?: string,
+): Promise<Buffer> {
+  if (!isVertexVideoConfigured()) {
+    throw new VideoError({
+      code: VIDEO_ERROR_CODES.PROVIDER_NOT_CONFIGURED,
+      message:
+        "Vertex AI credentials not configured for transition generation.",
+      category: ErrorCategory.CONFIGURATION,
+      severity: ErrorSeverity.HIGH,
+      retriable: false,
+    });
+  }
+
+  const config = await getVertexConfig();
+  const project = config.project;
+  const location = region || config.location;
   const startTime = Date.now();
 
-  // Use fetchPredictOperation endpoint - this is MODEL-SPECIFIC
-  const pollEndpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${VEO_MODEL}:fetchPredictOperation`;
+  const aspectRatio = options.aspectRatio || "16:9";
+  const resolution = options.resolution || "720p";
+  const generateAudio = options.audio ?? true;
+
+  logger.debug("Starting transition clip generation", {
+    model: VEO_FAST_MODEL,
+    durationSeconds,
+    firstFrameSize: firstFrame.length,
+    lastFrameSize: lastFrame.length,
+    promptLength: prompt.length,
+  });
+
+  try {
+    const firstFrameBase64 = firstFrame.toString("base64");
+    const lastFrameBase64 = lastFrame.toString("base64");
+    const firstMime = detectMimeType(firstFrame);
+    const lastMime = detectMimeType(lastFrame);
+    const accessToken = await getAccessToken();
+
+    // Use Veo 3.1 Fast for transitions (faster with minimal quality difference)
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${VEO_FAST_MODEL}:predictLongRunning`;
+
+    const requestBody = {
+      instances: [
+        {
+          prompt: prompt,
+          image: {
+            bytesBase64Encoded: firstFrameBase64,
+            mimeType: firstMime,
+          },
+          lastFrame: {
+            bytesBase64Encoded: lastFrameBase64,
+            mimeType: lastMime,
+          },
+        },
+      ],
+      parameters: {
+        sampleCount: 1,
+        durationSeconds: durationSeconds,
+        aspectRatio: aspectRatio,
+        resolution: resolution,
+        generateAudio: generateAudio,
+      },
+    };
+
+    const controller = new AbortController();
+    const requestTimeout = setTimeout(() => controller.abort(), 30000);
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      clearTimeout(requestTimeout);
+      if (isAbortError(error)) {
+        throw new VideoError({
+          code: VIDEO_ERROR_CODES.DIRECTOR_TRANSITION_FAILED,
+          message: "Transition generation request timed out after 30 seconds",
+          category: ErrorCategory.EXECUTION,
+          severity: ErrorSeverity.MEDIUM,
+          retriable: true,
+        });
+      }
+      throw error;
+    }
+    clearTimeout(requestTimeout);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new VideoError({
+        code: VIDEO_ERROR_CODES.DIRECTOR_TRANSITION_FAILED,
+        message: `Transition API error: ${response.status} - ${errorText}`,
+        category: ErrorCategory.EXECUTION,
+        severity: ErrorSeverity.MEDIUM,
+        retriable: response.status >= 500,
+        context: { status: response.status, error: errorText },
+      });
+    }
+
+    const operation = await response.json();
+    const operationName = operation.name;
+
+    if (!operationName) {
+      throw new VideoError({
+        code: VIDEO_ERROR_CODES.DIRECTOR_TRANSITION_FAILED,
+        message: "Transition API did not return an operation name",
+        category: ErrorCategory.EXECUTION,
+        severity: ErrorSeverity.MEDIUM,
+        retriable: false,
+      });
+    }
+
+    // Poll with Veo Fast model endpoint
+    const remainingTime =
+      VIDEO_GENERATION_TIMEOUT_MS - (Date.now() - startTime);
+    const videoBuffer = await pollTransitionOperation(
+      operationName,
+      accessToken,
+      project,
+      location,
+      Math.max(1000, remainingTime),
+    );
+
+    logger.debug("Transition clip generated", {
+      processingTime: Date.now() - startTime,
+      videoSize: videoBuffer.length,
+    });
+
+    return videoBuffer;
+  } catch (error) {
+    if (error instanceof VideoError) {
+      throw error;
+    }
+
+    throw new VideoError({
+      code: VIDEO_ERROR_CODES.DIRECTOR_TRANSITION_FAILED,
+      message: `Transition generation failed: ${error instanceof Error ? error.message : String(error)}`,
+      category: ErrorCategory.EXECUTION,
+      severity: ErrorSeverity.MEDIUM,
+      retriable: true,
+      originalError: error instanceof Error ? error : undefined,
+    });
+  }
+}
+
+/**
+ * Common polling helper that handles both video and transition operations.
+ * Accepts a model name to construct the appropriate endpoint.
+ */
+async function pollOperation(
+  modelOrEndpoint: string,
+  operationName: string,
+  accessToken: string,
+  project: string,
+  location: string,
+  timeoutMs: number,
+): Promise<Buffer> {
+  const startTime = Date.now();
+
+  const pollEndpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${modelOrEndpoint}:fetchPredictOperation`;
 
   while (Date.now() - startTime < timeoutMs) {
     const result = await makePollRequest(
@@ -762,30 +945,41 @@ async function pollVideoOperation(
       return extractVideoFromResult(result, operationName);
     }
 
-    const elapsed = Date.now() - startTime;
-    logger.debug("Polling video operation...", {
+    logger.debug("Polling operation...", {
       operationName,
-      elapsed,
-      remainingMs: timeoutMs - elapsed,
+      elapsed: Date.now() - startTime,
     });
 
-    // Wait before next poll
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
   }
 
-  // Timeout reached
   throw new VideoError({
     code: VIDEO_ERROR_CODES.POLL_TIMEOUT,
-    message: `Video generation timed out after ${Math.round(timeoutMs / 1000)}s while polling for completion`,
+    message: `Operation timed out after ${Math.round(timeoutMs / 1000)}s`,
     category: ErrorCategory.TIMEOUT,
-    severity: ErrorSeverity.HIGH,
+    severity: ErrorSeverity.MEDIUM,
     retriable: true,
-    context: {
-      operationName,
-      timeoutMs,
-      provider: "vertex",
-      suggestion:
-        "Try again - video generation can take 1-3 minutes. Consider using a shorter duration or lower resolution.",
-    },
+    context: { operationName, timeoutMs },
   });
+}
+
+/**
+ * Poll Vertex AI operation for transition clip completion.
+ * Uses the Veo Fast model fetchPredictOperation endpoint.
+ */
+async function pollTransitionOperation(
+  operationName: string,
+  accessToken: string,
+  project: string,
+  location: string,
+  timeoutMs: number,
+): Promise<Buffer> {
+  return pollOperation(
+    VEO_FAST_MODEL,
+    operationName,
+    accessToken,
+    project,
+    location,
+    timeoutMs,
+  );
 }

@@ -339,6 +339,9 @@ export {
   TOKEN_EXPIRY_BUFFER_MS,
 } from "./enums.js";
 
+// ===== ERROR CODES =====
+export { VIDEO_ERROR_CODES } from "./videoErrors.js";
+
 // Re-export subscription types from canonical location for convenience
 export type {
   ClaudeSubscriptionTier,

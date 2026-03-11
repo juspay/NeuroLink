@@ -171,6 +171,41 @@ export type VideoOutputOptions = {
   audio?: boolean;
 };
 
+// ============================================
+// DIRECTOR MODE TYPES
+// ============================================
+
+/**
+ * A single segment in Director Mode, representing one video clip.
+ */
+export type DirectorSegment = {
+  /** Prompt describing the video content for this segment */
+  prompt: string;
+  /** Input image for this segment (Buffer, URL string, file path, or ImageWithAltText) */
+  image: Buffer | string | ImageWithAltText;
+};
+
+/**
+ * Director Mode configuration options.
+ * Used when `input.segments` is provided to control transition generation.
+ */
+export type DirectorModeOptions = {
+  /**
+   * Prompts for generating transition clips (array of N-1 entries for N segments).
+   * transitionPrompts[i] is used for the transition between segment i and segment i+1.
+   * If omitted, defaults to "Smooth cinematic transition between scenes".
+   */
+  transitionPrompts?: string[];
+
+  /**
+   * Duration of each transition clip in seconds (array of N-1 entries for N segments).
+   * Each value must be 4, 6, or 8 (4 recommended for seamless feel).
+   * If omitted, all transitions default to 4 seconds.
+   * @default [4, 4, ...]
+   */
+  transitionDurations?: Array<4 | 6 | 8>;
+};
+
 /**
  * Result type for generated video content
  *
@@ -222,6 +257,29 @@ export type VideoGenerationResult = {
     audioEnabled?: boolean;
     /** Processing time in milliseconds */
     processingTime?: number;
+
+    // Director Mode fields (present when Director Mode is used)
+    /** Number of main segments in the video */
+    segmentCount?: number;
+    /** Number of transition clips generated */
+    transitionCount?: number;
+    /** Duration of each main clip in seconds */
+    clipDuration?: number;
+    /** Durations of each transition in seconds (one per transition) */
+    transitionDurations?: number[];
+    /** Per-segment metadata */
+    segments?: Array<{
+      index: number;
+      duration: number;
+      processingTime: number;
+    }>;
+    /** Per-transition metadata */
+    transitions?: Array<{
+      fromSegment: number;
+      toSegment: number;
+      duration: number;
+      processingTime: number;
+    }>;
   };
 };
 
@@ -342,6 +400,22 @@ export type MultimodalInput = {
 
   /** Video files for file-based video processing (future) */
   videoFiles?: Array<Buffer | string>;
+
+  /**
+   * Director Mode segments for multi-clip video generation.
+   * Each segment contains a prompt and image for generating one video clip.
+   * Automatically enables Director Mode when provided.
+   *
+   * @example
+   * ```typescript
+   * segments: [
+   *   { prompt: "Product reveal", image: imageBuffer1 },
+   *   { prompt: "Feature showcase", image: "./image2.jpg" },
+   *   { prompt: "Call to action", image: { data: imageBuffer3, altText: "CTA" } }
+   * ]
+   * ```
+   */
+  segments?: DirectorSegment[];
 };
 
 // ============================================
@@ -480,6 +554,46 @@ export function isVideoContent(content: Content): content is VideoContent {
  * Type guard to check if input contains multimodal content
  * Now includes audio and video detection
  */
+/**
+ * Type guard to validate if an object matches the DirectorSegment shape.
+ * Checks for required prompt (string) and image (Buffer, string, or ImageWithAltText).
+ */
+function isDirectorSegment(segment: unknown): segment is DirectorSegment {
+  if (!segment || typeof segment !== "object") {
+    return false;
+  }
+
+  const maybeSegment = segment as DirectorSegment;
+
+  // Check for required prompt field
+  if (typeof maybeSegment.prompt !== "string" || !maybeSegment.prompt) {
+    return false;
+  }
+
+  // Check for required image field
+  const { image } = maybeSegment;
+  if (!image) {
+    return false;
+  }
+
+  // Validate image type: Buffer, string (URL/path), or ImageWithAltText
+  if (Buffer.isBuffer(image)) {
+    return true;
+  }
+
+  if (typeof image === "string") {
+    return true;
+  }
+
+  // Check for ImageWithAltText structure
+  if (typeof image === "object" && "data" in image) {
+    const imgData = (image as ImageWithAltText).data;
+    return Buffer.isBuffer(imgData) || typeof imgData === "string";
+  }
+
+  return false;
+}
+
 export function isMultimodalInput(input: unknown): input is MultimodalInput {
   const maybeInput = input as MultimodalInput;
   return !!(
@@ -489,7 +603,10 @@ export function isMultimodalInput(input: unknown): input is MultimodalInput {
     maybeInput?.files?.length ||
     maybeInput?.content?.length ||
     maybeInput?.audioFiles?.length ||
-    maybeInput?.videoFiles?.length
+    maybeInput?.videoFiles?.length ||
+    (maybeInput?.segments?.length &&
+      Array.isArray(maybeInput.segments) &&
+      maybeInput.segments.every(isDirectorSegment))
   );
 }
 

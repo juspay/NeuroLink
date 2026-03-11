@@ -1541,8 +1541,11 @@ export abstract class BaseProvider implements AIProvider {
     // Dynamic imports to avoid loading video dependencies unless needed
     const { generateVideoWithVertex, VideoError, VIDEO_ERROR_CODES } =
       await import("../adapters/video/vertexVideoHandler.js");
-    const { validateVideoGenerationInput, validateImageForVideo } =
-      await import("../utils/parameterValidation.js");
+    const {
+      validateVideoGenerationInput,
+      validateImageForVideo,
+      validateDirectorModeInput,
+    } = await import("../utils/parameterValidation.js");
     const { ErrorFactory } = await import("../utils/errorHandling.js");
 
     // Build GenerateOptions for validation
@@ -1553,6 +1556,76 @@ export abstract class BaseProvider implements AIProvider {
       model: options.model,
     };
 
+    // ===== DIRECTOR MODE =====
+    // Route to Director pipeline when segments are provided
+    if (
+      generateOptions.input?.segments &&
+      Array.isArray(generateOptions.input.segments) &&
+      generateOptions.input.segments.length > 0
+    ) {
+      // Type narrowing: segments is guaranteed to exist here
+      const segments = generateOptions.input.segments;
+
+      const directorValidation = validateDirectorModeInput(generateOptions);
+      if (!directorValidation.isValid) {
+        throw ErrorFactory.invalidParameters(
+          "director-mode",
+          new Error(
+            directorValidation.errors
+              .map((e: { message: string }) => e.message)
+              .join("; "),
+          ),
+          { errors: directorValidation.errors },
+        );
+      }
+
+      if (directorValidation.warnings.length > 0) {
+        for (const warning of directorValidation.warnings) {
+          logger.warn(`Director Mode warning: ${warning}`);
+        }
+      }
+
+      const { executeDirectorPipeline, DIRECTOR_PIPELINE_TIMEOUT_MS } =
+        await import("../adapters/video/directorPipeline.js");
+
+      // Use caller's timeout if provided, otherwise use default Director timeout
+      const directorTimeout = options.timeout ?? DIRECTOR_PIPELINE_TIMEOUT_MS;
+
+      const videoResult = await this.executeWithTimeout(
+        () =>
+          executeDirectorPipeline(
+            segments,
+            generateOptions.output?.video ?? {},
+            generateOptions.output?.director ?? {},
+            options.region,
+          ),
+        { timeout: directorTimeout, operationType: "generate" },
+      );
+
+      // Build content summary with metadata
+      const joinedPrompts = generateOptions.input.segments
+        .map((s: { prompt: string }) => s.prompt)
+        .join(" → ");
+      const segmentCount =
+        videoResult.metadata?.segmentCount ??
+        generateOptions.input.segments.length;
+      const transitionCount =
+        videoResult.metadata?.transitionCount ?? Math.max(0, segmentCount - 1);
+      const totalDuration = videoResult.metadata?.duration ?? 0;
+      const contentSummary = `${joinedPrompts} — duration: ${totalDuration}s, segments: ${segmentCount}, transitions: ${transitionCount}`;
+
+      const baseResult: EnhancedGenerateResult = {
+        content: contentSummary,
+        provider: "vertex",
+        model: options.model || "veo-3.1-generate-001",
+        usage: { input: 0, output: 0, total: 0 },
+        video: videoResult,
+      };
+
+      return await this.enhanceResult(baseResult, options, startTime);
+    }
+
+    // ===== STANDARD SINGLE-CLIP VIDEO GENERATION =====
     // Validate video generation input
     const validation = validateVideoGenerationInput(generateOptions);
     if (!validation.isValid) {
