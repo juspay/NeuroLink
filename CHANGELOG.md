@@ -1,3 +1,9 @@
+## [9.22.0](https://github.com/juspay/neurolink/compare/v9.21.0...v9.22.0) (2026-03-12)
+
+### Features
+
+- **(landing):** comprehensive mobile redesign across all 13 landing page components ([405e3e5](https://github.com/juspay/neurolink/commit/405e3e5eb8672b50ee1fc319088fb8c2b4fb78a0))
+
 ## [9.21.0](https://github.com/juspay/neurolink/compare/v9.20.0...v9.21.0) (2026-03-09)
 
 ### Features
