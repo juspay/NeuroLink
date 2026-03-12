@@ -22,6 +22,22 @@ export type {
   RetryConfig,
   ToolConfig,
 } from "./configTypes.js";
+// Cron/Scheduling types
+export type {
+  CronManagerConfig,
+  CreateTaskOptions,
+  ScheduledTask,
+  Schedule,
+  ScheduleType,
+  SchedulerBackend,
+  SessionMode,
+  TaskExecutor,
+  TaskFilter,
+  TaskRunResult,
+  TaskStatus,
+  TaskStore,
+  RunStatus,
+} from "../cron/types.js";
 // External MCP types
 export type {
   ExternalMCPConfigValidation,

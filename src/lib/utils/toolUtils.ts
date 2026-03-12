@@ -69,3 +69,16 @@ export function getMaxToolsPerProvider(toolConfig?: ToolConfig): number {
 
   return 100; // Default
 }
+
+/**
+ * Check if cron/scheduling tools should be disabled
+ * @param toolConfig - Optional tool configuration
+ * @returns true if cron tools should be disabled
+ */
+export function shouldDisableCronTools(toolConfig?: ToolConfig): boolean {
+  if (toolConfig?.disableCronTools !== undefined) {
+    return toolConfig.disableCronTools;
+  }
+
+  return process.env.NEUROLINK_DISABLE_CRON_TOOLS === "true";
+}

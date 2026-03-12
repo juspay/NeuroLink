@@ -10,6 +10,9 @@ import * as path from "path";
 import { logger } from "../utils/logger.js";
 import { VertexAI } from "@google-cloud/vertexai";
 import { CSVProcessor } from "../utils/csvProcessor.js";
+import { shouldDisableCronTools } from "../utils/toolUtils.js";
+import { createCronTools } from "../cron/cronTools.js";
+import type { CronManager } from "../cron/cronManager.js";
 
 // Runtime Google Search tool creation - bypasses TypeScript strict typing
 function createGoogleSearchTools() {
@@ -895,4 +898,22 @@ export function validateToolStructure(): boolean {
     logger.error("❌ Tool validation failed:", error);
     return false;
   }
+}
+
+// --- Cron Tools Integration ---
+
+/**
+ * Get cron tools bound to a specific CronManager getter.
+ * Returns empty object if disabled via env var.
+ *
+ * @param getCronManager - Function that returns the CronManager instance
+ *   from the owning NeuroLink instance. This avoids module-global state
+ *   and supports multiple NeuroLink instances correctly.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getCronTools(getCronManager?: () => CronManager | undefined): Record<string, any> {
+  if (shouldDisableCronTools()) {
+    return {};
+  }
+  return createCronTools(getCronManager ?? (() => undefined));
 }

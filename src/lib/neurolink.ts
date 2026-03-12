@@ -188,6 +188,9 @@ import { ATTR } from "./telemetry/attributes.js";
 import { getWorkflow } from "./workflow/core/workflowRegistry.js";
 import { runWorkflow } from "./workflow/core/workflowRunner.js";
 import type { WorkflowConfig } from "./workflow/types.js";
+import { CronManager } from "./cron/cronManager.js";
+import type { CronManagerConfig } from "./cron/types.js";
+import { shouldDisableCronTools } from "./utils/toolUtils.js";
 
 /**
  * Check if an error is a non-retryable provider error that should immediately
@@ -628,6 +631,7 @@ export class NeuroLink {
    * @throws {Error} When HITL configuration is invalid (if enabled)
    */
   private observabilityConfig?: ObservabilityConfig;
+  private cronManager?: CronManager;
 
   constructor(config?: NeurolinkConstructorConfig) {
     this.toolRegistry = config?.toolRegistry || new MCPToolRegistry();
@@ -673,6 +677,7 @@ export class NeuroLink {
     );
     this.registerFileTools();
     this.registerMemoryRetrievalTools();
+    this.initializeCronManager(config?.cron);
     this.initializeLangfuse(
       constructorId,
       constructorStartTime,
@@ -1333,6 +1338,84 @@ Current user's request: ${currentInput}`;
       this.emitter.emit("externalMCP:toolRemoved", event);
       this.unregisterExternalMCPToolFromRegistry(event.toolName);
     });
+  }
+
+  /**
+   * Initialize the CronManager for scheduled task execution.
+   * Wires up the task executor to call this.generate() with the task's prompt.
+   */
+  private initializeCronManager(cronConfig?: CronManagerConfig): void {
+    if (shouldDisableCronTools()) {
+      logger.debug("[NeuroLink] Cron tools disabled via environment/config");
+      return;
+    }
+
+    const envStore = process.env.NEUROLINK_CRON_STORE;
+    const envMaxConcurrent = process.env.NEUROLINK_CRON_MAX_CONCURRENT;
+
+    // Validate environment variables before use
+    const validStores = ["memory", "redis"];
+    const resolvedStore = (envStore && validStores.includes(envStore))
+      ? (envStore as "memory" | "redis")
+      : cronConfig?.store || "memory";
+
+    const parsedMaxConcurrent = envMaxConcurrent
+      ? Number.parseInt(envMaxConcurrent, 10)
+      : undefined;
+    const resolvedMaxConcurrent = (parsedMaxConcurrent != null && Number.isInteger(parsedMaxConcurrent) && parsedMaxConcurrent > 0)
+      ? parsedMaxConcurrent
+      : cronConfig?.maxConcurrentRuns;
+
+    const config: CronManagerConfig = {
+      ...cronConfig,
+      enabled: true,
+      store: resolvedStore,
+      maxConcurrentRuns: resolvedMaxConcurrent,
+      maxRunHistory: cronConfig?.maxRunHistory,
+      redisConfig: cronConfig?.redisConfig,
+      defaultProvider: cronConfig?.defaultProvider,
+      defaultModel: cronConfig?.defaultModel,
+    };
+
+    this.cronManager = new CronManager(config);
+
+    // Wire up the executor: when a task fires, call this.generate()
+    this.cronManager.setExecutor(async (task, sessionId) => {
+      const generateOptions = {
+        input: { text: task.prompt },
+        provider: task.provider || config.defaultProvider,
+        model: task.model || config.defaultModel,
+        sessionId,
+      } as Record<string, unknown>;
+
+      const result = await this.generate(
+        generateOptions as import("./types/generateTypes.js").GenerateOptions,
+      );
+
+      return {
+        responseText: result.content,
+        tokenUsage: result.usage
+          ? {
+              promptTokens: result.usage.input,
+              completionTokens: result.usage.output,
+              totalTokens: result.usage.total,
+            }
+          : undefined,
+      };
+    });
+
+    logger.debug("[NeuroLink] CronManager initialized", {
+      store: config.store,
+      maxConcurrent: config.maxConcurrentRuns,
+    });
+  }
+
+  /**
+   * Get the CronManager instance for this NeuroLink instance.
+   * Used by BaseProvider to bind cron tools to the correct instance scope.
+   */
+  getCronManager(): CronManager | undefined {
+    return this.cronManager;
   }
 
   /**
@@ -2175,6 +2258,15 @@ Current user's request: ${currentInput}`;
         logger.debug("[NeuroLink] OpenTelemetry shutdown completed");
       } catch (error) {
         logger.warn("[NeuroLink] OpenTelemetry shutdown failed:", error);
+      }
+
+      if (this.cronManager) {
+        try {
+          await this.cronManager.shutdown();
+          logger.debug("[NeuroLink] CronManager shutdown completed");
+        } catch (error) {
+          logger.warn("[NeuroLink] CronManager shutdown failed:", error);
+        }
       }
 
       if (this.externalServerManager) {
@@ -8871,7 +8963,24 @@ Current user's request: ${currentInput}`;
         logger.warn("[NeuroLink] Error shutting down OpenTelemetry:", error);
       }
 
-      // 2. Shutdown external MCP server connections
+      // 2. Shutdown CronManager (timers, store connections)
+      if (this.cronManager) {
+        try {
+          logger.debug("[NeuroLink] Shutting down CronManager...");
+          await this.cronManager.shutdown();
+          this.cronManager = undefined;
+          logger.debug("[NeuroLink] CronManager shutdown successfully");
+        } catch (error) {
+          const err =
+            error instanceof Error
+              ? error
+              : new Error(`CronManager shutdown error: ${String(error)}`);
+          cleanupErrors.push(err);
+          logger.warn("[NeuroLink] Error shutting down CronManager:", error);
+        }
+      }
+
+      // 3. Shutdown external MCP server connections
       if (this.externalServerManager) {
         try {
           logger.debug("[NeuroLink] Shutting down external MCP servers...");

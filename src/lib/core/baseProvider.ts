@@ -2,7 +2,7 @@ import { generateText } from "ai";
 import type { CoreMessage, LanguageModelV1, Tool } from "ai";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { tracers } from "../telemetry/tracers.js";
-import { directAgentTools } from "../agent/directTools.js";
+import { directAgentTools, getCronTools } from "../agent/directTools.js";
 import type { AIProviderName } from "../constants/enums.js";
 import { IMAGE_GENERATION_MODELS } from "../core/constants.js";
 import type { EvaluationData } from "../index.js";
@@ -59,10 +59,10 @@ export abstract class BaseProvider implements AIProvider {
   protected readonly defaultTimeout: number = 30000; // 30 seconds
   protected middlewareOptions?: MiddlewareFactoryOptions; // TODO: Implement global level middlewares that can be used
 
-  // Tools are conditionally included based on centralized configuration
-  protected readonly directTools = shouldDisableBuiltinTools()
-    ? {}
-    : directAgentTools;
+  // Tools are conditionally included based on centralized configuration.
+  // Cron tools are merged in the constructor after this.neurolink is assigned,
+  // binding to the correct NeuroLink instance (avoids module-global state).
+  protected directTools: Record<string, unknown> = {};
   protected mcpTools?: Record<string, Tool>; // MCP tools loaded dynamically when available
   protected customTools?: Map<string, unknown>; // Custom tools from registerTool()
   protected toolExecutor?: (
@@ -91,6 +91,14 @@ export abstract class BaseProvider implements AIProvider {
     this.providerName = providerName || this.getProviderName();
     this.neurolink = neurolink;
     this.middlewareOptions = middleware;
+
+    // Initialize direct tools (built-in + cron) bound to this instance's NeuroLink
+    if (!shouldDisableBuiltinTools()) {
+      const cronTools = getCronTools(
+        () => this.neurolink?.getCronManager?.(),
+      );
+      this.directTools = { ...directAgentTools, ...cronTools };
+    }
 
     // Initialize composition modules
     this.messageBuilder = new MessageBuilder(this.providerName, this.modelName);

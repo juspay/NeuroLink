@@ -6,6 +6,7 @@
 import { MCPToolRegistry } from "../mcp/toolRegistry.js";
 import type { HITLConfig } from "../types/hitlTypes.js";
 import type { ConversationMemoryConfig } from "./conversation.js";
+import type { CronManagerConfig } from "../cron/types.js";
 import type { ObservabilityConfig } from "./observability.js";
 
 /**
@@ -28,6 +29,7 @@ export type NeurolinkConstructorConfig = {
   conversationMemory?: Partial<ConversationMemoryConfig>;
   enableOrchestration?: boolean;
   hitl?: HITLConfig;
+  cron?: CronManagerConfig;
   toolRegistry?: MCPToolRegistry;
   observability?: ObservabilityConfig;
 };
@@ -127,6 +129,8 @@ export type ToolConfig = {
   maxToolsPerProvider?: number;
   /** Whether MCP tools should be enabled */
   enableMCPTools?: boolean;
+  /** Whether cron/scheduling tools should be disabled */
+  disableCronTools?: boolean;
 };
 
 /**
@@ -215,6 +219,7 @@ export const DEFAULT_CONFIG: NeuroLinkConfig = {
     allowCustomTools: true,
     maxToolsPerProvider: 100,
     enableMCPTools: true,
+    disableCronTools: false,
   },
   configVersion: "3.0.1",
 };
