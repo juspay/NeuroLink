@@ -31,7 +31,7 @@ proxy.on("connect", (req, clientSocket, head) => {
     `[${new Date().toISOString()}] ---> Intercepted CONNECT request to: ${hostname}:${port}`,
   );
 
-  const serverSocket = net.connect(port || 80, hostname, () => {
+  const serverSocket = net.connect(Number(port) || 80, hostname, () => {
     console.log(
       `[${new Date().toISOString()}] ---> Connection to ${hostname} established.`,
     );
