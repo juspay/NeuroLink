@@ -400,7 +400,9 @@ export async function testComplexZodSchemaMultiProvider(
   const isGeminiModel =
     modelName?.toLowerCase().includes("gemini") ||
     (!modelName &&
-      (providerName === "google-ai" || providerName === "googleAiStudio"));
+      (providerName === "google-ai" ||
+        providerName === "googleAiStudio" ||
+        providerName === "vertex"));
 
   if (isGeminiModel) {
     logTest(
