@@ -22,31 +22,40 @@ const ROUTING_CONFIG = {
 } as const;
 
 /**
- * Model configurations for different task types and providers
+ * Model configurations for different task types and providers.
+ *
+ * Priority chain for provider/model values:
+ *   1. Per-request params (fallbackProvider/fallbackModel in ModelRoutingOptions) — highest
+ *   2. Environment variables (e.g. FAST_FALLBACK_MODEL) — deployment-level override
+ *   3. Hardcoded defaults below — always-safe fallback
+ *
+ * Note: `as const` is intentionally omitted because values are resolved at runtime
+ * from environment variables and cannot be statically inferred as literals.
  */
 const MODEL_CONFIGS = {
   fast: {
     primary: {
-      provider: "vertex",
-      model: "gemini-2.5-flash",
+      provider: process.env.FAST_PRIMARY_PROVIDER ?? "vertex",
+      model: process.env.FAST_PRIMARY_MODEL ?? "gemini-2.5-flash",
       capabilities: ["speed", "general", "code", "basic-reasoning"],
-      avgResponseTime: 800, // ms
+      avgResponseTime: 800,
       costPerToken: 0.0001,
       reasoning: "Optimized for speed and efficiency via Vertex AI",
     },
     fallback: {
-      provider: "vertex",
-      model: "gemini-2.5-pro",
+      provider: process.env.FAST_FALLBACK_PROVIDER ?? "vertex",
+      model: process.env.FAST_FALLBACK_MODEL ?? "claude-haiku-4-5@20251001",
       capabilities: ["speed", "general", "basic-reasoning"],
       avgResponseTime: 1200,
       costPerToken: 0.0002,
-      reasoning: "Vertex AI Gemini Pro fallback",
+      reasoning: "Vertex AI Claude Haiku fallback",
     },
   },
   reasoning: {
     primary: {
-      provider: "vertex",
-      model: "claude-sonnet-4@20250514",
+      provider: process.env.REASONING_PRIMARY_PROVIDER ?? "vertex",
+      model:
+        process.env.REASONING_PRIMARY_MODEL ?? "claude-sonnet-4-5@20250929",
       capabilities: [
         "reasoning",
         "analysis",
@@ -54,14 +63,15 @@ const MODEL_CONFIGS = {
         "code",
         "creativity",
       ],
-      avgResponseTime: 3000, // ms
+      avgResponseTime: 3000,
       costPerToken: 0.003,
       reasoning:
-        "Advanced reasoning and analysis via Claude Sonnet 4 on Vertex AI",
+        "Advanced reasoning and analysis via Claude Sonnet 4-5 on Vertex AI",
     },
     fallback: {
-      provider: "vertex",
-      model: "claude-opus-4@20250514",
+      provider: process.env.REASONING_FALLBACK_PROVIDER ?? "vertex",
+      model:
+        process.env.REASONING_FALLBACK_MODEL ?? "claude-opus-4-5@20251101",
       capabilities: [
         "reasoning",
         "analysis",
@@ -72,10 +82,10 @@ const MODEL_CONFIGS = {
       ],
       avgResponseTime: 4000,
       costPerToken: 0.005,
-      reasoning: "Claude Opus 4 fallback on Vertex AI for most complex tasks",
+      reasoning: "Claude Opus 4-5 fallback on Vertex AI for most complex tasks",
     },
   },
-} as const;
+};
 
 /**
  * Model Router
@@ -93,7 +103,7 @@ export class ModelRouter {
     if (options.forceTaskType) {
       classification = {
         type: options.forceTaskType,
-        confidence: ROUTING_CONFIG.maxRouteConfidence, // Use maxRouteConfidence instead of 1.0
+        confidence: ROUTING_CONFIG.maxRouteConfidence,
         reasoning: "forced task type",
       };
     } else {
@@ -110,7 +120,6 @@ export class ModelRouter {
     }
 
     if (options.requireCapability) {
-      // Check if the capability suggests a specific task type
       const capability = options.requireCapability.toLowerCase();
       if (
         ["analysis", "reasoning", "complex", "research"].some((c) =>
@@ -120,7 +129,9 @@ export class ModelRouter {
         taskType = "reasoning";
         reasons.push(`capability: ${capability}`);
       } else if (
-        ["speed", "quick", "fast", "simple"].some((c) => capability.includes(c))
+        ["speed", "quick", "fast", "simple"].some((c) =>
+          capability.includes(c),
+        )
       ) {
         taskType = "fast";
         reasons.push(`capability: ${capability}`);
@@ -134,7 +145,6 @@ export class ModelRouter {
     // 4. Calculate confidence based on multiple factors
     let confidence = classification.confidence;
 
-    // Adjust confidence based on prompt characteristics
     if (taskType === "fast" && prompt.length < 30) {
       confidence = Math.min(
         ROUTING_CONFIG.maxRouteConfidence,
@@ -151,7 +161,6 @@ export class ModelRouter {
       reasons.push("detailed prompt");
     }
 
-    // Ensure final confidence is within configured bounds
     confidence = Math.max(
       ROUTING_CONFIG.minRouteConfidence,
       Math.min(ROUTING_CONFIG.maxRouteConfidence, confidence),
@@ -184,35 +193,40 @@ export class ModelRouter {
   }
 
   /**
-   * Get fallback route if primary route fails
+   * Get fallback route if primary route fails.
+   *
+   * Applies a three-layer priority chain for fallback provider/model:
+   *   Layer 1 (highest): options.fallbackProvider / options.fallbackModel (per-request param)
+   *   Layer 2:           env vars via MODEL_CONFIGS (e.g. FAST_FALLBACK_MODEL)
+   *   Layer 3 (lowest):  hardcoded defaults in MODEL_CONFIGS
    */
   static getFallbackRoute(
     prompt: string,
     primaryRoute: ModelRoute,
     options: ModelRoutingOptions = {},
   ): ModelRoute {
-    // Determine fallback strategy
+    // Determine fallback task type
     let fallbackType: TaskType;
 
     if (options.fallbackStrategy) {
       if (options.fallbackStrategy === "auto") {
-        // Use opposite of primary for fallback
         const primaryType = this.getTaskTypeFromRoute(primaryRoute);
         fallbackType = primaryType === "fast" ? "reasoning" : "fast";
       } else {
         fallbackType = options.fallbackStrategy;
       }
     } else {
-      // Default: use fallback model of same type
       fallbackType = this.getTaskTypeFromRoute(primaryRoute);
     }
 
     const config = MODEL_CONFIGS[fallbackType];
+    // Layer 2 + 3: env var or hardcoded default from MODEL_CONFIGS
     const fallbackConfig = config.fallback;
 
     const route: ModelRoute = {
-      provider: fallbackConfig.provider,
-      model: fallbackConfig.model,
+      // Layer 1: param overrides win over env/hardcoded (Layer 2 & 3)
+      provider: options.fallbackProvider ?? fallbackConfig.provider,
+      model: options.fallbackModel ?? fallbackConfig.model,
       reasoning: `fallback from ${primaryRoute.provider}/${primaryRoute.model}`,
       confidence: Math.max(
         ROUTING_CONFIG.minRouteConfidence,
@@ -228,6 +242,15 @@ export class ModelRouter {
       fallbackRoute: `${route.provider}/${route.model}`,
       fallbackType,
       strategy: options.fallbackStrategy || "default",
+      fallbackSource: options.fallbackModel
+        ? "param"
+        : process.env[
+              fallbackType === "fast"
+                ? "FAST_FALLBACK_MODEL"
+                : "REASONING_FALLBACK_MODEL"
+            ]
+          ? "env"
+          : "default",
     });
 
     return route;
@@ -237,7 +260,6 @@ export class ModelRouter {
    * Determine task type from a model route
    */
   private static getTaskTypeFromRoute(route: ModelRoute): TaskType {
-    // Check which config matches this route
     for (const [taskType, config] of Object.entries(MODEL_CONFIGS)) {
       if (
         config.primary.provider === route.provider &&
@@ -253,7 +275,6 @@ export class ModelRouter {
       }
     }
 
-    // Default fallback based on model name patterns
     if (route.model.includes("flash") || route.model.includes("mini")) {
       return "fast";
     }
@@ -272,8 +293,6 @@ export class ModelRouter {
    */
   static async validateRoute(route: ModelRoute): Promise<boolean> {
     try {
-      // This would typically check provider availability
-      // For now, just validate the configuration exists
       const configs = Object.values(MODEL_CONFIGS).flatMap((config) => [
         config.primary,
         config.fallback,
@@ -304,7 +323,6 @@ export class ModelRouter {
   } {
     const routes = prompts.map((prompt) => this.route(prompt));
 
-    // Handle empty prompts array to avoid divide-by-zero
     if (routes.length === 0) {
       const stats = {
         total: 0,
@@ -354,7 +372,6 @@ export class ModelRouter {
     estimatedResponseTime: number;
     capabilities: string[];
   } {
-    // Find the config for this route
     const allConfigs = Object.values(MODEL_CONFIGS).flatMap((config) => [
       config.primary,
       config.fallback,
