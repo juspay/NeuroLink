@@ -259,4 +259,16 @@ export type ModelRoutingOptions = {
   requireCapability?: string;
   /** Fallback strategy if primary choice fails */
   fallbackStrategy?: "fast" | "reasoning" | "auto";
+  /**
+   * Override fallback provider at the routing level.
+   * Priority: this param > env var (FAST_FALLBACK_PROVIDER / REASONING_FALLBACK_PROVIDER) > hardcoded default.
+   * Useful for per-request control via Lighthouse feature flags.
+   */
+  fallbackProvider?: string;
+  /**
+   * Override fallback model at the routing level.
+   * Priority: this param > env var (FAST_FALLBACK_MODEL / REASONING_FALLBACK_MODEL) > hardcoded default.
+   * Useful for per-request control via Lighthouse feature flags.
+   */
+  fallbackModel?: string;
 };
