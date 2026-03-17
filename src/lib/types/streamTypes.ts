@@ -366,6 +366,37 @@ export type StreamOptions = {
   disableTools?: boolean;
   maxSteps?: number; // Maximum tool execution steps. Defaults to 5 in the implementation if not specified.
 
+  /**
+   * Override the fallback provider for this stream request.
+   * Used when the primary provider/model fails (zero chunks or error).
+   *
+   * Priority chain: this param > FAST_FALLBACK_PROVIDER / REASONING_FALLBACK_PROVIDER env var > hardcoded default.
+   *
+   * Useful for per-request control via Lighthouse feature flags — e.g. route a specific
+   * merchant to a different fallback provider without a deployment.
+   *
+   * @example
+   * ```typescript
+   * await neurolink.stream({
+   *   input: { text: "..." },
+   *   fallbackProvider: "openai",
+   *   fallbackModel: "gpt-4o-mini",
+   * });
+   * ```
+   */
+  fallbackProvider?: string;
+
+  /**
+   * Override the fallback model for this stream request.
+   * Used when the primary provider/model fails (zero chunks or error).
+   *
+   * Priority chain: this param > FAST_FALLBACK_MODEL / REASONING_FALLBACK_MODEL env var > hardcoded default.
+   *
+   * Useful for per-request control via Lighthouse feature flags — e.g. A/B test a
+   * different fallback model for a specific merchant without a deployment.
+   */
+  fallbackModel?: string;
+
   // Analytics and Evaluation
   enableEvaluation?: boolean;
   enableAnalytics?: boolean;
