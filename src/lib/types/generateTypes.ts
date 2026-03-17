@@ -244,6 +244,37 @@ export type GenerateOptions = {
    */
   disableTools?: boolean;
 
+  /**
+   * Override the fallback provider for this generate request.
+   * Used when the primary provider/model fails.
+   *
+   * Priority chain: this param > FAST_FALLBACK_PROVIDER / REASONING_FALLBACK_PROVIDER env var > hardcoded default.
+   *
+   * Useful for per-request control via Lighthouse feature flags — e.g. route a specific
+   * merchant to a different fallback provider without a deployment.
+   *
+   * @example
+   * ```typescript
+   * await neurolink.generate({
+   *   input: { text: "..." },
+   *   fallbackProvider: "openai",
+   *   fallbackModel: "gpt-4o-mini",
+   * });
+   * ```
+   */
+  fallbackProvider?: string;
+
+  /**
+   * Override the fallback model for this generate request.
+   * Used when the primary provider/model fails.
+   *
+   * Priority chain: this param > FAST_FALLBACK_MODEL / REASONING_FALLBACK_MODEL env var > hardcoded default.
+   *
+   * Useful for per-request control via Lighthouse feature flags — e.g. A/B test a
+   * different fallback model for a specific merchant without a deployment.
+   */
+  fallbackModel?: string;
+
   // Analytics and Evaluation
   enableEvaluation?: boolean;
   enableAnalytics?: boolean;
