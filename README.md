@@ -150,17 +150,242 @@ const result = await neurolink.generate({
 
 **[Enterprise HITL Guide](docs/features/enterprise-hitl.md)** | **[Quick Start](docs/features/hitl.md)**
 
-## Get Started in Two Steps
+## 📚 Quick Start Guide
+
+This guide will have you generating AI responses in under 5 minutes using either the SDK or CLI.
+
+### Installation
+
+Choose your preferred package manager:
 
 ```bash
-# 1. Run the interactive setup wizard (select providers, validate keys)
-pnpm dlx @juspay/neurolink setup
+# npm
+npm install @juspay/neurolink
 
-# 2. Start generating with automatic provider selection
-npx @juspay/neurolink generate "Write a launch plan for multimodal chat"
+# pnpm (recommended)
+pnpm add @juspay/neurolink
+
+# yarn
+yarn add @juspay/neurolink
+
+# CLI only (no installation needed)
+npx @juspay/neurolink --help
 ```
 
-Need a persistent workspace? Launch loop mode with `npx @juspay/neurolink loop` - [Learn more →](docs/features/cli-loop-sessions.md)
+### Configuration
+
+NeuroLink works with 13+ AI providers. You'll need at least one API key to get started:
+
+**Option 1: Interactive Setup (Recommended)**
+
+```bash
+# Run the setup wizard to configure providers
+pnpm dlx @juspay/neurolink setup
+```
+
+The wizard will guide you through:
+
+- Selecting your preferred AI providers
+- Validating API keys
+- Setting up configuration files
+
+**Option 2: Manual Configuration**
+
+Create a `.env` file in your project root:
+
+```bash
+# Choose one or more providers
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_AI_API_KEY=...
+```
+
+**Free Tier Options:**
+
+- **Google AI Studio**: Get a free API key at [aistudio.google.com](https://aistudio.google.com)
+- **Mistral AI**: Free tier available at [console.mistral.ai](https://console.mistral.ai)
+- **Ollama**: 100% free local models (requires [Ollama installation](https://ollama.ai))
+
+### Your First API Call (SDK)
+
+**Basic Text Generation:**
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+// Initialize (auto-selects best available provider from your .env)
+const neurolink = new NeuroLink();
+
+// Generate a response
+const result = await neurolink.generate({
+  input: { text: "Explain quantum computing in simple terms" },
+});
+
+console.log(result.content);
+```
+
+**Streaming Responses:**
+
+```typescript
+// Stream tokens in real-time
+const stream = await neurolink.stream({
+  input: { text: "Write a haiku about code" },
+});
+for await (const chunk of stream.stream) {
+  if ("content" in chunk) process.stdout.write(chunk.content);
+}
+```
+
+**Multimodal Input (Images + Text):**
+
+```typescript
+const result = await neurolink.generate({
+  input: {
+    text: "What's in this image?",
+    images: ["./photo.jpg"],
+  },
+});
+```
+
+**Using Tools:**
+
+```typescript
+// Built-in tools are automatically available
+const result = await neurolink.generate({
+  input: {
+    text: "What time is it and what files are in the current directory?",
+  },
+  // AI can call getCurrentTime and listDirectory tools
+});
+```
+
+### Your First API Call (CLI)
+
+**Basic Generation:**
+
+```bash
+# Simple text generation
+npx @juspay/neurolink generate "Explain TypeScript generics"
+
+# Specify provider and model
+npx @juspay/neurolink generate "Hello!" --provider openai --model gpt-4o
+
+# Stream responses
+npx @juspay/neurolink stream "Write a story about AI" --provider anthropic
+```
+
+**Multimodal Input:**
+
+```bash
+# Analyze images
+npx @juspay/neurolink generate "Describe this image" --image photo.jpg
+
+# Process PDFs
+npx @juspay/neurolink generate "Summarize this document" --pdf report.pdf
+
+# Combine multiple file types
+npx @juspay/neurolink generate "Analyze this data" --file data.xlsx --file config.json
+```
+
+**Interactive Loop Mode:**
+
+```bash
+# Start an interactive session with persistent context
+npx @juspay/neurolink loop
+
+# Inside loop mode:
+> set provider anthropic
+> set model claude-opus-4
+> generate "Hello, Claude!"
+> history  # View conversation history
+> exit
+```
+
+### Common Use Cases
+
+**RAG (Retrieval-Augmented Generation):**
+
+```typescript
+// Automatically chunk, embed, and search documents
+const result = await neurolink.generate({
+  input: { text: "What are the key features mentioned in the documentation?" },
+  rag: {
+    files: ["./docs/guide.md", "./docs/api.md"],
+    chunkSize: 512,
+    topK: 5,
+  },
+});
+```
+
+**Structured Output with Zod:**
+
+```typescript
+import { z } from "zod";
+
+const schema = z.object({
+  name: z.string(),
+  age: z.number(),
+  email: z.string().email(),
+});
+
+const result = await neurolink.generate({
+  input: {
+    text: "Extract user info: John Doe, 30 years old, john@example.com",
+  },
+  schema,
+  output: { format: "json" },
+});
+
+// Parse the structured JSON from result.content
+const parsed = schema.parse(JSON.parse(result.content));
+console.log(parsed); // { name: "John Doe", age: 30, email: "john@example.com" }
+```
+
+**External MCP Servers (GitHub, Slack, etc.):**
+
+```typescript
+// Connect to GitHub MCP server
+await neurolink.addExternalMCPServer("github", {
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-github"],
+  transport: "stdio",
+  env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN },
+});
+
+// AI can now interact with GitHub
+const result = await neurolink.generate({
+  input: { text: 'Create an issue titled "Bug: login fails"' },
+});
+```
+
+### Next Steps
+
+- **[Complete Documentation](https://docs.neurolink.ink)** - Comprehensive guides and API reference
+- **[Provider Setup Guide](docs/getting-started/provider-setup.md)** - Configure all 13 providers
+- **[SDK API Reference](docs/sdk/api-reference.md)** - Full TypeScript API documentation
+- **[CLI Command Reference](docs/cli/commands.md)** - Complete CLI documentation
+- **[Example Projects](docs/examples/index.md)** - Real-world integration examples
+- **[Advanced Features](docs/advanced/index.md)** - Middleware, observability, workflows
+
+### Troubleshooting
+
+**Issue: "Provider not configured"**
+
+- Run `npx @juspay/neurolink setup` or add provider API key to `.env`
+
+**Issue: Rate limit errors**
+
+- Configure multiple providers for redundancy — NeuroLink auto-selects the best available
+- Use `provider: "litellm"` with LiteLLM to proxy across many providers
+
+**Issue: Large context overflows**
+
+- Enable conversation memory with compaction: `new NeuroLink({ conversationMemory: { enabled: true } })`
+- Use `rag` option to search documents instead of sending full content
+
+Need help? Check our [Troubleshooting Guide](docs/reference/troubleshooting.md) or [open an issue](https://github.com/juspay/neurolink/issues).
+
+---
 
 ## 🌟 Complete Feature Set
 
