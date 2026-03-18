@@ -400,6 +400,7 @@ export enum VertexModels {
   GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview",
   GEMINI_3_1_FLASH = "gemini-3.1-flash",
   GEMINI_3_1_FLASH_LITE = "gemini-3.1-flash-lite",
+  GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview",
 
   // Gemini 3 Series (Preview)
   GEMINI_3_PRO = "gemini-3-pro",
@@ -437,6 +438,7 @@ export enum GoogleAIModels {
   GEMINI_3_1_PRO_PREVIEW = "gemini-3.1-pro-preview",
   GEMINI_3_1_FLASH = "gemini-3.1-flash",
   GEMINI_3_1_FLASH_LITE = "gemini-3.1-flash-lite",
+  GEMINI_3_1_FLASH_LITE_PREVIEW = "gemini-3.1-flash-lite-preview",
 
   // Gemini 3 Series (Preview)
   GEMINI_3_PRO_PREVIEW = "gemini-3-pro-preview",

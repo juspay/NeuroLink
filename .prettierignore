@@ -65,3 +65,6 @@ landing/**/*.svelte
 
 # Recovered/temporary documentation
 recovered-docs/
+
+# Temporary investigation artifacts
+fix/

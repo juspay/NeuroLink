@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import {
   createVertex,
   type GoogleVertexProviderSettings,
@@ -6,6 +7,7 @@ import {
   createVertexAnthropic,
   type GoogleVertexAnthropicProviderSettings,
 } from "@ai-sdk/google-vertex/anthropic";
+import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import {
   embed,
   embedMany,
@@ -16,8 +18,6 @@ import {
   streamText,
   type Tool,
 } from "ai";
-import { trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import dns from "node:dns";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -35,13 +35,15 @@ import {
 import { ModelConfigurationManager } from "../core/modelConfiguration.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
+import { ATTR, tracers, withClientSpan } from "../telemetry/index.js";
+import type { AnalyticsData } from "../types/analytics.js";
 import type { UnknownRecord } from "../types/common.js";
 import {
   AuthenticationError,
+  InvalidModelError,
   NetworkError,
   ProviderError,
   RateLimitError,
-  InvalidModelError,
 } from "../types/errors.js";
 import type {
   EnhancedGenerateResult,
@@ -53,10 +55,8 @@ import type { ZodUnknownSchema } from "../types/typeAliases.js";
 import { ERROR_CODES, NeuroLinkError } from "../utils/errorHandling.js";
 import { FileDetector } from "../utils/fileDetector.js";
 import { logger } from "../utils/logger.js";
-import { estimateTokens } from "../utils/tokenEstimation.js";
 import { isGemini3Model } from "../utils/modelDetection.js";
 import { calculateCost } from "../utils/pricing.js";
-import { tracers, ATTR, withClientSpan } from "../telemetry/index.js";
 import {
   createGoogleAuthConfig,
   createVertexProjectConfig,
@@ -71,17 +71,20 @@ import {
   createTimeoutController,
   TimeoutError,
 } from "../utils/timeout.js";
+import { estimateTokens } from "../utils/tokenEstimation.js";
 import {
-  buildNativeToolDeclarations,
   buildNativeConfig,
-  computeMaxSteps as computeMaxStepsShared,
+  buildNativeToolDeclarations,
   collectStreamChunks,
-  extractTextFromParts,
+  collectStreamChunksIncremental,
+  computeMaxSteps as computeMaxStepsShared,
+  createTextChannel,
   executeNativeToolCalls,
+  extractTextFromParts,
   handleMaxStepsTermination,
+  type NativeToolsConfig,
   pushModelResponseToHistory,
   sanitizeToolsForGemini,
-  type NativeToolsConfig,
 } from "./googleNativeGemini3.js";
 
 // Import proper types for multimodal message handling
@@ -1657,16 +1660,13 @@ export class GoogleVertexProvider extends BaseProvider {
           });
         }
 
-        // Build config
+        // Build config — systemInstruction stays in config for Gemini 3.x.
+        // The @google/genai SDK maps config.systemInstruction to the HTTP-level
+        // system_instruction field, which is the correct mechanism for all
+        // Gemini 3.x models (including global endpoint).  Older workaround
+        // that moved systemInstruction into user/model content messages caused
+        // "Please use a valid role: user, model" on Gemini 3.1+ preview models.
         const config = buildNativeConfig(options, toolsConfig);
-
-        // Global endpoint rejects systemInstruction for Gemini 3.x —
-        // move it into a prefixed user message (same fix as generate path)
-        let streamSystemPreamble: string | undefined;
-        if (effectiveLocation === "global" && config.systemInstruction) {
-          streamSystemPreamble = config.systemInstruction as string;
-          delete config.systemInstruction;
-        }
 
         // Add JSON output format support for native SDK stream
         if (streamOptions.output?.format === "json" || streamOptions.schema) {
@@ -1704,161 +1704,205 @@ export class GoogleVertexProvider extends BaseProvider {
         );
         const maxSteps = computeMaxStepsShared(options.maxSteps);
         // Inject conversation history so the native path has multi-turn context
-        let currentContents = this.prependConversationHistory(
+        const currentContents = this.prependConversationHistory(
           [...contents] as Array<{ role: string; parts: unknown[] }>,
           (options as TextGenerationOptions).conversationMessages as
             | Array<{ role: string; content: string }>
             | undefined,
         );
-        // Prepend system prompt as a user message for the global endpoint
-        if (streamSystemPreamble) {
-          currentContents = [
-            {
-              role: "user",
-              parts: [
-                { text: `[System Instructions]\n${streamSystemPreamble}` },
-              ],
-            },
-            {
-              role: "model",
-              parts: [{ text: "OK" }],
-            },
-            ...currentContents,
-          ];
-        }
-        let finalText = "";
-        let lastStepText = "";
-        let totalInputTokens = 0;
-        let totalOutputTokens = 0;
+        // Create a push-based text channel so the caller receives tokens as
+        // they arrive from the network rather than after full buffering.
+        const channel = createTextChannel();
+
+        // Shared mutable state updated by the background agentic loop.
         const allToolCalls: Array<{
           toolName: string;
           args: Record<string, unknown>;
         }> = [];
-        let step = 0;
-        const failedTools = new Map<
-          string,
-          { count: number; lastError: string }
-        >();
 
-        // Agentic loop for tool calling
-        try {
-          while (step < maxSteps) {
-            if (timeoutController?.controller.signal.aborted) {
-              break;
-            }
-            step++;
-            logger.debug(`[GoogleVertex] Native SDK step ${step}/${maxSteps}`);
+        // Shared metadata object mutated by the background loop so that
+        // responseTime and totalToolExecutions reflect final values.
+        const metadata = {
+          streamId: `native-vertex-${Date.now()}`,
+          startTime,
+          responseTime: 0,
+          totalToolExecutions: 0,
+        };
 
-            try {
-              const stream = await client.models.generateContentStream({
-                model: modelName,
-                contents: currentContents,
-                config,
-                ...(composedSignal
-                  ? { httpOptions: { signal: composedSignal } }
-                  : {}),
-              });
+        // analyticsResolvers lets the background loop settle the analytics
+        // promise once token counts are known (after the loop completes).
+        let analyticsResolve!: (value: AnalyticsData) => void;
+        let analyticsReject!: (reason: unknown) => void;
+        const analyticsPromise = new Promise<AnalyticsData>((res, rej) => {
+          analyticsResolve = res;
+          analyticsReject = rej;
+        });
 
-              const chunkResult = await collectStreamChunks(stream);
-              totalInputTokens += chunkResult.inputTokens;
-              totalOutputTokens += chunkResult.outputTokens;
+        // Run the agentic loop in the background without awaiting it here,
+        // so we can return the StreamResult (with channel.iterable) immediately.
+        const loopPromise = (async () => {
+          let lastStepText = "";
+          let totalInputTokens = 0;
+          let totalOutputTokens = 0;
+          let step = 0;
+          let completedWithFinalAnswer = false;
+          const failedTools = new Map<
+            string,
+            { count: number; lastError: string }
+          >();
 
-              const stepText = extractTextFromParts(
-                chunkResult.rawResponseParts,
-              );
-
-              if (chunkResult.stepFunctionCalls.length === 0) {
-                finalText = stepText;
-                break;
+          try {
+            // Agentic loop for tool calling
+            while (step < maxSteps) {
+              if (composedSignal?.aborted) {
+                throw composedSignal.reason instanceof Error
+                  ? composedSignal.reason
+                  : new Error("Request aborted");
               }
-
-              lastStepText = stepText;
-
-              // Record tool call events on the span
-              for (const fc of chunkResult.stepFunctionCalls) {
-                span.addEvent("gen_ai.tool_call", {
-                  "tool.name": fc.name as string,
-                  "tool.step": step,
-                });
-              }
-
+              step++;
               logger.debug(
-                `[GoogleVertex] Executing ${chunkResult.stepFunctionCalls.length} function calls`,
+                `[GoogleVertex] Native SDK step ${step}/${maxSteps}`,
               );
 
-              pushModelResponseToHistory(
-                currentContents,
-                chunkResult.rawResponseParts,
-                chunkResult.stepFunctionCalls,
-              );
+              try {
+                const rawStream = await client.models.generateContentStream({
+                  model: modelName,
+                  contents: currentContents,
+                  config,
+                  ...(composedSignal
+                    ? { httpOptions: { signal: composedSignal } }
+                    : {}),
+                });
 
-              const functionResponses = await executeNativeToolCalls(
-                "[GoogleVertex]",
-                chunkResult.stepFunctionCalls,
-                executeMap,
-                failedTools,
-                allToolCalls,
-                { abortSignal: composedSignal },
-              );
+                // For every step, use incremental collection so text parts
+                // are pushed to the channel as they arrive.  For intermediate
+                // steps (those that produce function calls) we still need the
+                // complete rawResponseParts for pushModelResponseToHistory,
+                // which collectStreamChunksIncremental provides at stream end.
+                const chunkResult = await collectStreamChunksIncremental(
+                  rawStream,
+                  channel,
+                );
+                totalInputTokens += chunkResult.inputTokens;
+                totalOutputTokens += chunkResult.outputTokens;
 
-              // Add function responses to history
-              currentContents.push({
-                role: "function",
-                parts: functionResponses as unknown[],
-              });
-            } catch (error) {
-              logger.error("[GoogleVertex] Native SDK error", error);
-              throw this.handleProviderError(error);
+                const stepText = extractTextFromParts(
+                  chunkResult.rawResponseParts,
+                );
+
+                // If no function calls, this was the final step — channel
+                // already received all text parts incrementally.
+                if (chunkResult.stepFunctionCalls.length === 0) {
+                  completedWithFinalAnswer = true;
+                  break;
+                }
+
+                lastStepText = stepText;
+
+                // Record tool call events on the span
+                for (const fc of chunkResult.stepFunctionCalls) {
+                  span.addEvent("gen_ai.tool_call", {
+                    "tool.name": fc.name as string,
+                    "tool.step": step,
+                  });
+                }
+
+                logger.debug(
+                  `[GoogleVertex] Executing ${chunkResult.stepFunctionCalls.length} function calls`,
+                );
+
+                pushModelResponseToHistory(
+                  currentContents,
+                  chunkResult.rawResponseParts,
+                  chunkResult.stepFunctionCalls,
+                );
+
+                const functionResponses = await executeNativeToolCalls(
+                  "[GoogleVertex]",
+                  chunkResult.stepFunctionCalls,
+                  executeMap,
+                  failedTools,
+                  allToolCalls,
+                  { abortSignal: composedSignal },
+                );
+
+                // Function/tool responses must use role: "user" — the
+                // @google/genai SDK's validateHistory() only accepts "user"
+                // and "model" roles (matching automaticFunctionCalling).
+                currentContents.push({
+                  role: "user",
+                  parts: functionResponses as unknown[],
+                });
+              } catch (error) {
+                logger.error("[GoogleVertex] Native SDK error", error);
+                throw this.handleProviderError(error);
+              }
             }
+
+            // Handle max-steps termination: if the model was still calling
+            // tools when we hit the limit, push a synthetic final message.
+            if (step >= maxSteps && !completedWithFinalAnswer) {
+              const fallback = handleMaxStepsTermination(
+                "[GoogleVertex]",
+                step,
+                maxSteps,
+                "", // finalText is empty — model didn't stop on its own
+                lastStepText,
+              );
+              if (fallback) {
+                channel.push(fallback);
+              }
+            }
+
+            const responseTime = Date.now() - startTime;
+
+            // Propagate final values to the shared metadata object so that
+            // the already-returned StreamResult reflects accurate telemetry.
+            metadata.responseTime = responseTime;
+            metadata.totalToolExecutions = allToolCalls.length;
+
+            // Set token usage and finish reason on the span
+            span.setAttribute(ATTR.GEN_AI_INPUT_TOKENS, totalInputTokens);
+            span.setAttribute(ATTR.GEN_AI_OUTPUT_TOKENS, totalOutputTokens);
+            span.setAttribute(
+              ATTR.GEN_AI_FINISH_REASON,
+              step >= maxSteps && !completedWithFinalAnswer
+                ? "max_steps"
+                : "stop",
+            );
+
+            analyticsResolve({
+              provider: this.providerName,
+              model: modelName,
+              tokenUsage: {
+                input: totalInputTokens,
+                output: totalOutputTokens,
+                total: totalInputTokens + totalOutputTokens,
+              },
+              requestDuration: responseTime,
+              timestamp: new Date().toISOString(),
+            });
+
+            channel.close();
+          } catch (err) {
+            channel.error(err);
+            analyticsReject(err);
+          } finally {
+            timeoutController?.cleanup();
           }
-        } finally {
-          timeoutController?.cleanup();
-        }
+        })();
 
-        finalText = handleMaxStepsTermination(
-          "[GoogleVertex]",
-          step,
-          maxSteps,
-          finalText,
-          lastStepText,
-        );
-
-        const responseTime = Date.now() - startTime;
-
-        // Set token usage and finish reason on the span
-        span.setAttribute(ATTR.GEN_AI_INPUT_TOKENS, totalInputTokens);
-        span.setAttribute(ATTR.GEN_AI_OUTPUT_TOKENS, totalOutputTokens);
-        span.setAttribute(
-          ATTR.GEN_AI_FINISH_REASON,
-          step >= maxSteps ? "max_steps" : "stop",
-        );
-
-        // Create async iterable for streaming result
-        async function* createTextStream(): AsyncIterable<{
-          content: string;
-        }> {
-          yield { content: finalText };
-        }
+        // Suppress unhandled-rejection warnings on loopPromise — errors are
+        // forwarded to the channel and will surface when the caller iterates.
+        loopPromise.catch(() => undefined);
 
         return {
-          stream: createTextStream(),
+          stream: channel.iterable,
           provider: this.providerName,
           model: modelName,
-          usage: {
-            input: totalInputTokens,
-            output: totalOutputTokens,
-            total: totalInputTokens + totalOutputTokens,
-          },
-          toolCalls: allToolCalls.map((tc) => ({
-            toolName: tc.toolName,
-            args: tc.args,
-          })),
-          metadata: {
-            streamId: `native-vertex-${Date.now()}`,
-            startTime,
-            responseTime,
-            totalToolExecutions: allToolCalls.length,
-          },
+          toolCalls: allToolCalls,
+          analytics: analyticsPromise,
+          metadata,
         };
       },
     );
@@ -1901,8 +1945,10 @@ export class GoogleVertexProvider extends BaseProvider {
         );
 
         // Build contents from input with multimodal support
+        // Prefer input.text over prompt — processCSVFilesForNativeSDK enriches
+        // input.text with inlined CSV data, so using prompt first would discard it.
         const inputText =
-          options.prompt || options.input?.text || "Please respond.";
+          options.input?.text || options.prompt || "Please respond.";
         const multimodalInput = options.input as
           | {
               text?: string;
@@ -1953,17 +1999,9 @@ export class GoogleVertexProvider extends BaseProvider {
           );
         }
 
-        // Build config
+        // Build config — systemInstruction stays in config for Gemini 3.x.
+        // See stream path comment for rationale.
         const config = buildNativeConfig(options, toolsConfig);
-
-        // Global endpoint rejects systemInstruction for Gemini 3.x, returning
-        // "Please use a valid role: user, model." Move it into a prefixed
-        // user message so the model still receives the system context.
-        let systemPreamble: string | undefined;
-        if (effectiveLocation === "global" && config.systemInstruction) {
-          systemPreamble = config.systemInstruction as string;
-          delete config.systemInstruction;
-        }
 
         // Note: Schema/JSON output for Gemini 3 native SDK is complex due to $ref resolution issues
         // For now, schemas are handled via the AI SDK fallback path, not native SDK
@@ -1982,26 +2020,12 @@ export class GoogleVertexProvider extends BaseProvider {
         );
         const maxSteps = computeMaxStepsShared(options.maxSteps);
         // Inject conversation history so the native path has multi-turn context
-        let currentContents = this.prependConversationHistory(
+        const currentContents = this.prependConversationHistory(
           [...contents] as Array<{ role: string; parts: unknown[] }>,
           options.conversationMessages as
             | Array<{ role: string; content: string }>
             | undefined,
         );
-        // Prepend system prompt as a user message for the global endpoint
-        if (systemPreamble) {
-          currentContents = [
-            {
-              role: "user",
-              parts: [{ text: `[System Instructions]\n${systemPreamble}` }],
-            },
-            {
-              role: "model",
-              parts: [{ text: "OK" }],
-            },
-            ...currentContents,
-          ];
-        }
         let finalText = "";
         let lastStepText = "";
         let totalInputTokens = 0;
@@ -2024,8 +2048,10 @@ export class GoogleVertexProvider extends BaseProvider {
         try {
           // Agentic loop for tool calling
           while (step < maxSteps) {
-            if (timeoutController?.controller.signal.aborted) {
-              break;
+            if (composedSignal?.aborted) {
+              throw composedSignal.reason instanceof Error
+                ? composedSignal.reason
+                : new Error("Request aborted");
             }
             step++;
             logger.debug(
@@ -2085,9 +2111,11 @@ export class GoogleVertexProvider extends BaseProvider {
                 { toolExecutions, abortSignal: composedSignal },
               );
 
-              // Add function responses to history
+              // Function/tool responses must use role: "user" — the
+              // @google/genai SDK's validateHistory() only accepts "user"
+              // and "model" roles (matching automaticFunctionCalling).
               currentContents.push({
-                role: "function",
+                role: "user",
                 parts: functionResponses as unknown[],
               });
             } catch (error) {
@@ -2243,15 +2271,21 @@ export class GoogleVertexProvider extends BaseProvider {
       options.model || this.modelName || getDefaultVertexModel(),
     );
 
+    // Structured output (JSON format or schema) is incompatible with tools on Gemini.
+    // Mirror the stream path pattern to prevent silent downgrade on the generate path.
+    const wantsStructuredOutput =
+      options.output?.format === "json" || !!options.schema;
+
     // Check if we should use native SDK for Gemini 3 with tools
-    const shouldUseTools = !options.disableTools && this.supportsTools();
+    const shouldUseTools =
+      !options.disableTools && this.supportsTools() && !wantsStructuredOutput;
     const sdkTools = shouldUseTools ? await this.getAllTools() : {};
     const hasTools =
       shouldUseTools &&
       (Object.keys(sdkTools).length > 0 ||
         (options.tools && Object.keys(options.tools).length > 0));
 
-    if (isGemini3Model(modelName) && hasTools) {
+    if (isGemini3Model(modelName) && hasTools && !wantsStructuredOutput) {
       // Process CSV files before routing to native SDK (bypasses normal message builder)
       const processedOptions = await this.processCSVFilesForNativeSDK(options);
 
@@ -3387,7 +3421,7 @@ export class GoogleVertexProvider extends BaseProvider {
           throw error;
         }
 
-        const delay = baseDelay * Math.pow(2, attempt - 1);
+        const delay = baseDelay * 2 ** (attempt - 1);
         logger.warn(
           `[GoogleVertexProvider] Auth token transient error (${err?.code || err?.message}), retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`,
         );

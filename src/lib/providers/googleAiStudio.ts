@@ -18,6 +18,7 @@ import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import type { NeuroLink } from "../neurolink.js";
 import { ATTR, tracers, withClientSpan } from "../telemetry/index.js";
+import type { AnalyticsData } from "../types/analytics.js";
 import type { UnknownRecord } from "../types/common.js";
 import {
   AuthenticationError,
@@ -53,7 +54,9 @@ import {
   buildNativeConfig,
   buildNativeToolDeclarations,
   collectStreamChunks,
+  collectStreamChunksIncremental,
   computeMaxSteps,
+  createTextChannel,
   executeNativeToolCalls,
   extractTextFromParts,
   handleMaxStepsTermination,
@@ -795,158 +798,209 @@ export class GoogleAIStudioProvider extends BaseProvider {
           const config = buildNativeConfig(options, toolsConfig);
           const maxSteps = computeMaxSteps(options.maxSteps);
 
-          let finalText = "";
-          let lastStepText = "";
-          let totalInputTokens = 0;
-          let totalOutputTokens = 0;
-          const allToolCalls: Array<{
-            toolName: string;
-            args: Record<string, unknown>;
-          }> = [];
-          let step = 0;
-          const failedTools = new Map<
-            string,
-            { count: number; lastError: string }
-          >();
-
           // Compose abort signal from user signal + timeout
           const composedSignal = composeAbortSignals(
             options.abortSignal,
             timeoutController?.controller.signal,
           );
-          // Agentic loop for tool calling
-          while (step < maxSteps) {
-            if (composedSignal?.aborted) {
-              throw composedSignal.reason instanceof Error
-                ? composedSignal.reason
-                : new Error("Request aborted");
-            }
-            step++;
-            logger.debug(
-              `[GoogleAIStudio] Native SDK step ${step}/${maxSteps}`,
-            );
+
+          // Create a push-based text channel so the caller receives tokens as
+          // they arrive from the network rather than after full buffering.
+          const channel = createTextChannel();
+
+          // Shared mutable state updated by the background agentic loop.
+          const allToolCalls: Array<{
+            toolName: string;
+            args: Record<string, unknown>;
+          }> = [];
+
+          // analyticsResolvers lets the background loop settle the analytics
+          // promise once token counts are known (after the loop completes).
+          let analyticsResolve!: (value: AnalyticsData) => void;
+          let analyticsReject!: (reason: unknown) => void;
+          const analyticsPromise = new Promise<AnalyticsData>((res, rej) => {
+            analyticsResolve = res;
+            analyticsReject = rej;
+          });
+
+          // Shared metadata object mutated by the background loop so the
+          // returned object reflects the final values after stream completion.
+          const metadata = {
+            streamId: `native-${Date.now()}`,
+            startTime,
+            responseTime: 0,
+            totalToolExecutions: 0,
+          };
+
+          // Run the agentic loop in the background without awaiting it here,
+          // so we can return the StreamResult (with channel.iterable) immediately.
+          const loopPromise = (async () => {
+            let lastStepText = "";
+            let totalInputTokens = 0;
+            let totalOutputTokens = 0;
+            let step = 0;
+            let completedWithFinalAnswer = false;
+            const failedTools = new Map<
+              string,
+              { count: number; lastError: string }
+            >();
 
             try {
-              const stream = await client.models.generateContentStream({
+              // Agentic loop for tool calling
+              while (step < maxSteps) {
+                if (composedSignal?.aborted) {
+                  throw composedSignal.reason instanceof Error
+                    ? composedSignal.reason
+                    : new Error("Request aborted");
+                }
+                step++;
+                logger.debug(
+                  `[GoogleAIStudio] Native SDK step ${step}/${maxSteps}`,
+                );
+
+                try {
+                  const rawStream = await client.models.generateContentStream({
+                    model: modelName,
+                    contents: currentContents,
+                    config,
+                    ...(composedSignal
+                      ? { httpOptions: { signal: composedSignal } }
+                      : {}),
+                  });
+
+                  // For every step, use incremental collection so text parts
+                  // are pushed to the channel as they arrive.  For intermediate
+                  // steps (those that produce function calls) we still need the
+                  // complete rawResponseParts for pushModelResponseToHistory,
+                  // which collectStreamChunksIncremental provides at stream end.
+                  const chunkResult = await collectStreamChunksIncremental(
+                    rawStream,
+                    channel,
+                  );
+                  totalInputTokens += chunkResult.inputTokens;
+                  totalOutputTokens += chunkResult.outputTokens;
+
+                  const stepText = extractTextFromParts(
+                    chunkResult.rawResponseParts,
+                  );
+
+                  // If no function calls, this was the final step — channel
+                  // already received all text parts incrementally.
+                  if (chunkResult.stepFunctionCalls.length === 0) {
+                    completedWithFinalAnswer = true;
+                    break;
+                  }
+
+                  lastStepText = stepText;
+
+                  // Record tool call events on the span
+                  for (const fc of chunkResult.stepFunctionCalls) {
+                    span.addEvent("gen_ai.tool_call", {
+                      "tool.name": fc.name as string,
+                      "tool.step": step,
+                    });
+                  }
+
+                  logger.debug(
+                    `[GoogleAIStudio] Executing ${chunkResult.stepFunctionCalls.length} function calls`,
+                  );
+
+                  // Add model response with ALL parts (including thoughtSignature) to history
+                  pushModelResponseToHistory(
+                    currentContents,
+                    chunkResult.rawResponseParts,
+                    chunkResult.stepFunctionCalls,
+                  );
+
+                  const functionResponses = await executeNativeToolCalls(
+                    "[GoogleAIStudio]",
+                    chunkResult.stepFunctionCalls,
+                    executeMap,
+                    failedTools,
+                    allToolCalls,
+                    { abortSignal: composedSignal },
+                  );
+
+                  // Add function responses to history — the @google/genai SDK
+                  // only accepts "user" and "model" as valid roles in contents.
+                  // Function/tool responses must use role: "user" (matching the
+                  // SDK's own automaticFunctionCalling implementation).
+                  currentContents.push({
+                    role: "user",
+                    parts: functionResponses as unknown[],
+                  });
+                } catch (error) {
+                  logger.error("[GoogleAIStudio] Native SDK error", error);
+                  throw this.handleProviderError(error);
+                }
+              }
+
+              // Handle max-steps termination: if the model was still calling
+              // tools when we hit the limit, push a synthetic final message.
+              const hitStepLimitWithoutFinalAnswer =
+                step >= maxSteps && !completedWithFinalAnswer;
+              if (hitStepLimitWithoutFinalAnswer) {
+                const fallback = handleMaxStepsTermination(
+                  "[GoogleAIStudio]",
+                  step,
+                  maxSteps,
+                  "", // finalText is empty — model didn't stop on its own
+                  lastStepText,
+                );
+                if (fallback) {
+                  channel.push(fallback);
+                }
+              }
+
+              const responseTime = Date.now() - startTime;
+
+              // Update shared metadata so the returned object reflects final values.
+              metadata.responseTime = responseTime;
+              metadata.totalToolExecutions = allToolCalls.length;
+
+              // Set token usage and finish reason on the span
+              span.setAttribute(ATTR.GEN_AI_INPUT_TOKENS, totalInputTokens);
+              span.setAttribute(ATTR.GEN_AI_OUTPUT_TOKENS, totalOutputTokens);
+              span.setAttribute(
+                ATTR.GEN_AI_FINISH_REASON,
+                hitStepLimitWithoutFinalAnswer ? "max_steps" : "stop",
+              );
+
+              analyticsResolve({
+                provider: this.providerName,
                 model: modelName,
-                contents: currentContents,
-                config,
-                ...(composedSignal
-                  ? { httpOptions: { signal: composedSignal } }
-                  : {}),
+                tokenUsage: {
+                  input: totalInputTokens,
+                  output: totalOutputTokens,
+                  total: totalInputTokens + totalOutputTokens,
+                },
+                requestDuration: responseTime,
+                timestamp: new Date().toISOString(),
               });
 
-              const chunkResult = await collectStreamChunks(stream);
-              totalInputTokens += chunkResult.inputTokens;
-              totalOutputTokens += chunkResult.outputTokens;
-
-              const stepText = extractTextFromParts(
-                chunkResult.rawResponseParts,
-              );
-
-              // If no function calls, we're done
-              if (chunkResult.stepFunctionCalls.length === 0) {
-                finalText = stepText;
-                break;
-              }
-
-              lastStepText = stepText;
-
-              // Record tool call events on the span
-              for (const fc of chunkResult.stepFunctionCalls) {
-                span.addEvent("gen_ai.tool_call", {
-                  "tool.name": fc.name as string,
-                  "tool.step": step,
-                });
-              }
-
-              logger.debug(
-                `[GoogleAIStudio] Executing ${chunkResult.stepFunctionCalls.length} function calls`,
-              );
-
-              // Add model response with ALL parts (including thoughtSignature) to history
-              pushModelResponseToHistory(
-                currentContents,
-                chunkResult.rawResponseParts,
-                chunkResult.stepFunctionCalls,
-              );
-
-              const functionResponses = await executeNativeToolCalls(
-                "[GoogleAIStudio]",
-                chunkResult.stepFunctionCalls,
-                executeMap,
-                failedTools,
-                allToolCalls,
-                { abortSignal: composedSignal },
-              );
-
-              // Add function responses to history — the @google/genai SDK
-              // only accepts "user" and "model" as valid roles in contents.
-              // Function/tool responses must use role: "user" (matching the
-              // SDK's own automaticFunctionCalling implementation).
-              currentContents.push({
-                role: "user",
-                parts: functionResponses as unknown[],
-              });
-            } catch (error) {
-              logger.error("[GoogleAIStudio] Native SDK error", error);
-              throw this.handleProviderError(error);
+              channel.close();
+            } catch (err) {
+              channel.error(err);
+              analyticsReject(err);
+            } finally {
+              timeoutController?.cleanup();
             }
-          }
+          })();
 
-          finalText = handleMaxStepsTermination(
-            "[GoogleAIStudio]",
-            step,
-            maxSteps,
-            finalText,
-            lastStepText,
-          );
-
-          const responseTime = Date.now() - startTime;
-
-          // Set token usage and finish reason on the span
-          span.setAttribute(ATTR.GEN_AI_INPUT_TOKENS, totalInputTokens);
-          span.setAttribute(ATTR.GEN_AI_OUTPUT_TOKENS, totalOutputTokens);
-          span.setAttribute(
-            ATTR.GEN_AI_FINISH_REASON,
-            step >= maxSteps ? "max_steps" : "stop",
-          );
-
-          // Create async iterable for streaming result
-          async function* createTextStream(): AsyncIterable<{
-            content: string;
-          }> {
-            yield { content: finalText };
-          }
+          // Suppress unhandled-rejection warnings on loopPromise — errors are
+          // forwarded to the channel and will surface when the caller iterates.
+          loopPromise.catch(() => undefined);
 
           return {
-            stream: createTextStream(),
+            stream: channel.iterable,
             provider: this.providerName,
             model: modelName,
-            toolCalls: allToolCalls.map((tc) => ({
-              toolName: tc.toolName,
-              args: tc.args,
-            })),
-            analytics: Promise.resolve({
-              provider: this.providerName,
-              model: modelName,
-              tokenUsage: {
-                input: totalInputTokens,
-                output: totalOutputTokens,
-                total: totalInputTokens + totalOutputTokens,
-              },
-              requestDuration: responseTime,
-              timestamp: new Date().toISOString(),
-            }),
-            metadata: {
-              streamId: `native-${Date.now()}`,
-              startTime,
-              responseTime,
-              totalToolExecutions: allToolCalls.length,
-            },
+            toolCalls: allToolCalls,
+            analytics: analyticsPromise,
+            metadata,
           };
         } finally {
-          timeoutController?.cleanup();
+          // Timeout controller cleanup is managed inside the background loop
         }
       },
     );
@@ -995,7 +1049,9 @@ export class GoogleAIStudioProvider extends BaseProvider {
           );
 
           // Build contents from input
-          const promptText = options.prompt || options.input?.text || "";
+          // Prefer input.text over prompt — processCSVFilesForNativeSDK enriches
+          // input.text with inlined CSV data, so using prompt first would discard it.
+          const promptText = options.input?.text || options.prompt || "";
           const currentContents: Array<{
             role: string;
             parts: unknown[];

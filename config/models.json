@@ -159,6 +159,42 @@
       }
     },
     "google": {
+      "gemini-3.1-pro-preview": {
+        "id": "gemini-3.1-pro-preview",
+        "displayName": "Gemini 3.1 Pro Preview",
+        "capabilities": [
+          "function-calling",
+          "vision",
+          "code-execution",
+          "multimodal",
+          "advanced-reasoning"
+        ],
+        "deprecated": false,
+        "pricing": { "input": 0.00125, "output": 0.005 },
+        "contextWindow": 1048576,
+        "releaseDate": "2026-03-01",
+        "metadata": {
+          "description": "Gemini 3.1 Pro preview with advanced reasoning, vision, and multimodal capabilities",
+          "useCase": "advanced",
+          "speed": "medium",
+          "quality": "highest"
+        }
+      },
+      "gemini-3.1-flash-lite-preview": {
+        "id": "gemini-3.1-flash-lite-preview",
+        "displayName": "Gemini 3.1 Flash Lite Preview",
+        "capabilities": ["function-calling", "vision", "multimodal"],
+        "deprecated": false,
+        "pricing": { "input": 0.000075, "output": 0.0003 },
+        "contextWindow": 1048576,
+        "releaseDate": "2026-03-01",
+        "metadata": {
+          "description": "Fast and cost-effective Gemini 3.1 Flash Lite preview with vision and multimodal support",
+          "useCase": "speed",
+          "speed": "fastest",
+          "quality": "medium"
+        }
+      },
       "gemini-3-pro-preview": {
         "id": "gemini-3-pro-preview-11-2025",
         "displayName": "Gemini 3 Pro Preview",

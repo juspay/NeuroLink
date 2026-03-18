@@ -11,9 +11,9 @@
 
 import { randomUUID } from "node:crypto";
 import {
-  type Tool,
   jsonSchema as aiJsonSchema,
   tool as createAISDKTool,
+  type Tool,
 } from "ai";
 import {
   DEFAULT_MAX_STEPS,
@@ -26,8 +26,8 @@ import {
   inlineJsonSchema,
   isZodSchema,
 } from "../utils/schemaConversion.js";
-import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
 import type { ThinkingConfig } from "../utils/thinkingConfig.js";
+import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
 
 // ── Types ──
 
@@ -247,7 +247,6 @@ export function sanitizeToolsForGemini(tools: Record<string, Tool>): {
       );
       // Don't fall back to the original tool — an incompatible schema would fail the Gemini request
       dropped.push(name);
-      continue;
     }
   }
 
@@ -265,35 +264,60 @@ export function buildNativeToolDeclarations(
   const functionDeclarations: NativeFunctionDeclaration[] = [];
   const executeMap = new Map<string, Tool["execute"]>();
 
+  const skippedTools: string[] = [];
+
   for (const [name, tool] of Object.entries(tools)) {
-    const decl: NativeFunctionDeclaration = {
-      name,
-      description: tool.description || `Tool: ${name}`,
-    };
+    try {
+      const decl: NativeFunctionDeclaration = {
+        name,
+        description: tool.description || `Tool: ${name}`,
+      };
 
-    if (tool.parameters) {
-      let rawSchema: Record<string, unknown>;
+      if (tool.parameters) {
+        let rawSchema: Record<string, unknown>;
 
-      if (isZodSchema(tool.parameters)) {
-        rawSchema = convertZodToJsonSchema(
-          tool.parameters as ZodUnknownSchema,
-        ) as Record<string, unknown>;
-      } else if (typeof tool.parameters === "object") {
-        rawSchema = tool.parameters as Record<string, unknown>;
-      } else {
-        rawSchema = { type: "object", properties: {} };
+        if (isZodSchema(tool.parameters)) {
+          rawSchema = convertZodToJsonSchema(
+            tool.parameters as ZodUnknownSchema,
+          ) as Record<string, unknown>;
+        } else if (typeof tool.parameters === "object") {
+          rawSchema = tool.parameters as Record<string, unknown>;
+        } else {
+          rawSchema = { type: "object", properties: {} };
+        }
+
+        // Unwrap Vercel AI SDK's jsonSchema() wrapper: { jsonSchema: { type: "object", ... } }
+        if (
+          rawSchema.jsonSchema &&
+          typeof rawSchema.jsonSchema === "object" &&
+          !rawSchema.type
+        ) {
+          rawSchema = rawSchema.jsonSchema as Record<string, unknown>;
+        }
+
+        decl.parametersJsonSchema = sanitizeSchemaForGemini(
+          inlineJsonSchema(rawSchema),
+        );
       }
 
-      decl.parametersJsonSchema = sanitizeSchemaForGemini(
-        inlineJsonSchema(rawSchema),
+      functionDeclarations.push(decl);
+
+      if (tool.execute) {
+        executeMap.set(name, tool.execute);
+      }
+    } catch (err) {
+      skippedTools.push(name);
+      logger.error(
+        `[buildNativeToolDeclarations] Failed to convert tool "${name}":`,
+        err,
       );
     }
+  }
 
-    functionDeclarations.push(decl);
-
-    if (tool.execute) {
-      executeMap.set(name, tool.execute);
-    }
+  if (skippedTools.length > 0) {
+    logger.warn(
+      `[buildNativeToolDeclarations] ${skippedTools.length} tool(s) skipped due to schema errors: ${skippedTools.join(", ")}`,
+    );
   }
 
   return { toolsConfig: [{ functionDeclarations }], executeMap };
@@ -388,6 +412,160 @@ export async function collectStreamChunks(
     }
 
     // Accumulate usage metadata from chunks
+    const usage = chunkRecord.usageMetadata as
+      | { promptTokenCount?: number; candidatesTokenCount?: number }
+      | undefined;
+    if (usage) {
+      inputTokens = Math.max(inputTokens, usage.promptTokenCount || 0);
+      outputTokens = Math.max(outputTokens, usage.candidatesTokenCount || 0);
+    }
+  }
+
+  return { rawResponseParts, stepFunctionCalls, inputTokens, outputTokens };
+}
+
+/**
+ * A push-based text channel that decouples producers (agentic loop) from
+ * consumers (the caller's async iterable).
+ *
+ * The producer calls `push(text)` for each chunk and `close()` / `error(err)`
+ * when done.  The consumer iterates the `iterable` async generator.
+ */
+export type TextChannel = {
+  /** Push a text chunk to the consumer. */
+  push(text: string): void;
+  /** Signal that no more chunks will arrive. */
+  close(): void;
+  /** Signal that the producer encountered a fatal error. */
+  error(err: unknown): void;
+  /** Async iterable consumed by the StreamResult. */
+  iterable: AsyncIterable<{ content: string }>;
+};
+
+/**
+ * Create a push-based text channel that bridges a background producer
+ * (the agentic tool-calling loop) with an async-iterable consumer.
+ *
+ * This enables truly incremental streaming: text parts are yielded to the
+ * caller as they arrive from the network, rather than being buffered until
+ * the model finishes generating.
+ */
+export function createTextChannel(): TextChannel {
+  const queue: Array<{ content: string }> = [];
+  let done = false;
+  let fatalError: unknown = undefined;
+  // Resolve the current "wait for data" promise when new data arrives
+  let notify: (() => void) | null = null;
+
+  function wake(): void {
+    if (notify) {
+      const fn = notify;
+      notify = null;
+      fn();
+    }
+  }
+
+  function push(text: string): void {
+    if (done) {
+      return;
+    }
+    queue.push({ content: text });
+    wake();
+  }
+
+  function close(): void {
+    done = true;
+    wake();
+  }
+
+  function error(err: unknown): void {
+    done = true;
+    fatalError = err;
+    wake();
+  }
+
+  let readIndex = 0;
+
+  async function* iterable(): AsyncIterable<{ content: string }> {
+    try {
+      while (true) {
+        if (readIndex < queue.length) {
+          yield queue[readIndex++];
+          // Periodically compact consumed chunks to avoid unbounded retention
+          if (readIndex > 1024 && readIndex * 2 >= queue.length) {
+            queue.splice(0, readIndex);
+            readIndex = 0;
+          }
+        } else if (done) {
+          if (fatalError !== undefined) {
+            throw fatalError instanceof Error
+              ? fatalError
+              : new Error(String(fatalError));
+          }
+          return;
+        } else {
+          // Wait until the producer pushes data or signals completion
+          await new Promise<void>((resolve) => {
+            notify = resolve;
+          });
+        }
+      }
+    } finally {
+      // Consumer stopped reading (e.g. disconnect/cancel): stop buffering.
+      done = true;
+      queue.length = 0;
+      notify?.();
+    }
+  }
+
+  return { push, close, error, iterable: iterable() };
+}
+
+/**
+ * Iterate a single stream step incrementally, pushing text parts to `channel`
+ * as they arrive from the network while simultaneously accumulating the full
+ * `CollectedChunkResult` needed for history and token accounting.
+ *
+ * Used for all steps (both intermediate tool-calling steps and the final
+ * text-only step).  Text parts are pushed to the channel as they arrive,
+ * enabling truly incremental streaming.  The complete `rawResponseParts`
+ * (including thoughtSignature) are still returned at the end for use by
+ * `pushModelResponseToHistory`.
+ */
+export async function collectStreamChunksIncremental(
+  stream: AsyncIterable<{
+    functionCalls?: NativeFunctionCall[];
+    [key: string]: unknown;
+  }>,
+  channel: TextChannel,
+): Promise<CollectedChunkResult> {
+  const rawResponseParts: unknown[] = [];
+  const stepFunctionCalls: NativeFunctionCall[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  for await (const chunk of stream) {
+    const chunkRecord = chunk as Record<string, unknown>;
+    const candidates = chunkRecord.candidates as
+      | Array<Record<string, unknown>>
+      | undefined;
+    const firstCandidate = candidates?.[0];
+    const chunkContent = firstCandidate?.content as
+      | Record<string, unknown>
+      | undefined;
+    if (chunkContent && Array.isArray(chunkContent.parts)) {
+      for (const part of chunkContent.parts as Array<Record<string, unknown>>) {
+        rawResponseParts.push(part);
+        // Forward text parts to the consumer immediately
+        if (typeof part.text === "string" && part.text.length > 0) {
+          channel.push(part.text);
+        }
+      }
+    }
+    if (chunk.functionCalls) {
+      stepFunctionCalls.push(...chunk.functionCalls);
+    }
+
     const usage = chunkRecord.usageMetadata as
       | { promptTokenCount?: number; candidatesTokenCount?: number }
       | undefined;

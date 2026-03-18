@@ -97,6 +97,9 @@ const VISION_CAPABILITIES = {
     "gpt-4-vision-preview",
   ],
   "google-ai": [
+    // Gemini 3.1 Series (Preview)
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
     // Gemini 3 Series (Preview - November 2025)
     "gemini-3-pro-preview",
     "gemini-3-pro-preview-11-2025",
@@ -175,6 +178,9 @@ const VISION_CAPABILITIES = {
     "gpt-4",
   ],
   vertex: [
+    // Gemini 3.1 models on Vertex AI (Preview)
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
     // Gemini 3.x models on Vertex AI (Preview)
     "gemini-3-pro-preview-11-2025",
     "gemini-3-pro-latest",
