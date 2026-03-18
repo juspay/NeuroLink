@@ -1,3 +1,9 @@
+## [9.28.0](https://github.com/juspay/neurolink/compare/v9.27.0...v9.28.0) (2026-03-18)
+
+### Features
+
+- **(mcp):** add MCP enhancement modules with routing, caching, batching, and wire into core SDK ([ee8a0b8](https://github.com/juspay/neurolink/commit/ee8a0b8e5e33dcafe44d33944bf9ff99ef59701a))
+
 ## [9.27.0](https://github.com/juspay/neurolink/compare/v9.26.2...v9.27.0) (2026-03-18)
 
 ### Features
