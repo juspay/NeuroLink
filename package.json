@@ -304,7 +304,7 @@
     "puppeteer": "^24.20.0",
     "semantic-release": "^24.2.8",
     "shell-quote": "^1.8.3",
-    "svelte": "^5.0.0",
+    "svelte": "^5.53.5",
     "svelte-check": "^4.0.0",
     "tslib": "^2.4.1",
     "tsx": "^4.21.0",
