@@ -245,7 +245,7 @@
     "ffprobe-static": "^3.1.0",
     "sharp": "^0.34.5",
     "@fastify/rate-limit": "^10.3.0",
-    "fastify": "^5.7.2",
+    "fastify": "^5.8.1",
     "@fastify/cors": "^11.2.0",
     "@koa/cors": "^5.0.0",
     "@koa/router": "^15.3.0",
