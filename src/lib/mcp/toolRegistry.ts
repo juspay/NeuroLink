@@ -541,7 +541,7 @@ export class MCPToolRegistry extends MCPRegistry {
           // Record success on span
           let resultStr: string;
           try {
-            resultStr = JSON.stringify(result.data);
+            resultStr = JSON.stringify(result.data) ?? "undefined";
           } catch {
             resultStr = "[unserializable]";
           }
