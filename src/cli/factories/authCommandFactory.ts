@@ -2,14 +2,18 @@
  * Auth Command Factory for NeuroLink
  *
  * Creates the unified authentication command with subcommands for AI providers.
- * Follows the MCP command pattern with subcommands: login, logout, status, refresh.
- *
- * Supported providers:
- * - Anthropic (API key + OAuth for Claude subscription plans)
+ * Subcommands:
+ * - login, logout, status, refresh: Anthropic OAuth (API key + OAuth)
+ * - providers, validate, health: Multi-provider auth management
  */
 
-import type { CommandModule, Argv } from "yargs";
+import type { CommandModule, Argv, ArgumentsCamelCase } from "yargs";
 import type { AuthCommandArgs } from "../../lib/types/index.js";
+import type {
+  AuthProvidersArgs,
+  AuthValidateArgs,
+  AuthHealthArgs,
+} from "../commands/authProviders.js";
 
 /**
  * Supported providers for authentication
@@ -20,10 +24,13 @@ const SUPPORTED_PROVIDERS = ["anthropic"] as const;
  * Auth Command Factory
  *
  * Creates the main auth command with subcommands:
- * - login: Authenticate with a provider
+ * - login: Authenticate with a provider (Anthropic OAuth)
  * - logout: Clear stored credentials
  * - status: Show authentication status
  * - refresh: Manually refresh OAuth tokens
+ * - providers: List available auth providers
+ * - validate: Validate a token against a provider
+ * - health: Check auth provider health
  */
 export class AuthCommandFactory {
   /**
@@ -105,6 +112,49 @@ export class AuthCommandFactory {
             async (argv) => {
               const { handleEnable } = await import("../commands/auth.js");
               await handleEnable(argv as AuthCommandArgs);
+            },
+          )
+          .command(
+            "providers",
+            "List available authentication providers",
+            (yargs) =>
+              yargs.option("format", {
+                type: "string",
+                choices: ["text", "json", "table"] as const,
+                default: "text",
+                description: "Output format",
+                alias: "f",
+              }),
+            async (argv) => {
+              const { handleProvidersCommand } =
+                await import("../commands/authProviders.js");
+              await handleProvidersCommand(
+                argv as ArgumentsCamelCase<AuthProvidersArgs>,
+              );
+            },
+          )
+          .command(
+            "validate <token>",
+            "Validate an authentication token",
+            (yargs) => this.buildValidateOptions(yargs),
+            async (argv) => {
+              const { handleValidateCommand } =
+                await import("../commands/authProviders.js");
+              await handleValidateCommand(
+                argv as ArgumentsCamelCase<AuthValidateArgs>,
+              );
+            },
+          )
+          .command(
+            "health",
+            "Check authentication provider health",
+            (yargs) => this.buildHealthOptions(yargs),
+            async (argv) => {
+              const { handleHealthCommand } =
+                await import("../commands/authProviders.js");
+              await handleHealthCommand(
+                argv as ArgumentsCamelCase<AuthHealthArgs>,
+              );
             },
           )
           .option("format", {
@@ -349,5 +399,95 @@ export class AuthCommandFactory {
         "$0 auth enable anthropic:1-VjRIq",
         "Re-enable a disabled account",
       );
+  }
+
+  /**
+   * Auth provider choices for multi-provider commands
+   */
+  private static readonly AUTH_PROVIDER_CHOICES = [
+    "auth0",
+    "clerk",
+    "supabase",
+    "firebase",
+    "workos",
+    "better-auth",
+    "jwt",
+    "oauth2",
+    "cognito",
+    "keycloak",
+  ] as const;
+
+  /**
+   * Build common provider options for validate/health commands
+   */
+  private static buildProviderOptions(yargs: Argv): Argv {
+    return yargs
+      .option("provider", {
+        type: "string",
+        choices: this.AUTH_PROVIDER_CHOICES,
+        default: "auth0",
+        description: "Authentication provider type",
+        alias: "p",
+      })
+      .option("domain", {
+        type: "string",
+        description: "Auth0 domain (for auth0 provider)",
+      })
+      .option("clientId", {
+        type: "string",
+        description: "Client ID (for auth0 provider)",
+        alias: "client-id",
+      })
+      .option("secretKey", {
+        type: "string",
+        description: "Secret key (for clerk provider)",
+        alias: "secret-key",
+      })
+      .option("url", {
+        type: "string",
+        description: "Provider URL (for supabase, better-auth)",
+      })
+      .option("anonKey", {
+        type: "string",
+        description: "Anon key (for supabase provider)",
+        alias: "anon-key",
+      })
+      .option("apiKey", {
+        type: "string",
+        description: "API key (for workos provider)",
+        alias: "api-key",
+      })
+      .option("secret", {
+        type: "string",
+        description:
+          "Secret (for better-auth, jwt providers). Can also be set via BETTER_AUTH_SECRET or JWT_SECRET env vars.",
+      })
+      .option("format", {
+        type: "string",
+        choices: ["text", "json"] as const,
+        default: "text",
+        description: "Output format",
+        alias: "f",
+      });
+  }
+
+  /**
+   * Build options for validate subcommand
+   */
+  private static buildValidateOptions(yargs: Argv): Argv {
+    return this.buildProviderOptions(
+      yargs.positional("token", {
+        type: "string",
+        description: "The token to validate (JWT or session token)",
+        demandOption: true,
+      }),
+    );
+  }
+
+  /**
+   * Build options for health subcommand
+   */
+  private static buildHealthOptions(yargs: Argv): Argv {
+    return this.buildProviderOptions(yargs);
   }
 }

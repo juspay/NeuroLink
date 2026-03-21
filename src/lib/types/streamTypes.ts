@@ -490,6 +490,12 @@ export type StreamOptions = {
 
   /** Callback invoked for each streaming chunk. */
   onChunk?: OnChunkCallback;
+
+  /** Pre-validated user context for the request */
+  requestContext?: Record<string, unknown>;
+
+  /** Raw auth token — validated by configured auth provider */
+  auth?: { token: string };
 };
 
 /**

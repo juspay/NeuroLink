@@ -25,6 +25,7 @@ import { FlexibleToolValidator } from "./flexibleToolValidator.js";
 import type { HITLManager } from "../types/hitlTypes.js";
 import { HITLUserRejectedError, HITLTimeoutError } from "../hitl/hitlErrors.js";
 import { withSpan, tracers, ATTR } from "../telemetry/index.js";
+import { getAuthContext } from "../auth/authContext.js";
 
 export class MCPToolRegistry extends MCPRegistry {
   private tools: Map<string, ToolInfo> = new Map();
@@ -385,11 +386,20 @@ export class MCPToolRegistry extends MCPRegistry {
           span.setAttribute("tool.type", toolType);
           span.setAttribute(ATTR.MCP_SERVER_ID, serverId);
 
+          // Try to get auth context if available
+          let authUserId: string | undefined;
+          try {
+            const authCtx = getAuthContext();
+            authUserId = authCtx?.user?.id;
+          } catch {
+            // Auth context not available — that's fine
+          }
+
           // Create execution context if not provided
           const execContext: ExecutionContext = {
             ...context,
             sessionId: context?.sessionId ?? randomUUID(),
-            userId: context?.userId,
+            userId: context?.userId ?? authUserId,
           };
 
           // Get the tool implementation using the resolved toolId

@@ -1,13 +1,14 @@
 /**
  * NeuroLink Authentication Module
  *
- * Provides OAuth 2.0 authentication support for Claude Pro/Max subscriptions
- * and secure token storage.
- *
- * Key components:
- * - AnthropicOAuth: OAuth 2.0 flow implementation with PKCE support
- * - TokenStore: Secure local storage for OAuth tokens
- * - Callback Server: Local HTTP server for OAuth redirects
+ * Exports the full multi-provider authentication system including:
+ * - Anthropic OAuth 2.0 flow (PKCE, token storage, callback server)
+ * - Multi-provider auth (Auth0, Clerk, Firebase, Supabase, Cognito,
+ *   Keycloak, Better Auth, WorkOS, JWT, OAuth2, Custom)
+ * - AuthProviderFactory / AuthProviderRegistry for lazy-loaded provider creation
+ * - Auth middleware (token extraction, RBAC, rate limiting)
+ * - Session management (memory, Redis)
+ * - Auth context (AsyncLocalStorage-based request scoping)
  */
 
 // =============================================================================
@@ -51,7 +52,7 @@ export type {
   OAuthTokenResponse,
   OAuthFlowTokens,
   OAuthFlowTokens as OAuthTokens,
-  TokenValidationResult,
+  TokenValidationResult as OAuthTokenValidationResult,
   AnthropicOAuthConfig,
   PKCEParams,
   CallbackResult,
@@ -82,3 +83,145 @@ export type { NeuroLinkAuthOptions, AuthStatus } from "../types/index.js";
 
 export { AccountPool } from "./accountPool.js";
 export type { ProxyAccount, AccountPoolConfig } from "../types/index.js";
+
+// =============================================================================
+// MULTI-PROVIDER AUTH SYSTEM
+// =============================================================================
+
+// Factory and Registry
+export {
+  AuthProviderFactory,
+  createAuthProvider,
+} from "./AuthProviderFactory.js";
+
+export { AuthProviderRegistry } from "./AuthProviderRegistry.js";
+
+// Unified error factory
+export { AuthError, AuthErrorCodes } from "./errors.js";
+
+// Base Provider
+export {
+  AuthProviderError,
+  BaseAuthProvider,
+  InMemorySessionStorage,
+} from "./providers/BaseAuthProvider.js";
+
+// Provider Implementations
+// NOTE: Concrete provider classes are NOT re-exported here to preserve lazy
+// loading via dynamic imports in AuthProviderFactory.  Obtain provider
+// instances through the factory instead:
+//   const provider = await AuthProviderFactory.create("auth0", config);
+
+// Auth Middleware
+export {
+  AuthMiddlewareError,
+  AuthMiddlewareErrorCodes,
+  createAuthMiddleware,
+  createExpressAuthMiddleware,
+  createProtectedMiddleware,
+  createRBACMiddleware,
+  createRequestContext,
+  type ExpressMiddleware,
+  extractToken,
+  type MiddlewareHandler,
+  type MiddlewareResult,
+  type NextFunction,
+} from "./middleware/AuthMiddleware.js";
+
+// Rate Limiting Middleware
+export {
+  createAuthenticatedRateLimitMiddleware,
+  createRateLimitByUserMiddleware,
+  createRateLimitStorage,
+  MemoryRateLimitStorage,
+  type RateLimitConfig,
+  type RateLimitMiddlewareResult,
+  type RateLimitResult,
+  type RateLimitStorage,
+  RedisRateLimitStorage,
+  UserRateLimiter,
+} from "./middleware/rateLimitByUser.js";
+
+// Session Management
+export {
+  createSessionStorage,
+  MemorySessionStorage,
+  RedisSessionStorage,
+  SessionManager,
+  type SessionManagerStorage as SessionStorageInterface,
+} from "./sessionManager.js";
+
+// Auth Context
+export {
+  AuthContextHolder,
+  createAuthenticatedContext,
+  getAuthContext,
+  getCurrentSession,
+  getCurrentUser,
+  globalAuthContext,
+  hasAllPermissions,
+  hasAnyRole,
+  hasPermission,
+  hasRole,
+  isAuthenticated,
+  requireAuth,
+  requirePermission,
+  requireRole,
+  requireUser,
+  runWithAuthContext,
+} from "./authContext.js";
+
+// Request Context
+export {
+  RequestContext,
+  NEUROLINK_RESOURCE_ID_KEY,
+  NEUROLINK_THREAD_ID_KEY,
+} from "./RequestContext.js";
+
+// Auth Types
+export type {
+  Auth0Config,
+  AuthCacheConfig,
+  AuthErrorInfo as AuthErrorType,
+  AuthErrorCode,
+  AuthEventData,
+  AuthEventHandler,
+  AuthEventType,
+  AuthenticatedContext,
+  AuthMiddlewareConfig,
+  AuthorizationResult,
+  AuthProviderConfig,
+  AuthProviderFactoryFn,
+  AuthProviderHealthCheck,
+  AuthProviderRegistration,
+  AuthProviderType,
+  AuthRequestContext,
+  AuthSession,
+  AuthUser,
+  BaseAuthProviderConfig,
+  BetterAuthConfig,
+  ClerkConfig,
+  CognitoConfig,
+  CustomAuthConfig,
+  FirebaseConfig,
+  JWK,
+  JWKS,
+  JWTConfig,
+  KeycloakConfig,
+  MastraAuthProvider,
+  OAuth2Config,
+  RBACConfig,
+  RBACMiddlewareConfig,
+  SessionConfig,
+  SessionStorage,
+  SessionValidationResult,
+  SupabaseConfig,
+  TokenClaims,
+  TokenExtractionConfig,
+  TokenValidationConfig,
+  TokenValidationResult as AuthTokenValidationResult,
+  WorkOSConfig,
+} from "../types/authTypes.js";
+
+// Server Bridge
+export { createAuthValidatorFromProvider } from "./serverBridge.js";

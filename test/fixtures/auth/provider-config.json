@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Authentication Provider Configuration Fixtures for Testing",
+  "version": "1.0.0",
+
+  "providers": {
+    "auth0": {
+      "type": "auth0",
+      "domain": "test-tenant.auth0.com",
+      "clientId": "test-client-id-auth0",
+      "clientSecret": "test-client-secret-auth0",
+      "audience": "https://api.test.com",
+      "debug": true,
+      "tokenValidation": {
+        "issuer": "https://test-tenant.auth0.com/",
+        "audience": "https://api.test.com",
+        "clockTolerance": 5
+      },
+      "session": {
+        "storage": "memory",
+        "duration": 3600,
+        "autoRefresh": true,
+        "refreshThreshold": 300
+      }
+    },
+
+    "clerk": {
+      "type": "clerk",
+      "secretKey": "TEST_CLERK_SECRET_KEY_PLACEHOLDER",
+      "publishableKey": "TEST_CLERK_PUBLISHABLE_KEY_PLACEHOLDER",
+      "apiUrl": "https://api.clerk.dev",
+      "debug": true,
+      "tokenValidation": {
+        "issuer": "https://clerk.test.com",
+        "clockTolerance": 5
+      }
+    },
+
+    "firebase": {
+      "type": "firebase",
+      "projectId": "test-firebase-project",
+      "apiKey": "TEST_FIREBASE_API_KEY_PLACEHOLDER",
+      "authDomain": "test-firebase-project.firebaseapp.com",
+      "debug": true,
+      "tokenValidation": {
+        "issuer": "https://securetoken.google.com/test-firebase-project",
+        "audience": "test-firebase-project"
+      }
+    },
+
+    "supabase": {
+      "type": "supabase",
+      "url": "https://test-project.supabase.co",
+      "anonKey": "TEST_SUPABASE_ANON_KEY_PLACEHOLDER",
+      "serviceRoleKey": "TEST_SUPABASE_SERVICE_ROLE_KEY_PLACEHOLDER",
+      "jwtSecret": "test-jwt-secret-for-supabase",
+      "debug": true
+    },
+
+    "cognito": {
+      "type": "cognito",
+      "userPoolId": "us-east-1_TestPool",
+      "clientId": "test-cognito-client-id",
+      "region": "us-east-1",
+      "debug": true,
+      "tokenValidation": {
+        "issuer": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_TestPool",
+        "clockTolerance": 5
+      }
+    },
+
+    "keycloak": {
+      "type": "keycloak",
+      "realm": "test-realm",
+      "serverUrl": "https://keycloak.test.com",
+      "clientId": "test-keycloak-client",
+      "clientSecret": "test-keycloak-secret",
+      "debug": true,
+      "tokenValidation": {
+        "issuer": "https://keycloak.test.com/realms/test-realm",
+        "clockTolerance": 5
+      }
+    },
+
+    "workos": {
+      "type": "workos",
+      "apiKey": "TEST_WORKOS_API_KEY_PLACEHOLDER",
+      "clientId": "client_test_workos",
+      "organizationId": "org_test_workos",
+      "debug": true
+    },
+
+    "better-auth": {
+      "type": "better-auth",
+      "baseUrl": "https://auth.test.com",
+      "secret": "test-better-auth-secret-key-32chars",
+      "debug": true,
+      "session": {
+        "storage": "memory",
+        "duration": 7200
+      }
+    },
+
+    "oauth2": {
+      "type": "oauth2",
+      "authorizationEndpoint": "https://oauth.test.com/authorize",
+      "tokenEndpoint": "https://oauth.test.com/token",
+      "userInfoEndpoint": "https://oauth.test.com/userinfo",
+      "clientId": "test-oauth2-client-id",
+      "clientSecret": "test-oauth2-client-secret",
+      "scopes": ["openid", "profile", "email"],
+      "debug": true
+    },
+
+    "jwt": {
+      "type": "jwt",
+      "secret": "test-jwt-secret-key-minimum-32-characters-long",
+      "algorithm": "HS256",
+      "issuer": "https://jwt.test.com",
+      "audience": "https://api.test.com",
+      "debug": true,
+      "tokenValidation": {
+        "clockTolerance": 5
+      }
+    },
+
+    "custom": {
+      "type": "custom",
+      "name": "TestCustomProvider",
+      "debug": true,
+      "customConfig": {
+        "validateEndpoint": "https://custom-auth.test.com/validate",
+        "refreshEndpoint": "https://custom-auth.test.com/refresh"
+      }
+    }
+  },
+
+  "rbacConfigurations": {
+    "default": {
+      "roleHierarchy": {
+        "admin": ["manager", "user", "viewer"],
+        "manager": ["user", "viewer"],
+        "user": ["viewer"],
+        "viewer": []
+      },
+      "permissionGroups": {
+        "read": ["read:users", "read:data", "read:reports"],
+        "write": ["write:users", "write:data"],
+        "admin": ["admin:users", "admin:system", "admin:config"]
+      }
+    },
+    "enterprise": {
+      "roleHierarchy": {
+        "superadmin": ["admin", "manager", "user", "viewer", "guest"],
+        "admin": ["manager", "user", "viewer"],
+        "manager": ["user", "viewer"],
+        "user": ["viewer"],
+        "viewer": ["guest"],
+        "guest": []
+      },
+      "permissionGroups": {
+        "system": ["system:config", "system:logs", "system:metrics"],
+        "users": ["users:create", "users:read", "users:update", "users:delete"],
+        "data": ["data:read", "data:write", "data:export", "data:import"]
+      }
+    }
+  },
+
+  "middlewareConfigurations": {
+    "basic": {
+      "tokenExtraction": {
+        "header": "Authorization",
+        "headerPrefix": "Bearer",
+        "cookie": "auth_token",
+        "query": "token"
+      },
+      "excludePaths": ["/health", "/public", "/api/v1/status"]
+    },
+    "strict": {
+      "tokenExtraction": {
+        "header": "Authorization",
+        "headerPrefix": "Bearer"
+      },
+      "excludePaths": ["/health"],
+      "requireAuthentication": true,
+      "checkPermissions": true
+    }
+  },
+
+  "sessionConfigurations": {
+    "short": {
+      "storage": "memory",
+      "duration": 900,
+      "autoRefresh": false
+    },
+    "standard": {
+      "storage": "memory",
+      "duration": 3600,
+      "autoRefresh": true,
+      "refreshThreshold": 300
+    },
+    "long": {
+      "storage": "memory",
+      "duration": 86400,
+      "autoRefresh": true,
+      "refreshThreshold": 3600,
+      "allowMultipleSessions": true,
+      "maxSessionsPerUser": 5
+    }
+  }
+}

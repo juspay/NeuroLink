@@ -364,9 +364,9 @@ export class ChunkerRegistry extends BaseRegistry<Chunker, ChunkerMetadata> {
     factory: () => Promise<Chunker>,
     metadata: ChunkerMetadata,
   ): void {
-    this.register(strategy, factory, metadata);
+    this.register(strategy, factory, metadata.aliases ?? [], { metadata });
 
-    // Register aliases
+    // Register aliases in local alias map for strategy resolution
     if (metadata.aliases) {
       for (const alias of metadata.aliases) {
         this.aliasMap.set(alias.toLowerCase(), strategy as ChunkingStrategy);

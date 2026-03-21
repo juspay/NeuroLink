@@ -103,7 +103,14 @@ import type {
   UnknownRecord,
 } from "./types/common.js";
 import type {
+  AuthenticatedContext,
+  AuthProviderConfig,
+  AuthProviderType,
+  MastraAuthProvider,
+} from "./types/authTypes.js";
+import type {
   MCPEnhancementsConfig,
+  NeuroLinkAuthConfig,
   NeurolinkConstructorConfig,
 } from "./types/configTypes.js";
 import type {
@@ -535,6 +542,11 @@ export class NeuroLink {
   // Add orchestration property
   private enableOrchestration: boolean;
 
+  // Authentication provider for secure access control
+  private authProvider?: MastraAuthProvider;
+  private pendingAuthConfig?: NeuroLinkAuthConfig;
+  private authInitPromise?: Promise<void>;
+
   // HITL (Human-in-the-Loop) support
   private hitlManager?: HITLManager;
 
@@ -804,6 +816,11 @@ export class NeuroLink {
       constructorStartTime,
       constructorHrTimeStart,
     );
+
+    // Store auth config for lazy initialization
+    if (config?.auth) {
+      this.pendingAuthConfig = config.auth;
+    }
   }
 
   /**
@@ -3026,6 +3043,95 @@ Current user's request: ${currentInput}`;
                       },
                     },
                   },
+                };
+              }
+
+              // Handle per-call auth token validation
+              if (options.auth?.token) {
+                const { AuthError } = await import("./auth/errors.js");
+                await this.ensureAuthProvider();
+                if (!this.authProvider) {
+                  throw AuthError.create(
+                    "PROVIDER_ERROR",
+                    "No auth provider configured. Set auth in constructor or via setAuthProvider() before using auth: { token }.",
+                  );
+                }
+                let authResult: Awaited<
+                  ReturnType<MastraAuthProvider["authenticateToken"]>
+                >;
+                try {
+                  authResult = await withTimeout(
+                    this.authProvider.authenticateToken(options.auth.token),
+                    5000,
+                    AuthError.create(
+                      "PROVIDER_ERROR",
+                      "Auth token validation timed out after 5000ms",
+                    ),
+                  );
+                } catch (err) {
+                  // Rethrow auth errors as-is; wrap anything else
+                  if (
+                    err instanceof Error &&
+                    "feature" in err &&
+                    (err as { feature: string }).feature === "Auth"
+                  ) {
+                    throw err;
+                  }
+                  throw AuthError.create(
+                    "PROVIDER_ERROR",
+                    `Auth token validation failed: ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                }
+                if (!authResult.valid) {
+                  throw AuthError.create(
+                    "INVALID_TOKEN",
+                    authResult.error || "Token validation failed",
+                  );
+                }
+                // Fail closed: token valid but no user identity is a provider bug
+                if (!authResult.user) {
+                  throw AuthError.create(
+                    "INVALID_TOKEN",
+                    "Token validated but no user identity returned",
+                  );
+                }
+                if (!authResult.user.id) {
+                  throw AuthError.create(
+                    "INVALID_TOKEN",
+                    "Token validated but user identity missing required 'id' field",
+                  );
+                }
+                // Merge validated user into context
+                options.context = {
+                  ...((options.context as Record<string, unknown>) || {}),
+                  userId: authResult.user.id,
+                  userEmail: authResult.user.email,
+                  userRoles: authResult.user.roles,
+                };
+              }
+
+              // Handle pre-validated requestContext
+              if (options.requestContext) {
+                // When auth token was validated, token-derived identity fields
+                // MUST take precedence over requestContext to prevent privilege escalation.
+                const tokenDerivedFields =
+                  options.auth?.token && this.authProvider
+                    ? {
+                        userId: (
+                          options.context as Record<string, unknown> | undefined
+                        )?.userId,
+                        userEmail: (
+                          options.context as Record<string, unknown> | undefined
+                        )?.userEmail,
+                        userRoles: (
+                          options.context as Record<string, unknown> | undefined
+                        )?.userRoles,
+                      }
+                    : {};
+                options.context = {
+                  ...((options.context as Record<string, unknown>) || {}),
+                  ...options.requestContext,
+                  ...tokenDerivedFields,
                 };
               }
 
@@ -5551,6 +5657,95 @@ Current user's request: ${currentInput}`;
                 limit: options.maxBudgetUsd,
               },
             });
+          }
+
+          // Handle per-call auth token validation
+          if (options.auth?.token) {
+            const { AuthError } = await import("./auth/errors.js");
+            await this.ensureAuthProvider();
+            if (!this.authProvider) {
+              throw AuthError.create(
+                "PROVIDER_ERROR",
+                "No auth provider configured. Set auth in constructor or via setAuthProvider() before using auth: { token }.",
+              );
+            }
+            let authResult: Awaited<
+              ReturnType<MastraAuthProvider["authenticateToken"]>
+            >;
+            try {
+              authResult = await withTimeout(
+                this.authProvider.authenticateToken(options.auth.token),
+                5000,
+                AuthError.create(
+                  "PROVIDER_ERROR",
+                  "Auth token validation timed out after 5000ms",
+                ),
+              );
+            } catch (err) {
+              // Rethrow auth errors as-is; wrap anything else
+              if (
+                err instanceof Error &&
+                "feature" in err &&
+                (err as { feature: string }).feature === "Auth"
+              ) {
+                throw err;
+              }
+              throw AuthError.create(
+                "PROVIDER_ERROR",
+                `Auth token validation failed: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+            if (!authResult.valid) {
+              throw AuthError.create(
+                "INVALID_TOKEN",
+                authResult.error || "Token validation failed",
+              );
+            }
+            // Fail closed: token valid but no user identity is a provider bug
+            if (!authResult.user) {
+              throw AuthError.create(
+                "INVALID_TOKEN",
+                "Token validated but no user identity returned",
+              );
+            }
+            if (!authResult.user.id) {
+              throw AuthError.create(
+                "INVALID_TOKEN",
+                "Token validated but user identity missing required 'id' field",
+              );
+            }
+            // Merge validated user into context
+            options.context = {
+              ...((options.context as Record<string, unknown>) || {}),
+              userId: authResult.user.id,
+              userEmail: authResult.user.email,
+              userRoles: authResult.user.roles,
+            };
+          }
+
+          // Handle pre-validated requestContext
+          if (options.requestContext) {
+            // When auth token was validated, token-derived identity fields
+            // MUST take precedence over requestContext to prevent privilege escalation.
+            const tokenDerivedFields =
+              options.auth?.token && this.authProvider
+                ? {
+                    userId: (
+                      options.context as Record<string, unknown> | undefined
+                    )?.userId,
+                    userEmail: (
+                      options.context as Record<string, unknown> | undefined
+                    )?.userEmail,
+                    userRoles: (
+                      options.context as Record<string, unknown> | undefined
+                    )?.userRoles,
+                  }
+                : {};
+            options.context = {
+              ...((options.context as Record<string, unknown>) || {}),
+              ...options.requestContext,
+              ...tokenDerivedFields,
+            };
           }
 
           this.emitStreamStartEvents(options, startTime);
@@ -11104,6 +11299,121 @@ Current user's request: ${currentInput}`;
     });
 
     return budgetResult.shouldCompact;
+  }
+
+  // ============================================================================
+  // Authentication Methods
+  // ============================================================================
+
+  /**
+   * Set the authentication provider for the NeuroLink instance
+   *
+   * @param config - Auth provider or configuration to create one
+   */
+  async setAuthProvider(config: NeuroLinkAuthConfig): Promise<void> {
+    // Clear any pending lazy-init promise so it does not race with this call.
+    this.authInitPromise = undefined;
+
+    // Duck-type check: direct MastraAuthProvider instance
+    if (
+      "authenticateToken" in config &&
+      typeof (config as MastraAuthProvider).authenticateToken === "function"
+    ) {
+      this.authProvider = config as MastraAuthProvider;
+      logger.info(`Auth provider set: ${this.authProvider.type}`);
+    } else if ("provider" in config) {
+      this.authProvider = (config as { provider: MastraAuthProvider }).provider;
+      logger.info(`Auth provider set: ${this.authProvider.type}`);
+    } else {
+      const typedConfig = config as {
+        type: AuthProviderType;
+        config: AuthProviderConfig;
+      };
+      const { AuthProviderFactory } =
+        await import("./auth/AuthProviderFactory.js");
+      this.authProvider = await AuthProviderFactory.createProvider(
+        typedConfig.type,
+        typedConfig.config,
+      );
+      logger.info(`Auth provider created and set: ${typedConfig.type}`);
+    }
+
+    if (this.authProvider) {
+      this.emitter.emit("auth:provider:set", {
+        type: this.authProvider.type,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  /**
+   * Get the currently configured authentication provider
+   */
+  getAuthProvider(): MastraAuthProvider | undefined {
+    return this.authProvider;
+  }
+
+  /**
+   * Lazily initialize the auth provider from pendingAuthConfig.
+   * Called on first use (generate/stream with auth token) to avoid
+   * async work in the synchronous constructor.
+   */
+  private async ensureAuthProvider(): Promise<void> {
+    if (this.authProvider || !this.pendingAuthConfig) {
+      return;
+    }
+    this.authInitPromise ??= (async () => {
+      try {
+        await this.setAuthProvider(this.pendingAuthConfig!);
+        this.pendingAuthConfig = undefined;
+      } catch (err) {
+        this.authInitPromise = undefined;
+        throw err;
+      }
+    })();
+    await this.authInitPromise;
+  }
+
+  /**
+   * Set the current authentication context for request handling.
+   *
+   * Delegates to the global AuthContextHolder so that auth state is NOT
+   * stored as an instance field (which would leak between concurrent requests
+   * sharing the same NeuroLink singleton). Prefer `runWithAuthContext()` from
+   * `authContext.ts` for proper request-scoped context via AsyncLocalStorage.
+   *
+   * @param context - The authenticated user context
+   */
+  async setAuthContext(context: AuthenticatedContext): Promise<void> {
+    const { globalAuthContext } = await import("./auth/authContext.js");
+    globalAuthContext.set(context);
+    logger.debug("Auth context set", {
+      userId: context.user.id,
+      provider: context.provider,
+      sessionId: context.session?.id,
+    });
+  }
+
+  /**
+   * Get the current authentication context.
+   *
+   * Checks AsyncLocalStorage first, then falls back to the global holder.
+   */
+  async getAuthContext(): Promise<AuthenticatedContext | undefined> {
+    const { getAuthContext: getCtx } = await import("./auth/authContext.js");
+    return getCtx();
+  }
+
+  /**
+   * Clear the current authentication context
+   */
+  async clearAuthContext(): Promise<void> {
+    const { globalAuthContext } = await import("./auth/authContext.js");
+    const userId = globalAuthContext.get()?.user.id;
+    globalAuthContext.clear();
+    if (userId) {
+      logger.debug(`Auth context cleared for user: ${userId}`);
+    }
   }
 
   /**

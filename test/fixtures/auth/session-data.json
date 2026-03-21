@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Session Data Fixtures for Authentication Testing",
+  "version": "1.0.0",
+
+  "sessions": {
+    "validSession": {
+      "id": "sess_valid_001",
+      "user": {
+        "id": "user_standard_001",
+        "email": "user@test.neurolink.dev",
+        "name": "Test Standard User",
+        "roles": ["user"],
+        "permissions": ["read:users", "read:data"]
+      },
+      "accessToken": "test-valid-session-access-token",
+      "refreshToken": "test-valid-session-refresh-token",
+      "isValid": true,
+      "expiresAt": "2030-01-01T00:00:00.000Z",
+      "createdAt": "2029-12-31T00:00:00.000Z",
+      "lastActivityAt": "2029-12-31T12:00:00.000Z",
+      "ipAddress": "127.0.0.1",
+      "userAgent": "Mozilla/5.0 (Test Browser)"
+    },
+
+    "expiredSession": {
+      "id": "sess_expired_001",
+      "user": {
+        "id": "user_expired_001",
+        "email": "expired@test.neurolink.dev",
+        "name": "Expired Session User",
+        "roles": ["user"],
+        "permissions": ["read:users"]
+      },
+      "accessToken": "test-expired-session-token",
+      "isValid": false,
+      "expiresAt": "2029-12-30T00:00:00.000Z",
+      "createdAt": "2029-12-29T00:00:00.000Z"
+    },
+
+    "adminSession": {
+      "id": "sess_admin_001",
+      "user": {
+        "id": "user_admin_001",
+        "email": "admin@test.neurolink.dev",
+        "name": "Test Admin User",
+        "roles": ["admin", "manager", "user"],
+        "permissions": ["admin:*", "read:*", "write:*"]
+      },
+      "accessToken": "test-admin-session-token",
+      "refreshToken": "test-admin-refresh-token",
+      "isValid": true,
+      "expiresAt": "2030-01-01T23:59:59.000Z",
+      "createdAt": "2029-12-31T00:00:00.000Z",
+      "metadata": {
+        "adminLevel": "super",
+        "department": "engineering"
+      }
+    },
+
+    "managerSession": {
+      "id": "sess_manager_001",
+      "user": {
+        "id": "user_manager_001",
+        "email": "manager@test.neurolink.dev",
+        "name": "Test Manager User",
+        "roles": ["manager", "user"],
+        "permissions": ["read:*", "write:users", "write:data"]
+      },
+      "accessToken": "test-manager-session-token",
+      "isValid": true,
+      "expiresAt": "2030-01-01T12:00:00.000Z",
+      "createdAt": "2029-12-31T06:00:00.000Z"
+    },
+
+    "aboutToExpireSession": {
+      "id": "sess_expiring_001",
+      "user": {
+        "id": "user_expiring_001",
+        "email": "expiring@test.neurolink.dev",
+        "name": "About To Expire User",
+        "roles": ["user"],
+        "permissions": ["read:users"]
+      },
+      "accessToken": "test-expiring-session-token",
+      "refreshToken": "test-expiring-refresh-token",
+      "isValid": true,
+      "expiresAt": "2029-12-31T13:05:00.000Z",
+      "createdAt": "2029-12-31T12:00:00.000Z",
+      "metadata": {
+        "needsRefresh": true
+      }
+    },
+
+    "multiDeviceSession1": {
+      "id": "sess_multi_001",
+      "user": {
+        "id": "user_multi_001",
+        "email": "multi@test.neurolink.dev",
+        "name": "Multi-Device User",
+        "roles": ["user"],
+        "permissions": ["read:users", "read:data"]
+      },
+      "accessToken": "test-multi-device-1-token",
+      "isValid": true,
+      "expiresAt": "2030-01-01T00:00:00.000Z",
+      "createdAt": "2029-12-31T08:00:00.000Z",
+      "ipAddress": "192.168.1.100",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    },
+
+    "multiDeviceSession2": {
+      "id": "sess_multi_002",
+      "user": {
+        "id": "user_multi_001",
+        "email": "multi@test.neurolink.dev",
+        "name": "Multi-Device User",
+        "roles": ["user"],
+        "permissions": ["read:users", "read:data"]
+      },
+      "accessToken": "test-multi-device-2-token",
+      "isValid": true,
+      "expiresAt": "2030-01-01T00:00:00.000Z",
+      "createdAt": "2029-12-31T09:00:00.000Z",
+      "ipAddress": "10.0.0.50",
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0)"
+    }
+  },
+
+  "sessionScenarios": {
+    "createSession": {
+      "input": {
+        "userId": "user_new_001",
+        "email": "newuser@test.neurolink.dev",
+        "name": "New Session User",
+        "roles": ["user"],
+        "permissions": ["read:public"]
+      },
+      "expectedOutput": {
+        "hasId": true,
+        "isValid": true,
+        "hasAccessToken": true,
+        "expiresInFuture": true
+      }
+    },
+
+    "refreshSession": {
+      "input": {
+        "sessionId": "sess_valid_001",
+        "refreshToken": "test-valid-session-refresh-token"
+      },
+      "expectedOutput": {
+        "success": true,
+        "newAccessToken": true,
+        "extendedExpiry": true
+      }
+    },
+
+    "validateSession": {
+      "validInput": {
+        "sessionId": "sess_valid_001"
+      },
+      "expiredInput": {
+        "sessionId": "sess_expired_001"
+      },
+      "invalidInput": {
+        "sessionId": "sess_nonexistent_999"
+      }
+    },
+
+    "revokeSession": {
+      "input": {
+        "sessionId": "sess_valid_001"
+      },
+      "expectedOutput": {
+        "success": true,
+        "sessionInvalidated": true
+      }
+    },
+
+    "revokeAllUserSessions": {
+      "input": {
+        "userId": "user_multi_001"
+      },
+      "expectedOutput": {
+        "success": true,
+        "sessionsRevoked": 2
+      }
+    }
+  },
+
+  "rateLimitData": {
+    "userRateLimits": {
+      "user_standard_001": {
+        "tokens": 100,
+        "maxTokens": 100,
+        "refillRate": 10,
+        "lastRefill": "2029-12-31T12:00:00.000Z"
+      },
+      "user_admin_001": {
+        "tokens": 1000,
+        "maxTokens": 1000,
+        "refillRate": 100,
+        "lastRefill": "2029-12-31T12:00:00.000Z"
+      },
+      "user_exceeded_001": {
+        "tokens": 0,
+        "maxTokens": 100,
+        "refillRate": 10,
+        "lastRefill": "2029-12-31T12:00:00.000Z"
+      }
+    },
+    "roleBasedLimits": {
+      "admin": { "maxTokens": 1000, "refillRate": 100 },
+      "manager": { "maxTokens": 500, "refillRate": 50 },
+      "user": { "maxTokens": 100, "refillRate": 10 },
+      "viewer": { "maxTokens": 50, "refillRate": 5 },
+      "guest": { "maxTokens": 10, "refillRate": 1 }
+    }
+  },
+
+  "authContextData": {
+    "authenticatedContext": {
+      "isAuthenticated": true,
+      "user": {
+        "id": "user_standard_001",
+        "email": "user@test.neurolink.dev",
+        "roles": ["user"],
+        "permissions": ["read:users", "read:data"]
+      },
+      "session": {
+        "id": "sess_valid_001",
+        "isValid": true
+      }
+    },
+    "unauthenticatedContext": {
+      "isAuthenticated": false,
+      "user": null,
+      "session": null
+    },
+    "adminContext": {
+      "isAuthenticated": true,
+      "user": {
+        "id": "user_admin_001",
+        "email": "admin@test.neurolink.dev",
+        "roles": ["admin", "manager", "user"],
+        "permissions": ["admin:*", "read:*", "write:*"]
+      },
+      "session": {
+        "id": "sess_admin_001",
+        "isValid": true
+      }
+    }
+  }
+}

@@ -118,6 +118,7 @@ const sidebars: SidebarsConfig = {
           label: "Infrastructure",
           collapsed: true,
           items: [
+            "features/authentication-providers",
             "features/provider-orchestration",
             "features/regional-streaming",
             "features/mcp-tools-showcase",
@@ -345,6 +346,7 @@ const sidebars: SidebarsConfig = {
         "reference/faq",
         "advanced/analytics",
         "advanced/updated-provider-test-results",
+        "advanced/auth-architecture",
       ],
     },
     {

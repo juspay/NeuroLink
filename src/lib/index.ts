@@ -1320,3 +1320,77 @@ export type {
   QualityErrorDetails,
   QueryIntentAnalysis,
 } from "./types/evaluationTypes.js";
+
+// ============================================================================
+// AUTHENTICATION PROVIDERS - Multi-provider Auth Integration
+// ============================================================================
+// Single-sourced from ./auth/index.js.  Only aliases that differ from the
+// canonical export name are listed explicitly; everything else is re-exported
+// as-is.
+
+export {
+  // Factory & Registry
+  AuthProviderFactory,
+  createAuthProvider,
+  AuthProviderRegistry,
+  // Unified error factory
+  AuthError as AuthErrorFactory,
+  AuthErrorCodes,
+  // Base Provider
+  BaseAuthProvider,
+  InMemorySessionStorage,
+  AuthProviderError,
+  // Auth Middleware (aliased to avoid conflict with server createAuthMiddleware)
+  createAuthMiddleware as createAuthProviderMiddleware,
+  createRBACMiddleware,
+  createProtectedMiddleware,
+  createExpressAuthMiddleware,
+  createRequestContext,
+  extractToken,
+  AuthMiddlewareError,
+  AuthMiddlewareErrorCodes,
+  type MiddlewareHandler as AuthMiddlewareHandler,
+  type MiddlewareResult,
+  type NextFunction,
+  type ExpressMiddleware,
+  // Rate Limiting Middleware
+  UserRateLimiter,
+  MemoryRateLimitStorage,
+  RedisRateLimitStorage,
+  createRateLimitByUserMiddleware,
+  createAuthenticatedRateLimitMiddleware,
+  createRateLimitStorage,
+  type RateLimitConfig as AuthRateLimitConfig,
+  type RateLimitResult,
+  type RateLimitMiddlewareResult,
+  type RateLimitStorage,
+  // Session Management
+  SessionManager,
+  MemorySessionStorage,
+  RedisSessionStorage,
+  createSessionStorage,
+  type SessionStorageInterface,
+  // Auth Context
+  AuthContextHolder,
+  globalAuthContext,
+  getAuthContext,
+  getCurrentUser,
+  getCurrentSession,
+  isAuthenticated,
+  hasRole,
+  hasAnyRole,
+  hasPermission,
+  hasAllPermissions,
+  requireAuth,
+  requireRole,
+  requirePermission,
+  requireUser,
+  runWithAuthContext,
+  createAuthenticatedContext,
+  // Request Context
+  RequestContext,
+  NEUROLINK_RESOURCE_ID_KEY,
+  NEUROLINK_THREAD_ID_KEY,
+  // Server Bridge
+  createAuthValidatorFromProvider,
+} from "./auth/index.js";

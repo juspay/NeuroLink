@@ -7,6 +7,7 @@ import { globalSession } from "../lib/session/globalSessionState.js";
 import { handleError } from "./errorHandler.js";
 import { logger } from "../lib/utils/logger.js";
 import { SetupCommandFactory } from "./factories/setupCommandFactory.js";
+import { AuthCommandFactory } from "./factories/authCommandFactory.js";
 import { ServerCommandFactory } from "./commands/server.js";
 import { ServeCommandFactory } from "./commands/serve.js";
 import { ragCommand } from "./commands/rag.js";
@@ -20,7 +21,6 @@ import {
   proxyInstallCommand,
   proxyUninstallCommand,
 } from "./commands/proxy.js";
-import { AuthCommandFactory } from "./factories/authCommandFactory.js";
 
 // Enhanced CLI with Professional UX
 export function initializeCliParser() {

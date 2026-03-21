@@ -335,3 +335,93 @@ export type { TokenRefresher } from "./subscriptionTypes.js";
 
 // Proxy types (Claude API format, cloaking, routing, config, stats, server adapters)
 export * from "./proxyTypes.js";
+
+// Authentication types - Multi-provider auth system
+export type {
+  // Provider types
+  AuthProviderType,
+  AuthProviderConfig,
+  MastraAuthProvider,
+  BetterAuthConfig,
+  Auth0Config,
+  ClerkConfig,
+  FirebaseConfig,
+  SupabaseConfig,
+  WorkOSConfig,
+  JWTConfig,
+  OAuth2Config,
+  CognitoConfig,
+  KeycloakConfig,
+  CustomAuthConfig,
+  BaseAuthProviderConfig,
+
+  // User and session
+  AuthUser,
+  AuthSession,
+  TokenType,
+
+  // Token types
+  TokenValidationResult as AuthTokenValidationResult,
+  TokenClaims,
+  JWK,
+  JWKS,
+  TokenRefreshResult,
+  TokenValidationConfig,
+  TokenExtractionConfig,
+
+  // Session types
+  SessionValidationResult,
+  SessionStorage,
+
+  // Authorization
+  AuthorizationResult,
+
+  // Context
+  AuthRequestContext,
+  AuthenticatedContext,
+
+  // Configuration
+  TokenExtractionStrategy,
+  SessionConfig,
+  SessionStorageType,
+  RBACConfig,
+  PermissionDefinition,
+  AuthCacheConfig,
+
+  // Middleware
+  AuthMiddlewareOptions,
+  AuthMiddlewareConfig,
+  RBACMiddlewareConfig,
+
+  // Error types
+  AuthErrorCode,
+  AuthErrorInfo,
+  // Backward-compatible alias (was `AuthError as AuthErrorType`)
+  AuthErrorInfo as AuthErrorType,
+
+  // Event types
+  AuthEventType,
+  AuthEventData,
+  AuthEventHandler,
+
+  // Factory types
+  AuthProviderFactoryFn,
+  AuthProviderRegistration,
+
+  // Health and events
+  AuthHealthCheck,
+  AuthProviderHealthCheck,
+  AuthEvents,
+
+  // Registry types (moved from AuthProviderRegistry.ts)
+  AuthProviderMetadata,
+  AuthProviderHealthStatus,
+
+  // Composed sub-types
+  AuthTokenValidator,
+  AuthUserAuthorizer,
+  AuthSessionManager,
+  AuthRequestHandler,
+  AuthUserManager,
+  AuthLifecycle,
+} from "./authTypes.js";

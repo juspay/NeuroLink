@@ -313,9 +313,9 @@ export class RerankerRegistry extends BaseRegistry<Reranker, RerankerMetadata> {
     factory: () => Promise<Reranker>,
     metadata: RerankerMetadata,
   ): void {
-    this.register(type, factory, metadata);
+    this.register(type, factory, metadata.aliases, { metadata });
 
-    // Register aliases
+    // Register aliases in local alias map for type resolution
     for (const alias of metadata.aliases) {
       this.aliasMap.set(alias.toLowerCase(), type);
       logger.debug(

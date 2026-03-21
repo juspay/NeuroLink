@@ -253,9 +253,9 @@ export class MetadataExtractorRegistry extends BaseRegistry<
     factory: () => Promise<MetadataExtractor>,
     metadata: MetadataExtractorMetadata,
   ): void {
-    this.register(type, factory, metadata);
+    this.register(type, factory, metadata.aliases, { metadata });
 
-    // Register aliases
+    // Register aliases in local alias map for type resolution
     for (const alias of metadata.aliases) {
       this.aliasMap.set(alias.toLowerCase(), type);
       logger.debug(

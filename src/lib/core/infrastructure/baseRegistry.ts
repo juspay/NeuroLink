@@ -32,9 +32,14 @@ export abstract class BaseRegistry<TItem, TMetadata = unknown> {
   register(
     id: string,
     factory: () => Promise<TItem>,
-    metadata: TMetadata,
+    aliases: string[] = [],
+    options?: { metadata: TMetadata },
   ): void {
+    const metadata = options?.metadata ?? ({} as TMetadata);
     this.items.set(id, { factory, metadata });
+    for (const alias of aliases) {
+      this.items.set(alias.toLowerCase(), { factory, metadata });
+    }
     logger.debug(`Registered ${id} in registry`);
   }
 
