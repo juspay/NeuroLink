@@ -244,7 +244,7 @@
     "@fastify/cors": "^11.2.0",
     "@koa/cors": "^5.0.0",
     "@koa/router": "^15.3.1",
-    "koa": "^3.1.1",
+    "koa": "^3.1.2",
     "koa-bodyparser": "^4.4.1",
     "express": "^5.1.0",
     "cors": "^2.8.5"
