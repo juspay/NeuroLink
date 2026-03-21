@@ -252,3 +252,45 @@ export type { StorageConfig } from "./conversation.js";
 
 // Subscription types (Claude subscription tiers, authentication, usage tracking)
 export * from "./subscriptionTypes.js";
+
+// Authentication types - Multi-provider auth system
+export type {
+  // Provider types
+  AuthProviderType,
+  AuthProviderConfig,
+  BetterAuthConfig,
+  Auth0Config,
+  ClerkConfig,
+  FirebaseConfig,
+  SupabaseConfig,
+  WorkOSConfig,
+  CustomAuthConfig,
+
+  // User and session
+  AuthUser,
+  AuthSession,
+  TokenType,
+
+  // Validation and authorization
+  TokenValidationResult as AuthTokenValidationResult,
+  AuthorizationResult,
+  TokenRefreshResult,
+
+  // Context
+  AuthRequestContext,
+  AuthenticatedContext,
+
+  // Configuration
+  TokenExtractionStrategy,
+  SessionConfig,
+  SessionStorageType,
+  RBACConfig,
+  PermissionDefinition,
+
+  // Middleware
+  AuthMiddlewareOptions,
+
+  // Health and events
+  AuthHealthCheck,
+  AuthEvents,
+} from "./authTypes.js";

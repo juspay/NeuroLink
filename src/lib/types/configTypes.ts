@@ -10,6 +10,18 @@ import type { ObservabilityConfig } from "./observability.js";
 import type { RoutingStrategy } from "../mcp/routing/index.js";
 import type { CacheStrategy } from "../mcp/caching/index.js";
 import type { ToolMiddleware } from "../mcp/toolIntegration.js";
+import type {
+  MastraAuthProvider,
+  AuthProviderType,
+  AuthProviderConfig,
+  Auth0Config,
+  ClerkConfig,
+  FirebaseConfig,
+  SupabaseConfig,
+  WorkOSConfig,
+  BetterAuthConfig,
+  AuthenticatedContext,
+} from "./authTypes.js";
 
 /**
  * Main NeuroLink configuration type
@@ -36,6 +48,8 @@ export type NeurolinkConstructorConfig = {
   modelAliasConfig?: import("./generateTypes.js").ModelAliasConfig;
   /** MCP enhancement modules configuration (cache, router, batcher, annotations, middleware) */
   mcp?: MCPEnhancementsConfig;
+  /** Authentication provider configuration */
+  auth?: NeuroLinkAuthConfig;
 };
 
 /**
@@ -88,6 +102,30 @@ export type MCPEnhancementsConfig = {
   };
   /** Global tool middleware applied to every tool execution. Default: empty. */
   middleware?: ToolMiddleware[];
+};
+
+/**
+ * Authentication configuration for NeuroLink SDK
+ */
+export type NeuroLinkAuthConfig =
+  | MastraAuthProvider
+  | { provider: MastraAuthProvider }
+  | { type: "auth0"; config: Auth0Config }
+  | { type: "clerk"; config: ClerkConfig }
+  | { type: "firebase"; config: FirebaseConfig }
+  | { type: "supabase"; config: SupabaseConfig }
+  | { type: "workos"; config: WorkOSConfig }
+  | { type: "better-auth"; config: BetterAuthConfig }
+  | { type: AuthProviderType; config: AuthProviderConfig };
+
+/**
+ * Re-export auth types for convenience
+ */
+export type {
+  MastraAuthProvider,
+  AuthProviderType,
+  AuthProviderConfig,
+  AuthenticatedContext,
 };
 
 /**

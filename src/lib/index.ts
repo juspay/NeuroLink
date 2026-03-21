@@ -1175,3 +1175,139 @@ export type {
   QualityErrorDetails,
   QueryIntentAnalysis,
 } from "./types/evaluationTypes.js";
+
+// ============================================================================
+// AUTHENTICATION PROVIDERS - Multi-provider Auth Integration
+// ============================================================================
+
+// Auth Provider Factory and Registry (Factory+Registry Pattern)
+export {
+  AuthProviderFactory,
+  getAuthProviderFactory,
+  createAuthProvider,
+  AuthFactoryError,
+  AuthFactoryErrorCodes,
+} from "./auth/AuthProviderFactory.js";
+
+export {
+  AuthProviderRegistry,
+  getAuthProviderRegistry,
+  registerAllAuthProviders,
+  AuthRegistryError,
+  AuthRegistryErrorCodes,
+  type AuthProviderMetadata,
+  type ProviderHealthStatus,
+} from "./auth/AuthProviderRegistry.js";
+
+// Base Provider
+export {
+  BaseAuthProvider,
+  InMemorySessionStorage,
+  AuthProviderError,
+  AuthProviderErrorCodes,
+} from "./auth/providers/BaseAuthProvider.js";
+
+// Provider Implementations
+export { Auth0Provider } from "./auth/providers/auth0.js";
+export { ClerkProvider } from "./auth/providers/clerk.js";
+export {
+  FirebaseAuthProvider,
+  FirebaseAuthProvider as FirebaseProvider,
+} from "./auth/providers/firebase.js";
+export {
+  SupabaseAuthProvider,
+  SupabaseAuthProvider as SupabaseProvider,
+} from "./auth/providers/supabase.js";
+export { CognitoProvider } from "./auth/providers/CognitoProvider.js";
+export { KeycloakProvider } from "./auth/providers/KeycloakProvider.js";
+export { BetterAuthProvider } from "./auth/providers/betterAuth.js";
+export { WorkOSProvider } from "./auth/providers/workos.js";
+export { CustomAuthProvider } from "./auth/providers/custom.js";
+
+// Auth Middleware
+export {
+  createAuthMiddleware as createAuthProviderMiddleware,
+  createRBACMiddleware,
+  createProtectedMiddleware,
+  createExpressAuthMiddleware,
+  createRequestContext,
+  extractToken,
+  AuthMiddlewareError,
+  AuthMiddlewareErrorCodes,
+  type MiddlewareHandler as AuthMiddlewareHandler,
+  type MiddlewareResult,
+  type NextFunction,
+  type ExpressMiddleware,
+} from "./auth/middleware/AuthMiddleware.js";
+
+// Rate Limiting Middleware
+export {
+  UserRateLimiter,
+  MemoryRateLimitStorage,
+  RedisRateLimitStorage,
+  createRateLimitByUserMiddleware,
+  createAuthenticatedRateLimitMiddleware,
+  createRateLimitStorage,
+  type RateLimitConfig as AuthRateLimitConfig,
+  type RateLimitResult,
+  type RateLimitMiddlewareResult,
+  type RateLimitStorage,
+} from "./auth/middleware/rateLimitByUser.js";
+
+// Session Management
+export {
+  SessionManager,
+  MemorySessionStorage,
+  RedisSessionStorage,
+  createSessionStorage,
+  type SessionStorage as SessionStorageInterface,
+} from "./auth/sessionManager.js";
+
+// Auth Context
+export {
+  AuthContextHolder,
+  globalAuthContext,
+  getAuthContext,
+  getCurrentUser,
+  getCurrentSession,
+  isAuthenticated,
+  hasRole,
+  hasAnyRole,
+  hasPermission,
+  hasAllPermissions,
+  requireAuth,
+  requireRole,
+  requirePermission,
+  requireUser,
+  runWithAuthContext,
+  createAuthenticatedContext,
+} from "./auth/authContext.js";
+
+// Auth Errors
+export {
+  AuthError,
+  InvalidTokenError,
+  TokenExpiredError,
+  MissingTokenError,
+  InsufficientPermissionsError,
+  AuthenticationFailedError,
+  UserNotFoundError,
+  SessionExpiredError,
+  SessionNotFoundError,
+  InvalidConfigurationError,
+  ProviderInitializationError,
+  ProviderAPIError,
+  AuthRateLimitError,
+  isAuthError,
+  isTokenError,
+  isPermissionError,
+  isSessionError,
+  isAuthenticationError,
+} from "./auth/authErrors.js";
+
+// Auth Types (only types not already exported via ./types/index.js)
+export type {
+  AuthMiddlewareConfig,
+  TokenClaims,
+  MastraAuthProvider,
+} from "./auth/types/authTypes.js";

@@ -7,6 +7,7 @@ import { globalSession } from "../lib/session/globalSessionState.js";
 import { handleError } from "./errorHandler.js";
 import { logger } from "../lib/utils/logger.js";
 import { SetupCommandFactory } from "./factories/setupCommandFactory.js";
+import { AuthCommandFactory } from "./factories/authCommandFactory.js";
 import { ServerCommandFactory } from "./commands/server.js";
 import { ServeCommandFactory } from "./commands/serve.js";
 import { ragCommand } from "./commands/rag.js";
@@ -222,5 +223,8 @@ export function initializeCliParser() {
 
       // Telemetry Commands
       .command(TelemetryCommandFactory.createTelemetryCommands())
+
+      // Auth Commands - Using AuthCommandFactory
+      .command(AuthCommandFactory.createAuthCommands())
   ); // Close the main return statement
 }

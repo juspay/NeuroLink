@@ -103,7 +103,13 @@ import type {
   UnknownRecord,
 } from "./types/common.js";
 import type {
+  AuthenticatedContext,
+  AuthProviderType,
+  MastraAuthProvider,
+} from "./types/authTypes.js";
+import type {
   MCPEnhancementsConfig,
+  NeuroLinkAuthConfig,
   NeurolinkConstructorConfig,
 } from "./types/configTypes.js";
 import type {
@@ -510,6 +516,11 @@ export class NeuroLink {
   // Add orchestration property
   private enableOrchestration: boolean;
 
+  // Authentication provider for secure access control
+  private authProvider?: MastraAuthProvider;
+  private authContext?: AuthenticatedContext;
+  private pendingAuthConfig?: NeuroLinkAuthConfig;
+
   // HITL (Human-in-the-Loop) support
   private hitlManager?: HITLManager;
 
@@ -779,6 +790,11 @@ export class NeuroLink {
       constructorStartTime,
       constructorHrTimeStart,
     );
+
+    // Store auth config for lazy initialization
+    if (config?.auth) {
+      this.pendingAuthConfig = config.auth;
+    }
   }
 
   /**
@@ -2973,6 +2989,62 @@ Current user's request: ${currentInput}`;
                       },
                     },
                   },
+                };
+              }
+
+              // Handle per-call auth token validation
+              if (options.auth?.token) {
+                await this.ensureAuthProvider();
+                if (!this.authProvider) {
+                  throw new Error(
+                    "No auth provider configured. Set auth in constructor or via setAuthProvider() before using auth: { token }.",
+                  );
+                }
+                const authResult = await this.authProvider.authenticateToken(
+                  options.auth.token,
+                );
+                if (!authResult.valid) {
+                  const { InvalidTokenError } = await import(
+                    "./auth/authErrors.js"
+                  );
+                  throw new InvalidTokenError(
+                    authResult.error || "Token validation failed",
+                    this.authProvider.type,
+                  );
+                }
+                // Merge validated user into context
+                if (authResult.user) {
+                  options.context = {
+                    ...((options.context as Record<string, unknown>) || {}),
+                    userId: authResult.user.id,
+                    userEmail: authResult.user.email,
+                    userRoles: authResult.user.roles,
+                  };
+                }
+              }
+
+              // Handle pre-validated requestContext
+              if (options.requestContext) {
+                // When auth token was validated, token-derived identity fields
+                // MUST take precedence over requestContext to prevent privilege escalation.
+                const tokenDerivedFields =
+                  options.auth?.token && this.authProvider
+                    ? {
+                        userId: (
+                          options.context as Record<string, unknown> | undefined
+                        )?.userId,
+                        userEmail: (
+                          options.context as Record<string, unknown> | undefined
+                        )?.userEmail,
+                        userRoles: (
+                          options.context as Record<string, unknown> | undefined
+                        )?.userRoles,
+                      }
+                    : {};
+                options.context = {
+                  ...((options.context as Record<string, unknown>) || {}),
+                  ...options.requestContext,
+                  ...tokenDerivedFields,
                 };
               }
 
@@ -5498,6 +5570,62 @@ Current user's request: ${currentInput}`;
                 limit: options.maxBudgetUsd,
               },
             });
+          }
+
+          // Handle per-call auth token validation
+          if (options.auth?.token) {
+            await this.ensureAuthProvider();
+            if (!this.authProvider) {
+              throw new Error(
+                "No auth provider configured. Set auth in constructor or via setAuthProvider() before using auth: { token }.",
+              );
+            }
+            const authResult = await this.authProvider.authenticateToken(
+              options.auth.token,
+            );
+            if (!authResult.valid) {
+              const { InvalidTokenError } = await import(
+                "./auth/authErrors.js"
+              );
+              throw new InvalidTokenError(
+                authResult.error || "Token validation failed",
+                this.authProvider.type,
+              );
+            }
+            // Merge validated user into context
+            if (authResult.user) {
+              options.context = {
+                ...((options.context as Record<string, unknown>) || {}),
+                userId: authResult.user.id,
+                userEmail: authResult.user.email,
+                userRoles: authResult.user.roles,
+              };
+            }
+          }
+
+          // Handle pre-validated requestContext
+          if (options.requestContext) {
+            // When auth token was validated, token-derived identity fields
+            // MUST take precedence over requestContext to prevent privilege escalation.
+            const tokenDerivedFields =
+              options.auth?.token && this.authProvider
+                ? {
+                    userId: (
+                      options.context as Record<string, unknown> | undefined
+                    )?.userId,
+                    userEmail: (
+                      options.context as Record<string, unknown> | undefined
+                    )?.userEmail,
+                    userRoles: (
+                      options.context as Record<string, unknown> | undefined
+                    )?.userRoles,
+                  }
+                : {};
+            options.context = {
+              ...((options.context as Record<string, unknown>) || {}),
+              ...options.requestContext,
+              ...tokenDerivedFields,
+            };
           }
 
           this.emitStreamStartEvents(options, startTime);
@@ -10793,6 +10921,99 @@ Current user's request: ${currentInput}`;
     });
 
     return budgetResult.shouldCompact;
+  }
+
+  // ============================================================================
+  // Authentication Methods
+  // ============================================================================
+
+  /**
+   * Set the authentication provider for the NeuroLink instance
+   *
+   * @param config - Auth provider or configuration to create one
+   */
+  async setAuthProvider(config: NeuroLinkAuthConfig): Promise<void> {
+    // Duck-type check: direct MastraAuthProvider instance
+    if (
+      "authenticateToken" in config &&
+      typeof (config as MastraAuthProvider).authenticateToken === "function"
+    ) {
+      this.authProvider = config as MastraAuthProvider;
+      logger.info(`Auth provider set: ${this.authProvider.type}`);
+    } else if ("provider" in config) {
+      this.authProvider = (config as { provider: MastraAuthProvider }).provider;
+      logger.info(`Auth provider set: ${this.authProvider.type}`);
+    } else {
+      const { AuthProviderFactory } = await import(
+        "./auth/AuthProviderFactory.js"
+      );
+      const factory = AuthProviderFactory.getInstance();
+      this.authProvider = await factory.create(
+        config.type as AuthProviderType,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        config.config as any,
+      );
+      logger.info(`Auth provider created and set: ${config.type}`);
+    }
+
+    if (this.authProvider) {
+      this.emitter.emit("auth:provider:set", {
+        type: this.authProvider.type,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  /**
+   * Get the currently configured authentication provider
+   */
+  getAuthProvider(): MastraAuthProvider | undefined {
+    return this.authProvider;
+  }
+
+  /**
+   * Lazily initialize the auth provider from pendingAuthConfig.
+   * Called on first use (generate/stream with auth token) to avoid
+   * async work in the synchronous constructor.
+   */
+  private async ensureAuthProvider(): Promise<void> {
+    if (this.authProvider || !this.pendingAuthConfig) {
+      return;
+    }
+    await this.setAuthProvider(this.pendingAuthConfig);
+    this.pendingAuthConfig = undefined;
+  }
+
+  /**
+   * Set the current authentication context for request handling
+   *
+   * @param context - The authenticated user context
+   */
+  setAuthContext(context: AuthenticatedContext): void {
+    this.authContext = context;
+    logger.debug("Auth context set", {
+      userId: context.user.id,
+      provider: context.provider,
+      sessionId: context.session.id,
+    });
+  }
+
+  /**
+   * Get the current authentication context
+   */
+  getAuthContext(): AuthenticatedContext | undefined {
+    return this.authContext;
+  }
+
+  /**
+   * Clear the current authentication context
+   */
+  clearAuthContext(): void {
+    const userId = this.authContext?.user.id;
+    this.authContext = undefined;
+    if (userId) {
+      logger.debug(`Auth context cleared for user: ${userId}`);
+    }
   }
 
   /**

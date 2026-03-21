@@ -68,8 +68,11 @@ export function createAgentRoutes(basePath: string = "/api"): RouteGroup {
             // Note: tools should be passed as Record<string, Tool> in generate options
             // If request.tools is an array of tool names, we skip them
             context: {
-              sessionId: request.sessionId,
-              userId: request.userId,
+              sessionId: ctx.session?.id ?? request.sessionId,
+              userId: ctx.user?.id ?? request.userId,
+              userEmail: ctx.user?.email,
+              userRoles: ctx.user?.roles,
+              requestId: ctx.requestId,
             },
           });
 
@@ -127,6 +130,13 @@ export function createAgentRoutes(basePath: string = "/api"): RouteGroup {
             systemPrompt: request.systemPrompt,
             temperature: request.temperature,
             maxTokens: request.maxTokens,
+            context: {
+              sessionId: ctx.session?.id ?? request.sessionId,
+              userId: ctx.user?.id ?? request.userId,
+              userEmail: ctx.user?.email,
+              userRoles: ctx.user?.roles,
+              requestId: ctx.requestId,
+            },
           });
 
           // Create redactor (no-op if redaction is not enabled)

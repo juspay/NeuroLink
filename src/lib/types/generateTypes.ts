@@ -457,6 +457,12 @@ export type GenerateOptions = {
 
   /** Callback invoked when generation encounters an error. */
   onError?: OnErrorCallback;
+
+  /** Pre-validated user context for the request */
+  requestContext?: Record<string, unknown>;
+
+  /** Raw auth token — validated by configured auth provider */
+  auth?: { token: string };
 };
 
 /**
