@@ -977,6 +977,8 @@ const LINK_MAPPINGS: Record<string, string> = {
   "mcp-enhancements.md": "/features/mcp-enhancements",
   "mcp-enhancements-diagrams": "/features/mcp-enhancements-diagrams",
   "mcp-enhancements-diagrams.md": "/features/mcp-enhancements-diagrams",
+  "client-sdk": "/features/client-sdk",
+  "client-sdk.md": "/features/client-sdk",
 
   // Cookbook - absolute paths
   "batch-processing": "/cookbook/batch-processing",

@@ -252,3 +252,79 @@ export type { StorageConfig } from "./conversation.js";
 
 // Subscription types (Claude subscription tiers, authentication, usage tracking)
 export * from "./subscriptionTypes.js";
+
+// Client SDK types (selective export to avoid collisions with existing types)
+// Conflicting names are aliased with "Client" prefix.
+export type {
+  // Core config
+  ClientConfig,
+  RequestOptions as ClientRequestOptions,
+  // Retry (conflicts with configTypes.ts RetryConfig)
+  RetryConfig as ClientRetryConfig,
+  // API response/error (ApiResponse conflicts with typeAliases.ts)
+  ApiResponse as ClientApiResponse,
+  ApiError as ClientApiError,
+  // Provider status (conflicts with providers.ts ProviderStatus)
+  ProviderStatus as ClientProviderStatus,
+  // Streaming (StreamResult conflicts with streamTypes.ts)
+  StreamEventType as ClientStreamEventType,
+  StreamEvent as ClientStreamEvent,
+  StreamCallbacks as ClientStreamCallbacks,
+  StreamResult as ClientStreamResult,
+  // Generation
+  GenerateRequestOptions as ClientGenerateRequestOptions,
+  GenerateResponse as ClientGenerateResponse,
+  StreamRequestOptions as ClientStreamRequestOptions,
+  // Agent
+  AgentExecuteOptions as ClientAgentExecuteOptions,
+  AgentExecuteResult as ClientAgentExecuteResult,
+  AgentInfo as ClientAgentInfo,
+  // Workflow
+  WorkflowExecuteOptions as ClientWorkflowExecuteOptions,
+  WorkflowExecuteResult as ClientWorkflowExecuteResult,
+  WorkflowInfo as ClientWorkflowInfo,
+  // Tool (conflicts with tools.ts ToolInfo)
+  ToolInfo as ClientToolInfo,
+  // Middleware (client HTTP middleware, distinct from AI SDK middleware)
+  Middleware as ClientMiddleware,
+  MiddlewareRequest as ClientMiddlewareRequest,
+  MiddlewareResponse as ClientMiddlewareResponse,
+  MiddlewareContext as ClientMiddlewareContext,
+  // React hooks
+  ChatMessage as ClientChatMessage,
+  UseChatOptions,
+  UseChatReturn,
+  UseAgentOptions,
+  UseAgentReturn,
+  UseWorkflowOptions,
+  UseWorkflowReturn,
+  UseVoiceOptions,
+  UseVoiceReturn,
+  UseStreamOptions,
+  UseStreamReturn,
+  UseToolsOptions,
+  UseToolsReturn,
+  // AI SDK adapter
+  LanguageModel as ClientLanguageModel,
+  LanguageModelCallOptions as ClientLanguageModelCallOptions,
+  LanguageModelResponse as ClientLanguageModelResponse,
+  LanguageModelStreamResponse as ClientLanguageModelStreamResponse,
+  NeuroLinkProviderOptions,
+  ModelOptions as ClientModelOptions,
+  // WebSocket
+  WebSocketOptions as ClientWebSocketOptions,
+  WebSocketState as ClientWebSocketState,
+  WebSocketMessageHandler as ClientWebSocketMessageHandler,
+  // Dedicated WS client types
+  WSClientState,
+  WSClientConfig,
+  WSClientMessage,
+  WSClientEventHandlers,
+  // Voice
+  SpeechRecognitionResult as ClientSpeechRecognitionResult,
+  SpeechSynthesisOptions as ClientSpeechSynthesisOptions,
+  // Authentication
+  AuthConfig as ClientAuthConfig,
+  OAuth2Config as ClientOAuth2Config,
+  TokenRefreshResult as ClientTokenRefreshResult,
+} from "./clientTypes.js";

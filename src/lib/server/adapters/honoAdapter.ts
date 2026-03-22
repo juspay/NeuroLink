@@ -420,33 +420,107 @@ export class HonoServerAdapter extends BaseServerAdapter {
           Symbol.asyncIterator in result
         ) {
           for await (const chunk of result as AsyncIterable<unknown>) {
+            // Transform raw provider chunks into StreamEvent format
+            // The client SDK expects { type, content, timestamp, ... } objects
+            const streamEvent = this.toStreamEvent(chunk);
             await stream.writeSSE({
-              data: JSON.stringify(chunk),
-              event: "message",
+              data: JSON.stringify(streamEvent),
             });
           }
-        } else {
-          // Single result, send as complete event
+        } else if (result && isErrorResponse(result)) {
+          // Error result, send as error event
+          const errorResult = result as {
+            error?: { message?: string; code?: string };
+            httpStatus?: number;
+          };
+          const statusCode = errorResult.httpStatus ?? 500;
           await stream.writeSSE({
-            data: JSON.stringify(result),
-            event: "complete",
+            data: JSON.stringify({
+              type: "error",
+              error: {
+                code: errorResult.error?.code ?? "STREAM_ERROR",
+                message: errorResult.error?.message ?? "Stream error",
+                status: statusCode,
+              },
+              timestamp: Date.now(),
+            }),
+          });
+        } else {
+          // Single result, normalize into a StreamEvent so the client can
+          // match on the `type` field via handleEvent()
+          const streamEvent = this.toStreamEvent(result);
+          await stream.writeSSE({
+            data: JSON.stringify(streamEvent),
           });
         }
 
-        // Send done event
+        // Send [DONE] signal that the client SDK expects
         await stream.writeSSE({
-          data: "",
-          event: "done",
+          data: "[DONE]",
         });
       } catch (error) {
         await stream.writeSSE({
           data: JSON.stringify({
-            error: error instanceof Error ? error.message : "Stream error",
+            type: "error",
+            error: {
+              code: "STREAM_ERROR",
+              message: error instanceof Error ? error.message : "Stream error",
+              status: 500,
+            },
+            timestamp: Date.now(),
           }),
-          event: "error",
+        });
+        // Still send [DONE] after error so the client terminates cleanly
+        await stream.writeSSE({
+          data: "[DONE]",
         });
       }
     });
+  }
+
+  /**
+   * Transform a raw provider chunk into a StreamEvent
+   * Provider chunks are typically { content: string } objects;
+   * the client SDK expects { type: "text", content: string, timestamp: number }
+   */
+  private toStreamEvent(chunk: unknown): Record<string, unknown> {
+    // Already a StreamEvent (has a type field)
+    if (
+      chunk &&
+      typeof chunk === "object" &&
+      "type" in chunk &&
+      typeof (chunk as Record<string, unknown>).type === "string"
+    ) {
+      return {
+        ...(chunk as Record<string, unknown>),
+        timestamp: (chunk as Record<string, unknown>).timestamp ?? Date.now(),
+      };
+    }
+
+    // Raw text chunk from provider: { content: string }
+    if (chunk && typeof chunk === "object" && "content" in chunk) {
+      return {
+        type: "text",
+        content: String((chunk as Record<string, unknown>).content),
+        timestamp: Date.now(),
+      };
+    }
+
+    // String chunk
+    if (typeof chunk === "string") {
+      return {
+        type: "text",
+        content: chunk,
+        timestamp: Date.now(),
+      };
+    }
+
+    // Unknown shape — wrap as metadata event (StreamEventType has no "data" variant)
+    return {
+      type: "metadata",
+      metadata: chunk,
+      timestamp: Date.now(),
+    };
   }
 
   /**

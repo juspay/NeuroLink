@@ -39,6 +39,150 @@ export { AIProviderFactory };
 export { GoogleTTSHandler } from "./adapters/tts/googleTTSHandler.js";
 // Config Manager export
 export { NeuroLinkConfigManager as ConfigManager } from "./config/configManager.js";
+
+// ============================================================================
+// CLIENT SDK EXPORTS - Type-safe API access for browser and Node.js
+// Note: React hooks are NOT re-exported here. Import from '@juspay/neurolink/client'.
+// ============================================================================
+
+export {
+  // HTTP Client
+  NeuroLinkClient,
+  createClient,
+  NeuroLinkApiError,
+  // AI SDK Adapter
+  NeuroLinkLanguageModel,
+  NeuroLinkAIProvider,
+  createNeuroLinkProvider,
+  createNeuroLinkModel,
+  createStreamingResponse,
+  neurolink as neuroLinkAIInstance,
+  // Interceptors
+  createApiKeyAuthInterceptor,
+  createBearerAuthInterceptor,
+  createDynamicAuthInterceptor,
+  createLoggingInterceptor,
+  createRetryInterceptor,
+  createRateLimitInterceptor,
+  createRequestTransformInterceptor,
+  createResponseTransformInterceptor,
+  createCacheInterceptor,
+  createTimeoutInterceptor,
+  createErrorHandlerInterceptor,
+  composeMiddleware,
+  conditionalMiddleware,
+  // Streaming Client
+  SSEClient,
+  WebSocketStreamingClient,
+  createStreamingClient,
+  createAsyncStream,
+  collectStream,
+  // Authentication
+  OAuth2TokenManager,
+  JWTTokenManager,
+  createApiKeyMiddleware,
+  createBearerTokenMiddleware,
+  createTokenManagerMiddleware,
+  createAuthWithRetryMiddleware,
+  createMultiAuthMiddleware,
+  OAuth2Error,
+  OAuth2AuthError,
+  TokenRefreshError,
+  decodeJWTPayload,
+  isJWTExpired,
+  getJWTExpiry,
+  getApiKeyFromEnv,
+  // Errors
+  ErrorCode as ClientErrorCode,
+  NeuroLinkError as ClientNeuroLinkError,
+  HttpError,
+  ClientRateLimitError,
+  ClientValidationError,
+  ClientAuthenticationError,
+  ClientAuthorizationError,
+  NotFoundError,
+  ClientNetworkError,
+  ClientTimeoutError,
+  ClientConnectionError,
+  AbortError,
+  ClientConfigurationError,
+  StreamError,
+  ClientProviderError,
+  ContextLengthError,
+  ContentFilterError,
+  createErrorFromResponse,
+  createErrorFromNative,
+  mapStatusToErrorCode,
+  isRetryableStatus,
+  isRetryableError,
+  isNeuroLinkError,
+  isApiError,
+} from "./client/index.js";
+
+export type {
+  // Client Config Types
+  ClientConfig,
+  RequestOptions,
+  ApiResponse,
+  ApiError,
+  RetryConfig,
+  Middleware as ClientMiddleware,
+  MiddlewareRequest,
+  MiddlewareResponse,
+  MiddlewareContext as ClientMiddlewareContext,
+  // Stream Types
+  StreamCallbacks,
+  StreamEvent,
+  StreamResult,
+  // Generation Types
+  GenerateRequestOptions,
+  GenerateResponse,
+  StreamRequestOptions,
+  // Agent Types
+  AgentExecuteOptions,
+  AgentExecuteResult,
+  AgentInfo,
+  // Workflow Types
+  WorkflowExecuteOptions,
+  WorkflowExecuteResult,
+  WorkflowInfo,
+  // Tool Types
+  ToolInfo as ClientToolInfo,
+  ProviderStatus,
+  // WebSocket Types
+  WebSocketOptions,
+  WebSocketState,
+  WebSocketMessageHandler,
+  // AI SDK Types
+  NeuroLinkProviderOptions,
+  ModelOptions,
+  LanguageModel,
+  LanguageModelCallOptions,
+  LanguageModelResponse,
+  LanguageModelStreamResponse,
+  // Interceptor Types
+  LoggingInterceptorOptions,
+  RetryInterceptorOptions,
+  RateLimiterOptions,
+  CacheInterceptorOptions,
+  TimeoutInterceptorOptions,
+  ErrorHandlerOptions,
+  // Streaming Types
+  SSEConnectionOptions,
+  SSEConnectionState,
+  StreamingRequestOptions,
+  StreamingEventEmitter,
+  StreamingClientConfig,
+  // Voice Types
+  SpeechRecognitionResult,
+  SpeechSynthesisOptions,
+  // Auth Types
+  AuthConfig as ClientAuthConfig,
+  OAuth2Config,
+  TokenRefreshResult,
+  // Error Types
+  ErrorCodeType,
+} from "./client/index.js";
 export {
   AIProviderName,
   BedrockModels,

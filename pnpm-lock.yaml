@@ -88,7 +88,7 @@ importers:
         version: 4.13.15
       '@juspay/hippocampus':
         specifier: ^0.1.3
-        version: 0.1.3(@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.0)(sqlite3@5.1.7))
+        version: 0.1.3(@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.4)(sqlite3@5.1.7))
       '@langfuse/otel':
         specifier: ^5.0.1
         version: 5.0.1(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/exporter-trace-otlp-http@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))
@@ -303,6 +303,9 @@ importers:
       '@types/node':
         specifier: ^25.3.3
         version: 25.5.0
+      '@types/react':
+        specifier: ^19.2.10
+        version: 19.2.14
       '@types/tar-stream':
         specifier: ^3.1.4
         version: 3.1.4
@@ -354,6 +357,12 @@ importers:
       puppeteer:
         specifier: ^24.37.5
         version: 24.40.0(typescript@5.9.3)
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
       semantic-release:
         specifier: ^25.0.3
         version: 25.0.3(typescript@5.9.3)
@@ -3928,6 +3937,9 @@ packages:
   '@types/range-parser@1.2.7':
     resolution: {integrity: sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==}
 
+  '@types/react@19.2.14':
+    resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
+
   '@types/request@2.48.13':
     resolution: {integrity: sha512-FGJ6udDNUCjd19pp0Q3iTiDkwhYup7J8hpMW9c4k53NrccQFFWKRho6hvtPPEhnXWKvukfwAlB6DbDz4yhH5Gg==}
 
@@ -4777,6 +4789,9 @@ packages:
   crypto-random-string@4.0.0:
     resolution: {integrity: sha512-x8dy3RnvYdlUcPOjkEHqozhiwzKNSq7GcPuXFbnyMOCHxX8V3OgIg/pYuabl2sbUPfIJaeAQB7PMOK8DFIdoRA==}
     engines: {node: '>=12'}
+
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   csv-parser@3.2.0:
     resolution: {integrity: sha512-fgKbp+AJbn1h2dcAHKIdKNSSjfp43BZZykXsCjzALjKy80VXQNHPFJ6T9Afwdzoj24aMkq8GwDS7KGcDPpejrA==}
@@ -7301,11 +7316,16 @@ packages:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
     hasBin: true
 
+  react-dom@19.2.4:
+    resolution: {integrity: sha512-AXJdLo8kgMbimY95O2aKQqsz2iWi9jMgKJhRBAxECE4IFxfcazB2LmzloIoibJI3C12IlY20+KFaLv+71bUJeQ==}
+    peerDependencies:
+      react: ^19.2.4
+
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
-  react@19.2.0:
-    resolution: {integrity: sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==}
+  react@19.2.4:
+    resolution: {integrity: sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ==}
     engines: {node: '>=0.10.0'}
 
   read-package-up@11.0.0:
@@ -7503,6 +7523,9 @@ packages:
   saxes@5.0.1:
     resolution: {integrity: sha512-5LBh1Tls8c9xgGjw3QrMwETmTMVk0oFgvrFSvWx62llR2hcEInrKNZ2GZCCuuy2lvWrdl5jhbpeqc5hRYKFOcw==}
     engines: {node: '>=10'}
+
+  scheduler@0.27.0:
+    resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
 
   scule@1.3.0:
     resolution: {integrity: sha512-6FtHJEvt+pVMIB9IBY+IcCJ6Z5f1iQnytgyfKMhDKgmzYG+TeH/wx1y3l27rshSbLiSanrR9ffZDrEsmjlQF2g==}
@@ -8631,12 +8654,12 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@1.2.12(react@19.2.0)(zod@3.25.76)':
+  '@ai-sdk/react@1.2.12(react@19.2.4)(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider-utils': 2.2.8(zod@3.25.76)
       '@ai-sdk/ui-utils': 1.2.11(zod@3.25.76)
-      react: 19.2.0
-      swr: 2.3.6(react@19.2.0)
+      react: 19.2.4
+      swr: 2.3.6(react@19.2.4)
       throttleit: 2.1.0
     optionalDependencies:
       zod: 3.25.76
@@ -10398,15 +10421,15 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@juspay/hippocampus@0.1.3(@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.0)(sqlite3@5.1.7))':
+  '@juspay/hippocampus@0.1.3(@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.4)(sqlite3@5.1.7))':
     dependencies:
       '@aws-sdk/client-s3': 3.1000.0
-      '@juspay/neurolink': 9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.0)(sqlite3@5.1.7)
+      '@juspay/neurolink': 9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.4)(sqlite3@5.1.7)
       redis: 4.7.1
     transitivePeerDependencies:
       - aws-crt
 
-  '@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.0)(sqlite3@5.1.7)':
+  '@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.4)(sqlite3@5.1.7)':
     dependencies:
       '@ai-sdk/anthropic': 1.2.12(zod@3.25.76)
       '@ai-sdk/azure': 1.3.25(zod@3.25.76)
@@ -10427,10 +10450,10 @@ snapshots:
       '@google/genai': 1.46.0(@modelcontextprotocol/sdk@1.27.1(@cfworker/json-schema@4.1.1)(zod@4.3.6))
       '@google/generative-ai': 0.24.1
       '@huggingface/inference': 2.8.1
-      '@juspay/hippocampus': 0.1.3(@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.0)(sqlite3@5.1.7))
+      '@juspay/hippocampus': 0.1.3(@juspay/neurolink@9.14.0(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@cfworker/json-schema@4.1.1)(@cloudflare/workers-types@4.20251004.0)(@langchain/core@0.3.78(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.213.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.19.0)(zod@4.3.6)))(@mistralai/mistralai@1.10.0)(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@2.6.0(@opentelemetry/api@1.9.0))(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.74.0)(@types/jest@29.5.14)(@types/node@25.5.0)(@types/pg@8.15.6)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(react@19.2.4)(sqlite3@5.1.7))
       '@langfuse/otel': 4.6.1(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/exporter-trace-otlp-http@0.202.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.0))
       '@modelcontextprotocol/sdk': 1.27.1(@cfworker/json-schema@4.1.1)(zod@3.25.76)
-      '@openrouter/ai-sdk-provider': 0.7.5(ai@4.3.19(react@19.2.0)(zod@3.25.76))(zod@3.25.76)
+      '@openrouter/ai-sdk-provider': 0.7.5(ai@4.3.19(react@19.2.4)(zod@3.25.76))(zod@3.25.76)
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/auto-instrumentations-node': 0.56.1(@opentelemetry/api@1.9.0)(encoding@0.1.13)
       '@opentelemetry/core': 2.6.0(@opentelemetry/api@1.9.0)
@@ -10441,7 +10464,7 @@ snapshots:
       '@opentelemetry/sdk-trace-node': 2.6.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
       adm-zip: 0.5.16
-      ai: 4.3.19(react@19.2.0)(zod@3.25.76)
+      ai: 4.3.19(react@19.2.4)(zod@3.25.76)
       chalk: 5.6.2
       csv-parser: 3.2.0
       dotenv: 16.6.1
@@ -10835,11 +10858,11 @@ snapshots:
     dependencies:
       '@octokit/openapi-types': 27.0.0
 
-  '@openrouter/ai-sdk-provider@0.7.5(ai@4.3.19(react@19.2.0)(zod@3.25.76))(zod@3.25.76)':
+  '@openrouter/ai-sdk-provider@0.7.5(ai@4.3.19(react@19.2.4)(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.8(zod@3.25.76)
-      ai: 4.3.19(react@19.2.0)(zod@3.25.76)
+      ai: 4.3.19(react@19.2.4)(zod@3.25.76)
       zod: 3.25.76
 
   '@openrouter/ai-sdk-provider@2.3.3(ai@6.0.134(zod@4.3.6))(zod@4.3.6)':
@@ -13612,6 +13635,10 @@ snapshots:
 
   '@types/range-parser@1.2.7': {}
 
+  '@types/react@19.2.14':
+    dependencies:
+      csstype: 3.2.3
+
   '@types/request@2.48.13':
     dependencies:
       '@types/caseless': 0.12.5
@@ -13888,17 +13915,17 @@ snapshots:
       clean-stack: 5.3.0
       indent-string: 5.0.0
 
-  ai@4.3.19(react@19.2.0)(zod@3.25.76):
+  ai@4.3.19(react@19.2.4)(zod@3.25.76):
     dependencies:
       '@ai-sdk/provider': 1.1.3
       '@ai-sdk/provider-utils': 2.2.8(zod@3.25.76)
-      '@ai-sdk/react': 1.2.12(react@19.2.0)(zod@3.25.76)
+      '@ai-sdk/react': 1.2.12(react@19.2.4)(zod@3.25.76)
       '@ai-sdk/ui-utils': 1.2.11(zod@3.25.76)
       '@opentelemetry/api': 1.9.0
       jsondiffpatch: 0.6.0
       zod: 3.25.76
     optionalDependencies:
-      react: 19.2.0
+      react: 19.2.4
 
   ai@6.0.134(zod@4.3.6):
     dependencies:
@@ -14548,6 +14575,8 @@ snapshots:
   crypto-random-string@4.0.0:
     dependencies:
       type-fest: 1.4.0
+
+  csstype@3.2.3: {}
 
   csv-parser@3.2.0: {}
 
@@ -17359,9 +17388,14 @@ snapshots:
       minimist: 1.2.8
       strip-json-comments: 2.0.1
 
+  react-dom@19.2.4(react@19.2.4):
+    dependencies:
+      react: 19.2.4
+      scheduler: 0.27.0
+
   react-is@18.3.1: {}
 
-  react@19.2.0: {}
+  react@19.2.4: {}
 
   read-package-up@11.0.0:
     dependencies:
@@ -17605,6 +17639,8 @@ snapshots:
   saxes@5.0.1:
     dependencies:
       xmlchars: 2.2.0
+
+  scheduler@0.27.0: {}
 
   scule@1.3.0: {}
 
@@ -18084,11 +18120,11 @@ snapshots:
       magic-string: 0.30.19
       zimmerframe: 1.1.4
 
-  swr@2.3.6(react@19.2.0):
+  swr@2.3.6(react@19.2.4):
     dependencies:
       dequal: 2.0.3
-      react: 19.2.0
-      use-sync-external-store: 1.6.0(react@19.2.0)
+      react: 19.2.4
+      use-sync-external-store: 1.6.0(react@19.2.4)
 
   tagged-tag@1.0.0: {}
 
@@ -18375,9 +18411,9 @@ snapshots:
 
   url-join@5.0.0: {}
 
-  use-sync-external-store@1.6.0(react@19.2.0):
+  use-sync-external-store@1.6.0(react@19.2.4):
     dependencies:
-      react: 19.2.0
+      react: 19.2.4
 
   util-deprecate@1.0.2: {}
 

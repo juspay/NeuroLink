@@ -9,12 +9,13 @@
     "declaration": true,
     "types": ["node"],
     "baseUrl": ".",
+    "jsx": "react-jsx",
     "paths": {
       "$lib": ["./src/lib"],
       "$lib/*": ["./src/lib/*"],
       "*": ["src/types/*"]
     }
   },
-  "include": ["src/cli/**/*.ts", "src/lib/**/*.ts"],
+  "include": ["src/cli/**/*.ts", "src/lib/**/*.ts", "src/lib/**/*.tsx"],
   "exclude": ["test", "**/*.test.ts", "**/*.spec.ts", "node_modules", "dist"]
 }

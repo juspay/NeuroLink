@@ -61,6 +61,7 @@
     "convert:specific": "tsx tools/automation/shellConverter.ts --specific",
     "// Testing (Continuous Test Suites)": "",
     "test": "npx tsx test/continuous-test-suite.ts",
+    "test:client": "npx tsx test/continuous-test-suite-client.ts",
     "test:context": "npx tsx test/continuous-test-suite-context.ts",
     "test:evaluation": "npx tsx test/continuous-test-suite-evaluation.ts",
     "test:mcp": "npx tsx test/continuous-test-suite-mcp-http.ts",
@@ -75,7 +76,7 @@
     "test:tracing": "npx tsx test/continuous-test-suite-tracing.ts",
     "test:tts": "npx tsx test/continuous-test-suite-tts.ts",
     "test:workflow": "npx tsx test/continuous-test-suite-workflow.ts",
-    "test:ci": "pnpm run test",
+    "test:ci": "pnpm run test && pnpm run test:client",
     "test:performance": "tsx tools/testing/performanceMonitor.ts",
     "// Content Generation (Cross-platform JS)": "",
     "content:videos": "tsx tools/converted-scripts/generateAllVideos.ts",
@@ -149,6 +150,11 @@
       "svelte": "./dist/index.js",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
     },
     "./types": {
       "types": "./dist/types/sdkTypes.d.ts",
@@ -230,7 +236,17 @@
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-trace-base": "^2.0.0",
-    "@opentelemetry/sdk-trace-node": "^2.0.0"
+    "@opentelemetry/sdk-trace-node": "^2.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "optionalDependencies": {
     "@fastify/cors": "^11.2.0",
@@ -280,6 +296,7 @@
     "@types/koa-bodyparser": "^4.3.13",
     "@types/koa__cors": "^5.0.1",
     "@types/node": "^25.3.3",
+    "@types/react": "^19.2.10",
     "@types/tar-stream": "^3.1.4",
     "@types/ws": "^8.18.1",
     "@types/xml2js": "^0.4.14",
@@ -297,6 +314,8 @@
     "prettier": "^3.8.1",
     "publint": "^0.3.17",
     "puppeteer": "^24.37.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "semantic-release": "^25.0.3",
     "shell-quote": "^1.8.3",
     "svelte": "^5.53.6",

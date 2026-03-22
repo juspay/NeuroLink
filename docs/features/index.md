@@ -25,6 +25,7 @@ Comprehensive guides for all NeuroLink features organized by category. Each guid
 | **[Context Compaction](context-compaction.md)**                        | 4-stage context compaction pipeline with automatic budget management, per-provider token estimation, and non-destructive message tagging.   |
 | **[Memory](memory.md)**                                                | Per-user condensed memory that persists across conversations. LLM-powered condensation with S3, Redis, or SQLite storage backends.          |
 | **[Claude Subscription Support](claude-subscription.md)**              | Multiple authentication methods for Claude (API key, OAuth) with support for Free, Pro, Max, and API tiers.                                 |
+| **[Client SDK](client-sdk.md)**                                        | Type-safe HTTP, SSE, and WebSocket clients with React hooks and Vercel AI SDK adapter.                                                      |
 
 **Q1 2026 Highlights:**
 
