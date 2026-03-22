@@ -3052,7 +3052,9 @@ export class CLICommandFactory {
       analytics?: unknown;
       evaluation?: unknown;
       model?: string;
-      toolCalls?: Array<{ toolName: string }>;
+      toolCalls?:
+        | Array<{ toolName: string }>
+        | Promise<Array<{ toolName: string }>>;
     },
     fullContent: string,
     options: BaseCommandArgs & Record<string, unknown>,
@@ -3067,7 +3069,10 @@ export class CLICommandFactory {
         content: fullContent,
         analytics: resolvedAnalytics,
         model: stream.model,
-        toolsUsed: stream.toolCalls?.map((tc) => tc.toolName) || [],
+        toolsUsed:
+          (stream.toolCalls instanceof Promise
+            ? []
+            : stream.toolCalls?.map((tc) => tc.toolName)) || [],
       };
       const analyticsDisplay = CLICommandFactory.formatAnalyticsForTextMode(
         streamAnalytics as unknown as GenerateResult,

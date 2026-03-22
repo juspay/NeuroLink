@@ -140,16 +140,18 @@ export class MistralProvider extends BaseProvider {
         },
       );
 
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        analytics: analyticsPromise,
-        metadata: {
-          startTime,
-          streamId: `mistral-${Date.now()}`,
+      return this.buildEnhancedStreamResult(
+        result,
+        transformedStream,
+        options,
+        {
+          analytics: analyticsPromise,
+          metadata: {
+            startTime,
+            streamId: `mistral-${Date.now()}`,
+          },
         },
-      };
+      );
     } catch (error) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);

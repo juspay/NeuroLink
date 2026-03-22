@@ -1,0 +1,397 @@
+{
+  "name": "event-types-test-fixtures",
+  "version": "1.0.0",
+  "description": "Test fixtures for 24 stream event types",
+
+  "eventTypes": [
+    "text:start",
+    "text:delta",
+    "text:end",
+    "tool:call:start",
+    "tool:call:delta",
+    "tool:call",
+    "tool:execute:start",
+    "tool:result",
+    "reasoning:start",
+    "reasoning:delta",
+    "reasoning:end",
+    "message:start",
+    "message:end",
+    "object:delta",
+    "object:complete",
+    "step:start",
+    "step:end",
+    "audio:start",
+    "audio:delta",
+    "audio:end",
+    "image:complete",
+    "error",
+    "progress",
+    "done"
+  ],
+
+  "eventCategories": {
+    "text": ["text:start", "text:delta", "text:end"],
+    "tool": [
+      "tool:call:start",
+      "tool:call:delta",
+      "tool:call",
+      "tool:execute:start",
+      "tool:result"
+    ],
+    "reasoning": ["reasoning:start", "reasoning:delta", "reasoning:end"],
+    "message": ["message:start", "message:end"],
+    "object": ["object:delta", "object:complete"],
+    "step": ["step:start", "step:end"],
+    "audio": ["audio:start", "audio:delta", "audio:end"],
+    "image": ["image:complete"],
+    "control": ["error", "progress", "done"]
+  },
+
+  "sampleEvents": {
+    "text:start": {
+      "type": "text:start",
+      "seq": 1,
+      "timestamp": 1706745600000,
+      "model": "gpt-4o"
+    },
+
+    "text:delta": {
+      "type": "text:delta",
+      "seq": 2,
+      "timestamp": 1706745600001,
+      "delta": "Hello, world!",
+      "accumulated": "Hello, world!",
+      "offset": 0
+    },
+
+    "text:end": {
+      "type": "text:end",
+      "seq": 3,
+      "timestamp": 1706745600002,
+      "text": "Hello, world! How can I help you today?",
+      "charCount": 39,
+      "wordCount": 8
+    },
+
+    "tool:call:start": {
+      "type": "tool:call:start",
+      "seq": 4,
+      "timestamp": 1706745600003,
+      "toolCallId": "call_abc123",
+      "toolName": "getWeather"
+    },
+
+    "tool:call:delta": {
+      "type": "tool:call:delta",
+      "seq": 5,
+      "timestamp": 1706745600004,
+      "toolCallId": "call_abc123",
+      "argsDelta": "{\"city\": \"New York\"}"
+    },
+
+    "tool:call": {
+      "type": "tool:call",
+      "seq": 6,
+      "timestamp": 1706745600005,
+      "toolCallId": "call_abc123",
+      "toolName": "getWeather",
+      "args": { "city": "New York" }
+    },
+
+    "tool:execute:start": {
+      "type": "tool:execute:start",
+      "seq": 7,
+      "timestamp": 1706745600006,
+      "toolCallId": "call_abc123",
+      "toolName": "getWeather"
+    },
+
+    "tool:result": {
+      "type": "tool:result",
+      "seq": 8,
+      "timestamp": 1706745600007,
+      "toolCallId": "call_abc123",
+      "toolName": "getWeather",
+      "result": { "temperature": 72, "condition": "sunny", "humidity": 45 },
+      "duration": 150,
+      "success": true
+    },
+
+    "reasoning:start": {
+      "type": "reasoning:start",
+      "seq": 9,
+      "timestamp": 1706745600008,
+      "thinkingLevel": "high"
+    },
+
+    "reasoning:delta": {
+      "type": "reasoning:delta",
+      "seq": 10,
+      "timestamp": 1706745600009,
+      "delta": "Let me analyze this step by step...",
+      "phase": "analysis",
+      "stepNumber": 1
+    },
+
+    "reasoning:end": {
+      "type": "reasoning:end",
+      "seq": 11,
+      "timestamp": 1706745600010,
+      "reasoning": "After careful analysis, I've determined...",
+      "reasoningTokens": 150,
+      "thoughtSignature": "sig_xyz789"
+    },
+
+    "message:start": {
+      "type": "message:start",
+      "seq": 12,
+      "timestamp": 1706745600011,
+      "role": "assistant",
+      "messageId": "msg_123",
+      "provider": "openai",
+      "model": "gpt-4o"
+    },
+
+    "message:end": {
+      "type": "message:end",
+      "seq": 13,
+      "timestamp": 1706745600012,
+      "messageId": "msg_123",
+      "finishReason": "stop",
+      "usage": { "input": 50, "output": 120, "total": 170 }
+    },
+
+    "object:delta": {
+      "type": "object:delta",
+      "seq": 14,
+      "timestamp": 1706745600013,
+      "partialObject": { "name": "John" },
+      "currentPath": "$.name",
+      "jsonTextDelta": "\"name\": \"John\""
+    },
+
+    "object:complete": {
+      "type": "object:complete",
+      "seq": 15,
+      "timestamp": 1706745600014,
+      "object": { "name": "John", "age": 30, "email": "john@example.com" },
+      "valid": true,
+      "validationErrors": []
+    },
+
+    "step:start": {
+      "type": "step:start",
+      "seq": 16,
+      "timestamp": 1706745600015,
+      "stepNumber": 1,
+      "stepType": "initial",
+      "maxSteps": 5,
+      "messageId": "msg_456"
+    },
+
+    "step:end": {
+      "type": "step:end",
+      "seq": 17,
+      "timestamp": 1706745600016,
+      "stepNumber": 1,
+      "finishReason": "tool_calls",
+      "isContinued": true,
+      "usage": { "input": 100, "output": 50, "total": 150 }
+    },
+
+    "audio:start": {
+      "type": "audio:start",
+      "seq": 18,
+      "timestamp": 1706745600017,
+      "format": "mp3",
+      "sampleRate": 44100,
+      "channels": 1
+    },
+
+    "audio:delta": {
+      "type": "audio:delta",
+      "seq": 19,
+      "timestamp": 1706745600018,
+      "audioData": "base64encodedaudiochunk==",
+      "duration": 500
+    },
+
+    "audio:end": {
+      "type": "audio:end",
+      "seq": 20,
+      "timestamp": 1706745600019,
+      "totalDuration": 5000,
+      "totalChunks": 10
+    },
+
+    "image:complete": {
+      "type": "image:complete",
+      "seq": 21,
+      "timestamp": 1706745600020,
+      "imageData": "base64encodedimage==",
+      "format": "png",
+      "width": 1024,
+      "height": 1024
+    },
+
+    "error": {
+      "type": "error",
+      "seq": 22,
+      "timestamp": 1706745600021,
+      "code": "RATE_LIMIT",
+      "message": "Rate limit exceeded. Please retry after 60 seconds.",
+      "category": "rate_limit",
+      "retriable": true,
+      "retryAfter": 60000
+    },
+
+    "progress": {
+      "type": "progress",
+      "seq": 23,
+      "timestamp": 1706745600022,
+      "bytesReceived": 2048,
+      "chunksReceived": 15,
+      "elapsedMs": 1500,
+      "phase": "streaming",
+      "percent": 75,
+      "estimatedRemainingMs": 500
+    },
+
+    "done": {
+      "type": "done",
+      "seq": 24,
+      "timestamp": 1706745600023,
+      "reason": "completed",
+      "totalEvents": 23,
+      "totalDuration": 2000
+    }
+  },
+
+  "typeGuards": {
+    "isTextEvent": ["text:start", "text:delta", "text:end"],
+    "isToolEvent": [
+      "tool:call:start",
+      "tool:call:delta",
+      "tool:call",
+      "tool:execute:start",
+      "tool:result"
+    ],
+    "isReasoningEvent": ["reasoning:start", "reasoning:delta", "reasoning:end"],
+    "isMessageEvent": ["message:start", "message:end"],
+    "isObjectEvent": ["object:delta", "object:complete"],
+    "isStepEvent": ["step:start", "step:end"],
+    "isAudioEvent": ["audio:start", "audio:delta", "audio:end"],
+    "isErrorEvent": ["error"],
+    "isContentEvent": [
+      "text:delta",
+      "reasoning:delta",
+      "tool:call:delta",
+      "audio:delta",
+      "object:delta"
+    ],
+    "isStartEvent": [
+      "text:start",
+      "reasoning:start",
+      "tool:call:start",
+      "tool:execute:start",
+      "message:start",
+      "step:start",
+      "audio:start"
+    ],
+    "isEndEvent": [
+      "text:end",
+      "reasoning:end",
+      "message:end",
+      "step:end",
+      "audio:end",
+      "object:complete",
+      "done"
+    ]
+  },
+
+  "testScenarios": {
+    "basicTextStream": {
+      "description": "Simple text generation with start, deltas, and end",
+      "events": [
+        "message:start",
+        "text:start",
+        "text:delta",
+        "text:delta",
+        "text:end",
+        "message:end"
+      ]
+    },
+    "toolExecution": {
+      "description": "Text with tool call and result",
+      "events": [
+        "message:start",
+        "text:start",
+        "text:delta",
+        "text:end",
+        "tool:call:start",
+        "tool:call",
+        "tool:execute:start",
+        "tool:result",
+        "text:start",
+        "text:delta",
+        "text:end",
+        "message:end"
+      ]
+    },
+    "reasoningWithText": {
+      "description": "Extended thinking followed by text response",
+      "events": [
+        "message:start",
+        "reasoning:start",
+        "reasoning:delta",
+        "reasoning:delta",
+        "reasoning:end",
+        "text:start",
+        "text:delta",
+        "text:end",
+        "message:end"
+      ]
+    },
+    "structuredOutput": {
+      "description": "Streaming JSON object generation",
+      "events": [
+        "message:start",
+        "object:delta",
+        "object:delta",
+        "object:delta",
+        "object:complete",
+        "message:end"
+      ]
+    },
+    "multiStep": {
+      "description": "Multi-step agentic workflow",
+      "events": [
+        "step:start",
+        "message:start",
+        "text:delta",
+        "tool:call",
+        "tool:result",
+        "text:delta",
+        "message:end",
+        "step:end",
+        "step:start",
+        "message:start",
+        "text:delta",
+        "message:end",
+        "step:end"
+      ]
+    },
+    "errorRecovery": {
+      "description": "Stream with error and recovery",
+      "events": [
+        "message:start",
+        "text:delta",
+        "error",
+        "text:delta",
+        "text:end",
+        "message:end"
+      ]
+    }
+  }
+}

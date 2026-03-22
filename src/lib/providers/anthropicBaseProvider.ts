@@ -259,11 +259,12 @@ export class AnthropicProviderV2 extends BaseProvider {
         }
       };
 
-      return {
-        stream: transformedStream(),
-        provider: this.providerName,
-        model: this.modelName,
-      };
+      return this.buildEnhancedStreamResult(
+        result,
+        transformedStream(),
+        options,
+        {},
+      );
     } catch (error) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);

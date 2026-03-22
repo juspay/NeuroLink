@@ -505,19 +505,26 @@ export type StreamResult = {
     | { type: "audio"; audio: AudioChunk }
   >; // text chunks (with optional workflow stage) or audio events
 
+  // Raw AI SDK typed stream providing access to tool calls, reasoning, steps, etc.
+  // Use this for fine-grained stream consumption beyond text content.
+  fullStream?: AsyncIterable<Record<string, unknown>>;
+
   // Provider information
   provider?: string;
   model?: string;
 
   // Usage information
-  usage?: TokenUsage;
+  usage?: TokenUsage | Promise<TokenUsage>;
 
   // Finish reason
-  finishReason?: string;
+  finishReason?: string | Promise<string>;
 
   // Tool integration (from Vercel AI SDK)
-  toolCalls?: ToolCall[]; // Tool calls made during generation
-  toolResults?: ToolResult[]; // Results from tool execution
+  toolCalls?: ToolCall[] | Promise<ToolCall[]>; // Tool calls made during generation
+  toolResults?: ToolResult[] | Promise<ToolResult[]>; // Results from tool execution
+
+  // Reasoning/thinking content from models that support extended thinking
+  reasoning?: string | Promise<string>;
 
   // ENHANCED: Native NeuroLink tool event system
   toolEvents?: AsyncIterable<ToolExecutionEvent>; // Real-time tool events generator

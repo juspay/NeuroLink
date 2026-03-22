@@ -175,6 +175,34 @@ export type {
   NeuroLinkMiddleware,
 } from "./types/middlewareTypes.js";
 
+// Enhanced Streaming Architecture
+// Re-exports from the streaming module for direct access
+export * from "./streaming/index.js";
+
+// Note: core/stream/ module (MastraModelOutput, StreamCompletionHooks, PartialObjectStreamHandler)
+// has been removed. Use streaming utilities from "./streaming/index.js" instead.
+
+// Core Infrastructure (shared utilities for Mastra-style features)
+// Note: withRetry, RetryOptions, TypedEventEmitter already exist in streaming module
+// Export with aliases to avoid conflicts
+export {
+  NeuroLinkFeatureError,
+  createErrorFactory,
+  BaseFactory,
+  BaseRegistry,
+} from "./core/infrastructure/index.js";
+
+export type {
+  ErrorCode,
+  FactoryFunction,
+  FactoryRegistration,
+  RegistryEntry,
+  RetryOptions as InfraRetryOptions,
+} from "./core/infrastructure/index.js";
+
+export { withRetry as infraWithRetry } from "./core/infrastructure/index.js";
+export { TypedEventEmitter as InfraTypedEventEmitter } from "./core/infrastructure/index.js";
+
 // Version
 export const VERSION = "1.0.0";
 
@@ -520,8 +548,7 @@ export type {
   ResourceContent,
   ResourceReader,
   ResourceSubscriptionCallback,
-  // Registry Client types
-  RegistryEntry,
+  // Registry Client types (RegistryEntry already exported from core/infrastructure)
   RegistrySearchOptions,
   RegistrySearchResult,
   RegistrySourceType,

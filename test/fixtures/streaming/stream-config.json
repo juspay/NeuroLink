@@ -1,0 +1,206 @@
+{
+  "name": "streaming-test-fixtures",
+  "version": "1.0.0",
+  "description": "Test fixtures for NeuroLink streaming architecture integration tests",
+
+  "defaultConfig": {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "streamId": "test-stream-001",
+    "includeAccumulated": true,
+    "emitReasoningEvents": true,
+    "maxSteps": 5
+  },
+
+  "providerConfigs": {
+    "openai": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "streamId": "openai-stream",
+      "includeAccumulated": true,
+      "emitReasoningEvents": false,
+      "maxSteps": 3
+    },
+    "anthropic": {
+      "provider": "anthropic",
+      "model": "claude-3-opus",
+      "streamId": "anthropic-stream",
+      "includeAccumulated": true,
+      "emitReasoningEvents": true,
+      "maxSteps": 5
+    },
+    "google": {
+      "provider": "google",
+      "model": "gemini-2.5-flash",
+      "streamId": "google-stream",
+      "includeAccumulated": true,
+      "emitReasoningEvents": true,
+      "maxSteps": 3
+    },
+    "vertex": {
+      "provider": "vertex",
+      "model": "gemini-2.5-pro",
+      "streamId": "vertex-stream",
+      "includeAccumulated": true,
+      "emitReasoningEvents": true,
+      "maxSteps": 5
+    }
+  },
+
+  "backpressureConfigs": {
+    "default": {
+      "highWatermark": 100,
+      "lowWatermark": 25,
+      "maxBufferSize": 1000,
+      "maxMemoryBytes": 52428800,
+      "monitorMemory": true,
+      "overflowStrategy": "drop-oldest"
+    },
+    "conservative": {
+      "highWatermark": 50,
+      "lowWatermark": 10,
+      "maxBufferSize": 500,
+      "maxMemoryBytes": 26214400,
+      "monitorMemory": true,
+      "overflowStrategy": "drop-oldest"
+    },
+    "aggressive": {
+      "highWatermark": 200,
+      "lowWatermark": 50,
+      "maxBufferSize": 2000,
+      "maxMemoryBytes": 104857600,
+      "monitorMemory": true,
+      "overflowStrategy": "drop-newest"
+    },
+    "strict": {
+      "highWatermark": 25,
+      "lowWatermark": 5,
+      "maxBufferSize": 100,
+      "maxMemoryBytes": 10485760,
+      "monitorMemory": true,
+      "overflowStrategy": "error"
+    }
+  },
+
+  "retryConfigs": {
+    "default": {
+      "maxRetries": 3,
+      "initialDelay": 1000,
+      "maxDelay": 30000,
+      "backoffMultiplier": 2,
+      "jitter": true
+    },
+    "aggressive": {
+      "maxRetries": 5,
+      "initialDelay": 500,
+      "maxDelay": 15000,
+      "backoffMultiplier": 1.5,
+      "jitter": true
+    },
+    "conservative": {
+      "maxRetries": 2,
+      "initialDelay": 2000,
+      "maxDelay": 60000,
+      "backoffMultiplier": 3,
+      "jitter": false
+    }
+  },
+
+  "modelOutputConfigs": {
+    "basic": {
+      "provider": "test-provider",
+      "model": "test-model",
+      "streamId": "output-stream-001"
+    },
+    "withCallbacks": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "streamId": "callback-stream",
+      "onTextDelta": true,
+      "onToolExecution": true,
+      "onMessageComplete": true,
+      "onError": true
+    },
+    "withReplay": {
+      "provider": "anthropic",
+      "model": "claude-3-sonnet",
+      "streamId": "replay-stream",
+      "enableReplayMode": true
+    }
+  },
+
+  "hookConfigs": {
+    "basic": {
+      "streamId": "hook-stream-001",
+      "provider": "test-provider",
+      "model": "test-model"
+    },
+    "withMetadata": {
+      "streamId": "hook-stream-002",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "metadata": {
+        "userId": "user-123",
+        "sessionId": "session-456",
+        "requestId": "req-789"
+      }
+    },
+    "withPriorities": {
+      "streamId": "hook-stream-003",
+      "provider": "anthropic",
+      "model": "claude-3-opus",
+      "defaultPriority": "normal"
+    }
+  },
+
+  "workflowStreamConfigs": {
+    "sequential": {
+      "workflowId": "workflow-001",
+      "mode": "sequential",
+      "maxConcurrency": 1,
+      "timeout": 30000
+    },
+    "parallel": {
+      "workflowId": "workflow-002",
+      "mode": "parallel",
+      "maxConcurrency": 5,
+      "timeout": 60000
+    },
+    "hierarchical": {
+      "workflowId": "workflow-003",
+      "mode": "hierarchical",
+      "maxConcurrency": 3,
+      "timeout": 45000
+    }
+  },
+
+  "agentNetworkConfigs": {
+    "sequential": {
+      "networkId": "network-001",
+      "mode": "sequential",
+      "agents": ["agent-1", "agent-2", "agent-3"]
+    },
+    "parallel": {
+      "networkId": "network-002",
+      "mode": "parallel",
+      "agents": ["agent-1", "agent-2", "agent-3", "agent-4"]
+    },
+    "hierarchical": {
+      "networkId": "network-003",
+      "mode": "hierarchical",
+      "supervisor": "supervisor-agent",
+      "workers": ["worker-1", "worker-2"]
+    },
+    "roundRobin": {
+      "networkId": "network-004",
+      "mode": "round-robin",
+      "agents": ["agent-1", "agent-2", "agent-3"]
+    },
+    "voting": {
+      "networkId": "network-005",
+      "mode": "voting",
+      "agents": ["agent-1", "agent-2", "agent-3"],
+      "votingThreshold": 0.6
+    }
+  }
+}

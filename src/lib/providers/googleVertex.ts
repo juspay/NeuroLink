@@ -1393,15 +1393,17 @@ export class GoogleVertexProvider extends BaseProvider {
         error?: string;
       }> = [];
 
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        ...(shouldUseTools && {
-          toolCalls,
-          toolResults,
-        }),
-      };
+      return this.buildEnhancedStreamResult(
+        result,
+        transformedStream,
+        options,
+        {
+          ...(shouldUseTools && {
+            toolCalls,
+            toolResults,
+          }),
+        },
+      );
     } catch (error) {
       timeoutController?.cleanup();
       logger.error(`${functionTag}: Exception`, {

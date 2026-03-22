@@ -252,3 +252,9 @@ export type { StorageConfig } from "./conversation.js";
 
 // Subscription types (Claude subscription tiers, authentication, usage tracking)
 export * from "./subscriptionTypes.js";
+
+// Action types are already exported above via "./actionTypes.js"
+
+// Note: Custom streaming event types (StreamEventPayload, MastraModelOutput, etc.)
+// have been removed. Use StreamResult with fullStream for rich stream data access.
+// Error types are available from the streaming module: import { StreamError, ... } from "./streaming/index.js"

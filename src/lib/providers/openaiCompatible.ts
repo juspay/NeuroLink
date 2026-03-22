@@ -319,16 +319,18 @@ export class OpenAICompatibleProvider extends BaseProvider {
         },
       );
 
-      return {
-        stream: transformedStream(),
-        provider: this.providerName,
-        model: this.modelName,
-        analytics: analyticsPromise,
-        metadata: {
-          startTime,
-          streamId: `openai-compatible-${Date.now()}`,
+      return this.buildEnhancedStreamResult(
+        result,
+        transformedStream(),
+        options,
+        {
+          analytics: analyticsPromise,
+          metadata: {
+            startTime,
+            streamId: `openai-compatible-${Date.now()}`,
+          },
         },
-      };
+      );
     } catch (error) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);

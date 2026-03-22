@@ -1280,14 +1280,15 @@ export class AnthropicProvider extends BaseProvider {
         id: string;
       }> = [];
 
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        toolCalls, // ✅ Include tool calls in stream result
-        toolResults, // ✅ Include tool results in stream result
-        // Note: omit usage/finishReason to avoid blocking streaming; compute asynchronously if needed.
-      };
+      return this.buildEnhancedStreamResult(
+        result,
+        transformedStream,
+        options,
+        {
+          toolCalls, // ✅ Include tool calls in stream result
+          toolResults, // ✅ Include tool results in stream result
+        },
+      );
     } catch (error: unknown) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);

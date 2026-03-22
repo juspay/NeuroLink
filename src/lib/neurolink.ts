@@ -5570,6 +5570,7 @@ Current user's request: ${currentInput}`;
 
               const {
                 stream: mcpStream,
+                fullStream: mcpFullStream,
                 provider: providerName,
                 usage: streamUsage,
                 model: streamModel,
@@ -5795,17 +5796,26 @@ Current user's request: ${currentInput}`;
 
               this.emitStreamEndEvents(streamResult);
 
-              return this.createStreamResponse(streamResult, processedStream, {
-                providerName,
-                options,
-                startTime,
-                responseTime,
-                streamId,
-                fallback: metadata.fallbackAttempted,
-                guardrailsBlocked: metadata.guardrailsBlocked,
-                error: metadata.error,
-                events: eventSequence,
-              });
+              return this.createStreamResponse(
+                {
+                  ...streamResult,
+                  fullStream: mcpFullStream,
+                  usage: streamUsage,
+                },
+                processedStream,
+                {
+                  providerName,
+                  model: streamModel,
+                  options,
+                  startTime,
+                  responseTime,
+                  streamId,
+                  fallback: metadata.fallbackAttempted,
+                  guardrailsBlocked: metadata.guardrailsBlocked,
+                  error: metadata.error,
+                  events: eventSequence,
+                },
+              );
             } catch (error) {
               return this.handleStreamError(
                 error,
@@ -6393,8 +6403,11 @@ Current user's request: ${currentInput}`;
       | { type: "audio"; audio: AudioChunk }
       | { type: "image"; imageOutput: { base64: string } }
     >;
+    fullStream?: AsyncIterable<Record<string, unknown>>;
     provider: string;
-    usage?: { input: number; output: number; total: number };
+    usage?:
+      | { input: number; output: number; total: number }
+      | Promise<{ input: number; output: number; total: number }>;
     model?: string;
     analytics?: AnalyticsData | Promise<AnalyticsData>;
   }> {
@@ -6569,6 +6582,7 @@ Current user's request: ${currentInput}`;
 
     return {
       stream: streamResult.stream,
+      fullStream: streamResult.fullStream,
       provider: providerName,
       usage: streamResult.usage,
       model: streamResult.model || options.model,
@@ -6625,10 +6639,11 @@ Current user's request: ${currentInput}`;
   private createStreamResponse(
     streamResult: {
       content: string;
-      usage?: TokenUsage;
-      finishReason: string;
-      toolCalls: ToolCall[];
-      toolResults: ToolResult[];
+      fullStream?: AsyncIterable<Record<string, unknown>>;
+      usage?: TokenUsage | Promise<TokenUsage>;
+      finishReason: string | Promise<string>;
+      toolCalls: ToolCall[] | Promise<ToolCall[]>;
+      toolResults: ToolResult[] | Promise<ToolResult[]>;
       analytics?: AnalyticsData;
       evaluation?: EvaluationData;
     },
@@ -6639,6 +6654,7 @@ Current user's request: ${currentInput}`;
     >,
     config: {
       providerName: string;
+      model?: string;
       options: StreamOptions;
       startTime: number;
       responseTime: number;
@@ -6656,8 +6672,9 @@ Current user's request: ${currentInput}`;
   ): StreamResult {
     return {
       stream,
+      fullStream: streamResult.fullStream,
       provider: config.providerName,
-      model: config.options.model,
+      model: config.options.model || config.model,
       usage: streamResult.usage,
       finishReason: streamResult.finishReason,
       toolCalls: streamResult.toolCalls,

@@ -724,16 +724,18 @@ export class GoogleAIStudioProvider extends BaseProvider {
         },
       );
 
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        analytics: analyticsPromise,
-        metadata: {
-          startTime,
-          streamId: `google-ai-${Date.now()}`,
+      return this.buildEnhancedStreamResult(
+        result,
+        transformedStream,
+        options,
+        {
+          analytics: analyticsPromise,
+          metadata: {
+            startTime,
+            streamId: `google-ai-${Date.now()}`,
+          },
         },
-      };
+      );
     } catch (error) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);

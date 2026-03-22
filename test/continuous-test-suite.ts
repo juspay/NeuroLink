@@ -1119,6 +1119,173 @@ async function testSDKStream(sdk: NeuroLink): Promise<boolean | null> {
   }
 }
 
+// Test SDK stream enriched fields (fullStream, usage, finishReason, toolCalls)
+async function testSDKStreamEnriched(sdk: NeuroLink): Promise<boolean | null> {
+  logSection(
+    "Testing SDK Stream Enriched Fields (fullStream, usage, finishReason)",
+  );
+
+  try {
+    const sdkOptions = buildBaseSDKOptions();
+
+    // Simple stream call to test enriched fields
+    const streamResult = await sdk.stream({
+      input: {
+        text: 'Say exactly "streaming enrichment test passed" and nothing else.',
+      },
+      maxTokens: 50,
+      provider: sdkOptions.provider,
+      ...(sdkOptions.model && { model: sdkOptions.model }),
+      disableTools: true, // Keep it simple - just text streaming
+    });
+
+    log("Stream result received", "blue");
+    log("Provider: " + (streamResult.provider || "unknown"), "reset");
+    log("Model: " + (streamResult.model || "unknown"), "reset");
+
+    // Step 1: Verify legacy stream still works (backward compat)
+    const chunks: string[] = [];
+    for await (const chunk of streamResult.stream) {
+      if ("content" in chunk && typeof chunk.content === "string") {
+        chunks.push(chunk.content);
+      }
+    }
+    const fullText = chunks.join("");
+    log("Stream text length: " + fullText.length, "reset");
+
+    if (fullText.length === 0) {
+      logTest(
+        "Stream Enriched - Legacy stream",
+        "FAIL",
+        "No text content received",
+      );
+      return false;
+    }
+    logTest(
+      "Stream Enriched - Legacy stream",
+      "PASS",
+      `${chunks.length} chunks, ${fullText.length} chars`,
+    );
+
+    // Step 2: Check usage field (should be populated after stream completes)
+    let usagePassed = false;
+    if (streamResult.usage !== undefined) {
+      const usage =
+        streamResult.usage instanceof Promise
+          ? await streamResult.usage
+          : streamResult.usage;
+      if (usage && typeof usage === "object") {
+        const hasTokenFields =
+          "promptTokens" in usage ||
+          "input" in usage ||
+          "totalTokens" in usage ||
+          "total" in usage;
+        if (hasTokenFields) {
+          log(`Usage: ${JSON.stringify(usage)}`, "reset");
+          logTest(
+            "Stream Enriched - usage",
+            "PASS",
+            "Token usage data received",
+          );
+          usagePassed = true;
+        }
+      }
+    }
+    if (!usagePassed) {
+      logTest(
+        "Stream Enriched - usage",
+        "FAIL",
+        "No usage data in StreamResult",
+      );
+    }
+
+    // Step 3: Check finishReason field
+    let finishReasonPassed = false;
+    if (streamResult.finishReason !== undefined) {
+      const finishReason =
+        streamResult.finishReason instanceof Promise
+          ? await streamResult.finishReason
+          : streamResult.finishReason;
+      if (finishReason && typeof finishReason === "string") {
+        log(`Finish reason: ${finishReason}`, "reset");
+        logTest("Stream Enriched - finishReason", "PASS", finishReason);
+        finishReasonPassed = true;
+      }
+    }
+    if (!finishReasonPassed) {
+      logTest(
+        "Stream Enriched - finishReason",
+        "FAIL",
+        "No finishReason in StreamResult",
+      );
+    }
+
+    // Step 4: Check fullStream field exists
+    let fullStreamPassed = false;
+    if (streamResult.fullStream !== undefined) {
+      logTest(
+        "Stream Enriched - fullStream",
+        "PASS",
+        "fullStream field present on StreamResult",
+      );
+      fullStreamPassed = true;
+    } else {
+      logTest(
+        "Stream Enriched - fullStream",
+        "FAIL",
+        "fullStream field missing from StreamResult",
+      );
+    }
+
+    // Step 5: Check toolCalls field (should be empty array or Promise since we disabled tools)
+    let toolCallsPassed = false;
+    if (streamResult.toolCalls !== undefined) {
+      const toolCalls =
+        streamResult.toolCalls instanceof Promise
+          ? await streamResult.toolCalls
+          : streamResult.toolCalls;
+      if (Array.isArray(toolCalls)) {
+        logTest(
+          "Stream Enriched - toolCalls",
+          "PASS",
+          `${toolCalls.length} tool calls`,
+        );
+        toolCallsPassed = true;
+      }
+    }
+    if (!toolCallsPassed) {
+      // toolCalls may be undefined if provider doesn't set it - acceptable
+      logTest(
+        "Stream Enriched - toolCalls",
+        "PASS",
+        "Field not set (acceptable for no-tool stream)",
+      );
+      toolCallsPassed = true;
+    }
+
+    // Overall result: usage and finishReason are the key enrichments
+    const allPassed = usagePassed && finishReasonPassed;
+    if (allPassed) {
+      logTest(
+        "Stream Enriched - Overall",
+        "PASS",
+        "All enriched fields verified with real provider data",
+      );
+    } else {
+      logTest(
+        "Stream Enriched - Overall",
+        "FAIL",
+        "Some enriched fields missing",
+      );
+    }
+    return allPassed;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logTest("Stream Enriched", "FAIL", errorMessage);
+    return false;
+  }
+}
+
 type BusinessTool = {
   name: string;
   description: string;
@@ -3934,6 +4101,7 @@ async function runAllTests(): Promise<void> {
     { name: "CLI Stream", fn: testCLIStream },
     { name: "SDK Generate", fn: () => testSDKGenerate(sharedSdk) },
     { name: "SDK Stream", fn: () => testSDKStream(sharedSdk) },
+    { name: "SDK Stream Enriched", fn: () => testSDKStreamEnriched(sharedSdk) },
     { name: "SDK Business Tools", fn: testSDKBusinessTools },
     { name: "SDK Business Tools (CLI Simulation)", fn: testCLIBusinessTools },
     // TODO: Fix HITL tests later - commented out for now (see HITL TODO block above)

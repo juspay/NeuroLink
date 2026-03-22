@@ -1,0 +1,333 @@
+{
+  "name": "backpressure-scenarios-test-fixtures",
+  "version": "1.0.0",
+  "description": "Test scenarios for backpressure handling in streaming architecture",
+
+  "overflowStrategies": {
+    "drop-oldest": {
+      "description": "Drop oldest items when buffer is full",
+      "behavior": "FIFO eviction - oldest events removed first",
+      "useCase": "Real-time streaming where recent data is more important"
+    },
+    "drop-newest": {
+      "description": "Drop newest items when buffer is full",
+      "behavior": "New events rejected when buffer full",
+      "useCase": "Ordered processing where sequence integrity matters"
+    },
+    "error": {
+      "description": "Throw error when buffer is full",
+      "behavior": "BufferOverflowError thrown on overflow",
+      "useCase": "Critical streams where data loss is unacceptable"
+    }
+  },
+
+  "scenarios": {
+    "normalFlow": {
+      "name": "Normal Flow",
+      "description": "Events processed without hitting watermarks",
+      "config": {
+        "highWatermark": 100,
+        "lowWatermark": 25,
+        "maxBufferSize": 1000
+      },
+      "input": {
+        "eventCount": 50,
+        "eventRate": 10,
+        "processingRate": 20
+      },
+      "expectedBehavior": {
+        "paused": false,
+        "dropped": 0,
+        "errors": 0
+      }
+    },
+
+    "highWatermarkTrigger": {
+      "name": "High Watermark Trigger",
+      "description": "Events exceed high watermark, causing pause",
+      "config": {
+        "highWatermark": 50,
+        "lowWatermark": 10,
+        "maxBufferSize": 200
+      },
+      "input": {
+        "eventCount": 100,
+        "eventRate": 50,
+        "processingRate": 10
+      },
+      "expectedBehavior": {
+        "paused": true,
+        "pauseCount": 1,
+        "resumedAfterDrain": true
+      }
+    },
+
+    "bufferOverflowDropOldest": {
+      "name": "Buffer Overflow - Drop Oldest",
+      "description": "Buffer fills up, oldest events dropped",
+      "config": {
+        "highWatermark": 50,
+        "lowWatermark": 10,
+        "maxBufferSize": 100,
+        "overflowStrategy": "drop-oldest"
+      },
+      "input": {
+        "eventCount": 200,
+        "eventRate": 100,
+        "processingRate": 5
+      },
+      "expectedBehavior": {
+        "droppedCount": 100,
+        "droppedReason": "overflow",
+        "bufferSize": 100,
+        "oldestEventsLost": true
+      }
+    },
+
+    "bufferOverflowDropNewest": {
+      "name": "Buffer Overflow - Drop Newest",
+      "description": "Buffer fills up, new events rejected",
+      "config": {
+        "highWatermark": 50,
+        "lowWatermark": 10,
+        "maxBufferSize": 100,
+        "overflowStrategy": "drop-newest"
+      },
+      "input": {
+        "eventCount": 200,
+        "eventRate": 100,
+        "processingRate": 5
+      },
+      "expectedBehavior": {
+        "droppedCount": 100,
+        "droppedReason": "overflow",
+        "bufferSize": 100,
+        "newestEventsLost": true
+      }
+    },
+
+    "bufferOverflowError": {
+      "name": "Buffer Overflow - Error",
+      "description": "Buffer fills up, error thrown",
+      "config": {
+        "highWatermark": 50,
+        "lowWatermark": 10,
+        "maxBufferSize": 100,
+        "overflowStrategy": "error"
+      },
+      "input": {
+        "eventCount": 150,
+        "eventRate": 100,
+        "processingRate": 5
+      },
+      "expectedBehavior": {
+        "errorThrown": true,
+        "errorType": "BufferOverflowError",
+        "errorMessage": "Buffer overflow: max size 100 exceeded"
+      }
+    },
+
+    "memoryPressure": {
+      "name": "Memory Pressure",
+      "description": "Memory limit exceeded triggers overflow handling",
+      "config": {
+        "highWatermark": 100,
+        "lowWatermark": 25,
+        "maxBufferSize": 10000,
+        "maxMemoryBytes": 1048576,
+        "monitorMemory": true
+      },
+      "input": {
+        "eventCount": 1000,
+        "eventSize": 2048,
+        "processingRate": 10
+      },
+      "expectedBehavior": {
+        "memoryLimitHit": true,
+        "droppedReason": "memory",
+        "memoryMonitorTriggered": true
+      }
+    },
+
+    "adaptiveRateControl": {
+      "name": "Adaptive Rate Control",
+      "description": "Rate controller adjusts based on buffer pressure",
+      "config": {
+        "highWatermark": 100,
+        "lowWatermark": 25,
+        "maxBufferSize": 500
+      },
+      "adaptiveConfig": {
+        "initialRate": 100,
+        "minRate": 10,
+        "maxRate": 500,
+        "adjustmentFactor": 0.8,
+        "measurementWindow": 1000
+      },
+      "input": {
+        "eventCount": 500,
+        "variableProcessingTime": true
+      },
+      "expectedBehavior": {
+        "rateAdjusted": true,
+        "rateDecreased": true,
+        "rateIncreased": true,
+        "finalRateStable": true
+      }
+    },
+
+    "pauseResumeycle": {
+      "name": "Pause/Resume Cycle",
+      "description": "Multiple pause and resume cycles during processing",
+      "config": {
+        "highWatermark": 30,
+        "lowWatermark": 10,
+        "maxBufferSize": 100
+      },
+      "input": {
+        "eventCount": 200,
+        "burstEvents": [
+          { "at": 0, "count": 40 },
+          { "at": 50, "count": 35 },
+          { "at": 100, "count": 45 }
+        ],
+        "processingRate": 20
+      },
+      "expectedBehavior": {
+        "pauseCount": 3,
+        "resumeCount": 3,
+        "allEventsProcessed": true
+      }
+    },
+
+    "gracefulDrain": {
+      "name": "Graceful Drain",
+      "description": "Buffer drains gracefully on stream end",
+      "config": {
+        "highWatermark": 50,
+        "lowWatermark": 10,
+        "maxBufferSize": 200
+      },
+      "input": {
+        "eventCount": 80,
+        "streamEndsAt": 60
+      },
+      "expectedBehavior": {
+        "allBufferedEventsDelivered": true,
+        "endEventReceived": true,
+        "bufferEmptyAfterEnd": true
+      }
+    }
+  },
+
+  "streamTransformers": {
+    "bufferedStream": {
+      "description": "Buffers events for batch processing",
+      "parameters": {
+        "bufferSize": "Number of events to buffer before flushing",
+        "flushInterval": "Max time before flush (ms)",
+        "onFlush": "Callback when buffer is flushed"
+      },
+      "testCases": [
+        {
+          "name": "Size-based flush",
+          "bufferSize": 10,
+          "flushInterval": null,
+          "inputEvents": 25,
+          "expectedFlushes": 3
+        },
+        {
+          "name": "Time-based flush",
+          "bufferSize": 100,
+          "flushInterval": 100,
+          "inputEvents": 5,
+          "expectedFlushes": 1
+        }
+      ]
+    },
+
+    "rateLimitedStream": {
+      "description": "Limits event emission rate",
+      "parameters": {
+        "eventsPerSecond": "Maximum events per second",
+        "burstLimit": "Maximum burst size"
+      },
+      "testCases": [
+        {
+          "name": "Strict rate limit",
+          "eventsPerSecond": 10,
+          "inputEvents": 50,
+          "expectedDuration": 5000
+        },
+        {
+          "name": "Burst handling",
+          "eventsPerSecond": 10,
+          "burstLimit": 20,
+          "inputEvents": 30,
+          "expectedInitialBurst": 20
+        }
+      ]
+    },
+
+    "chunkedStream": {
+      "description": "Chunks stream into fixed-size pieces",
+      "parameters": {
+        "chunkSize": "Number of events per chunk"
+      },
+      "testCases": [
+        {
+          "name": "Even chunks",
+          "chunkSize": 10,
+          "inputEvents": 50,
+          "expectedChunks": 5
+        },
+        {
+          "name": "Partial final chunk",
+          "chunkSize": 10,
+          "inputEvents": 47,
+          "expectedChunks": 5,
+          "finalChunkSize": 7
+        }
+      ]
+    }
+  },
+
+  "pressureMonitor": {
+    "description": "Real-time monitoring of backpressure state",
+    "metrics": [
+      "bufferSize",
+      "isPaused",
+      "totalBuffered",
+      "totalDropped",
+      "droppedByOverflow",
+      "droppedByMemory",
+      "pauseCount",
+      "resumeCount",
+      "currentMemoryUsage"
+    ],
+    "callbacks": {
+      "onPressure": "Called when pressure state changes (paused/resumed)",
+      "onDrop": "Called when events are dropped",
+      "onOverflow": "Called when buffer overflows",
+      "onMemoryWarning": "Called when memory usage exceeds threshold"
+    }
+  },
+
+  "errorScenarios": {
+    "bufferOverflowError": {
+      "type": "BufferOverflowError",
+      "message": "Buffer overflow: max size {maxSize} exceeded",
+      "retriable": false
+    },
+    "memoryExhaustedError": {
+      "type": "MemoryExhaustedError",
+      "message": "Memory limit {maxMemoryBytes} bytes exceeded",
+      "retriable": true
+    },
+    "backpressureTimeoutError": {
+      "type": "BackpressureTimeoutError",
+      "message": "Backpressure timeout: buffer did not drain within {timeout}ms",
+      "retriable": true
+    }
+  }
+}

@@ -1216,6 +1216,31 @@ export abstract class BaseProvider implements AIProvider {
   ): Promise<StreamResult>;
 
   /**
+   * Build an enriched StreamResult from an AI SDK streamText result.
+   * Providers should use this instead of manually constructing StreamResult
+   * to ensure all available data (usage, toolCalls, finishReason, etc.) is passed through.
+   */
+   
+  protected buildEnhancedStreamResult(
+    aiResult: Record<string, any>,
+    textStream: StreamResult["stream"],
+    options: StreamOptions,
+    extra?: Partial<StreamResult>,
+  ): StreamResult {
+    return {
+      stream: textStream,
+      fullStream: aiResult.fullStream,
+      provider: this.providerName,
+      model: options.model || this.modelName,
+      usage: aiResult.usage,
+      finishReason: aiResult.finishReason,
+      toolCalls: aiResult.toolCalls,
+      toolResults: aiResult.toolResults,
+      ...extra,
+    };
+  }
+
+  /**
    * Get the provider name
    */
   protected abstract getProviderName(): AIProviderName;

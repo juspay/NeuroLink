@@ -177,15 +177,17 @@ export class AzureOpenAIProvider extends BaseProvider {
       // Transform string stream to content object stream using BaseProvider method
       const transformedStream = this.createTextStream(stream);
 
-      return {
-        stream: transformedStream,
-        provider: "azure",
-        model: this.deployment,
-        metadata: {
-          streamId: `azure-${Date.now()}`,
-          startTime: Date.now(),
+      return this.buildEnhancedStreamResult(
+        stream,
+        transformedStream,
+        options,
+        {
+          metadata: {
+            streamId: `azure-${Date.now()}`,
+            startTime: Date.now(),
+          },
         },
-      };
+      );
     } catch (error: unknown) {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);
