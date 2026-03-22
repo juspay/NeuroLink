@@ -65,6 +65,7 @@ export type ExecutionContext<T = StandardRecord> = {
   cacheOptions?: CacheOptions;
   fallbackOptions?: FallbackOptions;
   timeoutMs?: number;
+  maxRetries?: number;
   startTime?: number;
 };
 
@@ -102,6 +103,9 @@ export type ToolInfo = {
   outputSchema?: StandardRecord;
   /** MCP tool annotations (safety hints, metadata). Auto-inferred when mcp.annotations.autoInfer is enabled. */
   annotations?: import("../mcp/toolAnnotations.js").MCPToolAnnotations;
+  /** Per-tool timeout in milliseconds, set at registration time */
+  timeoutMs?: number;
+  maxRetries?: number;
   [key: string]: unknown; // Generic extensibility
 };
 
@@ -119,6 +123,9 @@ export type ToolImplementation = {
   outputSchema?: unknown;
   category?: string;
   permissions?: string[];
+  /** Per-tool timeout in milliseconds, set at registration time */
+  timeoutMs?: number;
+  maxRetries?: number;
 };
 
 /**
@@ -126,13 +133,51 @@ export type ToolImplementation = {
  * Extracted from toolRegistry.ts for centralized type management
  */
 export type ToolExecutionOptions = {
+  /**
+   * Caller-specified execution timeout in milliseconds.
+   * Used by executeTool() callers to override the default timeout for a
+   * single invocation. Takes precedence over `timeoutMs` when both are set.
+   */
   timeout?: number;
   retries?: number;
   context?: unknown;
   preferredSource?: string;
   fallbackEnabled?: boolean;
   validateBeforeExecution?: boolean;
+  /**
+   * Per-tool timeout in milliseconds, copied from ToolInfo at registration
+   * time. Acts as the tool-level default; overridden by `timeout` when the
+   * caller supplies an explicit value.
+   * @deprecated Prefer using `timeout` for caller-specified overrides.
+   *             This field exists for internal forwarding from ToolInfo and
+   *             may be consolidated in a future release.
+   */
   timeoutMs?: number;
+  maxRetries?: number;
+};
+
+/**
+ * Options for tool registration via registerTool()
+ *
+ * These options configure per-tool execution behavior. When not provided,
+ * the SDK's global defaults are used (30s timeout, 2 retries), preserving
+ * backward compatibility with existing production systems.
+ *
+ * @example
+ * // Register with custom timeout and no retries
+ * sdk.registerTool("myTool", tool, { timeout: 5000, maxRetries: 0 });
+ *
+ * // Register with defaults (same as before — no behavior change)
+ * sdk.registerTool("myTool", tool);
+ */
+export type ToolRegistrationOptions = {
+  /** Per-tool execution timeout in milliseconds. Only applied when explicitly set.
+   *  When omitted, the SDK's global default (30s) is used. */
+  timeout?: number;
+  /** Maximum retry attempts on failure. Only applied when explicitly set.
+   *  When omitted, the SDK's global default (2 retries) is used.
+   *  Set to 0 to disable retries for this tool. */
+  maxRetries?: number;
 };
 
 /**

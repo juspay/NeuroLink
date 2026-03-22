@@ -154,6 +154,7 @@ import type {
   ToolExecutionContext,
   ToolExecutionSummary,
   ToolInfo,
+  ToolRegistrationOptions,
 } from "./types/tools.js";
 import type {
   BatchOperationResult,
@@ -269,6 +270,25 @@ function classifyMcpErrorMessage(
     return "validation_error";
   }
   return "unknown";
+}
+
+function mcpCategoryToErrorCategory(
+  mcpCategory: ReturnType<typeof classifyMcpErrorMessage>,
+): ErrorCategory {
+  switch (mcpCategory) {
+    case "not_found":
+      return ErrorCategory.VALIDATION;
+    case "permission_denied":
+      return ErrorCategory.PERMISSION;
+    case "timeout":
+      return ErrorCategory.TIMEOUT;
+    case "rate_limited":
+      return ErrorCategory.RESOURCE;
+    case "validation_error":
+      return ErrorCategory.VALIDATION;
+    case "unknown":
+      return ErrorCategory.EXECUTION;
+  }
 }
 
 /**
@@ -464,6 +484,7 @@ export class NeuroLink {
       failedExecutions: number;
       averageExecutionTime: number;
       lastExecutionTime: number;
+      errorCategories: Record<string, number>;
     }
   > = new Map();
 
@@ -488,13 +509,15 @@ export class NeuroLink {
     error?: Error,
   ): void {
     // Emit tool end event (NeuroLink format - enhanced with result/error)
+    // Serialize error to string for consumer compatibility (event listeners
+    // commonly check `typeof event.error === "string"`).
     this.emitter.emit("tool:end", {
       toolName,
       responseTime: Date.now() - startTime,
       success,
       timestamp: Date.now(),
       result: result, // Enhanced: include actual result
-      error: error, // Enhanced: include error if present
+      error: error ? error.message : undefined, // Emit as string, not Error object
     });
   }
   // Conversation memory support
@@ -1089,6 +1112,12 @@ export class NeuroLink {
                 metadata: { toolName, serverId: "direct", executionTime: 0 },
               };
             } catch (error) {
+              // Known limitation: this non-throwing error path returns
+              // { success: false } without recording errorCategories in
+              // toolExecutionMetrics. These are internal file-tool failures
+              // (low frequency), so the risk of metric gaps is minimal.
+              // A full fix would require access to the metrics map here,
+              // which is not available in the registration closure.
               return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),
@@ -1208,6 +1237,12 @@ export class NeuroLink {
             try {
               return await toolDef.execute(params);
             } catch (error) {
+              // Known limitation: this non-throwing error path returns
+              // { success: false } without recording errorCategories in
+              // toolExecutionMetrics. These are internal memory-tool failures
+              // (low frequency), so the risk of metric gaps is minimal.
+              // A full fix would require access to the metrics map here,
+              // which is not available in the registration closure.
               return {
                 success: false,
                 error: error instanceof Error ? error.message : String(error),
@@ -7185,7 +7220,11 @@ Current user's request: ${currentInput}`;
    * @param name - Unique name for the tool
    * @param tool - Tool in MCPExecutableTool format (unified MCP protocol type)
    */
-  registerTool(name: string, tool: MCPExecutableTool): void {
+  registerTool(
+    name: string,
+    tool: MCPExecutableTool,
+    options?: ToolRegistrationOptions,
+  ): void {
     this.invalidateToolCache(); // Invalidate cache when a tool is registered
     // Emit tool registration start event
     this.emitter.emit("tools-register:start", {
@@ -7239,8 +7278,70 @@ Current user's request: ${currentInput}`;
         })(),
       };
 
+      // Wrap execute with per-tool timeout if specified at registration.
+      // Uses AbortSignal.timeout() composed with any parent signal from the AI SDK.
+      // This ensures the timeout works regardless of the execution path
+      // (direct executeTool() or AI SDK generateText() tool calling).
+      if (
+        options?.timeout !== undefined &&
+        options.timeout > 0 &&
+        Number.isFinite(options.timeout)
+      ) {
+        const originalExecute = convertedTool.execute!;
+        const toolTimeout = options.timeout;
+        const toolName = name;
+        convertedTool.execute = async (...args: unknown[]) => {
+          const timeoutSignal = AbortSignal.timeout(toolTimeout);
+          // Compose with any parent abortSignal from ToolExecutionOptions
+          const execOptions = args[1] as
+            | { abortSignal?: AbortSignal }
+            | undefined;
+          const parentSignal = execOptions?.abortSignal;
+          const composedSignal = parentSignal
+            ? AbortSignal.any([parentSignal, timeoutSignal])
+            : timeoutSignal;
+
+          // Replace the abortSignal in execution options
+          const augmentedContext = {
+            ...execOptions,
+            abortSignal: composedSignal,
+          };
+
+          return Promise.race([
+            originalExecute(args[0], augmentedContext),
+            new Promise<never>((_, reject) => {
+              composedSignal.addEventListener(
+                "abort",
+                () => {
+                  if (timeoutSignal.aborted) {
+                    reject(
+                      new Error(
+                        `Tool '${toolName}' timed out after ${toolTimeout}ms (configured at registration)`,
+                      ),
+                    );
+                  } else {
+                    reject(
+                      new DOMException(
+                        "The operation was aborted",
+                        "AbortError",
+                      ),
+                    );
+                  }
+                },
+                { once: true },
+              );
+            }),
+          ]);
+        };
+      }
+
       // SMART DEFAULTS: Use utility to eliminate boilerplate creation
-      const mcpServerInfo = createCustomToolServerInfo(name, convertedTool);
+      const mcpServerInfo = createCustomToolServerInfo(
+        name,
+        convertedTool,
+        options?.timeout,
+        options?.maxRetries,
+      );
 
       // Register with toolRegistry using MCPServerInfo directly
       this.toolRegistry.registerServer(mcpServerInfo);
@@ -7250,6 +7351,7 @@ Current user's request: ${currentInput}`;
         toolName: name,
         success: true,
         timestamp: Date.now(),
+        timeoutMs: options?.timeout,
       });
     } catch (error) {
       logger.error(`Failed to register tool ${name}:`, error);
@@ -7679,6 +7781,12 @@ Current user's request: ${currentInput}`;
     const executionStartTime = Date.now();
 
     // === MCP ENHANCEMENT: RequestBatcher — batch programmatic tool calls ===
+    // LIMITATION: When the request batcher is enabled, per-tool timeout and retry
+    // settings (from registration options or call-site options) are NOT applied.
+    // The batcher uses its own hardcoded defaults for timeout and retry behavior.
+    // Use `bypassBatcher: true` to ensure per-tool timeout/retry is respected.
+    // Additionally, note that executeToolInternal's safe-tool retry logic may still
+    // trigger even when maxRetries is set to 0, since it operates independently.
     if (this.mcpToolBatcher && !options?.bypassBatcher) {
       return this.mcpToolBatcher.execute(toolName, params) as Promise<T>;
     }
@@ -7757,21 +7865,31 @@ Current user's request: ${currentInput}`;
             input: params, // Enhanced: add input parameters
           });
 
-          // Set default options
+          // NL-004: Use composite key (serverId.toolName) to avoid cross-server collisions
+          // Fetch toolInfo early so per-tool timeout is available for finalOptions
+          const toolInfo = this.toolRegistry.getToolInfo(toolName);
+
+          // Set default options — per-tool values from registration take precedence over global defaults.
+          // When not explicitly set at registration, global defaults are preserved for backward compatibility.
+          const registeredTimeout = toolInfo?.tool?.timeoutMs;
+          const registeredMaxRetries = toolInfo?.tool?.maxRetries;
           const finalOptions = {
-            timeout: options?.timeout || TOOL_TIMEOUTS.EXECUTION_DEFAULT_MS, // 30 second default timeout
-            maxRetries: options?.maxRetries || RETRY_ATTEMPTS.DEFAULT, // Default 2 retries for retriable errors
-            retryDelayMs: options?.retryDelayMs || RETRY_DELAYS.BASE_MS, // 1 second delay between retries
-            authContext: options?.authContext, // Pass through authentication context
-            disableToolCache: options?.disableToolCache, // Pass through cache bypass flag
+            timeout:
+              options?.timeout ??
+              registeredTimeout ??
+              TOOL_TIMEOUTS.EXECUTION_DEFAULT_MS,
+            maxRetries:
+              options?.maxRetries ??
+              registeredMaxRetries ??
+              RETRY_ATTEMPTS.DEFAULT,
+            retryDelayMs: options?.retryDelayMs || RETRY_DELAYS.BASE_MS,
+            authContext: options?.authContext,
+            disableToolCache: options?.disableToolCache,
           };
 
           // Track memory usage for tool execution
           const { MemoryManager } = await import("./utils/performance.js");
           const startMemory = MemoryManager.getMemoryUsageMB();
-
-          // NL-004: Use composite key (serverId.toolName) to avoid cross-server collisions
-          const toolInfo = this.toolRegistry.getToolInfo(toolName);
           const breakerServerId =
             externalTool?.serverId || toolInfo?.tool?.serverId || "unknown";
           const breakerKey = `${breakerServerId}.${toolName}`;
@@ -7796,6 +7914,7 @@ Current user's request: ${currentInput}`;
               failedExecutions: 0,
               averageExecutionTime: 0,
               lastExecutionTime: 0,
+              errorCategories: {},
             });
           }
           const metrics = this.toolExecutionMetrics.get(toolName);
@@ -7878,16 +7997,20 @@ Current user's request: ${currentInput}`;
               circuitBreakerState: circuitBreaker?.getState(),
             });
 
-            // Emit tool end event using the helper method
-            this.emitToolEndEvent(toolName, executionStartTime, true, result);
-
             // Set span success attributes
             // Check if result has isError flag (MCP tool error result)
+            // Also detect toolRegistry-wrapped errors that return { success: false }
+            const resultObj =
+              result && typeof result === "object"
+                ? (result as Record<string, unknown>)
+                : undefined;
             const isToolError =
-              result &&
-              typeof result === "object" &&
-              "isError" in result &&
-              (result as Record<string, unknown>).isError === true;
+              (resultObj &&
+                "isError" in resultObj &&
+                resultObj.isError === true) ||
+              (resultObj &&
+                "success" in resultObj &&
+                resultObj.success === false);
 
             // NL-001: Count isError:true results as circuit breaker failures
             // This ensures tools that return error results (not just thrown errors) are tracked
@@ -7954,7 +8077,39 @@ Current user's request: ${currentInput}`;
                 code: SpanStatusCode.ERROR,
                 message: `MCP tool returned isError: ${errorText.substring(0, 200)}`,
               });
+
+              if (metrics) {
+                metrics.failedExecutions++;
+                const prevSuccessful = metrics.successfulExecutions;
+                metrics.successfulExecutions = Math.max(
+                  0,
+                  metrics.successfulExecutions - 1,
+                );
+                // Recompute averageExecutionTime: back out this execution's duration
+                // which was incorrectly included as a success
+                if (prevSuccessful > 1) {
+                  metrics.averageExecutionTime =
+                    (metrics.averageExecutionTime * prevSuccessful -
+                      executionTime) /
+                    (prevSuccessful - 1);
+                } else {
+                  // No remaining successful executions, reset to 0
+                  metrics.averageExecutionTime = 0;
+                }
+                const mappedCategory =
+                  mcpCategoryToErrorCategory(errorCategory);
+                metrics.errorCategories[mappedCategory] =
+                  (metrics.errorCategories[mappedCategory] || 0) + 1;
+              }
             }
+
+            // Emit tool end event AFTER isError check so success flag is correct
+            this.emitToolEndEvent(
+              toolName,
+              executionStartTime,
+              !isToolError,
+              result,
+            );
 
             toolSpan.setAttribute(
               "tool.result.status",
@@ -8017,10 +8172,16 @@ Current user's request: ${currentInput}`;
               );
             }
 
-            // ADD: Centralized error event emission
-            this.emitter.emit("error", structuredError);
+            if (metrics) {
+              const category =
+                structuredError.category || ErrorCategory.EXECUTION;
+              metrics.errorCategories[category] =
+                (metrics.errorCategories[category] || 0) + 1;
+            }
 
-            // Emit tool end event using the helper method
+            // Emit tool end event BEFORE the error event.
+            // Node.js EventEmitter throws on unhandled 'error' events,
+            // which would prevent tool:end from being emitted.
             this.emitToolEndEvent(
               toolName,
               executionStartTime,
@@ -8028,6 +8189,9 @@ Current user's request: ${currentInput}`;
               undefined,
               structuredError,
             );
+
+            // Centralized error event emission
+            this.emitter.emit("error", structuredError);
 
             // Add execution context to structured error
             structuredError = new NeuroLinkError({
@@ -9111,6 +9275,7 @@ Current user's request: ${currentInput}`;
       successRate: number;
       averageExecutionTime: number;
       lastExecutionTime: number;
+      errorCategories: Record<string, number>;
     }
   > {
     const metrics: Record<
@@ -9122,12 +9287,14 @@ Current user's request: ${currentInput}`;
         successRate: number;
         averageExecutionTime: number;
         lastExecutionTime: number;
+        errorCategories: Record<string, number>;
       }
     > = {};
 
     for (const [toolName, toolMetrics] of this.toolExecutionMetrics.entries()) {
       metrics[toolName] = {
         ...toolMetrics,
+        errorCategories: { ...toolMetrics.errorCategories },
         successRate:
           toolMetrics.totalExecutions > 0
             ? toolMetrics.successfulExecutions / toolMetrics.totalExecutions
@@ -9231,6 +9398,7 @@ Current user's request: ${currentInput}`;
           successRate: number;
           averageExecutionTime: number;
           lastExecutionTime: number;
+          errorCategories: Record<string, number>;
         };
         circuitBreaker: {
           state: "closed" | "open" | "half-open";
@@ -9251,6 +9419,7 @@ Current user's request: ${currentInput}`;
           successRate: number;
           averageExecutionTime: number;
           lastExecutionTime: number;
+          errorCategories: Record<string, number>;
         };
         circuitBreaker: {
           state: "closed" | "open" | "half-open";
@@ -9311,6 +9480,28 @@ Current user's request: ${currentInput}`;
         recommendations.push("Optimize tool performance or increase timeout");
       }
 
+      if (metrics && metrics.errorCategories) {
+        const categories = metrics.errorCategories;
+        if (categories[ErrorCategory.TIMEOUT] > 0) {
+          issues.push(`Timeout errors: ${categories[ErrorCategory.TIMEOUT]}`);
+          recommendations.push(
+            "Consider increasing the tool timeout configuration",
+          );
+        }
+        if (categories[ErrorCategory.VALIDATION] > 0) {
+          issues.push(
+            `Validation errors: ${categories[ErrorCategory.VALIDATION]}`,
+          );
+          recommendations.push("Review input schemas and parameter validation");
+        }
+        if (categories[ErrorCategory.NETWORK] > 0) {
+          issues.push(`Network errors: ${categories[ErrorCategory.NETWORK]}`);
+          recommendations.push(
+            "Check network connectivity and endpoint availability",
+          );
+        }
+      }
+
       tools[toolName] = {
         name: toolName,
         isHealthy,
@@ -9319,6 +9510,9 @@ Current user's request: ${currentInput}`;
           successRate,
           averageExecutionTime: metrics?.averageExecutionTime || 0,
           lastExecutionTime: metrics?.lastExecutionTime || 0,
+          errorCategories: metrics?.errorCategories
+            ? { ...metrics.errorCategories }
+            : {},
         },
         circuitBreaker: {
           state: circuitBreaker?.getState() || "closed",

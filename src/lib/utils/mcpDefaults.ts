@@ -136,8 +136,10 @@ export function createMCPServerInfo(options: {
 export function createCustomToolServerInfo(
   toolName: string,
   tool: MCPExecutableTool,
+  timeoutMs?: number,
+  maxRetries?: number,
 ): MCPServerInfo {
-  return createMCPServerInfo({
+  const serverInfo = createMCPServerInfo({
     id: `custom-tool-${toolName}`,
     name: toolName,
     tool: {
@@ -148,6 +150,17 @@ export function createCustomToolServerInfo(
     },
     isCustomTool: true,
   });
+
+  if (serverInfo.metadata) {
+    if (timeoutMs !== undefined) {
+      serverInfo.metadata.toolTimeoutMs = timeoutMs;
+    }
+    if (maxRetries !== undefined) {
+      serverInfo.metadata.toolMaxRetries = maxRetries;
+    }
+  }
+
+  return serverInfo;
 }
 
 /**

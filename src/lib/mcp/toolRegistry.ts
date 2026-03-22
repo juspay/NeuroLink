@@ -215,6 +215,12 @@ export class MCPToolRegistry extends MCPRegistry {
       // For other tools, use fully-qualified serverId.toolName to avoid collisions
       const isCustomTool = serverId.startsWith("custom-tool-");
       const toolId = isCustomTool ? tool.name : `${serverId}.${tool.name}`;
+      const toolTimeoutMs = serverInfo.metadata?.toolTimeoutMs as
+        | number
+        | undefined;
+      const toolMaxRetries = serverInfo.metadata?.toolMaxRetries as
+        | number
+        | undefined;
       const toolInfo = {
         name: tool.name,
         description: tool.description,
@@ -226,6 +232,8 @@ export class MCPToolRegistry extends MCPRegistry {
           serverId: serverInfo.id,
         }),
         permissions: [], // MCPServerInfo.tools doesn't have permissions
+        ...(toolTimeoutMs !== undefined && { timeoutMs: toolTimeoutMs }),
+        ...(toolMaxRetries !== undefined && { maxRetries: toolMaxRetries }),
       };
 
       // Register only with fully-qualified toolId to avoid collisions
@@ -244,6 +252,8 @@ export class MCPToolRegistry extends MCPRegistry {
           existingCategory: serverInfo.metadata?.category,
           serverId: serverInfo.id,
         }),
+        ...(toolTimeoutMs !== undefined && { timeoutMs: toolTimeoutMs }),
+        ...(toolMaxRetries !== undefined && { maxRetries: toolMaxRetries }),
       });
 
       // Tool registered successfully

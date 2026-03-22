@@ -50,6 +50,7 @@ export class ToolsManager {
   protected toolExecutor?: (
     toolName: string,
     params: unknown,
+    options?: Record<string, unknown>,
   ) => Promise<unknown>;
 
   // Session context
@@ -95,7 +96,7 @@ export class ToolsManager {
     try {
       // Store custom tools for use in getAllTools()
       this.customTools = sdk.customTools;
-      this.toolExecutor = sdk.executeTool;
+      this.toolExecutor = sdk.executeTool.bind(sdk);
 
       logger.debug(`[${functionTag}] Setting up tool executor for provider`, {
         providerName: this.providerName,
@@ -383,6 +384,10 @@ export class ToolsManager {
       description?: string;
       parameters?: unknown;
       inputSchema?: unknown;
+      /** Per-tool timeout in milliseconds, set at registration time */
+      timeoutMs?: number;
+      /** Per-tool max retries, set at registration time */
+      maxRetries?: number;
     },
   ): Promise<Tool | null> {
     try {
@@ -439,7 +444,28 @@ export class ToolsManager {
             // Route through NeuroLink.executeTool() when available for MCP enhancement support
             // (cache, middleware, annotations, circuit breaker, routing)
             if (this.toolExecutor) {
-              const result = await this.toolExecutor(toolName, params);
+              // Per-tool timeout and retries flow through the customTools map
+              // (set at registration via ToolRegistrationOptions).
+              // The execute wrapper in registerTool already enforces timeouts,
+              // but we also forward them to toolExecutor for MCP-level handling.
+              const toolTimeoutMs = toolInfo.timeoutMs;
+              const toolMaxRetries = toolInfo.maxRetries;
+              const hasRegistrationOptions =
+                toolTimeoutMs !== undefined || toolMaxRetries !== undefined;
+              const result = await this.toolExecutor(
+                toolName,
+                params,
+                hasRegistrationOptions
+                  ? {
+                      ...(toolTimeoutMs !== undefined && {
+                        timeout: toolTimeoutMs,
+                      }),
+                      ...(toolMaxRetries !== undefined && {
+                        maxRetries: toolMaxRetries,
+                      }),
+                    }
+                  : undefined,
+              );
 
               const convertedResult = this.utilities?.convertToolResult
                 ? await this.utilities.convertToolResult(result)
