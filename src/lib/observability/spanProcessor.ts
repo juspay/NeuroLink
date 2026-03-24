@@ -5,24 +5,9 @@
  */
 
 import type { SpanAttributes, SpanData } from "./types/index.js";
+import type { SpanProcessor } from "../types/observability.js";
 
-/**
- * Span processor interface
- * Allows for composable span processing pipelines
- */
-export interface SpanProcessor {
-  /** Processor name for identification */
-  readonly name: string;
-
-  /** Process a span before export, returns null to drop the span */
-  process(span: SpanData): SpanData | null;
-
-  /** Optional async processing (for external lookups, etc.) */
-  processAsync?(span: SpanData): Promise<SpanData | null>;
-
-  /** Shutdown the processor (cleanup resources) */
-  shutdown?(): Promise<void>;
-}
+export type { SpanProcessor };
 
 /**
  * No-op processor that passes spans through unchanged

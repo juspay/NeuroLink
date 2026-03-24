@@ -18,15 +18,7 @@ import {
   SageMakerModels,
   OpenRouterModels,
 } from "../constants/enums.js";
-
-/**
- * Model choice for CLI prompts (inquirer format)
- */
-export type ModelChoice = {
-  name: string;
-  value: string;
-  description?: string;
-};
+import type { ModelChoice } from "../types/index.js";
 
 /**
  * Top models per provider with descriptions for CLI prompts

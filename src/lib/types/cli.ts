@@ -861,3 +861,341 @@ export namespace MistralSetup {
     help?: boolean;
   };
 }
+
+// ============================================================================
+// PROXY CLI TYPES (moved from src/cli/commands/proxy.ts)
+// ============================================================================
+
+/** Arguments accepted by `neurolink proxy start` */
+export type ProxyStartArgs = {
+  port?: number;
+  host?: string;
+  strategy?: string;
+  healthInterval?: number;
+  quiet?: boolean;
+  debug?: boolean;
+  config?: string;
+};
+
+/** Arguments accepted by `neurolink proxy status` */
+export type ProxyStatusArgs = {
+  format?: "text" | "json";
+  quiet?: boolean;
+};
+
+/** Arguments accepted by hidden `neurolink proxy guard` command */
+export type ProxyGuardArgs = {
+  host?: string;
+  port?: number;
+  parentPid?: number;
+  maxWaitMs?: number;
+  failureThreshold?: number;
+  pollIntervalMs?: number;
+  quiet?: boolean;
+};
+
+/** A fallback chain entry (serialisable subset of FallbackEntry) */
+export type FallbackInfo = { provider: string; model: string };
+
+/** Persisted state for a running proxy instance */
+export type ProxyState = {
+  pid: number;
+  port: number;
+  host: string;
+  strategy: string;
+  startTime: string;
+  /** Fallback chain from proxy config (persisted at start time) */
+  fallbackChain?: FallbackInfo[];
+  /** Optional fail-open guard PID that reverts Claude settings if proxy dies */
+  guardPid?: number;
+};
+
+// ============================================================================
+// AUTH CLI TYPES (moved from src/cli/commands/auth.ts)
+// ============================================================================
+
+/** Stored credentials for an authenticated provider. */
+export type StoredCredentials = {
+  type: "api-key" | "oauth";
+  apiKey?: string;
+  oauth?: import("./subscriptionTypes.js").OAuthTokens;
+  provider: string;
+  subscriptionTier?: import("./subscriptionTypes.js").ClaudeSubscriptionTier;
+  email?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+/** Result of checking authentication status for a provider. */
+export type AuthStatusResult = {
+  provider: string;
+  isAuthenticated: boolean;
+  method: "api-key" | "oauth" | "none";
+  subscriptionTier?: string;
+  tokenExpiry?: string;
+  hasRefreshToken?: boolean;
+  needsRefresh?: boolean;
+};
+
+// ============================================================================
+// AUTH COMMAND FACTORY TYPES (moved from src/cli/factories/authCommandFactory.ts)
+// ============================================================================
+
+/** Auth command arguments interface */
+export type AuthCommandArgs = BaseCommandArgs & {
+  provider?: string;
+  method?: "api-key" | "oauth" | "create-api-key";
+  format?: "text" | "json";
+  quiet?: boolean;
+  debug?: boolean;
+  nonInteractive?: boolean;
+  add?: boolean;
+  label?: string;
+  account?: string;
+  force?: boolean;
+  /** Yargs positional arguments */
+  _?: (string | number)[];
+};
+
+// ============================================================================
+// TELEMETRY CLI TYPES (moved from src/cli/commands/telemetry.ts)
+// ============================================================================
+
+/** Telemetry command arguments */
+export type TelemetryCommandArgs = {
+  format?: "text" | "json" | "table";
+  quiet?: boolean;
+};
+
+/** Telemetry status sub-command args */
+export type TelemetryStatusArgs = TelemetryCommandArgs;
+
+/** Telemetry configure sub-command args */
+export type TelemetryConfigureArgs = TelemetryCommandArgs & {
+  exporter: string;
+  config: string;
+};
+
+/** Telemetry list-exporters sub-command args */
+export type TelemetryListExportersArgs = TelemetryCommandArgs;
+
+/** Telemetry flush sub-command args */
+export type TelemetryFlushArgs = TelemetryCommandArgs & {
+  timeout?: number;
+};
+
+/** Telemetry stats sub-command args */
+export type TelemetryStatsArgs = TelemetryCommandArgs & {
+  detailed?: boolean;
+  byModel?: boolean;
+  byProvider?: boolean;
+};
+
+/** Available exporter names */
+export type ExporterName =
+  | "langfuse"
+  | "langsmith"
+  | "otel"
+  | "datadog"
+  | "sentry"
+  | "braintrust"
+  | "arize"
+  | "posthog"
+  | "laminar";
+
+// ============================================================================
+// OBSERVABILITY CLI TYPES (moved from src/cli/commands/observability.ts)
+// Prefixed with "Observability" to avoid collision with telemetry types.
+// ============================================================================
+
+/** Observability command arguments */
+export type ObservabilityCommandArgs = {
+  format?: "text" | "json" | "table";
+  quiet?: boolean;
+};
+
+/** Observability status sub-command args */
+export type ObservabilityStatusArgs = ObservabilityCommandArgs;
+
+/** Observability metrics sub-command args */
+export type ObservabilityMetricsArgs = ObservabilityCommandArgs & {
+  detailed?: boolean;
+};
+
+/** Observability exporters sub-command args */
+export type ObservabilityExportersArgs = ObservabilityCommandArgs;
+
+/** Observability costs sub-command args */
+export type ObservabilityCostsArgs = ObservabilityCommandArgs & {
+  byModel?: boolean;
+  byProvider?: boolean;
+};
+
+// ============================================================================
+// DOCS CLI TYPES (moved from src/cli/commands/docs.ts)
+// ============================================================================
+
+/** Docs command arguments */
+export type DocsCommandArgs = {
+  transport?: "stdio" | "http";
+  port?: number;
+};
+
+// ============================================================================
+// RAG CLI TYPES (moved from src/cli/commands/rag.ts)
+// ============================================================================
+
+// Note: ChunkArgs, IndexArgs, QueryArgs are defined as RAGCommandArgs in rag/types.ts
+// These are the CLI-layer argument shapes.
+
+// ============================================================================
+// SERVER CLI TYPES (moved from src/cli/commands/server.ts)
+// ============================================================================
+
+/** Server command arguments */
+export type ServerCommandArgs = {
+  port?: number;
+  host?: string;
+  framework?: "hono" | "express" | "fastify" | "koa";
+  basePath?: string;
+  cors?: boolean;
+  rateLimit?: boolean;
+  quiet?: boolean;
+  format?: "text" | "json" | "yaml";
+  output?: string;
+  debug?: boolean;
+};
+
+/** Server status stored in state file */
+export type ServerState = {
+  pid: number;
+  port: number;
+  host: string;
+  framework: import("../server/types.js").ServerFramework;
+  startTime: string;
+  basePath: string;
+};
+
+/** Server configuration stored in config file */
+export type ServerConfig = {
+  defaultPort: number;
+  defaultHost: string;
+  defaultFramework: "hono" | "express" | "fastify" | "koa";
+  defaultBasePath: string;
+  cors: {
+    enabled: boolean;
+    origins?: string[];
+  };
+  rateLimit: {
+    enabled: boolean;
+    windowMs?: number;
+    maxRequests?: number;
+  };
+  swagger: {
+    enabled: boolean;
+    path?: string;
+  };
+};
+
+// ============================================================================
+// SERVE CLI TYPES (moved from src/cli/commands/serve.ts)
+// ============================================================================
+
+/** Serve command arguments */
+export type ServeCommandArgs = {
+  port?: number;
+  host?: string;
+  framework?: import("../server/types.js").ServerFramework;
+  basePath?: string;
+  cors?: boolean;
+  rateLimit?: number;
+  swagger?: boolean;
+  config?: string;
+  watch?: boolean;
+  quiet?: boolean;
+  debug?: boolean;
+  format?: "text" | "json";
+};
+
+/** Server configuration file format */
+export type ServerConfigFile = {
+  port?: number;
+  host?: string;
+  framework?: import("../server/types.js").ServerFramework;
+  basePath?: string;
+  cors?: {
+    enabled?: boolean;
+    origins?: string[];
+    methods?: string[];
+    headers?: string[];
+    credentials?: boolean;
+    maxAge?: number;
+  };
+  rateLimit?: {
+    enabled?: boolean;
+    windowMs?: number;
+    maxRequests?: number;
+    message?: string;
+    skipPaths?: string[];
+  };
+  bodyParser?: {
+    enabled?: boolean;
+    maxSize?: string;
+    jsonLimit?: string;
+    urlEncoded?: boolean;
+  };
+  logging?: {
+    enabled?: boolean;
+    level?: "debug" | "info" | "warn" | "error";
+    includeBody?: boolean;
+    includeResponse?: boolean;
+  };
+  timeout?: number;
+  enableMetrics?: boolean;
+  enableSwagger?: boolean;
+};
+
+// ============================================================================
+// CONVERSATION SELECTOR TYPES (moved from src/cli/loop/conversationSelector.ts)
+// ============================================================================
+
+/** Menu choice type for conversation selector (includes separators). */
+export type MenuChoice =
+  | ConversationChoice
+  | { type: "separator"; line?: string };
+
+// ============================================================================
+// SAGEMAKER CLI TYPES (moved from src/cli/factories/sagemakerCommandFactory.ts)
+// ============================================================================
+
+/**
+ * Type for language models that expose the low-level doGenerate method.
+ * Used by SageMaker CLI commands for direct endpoint testing and benchmarking.
+ */
+export type DoGenerateModel = {
+  doGenerate(options: Record<string, unknown>): Promise<{
+    text?: string;
+    finishReason?: string;
+    usage: {
+      /** Token count for the prompt (Vercel AI SDK convention) */
+      promptTokens?: number;
+      /** Token count for the completion (Vercel AI SDK convention) */
+      completionTokens?: number;
+      /** Token count for the input (SageMaker/provider convention) */
+      inputTokens?: number;
+      /** Token count for the output (SageMaker/provider convention) */
+      outputTokens?: number;
+      totalTokens?: number;
+    };
+  }>;
+};
+
+/** Redis client type (awaited return of createRedisClient). */
+export type RedisClient = {
+  get: (key: string) => Promise<string | null>;
+  set: (key: string, value: string, options?: unknown) => Promise<unknown>;
+  del: (key: string) => Promise<number>;
+  keys: (pattern: string) => Promise<string[]>;
+  quit: () => Promise<void>;
+  [key: string]: unknown;
+};

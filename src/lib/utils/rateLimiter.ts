@@ -9,22 +9,7 @@
 
 import { logger } from "./logger.js";
 import { ErrorFactory } from "./errorHandling.js";
-
-/**
- * Configuration options for the rate limiter
- */
-export type RateLimiterConfig = {
-  /** Maximum tokens (downloads) allowed per interval */
-  maxTokens: number;
-  /** Refill interval in milliseconds */
-  refillIntervalMs: number;
-  /** Number of tokens to add per refill interval */
-  tokensPerRefill: number;
-  /** Maximum queue size for pending requests */
-  maxQueueSize: number;
-  /** Timeout for queued requests in milliseconds */
-  queueTimeoutMs: number;
-};
+import type { RateLimiterConfig } from "../types/configTypes.js";
 
 /**
  * Default configuration: 10 downloads per second

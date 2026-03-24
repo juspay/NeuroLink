@@ -30,11 +30,13 @@ export {
   isDangerousExtension,
   isValidDisplayName,
   isValidFileName,
-  type SanitizeDisplayNameOptions,
-  type SanitizeFileNameOptions,
   sanitizeDisplayName,
   sanitizeFileName,
 } from "./filename.js";
+export type {
+  SanitizeDisplayNameOptions,
+  SanitizeFileNameOptions,
+} from "../../types/index.js";
 
 // HTML escaping and sanitization
 export {
@@ -54,8 +56,8 @@ export {
 export {
   getSvgSanitizationRules,
   isSvgContentSafe,
-  type SvgSanitizationResult,
   sanitizeSvg,
   sanitizeSvgContent,
   sanitizeSvgContentDetailed,
 } from "./svg.js";
+export type { SvgSanitizationResult } from "../../types/index.js";

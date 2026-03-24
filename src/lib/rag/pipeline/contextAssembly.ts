@@ -14,19 +14,16 @@
 
 import type { Chunk, VectorQueryResult } from "../types.js";
 import type {
+  CitationFormat,
   ContextAssemblyOptions,
   ContextWindow,
-} from "../../types/ragTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { estimateTokens } from "../../utils/tokenEstimation.js";
 
-/**
- * Citation format options
- */
-export type CitationFormat = "inline" | "footnote" | "numbered" | "none";
-
-export type { ContextAssemblyOptions } from "../../types/ragTypes.js";
-export type { ContextWindow } from "../../types/ragTypes.js";
+export type { CitationFormat } from "../../types/index.js";
+export type { ContextAssemblyOptions } from "../../types/index.js";
+export type { ContextWindow } from "../../types/index.js";
 
 /**
  * Assemble context from retrieved results

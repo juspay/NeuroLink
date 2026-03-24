@@ -18,7 +18,11 @@
 import type { Tool } from "ai";
 import { tool as createAISDKTool, jsonSchema } from "ai";
 import { z } from "zod";
-import type { AIProviderName, StandardRecord } from "../../types/index.js";
+import type {
+  AIProviderName,
+  StandardRecord,
+  ToolUtilities,
+} from "../../types/index.js";
 import type { ToolArgs } from "../../types/tools.js";
 import type { JsonObject } from "../../types/common.js";
 import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
@@ -27,18 +31,6 @@ import { logger } from "../../utils/logger.js";
 import { getKeyCount } from "../../utils/transformationUtils.js";
 import { convertJsonSchemaToZod } from "../../utils/schemaConversion.js";
 import type { NeuroLink } from "../../neurolink.js";
-
-/**
- * Utility functions interface for ToolsManager
- */
-export type ToolUtilities = {
-  isZodSchema?: (schema: unknown) => boolean;
-  convertToolResult?: (result: unknown) => Promise<unknown>;
-  createPermissiveZodSchema?: () => z.ZodSchema;
-  fixSchemaForOpenAIStrictMode?: (
-    schema: Record<string, unknown>,
-  ) => Record<string, unknown>;
-};
 
 /**
  * ToolsManager class - Handles all tool management operations

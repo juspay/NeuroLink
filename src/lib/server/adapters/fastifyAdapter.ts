@@ -27,15 +27,8 @@ import type {
   ServerAdapterEvents,
   ServerContext,
 } from "../types.js";
+import type { FastifyRateLimitContext } from "../../types/index.js";
 import { isErrorResponse } from "../utils/validation.js";
-
-/**
- * Rate limit context type for error response builder
- */
-type RateLimitContext = {
-  ttl: number;
-  ban?: boolean;
-};
 
 /**
  * Fastify-specific server adapter
@@ -102,7 +95,7 @@ export class FastifyServerAdapter extends BaseServerAdapter {
         timeWindow: windowMs,
         errorResponseBuilder: (
           _request: FastifyRequest,
-          context: RateLimitContext,
+          context: FastifyRateLimitContext,
         ) => ({
           error: {
             code: "RATE_LIMIT_EXCEEDED",

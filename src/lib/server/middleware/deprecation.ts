@@ -5,11 +5,8 @@
  * @see https://datatracker.ietf.org/doc/html/rfc8594 - The 'Deprecation' HTTP Header Field
  */
 
-import type {
-  MiddlewareDefinition,
-  RouteDefinition,
-  RouteDeprecation,
-} from "../types.js";
+import type { MiddlewareDefinition, RouteDefinition } from "../types.js";
+import type { DeprecatedRouteInfo } from "../../types/index.js";
 
 /**
  * Deprecation middleware configuration
@@ -30,15 +27,6 @@ export type DeprecationConfig = {
    * Whether to include Link header for alternative routes (default: true)
    */
   includeLink?: boolean;
-};
-
-/**
- * Internal type for deprecated route lookup
- */
-type DeprecatedRouteInfo = {
-  method: string;
-  path: string;
-  deprecation: RouteDeprecation;
 };
 
 /**

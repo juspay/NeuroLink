@@ -1,14 +1,8 @@
 import { logger } from "../../utils/logger.js";
-
-export type FactoryFunction<TInstance, TConfig> = (
-  config?: TConfig,
-) => Promise<TInstance>;
-
-export type FactoryRegistration<TInstance, TConfig> = {
-  factory: FactoryFunction<TInstance, TConfig>;
-  aliases: string[];
-  metadata?: Record<string, unknown>;
-};
+import type {
+  FactoryFunction,
+  FactoryRegistration,
+} from "../../types/index.js";
 
 export abstract class BaseFactory<TInstance, TConfig = unknown> {
   protected items = new Map<string, FactoryRegistration<TInstance, TConfig>>();

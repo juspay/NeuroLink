@@ -11,6 +11,7 @@ import { SageMakerRuntimeClient } from "./client.js";
 import { handleSageMakerError } from "./errors.js";
 import { estimateTokenUsage, createSageMakerStream } from "./streaming.js";
 import type {
+  SageMakerAsLanguageModel,
   SageMakerConfig,
   SageMakerModelConfig,
 } from "../../types/providers.js";
@@ -121,23 +122,6 @@ const DEFAULT_MIN_CONCURRENCY = 1;
  * - When maxTokens is specified, it sets max_new_tokens parameter explicitly
  * - This aligns with the unlimited-by-default token policy across all providers
  */
-/**
- * Structural type that captures what AI SDK's `streamText` / `generateText`
- * actually invoke at runtime on a model object.
- *
- * `SageMakerLanguageModel` satisfies this interface. We expose it so that
- * consumers can cast `new SageMakerLanguageModel(...)` to `LanguageModel`
- * via this intermediate type, avoiding `as unknown as LanguageModel`.
- */
-export interface SageMakerAsLanguageModel {
-  readonly specificationVersion: string;
-  readonly provider: string;
-  readonly modelId: string;
-  readonly supportedUrls: Record<string, RegExp[]>;
-  doGenerate(options: Record<string, unknown>): Promise<unknown>;
-  doStream(options: Record<string, unknown>): Promise<unknown>;
-}
-
 export class SageMakerLanguageModel implements SageMakerAsLanguageModel {
   /**
    * Specification version for the AI SDK LanguageModel interface.

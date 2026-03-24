@@ -1463,6 +1463,44 @@ export type ProviderHealthStatusOptions = {
   recommendations: string[];
 };
 
+// ============================================================================
+// Language Model Adapter Types
+// ============================================================================
+
+/**
+ * Structural adapter type capturing what AI SDK's `streamText` / `generateText`
+ * actually invoke at runtime on a model object.
+ *
+ * `OllamaLanguageModel` satisfies this type. The provider can cast
+ * `new OllamaLanguageModel(...)` to `LanguageModel` via this
+ * intermediate type, avoiding `as unknown as LanguageModel`.
+ */
+export type OllamaAsLanguageModel = {
+  readonly specificationVersion: string;
+  readonly provider: string;
+  readonly modelId: string;
+  readonly supportedUrls: Record<string, RegExp[]>;
+  doGenerate(options: Record<string, unknown>): Promise<unknown>;
+  doStream(options: Record<string, unknown>): Promise<unknown>;
+};
+
+/**
+ * Structural type that captures what AI SDK's `streamText` / `generateText`
+ * actually invoke at runtime on a model object.
+ *
+ * `SageMakerLanguageModel` satisfies this type. Consumers can cast
+ * `new SageMakerLanguageModel(...)` to `LanguageModel` via this
+ * intermediate type, avoiding `as unknown as LanguageModel`.
+ */
+export type SageMakerAsLanguageModel = {
+  readonly specificationVersion: string;
+  readonly provider: string;
+  readonly modelId: string;
+  readonly supportedUrls: Record<string, RegExp[]>;
+  doGenerate(options: Record<string, unknown>): Promise<unknown>;
+  doStream(options: Record<string, unknown>): Promise<unknown>;
+};
+
 export type ProviderHealthCheckOptions = {
   timeout?: number;
   includeConnectivityTest?: boolean;
@@ -1591,4 +1629,89 @@ export type OpenRouterProviderCache = {
   modelsCacheTime: number;
   toolCapableModels: Set<string>;
   capabilitiesCached: boolean;
+};
+
+// =============================================================================
+// GOOGLE NATIVE GEMINI 3 TYPES (moved from providers/googleNativeGemini3.ts)
+// =============================================================================
+
+/** A single function declaration for the Gemini native SDK. */
+export type NativeFunctionDeclaration = {
+  name: string;
+  description: string;
+  parametersJsonSchema?: Record<string, unknown>;
+};
+
+/** The tools config array expected by the @google/genai SDK. */
+export type NativeToolsConfig = Array<{
+  functionDeclarations: NativeFunctionDeclaration[];
+}>;
+
+/** Return value of buildNativeToolDeclarations. */
+export type NativeToolDeclarationsResult = {
+  toolsConfig: NativeToolsConfig;
+  executeMap: Map<string, Tool["execute"]>;
+};
+
+/** A single function call returned by the Gemini model. */
+export type NativeFunctionCall = {
+  name: string;
+  args: Record<string, unknown>;
+};
+
+/** A single function response to feed back into the conversation. */
+export type NativeFunctionResponse = {
+  functionResponse: { name: string; response: unknown };
+};
+
+/** Result from collectStreamChunks. */
+export type CollectedChunkResult = {
+  rawResponseParts: unknown[];
+  stepFunctionCalls: NativeFunctionCall[];
+  inputTokens: number;
+  outputTokens: number;
+};
+
+/** Push-based text channel for incremental streaming. */
+export type TextChannel = {
+  /** Push a text chunk to the consumer. */
+  push: (text: string) => void;
+  /** Signal that no more chunks will arrive. */
+  close: () => void;
+  /** Signal that the producer encountered a fatal error. */
+  error: (err: unknown) => void;
+  /** Async iterable consumed by the StreamResult. */
+  iterable: AsyncIterable<{ content: string }>;
+};
+
+// =============================================================================
+// PROVIDER TYPE UTILS (moved from providers/providerTypeUtils.ts)
+// =============================================================================
+
+/** Language model object shape (LanguageModelV2/V3). */
+export type LanguageModelObject = {
+  readonly modelId: string;
+  readonly provider: string;
+};
+
+/** Step finish event shape for multi-step generation. */
+export type StepFinishEvent = {
+  readonly toolCalls: ReadonlyArray<unknown>;
+  readonly toolResults: ReadonlyArray<unknown>;
+  readonly text: string;
+  readonly finishReason: string;
+  readonly usage: { inputTokens?: number; outputTokens?: number };
+  [key: string]: unknown;
+};
+
+/**
+ * Represents an AI SDK Tool that may carry a legacy `parameters` field
+ * (from AI SDK v3/v4) in addition to the current `inputSchema`.
+ */
+export type ToolWithLegacyParams = {
+  description?: string;
+  inputSchema?: unknown;
+  execute?: (...args: unknown[]) => unknown;
+  /** Legacy field from AI SDK v3/v4 */
+  parameters?: unknown;
 };

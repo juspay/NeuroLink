@@ -9,7 +9,7 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import { tracers } from "../telemetry/tracers.js";
 import type { ProxyAgent } from "undici";
 import { shouldBypassProxy } from "./utils/noProxyUtils.js";
-import type { ParsedProxyConfig } from "../types/utilities.js";
+import type { ParsedProxyConfig } from "../types/index.js";
 
 const fetchTracer = tracers.http;
 

@@ -18,28 +18,8 @@ import type {
   ServerAdapterEvents,
   ServerContext,
 } from "../types.js";
+import type { KoaRateLimitEntry } from "../../types/index.js";
 import { isErrorResponse } from "../utils/validation.js";
-
-/**
- * Koa context type
- */
-type KoaContext = Koa.ParameterizedContext<
-  Koa.DefaultState,
-  Koa.DefaultContext
->;
-
-/**
- * Koa next function type
- */
-type KoaNext = Koa.Next;
-
-/**
- * Rate limit store entry
- */
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
 
 /**
  * Koa-specific server adapter
@@ -50,7 +30,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
   private router!: Router;
   private server?: import("http").Server;
   private frameworkInitialized = false;
-  private rateLimitStore = new Map<string, RateLimitEntry>();
+  private rateLimitStore = new Map<string, KoaRateLimitEntry>();
   private rateLimitCleanupInterval?: ReturnType<typeof setInterval>;
   private sockets: Set<Socket> = new Set();
 
@@ -86,7 +66,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
     this.router = new Router();
 
     // Request ID middleware (first)
-    this.app.use(async (ctx: KoaContext, next: KoaNext) => {
+    this.app.use(async (ctx: Koa.ParameterizedContext, next: Koa.Next) => {
       ctx.state.requestId =
         (ctx.get("x-request-id") as string) || this.generateRequestId();
       ctx.set("X-Request-ID", ctx.state.requestId);
@@ -94,7 +74,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
     });
 
     // Error handling middleware (should be early to catch all errors)
-    this.app.use(async (ctx: KoaContext, next: KoaNext) => {
+    this.app.use(async (ctx: Koa.ParameterizedContext, next: Koa.Next) => {
       try {
         await next();
       } catch (error) {
@@ -175,7 +155,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
 
     // Logging middleware
     if (this.config.logging.enabled) {
-      this.app.use(async (ctx: KoaContext, next: KoaNext) => {
+      this.app.use(async (ctx: Koa.ParameterizedContext, next: Koa.Next) => {
         const startTime = Date.now();
         logger.info(`[KoaAdapter] ${ctx.method} ${ctx.path}`, {
           requestId: ctx.state.requestId,
@@ -201,7 +181,10 @@ export class KoaServerAdapter extends BaseServerAdapter {
    * Create rate limiter middleware for Koa
    */
   private createRateLimiter(): Koa.Middleware {
-    return async (ctx: KoaContext, next: KoaNext): Promise<void> => {
+    return async (
+      ctx: Koa.ParameterizedContext,
+      next: Koa.Next,
+    ): Promise<void> => {
       // Skip rate limiting for excluded paths
       if (this.config.rateLimit.skipPaths) {
         for (const skipPath of this.config.rateLimit.skipPaths) {
@@ -293,7 +276,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
       | "patch"
       | "options";
 
-    this.router[method](route.path, async (ctx: KoaContext) => {
+    this.router[method](route.path, async (ctx: Koa.ParameterizedContext) => {
       const requestId = ctx.state.requestId;
       const startTime = Date.now();
 
@@ -396,7 +379,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
    * Handle streaming response using Server-Sent Events
    */
   private async handleStreamingResponse(
-    ctx: KoaContext,
+    ctx: Koa.ParameterizedContext,
     serverCtx: ServerContext,
     route: RouteDefinition,
   ): Promise<void> {
@@ -451,7 +434,7 @@ export class KoaServerAdapter extends BaseServerAdapter {
   protected registerFrameworkMiddleware(
     middleware: MiddlewareDefinition,
   ): void {
-    this.app.use(async (ctx: KoaContext, next: KoaNext) => {
+    this.app.use(async (ctx: Koa.ParameterizedContext, next: Koa.Next) => {
       // Skip excluded paths
       if (middleware.excludePaths?.some((p) => ctx.path.startsWith(p))) {
         return next();

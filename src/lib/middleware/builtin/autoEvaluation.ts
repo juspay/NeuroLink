@@ -43,7 +43,7 @@ export function createAutoEvaluationMiddleware(
       const options: LanguageModelV3CallOptions = params;
 
       const rawResult = await doGenerate();
-
+      const rawReasoning = (rawResult as { reasoning?: unknown }).reasoning;
       const textParts = rawResult.content
         .filter((c): c is { type: "text"; text: string } => c.type === "text")
         .map((c) => c.text);
@@ -64,6 +64,18 @@ export function createAutoEvaluationMiddleware(
       const result: GenerateResult = {
         content: textParts.join(""),
         finishReason: rawResult.finishReason.unified,
+        reasoning:
+          typeof rawReasoning === "string"
+            ? rawReasoning
+            : Array.isArray(rawReasoning)
+              ? rawReasoning
+                  .map((r) =>
+                    typeof r === "string"
+                      ? r
+                      : ((r as { text?: string })?.text ?? JSON.stringify(r)),
+                  )
+                  .join("\n")
+              : undefined,
         usage: {
           input: inputTokens,
           output: outputTokens,

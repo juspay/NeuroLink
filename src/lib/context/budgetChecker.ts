@@ -90,7 +90,7 @@ export function checkContextBudget(
       : 0;
 
     const toolDefinitionTokens = toolDefinitions?.length
-      ? toolDefinitions.reduce((sum: number, tool: unknown) => {
+      ? toolDefinitions.reduce<number>((sum, tool) => {
           try {
             const serialized = JSON.stringify(tool);
             return sum + estimateTokens(serialized, provider);

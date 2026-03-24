@@ -42,7 +42,8 @@ import {
   createTimeoutController,
   TimeoutError,
 } from "../utils/timeout.js";
-import { getModelId, type ToolWithLegacyParams } from "./providerTypeUtils.js";
+import { getModelId } from "./providerTypeUtils.js";
+import type { ToolWithLegacyParams } from "../types/index.js";
 
 /**
  * Retrieve a tool's schema, handling both AI SDK v6 (`inputSchema`) and

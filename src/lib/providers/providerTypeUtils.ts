@@ -7,15 +7,7 @@
 
 import type { LanguageModel, streamText } from "ai";
 import type { StreamTextResult } from "../types/streamTypes.js";
-
-/**
- * A language model object (as opposed to a plain string model identifier).
- * Both LanguageModelV2 and LanguageModelV3 share this shape.
- */
-interface LanguageModelObject {
-  readonly modelId: string;
-  readonly provider: string;
-}
+import type { LanguageModelObject } from "../types/index.js";
 
 /**
  * Type guard: checks whether a LanguageModel value is an object with `modelId`
@@ -62,36 +54,4 @@ export function toAnalyticsStreamResult(
   // Both use PromiseLike for async fields and compatible usage shapes
   // (extractTokenUsage handles both v4 and v6 field names).
   return result as StreamTextResult;
-}
-
-/**
- * Shape of the event passed to `onStepFinish` callbacks by the AI SDK's `streamText`.
- *
- * We define only the fields our providers actually use (`toolCalls`, `toolResults`)
- * so the destructuring in each callback is type-safe without importing the full
- * generic `StepResult<TOOLS>` (which would require threading TOOLS everywhere).
- */
-export interface StepFinishEvent {
-  readonly toolCalls: ReadonlyArray<unknown>;
-  readonly toolResults: ReadonlyArray<unknown>;
-  readonly text: string;
-  readonly finishReason: string;
-  readonly usage: { inputTokens?: number; outputTokens?: number };
-  [key: string]: unknown;
-}
-
-/**
- * Represents an AI SDK Tool that may carry a legacy `parameters` field
- * (from AI SDK v3/v4) in addition to the current `inputSchema`.
- *
- * In AI SDK v6 the canonical field is `inputSchema`, but tools created with
- * older SDK versions or third-party wrappers may still carry `parameters`.
- * This interface lets us access either field without `as any`.
- */
-export interface ToolWithLegacyParams {
-  description?: string;
-  inputSchema?: unknown;
-  execute?: (...args: unknown[]) => unknown;
-  /** Legacy field from AI SDK v3/v4 */
-  parameters?: unknown;
 }

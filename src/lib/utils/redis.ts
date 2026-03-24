@@ -261,7 +261,7 @@ export function serializeConversation(
  * Deserializes conversation object from Redis storage
  */
 export function deserializeConversation(
-  data: string | null,
+  data: string | Buffer | null,
 ): RedisConversationObject | null {
   if (!data) {
     return null;
@@ -269,7 +269,7 @@ export function deserializeConversation(
 
   try {
     // Parse as unknown first, then validate before casting
-    const parsedData = JSON.parse(data) as unknown;
+    const parsedData = JSON.parse(String(data)) as unknown;
 
     // Check if the parsed data is an object with required properties
     if (
@@ -401,8 +401,8 @@ export async function scanKeys(
       });
 
       // Extract cursor and keys from result
-      cursor = result.cursor;
-      const keys = result.keys || [];
+      cursor = String(result.cursor);
+      const keys = (result.keys || []).map(String);
 
       // Add keys to result array
       allKeys.push(...keys);

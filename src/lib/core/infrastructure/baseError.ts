@@ -1,4 +1,4 @@
-export type ErrorCode = string;
+import type { ErrorCode } from "../../types/index.js";
 
 export class NeuroLinkFeatureError extends Error {
   readonly code: ErrorCode;

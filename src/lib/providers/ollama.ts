@@ -11,6 +11,7 @@ import type {
   MultimodalChatMessage,
 } from "../types/conversation.js";
 import type {
+  OllamaAsLanguageModel,
   OllamaMessage,
   OllamaToolCall,
   OllamaToolResult,
@@ -72,23 +73,6 @@ const getOllamaTimeout = (): number => {
 const proxyFetch = createProxyFetch();
 
 // Custom LanguageModel implementation for Ollama
-/**
- * Structural adapter type capturing what AI SDK's `streamText` / `generateText`
- * actually invoke at runtime on a model object.
- *
- * `OllamaLanguageModel` satisfies this interface. We expose it so the provider
- * can cast `new OllamaLanguageModel(...)` to `LanguageModel` via this
- * intermediate type, avoiding `as unknown as LanguageModel`.
- */
-interface OllamaAsLanguageModel {
-  readonly specificationVersion: string;
-  readonly provider: string;
-  readonly modelId: string;
-  readonly supportedUrls: Record<string, RegExp[]>;
-  doGenerate(options: Record<string, unknown>): Promise<unknown>;
-  doStream(options: Record<string, unknown>): Promise<unknown>;
-}
-
 class OllamaLanguageModel implements OllamaAsLanguageModel {
   /**
    * Specification version for the AI SDK LanguageModel interface.

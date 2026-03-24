@@ -25,10 +25,8 @@ import {
   getSageMakerModelConfig,
 } from "./sagemaker/config.js";
 import { handleSageMakerError, SageMakerError } from "./sagemaker/errors.js";
-import {
-  SageMakerLanguageModel,
-  type SageMakerAsLanguageModel,
-} from "./sagemaker/language-model.js";
+import { SageMakerLanguageModel } from "./sagemaker/language-model.js";
+import type { SageMakerAsLanguageModel } from "../types/index.js";
 
 /**
  * Amazon SageMaker Provider extending BaseProvider

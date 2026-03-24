@@ -117,7 +117,6 @@ import {
   RETRY_ATTEMPTS,
   RETRY_DELAYS,
   PROVIDER_RETRY,
-  BACKOFF_CONFIG,
   RetryUtils,
 } from "./retry.js";
 import {
@@ -286,19 +285,6 @@ export function getPerformanceConfig(
   ) as keyof typeof PERFORMANCE_PROFILES;
   return PERFORMANCE_PROFILES[loadKey] ?? PERFORMANCE_PROFILES.NORMAL_LOAD;
 }
-
-// ===== TYPE EXPORTS =====
-
-/**
- * Type definitions for configuration objects
- */
-export type TimeoutCategory = keyof typeof TOOL_TIMEOUTS;
-export type RetryStrategy = keyof typeof BACKOFF_CONFIG;
-export type PerformanceProfile = keyof typeof PERFORMANCE_PROFILES;
-export type ProviderConfig =
-  (typeof PROVIDER_OPERATION_CONFIGS)[keyof typeof PROVIDER_OPERATION_CONFIGS];
-export type McpConfig =
-  (typeof MCP_OPERATION_CONFIGS)[keyof typeof MCP_OPERATION_CONFIGS];
 
 // ===== VERSION AND METADATA =====
 

@@ -9,18 +9,7 @@
  */
 
 import type { CommandModule, Argv } from "yargs";
-
-/**
- * Auth command arguments interface
- */
-export interface AuthCommandArgs {
-  provider?: string;
-  method?: "api-key" | "oauth" | "create-api-key";
-  format?: "text" | "json";
-  quiet?: boolean;
-  debug?: boolean;
-  nonInteractive?: boolean;
-}
+import type { AuthCommandArgs } from "../../lib/types/index.js";
 
 /**
  * Supported providers for authentication
@@ -82,6 +71,42 @@ export class AuthCommandFactory {
               await handleRefresh(argv as AuthCommandArgs);
             },
           )
+          .command(
+            "list",
+            "List all authenticated accounts",
+            (yargs) => this.buildListOptions(yargs),
+            async (argv) => {
+              const { handleList } = await import("../commands/auth.js");
+              await handleList(argv as AuthCommandArgs);
+            },
+          )
+          .command(
+            "remove <provider>",
+            "Remove an authenticated account",
+            (yargs) => this.buildRemoveOptions(yargs),
+            async (argv) => {
+              const { handleRemove } = await import("../commands/auth.js");
+              await handleRemove(argv as AuthCommandArgs);
+            },
+          )
+          .command(
+            "cleanup",
+            "Remove expired and disabled accounts from token store",
+            (yargs) => this.buildCleanupOptions(yargs),
+            async (argv) => {
+              const { handleCleanup } = await import("../commands/auth.js");
+              await handleCleanup(argv as AuthCommandArgs);
+            },
+          )
+          .command(
+            "enable <account>",
+            "Re-enable a previously disabled account",
+            (yargs) => this.buildEnableOptions(yargs),
+            async (argv) => {
+              const { handleEnable } = await import("../commands/auth.js");
+              await handleEnable(argv as AuthCommandArgs);
+            },
+          )
           .option("format", {
             choices: ["text", "json"] as const,
             default: "text",
@@ -105,6 +130,11 @@ export class AuthCommandFactory {
             "Create API key via OAuth (Claude Pro/Max - Recommended)",
           )
           .example(
+            "$0 auth login anthropic --add --label alice",
+            "Add additional account with label",
+          )
+          .example("$0 auth list", "List all authenticated accounts")
+          .example(
             "$0 auth status",
             "Show authentication status for all providers",
           )
@@ -113,8 +143,21 @@ export class AuthCommandFactory {
             "Clear Anthropic stored credentials",
           )
           .example(
+            "$0 auth remove anthropic --label alice",
+            "Remove a specific account",
+          )
+          .example(
             "$0 auth refresh anthropic",
             "Refresh Anthropic OAuth tokens",
+          )
+          .example("$0 auth cleanup", "Remove expired and disabled accounts")
+          .example(
+            "$0 auth cleanup --force",
+            "Remove stale accounts without confirmation",
+          )
+          .example(
+            "$0 auth enable anthropic:1-VjRIq",
+            "Re-enable a disabled account",
           )
           .help();
       },
@@ -147,6 +190,16 @@ export class AuthCommandFactory {
           "Skip interactive prompts (requires environment variables)",
         default: false,
       })
+      .option("add", {
+        type: "boolean",
+        default: false,
+        description:
+          "Add as additional account to the pool (instead of replacing)",
+      })
+      .option("label", {
+        type: "string",
+        description: "Human-readable label for this account (used with --add)",
+      })
       .example(
         "$0 auth login anthropic",
         "Interactive authentication (choose method)",
@@ -162,6 +215,10 @@ export class AuthCommandFactory {
       .example(
         "$0 auth login anthropic --method oauth",
         "Direct OAuth (experimental)",
+      )
+      .example(
+        "$0 auth login anthropic --add --label alice",
+        "Add as additional account with label",
       );
   }
 
@@ -210,5 +267,87 @@ export class AuthCommandFactory {
         demandOption: true,
       })
       .example("$0 auth refresh anthropic", "Refresh Anthropic OAuth tokens");
+  }
+
+  /**
+   * Build options for list subcommand
+   */
+  private static buildListOptions(yargs: Argv): Argv {
+    return yargs
+      .example("$0 auth list", "List all authenticated accounts")
+      .example("$0 auth list --format json", "List accounts in JSON format");
+  }
+
+  /**
+   * Build options for remove subcommand
+   */
+  private static buildRemoveOptions(yargs: Argv): Argv {
+    return yargs
+      .positional("provider", {
+        type: "string",
+        description: "AI provider to remove account from",
+        choices: SUPPORTED_PROVIDERS,
+        demandOption: true,
+      })
+      .option("label", {
+        type: "string",
+        description: "Label of the account to remove (e.g., alice)",
+      })
+      .option("account", {
+        type: "string",
+        description:
+          "Full compound key of the account to remove (e.g., anthropic:alice)",
+      })
+      .conflicts("label", "account")
+      .check((argv) => {
+        if (
+          argv.account &&
+          !String(argv.account).startsWith(`${String(argv.provider)}:`)
+        ) {
+          throw new Error("--account must belong to the selected provider");
+        }
+        return true;
+      })
+      .example(
+        "$0 auth remove anthropic --label alice",
+        "Remove account with label alice",
+      )
+      .example(
+        "$0 auth remove anthropic --account anthropic:alice",
+        "Remove account by compound key",
+      );
+  }
+
+  /**
+   * Build options for cleanup subcommand
+   */
+  private static buildCleanupOptions(yargs: Argv): Argv {
+    return yargs
+      .option("force", {
+        type: "boolean",
+        default: false,
+        description: "Skip confirmation when removing disabled accounts",
+      })
+      .example("$0 auth cleanup", "Remove expired and disabled accounts")
+      .example(
+        "$0 auth cleanup --force",
+        "Remove stale accounts without confirmation",
+      );
+  }
+
+  /**
+   * Build options for enable subcommand
+   */
+  private static buildEnableOptions(yargs: Argv): Argv {
+    return yargs
+      .positional("account", {
+        type: "string",
+        description: "Account key to re-enable (e.g., anthropic:1-VjRIq)",
+        demandOption: true,
+      })
+      .example(
+        "$0 auth enable anthropic:1-VjRIq",
+        "Re-enable a disabled account",
+      );
   }
 }

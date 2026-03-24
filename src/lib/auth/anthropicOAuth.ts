@@ -50,17 +50,6 @@ function redactTokens(s: string): string {
     .replace(/\b[A-Za-z0-9\-_]{32,}\b/g, "[TOKEN]");
 }
 
-// Re-export error classes for backward compatibility
-export {
-  OAuthError,
-  OAuthConfigurationError,
-  OAuthTokenExchangeError,
-  OAuthTokenRefreshError,
-  OAuthTokenValidationError,
-  OAuthTokenRevocationError,
-  OAuthCallbackServerError,
-} from "../types/errors.js";
-
 // =============================================================================
 // OAUTH CONSTANTS (Claude Code Official)
 // =============================================================================
@@ -77,9 +66,14 @@ export const CLAUDE_CODE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 export const ANTHROPIC_AUTH_URL = "https://claude.ai/oauth/authorize";
 
 /**
- * Anthropic OAuth token endpoint
+ * Anthropic OAuth token endpoint (primary — lighter Cloudflare)
  */
-export const ANTHROPIC_TOKEN_URL =
+export const ANTHROPIC_TOKEN_URL = "https://api.anthropic.com/v1/oauth/token";
+
+/**
+ * Anthropic OAuth token endpoint (fallback)
+ */
+export const ANTHROPIC_TOKEN_URL_FALLBACK =
   "https://console.anthropic.com/v1/oauth/token";
 
 /**
@@ -142,18 +136,7 @@ import type {
   AnthropicOAuthConfig,
   PKCEParams,
   CallbackResult,
-} from "../types/subscriptionTypes.js";
-
-// Re-export types for backward compatibility
-export type {
-  OAuthTokenResponse,
-  OAuthFlowTokens,
-  OAuthFlowTokens as OAuthTokens,
-  TokenValidationResult,
-  AnthropicOAuthConfig,
-  PKCEParams,
-  CallbackResult,
-} from "../types/subscriptionTypes.js";
+} from "../types/index.js";
 
 // =============================================================================
 // MAIN OAUTH CLASS
@@ -449,45 +432,65 @@ export class AnthropicOAuth {
       body.client_secret = clientSecret;
     }
 
-    try {
-      const response = await fetch(config.tokenUrl || this.tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: new URLSearchParams(body).toString(),
-      });
+    const urls = this.getTokenUrls(config.tokenUrl);
+    let lastError: unknown;
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        logger.error("Token exchange failed", {
-          status: response.status,
-          error: redactTokens(errorBody).slice(0, 500),
+    for (const url of urls) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams(body).toString(),
+          signal: controller.signal,
         });
-        throw new OAuthTokenExchangeError(
-          `Token exchange failed: ${response.status} - ${errorBody}`,
-          response.status,
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          logger.error("Token exchange failed", {
+            url,
+            status: response.status,
+            error: redactTokens(errorBody).slice(0, 500),
+          });
+          lastError = new OAuthTokenExchangeError(
+            `Token exchange failed: ${response.status} - ${errorBody}`,
+            response.status,
+          );
+          continue;
+        }
+
+        const tokenResponse: OAuthTokenResponse = await response.json();
+        const tokens = this.parseTokenResponse(tokenResponse);
+
+        logger.info("Token exchange successful", {
+          expiresAt: tokens.expiresAt.toISOString(),
+          hasRefreshToken: !!tokens.refreshToken,
+        });
+
+        return tokens;
+      } catch (error) {
+        if (error instanceof OAuthError) {
+          lastError = error;
+          continue;
+        }
+        lastError = new OAuthTokenExchangeError(
+          `Failed to exchange authorization code: ${error instanceof Error ? error.message : String(error)}`,
         );
+        continue;
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      const tokenResponse: OAuthTokenResponse = await response.json();
-      const tokens = this.parseTokenResponse(tokenResponse);
-
-      logger.info("Token exchange successful", {
-        expiresAt: tokens.expiresAt.toISOString(),
-        hasRefreshToken: !!tokens.refreshToken,
-      });
-
-      return tokens;
-    } catch (error) {
-      if (error instanceof OAuthError) {
-        throw error;
-      }
-      throw new OAuthTokenExchangeError(
-        `Failed to exchange authorization code: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
+
+    throw lastError instanceof OAuthError
+      ? lastError
+      : new OAuthTokenExchangeError(
+          `Failed to exchange authorization code: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+        );
   }
 
   // =============================================================================
@@ -532,44 +535,71 @@ export class AnthropicOAuth {
       body.client_secret = clientSecret;
     }
 
-    try {
-      const response = await fetch(config.tokenUrl || this.tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: new URLSearchParams(body).toString(),
-      });
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+      "User-Agent": CLAUDE_CLI_USER_AGENT,
+    };
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        logger.error("Token refresh failed", {
-          status: response.status,
-          error: redactTokens(errorBody).slice(0, 500),
+    const urls = this.getTokenUrls(config.tokenUrl);
+
+    let lastError: unknown;
+
+    for (const url of urls) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: new URLSearchParams(body).toString(),
+          signal: controller.signal,
         });
-        throw new OAuthTokenRefreshError(
-          `Token refresh failed: ${response.status} - ${errorBody}`,
-          response.status,
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          logger.error("Token refresh failed", {
+            url,
+            status: response.status,
+            error: redactTokens(errorBody).slice(0, 500),
+          });
+          lastError = new OAuthTokenRefreshError(
+            `Token refresh failed: ${response.status} - ${errorBody}`,
+            response.status,
+          );
+          // Try fallback URL if available
+          continue;
+        }
+
+        const tokenResponse: OAuthTokenResponse = await response.json();
+        const tokens = this.parseTokenResponse(tokenResponse);
+
+        logger.info("Access token refreshed successfully", {
+          expiresAt: tokens.expiresAt.toISOString(),
+        });
+
+        return tokens;
+      } catch (error) {
+        if (error instanceof OAuthError) {
+          lastError = error;
+          // Try fallback URL if available
+          continue;
+        }
+        lastError = new OAuthTokenRefreshError(
+          `Failed to refresh access token: ${error instanceof Error ? error.message : String(error)}`,
         );
+        continue;
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      const tokenResponse: OAuthTokenResponse = await response.json();
-      const tokens = this.parseTokenResponse(tokenResponse);
-
-      logger.info("Access token refreshed successfully", {
-        expiresAt: tokens.expiresAt.toISOString(),
-      });
-
-      return tokens;
-    } catch (error) {
-      if (error instanceof OAuthError) {
-        throw error;
-      }
-      throw new OAuthTokenRefreshError(
-        `Failed to refresh access token: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
+
+    // All URLs exhausted — throw the last error
+    throw lastError instanceof OAuthError
+      ? lastError
+      : new OAuthTokenRefreshError(
+          `Failed to refresh access token: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+        );
   }
 
   // =============================================================================
@@ -610,6 +640,7 @@ export class AnthropicOAuth {
           "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json",
           Authorization: `Bearer ${accessToken}`,
+          "User-Agent": CLAUDE_CLI_USER_AGENT,
         },
         body: new URLSearchParams({
           token: accessToken,
@@ -658,6 +689,7 @@ export class AnthropicOAuth {
           "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json",
           Authorization: `Bearer ${accessToken}`,
+          "User-Agent": CLAUDE_CLI_USER_AGENT,
         },
         body: new URLSearchParams({
           token: accessToken,
@@ -768,6 +800,24 @@ export class AnthropicOAuth {
   // =============================================================================
   // HELPER METHODS
   // =============================================================================
+
+  /**
+   * Build the list of token endpoint URLs to try, with optional fallback.
+   *
+   * When a custom tokenUrl was provided (via config param OR constructor), never
+   * fall back to the default Anthropic endpoint — leaking credentials to an
+   * unexpected endpoint is a security risk.
+   */
+  private getTokenUrls(configTokenUrl?: string): string[] {
+    if (configTokenUrl) {
+      return [configTokenUrl];
+    }
+    const isCustomConstructorUrl = this.tokenUrl !== ANTHROPIC_TOKEN_URL;
+    if (isCustomConstructorUrl) {
+      return [this.tokenUrl];
+    }
+    return [this.tokenUrl, ANTHROPIC_TOKEN_URL_FALLBACK];
+  }
 
   /**
    * Parses a token response into structured OAuthFlowTokens

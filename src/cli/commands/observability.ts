@@ -16,24 +16,12 @@ import ora from "ora";
 import { logger } from "../../lib/utils/logger.js";
 import { NeuroLink } from "../../lib/neurolink.js";
 import { formatRow, formatCost } from "../utils/formatters.js";
-
-/**
- * Observability command arguments
- */
-type ObservabilityCommandArgs = {
-  format?: "text" | "json" | "table";
-  quiet?: boolean;
-};
-
-type StatusArgs = ObservabilityCommandArgs;
-type MetricsArgs = ObservabilityCommandArgs & {
-  detailed?: boolean;
-};
-type ExportersArgs = ObservabilityCommandArgs;
-type CostsArgs = ObservabilityCommandArgs & {
-  byModel?: boolean;
-  byProvider?: boolean;
-};
+import type {
+  ObservabilityStatusArgs as StatusArgs,
+  ObservabilityMetricsArgs as MetricsArgs,
+  ObservabilityExportersArgs as ExportersArgs,
+  ObservabilityCostsArgs as CostsArgs,
+} from "../../lib/types/index.js";
 
 /**
  * Observability Command Factory

@@ -353,7 +353,7 @@ export class RedisConversationMemoryManager implements IConversationMemoryManage
     try {
       const userSessionsKey = getUserSessionsKey(this.redisConfig, userId);
       const sessions = await this.redisClient.sMembers(userSessionsKey);
-      return sessions;
+      return Array.from(sessions).map(String);
     } catch (error) {
       logger.error(
         "[RedisConversationMemoryManager] Failed to get user sessions",
@@ -412,7 +412,7 @@ export class RedisConversationMemoryManager implements IConversationMemoryManage
 
       const result = await this.redisClient.sRem(userSessionsKey, sessionId);
 
-      return result > 0;
+      return Number(result) > 0;
     } catch (error) {
       logger.error(
         "[RedisConversationMemoryManager] Failed to remove session from user set",
@@ -1547,7 +1547,7 @@ User message: "${userMessage}"`;
           const redisKey = getSessionKey(this.redisConfig, sessionId, userId);
           const result = await this.redisClient!.del(redisKey);
 
-          if (result > 0) {
+          if (Number(result) > 0) {
             // Remove session from user's session set
             if (userId) {
               await this.removeUserSession(userId, sessionId);

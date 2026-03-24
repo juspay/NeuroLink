@@ -624,6 +624,11 @@ export type GenerateResult = {
     workflowName: string;
   };
 
+  /** Thinking/reasoning text from provider (Anthropic thinking blocks, Gemini thought parts) */
+  reasoning?: string;
+  /** Token count for reasoning content */
+  reasoningTokens?: number;
+
   // NL-007: Retry metadata for observability
   retries?: {
     count: number;

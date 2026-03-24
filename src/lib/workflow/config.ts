@@ -56,7 +56,7 @@ const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
 /**
  * Provider name validation - accepts any AIProviderName enum value or string
  */
-const ProviderNameSchema = z
+const ProviderNameSchema: z.ZodType<AIProviderName> = z
   .union([z.nativeEnum(AIProviderName), z.string().min(1)])
   .transform((val) => val as AIProviderName);
 

@@ -23,15 +23,8 @@ import type {
   ServerAdapterEvents,
   ServerContext,
 } from "../types.js";
+import type { HonoRateLimitEntry } from "../../types/index.js";
 import { isErrorResponse } from "../utils/validation.js";
-
-/**
- * Rate limit store entry
- */
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
 
 // Declare global for runtime detection
 declare const Bun: { serve: (options: unknown) => unknown } | undefined;
@@ -46,7 +39,7 @@ declare const Deno:
 export class HonoServerAdapter extends BaseServerAdapter {
   private app!: Hono;
   private server?: unknown;
-  private rateLimitStore = new Map<string, RateLimitEntry>();
+  private rateLimitStore = new Map<string, HonoRateLimitEntry>();
   private rateLimitCleanupInterval?: ReturnType<typeof setInterval>;
   // Store context by request ID for sharing between middleware and route handlers
   private requestContextStore = new Map<string, ServerContext>();

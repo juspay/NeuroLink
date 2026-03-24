@@ -6,6 +6,20 @@
  */
 
 // =============================================================================
+// STORED OAUTH TOKENS (canonical location: authTypes.ts — re-exported here
+// for backward compatibility)
+// =============================================================================
+
+import type { StoredOAuthTokens } from "./authTypes.js";
+
+export type {
+  StoredOAuthTokens,
+  TokenRefresher,
+  TokenStorageData,
+  StoredProviderTokens,
+} from "./authTypes.js";
+
+// =============================================================================
 // SUBSCRIPTION TIER TYPES
 // =============================================================================
 
@@ -1081,3 +1095,90 @@ export interface AnthropicModelMetadata {
   /** Short description of the model */
   description: string;
 }
+
+// =============================================================================
+// CLAUDE PROXY TYPES
+// =============================================================================
+
+/** A single Claude account in the pool */
+export interface ProxyAccount {
+  id: string;
+  label?: string;
+  type: "oauth" | "api_key";
+  tokens?: StoredOAuthTokens;
+  apiKey?: string;
+  status: "healthy" | "cooling" | "disabled";
+  cooldownUntil?: number;
+  consecutiveFailures: number;
+  requestCount: number;
+  lastUsed: number;
+  subscriptionTier?: ClaudeSubscriptionTier;
+}
+
+/** Configuration for AccountPool */
+export interface AccountPoolConfig {
+  strategy: "round-robin" | "fill-first";
+  defaultCooldownMs?: number;
+  maxCooldownMs?: number;
+  maxRetryAccounts?: number;
+}
+
+/** A single model mapping entry */
+export interface ModelMapping {
+  from: string;
+  to: string;
+  provider: string;
+}
+
+/** A fallback chain entry */
+export interface FallbackEntry {
+  provider: string;
+  model: string;
+}
+
+/** Full proxy routing config */
+export interface ProxyRoutingConfig {
+  strategy: "round-robin" | "fill-first";
+  modelMappings: ModelMapping[];
+  fallbackChain: FallbackEntry[];
+  passthroughModels?: string[];
+}
+
+/** Cloaking plugin config */
+export interface CloakingConfig {
+  mode: "auto" | "always" | "never";
+  plugins: {
+    headerScrubber?: boolean;
+    sessionIdentity?: boolean;
+    systemPromptInjector?: boolean;
+    wordObfuscator?: { enabled: boolean; words: string[] };
+    tlsFingerprint?: { enabled: boolean };
+  };
+}
+
+/** Full proxy config (loaded from YAML) */
+export interface ProxyConfig {
+  host?: string;
+  port?: number;
+  auth?: "none" | "api-key";
+  proxyApiKey?: string;
+  /** Provider-keyed account map matching the YAML structure (e.g. accounts.anthropic[0]) */
+  accounts?: Record<
+    string,
+    Array<{
+      name: string;
+      apiKey?: string;
+      weight?: number;
+      rateLimit?: number;
+      enabled?: boolean;
+      baseUrl?: string;
+      orgId?: string;
+      metadata?: Record<string, unknown>;
+    }>
+  >;
+  routing?: Partial<ProxyRoutingConfig>;
+  cloaking?: CloakingConfig;
+}
+
+// TokenStorageData and StoredProviderTokens are now in authTypes.ts and
+// re-exported at the top of this file for backward compatibility.

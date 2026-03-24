@@ -9,17 +9,7 @@ import chalk from "chalk";
 import ora from "ora";
 
 import { logger } from "../../lib/utils/logger.js";
-
-// Allowed commands for security
-type AllowedCommand =
-  | "ollama"
-  | "curl"
-  | "systemctl"
-  | "pkill"
-  | "killall"
-  | "open"
-  | "taskkill"
-  | "start";
+import type { AllowedCommand } from "../../lib/types/index.js";
 
 /**
  * Shared Ollama utilities for CLI commands

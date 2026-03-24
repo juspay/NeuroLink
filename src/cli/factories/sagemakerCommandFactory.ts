@@ -20,23 +20,10 @@ import {
   runQuickDiagnostics,
   formatDiagnosticReport,
 } from "../../lib/providers/sagemaker/diagnostics.js";
-import type { SecureConfiguration } from "../../lib/types/cli.js";
-
-/**
- * Interface for language models that expose the low-level doGenerate method.
- * Used by SageMaker CLI commands for direct endpoint testing and benchmarking.
- */
-interface DoGenerateModel {
-  doGenerate(options: Record<string, unknown>): Promise<{
-    text?: string;
-    finishReason?: string;
-    usage: {
-      promptTokens: number;
-      completionTokens: number;
-      totalTokens?: number;
-    };
-  }>;
-}
+import type {
+  DoGenerateModel,
+  SecureConfiguration,
+} from "../../lib/types/cli.js";
 
 /**
  * Narrow a LanguageModel to a DoGenerateModel if it exposes doGenerate.
@@ -401,7 +388,7 @@ export class SageMakerCommandFactory {
             `   Output: "${result.text?.substring(0, 100)}${result.text && result.text.length > 100 ? "..." : ""}"`,
           );
           logger.always(
-            `   Tokens: ${result.usage.promptTokens} -> ${result.usage.completionTokens} (${result.usage.totalTokens ?? result.usage.promptTokens + result.usage.completionTokens} total)`,
+            `   Tokens: ${result.usage.promptTokens ?? result.usage.inputTokens ?? 0} -> ${result.usage.completionTokens ?? result.usage.outputTokens ?? 0} (${result.usage.totalTokens ?? (result.usage.promptTokens ?? result.usage.inputTokens ?? 0) + (result.usage.completionTokens ?? result.usage.outputTokens ?? 0)} total)`,
           );
           logger.always(`   Finish Reason: ${result.finishReason}`);
         } catch (genError) {
@@ -895,7 +882,12 @@ export class SageMakerCommandFactory {
                   duration: Date.now() - requestStart,
                   tokens:
                     result.usage.totalTokens ??
-                    result.usage.promptTokens + result.usage.completionTokens,
+                    (result.usage.promptTokens ??
+                      result.usage.inputTokens ??
+                      0) +
+                      (result.usage.completionTokens ??
+                        result.usage.outputTokens ??
+                        0),
                   success: true,
                 };
               } catch (error: unknown) {

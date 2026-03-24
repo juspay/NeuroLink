@@ -32,68 +32,10 @@ import {
   isProcessRunning,
   StateFileManager,
 } from "../utils/serverUtils.js";
-
-// ============================================
-// Types
-// ============================================
-
-/**
- * Serve command arguments
- */
-type ServeCommandArgs = {
-  port?: number;
-  host?: string;
-  framework?: ServerFramework;
-  basePath?: string;
-  cors?: boolean;
-  rateLimit?: number;
-  swagger?: boolean;
-  config?: string;
-  watch?: boolean;
-  quiet?: boolean;
-  debug?: boolean;
-  format?: "text" | "json";
-};
-
-/**
- * Server configuration file format
- */
-type ServerConfigFile = {
-  port?: number;
-  host?: string;
-  framework?: ServerFramework;
-  basePath?: string;
-  cors?: {
-    enabled?: boolean;
-    origins?: string[];
-    methods?: string[];
-    headers?: string[];
-    credentials?: boolean;
-    maxAge?: number;
-  };
-  rateLimit?: {
-    enabled?: boolean;
-    windowMs?: number;
-    maxRequests?: number;
-    message?: string;
-    skipPaths?: string[];
-  };
-  bodyParser?: {
-    enabled?: boolean;
-    maxSize?: string;
-    jsonLimit?: string;
-    urlEncoded?: boolean;
-  };
-  logging?: {
-    enabled?: boolean;
-    level?: "debug" | "info" | "warn" | "error";
-    includeBody?: boolean;
-    includeResponse?: boolean;
-  };
-  timeout?: number;
-  enableMetrics?: boolean;
-  enableSwagger?: boolean;
-};
+import type {
+  ServeCommandArgs,
+  ServerConfigFile,
+} from "../../lib/types/index.js";
 
 /**
  * Minimal interface for the server instance returned by createServer.
