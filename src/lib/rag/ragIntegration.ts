@@ -28,6 +28,7 @@ import type {
   RAGConfig,
   VectorQueryResult,
 } from "./types.js";
+import type { RAGPreparedTool } from "../types/index.js";
 
 /**
  * Maps file extensions to recommended chunking strategies
@@ -170,19 +171,7 @@ function diversifyResults(
   return diversified;
 }
 
-/**
- * Result of preparing RAG for a generate/stream call
- */
-export type RAGPreparedTool = {
-  /** The tool to inject into the tools Record */
-  tool: Tool;
-  /** Tool name (key for the tools Record) */
-  toolName: string;
-  /** Number of chunks indexed */
-  chunksIndexed: number;
-  /** Number of files loaded */
-  filesLoaded: number;
-};
+export type { RAGPreparedTool } from "../types/index.js";
 
 /**
  * Prepare RAG tools from the provided configuration.

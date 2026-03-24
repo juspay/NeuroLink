@@ -9,19 +9,17 @@
 import { TypedEventEmitter } from "../../core/infrastructure/index.js";
 import { logger } from "../../utils/logger.js";
 import { RAGCircuitBreakerError, RAGErrorCodes } from "../errors/RAGError.js";
-
-/**
- * Circuit breaker states
- */
-export type CircuitState = "closed" | "open" | "half-open";
-
 import type {
+  CircuitState,
   RAGCircuitBreakerConfig,
+  RAGCircuitBreakerEvents,
   RAGCircuitBreakerStats,
-} from "../../types/ragTypes.js";
+} from "../../types/index.js";
 
-export type { RAGCircuitBreakerConfig } from "../../types/ragTypes.js";
-export type { RAGCircuitBreakerStats } from "../../types/ragTypes.js";
+export type { CircuitState } from "../../types/index.js";
+export type { RAGCircuitBreakerConfig } from "../../types/index.js";
+export type { RAGCircuitBreakerStats } from "../../types/index.js";
+export type { RAGCircuitBreakerEvents } from "../../types/index.js";
 
 /**
  * Call record for statistics
@@ -31,32 +29,6 @@ type CallRecord = {
   success: boolean;
   duration: number;
   operationType?: string;
-};
-
-/**
- * Circuit breaker events
- */
-export type RAGCircuitBreakerEvents = {
-  stateChange: [
-    {
-      oldState: CircuitState;
-      newState: CircuitState;
-      reason: string;
-      timestamp: Date;
-    },
-  ];
-  callSuccess: [{ duration: number; timestamp: Date; operationType?: string }];
-  callFailure: [
-    {
-      error: string;
-      duration: number;
-      timestamp: Date;
-      operationType?: string;
-    },
-  ];
-  circuitOpen: [{ failureRate: number; totalCalls: number; timestamp: Date }];
-  circuitHalfOpen: [{ timestamp: Date }];
-  circuitClosed: [{ timestamp: Date }];
 };
 
 /**

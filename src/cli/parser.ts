@@ -12,6 +12,15 @@ import { ServeCommandFactory } from "./commands/serve.js";
 import { ragCommand } from "./commands/rag.js";
 import { ObservabilityCommandFactory } from "./commands/observability.js";
 import { TelemetryCommandFactory } from "./commands/telemetry.js";
+import {
+  proxyStartCommand,
+  proxyStatusCommand,
+  proxySetupCommand,
+  proxyGuardCommand,
+  proxyInstallCommand,
+  proxyUninstallCommand,
+} from "./commands/proxy.js";
+import { AuthCommandFactory } from "./factories/authCommandFactory.js";
 
 // Enhanced CLI with Professional UX
 export function initializeCliParser() {
@@ -222,5 +231,27 @@ export function initializeCliParser() {
 
       // Telemetry Commands
       .command(TelemetryCommandFactory.createTelemetryCommands())
+
+      // Auth Commands - Authentication management
+      .command(AuthCommandFactory.createAuthCommands())
+
+      // Proxy Commands - Claude multi-account proxy
+      .command({
+        command: "proxy <subcommand>",
+        describe: "Manage Claude multi-account proxy server",
+        builder: (yargs) =>
+          yargs
+            .command(proxyStartCommand)
+            .command(proxyStatusCommand)
+            .command(proxySetupCommand)
+            .command(proxyGuardCommand)
+            .command(proxyInstallCommand)
+            .command(proxyUninstallCommand)
+            .demandCommand(
+              1,
+              "Please specify a proxy subcommand: start, status, setup, guard, install, or uninstall",
+            ),
+        handler: () => {},
+      })
   ); // Close the main return statement
 }

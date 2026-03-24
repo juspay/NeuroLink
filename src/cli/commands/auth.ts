@@ -8,10 +8,12 @@
  * - OAuth 2.1 authentication with PKCE (for Claude subscription)
  *
  * Subcommands:
- * - login: Authenticate with a provider
+ * - login: Authenticate with a provider (supports --add/--label for multi-account)
  * - logout: Clear stored credentials
  * - status: Show authentication status
  * - refresh: Manually refresh OAuth tokens
+ * - list: List all authenticated accounts
+ * - remove: Remove an authenticated account
  *
  * Currently supports:
  * - Anthropic (API key + OAuth)
@@ -34,7 +36,14 @@ import {
   CLAUDE_CLI_USER_AGENT,
   OAUTH_BETA_HEADERS,
 } from "../../lib/auth/anthropicOAuth.js";
-import type { AuthCommandArgs } from "../factories/authCommandFactory.js";
+import type {
+  AuthCommandArgs,
+  StoredCredentials,
+  AuthStatusResult,
+  OAuthTokens as OAuthTokensType,
+  AccountQuota,
+} from "../../lib/types/index.js";
+import { loadAccountQuotas } from "../../lib/proxy/accountQuota.js";
 
 // =============================================================================
 // CONSTANTS
@@ -81,41 +90,15 @@ const SUPPORTED_PROVIDERS = ["anthropic"] as const;
 type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 // =============================================================================
-// TYPES (imported from canonical locations)
-// =============================================================================
-
-import type {
-  OAuthTokens as OAuthTokensType,
-  ClaudeSubscriptionTier,
-} from "../../lib/types/subscriptionTypes.js";
-
-interface StoredCredentials {
-  type: "api-key" | "oauth";
-  apiKey?: string;
-  oauth?: OAuthTokensType;
-  provider: string;
-  subscriptionTier?: ClaudeSubscriptionTier;
-  createdAt: number;
-  updatedAt: number;
-}
-
-interface AuthStatusResult {
-  provider: string;
-  isAuthenticated: boolean;
-  method: "api-key" | "oauth" | "none";
-  subscriptionTier?: string;
-  tokenExpiry?: string;
-  hasRefreshToken?: boolean;
-  needsRefresh?: boolean;
-}
-
-// =============================================================================
 // SUBCOMMAND HANDLERS
 // =============================================================================
 
 /**
  * Handle the login subcommand
  * `neurolink auth login <provider>`
+ *
+ * When --add is specified, saves tokens to the TokenStore with a compound key
+ * (e.g., "anthropic:alice") to support multi-account pools.
  */
 export async function handleLogin(argv: AuthCommandArgs): Promise<void> {
   try {
@@ -132,20 +115,341 @@ export async function handleLogin(argv: AuthCommandArgs): Promise<void> {
     }
 
     // If method is specified, use it directly
+    // Each handler returns true when credentials were written to a file,
+    // false for .env-only or "keep existing" paths.
+    let wroteCredentials = false;
     if (argv.method) {
       if (argv.method === "api-key") {
-        await handleApiKeyAuth(provider, !argv.nonInteractive);
+        wroteCredentials = await handleApiKeyAuth(
+          provider,
+          !argv.nonInteractive,
+        );
       } else if (argv.method === "oauth") {
         await handleOAuthAuth(provider);
+        wroteCredentials = true;
       } else if (argv.method === "create-api-key") {
         await handleCreateApiKeyOAuth(provider);
+        wroteCredentials = true;
       }
     } else {
       // Interactive mode - ask user which method they prefer
-      await handleInteractiveAuth(provider);
+      wroteCredentials = await handleInteractiveAuth(provider);
+    }
+
+    // Only save to TokenStore when the auth flow actually wrote credentials.
+    // Skip for .env-only or "keep existing" paths — re-reading a stale or
+    // nonexistent credentials file is wasteful and can produce wrong entries.
+    if (wroteCredentials) {
+      await saveAccountToPool(provider, argv.label);
     }
   } catch (error) {
     logger.error(chalk.red("Authentication failed:"));
+    logger.error(
+      chalk.red(error instanceof Error ? error.message : "Unknown error"),
+    );
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quota display helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a future unix timestamp (seconds) into a human-readable relative
+ * duration like "2h 15m" or "4d 3h".  Returns "now" if the time has passed.
+ */
+function formatTimeUntil(unixTimestamp: number): string {
+  const ms = unixTimestamp * 1000 - Date.now();
+  if (ms <= 0) {
+    return "now";
+  }
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remainHours = hours % 24;
+    return `${days}d ${remainHours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
+/**
+ * Format session/weekly quota into compact display strings.
+ */
+function formatQuotaColumns(quota: AccountQuota): {
+  sessionText: string;
+  weeklyText: string;
+  sessionReset: string;
+  weeklyReset: string;
+} {
+  const sessionRemaining = Math.round((1 - quota.sessionUsed) * 100);
+  const weeklyRemaining = Math.round((1 - quota.weeklyUsed) * 100);
+
+  const colorize = (pct: number, text: string): string => {
+    if (pct <= 10) {
+      return chalk.red(text);
+    }
+    if (pct <= 30) {
+      return chalk.yellow(text);
+    }
+    return chalk.green(text);
+  };
+
+  return {
+    sessionText: colorize(sessionRemaining, `${sessionRemaining}% left`),
+    weeklyText: colorize(weeklyRemaining, `${weeklyRemaining}% left`),
+    sessionReset:
+      quota.sessionResetAt > 0
+        ? chalk.gray(`resets ${formatTimeUntil(quota.sessionResetAt)}`)
+        : "",
+    weeklyReset:
+      quota.weeklyResetAt > 0
+        ? chalk.gray(`resets ${formatTimeUntil(quota.weeklyResetAt)}`)
+        : "",
+  };
+}
+
+/**
+ * Handle the list subcommand
+ * `neurolink auth list`
+ *
+ * Lists all authenticated accounts from the TokenStore.
+ */
+export async function handleList(argv: AuthCommandArgs): Promise<void> {
+  try {
+    const allKeys = await defaultTokenStore.listProviders();
+
+    if (allKeys.length === 0) {
+      if (argv.format === "json") {
+        logger.always(JSON.stringify([], null, 2));
+      } else {
+        logger.always(chalk.yellow("\nNo authenticated accounts found.\n"));
+        logger.always(
+          chalk.blue(
+            "Run 'neurolink auth login <provider>' to authenticate.\n",
+          ),
+        );
+      }
+      return;
+    }
+
+    // Build enriched account list with token metadata
+    const enrichedAccounts = await Promise.all(
+      allKeys.map(async (key) => {
+        const parts = key.split(":");
+        const provider = parts[0];
+        const label = parts.length > 1 ? parts.slice(1).join(":") : undefined;
+        let tier: string | undefined;
+        let email: string | undefined;
+        let tokenStatus: "valid" | "expired" | "unknown" = "unknown";
+        let expiresAt: number | undefined;
+
+        // Derive email from the compound key label when it looks like an email.
+        // The credentials file is a shared singleton that gets overwritten on
+        // every login — reading email from it would show the LATEST login's
+        // email for ALL accounts.  The label is the per-account source of truth.
+        if (label && label.includes("@")) {
+          email = label;
+        }
+
+        // Fall back to credentials file ONLY for the default (unlabeled) account.
+        // Compound-key entries (labeled accounts) must NOT read the shared
+        // credentials file because it gets overwritten on every login and would
+        // show the latest login's email/tier for all accounts.  Per-account
+        // metadata is encoded in the token's scope field instead.
+        if (!email && !label) {
+          try {
+            const credPath = path.join(
+              NEUROLINK_CONFIG_DIR,
+              `${provider}-credentials.json`,
+            );
+            if (fs.existsSync(credPath)) {
+              const creds = JSON.parse(
+                fs.readFileSync(credPath, "utf-8"),
+              ) as StoredCredentials;
+              email = creds.email;
+              if (creds.subscriptionTier) {
+                tier = creds.subscriptionTier;
+              }
+            }
+          } catch {
+            /* non-fatal */
+          }
+        }
+
+        try {
+          const tokens = await defaultTokenStore.loadTokens(key);
+          if (tokens) {
+            expiresAt = tokens.expiresAt;
+            const isExpired = defaultTokenStore.isTokenExpired(tokens, 0);
+            tokenStatus = isExpired ? "expired" : "valid";
+            // Extract per-account metadata from scope (e.g. "tier:pro email:user@example.com")
+            if (tokens.scope) {
+              if (!tier) {
+                const tierMatch = tokens.scope.match(/tier:(\w+)/);
+                if (tierMatch) {
+                  tier = tierMatch[1];
+                }
+              }
+              if (!email) {
+                const emailMatch = tokens.scope.match(/email:(\S+)/);
+                if (emailMatch) {
+                  email = emailMatch[1];
+                }
+              }
+            }
+          }
+        } catch {
+          // Token load failed — show as unknown
+        }
+
+        return { key, provider, label, email, tier, tokenStatus, expiresAt };
+      }),
+    );
+
+    // Load persisted quota data (captured from proxy responses).
+    let quotas: Record<string, AccountQuota> = {};
+    try {
+      quotas = await loadAccountQuotas();
+    } catch {
+      // Non-fatal — quota display is best-effort
+    }
+
+    if (argv.format === "json") {
+      // Merge quota data into each account object for JSON output
+      const withQuota = enrichedAccounts.map((acct) => {
+        const quotaKey = acct.label ?? acct.key;
+        const quota = quotas[quotaKey] ?? null;
+        return { ...acct, quota };
+      });
+      logger.always(JSON.stringify(withQuota, null, 2));
+    } else {
+      logger.always(chalk.bold("\nAuthenticated Accounts:\n"));
+
+      // Check if any account has quota data to decide column layout
+      const hasQuota = enrichedAccounts.some((acct) => {
+        const quotaKey = acct.label ?? acct.key;
+        return quotas[quotaKey] !== undefined;
+      });
+
+      // Table header
+      const colKey = "LABEL".padEnd(20);
+      const colEmail = "EMAIL".padEnd(28);
+      const colStatus = "TOKEN STATUS".padEnd(14);
+      const colProvider = "PROVIDER".padEnd(12);
+      const colSession = hasQuota ? "SESSION".padEnd(10) : "";
+      const colWeekly = hasQuota ? "WEEKLY".padEnd(10) : "";
+      logger.always(
+        `  ${chalk.gray(colKey)} ${chalk.gray(colProvider)} ${chalk.gray(colEmail)} ${chalk.gray(colStatus)}${hasQuota ? ` ${chalk.gray(colSession)} ${chalk.gray(colWeekly)}` : ""}`,
+      );
+      logger.always(`  ${chalk.gray("-".repeat(hasQuota ? 100 : 78))}`);
+
+      for (const acct of enrichedAccounts) {
+        const displayLabel = (acct.label ?? acct.key).padEnd(20);
+        const displayEmail = (acct.email ?? "-").padEnd(28);
+        const displayProvider = acct.provider.padEnd(12);
+
+        let statusText: string;
+        if (acct.tokenStatus === "valid") {
+          statusText = chalk.green("valid".padEnd(14));
+        } else if (acct.tokenStatus === "expired") {
+          statusText = chalk.red("expired".padEnd(14));
+        } else {
+          statusText = chalk.yellow("unknown".padEnd(14));
+        }
+
+        const quotaKey = acct.label ?? acct.key;
+        const quota = quotas[quotaKey];
+
+        if (hasQuota && quota) {
+          const qc = formatQuotaColumns(quota);
+          logger.always(
+            `  ${chalk.cyan(displayLabel)} ${displayProvider} ${displayEmail} ${statusText} ${qc.sessionText.padEnd(10)} ${qc.weeklyText.padEnd(10)}`,
+          );
+          // Second line: reset times (indented under session/weekly columns)
+          if (qc.sessionReset || qc.weeklyReset) {
+            const indent = " ".repeat(2 + 20 + 1 + 12 + 1 + 28 + 1 + 14 + 1);
+            logger.always(
+              `${indent}${(qc.sessionReset || "").padEnd(10)} ${qc.weeklyReset || ""}`,
+            );
+          }
+        } else {
+          logger.always(
+            `  ${chalk.cyan(displayLabel)} ${displayProvider} ${displayEmail} ${statusText}${hasQuota ? "  -          -" : ""}`,
+          );
+        }
+      }
+      logger.always("");
+    }
+  } catch (error) {
+    logger.error(chalk.red("Failed to list accounts:"));
+    logger.error(
+      chalk.red(error instanceof Error ? error.message : "Unknown error"),
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Handle the remove subcommand
+ * `neurolink auth remove <provider> --label <label>` or `neurolink auth remove <provider> --account <key>`
+ *
+ * Removes an authenticated account from the TokenStore.
+ * When neither --label nor --account is given, removes the default (unlabelled) account
+ * for the specified provider.
+ */
+export async function handleRemove(argv: AuthCommandArgs): Promise<void> {
+  try {
+    const provider = argv.provider?.toLowerCase() ?? "anthropic";
+
+    // Resolve the compound key from --account, --label, or provider default
+    let compoundKey: string;
+
+    if (argv.account) {
+      compoundKey = argv.account;
+    } else if (argv.label) {
+      compoundKey = `${provider}:${argv.label}`;
+    } else {
+      // Remove the default (unlabelled) account for this provider
+      compoundKey = provider;
+    }
+
+    // Check if the account exists
+    const allKeys = await defaultTokenStore.listProviders();
+    if (!allKeys.includes(compoundKey)) {
+      logger.error(chalk.red(`Account not found: ${compoundKey}`));
+      logger.always(
+        chalk.blue(
+          "\nRun 'neurolink auth list' to see all authenticated accounts.\n",
+        ),
+      );
+      process.exit(1);
+    }
+
+    await defaultTokenStore.clearTokens(compoundKey);
+
+    // Only remove the legacy credentials file for bare provider keys.
+    // Compound keys (e.g., "anthropic:alice") should not touch the shared
+    // legacy credentials file — it may belong to the default account.
+    if (!compoundKey.includes(":")) {
+      const legacyCredFile = path.join(
+        NEUROLINK_CONFIG_DIR,
+        `${compoundKey}-credentials.json`,
+      );
+      try {
+        if (fs.existsSync(legacyCredFile)) {
+          fs.unlinkSync(legacyCredFile);
+          logger.debug(`Removed legacy credentials file: ${legacyCredFile}`);
+        }
+      } catch {
+        // Non-fatal — legacy file may not exist or may already be gone
+      }
+    }
+
+    logger.always(chalk.green(`\nAccount removed: ${compoundKey}\n`));
+  } catch (error) {
+    logger.error(chalk.red("Failed to remove account:"));
     logger.error(
       chalk.red(error instanceof Error ? error.message : "Unknown error"),
     );
@@ -194,11 +498,23 @@ export async function handleLogout(argv: AuthCommandArgs): Promise<void> {
         }
       }
 
-      // Also clear from TokenStore if OAuth
+      // Also clear from TokenStore — both the bare provider key and all
+      // compound-key entries (provider:label) used by the account pool.
       try {
         await defaultTokenStore.clearTokens(provider);
       } catch {
-        // Ignore if no tokens stored
+        // Ignore if no tokens stored for bare key
+      }
+      try {
+        const allKeys = await defaultTokenStore.listProviders();
+        for (const k of allKeys) {
+          if (k.startsWith(`${provider}:`)) {
+            await defaultTokenStore.clearTokens(k);
+            logger.debug(`Cleared pooled account: ${k}`);
+          }
+        }
+      } catch {
+        // Ignore if listing/clearing fails
       }
 
       // Check for environment variable
@@ -451,6 +767,32 @@ export async function handleRefresh(argv: AuthCommandArgs): Promise<void> {
         updatedAt: Date.now(),
       });
 
+      // Also update the TokenStore pool entries for this provider.
+      // Update both the bare provider key and compound "provider:label" keys
+      // so that pooled accounts created via saveAccountToPool() stay current.
+      try {
+        const allKeys = await defaultTokenStore.listProviders();
+        for (const key of allKeys) {
+          if (key === provider || key.startsWith(`${provider}:`)) {
+            const existingTokens = await defaultTokenStore.loadTokens(key);
+            if (existingTokens) {
+              await defaultTokenStore.saveTokens(key, {
+                accessToken: newTokens.accessToken,
+                refreshToken: newTokens.refreshToken,
+                expiresAt: newTokens.expiresAt ?? Date.now() + 3600 * 1000,
+                tokenType: newTokens.tokenType || "Bearer",
+                scope: existingTokens.scope, // preserve existing scope metadata
+              });
+              logger.debug(`Updated TokenStore entry: ${key}`);
+            }
+          }
+        }
+      } catch (poolErr) {
+        logger.debug(
+          `[auth] Failed to update TokenStore pool entries: ${poolErr instanceof Error ? poolErr.message : String(poolErr)}`,
+        );
+      }
+
       if (spinner) {
         spinner.succeed("Access token refreshed successfully!");
       }
@@ -470,6 +812,130 @@ export async function handleRefresh(argv: AuthCommandArgs): Promise<void> {
     }
   } catch (error) {
     logger.error(chalk.red("Token refresh failed:"));
+    logger.error(
+      chalk.red(error instanceof Error ? error.message : "Unknown error"),
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Handle the cleanup subcommand
+ * `neurolink auth cleanup [--force]`
+ *
+ * Removes stale accounts from the token store:
+ *   1. Expired entries with no refresh token (via pruneExpired)
+ *   2. Permanently disabled entries (after confirmation)
+ */
+export async function handleCleanup(argv: AuthCommandArgs): Promise<void> {
+  try {
+    const removed: Array<{ key: string; reason: string }> = [];
+
+    // Step 1: Prune expired entries that have no refresh token
+    const pruned = await defaultTokenStore.pruneExpired();
+    for (const key of pruned) {
+      removed.push({ key, reason: "expired, no refresh token" });
+    }
+
+    // Step 2: Find disabled entries (pruneExpired already removes disabled
+    // entries, but in case the user runs cleanup with entries that were
+    // disabled between the prune call and now, check again)
+    const disabledKeys = await defaultTokenStore.listDisabled();
+
+    if (disabledKeys.length > 0) {
+      let shouldRemove = false;
+
+      if (argv.force || argv.nonInteractive) {
+        shouldRemove = true;
+      } else {
+        logger.always(
+          chalk.yellow(`\nFound ${disabledKeys.length} disabled account(s):`),
+        );
+        for (const key of disabledKeys) {
+          logger.always(`  - ${key}`);
+        }
+
+        const { confirm } = await inquirer.prompt([
+          {
+            name: "confirm",
+            type: "confirm",
+            message: "Remove these disabled accounts?",
+            default: false,
+          },
+        ]);
+        shouldRemove = confirm;
+      }
+
+      if (shouldRemove) {
+        for (const key of disabledKeys) {
+          await defaultTokenStore.clearTokens(key);
+          removed.push({ key, reason: "disabled: refresh_failed" });
+        }
+      }
+    }
+
+    // Report results
+    if (removed.length === 0) {
+      logger.always(chalk.green("No stale accounts found."));
+    } else {
+      logger.always(
+        chalk.green(
+          `\nCleaned up ${removed.length} stale account${removed.length === 1 ? "" : "s"}:`,
+        ),
+      );
+      for (const entry of removed) {
+        logger.always(`  - ${entry.key} (${entry.reason})`);
+      }
+      logger.always("");
+    }
+  } catch (error) {
+    logger.error(chalk.red("Cleanup failed:"));
+    logger.error(
+      chalk.red(error instanceof Error ? error.message : "Unknown error"),
+    );
+    process.exit(1);
+  }
+}
+
+/**
+ * Handle the enable subcommand
+ * `neurolink auth enable <account>`
+ *
+ * Re-enables a previously disabled account so it can be used by the proxy pool again.
+ */
+export async function handleEnable(argv: AuthCommandArgs): Promise<void> {
+  try {
+    // Resolve account key from --account option or positional arg
+    const accountKey =
+      argv.account || (argv._ && argv._[2] ? String(argv._[2]) : undefined);
+
+    if (!accountKey) {
+      logger.error(chalk.red("Missing required argument: <account>"));
+      logger.always(
+        chalk.blue(
+          "\nUsage: neurolink auth enable <account>\n" +
+            "Run 'neurolink auth list' to see all accounts.\n",
+        ),
+      );
+      process.exit(1);
+    }
+
+    // Check if account exists in the token store
+    const allKeys = await defaultTokenStore.listProviders();
+    if (!allKeys.includes(accountKey)) {
+      logger.error(chalk.red(`Account not found: ${accountKey}`));
+      logger.always(
+        chalk.blue(
+          "\nRun 'neurolink auth list' to see all authenticated accounts.\n",
+        ),
+      );
+      process.exit(1);
+    }
+
+    await defaultTokenStore.markEnabled(accountKey);
+    logger.always(chalk.green(`\nRe-enabled account: ${accountKey}\n`));
+  } catch (error) {
+    logger.error(chalk.red("Failed to enable account:"));
     logger.error(
       chalk.red(error instanceof Error ? error.message : "Unknown error"),
     );
@@ -529,7 +995,7 @@ export async function handleAuth(argv: {
  */
 async function handleInteractiveAuth(
   provider: SupportedProvider,
-): Promise<void> {
+): Promise<boolean> {
   logger.always(
     chalk.blue(
       `\n${provider.charAt(0).toUpperCase() + provider.slice(1)} Authentication Setup\n`,
@@ -559,7 +1025,7 @@ async function handleInteractiveAuth(
 
     if (!reconfigure) {
       logger.always(chalk.blue("Keeping existing configuration."));
-      return;
+      return false;
     }
   }
 
@@ -587,11 +1053,13 @@ async function handleInteractiveAuth(
   ]);
 
   if (method === "api-key") {
-    await handleApiKeyAuth(provider, true);
+    return await handleApiKeyAuth(provider, true);
   } else if (method === "create-api-key") {
     await handleCreateApiKeyOAuth(provider);
+    return true;
   } else {
     await handleOAuthAuth(provider);
+    return true;
   }
 }
 
@@ -601,7 +1069,7 @@ async function handleInteractiveAuth(
 async function handleApiKeyAuth(
   provider: SupportedProvider,
   interactive: boolean,
-): Promise<void> {
+): Promise<boolean> {
   logger.always(chalk.blue("\nAPI Key Authentication\n"));
 
   if (provider === "anthropic") {
@@ -626,7 +1094,7 @@ async function handleApiKeyAuth(
         updatedAt: Date.now(),
       });
       logger.always(chalk.green("Using ANTHROPIC_API_KEY from environment."));
-      return;
+      return true;
     }
     throw new Error(
       "Non-interactive mode requires ANTHROPIC_API_KEY environment variable when using --method api-key",
@@ -663,21 +1131,17 @@ async function handleApiKeyAuth(
 
     if (!isValid) {
       spinner.fail("API key validation failed");
-      logger.error(
-        chalk.red(
-          "The API key could not be validated. Please check and try again.",
-        ),
+      throw new Error(
+        "The API key could not be validated. Please check and try again.",
       );
-      return;
     }
 
     spinner.succeed("API key validated successfully");
   } catch (error) {
     spinner.fail("API key validation failed");
-    logger.error(
-      chalk.red(error instanceof Error ? error.message : "Validation error"),
-    );
-    return;
+    throw error instanceof Error
+      ? error
+      : new Error(String(error) || "Validation error");
   }
 
   // Ask where to store the key
@@ -716,6 +1180,9 @@ async function handleApiKeyAuth(
     logger.always("");
     logger.always(chalk.green("Authentication configured successfully!"));
     showUsageExample(provider);
+
+    // Credentials file was written only if user chose "config" or "both"
+    return storageOption === "config" || storageOption === "both";
   } catch (error) {
     spinnerSave.fail("Failed to save API key");
     throw error;
@@ -973,20 +1440,6 @@ async function handleOAuthAuth(provider: SupportedProvider): Promise<void> {
     logger.always(chalk.yellow("Copy that code and paste it back here.\n"));
   }
 
-  const { proceed } = await inquirer.prompt([
-    {
-      type: "confirm",
-      name: "proceed",
-      message: "Continue with OAuth authentication?",
-      default: true,
-    },
-  ]);
-
-  if (!proceed) {
-    logger.always(chalk.yellow("OAuth authentication cancelled."));
-    return;
-  }
-
   const spinner = ora("Starting OAuth flow...").start();
 
   // Generate PKCE challenge - state = verifier (OpenCode's approach)
@@ -1095,6 +1548,9 @@ async function handleOAuthAuth(provider: SupportedProvider): Promise<void> {
     expires_in?: number;
     token_type?: string;
     scope?: string;
+    // Token exchange may include account/org info (primary email source)
+    account?: { uuid?: string; email_address?: string };
+    organization?: { uuid?: string; name?: string };
   };
 
   // Save tokens
@@ -1108,14 +1564,50 @@ async function handleOAuthAuth(provider: SupportedProvider): Promise<void> {
     scope: tokenData.scope,
   };
 
-  // Detect subscription tier if possible
-  const subscriptionTier = await detectSubscriptionTier(tokens.accessToken);
+  // === Triple fallback chain for email & subscription tier ===
+  // Primary: extract email from token exchange response
+  let email: string | undefined = tokenData.account?.email_address;
+  let subscriptionTier: "free" | "pro" | "max" | "api" | undefined;
+
+  // Fallback 1: validation endpoint (/v1/oauth/validate)
+  // Always try when email OR tier is missing — token exchange gives email but not tier
+  if (!email || !subscriptionTier) {
+    try {
+      const { AnthropicOAuth } =
+        await import("../../lib/auth/anthropicOAuth.js");
+      const oauth = new AnthropicOAuth();
+      const validationResult = await oauth.validateTokenWithDetails(
+        tokens.accessToken,
+      );
+      if (validationResult.user) {
+        email = email || validationResult.user.email;
+        if (validationResult.user.subscription) {
+          subscriptionTier = validationResult.user
+            .subscription as typeof subscriptionTier;
+        }
+      }
+    } catch {
+      /* non-fatal — validation is best-effort */
+    }
+  }
+
+  // Fallback 2: /v1/me endpoint (also detects subscription tier)
+  if (!subscriptionTier || !email) {
+    const meResult = await detectSubscriptionTierAndEmail(tokens.accessToken);
+    if (!subscriptionTier && meResult.tier) {
+      subscriptionTier = meResult.tier;
+    }
+    if (!email && meResult.email) {
+      email = meResult.email;
+    }
+  }
 
   await saveStoredCredentials(provider, {
     type: "oauth",
     oauth: tokens,
     provider,
     subscriptionTier,
+    email,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   });
@@ -1127,6 +1619,9 @@ async function handleOAuthAuth(provider: SupportedProvider): Promise<void> {
   logger.always(chalk.green.bold("  Authentication configured successfully!"));
   logger.always(chalk.green("═".repeat(60)));
   logger.always("");
+  if (email) {
+    logger.always(`  Email:             ${chalk.blue(email)}`);
+  }
   if (subscriptionTier) {
     logger.always(`  Subscription Tier: ${chalk.blue(subscriptionTier)}`);
   }
@@ -1138,6 +1633,131 @@ async function handleOAuthAuth(provider: SupportedProvider): Promise<void> {
   );
 
   showUsageExample(provider);
+}
+
+// =============================================================================
+// MULTI-ACCOUNT HELPERS
+// =============================================================================
+
+/**
+ * Save the most recently authenticated credentials to the TokenStore
+ * using a compound key (e.g., "anthropic:alice") for multi-account pools.
+ *
+ * Reads back the credentials file that was just written by the auth flow,
+ * then saves the tokens into the TokenStore under the compound key.
+ */
+async function saveAccountToPool(
+  provider: SupportedProvider,
+  label?: string,
+): Promise<void> {
+  const credentials = await getStoredCredentials(provider);
+  if (!credentials) {
+    logger.error(
+      chalk.red(
+        "Could not read back credentials after authentication. Multi-account save skipped.",
+      ),
+    );
+    return;
+  }
+
+  // Determine the compound key
+  // Use email as the label when available (human-readable, unique per account)
+  const credEmail = credentials.email;
+  let compoundKey: string;
+  if (label) {
+    compoundKey = `${provider}:${label}`;
+  } else {
+    const autoLabel = credEmail ?? Date.now().toString(36).slice(-6);
+    compoundKey = `${provider}:${autoLabel}`;
+  }
+
+  // Decision 10A: Auto-prune stale token-prefix entries when email is known.
+  // When we have a real email, remove old entries whose stored token value is
+  // identical to the one we are about to save.  This avoids false positives on
+  // legitimate user labels like "primary", "work123", or "office42" that the old
+  // broad regex (^[A-Za-z0-9_]{5,8}$) would incorrectly match.
+  if (credEmail) {
+    const newAccessToken =
+      credentials.type === "oauth"
+        ? credentials.oauth?.accessToken
+        : credentials.apiKey;
+    try {
+      const allKeys = await defaultTokenStore.listProviders();
+      for (const k of allKeys) {
+        if (!k.startsWith(`${provider}:`)) {
+          continue;
+        }
+        const existingLabel = k.split(":").slice(1).join(":");
+        // Skip the email key we are about to write
+        if (existingLabel === credEmail) {
+          continue;
+        }
+        // Skip the explicit user label we are about to write
+        if (label && existingLabel === label) {
+          continue;
+        }
+        // Only prune when the stored token value is identical (true duplicate)
+        if (newAccessToken) {
+          try {
+            const existingTokens = await defaultTokenStore.loadTokens(k);
+            if (
+              existingTokens &&
+              existingTokens.accessToken === newAccessToken
+            ) {
+              logger.debug(`Auto-pruning duplicate token entry: ${k}`);
+              await defaultTokenStore.clearTokens(k);
+            }
+          } catch {
+            // Non-fatal — skip entries we can't read
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — dedup is best-effort
+      logger.debug("Failed to auto-prune stale entries during login");
+    }
+  }
+
+  // Build per-account metadata scope string so email/tier are stored
+  // alongside the token rather than in the shared credentials file.
+  const metaParts: string[] = [];
+  if (credentials.subscriptionTier) {
+    metaParts.push(`tier:${credentials.subscriptionTier}`);
+  }
+  if (credentials.email) {
+    metaParts.push(`email:${credentials.email}`);
+  }
+
+  // Build StoredOAuthTokens for the TokenStore
+  if (credentials.type === "oauth" && credentials.oauth) {
+    const baseScope = credentials.oauth.scope ?? "";
+    const scopeWithMeta = [baseScope, ...metaParts].filter(Boolean).join(" ");
+    await defaultTokenStore.saveTokens(compoundKey, {
+      accessToken: credentials.oauth.accessToken,
+      refreshToken: credentials.oauth.refreshToken,
+      expiresAt: credentials.oauth.expiresAt ?? Date.now() + 3600 * 1000,
+      tokenType: credentials.oauth.tokenType || "Bearer",
+      scope: scopeWithMeta || undefined,
+    });
+  } else if (credentials.type === "api-key" && credentials.apiKey) {
+    // For API keys, store as a non-expiring token in the TokenStore.
+    // Use Number.MAX_SAFE_INTEGER so isTokenExpired() and pruneExpired()
+    // never treat a perfectly valid API key as expired.
+    const scopeWithMeta = metaParts.join(" ") || undefined;
+    await defaultTokenStore.saveTokens(compoundKey, {
+      accessToken: credentials.apiKey,
+      expiresAt: Number.MAX_SAFE_INTEGER,
+      tokenType: "api-key",
+      scope: scopeWithMeta,
+    });
+  } else {
+    logger.error(
+      chalk.red("No valid credentials found. Multi-account save skipped."),
+    );
+    return;
+  }
+
+  logger.always(chalk.green(`\nAccount added: ${compoundKey}\n`));
 }
 
 // =============================================================================
@@ -1194,32 +1814,39 @@ async function getAuthStatus(
 }
 
 /**
- * Detect subscription tier from token (if API supports it)
+ * Detect subscription tier and email from /v1/me endpoint.
+ * Returns both tier and email when available (used as fallback 2 in the
+ * triple fallback chain for email resolution).
  */
-async function detectSubscriptionTier(
+async function detectSubscriptionTierAndEmail(
   accessToken: string,
-): Promise<"free" | "pro" | "max" | "api" | undefined> {
+): Promise<{ tier?: "free" | "pro" | "max" | "api"; email?: string }> {
   try {
-    // Attempt to call an endpoint that returns user info
-    // This is a placeholder - actual implementation depends on Anthropic's API
     const response = await fetch("https://api.anthropic.com/v1/me", {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
+        "User-Agent": "claude-cli/2.1.80 (external, cli)",
+        "anthropic-version": "2023-06-01",
       },
     });
 
     if (response.ok) {
-      const data = (await response.json()) as { subscription?: string };
-      if (data.subscription) {
-        return data.subscription as "free" | "pro" | "max" | "api";
-      }
+      const data = (await response.json()) as {
+        subscription?: string;
+        email?: string;
+        email_address?: string;
+      };
+      return {
+        tier: data.subscription as "free" | "pro" | "max" | "api" | undefined,
+        email: data.email || data.email_address,
+      };
     }
   } catch {
-    // Ignore errors - subscription detection is optional
+    // Ignore errors - subscription/email detection is optional
   }
 
-  return undefined;
+  return {};
 }
 
 /**

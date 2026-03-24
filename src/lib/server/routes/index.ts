@@ -5,6 +5,8 @@
 
 import type { RouteDefinition, RouteGroup } from "../types.js";
 import { createAgentRoutes } from "./agentRoutes.js";
+import { createClaudeProxyRoutes } from "./claudeProxyRoutes.js";
+// ClaudeProxyDeps removed
 import { createHealthRoutes } from "./healthRoutes.js";
 import { createMCPRoutes } from "./mcpRoutes.js";
 import { createMemoryRoutes } from "./memoryRoutes.js";
@@ -13,6 +15,8 @@ import { createToolRoutes } from "./toolRoutes.js";
 
 // Re-export route builders from individual files
 export { createAgentRoutes } from "./agentRoutes.js";
+export { createClaudeProxyRoutes } from "./claudeProxyRoutes.js";
+// ClaudeProxyDeps removed
 export { createHealthRoutes } from "./healthRoutes.js";
 export { createMCPRoutes } from "./mcpRoutes.js";
 export { createMemoryRoutes } from "./memoryRoutes.js";
@@ -37,6 +41,12 @@ export type CreateRoutesOptions = {
    * default endpoint definitions.
    */
   getRoutes?: () => RouteDefinition[];
+  /**
+   * Enable or disable the Claude-compatible proxy routes.
+   * When true, registers /v1/messages, /v1/models, and /v1/messages/count_tokens
+   * endpoints that accept Anthropic API format requests.
+   */
+  claudeProxy?: boolean;
 };
 
 /**
@@ -58,6 +68,11 @@ export function createAllRoutes(
   // Conditionally add OpenAPI/Swagger routes
   if (options?.enableSwagger) {
     routes.push(createOpenApiRoutes(basePath, options.getRoutes));
+  }
+
+  // Conditionally add Claude-compatible proxy routes
+  if (options?.claudeProxy) {
+    routes.push(createClaudeProxyRoutes(undefined, basePath));
   }
 
   return routes;

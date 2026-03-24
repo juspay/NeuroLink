@@ -49,8 +49,8 @@ import {
   CLAUDE_CLI_USER_AGENT,
   CLAUDE_CODE_CLIENT_ID,
   ANTHROPIC_TOKEN_URL,
-  MCP_TOOL_PREFIX,
 } from "../auth/anthropicOAuth.js";
+import { createOAuthFetch } from "../proxy/oauthFetch.js";
 import { homedir } from "os";
 import {
   readFileSync,
@@ -77,226 +77,6 @@ const ANTHROPIC_BETA_HEADERS = {
     "fine-grained-tool-streaming-2025-05-14",
   ].join(","),
 };
-
-/**
- * Creates a custom fetch function for OAuth-authenticated requests.
- * This wrapper applies all required transformations for OAuth mode:
- * - Uses Authorization: Bearer header (NOT x-api-key)
- * - Adds OAuth-required beta headers (oauth-2025-04-20 is critical)
- * - Sets User-Agent to Claude CLI
- * - Adds ?beta=true query parameter to /v1/messages
- * - Prefixes tool names with mcp_
- * - Strips mcp_ prefix from tool names in responses
- *
- * Accepts a getter function instead of a static token so that refreshed
- * tokens are picked up automatically on each request.
- */
-function createOAuthFetch(
-  getToken: () => string,
-  includeOptionalBetas = true,
-): typeof fetch {
-  return async (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> => {
-    // Build the URL
-    let requestUrl: URL | null = null;
-
-    try {
-      if (typeof input === "string" || input instanceof URL) {
-        requestUrl = new URL(input.toString());
-      } else if (input instanceof Request) {
-        requestUrl = new URL(input.url);
-      }
-    } catch {
-      requestUrl = null;
-    }
-
-    // Add ?beta=true to /v1/messages endpoint
-    if (
-      requestUrl &&
-      requestUrl.pathname === "/v1/messages" &&
-      !requestUrl.searchParams.has("beta")
-    ) {
-      requestUrl.searchParams.set("beta", "true");
-    }
-
-    // Build new headers
-    const requestHeaders = new Headers();
-
-    // Copy headers from Request object if present
-    if (input instanceof Request) {
-      input.headers.forEach((value, key) => {
-        requestHeaders.set(key, value);
-      });
-    }
-
-    // Copy headers from init if present
-    if (init?.headers) {
-      if (init.headers instanceof Headers) {
-        init.headers.forEach((value, key) => {
-          requestHeaders.set(key, value);
-        });
-      } else if (Array.isArray(init.headers)) {
-        for (const [key, value] of init.headers) {
-          if (typeof value !== "undefined") {
-            requestHeaders.set(key, String(value));
-          }
-        }
-      } else {
-        for (const [key, value] of Object.entries(init.headers)) {
-          if (typeof value !== "undefined") {
-            requestHeaders.set(key, String(value));
-          }
-        }
-      }
-    }
-
-    // Check if claude-code beta was requested
-    const incomingBeta = requestHeaders.get("anthropic-beta") || "";
-    const incomingBetasList = incomingBeta
-      .split(",")
-      .map((b) => b.trim())
-      .filter(Boolean);
-    const includeClaudeCode = incomingBetasList.includes(
-      "claude-code-20250219",
-    );
-
-    // Merge beta headers — oauth-2025-04-20 is always required for OAuth;
-    // optional betas (interleaved-thinking) gated on includeOptionalBetas.
-    const mergedBetas = [
-      "oauth-2025-04-20",
-      ...(includeOptionalBetas ? ["interleaved-thinking-2025-05-14"] : []),
-      ...(includeClaudeCode ? ["claude-code-20250219"] : []),
-    ].join(",");
-
-    // Set OAuth authorization (Bearer token, NOT x-api-key)
-    // Call getToken() each time so refreshed tokens are used automatically.
-    requestHeaders.set("authorization", `Bearer ${getToken()}`);
-    requestHeaders.set("anthropic-beta", mergedBetas);
-    requestHeaders.set("user-agent", CLAUDE_CLI_USER_AGENT);
-    requestHeaders.delete("x-api-key");
-
-    logger.debug("[createOAuthFetch] Making OAuth request:", {
-      url: requestUrl?.toString() || input.toString(),
-      hasAuthorization: requestHeaders.has("authorization"),
-      authType: "Bearer",
-      anthropicBeta: requestHeaders.get("anthropic-beta"),
-      userAgent: requestHeaders.get("user-agent"),
-    });
-
-    // Add mcp_ prefix to tool names in request body
-    let body = init?.body;
-    if (body && typeof body === "string") {
-      try {
-        const parsed = JSON.parse(body);
-
-        // Add prefix to tools definitions
-        if (parsed.tools && Array.isArray(parsed.tools)) {
-          parsed.tools = parsed.tools.map(
-            (tool: { name?: string; [key: string]: unknown }) => ({
-              ...tool,
-              name: tool.name ? `${MCP_TOOL_PREFIX}${tool.name}` : tool.name,
-            }),
-          );
-        }
-
-        // Add prefix to tool_use blocks in messages
-        if (parsed.messages && Array.isArray(parsed.messages)) {
-          parsed.messages = parsed.messages.map(
-            (msg: { content?: unknown; [key: string]: unknown }) => {
-              if (msg.content && Array.isArray(msg.content)) {
-                msg.content = msg.content.map((block: unknown) => {
-                  const b = block as {
-                    type?: string;
-                    name?: string;
-                    [key: string]: unknown;
-                  };
-                  if (b.type === "tool_use" && b.name) {
-                    return {
-                      ...b,
-                      name: `${MCP_TOOL_PREFIX}${b.name}`,
-                    };
-                  }
-                  return block;
-                });
-              }
-              return msg;
-            },
-          );
-        }
-
-        body = JSON.stringify(parsed);
-      } catch {
-        // Ignore JSON parse errors
-      }
-    }
-
-    // Make the request
-    const response = await fetch(
-      requestUrl?.toString() ||
-        (input instanceof Request ? input.url : input.toString()),
-      {
-        ...init,
-        body,
-        headers: requestHeaders,
-      },
-    );
-
-    // Transform streaming response to rename tools back (remove mcp_ prefix).
-    // Uses a small carry buffer to handle cross-chunk boundary splits of
-    // `"name": "mcp_..."` patterns.
-    if (response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      const encoder = new TextEncoder();
-      // Carry tail covers the longest possible partial match: `"name": "mcp_`
-      const CARRY_TAIL = 24;
-      let carry = "";
-
-      const stream = new ReadableStream({
-        async pull(controller) {
-          const { done, value } = await reader.read();
-          if (done) {
-            // Flush any remaining carry
-            if (carry) {
-              const flushed = carry.replace(
-                /"name"\s*:\s*"mcp_([^"]+)"/g,
-                '"name": "$1"',
-              );
-              controller.enqueue(encoder.encode(flushed));
-              carry = "";
-            }
-            controller.close();
-            return;
-          }
-
-          const chunkText = decoder.decode(value, { stream: true });
-          const combined = carry + chunkText;
-          const replaced = combined.replace(
-            /"name"\s*:\s*"mcp_([^"]+)"/g,
-            '"name": "$1"',
-          );
-          // Keep a small tail as carry to cover partial matches at chunk boundary
-          const safeLen = Math.max(0, replaced.length - CARRY_TAIL);
-          carry = replaced.slice(safeLen);
-          const toEmit = replaced.slice(0, safeLen);
-          if (toEmit) {
-            controller.enqueue(encoder.encode(toEmit));
-          }
-        },
-      });
-
-      return new Response(stream, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-      });
-    }
-
-    return response;
-  };
-}
 
 // AnthropicProviderConfig is imported from types/providers.ts
 // Re-export for backward compatibility
@@ -571,9 +351,17 @@ export class AnthropicProvider extends BaseProvider {
       // even after an automatic token refresh.
       // oauthToken is guaranteed non-null here (checked by the enclosing if-guard).
       const tokenRef = this.oauthToken;
+      // skipBodyTransform=true: For the SDK provider path, body transforms ARE
+      // intentionally skipped because the Vercel AI SDK builds its own request
+      // format (system prompts, metadata, tool definitions). The billing header,
+      // agent block, user_id injection, and mcp_ tool-name prefixing are only
+      // needed for proxy passthrough of raw Claude API requests where we must
+      // make the request look like it came from Claude Code / CLIProxyAPI.
       const oauthFetch = createOAuthFetch(
         () => tokenRef.accessToken,
         this.enableBetaFeatures,
+        false, // No mcp_ prefix — tool names pass through as-is (matches CLIProxyAPI)
+        true, // skipBodyTransform — see comment above
       );
 
       // For OAuth, we use a dummy API key since our fetch wrapper handles auth

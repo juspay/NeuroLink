@@ -1,10 +1,14 @@
 import { logger } from "../../utils/logger.js";
+import type { InfraRegistryEntry } from "../../types/index.js";
 
-export type RegistryEntry<TItem, TMetadata = unknown> = {
-  factory: () => Promise<TItem>;
-  metadata: TMetadata;
-  instance?: TItem;
-};
+/**
+ * Local alias: the canonical type was renamed to InfraRegistryEntry to avoid
+ * collision with other RegistryEntry types in the codebase.
+ */
+export type RegistryEntry<TItem, TMetadata = unknown> = InfraRegistryEntry<
+  TItem,
+  TMetadata
+>;
 
 export abstract class BaseRegistry<TItem, TMetadata = unknown> {
   protected items = new Map<string, RegistryEntry<TItem, TMetadata>>();

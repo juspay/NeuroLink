@@ -34,7 +34,7 @@ export {
   OAuthTokenValidationError,
   OAuthTokenRevocationError,
   OAuthCallbackServerError,
-} from "./anthropicOAuth.js";
+} from "../types/errors.js";
 
 // OAuth helper functions
 export {
@@ -55,7 +55,7 @@ export type {
   AnthropicOAuthConfig,
   PKCEParams,
   CallbackResult,
-} from "./anthropicOAuth.js";
+} from "../types/index.js";
 
 // =============================================================================
 // TOKEN STORE - Secure Token Storage
@@ -65,20 +65,20 @@ export type {
 export { TokenStore, tokenStore, defaultTokenStore } from "./tokenStore.js";
 
 // Token store error class (canonical definition in types/errors.ts)
-export { TokenStoreError } from "./tokenStore.js";
+export { TokenStoreError } from "../types/errors.js";
 
-// Token store types
-export type {
-  StoredOAuthTokens,
-  OAuthTokens as StoredOAuthTokensLegacy,
-  TokenRefresher,
-} from "./tokenStore.js";
+// Token store types (canonical location: types/authTypes.ts)
+export type { StoredOAuthTokens, TokenRefresher } from "../types/authTypes.js";
 
 // =============================================================================
 // UNIFIED AUTH INTERFACE (canonical definitions in types/subscriptionTypes.ts)
 // =============================================================================
 
-export type {
-  NeuroLinkAuthOptions,
-  AuthStatus,
-} from "../types/subscriptionTypes.js";
+export type { NeuroLinkAuthOptions, AuthStatus } from "../types/index.js";
+
+// =============================================================================
+// ACCOUNT POOL - Multi-account rotation with cooldowns
+// =============================================================================
+
+export { AccountPool } from "./accountPool.js";
+export type { ProxyAccount, AccountPoolConfig } from "../types/index.js";

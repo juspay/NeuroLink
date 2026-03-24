@@ -278,3 +278,83 @@ export const DEFAULT_CONFIG: NeuroLinkConfig = {
   },
   configVersion: "3.0.1",
 };
+
+// =============================================================================
+// CONSTANTS-DERIVED TYPES (moved from constants/index.ts)
+// =============================================================================
+
+import {
+  TOOL_TIMEOUTS,
+  BACKOFF_CONFIG,
+  PERFORMANCE_PROFILES,
+  PROVIDER_OPERATION_CONFIGS,
+  MCP_OPERATION_CONFIGS,
+} from "../constants/index.js";
+
+/** Timeout category keys from TOOL_TIMEOUTS. */
+export type TimeoutCategory = keyof typeof TOOL_TIMEOUTS;
+
+/** Retry strategy keys from BACKOFF_CONFIG. */
+export type RetryStrategy = keyof typeof BACKOFF_CONFIG;
+
+/** Performance profile keys from PERFORMANCE_PROFILES. */
+export type PerformanceProfile = keyof typeof PERFORMANCE_PROFILES;
+
+/** Provider-specific operation config. */
+export type ProviderOperationConfig =
+  (typeof PROVIDER_OPERATION_CONFIGS)[keyof typeof PROVIDER_OPERATION_CONFIGS];
+
+/** MCP-specific operation config. */
+export type McpOperationConfig =
+  (typeof MCP_OPERATION_CONFIGS)[keyof typeof MCP_OPERATION_CONFIGS];
+
+// =============================================================================
+// RATE LIMITER CONFIG (moved from utils/rateLimiter.ts)
+// =============================================================================
+
+/** Configuration options for the token bucket rate limiter. */
+export type RateLimiterConfig = {
+  /** Maximum tokens (downloads) allowed per interval */
+  maxTokens: number;
+  /** Refill interval in milliseconds */
+  refillIntervalMs: number;
+  /** Number of tokens to add per refill interval */
+  tokensPerRefill: number;
+  /** Maximum queue size for pending requests */
+  maxQueueSize: number;
+  /** Timeout for queued requests in milliseconds */
+  queueTimeoutMs: number;
+};
+
+// =============================================================================
+// THINKING CONFIG TYPES (moved from utils/thinkingConfig.ts)
+// =============================================================================
+
+/** ThinkingLevel type for Gemini 3 models. */
+export type ThinkingLevel = "minimal" | "low" | "medium" | "high";
+
+/** ThinkingConfig matching the SDK's expected structure. */
+export type ThinkingConfig = {
+  enabled?: boolean;
+  type?: "enabled" | "disabled";
+  /** Token budget for thinking (Anthropic models: 5000-100000) */
+  budgetTokens?: number;
+  /** Thinking level for Gemini 3 models */
+  thinkingLevel?: ThinkingLevel;
+};
+
+/** Options for creating a thinkingConfig from CLI-style options. */
+export type CreateThinkingConfigOptions = {
+  /** Enable thinking mode */
+  thinking?: boolean;
+  /** Token budget for thinking (defaults to 10000) */
+  thinkingBudget?: number;
+  /** Thinking level for Gemini 3 models */
+  thinkingLevel?: ThinkingLevel;
+};
+
+/** Native SDK thinkingConfig structure for Gemini native SDK. */
+export type NativeThinkingConfig = {
+  includeThoughts: boolean;
+  thinkingLevel: ThinkingLevel;
+};

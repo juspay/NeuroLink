@@ -271,3 +271,183 @@ export type TestResult = {
   /** Optional execution duration in milliseconds */
   duration?: number;
 };
+
+// =============================================================================
+// SAFE PARSE RESULT (moved from utils/json/safeParse.ts)
+// =============================================================================
+
+/**
+ * Result type for safe JSON parsing operations
+ */
+export type SafeParseResult<T> = {
+  success: boolean;
+  data: T | null;
+  error: Error | null;
+};
+
+// =============================================================================
+// RETRY OPTIONS (moved from utils/async/retry.ts)
+// =============================================================================
+
+/**
+ * Configuration options for retry operations with exponential backoff.
+ * Named AsyncRetryOptions to avoid collision with utilities.ts RetryOptions.
+ */
+export type AsyncRetryOptions = {
+  /**
+   * Maximum number of retry attempts (not including the initial attempt).
+   * @default 3
+   */
+  maxRetries: number;
+
+  /**
+   * Initial delay between retries in milliseconds.
+   * @default 1000
+   */
+  baseDelayMs: number;
+
+  /**
+   * Maximum delay cap in milliseconds.
+   * @default 30000
+   */
+  maxDelayMs: number;
+
+  /**
+   * Multiplier for exponential backoff.
+   * @default 2
+   */
+  backoffMultiplier?: number;
+
+  /**
+   * Function to determine if a retry should be attempted.
+   * Return false to stop retrying immediately.
+   */
+  shouldRetry?: (error: Error, attempt: number) => boolean;
+
+  /**
+   * Whether to add random jitter to backoff delays to prevent thundering herd.
+   * @default true
+   */
+  addJitter?: boolean;
+
+  /**
+   * Callback invoked before each retry attempt.
+   * Useful for logging or metrics.
+   */
+  onRetry?: (error: Error, attempt: number, delayMs: number) => void;
+};
+
+// =============================================================================
+// TOKEN UTILS TYPES (moved from utils/tokenUtils.ts)
+// =============================================================================
+
+/**
+ * Raw usage object that may come from various AI providers.
+ * Supports multiple naming conventions and nested structures.
+ */
+export type RawUsageObject = {
+  // BaseProvider normalized format
+  input?: number;
+  output?: number;
+  total?: number;
+
+  // AI SDK format
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+
+  // OpenAI/Mistral format
+  promptTokens?: number;
+  completionTokens?: number;
+
+  // Anthropic-style cache tokens
+  cacheCreationInputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+
+  // OpenAI o1/Anthropic reasoning tokens
+  reasoningTokens?: number;
+  reasoning?: number;
+  reasoning_tokens?: number;
+  thinkingTokens?: number;
+
+  // Nested usage object (some providers wrap usage)
+  usage?: RawUsageObject;
+};
+
+/**
+ * Options for token extraction from raw usage objects.
+ */
+export type TokenExtractionOptions = {
+  /**
+   * Whether to calculate cache savings percentage
+   * @default true
+   */
+  calculateCacheSavings?: boolean;
+
+  /**
+   * How to handle missing optional fields
+   * - "zero": Return 0 for missing optional fields
+   * - "undefined": Return undefined for missing optional fields (default)
+   */
+  missingOptionalBehavior?: "zero" | "undefined";
+};
+
+// =============================================================================
+// MODEL CHOICE TYPE (moved from utils/modelChoices.ts)
+// =============================================================================
+
+/**
+ * Model choice for CLI prompts (inquirer format)
+ */
+export type ModelChoice = {
+  name: string;
+  value: string;
+  description?: string;
+};
+
+// =============================================================================
+// INFRASTRUCTURE TYPES (moved from core/infrastructure/)
+// =============================================================================
+
+/** Factory function type for creating instances. */
+export type FactoryFunction<TInstance, TConfig> = (
+  config?: TConfig,
+) => Promise<TInstance>;
+
+/** Factory registration entry. */
+export type FactoryRegistration<TInstance, TConfig> = {
+  factory: FactoryFunction<TInstance, TConfig>;
+  aliases: string[];
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Registry entry for lazy-loaded items in BaseRegistry.
+ * Named InfraRegistryEntry to avoid collision with workflowTypes.ts RegistryEntry.
+ */
+export type InfraRegistryEntry<TItem, TMetadata = unknown> = {
+  factory: () => Promise<TItem>;
+  metadata: TMetadata;
+  instance?: TItem;
+};
+
+/** Error code type (string-based). */
+export type ErrorCode = string;
+
+// =============================================================================
+// TOOL UTILITIES (moved from core/modules/ToolsManager.ts)
+// =============================================================================
+
+import type { z } from "zod";
+
+/** Utility functions for tool management. */
+export type ToolUtilities = {
+  isZodSchema?: (schema: unknown) => boolean;
+  convertToolResult?: (result: unknown) => Promise<unknown>;
+  createPermissiveZodSchema?: () => z.ZodSchema;
+  fixSchemaForOpenAIStrictMode?: (
+    schema: Record<string, unknown>,
+  ) => Record<string, unknown>;
+};

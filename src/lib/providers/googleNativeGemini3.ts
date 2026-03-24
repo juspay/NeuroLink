@@ -27,47 +27,27 @@ import {
   inlineJsonSchema,
   isZodSchema,
 } from "../utils/schemaConversion.js";
-import type { ThinkingConfig } from "../utils/thinkingConfig.js";
+import type { ThinkingConfig } from "../types/configTypes.js";
 import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
-import type { ToolWithLegacyParams } from "./providerTypeUtils.js";
+import type {
+  CollectedChunkResult,
+  NativeFunctionCall,
+  NativeFunctionDeclaration,
+  NativeFunctionResponse,
+  NativeToolDeclarationsResult,
+  NativeToolsConfig,
+  TextChannel,
+  ToolWithLegacyParams,
+} from "../types/index.js";
 
-// ── Types ──
-
-/** A single native @google/genai function declaration. */
-export type NativeFunctionDeclaration = {
-  name: string;
-  description: string;
-  parametersJsonSchema?: Record<string, unknown>;
-};
-
-/** The tools config array expected by the @google/genai SDK. */
-export type NativeToolsConfig = Array<{
-  functionDeclarations: NativeFunctionDeclaration[];
-}>;
-
-/** Return value of buildNativeToolDeclarations. */
-export type NativeToolDeclarationsResult = {
-  toolsConfig: NativeToolsConfig;
-  executeMap: Map<string, Tool["execute"]>;
-};
-
-/** A single function call returned by the Gemini model. */
-export type NativeFunctionCall = {
-  name: string;
-  args: Record<string, unknown>;
-};
-
-/** A single function response to feed back into the conversation. */
-export type NativeFunctionResponse = {
-  functionResponse: { name: string; response: unknown };
-};
-
-/** Result from collectStreamChunks. */
-export type CollectedChunkResult = {
-  rawResponseParts: unknown[];
-  stepFunctionCalls: NativeFunctionCall[];
-  inputTokens: number;
-  outputTokens: number;
+export type {
+  CollectedChunkResult,
+  NativeFunctionCall,
+  NativeFunctionDeclaration,
+  NativeFunctionResponse,
+  NativeToolDeclarationsResult,
+  NativeToolsConfig,
+  TextChannel,
 };
 
 // ── Functions ──
@@ -429,24 +409,6 @@ export async function collectStreamChunks(
 
   return { rawResponseParts, stepFunctionCalls, inputTokens, outputTokens };
 }
-
-/**
- * A push-based text channel that decouples producers (agentic loop) from
- * consumers (the caller's async iterable).
- *
- * The producer calls `push(text)` for each chunk and `close()` / `error(err)`
- * when done.  The consumer iterates the `iterable` async generator.
- */
-export type TextChannel = {
-  /** Push a text chunk to the consumer. */
-  push(text: string): void;
-  /** Signal that no more chunks will arrive. */
-  close(): void;
-  /** Signal that the producer encountered a fatal error. */
-  error(err: unknown): void;
-  /** Async iterable consumed by the StreamResult. */
-  iterable: AsyncIterable<{ content: string }>;
-};
 
 /**
  * Create a push-based text channel that bridges a background producer

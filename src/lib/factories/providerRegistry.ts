@@ -70,7 +70,7 @@ export class ProviderRegistry {
             await import("../providers/googleAiStudio.js");
           return new GoogleAIStudioProvider(
             modelName,
-            sdk as NeuroLink | undefined,
+            sdk as unknown as NeuroLink | undefined,
           );
         },
         GoogleAIModels.GEMINI_2_5_FLASH,
@@ -86,7 +86,10 @@ export class ProviderRegistry {
           sdk?: UnknownRecord,
         ) => {
           const { OpenAIProvider } = await import("../providers/openAI.js");
-          return new OpenAIProvider(modelName, sdk as NeuroLink | undefined);
+          return new OpenAIProvider(
+            modelName,
+            sdk as unknown as NeuroLink | undefined,
+          );
         },
         OpenAIModels.GPT_4O_MINI,
         ["gpt", "chatgpt"],
@@ -102,7 +105,10 @@ export class ProviderRegistry {
         ) => {
           const { AnthropicProvider } =
             await import("../providers/anthropic.js");
-          return new AnthropicProvider(modelName, sdk as NeuroLink | undefined);
+          return new AnthropicProvider(
+            modelName,
+            sdk as unknown as NeuroLink | undefined,
+          );
         },
         AnthropicModels.CLAUDE_SONNET_4_6,
         ["claude", "anthropic"],
@@ -121,7 +127,7 @@ export class ProviderRegistry {
             await import("../providers/amazonBedrock.js");
           return new AmazonBedrockProvider(
             modelName,
-            sdk as NeuroLink | undefined,
+            sdk as unknown as NeuroLink | undefined,
             region,
           );
         },
@@ -141,7 +147,7 @@ export class ProviderRegistry {
             await import("../providers/azureOpenai.js");
           return new AzureOpenAIProvider(
             modelName,
-            sdk as NeuroLink | undefined,
+            sdk as unknown as NeuroLink | undefined,
           );
         },
         process.env.AZURE_MODEL ||
@@ -166,7 +172,7 @@ export class ProviderRegistry {
           return new GoogleVertexProvider(
             modelName,
             providerName,
-            sdk as NeuroLink | undefined,
+            sdk as unknown as NeuroLink | undefined,
             region,
           );
         },
@@ -198,7 +204,7 @@ export class ProviderRegistry {
           const { MistralProvider } = await import("../providers/mistral.js");
           return new MistralProvider(
             modelName,
-            sdk as MistralProviderType | undefined,
+            sdk as unknown as MistralProviderType | undefined,
           );
         },
         MistralModels.MISTRAL_LARGE_LATEST,
@@ -225,7 +231,10 @@ export class ProviderRegistry {
           sdk?: UnknownRecord,
         ) => {
           const { LiteLLMProvider } = await import("../providers/litellm.js");
-          return new LiteLLMProvider(modelName, sdk as NeuroLink | undefined);
+          return new LiteLLMProvider(
+            modelName,
+            sdk as unknown as NeuroLink | undefined,
+          );
         },
         process.env.LITELLM_MODEL || LiteLLMModels.OPENAI_GPT_4O_MINI,
         ["litellm"],
@@ -243,7 +252,7 @@ export class ProviderRegistry {
             await import("../providers/openaiCompatible.js");
           return new OpenAICompatibleProvider(
             modelName,
-            sdk as NeuroLink | undefined,
+            sdk as unknown as NeuroLink | undefined,
           );
         },
         process.env.OPENAI_COMPATIBLE_MODEL || undefined, // Enable auto-discovery when no model specified
@@ -262,7 +271,7 @@ export class ProviderRegistry {
             await import("../providers/openRouter.js");
           return new OpenRouterProvider(
             modelName,
-            sdk as NeuroLink | undefined,
+            sdk as unknown as NeuroLink | undefined,
           );
         },
         process.env.OPENROUTER_MODEL || "anthropic/claude-3-5-sonnet",

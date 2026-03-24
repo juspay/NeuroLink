@@ -11,68 +11,17 @@ import path from "path";
 import { logger } from "../../lib/utils/logger.js";
 import { NeuroLink } from "../../lib/neurolink.js";
 import { withTimeout } from "../../lib/utils/errorHandling.js";
-import type { ServerFramework } from "../../lib/server/types.js";
 import {
   isProcessRunning,
   formatUptime,
   ensureStateDir,
   getNeuroLinkDir,
 } from "../utils/serverUtils.js";
-
-// ============================================
-// Types
-// ============================================
-
-/**
- * Server command arguments
- */
-type ServerCommandArgs = {
-  port?: number;
-  host?: string;
-  framework?: "hono" | "express" | "fastify" | "koa";
-  basePath?: string;
-  cors?: boolean;
-  rateLimit?: boolean;
-  quiet?: boolean;
-  format?: "text" | "json" | "yaml";
-  output?: string;
-  debug?: boolean;
-};
-
-/**
- * Server status stored in state file
- */
-type ServerState = {
-  pid: number;
-  port: number;
-  host: string;
-  framework: ServerFramework;
-  startTime: string;
-  basePath: string;
-};
-
-/**
- * Server configuration stored in config file
- */
-type ServerConfig = {
-  defaultPort: number;
-  defaultHost: string;
-  defaultFramework: "hono" | "express" | "fastify" | "koa";
-  defaultBasePath: string;
-  cors: {
-    enabled: boolean;
-    origins?: string[];
-  };
-  rateLimit: {
-    enabled: boolean;
-    windowMs?: number;
-    maxRequests?: number;
-  };
-  swagger: {
-    enabled: boolean;
-    path?: string;
-  };
-};
+import type {
+  ServerCommandArgs,
+  ServerState,
+  ServerConfig,
+} from "../../lib/types/index.js";
 
 // ============================================
 // State Management

@@ -49,7 +49,7 @@ import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
 import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
 import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
 import { type Span, trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import type { ToolWithLegacyParams } from "./providerTypeUtils.js";
+import type { ToolWithLegacyParams } from "../types/index.js";
 import type { ToolParameterSchema } from "../types/tools.js";
 
 const bedrockTracer = trace.getTracer("neurolink.bedrock");

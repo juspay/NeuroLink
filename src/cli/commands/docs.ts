@@ -1,10 +1,6 @@
 import type { CommandModule, Argv } from "yargs";
 import chalk from "chalk";
-
-type DocsCommandArgs = {
-  transport?: "stdio" | "http";
-  port?: number;
-};
+import type { DocsCommandArgs } from "../../lib/types/index.js";
 
 export class DocsCommandFactory {
   static createDocsCommand(): CommandModule<object, DocsCommandArgs> {

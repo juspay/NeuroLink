@@ -18,7 +18,7 @@ import {
   createTimeoutController,
   TimeoutError,
 } from "../utils/timeout.js";
-import { type StepFinishEvent } from "./providerTypeUtils.js";
+import type { StepFinishEvent } from "../types/index.js";
 
 export class AzureOpenAIProvider extends BaseProvider {
   private apiKey: string;

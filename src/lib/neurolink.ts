@@ -433,6 +433,7 @@ const metricsTraceContextStorage = new AsyncLocalStorage<MetricsTraceContext>();
 
 export class NeuroLink {
   private mcpInitialized = false;
+  private mcpSkipped = false;
   private mcpInitPromise: Promise<void> | null = null;
   private emitter =
     new EventEmitter() as unknown as TypedEventEmitter<NeuroLinkEvents>;
@@ -1635,8 +1636,9 @@ Current user's request: ${currentInput}`;
    * Uses isolated async context to prevent hanging
    */
   private async initializeMCP(): Promise<void> {
-    // Skip if already initialized — prevents redundant re-init on every generate call
-    if (this.mcpInitialized) {
+    // Skip if already initialized or explicitly skipped — prevents redundant
+    // re-init on every generate call.
+    if (this.mcpInitialized || this.mcpSkipped) {
       return;
     }
 
@@ -1645,6 +1647,21 @@ Current user's request: ${currentInput}`;
     // a second parallel initialization.
     if (this.mcpInitPromise) {
       return this.mcpInitPromise;
+    }
+
+    // Environment-level kill switch — skip MCP-specific initialization on cold
+    // start but always ensure providers are registered exactly once.
+    if (process.env.NEUROLINK_SKIP_MCP === "true") {
+      this.mcpInitPromise = (async () => {
+        await this.initializeProviderRegistryInternal();
+        this.mcpSkipped = true;
+      })();
+      try {
+        await this.mcpInitPromise;
+      } finally {
+        this.mcpInitPromise = null;
+      }
+      return;
     }
 
     this.mcpInitPromise = this.performMCPInitializationOnce();
@@ -6206,14 +6223,17 @@ Current user's request: ${currentInput}`;
         "NeuroLink.fallbackStream",
       );
 
-      // Get conversation messages for context (same as primary stream)
-      const conversationMessages = await getConversationMessages(
-        this.conversationMemory,
-        {
-          prompt: enhancedOptions.input.text,
-          context: enhancedOptions.context as Record<string, unknown>,
-        } as TextGenerationOptions,
-      );
+      // Prefer the caller-supplied / compacted conversation messages that were
+      // threaded through options.  Only fall back to memory when no explicit
+      // history was provided — this preserves caller-supplied empty arrays
+      // (which signal "no prior context") and avoids resurrecting stale memory.
+      const conversationMessages =
+        enhancedOptions.conversationMessages !== undefined
+          ? enhancedOptions.conversationMessages
+          : await getConversationMessages(this.conversationMemory, {
+              prompt: enhancedOptions.input.text,
+              context: enhancedOptions.context as Record<string, unknown>,
+            } as TextGenerationOptions);
 
       const fallbackResult = await fallbackProvider.stream({
         ...enhancedOptions,
@@ -6470,15 +6490,25 @@ Current user's request: ${currentInput}`;
       ? options.systemPrompt || ""
       : this.createToolAwareSystemPrompt(options.systemPrompt, availableTools);
 
-    // Get conversation messages for context
-    let conversationMessages = await getConversationMessages(
-      this.conversationMemory,
-      {
-        ...options,
-        prompt: options.input.text,
-        context: options.context,
-      } as TextGenerationOptions,
-    );
+    // Get conversation messages for context.
+    // If the caller already supplied conversationMessages (e.g. proxy routes
+    // forwarding a multi-turn Claude request), honour them — including an
+    // explicit empty array, which signals "no prior context". Otherwise fall
+    // back to the conversation memory store (interactive CLI / SDK sessions).
+    const hasCallerConversationHistory =
+      options.conversationMessages !== undefined;
+    const resolvedConversationMessages = hasCallerConversationHistory
+      ? options.conversationMessages
+      : await getConversationMessages(this.conversationMemory, {
+          ...options,
+          prompt: options.input.text,
+          context: options.context,
+        } as TextGenerationOptions);
+    // Make the resolved messages the single source of truth so downstream
+    // consumers (compaction, fallback streams) reuse them instead of
+    // reloading from conversationMemory.
+    options.conversationMessages = resolvedConversationMessages;
+    let conversationMessages = resolvedConversationMessages;
 
     // Pre-generation budget check for streaming
     const streamBudget = checkContextBudget({
@@ -6498,7 +6528,7 @@ Current user's request: ${currentInput}`;
     const streamCompactionSessionId = this.getCompactionSessionId(options);
     if (
       streamBudget.shouldCompact &&
-      this.conversationMemory &&
+      (hasCallerConversationHistory || this.conversationMemory) &&
       streamMessageCount >
         (this.lastCompactionMessageCount.get(streamCompactionSessionId) ?? 0)
     ) {
@@ -6521,6 +6551,10 @@ Current user's request: ${currentInput}`;
       if (compactionResult.compacted) {
         const repairedResult = repairToolPairs(compactionResult.messages);
         conversationMessages = repairedResult.messages;
+        // Keep options.conversationMessages in sync so downstream consumers
+        // (e.g. handleStreamFallback) use the compacted history rather than
+        // re-reading from conversationMemory.
+        options.conversationMessages = conversationMessages;
         this.lastCompactionMessageCount.set(
           streamCompactionSessionId,
           conversationMessages.length,
@@ -6559,6 +6593,9 @@ Current user's request: ${currentInput}`;
           postCompactBudget.breakdown,
           providerName,
         );
+        // Keep options in sync after emergency truncation so fallback paths
+        // use the truncated history.
+        options.conversationMessages = conversationMessages;
 
         const finalBudget = checkContextBudget({
           provider: providerName,
@@ -7571,7 +7608,12 @@ Current user's request: ${currentInput}`;
       toolMap.set(tool.name, {
         name: tool.name,
         description: tool.description || "",
-        inputSchema: tool.inputSchema || tool.parameters || {},
+        inputSchema:
+          typeof tool.inputSchema === "object" && tool.inputSchema !== null
+            ? tool.inputSchema
+            : typeof tool.parameters === "object" && tool.parameters !== null
+              ? tool.parameters
+              : {},
         execute: async (params: unknown, context?: unknown) => {
           // CONTEXT MERGING: Combine all available contexts for maximum information
           const storedContext = this.toolExecutionContext || {};
@@ -7634,7 +7676,10 @@ Current user's request: ${currentInput}`;
         toolMap.set(toolName, {
           name: toolName,
           description: toolDef.description || `File tool: ${toolName}`,
-          inputSchema: toolParams ?? { type: "object", properties: {} },
+          inputSchema:
+            typeof toolParams === "object" && toolParams !== null
+              ? toolParams
+              : { type: "object", properties: {} },
           execute: async (params: unknown) => {
             return await (
               toolDef.execute as (

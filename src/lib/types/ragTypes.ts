@@ -232,8 +232,7 @@ export type RAGCircuitBreakerStats = {
   p95Latency: number;
 };
 
-// Re-import CircuitState for use in RAGCircuitBreakerStats
-import type { CircuitState } from "../rag/resilience/CircuitBreaker.js";
+// CircuitState is now defined in this file (see bottom section)
 
 // ============================================================================
 // Pipeline Types (from src/lib/rag/pipeline/RAGPipeline.ts)
@@ -590,4 +589,53 @@ export type DocumentLoader = {
    * @returns True if loader can handle the source
    */
   canHandle(source: string): boolean;
+};
+
+// =============================================================================
+// CIRCUIT BREAKER TYPES (moved from rag/resilience/CircuitBreaker.ts)
+// =============================================================================
+
+/** Circuit breaker state. */
+export type CircuitState = "closed" | "open" | "half-open";
+
+/** Event map for RAG circuit breaker. */
+export type RAGCircuitBreakerEvents = {
+  stateChange: [
+    {
+      oldState: CircuitState;
+      newState: CircuitState;
+      reason: string;
+      timestamp: Date;
+    },
+  ];
+  callSuccess: [{ duration: number; timestamp: Date; operationType?: string }];
+  callFailure: [
+    {
+      error: string;
+      duration: number;
+      timestamp: Date;
+      operationType?: string;
+    },
+  ];
+  circuitOpen: [{ failureRate: number; totalCalls: number; timestamp: Date }];
+  circuitHalfOpen: [{ timestamp: Date }];
+  circuitClosed: [{ timestamp: Date }];
+};
+
+// =============================================================================
+// RAG INTEGRATION TYPES (moved from rag/ragIntegration.ts)
+// =============================================================================
+
+import type { Tool } from "ai";
+
+/** Prepared RAG tool ready for injection into generate/stream. */
+export type RAGPreparedTool = {
+  /** The tool to inject into the tools Record */
+  tool: Tool;
+  /** Tool name (key for the tools Record) */
+  toolName: string;
+  /** Number of chunks indexed */
+  chunksIndexed: number;
+  /** Number of files loaded */
+  filesLoaded: number;
 };

@@ -21,10 +21,8 @@ import {
 } from "../utils/timeout.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import {
-  toAnalyticsStreamResult,
-  type StepFinishEvent,
-} from "./providerTypeUtils.js";
+import { toAnalyticsStreamResult } from "./providerTypeUtils.js";
+import type { StepFinishEvent } from "../types/index.js";
 
 // Constants
 const FALLBACK_OPENAI_COMPATIBLE_MODEL = "gpt-3.5-turbo";

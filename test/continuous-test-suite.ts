@@ -3803,6 +3803,686 @@ async function testGoogleAIStudioImageGeneration(): Promise<boolean | null> {
 
 // Types imported from @juspay/neurolink: ProcessResult, TestFunction, TestResult
 
+// ============================================================
+// Model Alias Resolution Tests (NL-004)
+// ============================================================
+
+/**
+ * Test 1: Model Alias Redirect
+ * Verifies that a model alias with action "redirect" silently redirects
+ * to the target model and returns a valid response.
+ */
+async function testModelAliasRedirect(): Promise<boolean | null> {
+  logSection("Model Alias Redirect");
+
+  const baseOptions = buildBaseSDKOptions();
+  const targetModel = baseOptions.model;
+
+  // If no model override is set, skip since we need a concrete target
+  if (!targetModel) {
+    logTest(
+      "Model Alias Redirect",
+      "SKIP",
+      "Requires --model to provide a concrete alias target",
+    );
+    return null;
+  }
+
+  // Build alias config that redirects "test-old-model" to the real model
+  const sdk = new NeuroLink({
+    modelAliasConfig: {
+      aliases: {
+        "test-old-model": {
+          target: targetModel,
+          action: "redirect",
+          reason: "test-old-model has been replaced",
+        },
+      },
+    },
+  });
+
+  try {
+    logTest(
+      "Model Alias Redirect",
+      "TESTING",
+      `Redirecting "test-old-model" to "${targetModel}"...`,
+    );
+
+    const result = await sdk.generate({
+      input: {
+        text: "Say hello in one sentence.",
+      },
+      model: "test-old-model",
+      provider: baseOptions.provider,
+      maxTokens: 200,
+    });
+
+    const content =
+      typeof result === "string"
+        ? result
+        : typeof result === "object" && result !== null
+          ? ((result as { content?: string }).content ?? "")
+          : "";
+
+    if (content && content.length > 0) {
+      logTest(
+        "Model Alias Redirect",
+        "PASS",
+        `Redirect worked silently, got ${content.length} chars`,
+      );
+      return true;
+    } else {
+      logTest("Model Alias Redirect", "FAIL", "Empty response after redirect");
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    // If the error is about missing API key or provider config, skip
+    if (
+      errorMessage.includes("API key") ||
+      errorMessage.includes("not configured")
+    ) {
+      logTest(
+        "Model Alias Redirect",
+        "SKIP",
+        "Provider not configured: " + errorMessage,
+      );
+      return null;
+    }
+    logTest("Model Alias Redirect", "FAIL", errorMessage);
+    return false;
+  } finally {
+    await cleanupNeuroLinkInstance(sdk);
+  }
+}
+
+/**
+ * Test 2: Model Alias Block
+ * Verifies that a model alias with action "block" throws a NeuroLinkError
+ * with code MODEL_DEPRECATED when the blocked model is requested.
+ */
+async function testModelAliasBlock(): Promise<boolean | null> {
+  logSection("Model Alias Block");
+
+  const baseOptions = buildBaseSDKOptions();
+
+  const sdk = new NeuroLink({
+    modelAliasConfig: {
+      aliases: {
+        "test-banned-model": {
+          target: "any-replacement",
+          action: "block",
+          reason: "This model is deprecated and no longer available.",
+        },
+      },
+    },
+  });
+
+  try {
+    logTest(
+      "Model Alias Block",
+      "TESTING",
+      'Attempting to use blocked model "test-banned-model"...',
+    );
+
+    await sdk.generate({
+      input: {
+        text: "Say hello.",
+      },
+      model: "test-banned-model",
+      provider: baseOptions.provider,
+      maxTokens: 200,
+    });
+
+    // If we get here, no error was thrown — that's a failure
+    logTest(
+      "Model Alias Block",
+      "FAIL",
+      "Expected MODEL_DEPRECATED error but no error was thrown",
+    );
+    return false;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check that the error is the expected MODEL_DEPRECATED block error
+    if (
+      errorMessage.includes("MODEL_DEPRECATED") ||
+      errorMessage.includes("blocked") ||
+      errorMessage.includes("deprecated")
+    ) {
+      logTest(
+        "Model Alias Block",
+        "PASS",
+        `Correctly blocked with error: ${errorMessage.slice(0, 120)}`,
+      );
+      return true;
+    }
+
+    // Wrong kind of error
+    logTest(
+      "Model Alias Block",
+      "FAIL",
+      `Expected MODEL_DEPRECATED error but got: ${errorMessage.slice(0, 200)}`,
+    );
+    return false;
+  } finally {
+    await cleanupNeuroLinkInstance(sdk);
+  }
+}
+
+/**
+ * Test 3: Model Alias Warn
+ * Verifies that a model alias with action "warn" logs a warning but still
+ * redirects to the target model and returns a valid response.
+ */
+async function testModelAliasWarn(): Promise<boolean | null> {
+  logSection("Model Alias Warn");
+
+  const baseOptions = buildBaseSDKOptions();
+  const targetModel = baseOptions.model;
+
+  if (!targetModel) {
+    logTest(
+      "Model Alias Warn",
+      "SKIP",
+      "Requires --model to provide a concrete alias target",
+    );
+    return null;
+  }
+
+  const sdk = new NeuroLink({
+    modelAliasConfig: {
+      aliases: {
+        "test-legacy-model": {
+          target: targetModel,
+          action: "warn",
+          reason: "test-legacy-model is deprecated, please migrate.",
+        },
+      },
+    },
+  });
+
+  try {
+    logTest(
+      "Model Alias Warn",
+      "TESTING",
+      `Using warned model "test-legacy-model" (redirects to "${targetModel}")...`,
+    );
+
+    const result = await sdk.generate({
+      input: {
+        text: "Say hello in one sentence.",
+      },
+      model: "test-legacy-model",
+      provider: baseOptions.provider,
+      maxTokens: 200,
+    });
+
+    const content =
+      typeof result === "string"
+        ? result
+        : typeof result === "object" && result !== null
+          ? ((result as { content?: string }).content ?? "")
+          : "";
+
+    if (content && content.length > 0) {
+      logTest(
+        "Model Alias Warn",
+        "PASS",
+        `Warn + redirect worked, got ${content.length} chars (warning was logged)`,
+      );
+      return true;
+    } else {
+      logTest("Model Alias Warn", "FAIL", "Empty response after warn redirect");
+      return false;
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (
+      errorMessage.includes("API key") ||
+      errorMessage.includes("not configured")
+    ) {
+      logTest(
+        "Model Alias Warn",
+        "SKIP",
+        "Provider not configured: " + errorMessage,
+      );
+      return null;
+    }
+    logTest("Model Alias Warn", "FAIL", errorMessage);
+    return false;
+  } finally {
+    await cleanupNeuroLinkInstance(sdk);
+  }
+}
+
+// =============================================================================
+// PROXY COMPONENT RUNTIME TESTS (no mocks, no API calls — pure in-process logic)
+// =============================================================================
+
+async function testAccountPoolRuntime(): Promise<boolean | null> {
+  logSection("Testing AccountPool Runtime");
+  try {
+    const { AccountPool } = await import("../dist/lib/auth/accountPool.js");
+
+    const pool = new AccountPool({ strategy: "round-robin" });
+    pool.addAccount({
+      id: "a",
+      type: "api_key",
+      apiKey: "sk-a",
+      status: "healthy",
+      consecutiveFailures: 0,
+      requestCount: 0,
+      lastUsed: 0,
+    });
+    pool.addAccount({
+      id: "b",
+      type: "api_key",
+      apiKey: "sk-b",
+      status: "healthy",
+      consecutiveFailures: 0,
+      requestCount: 0,
+      lastUsed: 0,
+    });
+    pool.addAccount({
+      id: "c",
+      type: "api_key",
+      apiKey: "sk-c",
+      status: "healthy",
+      consecutiveFailures: 0,
+      requestCount: 0,
+      lastUsed: 0,
+    });
+
+    // Round-robin cycling
+    const first = pool.getNextAccount();
+    const second = pool.getNextAccount();
+    const third = pool.getNextAccount();
+    if (first?.id !== "a" || second?.id !== "b" || third?.id !== "c") {
+      logTest(
+        "AccountPool Runtime",
+        "FAIL",
+        `Round-robin wrong: ${first?.id}, ${second?.id}, ${third?.id}`,
+      );
+      return false;
+    }
+
+    // Cooling skip
+    pool.markQuotaExceeded("b");
+    const afterCool = pool.getNextAccount();
+    if (afterCool?.id === "b") {
+      logTest("AccountPool Runtime", "FAIL", "Should skip cooling account b");
+      return false;
+    }
+
+    // All exhausted
+    pool.markQuotaExceeded("a");
+    pool.markQuotaExceeded("c");
+    if (pool.getNextAccount() !== null) {
+      logTest(
+        "AccountPool Runtime",
+        "FAIL",
+        "Should return null when all exhausted",
+      );
+      return false;
+    }
+
+    logTest(
+      "AccountPool Runtime",
+      "PASS",
+      "Round-robin, cooling skip, exhaustion all work",
+    );
+    return true;
+  } catch (error: any) {
+    logTest("AccountPool Runtime", "FAIL", error.message);
+    return false;
+  }
+}
+
+async function testModelRouterRuntime(): Promise<boolean | null> {
+  logSection("Testing ModelRouter Runtime");
+  try {
+    const { ModelRouter } = await import("../dist/lib/proxy/modelRouter.js");
+    const router = new ModelRouter({
+      strategy: "round-robin",
+      modelMappings: [
+        {
+          from: "claude-haiku-4-5",
+          to: "gemini-2.5-flash",
+          provider: "google-ai",
+        },
+      ],
+      fallbackChain: [{ provider: "google-ai", model: "gemini-2.5-pro" }],
+      passthroughModels: ["claude-sonnet-4"],
+    });
+
+    const mapped = router.resolve("claude-haiku-4-5");
+    if (
+      mapped.provider !== "google-ai" ||
+      mapped.model !== "gemini-2.5-flash"
+    ) {
+      logTest(
+        "ModelRouter Runtime",
+        "FAIL",
+        `Mapping wrong: ${JSON.stringify(mapped)}`,
+      );
+      return false;
+    }
+
+    const passthrough = router.resolve("claude-sonnet-4");
+    if (passthrough.provider !== "anthropic") {
+      logTest(
+        "ModelRouter Runtime",
+        "FAIL",
+        `Passthrough wrong: ${JSON.stringify(passthrough)}`,
+      );
+      return false;
+    }
+
+    const defaultClaude = router.resolve("claude-opus-4");
+    if (defaultClaude.provider !== "anthropic") {
+      logTest(
+        "ModelRouter Runtime",
+        "FAIL",
+        `Default claude-* wrong: ${JSON.stringify(defaultClaude)}`,
+      );
+      return false;
+    }
+
+    logTest(
+      "ModelRouter Runtime",
+      "PASS",
+      "Mapping, passthrough, and default resolution all work",
+    );
+    return true;
+  } catch (error: any) {
+    logTest("ModelRouter Runtime", "FAIL", error.message);
+    return false;
+  }
+}
+
+async function testClaudeFormatRuntime(): Promise<boolean | null> {
+  logSection("Testing ClaudeFormat Runtime");
+  try {
+    const { parseClaudeRequest, serializeClaudeResponse, buildClaudeError } =
+      await import("../dist/lib/proxy/claudeFormat.js");
+
+    // Parse request
+    const parsed = parseClaudeRequest({
+      model: "claude-sonnet-4",
+      max_tokens: 1024,
+      messages: [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there" },
+        { role: "user", content: "What is 2+2?" },
+      ],
+      system: "You are helpful",
+    });
+    if (!parsed.prompt || parsed.prompt !== "What is 2+2?") {
+      logTest(
+        "ClaudeFormat Runtime",
+        "FAIL",
+        `Parse wrong prompt: ${parsed.prompt}`,
+      );
+      return false;
+    }
+
+    // Serialize response
+    const response = serializeClaudeResponse(
+      {
+        content: "4",
+        model: "claude-sonnet-4",
+        usage: { input: 10, output: 1, total: 11 },
+        finishReason: "stop",
+      },
+      "claude-sonnet-4",
+    );
+    if (response.type !== "message" || response.role !== "assistant") {
+      logTest(
+        "ClaudeFormat Runtime",
+        "FAIL",
+        `Serialize wrong type: ${response.type}`,
+      );
+      return false;
+    }
+    if (!response.id?.startsWith("msg_")) {
+      logTest("ClaudeFormat Runtime", "FAIL", `Bad message ID: ${response.id}`);
+      return false;
+    }
+
+    // Error envelope
+    const error = buildClaudeError(429, "Rate limited");
+    if (error.type !== "error" || error.error.type !== "rate_limit_error") {
+      logTest(
+        "ClaudeFormat Runtime",
+        "FAIL",
+        `Error envelope wrong: ${JSON.stringify(error)}`,
+      );
+      return false;
+    }
+
+    logTest(
+      "ClaudeFormat Runtime",
+      "PASS",
+      "Parse, serialize, and error envelope all work",
+    );
+    return true;
+  } catch (error: any) {
+    logTest("ClaudeFormat Runtime", "FAIL", error.message);
+    return false;
+  }
+}
+
+async function testSSESerializerRuntime(): Promise<boolean | null> {
+  logSection("Testing SSE Serializer Runtime");
+  try {
+    const { ClaudeStreamSerializer } =
+      await import("../dist/lib/proxy/claudeFormat.js");
+    const sse = new ClaudeStreamSerializer("claude-sonnet-4", 100);
+
+    const events: string[] = [];
+
+    // Start
+    for (const frame of sse.start()) {
+      events.push(frame);
+    }
+    // Text deltas
+    for (const frame of sse.pushDelta("Hello ")) {
+      events.push(frame);
+    }
+    for (const frame of sse.pushDelta("world!")) {
+      events.push(frame);
+    }
+    // Finish
+    for (const frame of sse.finish(5, "stop")) {
+      events.push(frame);
+    }
+
+    // Verify event sequence — assert ordering, not just membership.
+    // The SSE contract requires: message_start comes first, then
+    // content_block_start before any content_block_delta, and
+    // message_stop must be the final event.
+    const eventTypes = events.map((e) => {
+      const match = e.match(/^event: (\S+)/);
+      return match ? match[1] : "unknown";
+    });
+
+    const requiredOrder = [
+      "message_start",
+      "content_block_start",
+      "content_block_delta",
+      "message_stop",
+    ];
+    for (const evt of requiredOrder) {
+      if (!eventTypes.includes(evt)) {
+        logTest("SSE Serializer Runtime", "FAIL", `Missing ${evt}`);
+        return false;
+      }
+    }
+
+    // Verify relative ordering of the required events
+    let lastIdx = -1;
+    for (const evt of requiredOrder) {
+      const idx = eventTypes.indexOf(evt);
+      if (idx < lastIdx) {
+        logTest(
+          "SSE Serializer Runtime",
+          "FAIL",
+          `Event "${evt}" appeared at index ${idx} but expected after index ${lastIdx}`,
+        );
+        return false;
+      }
+      lastIdx = idx;
+    }
+
+    // message_stop must be the very last event
+    if (eventTypes[eventTypes.length - 1] !== "message_stop") {
+      logTest(
+        "SSE Serializer Runtime",
+        "FAIL",
+        `Last event should be message_stop, got "${eventTypes[eventTypes.length - 1]}"`,
+      );
+      return false;
+    }
+
+    logTest(
+      "SSE Serializer Runtime",
+      "PASS",
+      `Event sequence correct (order verified): ${eventTypes.length} events`,
+    );
+    return true;
+  } catch (error: any) {
+    logTest("SSE Serializer Runtime", "FAIL", error.message);
+    return false;
+  }
+}
+
+async function testCloakingRuntime(): Promise<boolean | null> {
+  logSection("Testing Cloaking Pipeline Runtime");
+  try {
+    const { CloakingPipeline } =
+      await import("../dist/lib/proxy/cloaking/index.js");
+    const { createHeaderScrubber } =
+      await import("../dist/lib/proxy/cloaking/plugins/headerScrubber.js");
+    const { createSessionIdentity } =
+      await import("../dist/lib/proxy/cloaking/plugins/sessionIdentity.js");
+    const { createWordObfuscator } =
+      await import("../dist/lib/proxy/cloaking/plugins/wordObfuscator.js");
+
+    const pipeline = new CloakingPipeline();
+    pipeline.use(createHeaderScrubber());
+    pipeline.use(createSessionIdentity());
+    pipeline.use(createWordObfuscator(["proxy", "neurolink"]));
+
+    const ctx = {
+      request: {
+        headers: {
+          "x-forwarded-for": "1.2.3.4",
+          "content-type": "application/json",
+          authorization: "Bearer sk-test",
+        },
+        body: {
+          messages: [{ role: "user", content: "I use a proxy with neurolink" }],
+          model: "claude-sonnet-4",
+        },
+        url: "https://api.anthropic.com/v1/messages",
+      },
+      account: {
+        id: "test-acct",
+        type: "oauth" as const,
+        status: "healthy" as const,
+        consecutiveFailures: 0,
+        requestCount: 0,
+        lastUsed: 0,
+      },
+      config: { mode: "always" as const, plugins: {} },
+    };
+
+    const result = await pipeline.processRequest(ctx);
+
+    // Verify headers scrubbed
+    if (result.request.headers["x-forwarded-for"]) {
+      logTest("Cloaking Runtime", "FAIL", "x-forwarded-for not scrubbed");
+      return false;
+    }
+    // Verify auth preserved
+    if (!result.request.headers["authorization"]) {
+      logTest("Cloaking Runtime", "FAIL", "authorization header lost");
+      return false;
+    }
+    // Verify session identity injected
+    if (
+      !result.request.body?.metadata?.user_id ||
+      !(result.request.body.metadata.user_id as string).startsWith("user_")
+    ) {
+      logTest(
+        "Cloaking Runtime",
+        "FAIL",
+        `Session ID not injected: ${result.request.body?.metadata?.user_id}`,
+      );
+      return false;
+    }
+    // Verify word obfuscation (zero-width space in "proxy")
+    const content = result.request.body.messages[0].content;
+    if (!content.includes("\u200B")) {
+      logTest("Cloaking Runtime", "FAIL", "Zero-width space not inserted");
+      return false;
+    }
+
+    logTest(
+      "Cloaking Runtime",
+      "PASS",
+      "Headers scrubbed, session ID injected, words obfuscated",
+    );
+    return true;
+  } catch (error: any) {
+    logTest("Cloaking Runtime", "FAIL", error.message);
+    return false;
+  }
+}
+
+async function testProxyConfigRuntime(): Promise<boolean | null> {
+  logSection("Testing ProxyConfig Runtime");
+  try {
+    const { parseProxyConfigString } =
+      await import("../dist/lib/proxy/proxyConfig.js");
+
+    const config = await parseProxyConfigString(
+      JSON.stringify({
+        version: 1,
+        accounts: {
+          anthropic: [
+            { name: "test-account", apiKey: "sk-ant-test-123", weight: 1 },
+          ],
+        },
+      }),
+    );
+
+    if (!config || !config.accounts?.anthropic) {
+      logTest("ProxyConfig Runtime", "FAIL", "Config not parsed");
+      return false;
+    }
+    if (config.accounts.anthropic[0].name !== "test-account") {
+      logTest(
+        "ProxyConfig Runtime",
+        "FAIL",
+        `Wrong account name: ${config.accounts.anthropic[0].name}`,
+      );
+      return false;
+    }
+
+    logTest(
+      "ProxyConfig Runtime",
+      "PASS",
+      "JSON config parsed correctly with accounts",
+    );
+    return true;
+  } catch (error: any) {
+    logTest("ProxyConfig Runtime", "FAIL", error.message);
+    return false;
+  }
+}
+
 // Main test runner
 async function runAllTests(): Promise<void> {
   logSection("NeuroLink Continuous Test Suite");
@@ -3952,6 +4632,53 @@ async function runAllTests(): Promise<void> {
           TEST_CONFIG.provider,
           TEST_CONFIG.model,
         ),
+    },
+    // Model Alias Resolution Tests (NL-004)
+    {
+      name: "Model Alias Redirect",
+      fn: testModelAliasRedirect,
+      category: "model-alias",
+    },
+    {
+      name: "Model Alias Block",
+      fn: testModelAliasBlock,
+      category: "model-alias",
+    },
+    {
+      name: "Model Alias Warn",
+      fn: testModelAliasWarn,
+      category: "model-alias",
+    },
+    // Proxy Component Runtime Tests
+    {
+      name: "AccountPool Runtime",
+      fn: testAccountPoolRuntime,
+      category: "proxy-components",
+    },
+    {
+      name: "ModelRouter Runtime",
+      fn: testModelRouterRuntime,
+      category: "proxy-components",
+    },
+    {
+      name: "ClaudeFormat Runtime",
+      fn: testClaudeFormatRuntime,
+      category: "proxy-components",
+    },
+    {
+      name: "SSE Serializer Runtime",
+      fn: testSSESerializerRuntime,
+      category: "proxy-components",
+    },
+    {
+      name: "Cloaking Pipeline Runtime",
+      fn: testCloakingRuntime,
+      category: "proxy-components",
+    },
+    {
+      name: "ProxyConfig Runtime",
+      fn: testProxyConfigRuntime,
+      category: "proxy-components",
     },
   ];
 

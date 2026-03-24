@@ -4,6 +4,7 @@
  */
 
 import { logger } from "../utils/logger.js";
+import type { RetryPolicy } from "../types/observability.js";
 
 /**
  * Result of a retry decision
@@ -33,22 +34,7 @@ export type RetryContext = {
   metadata?: Record<string, unknown>;
 };
 
-/**
- * Retry policy interface
- */
-export interface RetryPolicy {
-  /** Policy name for identification */
-  readonly name: string;
-
-  /** Decide whether to retry */
-  shouldRetry(context: RetryContext): RetryDecision;
-
-  /** Maximum attempts allowed */
-  readonly maxAttempts: number;
-
-  /** Maximum total time allowed for retries */
-  readonly maxTotalTimeMs: number;
-}
+export type { RetryPolicy };
 
 /**
  * Base retry policy with common configuration

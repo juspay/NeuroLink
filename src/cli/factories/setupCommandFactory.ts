@@ -4,7 +4,7 @@
  */
 
 import type { CommandModule, Argv } from "yargs";
-import type { BaseCommandArgs } from "../../lib/types/cli.js";
+import type { SetupCommandArgs } from "../../lib/types/index.js";
 import { handleGCPSetup } from "../commands/setup-gcp.js";
 import { handleBedrockSetup } from "../commands/setup-bedrock.js";
 import { handleOpenAISetup } from "../commands/setup-openai.js";
@@ -14,14 +14,6 @@ import { handleAzureSetup } from "../commands/setup-azure.js";
 import { handleHuggingFaceSetup } from "../commands/setup-huggingface.js";
 import { handleMistralSetup } from "../commands/setup-mistral.js";
 import { handleSetup } from "../commands/setup.js";
-
-type SetupCommandArgs = BaseCommandArgs & {
-  check?: boolean;
-  nonInteractive?: boolean;
-  provider?: string;
-  list?: boolean;
-  status?: boolean;
-};
 
 /**
  * Setup Command Factory

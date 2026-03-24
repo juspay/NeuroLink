@@ -141,7 +141,8 @@ export function createHealthRoutes(basePath: string = "/api"): RouteGroup {
             type: memory?.constructor.name || "none",
           };
 
-          return {
+          // Build the base health response
+          const healthResponse: Record<string, unknown> = {
             status: "ok",
             timestamp: new Date().toISOString(),
             uptime: process.uptime() * 1000,
@@ -175,6 +176,34 @@ export function createHealthRoutes(basePath: string = "/api"): RouteGroup {
               servers: externalServers,
             },
           };
+
+          // Add proxy account pool status when proxy mode is active
+          if (ctx.metadata?.accountPool) {
+            const pool = ctx.metadata.accountPool as {
+              getAllAccounts: () => Array<{
+                id: string;
+                label?: string;
+                status: string;
+                requestCount: number;
+                subscriptionTier?: string;
+              }>;
+              getHealthyCount: () => number;
+              getStrategy: () => string;
+            };
+            const allAccounts = pool.getAllAccounts();
+            const statusCounts: Record<string, number> = {};
+            for (const a of allAccounts) {
+              statusCounts[a.status] = (statusCounts[a.status] || 0) + 1;
+            }
+            healthResponse.proxy = {
+              totalAccounts: allAccounts.length,
+              statusDistribution: statusCounts,
+              healthyCount: pool.getHealthyCount(),
+              strategy: pool.getStrategy(),
+            };
+          }
+
+          return healthResponse;
         },
         description: "Detailed health information",
         tags: ["health"],

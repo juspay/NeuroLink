@@ -18,33 +18,13 @@ import { logger } from "../../lib/utils/logger.js";
 import { NeuroLink } from "../../lib/neurolink.js";
 import { flushOpenTelemetry } from "../../lib/services/server/ai/observability/instrumentation.js";
 import { formatRow, formatCost } from "../utils/formatters.js";
-
-/**
- * Telemetry command arguments
- */
-type TelemetryCommandArgs = {
-  format?: "text" | "json" | "table";
-  quiet?: boolean;
-};
-
-type StatusArgs = TelemetryCommandArgs;
-
-type ConfigureArgs = TelemetryCommandArgs & {
-  exporter: string;
-  config: string;
-};
-
-type ListExportersArgs = TelemetryCommandArgs;
-
-type FlushArgs = TelemetryCommandArgs & {
-  timeout?: number;
-};
-
-type StatsArgs = TelemetryCommandArgs & {
-  detailed?: boolean;
-  byModel?: boolean;
-  byProvider?: boolean;
-};
+import type {
+  TelemetryStatusArgs as StatusArgs,
+  TelemetryConfigureArgs as ConfigureArgs,
+  TelemetryListExportersArgs as ListExportersArgs,
+  TelemetryFlushArgs as FlushArgs,
+  TelemetryStatsArgs as StatsArgs,
+} from "../../lib/types/index.js";
 
 /**
  * Available exporter names

@@ -251,6 +251,9 @@ export * from "./conversationMemoryInterface.js";
 export type { StorageConfig } from "./conversation.js";
 
 // Subscription types (Claude subscription tiers, authentication, usage tracking)
+// NOTE: subscriptionTypes.ts re-exports auth types from ./authTypes.ts for
+// backward compatibility. Import StoredOAuthTokens, TokenRefresher, etc.
+// from authTypes.ts for new code.
 export * from "./subscriptionTypes.js";
 
 // Client SDK types (selective export to avoid collisions with existing types)
@@ -328,3 +331,7 @@ export type {
   OAuth2Config as ClientOAuth2Config,
   TokenRefreshResult as ClientTokenRefreshResult,
 } from "./clientTypes.js";
+export type { TokenRefresher } from "./subscriptionTypes.js";
+
+// Proxy types (Claude API format, cloaking, routing, config, stats, server adapters)
+export * from "./proxyTypes.js";

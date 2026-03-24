@@ -6,20 +6,9 @@
 import type { SamplerConfig, SamplingRule } from "../types/exporterTypes.js";
 import type { SpanData } from "../types/spanTypes.js";
 import { SpanStatus } from "../types/spanTypes.js";
+import type { Sampler } from "../../types/observability.js";
 
-/**
- * Sampler interface for controlling which spans are exported
- */
-export interface Sampler {
-  /** Sampler name for identification */
-  readonly name: string;
-
-  /** Determine if a span should be sampled */
-  shouldSample(span: SpanData): boolean;
-
-  /** Get sampling decision description */
-  getDescription(): string;
-}
+export type { Sampler };
 
 /**
  * Always sample all spans

@@ -191,3 +191,63 @@ export type ObservabilityConfig = {
   /** OpenTelemetry configuration */
   openTelemetry?: OpenTelemetryConfig;
 };
+
+// =============================================================================
+// OBSERVABILITY MODULE TYPES (from retryPolicy.ts, samplers.ts, spanProcessor.ts)
+// =============================================================================
+
+/**
+ * Retry policy type for observability exporters.
+ */
+export type RetryPolicy = {
+  /** Policy name for identification */
+  readonly name: string;
+
+  /** Decide whether to retry */
+  shouldRetry(
+    context: import("../observability/retryPolicy.js").RetryContext,
+  ): import("../observability/retryPolicy.js").RetryDecision;
+
+  /** Maximum attempts allowed */
+  readonly maxAttempts: number;
+
+  /** Maximum total time allowed for retries */
+  readonly maxTotalTimeMs: number;
+};
+
+/**
+ * Sampler type for controlling which spans are exported.
+ */
+export type Sampler = {
+  /** Sampler name for identification */
+  readonly name: string;
+
+  /** Determine if a span should be sampled */
+  shouldSample(
+    span: import("../observability/types/spanTypes.js").SpanData,
+  ): boolean;
+
+  /** Get sampling decision description */
+  getDescription(): string;
+};
+
+/**
+ * Span processor type for composable span processing pipelines.
+ */
+export type SpanProcessor = {
+  /** Processor name for identification */
+  readonly name: string;
+
+  /** Process a span before export, returns null to drop the span */
+  process(
+    span: import("../observability/types/spanTypes.js").SpanData,
+  ): import("../observability/types/spanTypes.js").SpanData | null;
+
+  /** Optional async processing (for external lookups, etc.) */
+  processAsync?(
+    span: import("../observability/types/spanTypes.js").SpanData,
+  ): Promise<import("../observability/types/spanTypes.js").SpanData | null>;
+
+  /** Shutdown the processor (cleanup resources) */
+  shutdown?(): Promise<void>;
+};

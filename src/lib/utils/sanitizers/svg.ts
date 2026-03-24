@@ -17,6 +17,8 @@
  * @see https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
  */
 
+import type { SvgSanitizationResult } from "../../types/index.js";
+
 /**
  * Safe SVG elements (allowlist)
  * Only these elements will be preserved in sanitized output
@@ -227,18 +229,6 @@ const DANGEROUS_SVG_ATTRIBUTES = new Set([
   "oncut",
   "onpaste",
 ]);
-
-/**
- * Result of SVG sanitization including metadata about removed content
- */
-export type SvgSanitizationResult = {
-  /** Sanitized SVG content */
-  content: string;
-  /** Items that were removed during sanitization */
-  removedItems: string[];
-  /** Whether any content was modified */
-  wasModified: boolean;
-};
 
 /**
  * Sanitize SVG content by removing dangerous elements and attributes.

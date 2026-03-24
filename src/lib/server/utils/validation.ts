@@ -232,8 +232,8 @@ export function createErrorResponse(
  * Validation result type
  */
 export type ValidationResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: ErrorResponse };
+  | { success: true; data: T; error?: undefined }
+  | { success: false; error: ErrorResponse; data?: undefined };
 
 /**
  * Validate request body against a Zod schema

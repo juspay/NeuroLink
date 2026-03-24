@@ -10,7 +10,11 @@ import type {
   ConversationSummary,
 } from "../../lib/types/conversation.js";
 import type { RedisStorageConfig } from "../../lib/types/conversation.js";
-import type { ConversationChoice } from "../../lib/types/cli.js";
+import type {
+  ConversationChoice,
+  MenuChoice,
+  RedisClient,
+} from "../../lib/types/index.js";
 import {
   createRedisClient,
   scanKeys,
@@ -27,9 +31,6 @@ import {
   getContentIcon,
 } from "../../lib/utils/loopUtils.js";
 
-type MenuChoice = ConversationChoice | InstanceType<typeof inquirer.Separator>;
-type RedisClient = Awaited<ReturnType<typeof createRedisClient>>;
-
 export class ConversationSelector {
   private redisClient: RedisClient | null = null;
   private redisConfig: Required<RedisStorageConfig>;
@@ -45,7 +46,12 @@ export class ConversationSelector {
    */
   private async initializeRedis(): Promise<void> {
     if (!this.redisClient) {
-      this.redisClient = await createRedisClient(this.redisConfig);
+      // Cast is necessary: createRedisClient returns the ioredis client type which
+      // does not structurally match our RedisClient interface due to overloaded
+      // method signatures. The runtime value is fully compatible.
+      this.redisClient = (await createRedisClient(
+        this.redisConfig,
+      )) as unknown as RedisClient;
     }
   }
 
@@ -136,7 +142,10 @@ export class ConversationSelector {
     }
 
     const pattern = `${this.redisConfig.keyPrefix}*`;
-    const keys = await scanKeys(this.redisClient, pattern);
+    const keys = await scanKeys(
+      this.redisClient as unknown as Parameters<typeof scanKeys>[0],
+      pattern,
+    );
     logger.debug(`Found ${keys.length} conversation keys in Redis`);
     return keys;
   }
@@ -223,7 +232,9 @@ export class ConversationSelector {
         value: "NEW_CONVERSATION",
         short: "New Conversation",
       },
-      new inquirer.Separator(),
+      // Cast is intentional: inquirer's Separator type is not exported cleanly
+      // and does not overlap with MenuChoice, but inquirer accepts it at runtime.
+      new inquirer.Separator() as unknown as MenuChoice,
     ];
 
     for (const conversation of conversations.slice(

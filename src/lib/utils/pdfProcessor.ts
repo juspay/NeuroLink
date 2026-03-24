@@ -13,7 +13,9 @@ import type {
   FileProcessingResult,
   PDFProcessorOptions,
   PDFProviderConfig,
-} from "../types/fileTypes.js";
+  PDFImageConversionOptions,
+  PDFImageConversionResult,
+} from "../types/index.js";
 import { ErrorFactory } from "./errorHandling.js";
 import { logger } from "./logger.js";
 
@@ -130,32 +132,6 @@ const PDF_PROVIDER_CONFIGS: Record<string, PDFProviderConfig> = {
     requiresCitations: false,
     apiType: "files-api",
   },
-};
-
-/**
- * Options for PDF to image conversion
- */
-export type PDFImageConversionOptions = {
-  /** Scale factor for image quality (1-4, default: 2) */
-  scale?: number;
-  /** Maximum number of pages to convert (default: 20 from PDF_LIMITS.DEFAULT_MAX_PAGES) */
-  maxPages?: number;
-  /** Output format (png or jpeg, default: png). Note: pdf-to-img outputs PNG, JPEG conversion would require additional processing */
-  format?: "png" | "jpeg";
-};
-
-/**
- * Result of PDF to image conversion
- */
-export type PDFImageConversionResult = {
-  /** Array of base64-encoded PNG images (one per page) */
-  images: string[];
-  /** Number of pages converted */
-  pageCount: number;
-  /** Total conversion time in milliseconds */
-  conversionTimeMs: number;
-  /** Any warnings during conversion */
-  warnings?: string[];
 };
 
 export class PDFProcessor {
@@ -347,11 +323,9 @@ export class PDFProcessor {
     // ============================================================================
 
     // 0. Validate format is supported and case-sensitive
-    const SUPPORTED_FORMATS = ["png", "jpeg"] as const;
-    type SupportedFormat = (typeof SUPPORTED_FORMATS)[number];
-    if (!SUPPORTED_FORMATS.includes(format as SupportedFormat)) {
+    if (format !== "png") {
       throw new Error(
-        `Invalid format: "${format}". Supported formats: "png", "jpeg".`,
+        `Invalid format: "${format}". Only "png" format is currently supported.`,
       );
     }
 

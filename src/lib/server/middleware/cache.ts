@@ -4,6 +4,7 @@
  */
 
 import type { MiddlewareDefinition, ServerContext } from "../types.js";
+import type { ResponseCacheEntry } from "../../types/index.js";
 
 /**
  * Cache configuration
@@ -376,14 +377,6 @@ export class LRUCache<K, V> {
 // ============================================
 // Response Cache Store (Synchronous)
 // ============================================
-
-/**
- * Response cache entry
- */
-type ResponseCacheEntry<T> = {
-  value: T;
-  expiresAt: number;
-};
 
 /**
  * Synchronous response cache store with TTL support

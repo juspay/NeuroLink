@@ -5,14 +5,7 @@
  * Provides safe parsing that doesn't throw on invalid JSON.
  */
 
-/**
- * Result type for safe JSON parsing operations
- */
-export type SafeParseResult<T> = {
-  success: boolean;
-  data: T | null;
-  error: Error | null;
-};
+import type { SafeParseResult } from "../../types/index.js";
 
 /**
  * Safely parse a JSON string without throwing.

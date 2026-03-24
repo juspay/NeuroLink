@@ -9,62 +9,7 @@
  */
 
 import type { TokenUsage } from "../types/analytics.js";
-
-/**
- * Raw usage object that may come from various AI providers
- * Supports multiple naming conventions and nested structures
- */
-export type RawUsageObject = {
-  // BaseProvider normalized format
-  input?: number;
-  output?: number;
-  total?: number;
-
-  // AI SDK format
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-
-  // OpenAI/Mistral format
-  promptTokens?: number;
-  completionTokens?: number;
-
-  // Anthropic-style cache tokens
-  cacheCreationInputTokens?: number;
-  cacheReadInputTokens?: number;
-  // Alternative cache token naming
-  cacheCreationTokens?: number;
-  cacheReadTokens?: number;
-
-  // OpenAI o1/Anthropic reasoning tokens
-  reasoningTokens?: number;
-  reasoning?: number;
-  // Snake case variant (some APIs)
-  reasoning_tokens?: number;
-  // Google/other provider thinking tokens
-  thinkingTokens?: number;
-
-  // Nested usage object (some providers wrap usage)
-  usage?: RawUsageObject;
-};
-
-/**
- * Options for token extraction behavior
- */
-export type TokenExtractionOptions = {
-  /**
-   * Whether to calculate cache savings percentage
-   * @default true
-   */
-  calculateCacheSavings?: boolean;
-
-  /**
-   * How to handle missing optional fields
-   * - "zero": Return 0 for missing optional fields
-   * - "undefined": Return undefined for missing optional fields (default)
-   */
-  missingOptionalBehavior?: "zero" | "undefined";
-};
+import type { RawUsageObject, TokenExtractionOptions } from "../types/index.js";
 
 /**
  * Extract input token count from various provider formats

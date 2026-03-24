@@ -377,3 +377,67 @@ export type GoogleFilesAPIUploadResult = {
     uri: string;
   };
 };
+
+// =============================================================================
+// PDF PROCESSOR TYPES (moved from utils/pdfProcessor.ts)
+// =============================================================================
+
+/** Options for converting PDF pages to images. */
+export type PDFImageConversionOptions = {
+  /** Scale factor for image quality (1-4, default: 2) */
+  scale?: number;
+  /** Maximum number of pages to convert (default: 20 from PDF_LIMITS.DEFAULT_MAX_PAGES) */
+  maxPages?: number;
+  /** Output format (default: png). Only PNG is currently implemented by PDFProcessor. */
+  format?: "png";
+};
+
+/** Result of PDF to image conversion. */
+export type PDFImageConversionResult = {
+  /** Array of base64-encoded PNG images (one per page) */
+  images: string[];
+  /** Number of pages converted */
+  pageCount: number;
+  /** Total conversion time in milliseconds */
+  conversionTimeMs: number;
+  /** Any warnings during conversion */
+  warnings?: string[];
+};
+
+// =============================================================================
+// FILENAME SANITIZER TYPES (moved from utils/sanitizers/filename.ts)
+// =============================================================================
+
+/** Options for filename sanitization. */
+export type SanitizeFileNameOptions = {
+  /** Maximum length for the filename (default: 255) */
+  maxLength?: number;
+  /** Replacement character for invalid chars (default: '_') */
+  replacement?: string;
+  /** Whether to block dangerous extensions (default: true) */
+  blockDangerousExtensions?: boolean;
+  /** Whether to allow hidden files starting with dot (default: false) */
+  allowHiddenFiles?: boolean;
+};
+
+/** Options for display name sanitization. */
+export type SanitizeDisplayNameOptions = {
+  /** Maximum length for the name (default: 100) */
+  maxLength?: number;
+  /** Whether to allow unicode characters (default: true) */
+  allowUnicode?: boolean;
+};
+
+// =============================================================================
+// SVG SANITIZER TYPES (moved from utils/sanitizers/svg.ts)
+// =============================================================================
+
+/** Result of SVG sanitization. */
+export type SvgSanitizationResult = {
+  /** Sanitized SVG content */
+  content: string;
+  /** Items that were removed during sanitization */
+  removedItems: string[];
+  /** Whether any content was modified */
+  wasModified: boolean;
+};

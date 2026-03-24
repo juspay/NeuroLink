@@ -754,12 +754,31 @@ export class GenerationHandler {
       }
     }
 
+    // Extract reasoning from AI SDK response (Anthropic thinking, Gemini thought, OpenAI o1)
+    // Handle both string and array (AI SDK v5 returns string, v6 returns ReasoningOutput[])
+    const rawReasoning = generateResult.reasoning;
+    const reasoning: string | undefined = rawReasoning
+      ? typeof rawReasoning === "string"
+        ? rawReasoning
+        : Array.isArray(rawReasoning)
+          ? rawReasoning
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((r: any) =>
+                typeof r === "string" ? r : (r.text ?? JSON.stringify(r)),
+              )
+              .join("\n")
+          : String(rawReasoning)
+      : undefined;
+    const reasoningTokens: number | undefined = usage.reasoning ?? undefined;
+
     return {
       content,
       usage,
       finishReason: generateResult.finishReason,
       provider: this.providerName,
       model: this.modelName,
+      reasoning,
+      reasoningTokens,
       toolCalls: generateResult.toolCalls
         ? generateResult.toolCalls.map((tc: ToolCallObject) => ({
             toolCallId: tc.toolCallId || "unknown",

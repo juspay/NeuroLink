@@ -5,6 +5,7 @@
  */
 
 import type { DataStreamWriter } from "../types.js";
+import type { CloseHandler } from "../../types/index.js";
 
 // ============================================
 // Event Types
@@ -624,11 +625,6 @@ export function formatSSEEvent(options: SSEEventOptions): string {
 // ============================================
 // WebStreamWriter (Legacy Compatibility)
 // ============================================
-
-/**
- * Close handler type
- */
-type CloseHandler = () => void;
 
 /**
  * Base class for data stream writers

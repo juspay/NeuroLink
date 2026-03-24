@@ -5,47 +5,13 @@
  */
 
 import { delay } from "./delay.js";
+import type { AsyncRetryOptions } from "../../types/index.js";
 
 /**
- * Configuration options for retry operations.
+ * Local alias: the canonical type was renamed to AsyncRetryOptions to avoid
+ * collision with other RetryOptions types in the codebase.
  */
-export type RetryOptions = {
-  /**
-   * Maximum number of retry attempts (not including the initial attempt).
-   * @default 3
-   */
-  maxRetries: number;
-
-  /**
-   * Initial delay between retries in milliseconds.
-   * @default 1000
-   */
-  baseDelayMs: number;
-
-  /**
-   * Maximum delay cap in milliseconds.
-   * @default 30000
-   */
-  maxDelayMs: number;
-
-  /**
-   * Multiplier for exponential backoff.
-   * @default 2
-   */
-  backoffMultiplier?: number;
-
-  /**
-   * Function to determine if a retry should be attempted.
-   * Return false to stop retrying immediately.
-   */
-  shouldRetry?: (error: Error, attempt: number) => boolean;
-
-  /**
-   * Callback invoked before each retry attempt.
-   * Useful for logging or metrics.
-   */
-  onRetry?: (error: Error, attempt: number, delayMs: number) => void;
-};
+export type RetryOptions = AsyncRetryOptions;
 
 /**
  * Default retry configuration.

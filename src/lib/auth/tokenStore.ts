@@ -19,69 +19,17 @@ import { homedir } from "os";
 import { createHash } from "crypto";
 import { logger } from "../utils/logger.js";
 import { TokenStoreError } from "../types/errors.js";
+import { AsyncMutex } from "../utils/asyncMutex.js";
+import type {
+  TokenStorageData,
+  StoredOAuthTokens,
+  TokenRefresher,
+} from "../types/authTypes.js";
 
-// Re-export for backward compatibility
-export { TokenStoreError } from "../types/errors.js";
+// Re-export so existing consumers of `../auth/tokenStore.js` keep working.
+export type { StoredOAuthTokens, TokenRefresher };
 
 const { readFile, writeFile, mkdir, unlink, access, chmod, rename } = fs;
-
-// =============================================================================
-// TYPES AND INTERFACES
-// =============================================================================
-
-/**
- * OAuth tokens structure for storage.
- * Stricter version of OAuthTokens from subscriptionTypes with required fields.
- */
-export interface StoredOAuthTokens {
-  /** The access token for API authentication */
-  accessToken: string;
-  /** The refresh token for obtaining new access tokens (optional for some OAuth flows) */
-  refreshToken?: string;
-  /** Unix timestamp (ms) when the access token expires */
-  expiresAt: number;
-  /** Token type, typically "Bearer" */
-  tokenType: string;
-  /** Optional OAuth scopes granted */
-  scope?: string;
-}
-
-/**
- * @deprecated Use StoredOAuthTokens instead
- */
-export type OAuthTokens = StoredOAuthTokens;
-
-/**
- * Token refresher function type
- * Takes a refresh token and returns new tokens
- */
-export type TokenRefresher = (
-  refreshToken: string,
-) => Promise<StoredOAuthTokens>;
-
-/**
- * Internal storage format for multi-provider tokens
- */
-interface TokenStorageData {
-  /** Version of the storage format */
-  version: string;
-  /** Last modified timestamp */
-  lastModified: number;
-  /** Tokens indexed by provider name */
-  providers: Record<string, StoredProviderTokens>;
-}
-
-/**
- * Per-provider token storage structure
- */
-interface StoredProviderTokens {
-  /** The stored tokens */
-  tokens: StoredOAuthTokens;
-  /** When the tokens were stored */
-  createdAt: number;
-  /** When the tokens were last accessed */
-  lastAccessed: number;
-}
 
 // =============================================================================
 // TOKEN STORE CLASS
@@ -125,13 +73,18 @@ export class TokenStore {
   private static readonly TOKEN_FILE = "tokens.json";
   private static readonly FILE_PERMISSIONS = 0o600;
   private static readonly DIR_PERMISSIONS = 0o700;
-  /** Default expiration buffer: 5 minutes */
-  private static readonly DEFAULT_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+  /** Default expiration buffer: 1 hour (proactive refresh before actual expiry) */
+  private static readonly DEFAULT_EXPIRY_BUFFER_MS = 60 * 60 * 1000;
 
   private readonly storagePath: string;
   private readonly encryptionEnabled: boolean;
   private readonly encryptionKey: string;
   private readonly tokenRefreshers: Map<string, TokenRefresher> = new Map();
+  private readonly inFlightRefreshes = new Map<
+    string,
+    Promise<StoredOAuthTokens>
+  >();
+  private readonly _mutex = new AsyncMutex();
 
   /**
    * Creates a new TokenStore instance
@@ -183,6 +136,18 @@ export class TokenStore {
    * @throws TokenStoreError if storage fails
    */
   async saveTokens(provider: string, tokens: StoredOAuthTokens): Promise<void> {
+    return this._mutex.runExclusive(async () => {
+      await this._saveTokensInternal(provider, tokens);
+    });
+  }
+
+  /**
+   * Internal save without mutex — callers must already hold the mutex.
+   */
+  private async _saveTokensInternal(
+    provider: string,
+    tokens: StoredOAuthTokens,
+  ): Promise<void> {
     // Validate tokens before saving
     this.validateTokens(tokens);
 
@@ -256,6 +221,17 @@ export class TokenStore {
    * @throws TokenStoreError if reading fails (other than file not found)
    */
   async loadTokens(provider: string): Promise<StoredOAuthTokens | null> {
+    return this._mutex.runExclusive(async () => {
+      return this._loadTokensInternal(provider);
+    });
+  }
+
+  /**
+   * Internal load without mutex — callers must already hold the mutex.
+   */
+  private async _loadTokensInternal(
+    provider: string,
+  ): Promise<StoredOAuthTokens | null> {
     try {
       const storageData = await this.loadStorageData();
       const providerData = storageData.providers[provider];
@@ -291,41 +267,46 @@ export class TokenStore {
    * @throws TokenStoreError if deletion fails
    */
   async clearTokens(provider: string): Promise<void> {
-    try {
-      const storageData = await this.loadStorageData();
+    return this._mutex.runExclusive(async () => {
+      // Clear in-memory refresh state so re-adding an account starts fresh
+      this.inFlightRefreshes.delete(provider);
+      this.tokenRefreshers.delete(provider);
+      try {
+        const storageData = await this.loadStorageData();
 
-      if (!storageData.providers[provider]) {
-        logger.debug("No tokens to clear for provider", { provider });
-        return;
+        if (!storageData.providers[provider]) {
+          logger.debug("No tokens to clear for provider", { provider });
+          return;
+        }
+
+        delete storageData.providers[provider];
+        storageData.lastModified = Date.now();
+
+        // If no more providers, delete the file entirely
+        if (Object.keys(storageData.providers).length === 0) {
+          await this.deleteStorageFile();
+        } else {
+          await this.saveStorageData(storageData);
+        }
+
+        logger.info("OAuth tokens cleared successfully", { provider });
+      } catch (error) {
+        if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
+          logger.debug("No tokens to clear for provider", { provider });
+          return;
+        }
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Failed to clear OAuth tokens", {
+          provider,
+          error: errorMessage,
+        });
+        throw new TokenStoreError(
+          `Failed to clear tokens for ${provider}: ${errorMessage}`,
+          "STORAGE_ERROR",
+        );
       }
-
-      delete storageData.providers[provider];
-      storageData.lastModified = Date.now();
-
-      // If no more providers, delete the file entirely
-      if (Object.keys(storageData.providers).length === 0) {
-        await this.deleteStorageFile();
-      } else {
-        await this.saveStorageData(storageData);
-      }
-
-      logger.info("OAuth tokens cleared successfully", { provider });
-    } catch (error) {
-      if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
-        logger.debug("No tokens to clear for provider", { provider });
-        return;
-      }
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error("Failed to clear OAuth tokens", {
-        provider,
-        error: errorMessage,
-      });
-      throw new TokenStoreError(
-        `Failed to clear tokens for ${provider}: ${errorMessage}`,
-        "STORAGE_ERROR",
-      );
-    }
+    });
   }
 
   /**
@@ -354,55 +335,126 @@ export class TokenStore {
    * @throws TokenStoreError if refresh fails
    */
   async getValidToken(provider: string): Promise<string | null> {
-    const tokens = await this.loadTokens(provider);
+    // Phase 1: Read token under mutex (fast)
+    const snapshot = await this._mutex.runExclusive(async () => {
+      const tokens = await this._loadTokensInternal(provider);
+      if (!tokens) {
+        return null;
+      }
+      return { ...tokens };
+    });
 
-    if (!tokens) {
+    if (!snapshot) {
       logger.debug("No tokens found for provider", { provider });
       return null;
     }
 
-    // Check if token is expired or about to expire
-    if (this.isTokenExpired(tokens)) {
-      logger.debug("Token expired or expiring soon", {
-        provider,
-        expiresAt: new Date(tokens.expiresAt).toISOString(),
-      });
-
-      // Try to refresh if a refresher is configured
-      const refresher = this.tokenRefreshers.get(provider);
-      if (refresher && tokens.refreshToken) {
-        try {
-          logger.info("Refreshing expired token", { provider });
-          const newTokens = await refresher(tokens.refreshToken);
-
-          // Save the new tokens
-          await this.saveTokens(provider, newTokens);
-
-          logger.info("Token refreshed successfully", { provider });
-          return newTokens.accessToken;
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          logger.error("Failed to refresh token", {
-            provider,
-            error: errorMessage,
-          });
-          throw new TokenStoreError(
-            `Failed to refresh token for ${provider}: ${errorMessage}`,
-            "REFRESH_ERROR",
-          );
-        }
-      } else {
-        logger.debug("No refresher configured or no refresh token available", {
-          provider,
-          hasRefresher: !!refresher,
-          hasRefreshToken: !!tokens.refreshToken,
-        });
-        return null;
-      }
+    // Token is still valid — return immediately
+    if (!this.isTokenExpired(snapshot)) {
+      return snapshot.accessToken;
     }
 
-    return tokens.accessToken;
+    logger.debug("Token expired or expiring soon", {
+      provider,
+      expiresAt: new Date(snapshot.expiresAt).toISOString(),
+    });
+
+    // Phase 2: Refresh OUTSIDE the mutex so other reads are not blocked
+    const refresher = this.tokenRefreshers.get(provider);
+    if (!refresher || !snapshot.refreshToken) {
+      logger.debug("No refresher configured or no refresh token available", {
+        provider,
+        hasRefresher: !!refresher,
+        hasRefreshToken: !!snapshot.refreshToken,
+      });
+      // No refresher/refresh-token available — fall back to hard expiry check.
+      // The proactive buffer only applies when a refresh is possible.
+      return this.isTokenExpired(snapshot, 0) ? null : snapshot.accessToken;
+    }
+
+    // Deduplicate concurrent refresh calls for the same provider:
+    // If a refresh is already in-flight, await it instead of starting another.
+    const existing = this.inFlightRefreshes.get(provider);
+    if (existing) {
+      logger.debug("Awaiting in-flight refresh for provider", { provider });
+      const result = await existing;
+      return result.accessToken;
+    }
+
+    const refreshTokenValue = snapshot.refreshToken!;
+    const refreshPromise = (async (): Promise<StoredOAuthTokens> => {
+      let newTokens: StoredOAuthTokens;
+      try {
+        logger.info("Refreshing expired token", { provider });
+        newTokens = await refresher(refreshTokenValue);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error("Failed to refresh token", {
+          provider,
+          error: errorMessage,
+        });
+        throw new TokenStoreError(
+          `Failed to refresh token for ${provider}: ${errorMessage}`,
+          "REFRESH_ERROR",
+        );
+      }
+
+      // Phase 3: Write refreshed token under mutex (fast).
+      // Re-check that the token is still expired before overwriting —
+      // another caller may have already persisted a fresh token.
+      // Also guard against resurrecting cleared/disabled entries:
+      // if the entry was removed or disabled during the in-flight refresh,
+      // skip the save to avoid re-creating a dead entry.
+      const persistedTokens = await this._mutex.runExclusive(async () => {
+        // Guard: do not resurrect cleared entries
+        const current = await this._loadTokensInternal(provider);
+        if (!current) {
+          logger.debug(
+            "Skipping token persist — provider entry was cleared during refresh",
+            { provider },
+          );
+          return newTokens; // return refreshed tokens to caller but don't persist
+        }
+
+        // Guard: do not resurrect disabled entries
+        try {
+          const storageData = await this.loadStorageData();
+          const providerData = storageData.providers[provider];
+          if (providerData?.disabled) {
+            logger.debug(
+              "Skipping token persist — provider was disabled during refresh",
+              { provider },
+            );
+            return newTokens;
+          }
+        } catch {
+          // Storage read failure — proceed cautiously
+        }
+
+        if (!this.isTokenExpired(current)) {
+          // Another caller already persisted a fresh token — use theirs.
+          logger.debug(
+            "Skipping token persist — another refresh already wrote a valid token",
+            { provider },
+          );
+          return current;
+        }
+        await this._saveTokensInternal(provider, newTokens);
+        return newTokens;
+      });
+
+      logger.info("Token refreshed successfully", { provider });
+      return persistedTokens;
+    })();
+
+    this.inFlightRefreshes.set(provider, refreshPromise);
+    try {
+      const newTokens = await refreshPromise;
+      return newTokens.accessToken;
+    } finally {
+      this.inFlightRefreshes.delete(provider);
+    }
   }
 
   /**
@@ -462,13 +514,227 @@ export class TokenStore {
   }
 
   /**
+   * Lists all provider keys that start with the given prefix
+   *
+   * @param prefix - The prefix to filter by (e.g., "anthropic:")
+   * @returns Array of matching provider keys
+   */
+  async listByPrefix(prefix: string): Promise<string[]> {
+    const allProviders = await this.listProviders();
+    return allProviders.filter((key) => key.startsWith(prefix));
+  }
+
+  // ===========================================================================
+  // DISABLED STATE METHODS
+  // ===========================================================================
+
+  /**
+   * Marks a provider's tokens as permanently disabled (persisted to disk).
+   *
+   * Disabled accounts are skipped immediately by consumers — no wasted
+   * round-trips. The state survives proxy restarts because it is stored
+   * alongside the tokens in the JSON file.
+   *
+   * @param provider - The provider key (e.g., "anthropic:user@example.com")
+   * @param reason - Optional human-readable reason (e.g., "refresh_failed")
+   */
+  async markDisabled(provider: string, reason?: string): Promise<void> {
+    return this._mutex.runExclusive(async () => {
+      let storageData: TokenStorageData;
+      try {
+        storageData = await this.loadStorageData();
+      } catch (error) {
+        if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
+          logger.debug("No token storage found — nothing to disable", {
+            provider,
+          });
+          return;
+        }
+        throw error;
+      }
+
+      const providerData = storageData.providers[provider];
+      if (!providerData) {
+        logger.debug("No tokens found for provider — nothing to disable", {
+          provider,
+        });
+        return;
+      }
+
+      providerData.disabled = true;
+      providerData.disabledAt = Date.now();
+      providerData.disabledReason = reason;
+      storageData.lastModified = Date.now();
+
+      await this.saveStorageData(storageData);
+
+      logger.info("Provider marked as disabled", {
+        provider,
+        reason: reason ?? "unspecified",
+      });
+    });
+  }
+
+  /**
+   * Re-enables a previously disabled provider (persisted to disk).
+   *
+   * Clears the disabled flag, timestamp, and reason so the account can
+   * be used again by the proxy pool.
+   *
+   * @param provider - The provider key (e.g., "anthropic:user@example.com")
+   */
+  async markEnabled(provider: string): Promise<void> {
+    return this._mutex.runExclusive(async () => {
+      let storageData: TokenStorageData;
+      try {
+        storageData = await this.loadStorageData();
+      } catch (error) {
+        if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
+          logger.debug("No token storage found — nothing to enable", {
+            provider,
+          });
+          return;
+        }
+        throw error;
+      }
+
+      const providerData = storageData.providers[provider];
+      if (!providerData) {
+        logger.debug("No tokens found for provider — nothing to enable", {
+          provider,
+        });
+        return;
+      }
+
+      providerData.disabled = false;
+      delete providerData.disabledAt;
+      delete providerData.disabledReason;
+      storageData.lastModified = Date.now();
+
+      await this.saveStorageData(storageData);
+
+      logger.info("Provider re-enabled", { provider });
+    });
+  }
+
+  /**
+   * Checks whether a provider's tokens are currently disabled.
+   *
+   * Returns false for providers that don't exist in the store (no tokens
+   * at all) and for entries that predate the disabled field (backward compat).
+   *
+   * @param provider - The provider key
+   * @returns true if the provider entry exists and is disabled
+   */
+  async isDisabled(provider: string): Promise<boolean> {
+    return this._mutex.runExclusive(async () => {
+      try {
+        const storageData = await this.loadStorageData();
+        const providerData = storageData.providers[provider];
+        return providerData?.disabled === true;
+      } catch (error) {
+        if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
+          return false;
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Lists all provider keys that are currently disabled.
+   *
+   * @returns Array of disabled provider keys (empty if none or no storage file)
+   */
+  async listDisabled(): Promise<string[]> {
+    return this._mutex.runExclusive(async () => {
+      try {
+        const storageData = await this.loadStorageData();
+        return Object.entries(storageData.providers)
+          .filter(([, data]) => data.disabled === true)
+          .map(([key]) => key);
+      } catch (error) {
+        if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
+          return [];
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Removes expired and unrefreshable token entries from disk.
+   *
+   * An entry is pruned when:
+   *   - Its access token is expired (with optional buffer) AND it has no
+   *     refresh token, AND it is NOT manually disabled.
+   *
+   * Manually disabled entries are preserved so that `auth enable` can
+   * re-enable them later. They are only removed via explicit `clearTokens`.
+   *
+   * @param bufferMs - Extra buffer in milliseconds to subtract from expiresAt
+   *                   when checking expiry (default: 0 — strict expiry check)
+   * @returns Array of provider keys that were removed
+   */
+  async pruneExpired(bufferMs: number = 0): Promise<string[]> {
+    return this._mutex.runExclusive(async () => {
+      let storageData: TokenStorageData;
+      try {
+        storageData = await this.loadStorageData();
+      } catch (error) {
+        if (error instanceof TokenStoreError && error.code === "NOT_FOUND") {
+          return [];
+        }
+        throw error;
+      }
+
+      const now = Date.now();
+      const pruned: string[] = [];
+
+      for (const [key, providerData] of Object.entries(storageData.providers)) {
+        const isExpired = providerData.tokens.expiresAt - bufferMs <= now;
+        const hasNoRefreshToken = !providerData.tokens.refreshToken;
+        const isManuallyDisabled = providerData.disabled === true;
+
+        // Only prune expired+unrefreshable entries that are NOT manually disabled
+        if (isExpired && hasNoRefreshToken && !isManuallyDisabled) {
+          delete storageData.providers[key];
+          pruned.push(key);
+        }
+      }
+
+      if (pruned.length > 0) {
+        storageData.lastModified = Date.now();
+
+        if (Object.keys(storageData.providers).length === 0) {
+          await this.deleteStorageFile();
+        } else {
+          await this.saveStorageData(storageData);
+        }
+
+        logger.info("Pruned expired token entries", {
+          removed: pruned,
+          count: pruned.length,
+        });
+      }
+
+      return pruned;
+    });
+  }
+
+  /**
    * Clears all stored tokens for all providers
    *
    * @throws TokenStoreError if deletion fails
    */
   async clearAllTokens(): Promise<void> {
-    await this.deleteStorageFile();
-    logger.info("All OAuth tokens cleared");
+    return this._mutex.runExclusive(async () => {
+      // Clear all in-memory refresh state so re-adding accounts starts fresh
+      this.inFlightRefreshes.clear();
+      this.tokenRefreshers.clear();
+      await this.deleteStorageFile();
+      logger.info("All OAuth tokens cleared");
+    });
   }
 
   // ===========================================================================
