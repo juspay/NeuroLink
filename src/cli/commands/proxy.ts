@@ -418,8 +418,10 @@ export const proxyStartCommand: CommandModule<object, ProxyStartArgs> = {
         process.exit(1);
       }
 
-      // Guard: launchd is managing the service — don't start manually
-      if (await isLaunchdManaging()) {
+      // Guard: launchd is managing the service — don't start manually.
+      // Skip this guard when WE are the process launchd is managing
+      // (PPID 1 = launched by launchd on macOS).
+      if (process.ppid !== 1 && (await isLaunchdManaging())) {
         if (spinner) {
           spinner.fail(
             chalk.red(
