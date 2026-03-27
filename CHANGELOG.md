@@ -1,3 +1,9 @@
+## [9.34.0](https://github.com/juspay/neurolink/compare/v9.33.0...v9.34.0) (2026-03-27)
+
+### Features
+
+- **(browser):** add browser-compatible bundle for client-side SDK usage ([85089db](https://github.com/juspay/neurolink/commit/85089dbc9bef912e6c3acbec729d2d4d0ac17829))
+
 ## [9.33.0](https://github.com/juspay/neurolink/compare/v9.32.1...v9.33.0) (2026-03-27)
 
 ### Features
