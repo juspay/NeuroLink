@@ -1,3 +1,9 @@
+## [9.33.0](https://github.com/juspay/neurolink/compare/v9.32.1...v9.33.0) (2026-03-27)
+
+### Features
+
+- **(memory):** add per-call memory control options (read/write) for generate and stream in NeuroLink ([c9a354b](https://github.com/juspay/neurolink/commit/c9a354b2b3197a78a42d2a19f25757792467023f))
+
 ## [9.32.1](https://github.com/juspay/neurolink/compare/v9.32.0...v9.32.1) (2026-03-27)
 
 ### Bug Fixes
