@@ -93,10 +93,13 @@ export function loadUpdateState(stateFilePath?: string): UpdateState | null {
     const content = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(content);
     // Minimal shape check — reject valid JSON that isn't an UpdateState
+    // Note: typeof null === "object", so we check both
     if (
       typeof parsed !== "object" ||
       parsed === null ||
       typeof parsed.suppressedVersions !== "object" ||
+      parsed.suppressedVersions === null ||
+      Array.isArray(parsed.suppressedVersions) ||
       typeof parsed.lastCheckAt !== "string"
     ) {
       return getDefaultUpdateState();

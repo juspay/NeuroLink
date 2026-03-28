@@ -1212,15 +1212,22 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
     const QUIET_THRESHOLD_MS = 120 * 1000; // 2 minutes of silence
     const UPDATE_TIMEOUT_MS = 30 * 1000; // 30 seconds to come healthy
 
-    // Get running version from /health endpoint
+    // Get running version from /health endpoint (with timeout to avoid hanging)
     let runningVersion = PROXY_VERSION; // fallback
     try {
-      const healthResp = await fetch(`http://${host}:${port}/health`);
+      const healthResp = await fetch(`http://${host}:${port}/health`, {
+        signal: AbortSignal.timeout(5_000),
+      });
       const healthData = (await healthResp.json()) as { version?: string };
       runningVersion = healthData.version ?? PROXY_VERSION;
     } catch {
       /* use fallback */
     }
+
+    // Auto-update only works on macOS with launchd. On other platforms,
+    // there's no restart mechanism, so skip the update loop entirely.
+    const canAutoUpdate =
+      process.platform === "darwin" && (await isLaunchdManaging());
 
     let updateInProgress = false;
     let updateRestartInProgress = false;
@@ -1328,7 +1335,7 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
         try {
           execFileSync(
             "launchctl",
-            ["kickstart", "-k", `gui/${uid}/com.neurolink.proxy`],
+            ["kickstart", "-k", `gui/${uid}/${PLIST_LABEL}`],
             {
               timeout: 10_000,
               stdio: "pipe",
@@ -1385,8 +1392,10 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
     };
 
     // Run first check after a short delay, then on interval
-    setTimeout(runUpdateCheck, 30_000);
-    setInterval(runUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
+    if (canAutoUpdate) {
+      setTimeout(runUpdateCheck, 30_000);
+      setInterval(runUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
+    }
 
     const startedAt = Date.now();
     let parentStatus = getProcessStatus(parentPid);

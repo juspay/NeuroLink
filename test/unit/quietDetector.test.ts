@@ -221,6 +221,34 @@ describe("checkTrafficQuiet", () => {
   });
 
   // ---------------------------------------------------------------
+  // 7. Midnight rollover: falls back to yesterday's log
+  // ---------------------------------------------------------------
+  it("falls back to yesterday's log when today's file doesn't exist", () => {
+    // Remove today's file if it exists
+    const todayFile = logFilePath();
+    if (existsSync(todayFile)) {
+      rmSync(todayFile);
+    }
+
+    // Create yesterday's log file with a recent timestamp
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+    const yesterdayFile = join(LOG_DIR, `proxy-debug-${yesterdayStr}.jsonl`);
+    const recentTimestamp = new Date(Date.now() - 30_000).toISOString();
+    writeFileSync(yesterdayFile, makeLogLine(recentTimestamp) + "\n");
+
+    const result = checkTrafficQuiet();
+
+    // Should read from yesterday's log, NOT return quiet (only 30s ago)
+    expect(result.isQuiet).toBe(false);
+    expect(result.lastActivityAt).toBeInstanceOf(Date);
+    expect(result.silenceDurationMs).toBeLessThan(60_000);
+
+    // Cleanup
+    rmSync(yesterdayFile);
+  });
+
+  // ---------------------------------------------------------------
   // Additional: custom threshold
   // ---------------------------------------------------------------
   it("respects a custom quietThresholdMs", () => {

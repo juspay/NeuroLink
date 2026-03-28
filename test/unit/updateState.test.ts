@@ -199,6 +199,36 @@ describe("updateState", () => {
     expect(state).toEqual(getDefaultUpdateState());
   });
 
+  it("returns default state when suppressedVersions is null", () => {
+    fs.writeFileSync(
+      stateFile,
+      JSON.stringify({
+        lastCheckAt: new Date().toISOString(),
+        lastCheckVersion: "1.0.0",
+        suppressedVersions: null,
+        lastUpdateAt: null,
+        lastUpdateVersion: null,
+      }),
+    );
+    const state = loadUpdateState(stateFile);
+    expect(state).toEqual(getDefaultUpdateState());
+  });
+
+  it("returns default state when suppressedVersions is an array", () => {
+    fs.writeFileSync(
+      stateFile,
+      JSON.stringify({
+        lastCheckAt: new Date().toISOString(),
+        lastCheckVersion: "1.0.0",
+        suppressedVersions: [],
+        lastUpdateAt: null,
+        lastUpdateVersion: null,
+      }),
+    );
+    const state = loadUpdateState(stateFile);
+    expect(state).toEqual(getDefaultUpdateState());
+  });
+
   // -------------------------------------------------------
   // getDefaultUpdateState
   // -------------------------------------------------------
