@@ -23,12 +23,26 @@ const DEFAULT_QUIET_THRESHOLD_MS = 120_000;
 const TAIL_READ_SIZE = 4096;
 
 /**
- * Build the path to today's proxy debug log file.
+ * Build the path to a proxy debug log file for a given date.
  * Format: ~/.neurolink/logs/proxy-debug-YYYY-MM-DD.jsonl
  */
-function getTodayLogPath(): string {
-  const today = new Date().toISOString().split("T")[0];
-  return join(homedir(), ".neurolink", "logs", `proxy-debug-${today}.jsonl`);
+function getLogPathForDate(date: Date): string {
+  const dateStr = date.toISOString().split("T")[0];
+  return join(homedir(), ".neurolink", "logs", `proxy-debug-${dateStr}.jsonl`);
+}
+
+/**
+ * Get the most relevant log file path. Uses today's log if it exists,
+ * otherwise falls back to yesterday's to handle the midnight rollover case
+ * (last request at 23:59, update check at 00:01).
+ */
+function getActiveLogPath(): string {
+  const todayPath = getLogPathForDate(new Date());
+  if (existsSync(todayPath)) {
+    return todayPath;
+  }
+  const yesterday = new Date(Date.now() - 86_400_000);
+  return getLogPathForDate(yesterday);
 }
 
 /**
@@ -103,7 +117,7 @@ export function checkTrafficQuiet(
     silenceDurationMs: Infinity,
   };
 
-  const logPath = getTodayLogPath();
+  const logPath = getActiveLogPath();
 
   if (!existsSync(logPath)) {
     return noActivityResult;
