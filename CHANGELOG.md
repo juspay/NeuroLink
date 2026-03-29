@@ -1,3 +1,9 @@
+## [9.39.0](https://github.com/juspay/neurolink/compare/v9.38.0...v9.39.0) (2026-03-29)
+
+### Features
+
+- **(proxy):** add OAuth polyfill for non-Claude-Code clients ([bea68f1](https://github.com/juspay/neurolink/commit/bea68f1f9d6d1c924743f0ff6c43c1ec794fdd43))
+
 ## [9.38.0](https://github.com/juspay/neurolink/compare/v9.37.0...v9.38.0) (2026-03-28)
 
 ### Features
