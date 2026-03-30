@@ -351,6 +351,94 @@ const stream = await neurolink.stream({
 });
 ```
 
+## Multi-User Memory
+
+Retrieve and store memory for multiple users in a single `generate()` or `stream()` call. This enables **layered memory** — combining a user's personal context with org-level policies, team context, or any other memory scope.
+
+The primary user is always determined by `context.userId`. Additional users are specified via `memory.additionalUsers`. Memory for all users (primary + additional) is fetched and stored in parallel.
+
+### Quick Start
+
+```typescript
+const result = await neurolink.stream({
+  input: { text: "How should I handle PCI data in our API?" },
+  context: { userId: "user-alice" },
+  memory: {
+    additionalUsers: [
+      {
+        userId: "org-acme",
+        label: "Organization Policy",
+        prompt: `Extract only compliance requirements, security policies, and org-level decisions.
+
+OLD_MEMORY:
+{{OLD_MEMORY}}
+
+NEW_CONTENT:
+{{NEW_CONTENT}}
+
+Condensed memory (max {{MAX_WORDS}} words):`,
+        maxWords: 100,
+      },
+      {
+        userId: "team-payments",
+        label: "Team Context",
+      },
+    ],
+  },
+});
+```
+
+### Context Format
+
+When multiple users' memories are retrieved, they are formatted with labels and injected into the prompt:
+
+```
+Context from previous conversations:
+
+[User]
+Alice is a senior engineer on the payments team, prefers Python.
+
+[Organization Policy]
+PCI-DSS Level 1 compliance required. All cardholder data must be encrypted at rest and in transit.
+
+[Team Context]
+Payments team uses microservices architecture with Stripe integration.
+
+Current user's request: How should I handle PCI data in our API?
+```
+
+The primary user's label is always `"User"`. Additional users use the `label` field, falling back to `userId` if not set.
+
+### Per-User Condensation
+
+Each additional user can specify a custom `prompt` and `maxWords` for its condensation strategy. This is useful when different memory scopes need different extraction rules — e.g. personal preferences vs compliance policies.
+
+The `prompt` must include `{{OLD_MEMORY}}`, `{{NEW_CONTENT}}`, and `{{MAX_WORDS}}` placeholders. See [Custom Condensation Prompt](#custom-condensation-prompt) for details.
+
+### Selective Read/Write
+
+Control which additional users participate in read and write independently:
+
+```typescript
+memory: {
+  additionalUsers: [
+    { userId: "org-acme", label: "Org Policy", write: false },  // read-only
+    { userId: "team-x", label: "Team", read: false },           // write-only
+  ],
+}
+```
+
+### AdditionalMemoryUser Options
+
+| Field      | Type    | Default  | Description                                           |
+| ---------- | ------- | -------- | ----------------------------------------------------- |
+| `userId`   | string  | required | The owner ID to retrieve/store memory for             |
+| `label`    | string  | userId   | Label used in the formatted memory context            |
+| `read`     | boolean | `true`   | Whether to read this user's memory                    |
+| `write`    | boolean | `true`   | Whether to write conversation into this user's memory |
+| `prompt`   | string  | default  | Custom condensation prompt for this user              |
+| `maxWords` | number  | default  | Max words for this user's condensed memory            |
+
 ## Environment Variables
 
 The `@juspay/hippocampus` SDK reads these environment variables:
