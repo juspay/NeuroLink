@@ -479,7 +479,37 @@ export type GenerateOptions = {
     read?: boolean;
     /** Whether to write (add/condense) the conversation into memory after completion. Defaults to true. */
     write?: boolean;
+    /**
+     * Additional users whose memory should be retrieved/stored alongside the primary user.
+     * Each entry can override the condensation prompt and maxWords for that user.
+     * Primary user is still determined by context.userId.
+     */
+    additionalUsers?: AdditionalMemoryUser[];
   };
+};
+
+/**
+ * Represents an additional user whose memory should be included in a generate/stream call.
+ * Allows per-user prompt overrides for different memory condensation strategies
+ * (e.g. personal preferences vs org-level policies).
+ */
+export type AdditionalMemoryUser = {
+  /** The user/owner ID to retrieve or store memory for. */
+  userId: string;
+  /**
+   * Human-readable label used in the formatted memory context.
+   * E.g. "Organization Policy", "Team Context", "User Preferences".
+   * If not provided, defaults to userId.
+   */
+  label?: string;
+  /** Whether to read this user's memory and include in context. Defaults to true. */
+  read?: boolean;
+  /** Whether to write conversation into this user's memory. Defaults to true. */
+  write?: boolean;
+  /** Custom condensation prompt for this user. Overrides the default Hippocampus prompt. */
+  prompt?: string;
+  /** Max words for this user's condensed memory. Overrides the default maxWords. */
+  maxWords?: number;
 };
 
 /**

@@ -192,6 +192,7 @@ export * from "./evaluationProviders.js";
 export * from "./fileTypes.js";
 // Generate types - NEW (selective export to avoid GenerateResult conflict with cli.js)
 export type {
+  AdditionalMemoryUser,
   EnhancedGenerateResult,
   EnhancedProvider,
   FactoryEnhancedProvider,

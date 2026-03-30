@@ -130,7 +130,11 @@ import type {
   ExternalMCPToolInfo,
 } from "./types/externalMcp.js";
 // NEW: Generate function imports
-import type { GenerateOptions, GenerateResult } from "./types/generateTypes.js";
+import type {
+  AdditionalMemoryUser,
+  GenerateOptions,
+  GenerateResult,
+} from "./types/generateTypes.js";
 import type {
   ConfirmationResponseEvent,
   HITLConfig,
@@ -1293,6 +1297,24 @@ Current user's request: ${currentInput}`;
   }
 
   /**
+   * Format memory context from multiple users into a labeled block.
+   */
+  private formatMultiUserMemoryContext(
+    memories: Map<string, string>,
+    currentInput: string,
+  ): string {
+    const memoryBlocks: string[] = [];
+    for (const [label, memory] of memories) {
+      memoryBlocks.push(`[${label}]\n${memory}`);
+    }
+    return `Context from previous conversations:
+
+${memoryBlocks.join("\n\n")}
+
+Current user's request: ${currentInput}`;
+  }
+
+  /**
    * Determine whether memory should be read (retrieved) for this call.
    * Respects both the global memory SDK config and per-call overrides.
    */
@@ -1343,42 +1365,98 @@ Current user's request: ${currentInput}`;
   }
 
   /**
-   * Retrieve condensed memory for a user.
+   * Retrieve condensed memory for a user (and optionally additional users).
    * Returns the input text enhanced with memory context, or unchanged if no memory.
    */
   private async retrieveMemory(
     inputText: string,
     userId: string,
+    additionalUsers?: AdditionalMemoryUser[],
   ): Promise<string> {
     const client = this.ensureMemoryReady();
     if (!client) {
       return inputText;
     }
 
-    const memory = await client.get(userId);
-    if (!memory) {
+    // Collect all user IDs to read (primary + additional users with read !== false)
+    const readableAdditional = (additionalUsers || []).filter(
+      (u) => u.read !== false,
+    );
+
+    if (readableAdditional.length === 0) {
+      // Single user — use original fast path
+      const memory = await client.get(userId);
+      if (!memory) {
+        return inputText;
+      }
+      return this.formatMemoryContext(memory, inputText);
+    }
+
+    // Multi-user: fetch all memories in parallel
+    // Build entries with labels for formatting
+    const entries = [
+      { id: userId, label: "User" },
+      ...readableAdditional.map((u) => ({
+        id: u.userId,
+        label: u.label || u.userId,
+      })),
+    ];
+    const results = await Promise.all(
+      entries.map(async (entry) => {
+        const memory = await client.get(entry.id);
+        return { ...entry, memory } as const;
+      }),
+    );
+
+    const memories = new Map<string, string>();
+    for (const { label, memory } of results) {
+      if (memory) {
+        memories.set(label, memory);
+      }
+    }
+
+    if (memories.size === 0) {
       return inputText;
     }
 
-    return this.formatMemoryContext(memory, inputText);
+    return this.formatMultiUserMemoryContext(memories, inputText);
   }
 
   /**
    * Store a conversation turn in memory (non-blocking).
    * Calls add(userId, content) which internally condenses old + new via LLM.
+   * Supports additional users with per-user prompt and maxWords overrides.
    */
   private storeMemoryInBackground(
     originalPrompt: string,
     responseContent: string,
     userId: string,
+    additionalUsers?: AdditionalMemoryUser[],
   ): void {
     setImmediate(async () => {
       try {
         const client = this.ensureMemoryReady();
-        if (client) {
-          const content = `User: ${originalPrompt}\nAssistant: ${responseContent}`;
-          await client.add(userId, content);
+        if (!client) {
+          return;
         }
+
+        const content = `User: ${originalPrompt}\nAssistant: ${responseContent}`;
+
+        // Collect all users to write: primary + additional users with write !== false
+        const writeOps: Promise<string>[] = [client.add(userId, content)];
+
+        const writableAdditional = (additionalUsers || []).filter(
+          (u) => u.write !== false,
+        );
+        for (const user of writableAdditional) {
+          const addOptions =
+            user.prompt || user.maxWords
+              ? { prompt: user.prompt, maxWords: user.maxWords }
+              : undefined;
+          writeOps.push(client.add(user.userId, content, addOptions));
+        }
+
+        await Promise.all(writeOps);
       } catch (error) {
         logger.warn("Memory storage failed:", error);
       }
@@ -3340,6 +3418,26 @@ Current user's request: ${currentInput}`;
                     }
                   }
 
+                  // Memory retrieval for generate path
+                  if (
+                    this.shouldReadMemory(
+                      options.memory,
+                      options.context?.userId,
+                    ) &&
+                    options.context?.userId
+                  ) {
+                    try {
+                      options.input.text = await this.retrieveMemory(
+                        options.input.text,
+                        options.context.userId as string,
+                        options.memory?.additionalUsers,
+                      );
+                      logger.debug("Memory retrieval successful (generate)");
+                    } catch (error) {
+                      logger.warn("Memory retrieval failed (generate):", error);
+                    }
+                  }
+
                   // 🔧 CRITICAL FIX: Convert to TextGenerationOptions while preserving the input object for multimodal support
                   const baseOptions: TextGenerationOptions = {
                     prompt: options.input.text,
@@ -3607,6 +3705,7 @@ Current user's request: ${currentInput}`;
         originalPrompt ?? "",
         generateResult.content.trim(),
         options.context.userId as string,
+        options.memory?.additionalUsers,
       );
     }
   }
@@ -6170,6 +6269,7 @@ Current user's request: ${currentInput}`;
         options.input.text = await this.retrieveMemory(
           options.input.text,
           options.context.userId as string,
+          options.memory?.additionalUsers,
         );
         logger.debug("Memory retrieval successful");
       } catch (error) {
@@ -6638,6 +6738,7 @@ Current user's request: ${currentInput}`;
         originalPrompt ?? "",
         accumulatedContent.trim(),
         enhancedOptions.context?.userId as string,
+        enhancedOptions.memory?.additionalUsers,
       );
     }
   }

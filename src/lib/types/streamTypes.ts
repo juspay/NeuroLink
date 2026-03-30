@@ -19,6 +19,7 @@ import type { Content, ImageWithAltText } from "./content.js";
 import type { ChatMessage } from "./conversation.js";
 import type { AIModelProviderConfig } from "./providers.js";
 import type { TTSChunk, TTSOptions } from "./ttsTypes.js";
+import type { AdditionalMemoryUser } from "./generateTypes.js";
 import type { StandardRecord, ValidationSchema } from "./typeAliases.js";
 
 /**
@@ -511,6 +512,12 @@ export type StreamOptions = {
     read?: boolean;
     /** Whether to write (add/condense) the conversation into memory after completion. Defaults to true. */
     write?: boolean;
+    /**
+     * Additional users whose memory should be retrieved/stored alongside the primary user.
+     * Each entry can override the condensation prompt and maxWords for that user.
+     * Primary user is still determined by context.userId.
+     */
+    additionalUsers?: AdditionalMemoryUser[];
   };
 };
 
