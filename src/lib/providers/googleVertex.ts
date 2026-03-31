@@ -1377,8 +1377,8 @@ export class GoogleVertexProvider extends BaseProvider {
         })
         .finally(() => timeoutController?.cleanup());
 
-      // Transform string stream to content object stream using BaseProvider method
-      const transformedStream = this.createTextStream(result);
+      const transformedStream =
+        this.streamHandler.createFilteredFullStream(result);
 
       // Track tool calls and results for streaming
       const toolCalls: Array<{

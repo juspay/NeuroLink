@@ -171,6 +171,99 @@ export class StreamHandler {
   }
 
   /**
+   * Create filtered stream from AI SDK fullStream
+   *
+   * Filters out reasoning/thinking chunks from the stream to prevent chain-of-thought
+   * tokens from leaking to users when using models with extended thinking capabilities
+   * (e.g., Claude Sonnet 4.5, Gemini 2.5 Pro).
+   *
+   * **When to use:**
+   * - For Google Vertex AI provider with reasoning-capable models
+   * - When you want to hide internal reasoning/thinking process from end users
+   *
+   * **Note:** Currently only implemented for GoogleVertex provider. Other providers
+   * (OpenAI, Anthropic, etc.) use `createTextStream` which passes through all text.
+   * This may change as more models adopt extended thinking capabilities.
+   *
+   * **Filtered chunk types:**
+   * - `reasoning` - Chain-of-thought thinking tokens
+   * - `reasoning-signature` - Signatures for reasoning blocks
+   * - `redacted-reasoning` - Redacted thinking content
+   * - `source`, `tool-call`, `tool-result` - Non-text chunks
+   *
+   * **Passed through:**
+   * - `text-delta` - Yields content to user
+   * - `error` - Throws as Error
+   * - Plain strings - Yields as content (fallback)
+   *
+   * **Fallback:** Uses textStream if fullStream is unavailable
+   *
+   * @param result - AI SDK stream result with fullStream or textStream
+   * @returns AsyncGenerator yielding only text content chunks
+   *
+   * @example
+   * ```typescript
+   * const result = await streamText({ model, messages });
+   * const filtered = this.streamHandler.createFilteredFullStream(result);
+   * for await (const chunk of filtered) {
+   *   console.log(chunk.content); // Only visible text, no reasoning
+   * }
+   * ```
+   */
+  createFilteredFullStream(result: {
+    fullStream?: AsyncIterable<unknown>;
+    textStream?: AsyncIterable<string>;
+  }): AsyncGenerator<{ content: string }> {
+    // Type guards
+    const hasType = (val: unknown): val is { type: string } =>
+      val !== null &&
+      typeof val === "object" &&
+      "type" in val &&
+      typeof (val as Record<string, unknown>).type === "string";
+    const isTextDelta = (val: {
+      type: string;
+    }): val is { type: "text-delta"; textDelta: string } =>
+      val.type === "text-delta" &&
+      "textDelta" in val &&
+      typeof (val as Record<string, unknown>).textDelta === "string";
+    const isError = (val: {
+      type: string;
+    }): val is { type: "error"; error: unknown } =>
+      val.type === "error" && "error" in val;
+
+    const getErrorMessage = (error: unknown): string => {
+      if (error !== null && typeof error === "object" && "message" in error) {
+        const msg = (error as Record<string, unknown>).message;
+        return typeof msg === "string" ? msg : "Unknown error";
+      }
+      return "Unknown error";
+    };
+
+    return (async function* () {
+      if (result.fullStream) {
+        for await (const chunk of result.fullStream) {
+          if (typeof chunk === "string") {
+            yield { content: chunk };
+          } else if (hasType(chunk)) {
+            if (isError(chunk)) {
+              throw new Error(
+                `Streaming error: ${getErrorMessage(chunk.error)}`,
+              );
+            } else if (isTextDelta(chunk)) {
+              yield { content: chunk.textDelta };
+            }
+            // Skip: reasoning, reasoning-signature, redacted-reasoning, source, tool-call, tool-result, etc.
+          }
+        }
+      } else if (result.textStream) {
+        for await (const chunk of result.textStream) {
+          yield { content: chunk };
+        }
+      }
+    })();
+  }
+
+  /**
    * Create standardized stream result - consolidates result structure
    */
   createStreamResult(
