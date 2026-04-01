@@ -1,3 +1,9 @@
+## [9.42.0](https://github.com/juspay/neurolink/compare/v9.41.0...v9.42.0) (2026-04-01)
+
+### Features
+
+- **(proxy):** add OTLP observability, passthrough mode, and env-file support ([59ae70b](https://github.com/juspay/neurolink/commit/59ae70b9a33089f04addce63eb9e6151dcc97a0f))
+
 ## [9.41.0](https://github.com/juspay/neurolink/compare/v9.40.0...v9.41.0) (2026-03-30)
 
 ### Features
