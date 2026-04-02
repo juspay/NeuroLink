@@ -1,3 +1,9 @@
+## [9.44.0](https://github.com/juspay/neurolink/compare/v9.43.0...v9.44.0) (2026-04-02)
+
+### Features
+
+- **(demo):** display neurolink features in demo code ([b13e995](https://github.com/juspay/neurolink/commit/b13e99586a30b87bfda3bfcf9378e7a420fd18ed))
+
 ## [9.43.0](https://github.com/juspay/neurolink/compare/v9.42.1...v9.43.0) (2026-04-02)
 
 ### Features
