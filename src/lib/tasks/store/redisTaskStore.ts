@@ -245,27 +245,41 @@ export class RedisTaskStore implements TaskStore {
     const ttlSeconds = Math.ceil(ttlMs / 1000);
     // Set TTL on associated keys best-effort. A successful task write should not
     // be surfaced as a failure just because the retention metadata could not be updated.
-    client.expire(taskRunsKey(task.id), ttlSeconds).catch((err) => {
-      logger.warn(
-        "[TaskStore:Redis] Failed to set TTL on task runs key — task data may outlive retention window",
-        {
-          taskId: task.id,
-          key: taskRunsKey(task.id),
-          ttlSeconds,
-          error: String(err),
-        },
-      );
-    });
-    client.expire(taskHistoryKey(task.id), ttlSeconds).catch((err) => {
-      logger.warn(
-        "[TaskStore:Redis] Failed to set TTL on task history key — task data may outlive retention window",
-        {
-          taskId: task.id,
-          key: taskHistoryKey(task.id),
-          ttlSeconds,
-          error: String(err),
-        },
-      );
-    });
+    void (async () => {
+      const runsKey = taskRunsKey(task.id);
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await client.expire(runsKey, ttlSeconds);
+          break;
+        } catch (err) {
+          if (attempt === 3) {
+            logger.warn(
+              "[TaskStore:Redis] expire failed after 3 attempts on task runs key — task data may outlive retention window",
+              { taskId: task.id, key: runsKey, ttlSeconds, err: String(err) },
+            );
+          } else {
+            await new Promise((r) => setTimeout(r, 100 * attempt));
+          }
+        }
+      }
+    })();
+    void (async () => {
+      const histKey = taskHistoryKey(task.id);
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await client.expire(histKey, ttlSeconds);
+          break;
+        } catch (err) {
+          if (attempt === 3) {
+            logger.warn(
+              "[TaskStore:Redis] expire failed after 3 attempts on task history key — task data may outlive retention window",
+              { taskId: task.id, key: histKey, ttlSeconds, err: String(err) },
+            );
+          } else {
+            await new Promise((r) => setTimeout(r, 100 * attempt));
+          }
+        }
+      }
+    })();
   }
 }

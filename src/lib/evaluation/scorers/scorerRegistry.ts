@@ -473,8 +473,9 @@ export class ScorerRegistry {
         logger.debug(
           `Registered ${ScorerRegistry.scorers.size} built-in scorers (including aliases)`,
         );
-      } finally {
-        // Keep initPromise for future callers to await
+      } catch (err) {
+        ScorerRegistry.initPromise = null; // allow retry on next call
+        throw err;
       }
     })();
 

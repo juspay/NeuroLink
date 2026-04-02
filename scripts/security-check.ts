@@ -42,8 +42,8 @@ const IGNORED_VULNERABLE_PACKAGES = [
   "jsondiffpatch", // XSS in ai dependency - tracked separately
   "undici", // DoS in transitive dependency - requires upstream fix
   "ai", // File upload bypass - planned upgrade
-  "lodash", // Code injection in @semantic-release dev dep - no patch available
-  "lodash-es", // Code injection in @semantic-release dev dep - no patch available
+  "lodash", // TODO: track in #xxx — no patch available upstream for @semantic-release dev dep
+  "lodash-es", // TODO: track in #xxx — no patch available upstream for @semantic-release dev dep
 ];
 
 interface SecurityIssue {

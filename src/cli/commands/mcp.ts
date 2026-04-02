@@ -3034,6 +3034,19 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
 
       const serverId = argv.server as string | undefined;
       const foundTool = this.findToolForAnnotation(servers, toolName, serverId);
+      if (foundTool === "ambiguous") {
+        logger.error(
+          chalk.red(
+            `Tool '${toolName}' exists on multiple servers. Use --server <id> to specify which server to annotate.`,
+          ),
+        );
+        logger.always(
+          chalk.yellow(
+            "Use 'neurolink mcp annotate --list' to see available tools and their server IDs.",
+          ),
+        );
+        process.exit(1);
+      }
       if (!foundTool) {
         logger.error(
           chalk.red(
@@ -3171,7 +3184,9 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
     servers: MCPServerInfo[],
     toolName: string,
     serverId?: string,
-  ): AnnotatedToolTarget | null {
+  ): AnnotatedToolTarget | null | "ambiguous" {
+    const matches: AnnotatedToolTarget[] = [];
+
     for (const server of servers) {
       if (serverId && server.id !== serverId) {
         continue;
@@ -3179,17 +3194,25 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
 
       for (const tool of server.tools || []) {
         if (tool.name === toolName) {
-          return {
+          matches.push({
             name: tool.name,
             description: tool.description,
             serverId: server.id,
             serverName: server.name,
-          };
+          });
         }
       }
     }
 
-    return null;
+    if (matches.length === 0) {
+      return null;
+    }
+
+    if (matches.length > 1) {
+      return "ambiguous";
+    }
+
+    return matches[0] ?? null;
   }
 
   private static buildAnnotationsFromArgs(

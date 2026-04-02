@@ -7,7 +7,7 @@ import { ProviderRegistry } from "../factories/providerRegistry.js";
 import { getBestProvider } from "../utils/providerUtils.js";
 import { logger } from "../utils/logger.js";
 import { dynamicModelProvider } from "./dynamicModels.js";
-import { withTimeout } from "../utils/errorHandling.js";
+import { withTimeout, ErrorFactory } from "../utils/errorHandling.js";
 import type { AIProvider, SupportedModelName } from "../types/index.js";
 import { AIProviderName } from "../constants/enums.js";
 import type { UnknownRecord } from "../types/common.js";
@@ -47,7 +47,7 @@ export class AIProviderFactory {
       await withTimeout(
         dynamicModelProvider.initialize(),
         INIT_TIMEOUT,
-        new Error("Dynamic provider initialization timeout"),
+        ErrorFactory.toolTimeout("dynamic-provider-init", INIT_TIMEOUT),
       );
 
       logger.debug(
@@ -251,7 +251,7 @@ export class AIProviderFactory {
     await withTimeout(
       ProviderRegistry.registerAllProviders(),
       30_000,
-      new Error("Provider registration timed out"),
+      ErrorFactory.toolTimeout("provider-registration", 30_000),
     );
 
     const normalizedName = this.normalizeProviderName(providerName);
@@ -275,7 +275,7 @@ export class AIProviderFactory {
         region,
       ),
       30_000,
-      new Error(`Provider creation timed out for ${normalizedName}`),
+      ErrorFactory.toolTimeout(`provider-creation:${normalizedName}`, 30_000),
     );
 
     return { normalizedName, finalModelName, provider };

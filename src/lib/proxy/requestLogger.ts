@@ -641,7 +641,7 @@ export async function logBodyCapture(
   const redactedHeaders = redactHeaders(entry.headers);
   const preparedBody = prepareRedactedBody(entry.body);
 
-  let stored: StoredBodyArtifact = {};
+  let stored: StoredBodyArtifact;
   try {
     stored = await writeBodyArtifact(
       entry,
@@ -649,8 +649,16 @@ export async function logBodyCapture(
       preparedBody.value,
       preparedBody.truncated,
     );
-  } catch {
-    // Best-effort artifact persistence; continue with in-memory metadata only.
+  } catch (writeError) {
+    logger.warn(
+      "[RequestLogger] writeBodyArtifact failed, falling back to in-memory body for OTLP",
+      { error: writeError },
+    );
+    stored = {
+      redactedBody: preparedBody.value,
+      redactedBodyBytes: preparedBody.bytes,
+      bodyTruncated: preparedBody.truncated,
+    };
   }
 
   const dateStr = new Date(entry.timestamp).toISOString().split("T")[0];
