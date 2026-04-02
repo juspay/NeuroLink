@@ -4,7 +4,6 @@
  */
 import { AIProviderFactory } from "../core/factory.js";
 import { logger } from "./logger.js";
-import type { UnknownRecord } from "../types/common.js";
 import type { ProviderError } from "../types/providers.js";
 import type { EnvVarValidationResult } from "../types/utilities.js";
 import { AIProviderName } from "../constants/enums.js";
@@ -87,7 +86,10 @@ export async function getBestProvider(
   }
 
   // Special case for Ollama - prioritize local when available
-  if (process.env.OLLAMA_BASE_URL && process.env.OLLAMA_MODEL) {
+  if (
+    (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_API_BASE) &&
+    process.env.OLLAMA_MODEL
+  ) {
     try {
       if (await isProviderAvailable("ollama")) {
         logger.debug(`[getBestProvider] Prioritizing working local Ollama`);
@@ -101,7 +103,7 @@ export async function getBestProvider(
   /**
    * Provider priority order rationale:
    * - LiteLLM and Ollama are prioritized first for local/self-hosted deployments,
-   *   avoiding cloud quota/rate-limit issues during fallback scenarios.
+   *   avoiding unnecessary dependence on external providers during fallback scenarios.
    * - Vertex (Google Cloud AI) follows for enterprise-grade reliability.
    * - Google AI follows as second cloud priority for comprehensive Google AI ecosystem support.
    * - OpenAI maintains high priority due to its consistent reliability and broad model support.
@@ -109,8 +111,8 @@ export async function getBestProvider(
    * Please update this comment if the order is changed in the future, and document the rationale for maintainability.
    */
   const providers = [
-    "litellm", // Prioritize self-hosted/proxy (no rate limits)
-    "ollama", // Local models (no rate limits)
+    "litellm", // Prioritize self-hosted proxy deployments first
+    "ollama", // Local models when the configured runtime target is installed
     "vertex", // Google Cloud AI (enterprise)
     "google-ai", // Google AI ecosystem support
     "openai", // Reliable with broad model support
@@ -144,27 +146,22 @@ async function isProviderAvailable(providerName: string): Promise<boolean> {
     return false;
   }
 
+  if (providerName === "litellm") {
+    const availability =
+      await ProviderHealthChecker.checkFallbackProviderAvailability(
+        AIProviderName.LITELLM,
+        process.env.LITELLM_MODEL || "openai/gpt-4o-mini",
+      );
+    return availability.available;
+  }
+
   if (providerName === "ollama") {
-    try {
-      const response = await fetch("http://localhost:11434/api/tags", {
-        method: "GET",
-        signal: AbortSignal.timeout(2000),
-      });
-      if (response.ok) {
-        const { models } = await response.json();
-        const defaultOllamaModel = process.env.OLLAMA_MODEL || "llama3.1:8b";
-        // Check for exact match first, then prefix match (e.g. "gemma3:27b" matches "gemma3:27b-fp16")
-        return models.some(
-          (m: UnknownRecord) =>
-            m.name === defaultOllamaModel ||
-            (typeof m.name === "string" &&
-              m.name.startsWith(defaultOllamaModel.split(":")[0] + ":")),
-        );
-      }
-      return false;
-    } catch {
-      return false;
-    }
+    const availability =
+      await ProviderHealthChecker.checkFallbackProviderAvailability(
+        AIProviderName.OLLAMA,
+        process.env.OLLAMA_MODEL || "llama3.1:8b",
+      );
+    return availability.available;
   }
 
   try {

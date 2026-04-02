@@ -28,6 +28,16 @@ This guide explains how to read the OpenObserve dashboard used to operate the Ne
 
 For a fresh local setup, use the NeuroLink-owned helper in `scripts/observability/` instead of borrowing telemetry files from another repo.
 
+If you do not already have the CLI installed, install it first:
+
+```bash
+pnpm add -g @juspay/neurolink
+# or
+npm install -g @juspay/neurolink
+```
+
+Then continue with the setup steps below.
+
 1. Optional: copy `scripts/observability/proxy-observability.env.example` to `scripts/observability/proxy-observability.env` only if your local ports or credentials need to differ from the defaults.
 2. Start the local OpenObserve stack and import the dashboard:
 

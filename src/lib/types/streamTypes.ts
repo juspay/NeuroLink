@@ -2,7 +2,11 @@ import type { LanguageModel, StepResult, Tool, ToolChoice } from "ai";
 import type { AIProviderName } from "../constants/enums.js";
 import type { EvaluationData } from "../index.js";
 import type { RAGConfig } from "../rag/types.js";
-import type { AnalyticsData, ToolExecutionEvent, ToolExecutionSummary } from "../types/index.js";
+import type {
+  AnalyticsData,
+  ToolExecutionEvent,
+  ToolExecutionSummary,
+} from "../types/index.js";
 import type {
   MiddlewareFactoryOptions,
   OnChunkCallback,
@@ -59,7 +63,9 @@ export type StreamingOptions = {
 /**
  * Progress callback for streaming operations
  */
-export type ProgressCallback = (progress: StreamingProgressData) => void | Promise<void>;
+export type ProgressCallback = (
+  progress: StreamingProgressData,
+) => void | Promise<void>;
 
 /**
  * Type for tool execution calls (AI SDK compatible)
@@ -665,7 +671,15 @@ export type StreamTextResult = {
       }
     | undefined
   >;
-  finishReason: PromiseLike<"stop" | "length" | "content-filter" | "tool-calls" | "error" | "other" | "unknown">;
+  finishReason: PromiseLike<
+    | "stop"
+    | "length"
+    | "content-filter"
+    | "tool-calls"
+    | "error"
+    | "other"
+    | "unknown"
+  >;
   /**
    * Tool results. Accepts both NeuroLink ToolResult[] and AI SDK TypedToolResult[],
    * since the analytics collector passes them through as `unknown` anyway.

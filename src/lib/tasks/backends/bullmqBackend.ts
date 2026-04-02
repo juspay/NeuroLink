@@ -90,37 +90,42 @@ export class BullMQBackend implements TaskBackend {
     const queue = this.getQueue();
     this.executors.set(task.id, executor);
 
-    const jobData = { taskId: task.id, task };
-    const schedule = task.schedule;
+    try {
+      const jobData = { taskId: task.id, task };
+      const schedule = task.schedule;
 
-    if (schedule.type === "cron") {
-      await queue.upsertJobScheduler(
-        task.id,
-        {
-          pattern: schedule.expression,
-          ...(schedule.timezone ? { tz: schedule.timezone } : {}),
-        },
-        { name: task.name, data: jobData },
-      );
-    } else if (schedule.type === "interval") {
-      await queue.upsertJobScheduler(
-        task.id,
-        { every: schedule.every },
-        { name: task.name, data: jobData },
-      );
-    } else if (schedule.type === "once") {
-      const at =
-        typeof schedule.at === "string" ? new Date(schedule.at) : schedule.at;
-      const delay = Math.max(0, at.getTime() - Date.now());
-      await queue.add(task.name, jobData, {
-        jobId: task.id,
-        delay,
-      });
+      if (schedule.type === "cron") {
+        await queue.upsertJobScheduler(
+          task.id,
+          {
+            pattern: schedule.expression,
+            ...(schedule.timezone ? { tz: schedule.timezone } : {}),
+          },
+          { name: task.name, data: jobData },
+        );
+      } else if (schedule.type === "interval") {
+        await queue.upsertJobScheduler(
+          task.id,
+          { every: schedule.every },
+          { name: task.name, data: jobData },
+        );
+      } else if (schedule.type === "once") {
+        const at =
+          typeof schedule.at === "string" ? new Date(schedule.at) : schedule.at;
+        const delay = Math.max(0, at.getTime() - Date.now());
+        await queue.add(task.name, jobData, {
+          jobId: task.id,
+          delay,
+        });
+      }
+    } catch (error) {
+      this.executors.delete(task.id);
+      throw error;
     }
 
     logger.info("[BullMQ] Task scheduled", {
       taskId: task.id,
-      type: schedule.type,
+      type: task.schedule.type,
     });
   }
 

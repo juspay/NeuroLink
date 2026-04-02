@@ -86,6 +86,7 @@ export class TelemetryService {
     try {
       const provider = trace.getTracerProvider() as {
         constructor?: { name?: string };
+        getDelegate?: () => { constructor?: { name?: string } } | null;
         _delegate?: { constructor?: { name?: string } };
       } | null;
 
@@ -93,16 +94,21 @@ export class TelemetryService {
         return false;
       }
 
-      const delegateName = provider._delegate?.constructor?.name || "";
-      if (delegateName && delegateName !== "NoopTracerProvider") {
+      const providerName = provider.constructor?.name || "";
+      if (
+        providerName &&
+        providerName !== "ProxyTracerProvider" &&
+        providerName !== "NoopTracerProvider"
+      ) {
         return true;
       }
 
-      const providerName = provider.constructor?.name || "";
-      return (
-        providerName !== "ProxyTracerProvider" &&
-        providerName !== "NoopTracerProvider"
-      );
+      const delegate =
+        typeof provider.getDelegate === "function"
+          ? provider.getDelegate()
+          : provider._delegate;
+      const delegateName = delegate?.constructor?.name || "";
+      return Boolean(delegateName && delegateName !== "NoopTracerProvider");
     } catch (error) {
       logger.warn("[Telemetry] Failed checking for external TracerProvider", {
         error: error instanceof Error ? error.message : String(error),

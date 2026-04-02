@@ -489,7 +489,7 @@ type ProviderConfig = {
   priority: number;
 };
 
-// Default priority: self-hosted first (no rate limits), then cloud providers
+// Default priority: self-hosted first, then cloud providers
 const providerChain: ProviderConfig[] = [
   { provider: "litellm", model: "openai/gpt-4o", priority: 1 },
   { provider: "ollama", model: "llama3.1:8b", priority: 2 },

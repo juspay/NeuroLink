@@ -1,3 +1,8 @@
+---
+title: Step-by-Step Integration Tutorials
+slug: tutorials/step-by-step
+---
+
 # 📚 Step-by-Step Integration Tutorials
 
 ## 🚀 Quick Start (15 minutes) {#quick-start-15-minutes}

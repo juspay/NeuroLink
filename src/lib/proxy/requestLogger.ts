@@ -45,6 +45,9 @@ const MAX_RESOLVE_ATTEMPTS = 10;
 
 /** Maximum body chunk size emitted to OTLP logs. */
 const BODY_OTLP_CHUNK_SIZE = 16_000;
+/** Maximum redacted body bytes persisted per capture entry. */
+const MAX_CAPTURED_BODY_BYTES = 1024 * 1024;
+const BODY_TRUNCATION_MARKER = "\n...[TRUNCATED]";
 
 const gzip = promisify(gzipCallback);
 
@@ -323,6 +326,7 @@ type StoredBodyArtifact = {
   redactedBodyBytes?: number;
   storedFileBytes?: number;
   redactedBody?: string;
+  bodyTruncated?: boolean;
 };
 
 function serializeBody(body: unknown): string | undefined {
@@ -351,10 +355,157 @@ function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function utf8ByteLength(value: string): number {
+  return Buffer.byteLength(value, "utf8");
+}
+
+function truncateUtf8String(
+  input: string,
+  maxBytes: number,
+  marker: string = BODY_TRUNCATION_MARKER,
+): { value: string; bytes: number; truncated: boolean } {
+  const inputBytes = utf8ByteLength(input);
+  if (inputBytes <= maxBytes) {
+    return { value: input, bytes: inputBytes, truncated: false };
+  }
+
+  const markerBytes = utf8ByteLength(marker);
+  if (maxBytes <= markerBytes) {
+    return { value: marker, bytes: markerBytes, truncated: true };
+  }
+
+  let value = "";
+  let bytes = 0;
+  for (const char of input) {
+    const charBytes = utf8ByteLength(char);
+    if (bytes + charBytes + markerBytes > maxBytes) {
+      break;
+    }
+    value += char;
+    bytes += charBytes;
+  }
+
+  const truncatedValue = `${value}${marker}`;
+  return {
+    value: truncatedValue,
+    bytes: utf8ByteLength(truncatedValue),
+    truncated: true,
+  };
+}
+
+function splitUtf8StringByBytes(input: string, maxBytes: number): string[] {
+  if (!input) {
+    return [""];
+  }
+
+  const chunks: string[] = [];
+  let currentChunk = "";
+  let currentBytes = 0;
+
+  for (const char of input) {
+    const charBytes = utf8ByteLength(char);
+    if (currentChunk && currentBytes + charBytes > maxBytes) {
+      chunks.push(currentChunk);
+      currentChunk = char;
+      currentBytes = charBytes;
+      continue;
+    }
+
+    currentChunk += char;
+    currentBytes += charBytes;
+  }
+
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks;
+}
+
+function prepareRedactedBody(body: unknown): {
+  value?: string;
+  bytes?: number;
+  truncated: boolean;
+} {
+  const redacted = redactBody(body);
+  if (redacted === undefined) {
+    return { truncated: false };
+  }
+
+  return truncateUtf8String(redacted, MAX_CAPTURED_BODY_BYTES);
+}
+
+type ManagedLogFile = {
+  path: string;
+  mtime: number;
+  size: number;
+};
+
+function collectManagedLogFiles(rootDir: string): ManagedLogFile[] {
+  const managedFiles: ManagedLogFile[] = [];
+
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const entryPath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(entryPath);
+        continue;
+      }
+
+      const isTopLevelProxyLog =
+        directory === rootDir &&
+        /^proxy(?:-attempts|-debug)?-.*\.jsonl$/.test(entry.name);
+      const isBodyArtifact =
+        entry.name.endsWith(".json.gz") &&
+        entryPath.includes(`${join(rootDir, "bodies")}`);
+
+      if (!isTopLevelProxyLog && !isBodyArtifact) {
+        continue;
+      }
+
+      try {
+        const stat = statSync(entryPath);
+        managedFiles.push({
+          path: entryPath,
+          mtime: stat.mtimeMs,
+          size: stat.size,
+        });
+      } catch {
+        // Non-fatal
+      }
+    }
+  };
+
+  walk(rootDir);
+  return managedFiles;
+}
+
+function pruneEmptyDirectories(directory: string, stopAt: string): void {
+  if (!existsSync(directory)) {
+    return;
+  }
+
+  try {
+    const entries = readdirSync(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        pruneEmptyDirectories(join(directory, entry.name), stopAt);
+      }
+    }
+
+    if (directory !== stopAt && readdirSync(directory).length === 0) {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  } catch {
+    // Non-fatal
+  }
+}
+
 async function writeBodyArtifact(
   entry: ProxyBodyCaptureEntry,
   redactedHeaders: Record<string, string> | undefined,
   redactedBody: string | undefined,
+  bodyTruncated: boolean,
 ): Promise<StoredBodyArtifact> {
   if (!logDir || redactedBody === undefined) {
     return {};
@@ -396,9 +547,10 @@ async function writeBodyArtifact(
   return {
     bodyPath,
     bodySha256: sha256(redactedBody),
-    redactedBodyBytes: Buffer.byteLength(redactedBody, "utf8"),
+    redactedBodyBytes: utf8ByteLength(redactedBody),
     storedFileBytes: compressed.byteLength,
     redactedBody,
+    bodyTruncated,
   };
 }
 
@@ -413,16 +565,14 @@ function emitOtlpBodyLogRecord(
       }
 
       const otelLogger = provider.getLogger("neurolink-proxy-bodies", "1.0.0");
-      const totalChunks = Math.max(
-        1,
-        Math.ceil(stored.redactedBody.length / BODY_OTLP_CHUNK_SIZE),
+      const chunks = splitUtf8StringByBytes(
+        stored.redactedBody,
+        BODY_OTLP_CHUNK_SIZE,
       );
+      const totalChunks = Math.max(1, chunks.length);
 
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-        const chunk = stored.redactedBody.slice(
-          chunkIndex * BODY_OTLP_CHUNK_SIZE,
-          (chunkIndex + 1) * BODY_OTLP_CHUNK_SIZE,
-        );
+        const chunk = chunks[chunkIndex] ?? "";
 
         otelLogger.emit({
           severityNumber:
@@ -458,6 +608,9 @@ function emitOtlpBodyLogRecord(
             ...(stored.redactedBodyBytes !== undefined && {
               "body.bytes": stored.redactedBodyBytes,
             }),
+            ...(stored.bodyTruncated !== undefined && {
+              "body.truncated": stored.bodyTruncated,
+            }),
             ...(entry.traceId && { "trace.id": entry.traceId }),
             ...(entry.spanId && { "span.id": entry.spanId }),
             ...(entry.metadata && {
@@ -486,13 +639,15 @@ export async function logBodyCapture(
       ? { traceId: entry.traceId, spanId: entry.spanId }
       : bridge.getCurrentTraceContext();
   const redactedHeaders = redactHeaders(entry.headers);
+  const preparedBody = prepareRedactedBody(entry.body);
 
   let stored: StoredBodyArtifact = {};
   try {
     stored = await writeBodyArtifact(
       entry,
       redactedHeaders,
-      redactBody(entry.body),
+      preparedBody.value,
+      preparedBody.truncated,
     );
   } catch {
     // Best-effort artifact persistence; continue with in-memory metadata only.
@@ -517,8 +672,9 @@ export async function logBodyCapture(
     bodyPath: stored.bodyPath,
     bodySha256: stored.bodySha256,
     observedBodyBytes: entry.bodySize,
-    redactedBodyBytes: stored.redactedBodyBytes,
+    redactedBodyBytes: stored.redactedBodyBytes ?? preparedBody.bytes,
     storedFileBytes: stored.storedFileBytes,
+    bodyTruncated: stored.bodyTruncated ?? preparedBody.truncated,
     metadata: entry.metadata,
   };
 
@@ -657,23 +813,9 @@ export function cleanupLogs(
 
   try {
     const activeLogDir = logDir;
-    const files = readdirSync(logDir)
-      .filter(
-        (f) =>
-          (f.startsWith("proxy-") || f.startsWith("proxy-attempts-")) &&
-          f.endsWith(".jsonl"),
-      )
-      .map((f) => {
-        const filePath = join(activeLogDir, f);
-        const stat = statSync(filePath);
-        return {
-          name: f,
-          path: filePath,
-          mtime: stat.mtimeMs,
-          size: stat.size,
-        };
-      })
-      .sort((a, b) => a.mtime - b.mtime); // oldest first
+    const files = collectManagedLogFiles(activeLogDir).sort(
+      (a, b) => a.mtime - b.mtime,
+    ); // oldest first
 
     const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
     let deletedCount = 0;
@@ -693,34 +835,12 @@ export function cleanupLogs(
 
     const bodiesDir = join(logDir, "bodies");
     if (existsSync(bodiesDir)) {
-      for (const entry of readdirSync(bodiesDir)) {
-        const bodyPath = join(bodiesDir, entry);
-        try {
-          if (statSync(bodyPath).mtimeMs < cutoff) {
-            rmSync(bodyPath, { recursive: true, force: true });
-          }
-        } catch {
-          // Non-fatal
-        }
-      }
-    }
-
-    // Include body artifacts in total size calculation
-    const bodiesDirForSize = join(logDir, "bodies");
-    let bodiesSize = 0;
-    if (existsSync(bodiesDirForSize)) {
-      for (const entry of readdirSync(bodiesDirForSize)) {
-        try {
-          bodiesSize += statSync(join(bodiesDirForSize, entry)).size;
-        } catch {
-          // Non-fatal
-        }
-      }
+      pruneEmptyDirectories(bodiesDir, bodiesDir);
     }
 
     // Pass 2: if total size exceeds maxSizeMb, delete oldest until under limit
     const maxBytes = maxSizeMb * 1024 * 1024;
-    let totalSize = remaining.reduce((sum, f) => sum + f.size, 0) + bodiesSize;
+    let totalSize = remaining.reduce((sum, f) => sum + f.size, 0);
 
     while (totalSize > maxBytes && remaining.length > 0) {
       const oldest = remaining.shift();
@@ -731,6 +851,10 @@ export function cleanupLogs(
       totalSize -= oldest.size;
       deletedCount++;
       freedBytes += oldest.size;
+    }
+
+    if (existsSync(bodiesDir)) {
+      pruneEmptyDirectories(bodiesDir, bodiesDir);
     }
 
     if (deletedCount > 0) {

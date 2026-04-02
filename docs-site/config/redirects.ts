@@ -127,7 +127,6 @@ const sectionReorganizationRedirects: PluginOptions["redirects"] = [
   // Analytics/observability redirects (redirect to telemetry as main observability page)
   { from: "/analytics", to: "/docs/observability/telemetry" },
   { from: "/docs/analytics", to: "/docs/observability/telemetry" },
-  { from: "/docs/reference/analytics", to: "/docs/observability/telemetry" },
   { from: "/observability", to: "/docs/observability/telemetry" },
   { from: "/telemetry", to: "/docs/observability/telemetry" },
 

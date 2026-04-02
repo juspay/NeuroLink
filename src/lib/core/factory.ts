@@ -68,6 +68,218 @@ export class AIProviderFactory {
       // This ensures the factory continues to work even if dynamic models fail
     }
   }
+
+  private static resolveModelFromEnvironment(
+    providerName: string,
+    modelName: string | null | undefined,
+    functionTag: string,
+  ): string | null | undefined {
+    if (modelName && modelName !== "default") {
+      logger.debug(
+        `[${functionTag}] Skipping environment variable check - explicit model provided: ${modelName}`,
+      );
+      return modelName;
+    }
+
+    logger.debug(
+      `[${functionTag}] Checking environment variables for provider: ${providerName}`,
+    );
+
+    const normalizedProvider = providerName.toLowerCase();
+    const envConfigs = [
+      {
+        match: ["bedrock"],
+        label: "Bedrock",
+        vars: ["BEDROCK_MODEL", "BEDROCK_MODEL_ID"],
+      },
+      {
+        match: ["vertex"],
+        label: "Vertex",
+        vars: ["VERTEX_MODEL"],
+      },
+      {
+        match: ["azure"],
+        label: "Azure",
+        vars: [
+          "AZURE_OPENAI_MODEL",
+          "AZURE_OPENAI_DEPLOYMENT",
+          "AZURE_OPENAI_DEPLOYMENT_ID",
+        ],
+      },
+      {
+        match: ["openai", "gpt", "chatgpt", "openai-compat"],
+        label: "OpenAI",
+        vars: ["OPENAI_MODEL"],
+      },
+      {
+        match: ["anthropic", "claude", "anthropic-claude"],
+        label: "Anthropic",
+        vars: ["ANTHROPIC_MODEL"],
+      },
+      {
+        match: ["google", "gemini"],
+        label: "Google AI",
+        vars: ["GOOGLE_AI_MODEL"],
+      },
+      {
+        match: ["mistral"],
+        label: "Mistral",
+        vars: ["MISTRAL_MODEL"],
+      },
+      {
+        match: ["ollama"],
+        label: "Ollama",
+        vars: ["OLLAMA_MODEL"],
+      },
+      {
+        match: ["litellm"],
+        label: "LiteLLM",
+        vars: ["LITELLM_MODEL"],
+      },
+    ] as const;
+
+    const envConfig = envConfigs.find((config) =>
+      config.match.some((match) => normalizedProvider.includes(match)),
+    );
+    if (!envConfig) {
+      logger.debug(
+        `[${functionTag}] Provider ${providerName} - no environment variable check implemented`,
+      );
+      return modelName;
+    }
+
+    const matchedVar = envConfig.vars.find((name) => process.env[name]);
+    const envModel = matchedVar ? process.env[matchedVar] : undefined;
+    if (envModel) {
+      logger.debug(
+        `[${functionTag}] Environment variable found for ${envConfig.label}`,
+        {
+          envVariable: matchedVar,
+          resolvedModel: envModel,
+        },
+      );
+      return envModel;
+    }
+
+    logger.debug(
+      `[${functionTag}] No ${envConfig.label} environment variables found (${envConfig.vars.join(", ")})`,
+    );
+    return modelName;
+  }
+
+  private static async resolveDynamicModelName(
+    providerName: string,
+    modelName: string | null | undefined,
+    resolvedModelName: string | null | undefined,
+    functionTag: string,
+  ): Promise<string | null | undefined> {
+    if (
+      (resolvedModelName && resolvedModelName !== "default") ||
+      (modelName && modelName !== "default")
+    ) {
+      logger.debug(`[${functionTag}] Skipping dynamic model resolution`, {
+        resolvedModelName: resolvedModelName || "none",
+        reason:
+          "Model already resolved from environment variables or explicit parameter",
+      });
+      return resolvedModelName;
+    }
+
+    logger.debug(`[${functionTag}] Attempting dynamic model resolution`, {
+      currentResolvedModel: resolvedModelName || "none",
+      reason: "No environment variable found and no explicit model provided",
+    });
+
+    try {
+      const normalizedProvider = this.normalizeProviderName(providerName);
+
+      if (dynamicModelProvider.needsRefresh()) {
+        logger.debug(
+          `[${functionTag}] Dynamic model provider needs refresh - initializing`,
+        );
+        await this.initializeDynamicProviderWithTimeout();
+      }
+
+      const dynamicModel = dynamicModelProvider.resolveModel(
+        normalizedProvider,
+        modelName || undefined,
+      );
+      if (!dynamicModel) {
+        logger.debug(
+          `[${functionTag}] Dynamic model resolution returned null`,
+          {
+            provider: normalizedProvider,
+            requestedModel: modelName || "default",
+          },
+        );
+        return resolvedModelName;
+      }
+
+      logger.debug(`[${functionTag}] Resolved dynamic model`, {
+        provider: normalizedProvider,
+        requestedModel: modelName || "default",
+        resolvedModel: dynamicModel.id,
+        displayName: dynamicModel.displayName,
+        pricing: dynamicModel.pricing.input,
+      });
+      return dynamicModel.id;
+    } catch (resolveError) {
+      logger.debug(
+        `[${functionTag}] Dynamic model resolution failed, using static fallback`,
+        {
+          error:
+            resolveError instanceof Error
+              ? resolveError.message
+              : String(resolveError),
+        },
+      );
+      return resolvedModelName;
+    }
+  }
+
+  private static async createResolvedProvider(
+    providerName: string,
+    resolvedModelName: string | null | undefined,
+    sdk: UnknownRecord | undefined,
+    region: string | undefined,
+    functionTag: string,
+  ): Promise<{
+    normalizedName: string;
+    finalModelName: string | undefined;
+    provider: AIProvider;
+  }> {
+    await withTimeout(
+      ProviderRegistry.registerAllProviders(),
+      30_000,
+      new Error("Provider registration timed out"),
+    );
+
+    const normalizedName = this.normalizeProviderName(providerName);
+    const finalModelName =
+      resolvedModelName === "default" || resolvedModelName === null
+        ? undefined
+        : resolvedModelName;
+
+    logger.debug(`[${functionTag}] Final provider configuration`, {
+      originalProviderName: providerName,
+      normalizedProviderName: normalizedName,
+      resolvedModelName: resolvedModelName || "not resolved",
+      finalModelName: finalModelName || "using provider default",
+    });
+
+    const provider = await withTimeout(
+      ProviderFactory.createProvider(
+        normalizedName,
+        finalModelName,
+        sdk,
+        region,
+      ),
+      30_000,
+      new Error(`Provider creation timed out for ${normalizedName}`),
+    );
+
+    return { normalizedName, finalModelName, provider };
+  }
   /**
    * Create a provider instance for the specified provider type
    * @param providerName - Name of the provider ('vertex', 'bedrock', 'openai')
@@ -122,269 +334,25 @@ export class AIProviderFactory {
           //
           // The dynamic model provider now provides reliable functionality without hanging
 
-          let resolvedModelName = modelName;
-
-          // PRIORITY 1: Check environment variables BEFORE dynamic resolution
-          if (!modelName || modelName === "default") {
-            logger.debug(
-              `[${functionTag}] Checking environment variables for provider: ${providerName}`,
-            );
-
-            // Check for provider-specific environment variables first
-            if (providerName.toLowerCase().includes("bedrock")) {
-              const envModel =
-                process.env.BEDROCK_MODEL || process.env.BEDROCK_MODEL_ID;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Bedrock`,
-                  {
-                    envVariable: process.env.BEDROCK_MODEL
-                      ? "BEDROCK_MODEL"
-                      : "BEDROCK_MODEL_ID",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Bedrock environment variables found (BEDROCK_MODEL, BEDROCK_MODEL_ID)`,
-                );
-              }
-            } else if (providerName.toLowerCase().includes("vertex")) {
-              const envModel = process.env.VERTEX_MODEL;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Vertex`,
-                  {
-                    envVariable: "VERTEX_MODEL",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Vertex environment variables found (VERTEX_MODEL)`,
-                );
-              }
-            } else if (providerName.toLowerCase().includes("azure")) {
-              const envModel =
-                process.env.AZURE_OPENAI_MODEL ||
-                process.env.AZURE_OPENAI_DEPLOYMENT ||
-                process.env.AZURE_OPENAI_DEPLOYMENT_ID;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Azure`,
-                  {
-                    envVariable: process.env.AZURE_OPENAI_MODEL
-                      ? "AZURE_OPENAI_MODEL"
-                      : process.env.AZURE_OPENAI_DEPLOYMENT
-                        ? "AZURE_OPENAI_DEPLOYMENT"
-                        : "AZURE_OPENAI_DEPLOYMENT_ID",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Azure environment variables found (AZURE_OPENAI_MODEL, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_DEPLOYMENT_ID)`,
-                );
-              }
-            } else if (providerName.toLowerCase().includes("openai")) {
-              const envModel = process.env.OPENAI_MODEL;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for OpenAI`,
-                  {
-                    envVariable: "OPENAI_MODEL",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No OpenAI environment variables found (OPENAI_MODEL)`,
-                );
-              }
-            } else if (providerName.toLowerCase().includes("anthropic")) {
-              const envModel = process.env.ANTHROPIC_MODEL;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Anthropic`,
-                  {
-                    envVariable: "ANTHROPIC_MODEL",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Anthropic environment variables found (ANTHROPIC_MODEL)`,
-                );
-              }
-            } else if (
-              providerName.toLowerCase().includes("google") ||
-              providerName.toLowerCase().includes("gemini")
-            ) {
-              const envModel = process.env.GOOGLE_AI_MODEL;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Google AI`,
-                  {
-                    envVariable: "GOOGLE_AI_MODEL",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Google AI environment variables found (GOOGLE_AI_MODEL)`,
-                );
-              }
-            } else if (providerName.toLowerCase().includes("mistral")) {
-              const envModel = process.env.MISTRAL_MODEL;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Mistral`,
-                  {
-                    envVariable: "MISTRAL_MODEL",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Mistral environment variables found (MISTRAL_MODEL)`,
-                );
-              }
-            } else if (providerName.toLowerCase().includes("ollama")) {
-              const envModel = process.env.OLLAMA_MODEL;
-              if (envModel) {
-                resolvedModelName = envModel;
-                logger.debug(
-                  `[${functionTag}] Environment variable found for Ollama`,
-                  {
-                    envVariable: "OLLAMA_MODEL",
-                    resolvedModel: envModel,
-                  },
-                );
-              } else {
-                logger.debug(
-                  `[${functionTag}] No Ollama environment variables found (OLLAMA_MODEL)`,
-                );
-              }
-            } else {
-              logger.debug(
-                `[${functionTag}] Provider ${providerName} - no environment variable check implemented`,
-              );
-            }
-          } else {
-            logger.debug(
-              `[${functionTag}] Skipping environment variable check - explicit model provided: ${modelName}`,
-            );
-          }
-
-          // PRIORITY 2: Enable dynamic model resolution only if no env var found
-          if (
-            (!resolvedModelName || resolvedModelName === "default") &&
-            (!modelName || modelName === "default")
-          ) {
-            logger.debug(
-              `[${functionTag}] Attempting dynamic model resolution`,
-              {
-                currentResolvedModel: resolvedModelName || "none",
-                reason:
-                  "No environment variable found and no explicit model provided",
-              },
-            );
-
-            try {
-              const normalizedProvider =
-                this.normalizeProviderName(providerName);
-
-              // Initialize with timeout protection - won't hang anymore
-              if (dynamicModelProvider.needsRefresh()) {
-                logger.debug(
-                  `[${functionTag}] Dynamic model provider needs refresh - initializing`,
-                );
-                await this.initializeDynamicProviderWithTimeout();
-              }
-
-              const dynamicModel = dynamicModelProvider.resolveModel(
-                normalizedProvider,
-                modelName || undefined,
-              );
-
-              if (dynamicModel) {
-                resolvedModelName = dynamicModel.id;
-                logger.debug(`[${functionTag}] Resolved dynamic model`, {
-                  provider: normalizedProvider,
-                  requestedModel: modelName || "default",
-                  resolvedModel: resolvedModelName,
-                  displayName: dynamicModel.displayName,
-                  pricing: dynamicModel.pricing.input,
-                });
-              } else {
-                logger.debug(
-                  `[${functionTag}] Dynamic model resolution returned null`,
-                  {
-                    provider: normalizedProvider,
-                    requestedModel: modelName || "default",
-                  },
-                );
-              }
-            } catch (resolveError) {
-              logger.debug(
-                `[${functionTag}] Dynamic model resolution failed, using static fallback`,
-                {
-                  error:
-                    resolveError instanceof Error
-                      ? resolveError.message
-                      : String(resolveError),
-                },
-              );
-              // Continue with static model name - no functionality loss
-            }
-          } else {
-            logger.debug(`[${functionTag}] Skipping dynamic model resolution`, {
-              resolvedModelName: resolvedModelName || "none",
-              reason:
-                "Model already resolved from environment variables or explicit parameter",
-            });
-          }
-
-          // CRITICAL FIX: Initialize providers before using them
-          await withTimeout(
-            ProviderRegistry.registerAllProviders(),
-            30_000,
-            new Error("Provider registration timed out"),
+          let resolvedModelName = this.resolveModelFromEnvironment(
+            providerName,
+            modelName,
+            functionTag,
           );
-
-          // PURE FACTORY PATTERN: No switch statements - use ProviderFactory exclusively
-          const normalizedName = this.normalizeProviderName(providerName);
-          const finalModelName =
-            resolvedModelName === "default" || resolvedModelName === null
-              ? undefined
-              : resolvedModelName;
-
-          logger.debug(`[${functionTag}] Final provider configuration`, {
-            originalProviderName: providerName,
-            normalizedProviderName: normalizedName,
-            originalModelName: modelName || "not provided",
-            resolvedModelName: resolvedModelName || "not resolved",
-            finalModelName: finalModelName || "using provider default",
-          });
-
-          // Create provider with enhanced SDK and region support
-          const provider = await withTimeout(
-            ProviderFactory.createProvider(
-              normalizedName,
-              finalModelName,
+          resolvedModelName = await this.resolveDynamicModelName(
+            providerName,
+            modelName,
+            resolvedModelName,
+            functionTag,
+          );
+          const { normalizedName, finalModelName, provider } =
+            await this.createResolvedProvider(
+              providerName,
+              resolvedModelName,
               sdk,
               region,
-            ),
-            30_000,
-            new Error(`Provider creation timed out for ${normalizedName}`),
-          );
+              functionTag,
+            );
 
           // Summary logging in format expected by debugging tools
           logger.debug(

@@ -394,6 +394,25 @@ export class OpenAIProvider extends BaseProvider {
       // Build message array from options with multimodal support
       // Using protected helper from BaseProvider to eliminate code duplication
       const messages = await this.buildMessagesForStream(options);
+      let resolvedToolChoice = resolveToolChoice(
+        options,
+        tools,
+        shouldUseTools,
+      );
+
+      // Guard: if toolChoice names a specific tool that was filtered out, fall back to "auto"
+      if (
+        resolvedToolChoice !== null &&
+        typeof resolvedToolChoice === "object" &&
+        "toolName" in resolvedToolChoice &&
+        typeof resolvedToolChoice.toolName === "string" &&
+        !tools[resolvedToolChoice.toolName]
+      ) {
+        logger.warn(
+          `OpenAI: toolChoice references tool "${resolvedToolChoice.toolName}" which was removed during filtering; falling back to "auto"`,
+        );
+        resolvedToolChoice = "auto";
+      }
 
       // Debug the actual request being sent to OpenAI
       logger.debug(`OpenAI: streamText request parameters:`, {
@@ -402,8 +421,7 @@ export class OpenAIProvider extends BaseProvider {
         temperature: options.temperature,
         maxTokens: options.maxTokens,
         toolsCount: Object.keys(tools).length,
-        toolChoice:
-          shouldUseTools && Object.keys(tools).length > 0 ? "auto" : "none",
+        toolChoice: resolvedToolChoice,
         maxSteps: options.maxSteps || DEFAULT_MAX_STEPS,
         firstToolExample:
           Object.keys(tools).length > 0
@@ -442,7 +460,7 @@ export class OpenAIProvider extends BaseProvider {
           maxRetries: 0, // NL11: Disable AI SDK's invisible internal retries; we handle retries with OTel instrumentation
           tools,
           stopWhen: stepCountIs(options.maxSteps || DEFAULT_MAX_STEPS),
-          toolChoice: resolveToolChoice(options, tools, shouldUseTools),
+          toolChoice: resolvedToolChoice,
           abortSignal: composeAbortSignals(
             options.abortSignal,
             timeoutController?.controller.signal,
@@ -531,163 +549,11 @@ export class OpenAIProvider extends BaseProvider {
         resultType: typeof result,
       });
 
-      // Transform string stream to content object stream using fullStream
-      const transformedStream = async function* () {
-        try {
-          logger.debug(`OpenAI: Starting stream transformation`, {
-            hasTextStream: !!result.textStream,
-            hasFullStream: !!result.fullStream,
-            resultKeys: Object.keys(result),
-            toolsEnabled: shouldUseTools,
-            toolsCount: Object.keys(tools).length,
-          });
-
-          let chunkCount = 0;
-          let contentYielded = 0;
-          // Try fullStream first (handles both text and tool calls), fallback to textStream
-          const streamToUse = result.fullStream || result.textStream;
-          if (!streamToUse) {
-            logger.error("OpenAI: No stream available in result", {
-              resultKeys: Object.keys(result),
-            });
-            return;
-          }
-
-          logger.debug(`OpenAI: Stream source selected:`, {
-            usingFullStream: !!result.fullStream,
-            usingTextStream: !!result.textStream && !result.fullStream,
-            streamSourceType: result.fullStream ? "fullStream" : "textStream",
-          });
-
-          for await (const chunk of streamToUse) {
-            chunkCount++;
-            logger.debug(`OpenAI: Processing chunk ${chunkCount}:`, {
-              chunkType: typeof chunk,
-              chunkValue:
-                typeof chunk === "string"
-                  ? (chunk as string).substring(0, 50)
-                  : "not-string",
-              chunkKeys:
-                chunk && typeof chunk === "object"
-                  ? Object.keys(chunk)
-                  : "not-object",
-              hasText: chunk && typeof chunk === "object" && "text" in chunk,
-              hasTextDelta:
-                chunk && typeof chunk === "object" && "textDelta" in chunk,
-              hasType: chunk && typeof chunk === "object" && "type" in chunk,
-              chunkTypeValue:
-                chunk && typeof chunk === "object" && "type" in chunk
-                  ? (chunk as { type: unknown }).type
-                  : "no-type",
-            });
-
-            let contentToYield: string | null = null;
-
-            // Handle different chunk types from fullStream
-            if (chunk && typeof chunk === "object") {
-              // Log the full chunk structure for debugging (debug mode only)
-              if (process.env.NEUROLINK_DEBUG === "true") {
-                logger.debug(`OpenAI: Full chunk structure:`, {
-                  chunkKeys: Object.keys(chunk),
-                  fullChunk: JSON.stringify(chunk).substring(0, 500),
-                });
-              }
-
-              if ("type" in chunk && chunk.type === "error") {
-                // Handle error chunks when tools are enabled
-                const errorChunk = chunk as {
-                  type: "error";
-                  error: Record<string, unknown>;
-                };
-                logger.error(`OpenAI: Error chunk received:`, {
-                  errorType: errorChunk.type,
-                  errorDetails: errorChunk.error,
-                  fullChunk: JSON.stringify(chunk),
-                });
-
-                // Throw a more descriptive error for tool-related issues
-                const errorMessage =
-                  errorChunk.error &&
-                  typeof errorChunk.error === "object" &&
-                  "message" in errorChunk.error
-                    ? String(errorChunk.error.message)
-                    : "OpenAI API error when tools are enabled";
-                throw new Error(
-                  `OpenAI streaming error with tools: ${errorMessage}. Try disabling tools with --disableTools`,
-                );
-              } else if (
-                "type" in chunk &&
-                chunk.type === "text-delta" &&
-                "textDelta" in chunk
-              ) {
-                // Text delta from fullStream
-                contentToYield = chunk.textDelta as string;
-                logger.debug(`OpenAI: Found text-delta:`, {
-                  textDelta: contentToYield,
-                });
-              } else if ("text" in chunk) {
-                // Direct text chunk
-                contentToYield = chunk.text as string;
-                logger.debug(`OpenAI: Found direct text:`, {
-                  text: contentToYield,
-                });
-              } else {
-                // Log unhandled chunks in debug mode only
-                if (process.env.NEUROLINK_DEBUG === "true") {
-                  logger.debug(`OpenAI: Unhandled object chunk:`, {
-                    chunkKeys: Object.keys(chunk),
-                    chunkType: chunk.type || "no-type",
-                    fullChunk: JSON.stringify(chunk).substring(0, 500),
-                  });
-                }
-              }
-            } else if (typeof chunk === "string") {
-              // Direct string chunk from textStream
-              contentToYield = chunk;
-              logger.debug(`OpenAI: Found string chunk:`, {
-                content: contentToYield,
-              });
-            } else {
-              logger.warn(`OpenAI: Unhandled chunk type:`, {
-                type: typeof chunk,
-                value: String(chunk).substring(0, 100),
-              });
-            }
-
-            if (contentToYield) {
-              contentYielded++;
-              logger.debug(`OpenAI: Yielding content ${contentYielded}:`, {
-                content: contentToYield.substring(0, 50),
-                length: contentToYield.length,
-              });
-              yield { content: contentToYield };
-            }
-          }
-
-          logger.debug(`OpenAI: Stream transformation completed`, {
-            totalChunks: chunkCount,
-            contentYielded,
-            success: contentYielded > 0,
-          });
-
-          if (contentYielded === 0) {
-            logger.warn(
-              `OpenAI: No content was yielded from stream despite processing ${chunkCount} chunks`,
-            );
-          }
-        } catch (streamError) {
-          // AI SDK v6 throws NoOutputGeneratedError when the stream produced no output.
-          // Treat as an empty stream rather than crashing with an unhandled rejection.
-          if (NoOutputGeneratedError.isInstance(streamError)) {
-            logger.warn(
-              "OpenAI: Stream produced no output (NoOutputGeneratedError)",
-            );
-            return;
-          }
-          logger.error(`OpenAI: Stream transformation error:`, streamError);
-          throw streamError;
-        }
-      };
+      const transformedStream = this.createOpenAITransformedStream(
+        result,
+        shouldUseTools,
+        tools,
+      );
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(
@@ -702,7 +568,7 @@ export class OpenAIProvider extends BaseProvider {
       );
 
       return {
-        stream: transformedStream(),
+        stream: transformedStream,
         provider: this.providerName,
         model: this.modelName,
         analytics: analyticsPromise,
@@ -715,6 +581,166 @@ export class OpenAIProvider extends BaseProvider {
       timeoutController?.cleanup();
       throw this.handleProviderError(error);
     }
+  }
+
+  private async *createOpenAITransformedStream(
+    result: ReturnType<typeof streamText>,
+    shouldUseTools: boolean,
+    tools: Record<string, Tool>,
+  ): AsyncGenerator<{ content: string }> {
+    try {
+      logger.debug(`OpenAI: Starting stream transformation`, {
+        hasTextStream: !!result.textStream,
+        hasFullStream: !!result.fullStream,
+        resultKeys: Object.keys(result),
+        toolsEnabled: shouldUseTools,
+        toolsCount: Object.keys(tools).length,
+      });
+
+      let chunkCount = 0;
+      let contentYielded = 0;
+      const streamToUse = result.fullStream || result.textStream;
+      if (!streamToUse) {
+        logger.error("OpenAI: No stream available in result", {
+          resultKeys: Object.keys(result),
+        });
+        return;
+      }
+
+      logger.debug(`OpenAI: Stream source selected:`, {
+        usingFullStream: !!result.fullStream,
+        usingTextStream: !!result.textStream && !result.fullStream,
+        streamSourceType: result.fullStream ? "fullStream" : "textStream",
+      });
+
+      for await (const chunk of streamToUse) {
+        chunkCount++;
+        logger.debug(`OpenAI: Processing chunk ${chunkCount}:`, {
+          chunkType: typeof chunk,
+          chunkValue:
+            typeof chunk === "string"
+              ? (chunk as string).substring(0, 50)
+              : "not-string",
+          chunkKeys:
+            chunk && typeof chunk === "object"
+              ? Object.keys(chunk)
+              : "not-object",
+          hasText: chunk && typeof chunk === "object" && "text" in chunk,
+          hasTextDelta:
+            chunk && typeof chunk === "object" && "textDelta" in chunk,
+          hasType: chunk && typeof chunk === "object" && "type" in chunk,
+          chunkTypeValue:
+            chunk && typeof chunk === "object" && "type" in chunk
+              ? (chunk as { type: unknown }).type
+              : "no-type",
+        });
+
+        const contentToYield = this.extractOpenAIChunkContent(chunk);
+        if (contentToYield) {
+          contentYielded++;
+          logger.debug(`OpenAI: Yielding content ${contentYielded}:`, {
+            content: contentToYield.substring(0, 50),
+            length: contentToYield.length,
+          });
+          yield { content: contentToYield };
+        }
+      }
+
+      logger.debug(`OpenAI: Stream transformation completed`, {
+        totalChunks: chunkCount,
+        contentYielded,
+        success: contentYielded > 0,
+      });
+
+      if (contentYielded === 0) {
+        logger.warn(
+          `OpenAI: No content was yielded from stream despite processing ${chunkCount} chunks`,
+        );
+      }
+    } catch (streamError) {
+      if (NoOutputGeneratedError.isInstance(streamError)) {
+        logger.warn(
+          "OpenAI: Stream produced no output (NoOutputGeneratedError)",
+        );
+        return;
+      }
+      logger.error(`OpenAI: Stream transformation error:`, streamError);
+      throw streamError;
+    }
+  }
+
+  private extractOpenAIChunkContent(chunk: unknown): string | null {
+    if (chunk && typeof chunk === "object") {
+      if (process.env.NEUROLINK_DEBUG === "true") {
+        logger.debug(`OpenAI: Full chunk structure:`, {
+          chunkKeys: Object.keys(chunk),
+          fullChunk: JSON.stringify(chunk).substring(0, 500),
+        });
+      }
+
+      if ("type" in chunk && chunk.type === "error") {
+        const errorChunk = chunk as {
+          type: "error";
+          error: Record<string, unknown>;
+        };
+        logger.error(`OpenAI: Error chunk received:`, {
+          errorType: errorChunk.type,
+          errorDetails: errorChunk.error,
+          fullChunk: JSON.stringify(chunk),
+        });
+
+        const errorMessage =
+          errorChunk.error &&
+          typeof errorChunk.error === "object" &&
+          "message" in errorChunk.error
+            ? String(errorChunk.error.message)
+            : "OpenAI API error when tools are enabled";
+        throw new Error(
+          `OpenAI streaming error with tools: ${errorMessage}. Try disabling tools with --disableTools`,
+        );
+      }
+
+      if (
+        "type" in chunk &&
+        chunk.type === "text-delta" &&
+        "textDelta" in chunk
+      ) {
+        const textDelta = chunk.textDelta as string;
+        logger.debug(`OpenAI: Found text-delta:`, { textDelta });
+        return textDelta;
+      }
+
+      if ("text" in chunk) {
+        const text = chunk.text as string;
+        logger.debug(`OpenAI: Found direct text:`, { text });
+        return text;
+      }
+
+      if (process.env.NEUROLINK_DEBUG === "true") {
+        logger.debug(`OpenAI: Unhandled object chunk:`, {
+          chunkKeys: Object.keys(chunk),
+          chunkType:
+            "type" in chunk
+              ? String((chunk as { type?: unknown }).type)
+              : "no-type",
+          fullChunk: JSON.stringify(chunk).substring(0, 500),
+        });
+      }
+      return null;
+    }
+
+    if (typeof chunk === "string") {
+      logger.debug(`OpenAI: Found string chunk:`, {
+        content: chunk,
+      });
+      return chunk;
+    }
+
+    logger.warn(`OpenAI: Unhandled chunk type:`, {
+      type: typeof chunk,
+      value: String(chunk).substring(0, 100),
+    });
+    return null;
   }
 
   /**

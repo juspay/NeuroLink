@@ -114,7 +114,11 @@ export class ProviderHealthChecker {
 
     try {
       // 1. Check environment configuration
-      await this.checkEnvironmentConfiguration(providerName, healthStatus);
+      await this.checkEnvironmentConfiguration(
+        providerName,
+        healthStatus,
+        timeout,
+      );
 
       // 2. Check API key validity (basic format validation)
       await this.checkApiKeyValidity(providerName, healthStatus);
@@ -187,6 +191,7 @@ export class ProviderHealthChecker {
   private static async checkEnvironmentConfiguration(
     providerName: AIProviderName,
     healthStatus: ProviderHealthStatusOptions,
+    timeout: number,
   ): Promise<void> {
     const requiredEnvVars = this.getRequiredEnvironmentVariables(providerName);
 
@@ -237,7 +242,7 @@ export class ProviderHealthChecker {
     }
 
     // Provider-specific configuration checks
-    await this.checkProviderSpecificConfig(providerName, healthStatus);
+    await this.checkProviderSpecificConfig(providerName, healthStatus, timeout);
   }
 
   /**
@@ -370,36 +375,39 @@ export class ProviderHealthChecker {
       return;
     }
 
+    const headers = {
+      "User-Agent": "NeuroLink-HealthCheck/1.0",
+      ...this.getConnectivityHeaders(providerName),
+    };
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const proxyFetch = createProxyFetch();
-      let response = await proxyFetch(endpoint, {
-        method: "HEAD",
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "NeuroLink-HealthCheck/1.0",
-        },
-      });
-
-      // Fallback to GET if HEAD returns 405 (Method Not Allowed) for restrictive gateways
-      if (response.status === 405) {
-        response = await proxyFetch(endpoint, {
-          method: "GET",
+      try {
+        const proxyFetch = createProxyFetch();
+        let response = await proxyFetch(endpoint, {
+          method: "HEAD",
           signal: controller.signal,
-          headers: {
-            "User-Agent": "NeuroLink-HealthCheck/1.0",
-          },
+          headers,
         });
-      }
 
-      clearTimeout(timeoutId);
+        // Fallback to GET if HEAD returns 405 (Method Not Allowed) for restrictive gateways
+        if (response.status === 405) {
+          response = await proxyFetch(endpoint, {
+            method: "GET",
+            signal: controller.signal,
+            headers,
+          });
+        }
 
-      if (!response.ok) {
-        healthStatus.configurationIssues.push(
-          `Connectivity test failed: HTTP ${response.status}`,
-        );
+        if (!response.ok) {
+          healthStatus.configurationIssues.push(
+            `Connectivity test failed: HTTP ${response.status}`,
+          );
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     } catch (error) {
       const errorMessage =
@@ -450,6 +458,18 @@ export class ProviderHealthChecker {
         );
       }
     }
+  }
+
+  private static getConnectivityHeaders(
+    providerName: AIProviderName,
+  ): Record<string, string> {
+    if (providerName === AIProviderName.LITELLM) {
+      return {
+        Authorization: `Bearer ${process.env.LITELLM_API_KEY || "sk-anything"}`,
+      };
+    }
+
+    return {};
   }
 
   /**
@@ -615,6 +635,7 @@ export class ProviderHealthChecker {
   private static async checkProviderSpecificConfig(
     providerName: AIProviderName,
     healthStatus: ProviderHealthStatusOptions,
+    timeout: number,
   ): Promise<void> {
     switch (providerName) {
       case AIProviderName.VERTEX:
@@ -627,10 +648,10 @@ export class ProviderHealthChecker {
         await this.checkAzureConfig(healthStatus);
         break;
       case AIProviderName.LITELLM:
-        await this.checkLiteLLMConfig(healthStatus);
+        await this.checkLiteLLMConfig(healthStatus, timeout);
         break;
       case AIProviderName.OLLAMA:
-        await this.checkOllamaConfig(healthStatus);
+        await this.checkOllamaConfig(healthStatus, timeout);
         break;
     }
   }
@@ -994,11 +1015,15 @@ export class ProviderHealthChecker {
     availableModels: string[],
     requestedModel: string,
   ): boolean {
+    const normalizedRequestedModel = requestedModel.trim();
+    const requiresExactMatch = /@/.test(normalizedRequestedModel);
+
     return availableModels.some(
       (model) =>
-        model === requestedModel ||
-        model.startsWith(`${requestedModel}:`) ||
-        requestedModel.startsWith(`${model}:`),
+        model === normalizedRequestedModel ||
+        (!requiresExactMatch &&
+          (model.startsWith(`${normalizedRequestedModel}:`) ||
+            model.startsWith(`${normalizedRequestedModel}@`))),
     );
   }
 
@@ -1085,6 +1110,7 @@ export class ProviderHealthChecker {
 
   private static async checkLiteLLMConfig(
     healthStatus: ProviderHealthStatusOptions,
+    timeout: number = this.DEFAULT_TIMEOUT,
   ): Promise<void> {
     const liteLLMBase = this.getLiteLLMBaseUrl();
     if (!liteLLMBase.startsWith("http")) {
@@ -1098,7 +1124,7 @@ export class ProviderHealthChecker {
 
     const availability = await this.checkLiteLLMAvailability({
       model: this.getConfiguredLiteLLMModel(),
-      timeout: 2000,
+      timeout,
     });
 
     if (!availability.available) {
@@ -1120,6 +1146,7 @@ export class ProviderHealthChecker {
    */
   private static async checkOllamaConfig(
     healthStatus: ProviderHealthStatusOptions,
+    timeout: number = this.DEFAULT_TIMEOUT,
   ): Promise<void> {
     const ollamaBase = this.getOllamaBaseUrl();
     if (!ollamaBase.startsWith("http")) {
@@ -1135,7 +1162,7 @@ export class ProviderHealthChecker {
 
     const availability = await this.checkOllamaAvailability({
       model: this.getConfiguredOllamaModel(),
-      timeout: 2000,
+      timeout,
     });
 
     if (!availability.available) {

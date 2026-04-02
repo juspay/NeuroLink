@@ -192,11 +192,36 @@ function createAccumulator(captureRawText: boolean): TelemetryAccumulator {
   };
 }
 
-function truncateString(input: string, maxBytes: number): string {
-  if (input.length <= maxBytes) {
+function utf8ByteLength(input: string): number {
+  return Buffer.byteLength(input, "utf8");
+}
+
+function truncateUtf8String(input: string, maxBytes: number): string {
+  if (utf8ByteLength(input) <= maxBytes) {
     return input;
   }
-  return `${input.slice(0, maxBytes)}${TRUNCATION_MARKER}`;
+
+  const markerBytes = utf8ByteLength(TRUNCATION_MARKER);
+  if (maxBytes <= 0 || maxBytes < markerBytes) {
+    return "";
+  }
+
+  let output = "";
+  let usedBytes = 0;
+  for (const char of input) {
+    const charBytes = utf8ByteLength(char);
+    if (usedBytes + charBytes + markerBytes > maxBytes) {
+      break;
+    }
+    output += char;
+    usedBytes += charBytes;
+  }
+
+  return `${output}${TRUNCATION_MARKER}`;
+}
+
+function truncateString(input: string, maxBytes: number): string {
+  return truncateUtf8String(input, maxBytes);
 }
 
 function appendCappedFragment(
@@ -205,19 +230,20 @@ function appendCappedFragment(
   currentBytes: number,
   maxBytes: number,
 ): { value: string; nextBytes: number } {
+  const fragmentBytes = utf8ByteLength(fragment);
   if (currentBytes >= maxBytes) {
     return {
       value:
         current && current.endsWith(TRUNCATION_MARKER)
           ? current
           : `${current ?? ""}${TRUNCATION_MARKER}`,
-      nextBytes: currentBytes + fragment.length,
+      nextBytes: currentBytes + fragmentBytes,
     };
   }
 
   const remainingBytes = maxBytes - currentBytes;
-  const nextBytes = currentBytes + fragment.length;
-  if (fragment.length <= remainingBytes) {
+  const nextBytes = currentBytes + fragmentBytes;
+  if (fragmentBytes <= remainingBytes) {
     return {
       value: `${current ?? ""}${fragment}`,
       nextBytes,
@@ -225,7 +251,7 @@ function appendCappedFragment(
   }
 
   return {
-    value: `${current ?? ""}${fragment.slice(0, remainingBytes)}${TRUNCATION_MARKER}`,
+    value: `${current ?? ""}${truncateUtf8String(fragment, remainingBytes)}`,
     nextBytes,
   };
 }
@@ -242,15 +268,20 @@ function appendRawTextChunk(acc: TelemetryAccumulator, chunk: string): void {
     return;
   }
 
-  if (chunk.length <= remainingBytes) {
+  const chunkBytes = utf8ByteLength(chunk);
+  if (chunkBytes <= remainingBytes) {
     acc.rawTextChunks.push(chunk);
-    acc.rawTextBytes += chunk.length;
+    acc.rawTextBytes += chunkBytes;
     return;
   }
 
-  acc.rawTextChunks.push(chunk.slice(0, remainingBytes), TRUNCATION_MARKER);
+  acc.rawTextChunks.push(truncateUtf8String(chunk, remainingBytes));
   acc.rawTextBytes = MAX_RAW_TEXT_BYTES;
   acc.rawTextTruncated = true;
+}
+
+function getBlockContentBytes(block: SSEContentBlock): number {
+  return utf8ByteLength(block.text ?? block.thinking ?? block.toolInput ?? "");
 }
 
 function finalize(acc: TelemetryAccumulator): SSETelemetry {
@@ -325,7 +356,7 @@ function processContentBlockStart(
   }
 
   acc.contentBlocks.push(entry);
-  acc.blockByteCounts.set(index, 0);
+  acc.blockByteCounts.set(index, getBlockContentBytes(entry));
 }
 
 function processContentBlockDelta(

@@ -112,7 +112,7 @@ async function readLatestLocalSummary() {
       handle = await fs.open(path, "r");
     } catch (err) {
       if (err.code === "ENOENT") {
-        return null;
+        continue;
       }
       throw err;
     }

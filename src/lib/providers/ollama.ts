@@ -69,7 +69,23 @@ const getOllamaTimeout = (): number => {
   return parseInt(process.env.OLLAMA_TIMEOUT || "240000", 10);
 };
 
-async function createOllamaHttpError(response: Response): Promise<Error> {
+type OllamaHttpError = ProviderError & {
+  statusCode: number;
+  statusText: string;
+  responseBody: string;
+};
+
+function isOllamaHttpError(error: unknown): error is OllamaHttpError {
+  return (
+    error instanceof ProviderError &&
+    typeof (error as { statusCode?: unknown }).statusCode === "number" &&
+    typeof (error as { responseBody?: unknown }).responseBody === "string"
+  );
+}
+
+async function createOllamaHttpError(
+  response: Response,
+): Promise<OllamaHttpError> {
   let responseBody = "";
   try {
     responseBody = (await response.text()).trim();
@@ -78,9 +94,14 @@ async function createOllamaHttpError(response: Response): Promise<Error> {
   }
 
   const suffix = responseBody ? ` - ${responseBody.slice(0, 500)}` : "";
-  return new Error(
+  const error = new ProviderError(
     `Ollama API error: ${response.status} ${response.statusText}${suffix}`,
-  );
+    "ollama",
+  ) as OllamaHttpError;
+  error.statusCode = response.status;
+  error.statusText = response.statusText;
+  error.responseBody = responseBody;
+  return error;
 }
 
 // Create proxy-aware fetch instance
@@ -2037,9 +2058,13 @@ export class OllamaProvider extends BaseProvider {
     }
 
     const errMsg = (error as Error).message ?? "";
+    const httpStatus = isOllamaHttpError(error) ? error.statusCode : undefined;
+    const responseBody = isOllamaHttpError(error) ? error.responseBody : "";
     if (
-      errMsg.includes("404") &&
-      (errMsg.toLowerCase().includes("model") ||
+      httpStatus === 404 &&
+      (responseBody.toLowerCase().includes("model") ||
+        responseBody.toLowerCase().includes("not found") ||
+        errMsg.toLowerCase().includes("model") ||
         errMsg.toLowerCase().includes("not found"))
     ) {
       return new InvalidModelError(
@@ -2048,7 +2073,7 @@ export class OllamaProvider extends BaseProvider {
       );
     }
 
-    if (errMsg.includes("404")) {
+    if (httpStatus === 404) {
       return new ProviderError(
         `❌ Ollama Endpoint Returned HTTP 404\n\nThe configured base URL (${this.baseUrl}) did not serve the expected Ollama endpoint for model '${this.modelName}'. This is usually a configuration or API-mode mismatch rather than a missing model.\n\n🔧 Check:\n1. Verify the base URL: ${this.baseUrl}\n2. For native Ollama mode, confirm /api/generate exists\n3. For OpenAI-compatible mode, confirm /v1/chat/completions exists\n4. If the model is missing, the response body should explicitly say so`,
         this.providerName,

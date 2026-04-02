@@ -225,7 +225,32 @@ export class TaskManager {
     try {
       await backend.schedule(task, (t) => this.onTaskTick(t));
     } catch (err) {
-      await store.delete(task.id);
+      this.callbacks.delete(task.id);
+      try {
+        await store.delete(task.id);
+      } catch (cleanupError) {
+        // Deletion failed — task remains persisted as active. Attempt to mark it
+        // failed so it reaches a terminal state and operators can identify it.
+        logger.error(
+          "[TaskManager] Failed to clean up task after schedule error — task may remain persisted as active",
+          {
+            taskId: task.id,
+            scheduleError: String(err),
+            cleanupError: String(cleanupError),
+          },
+        );
+        try {
+          await store.update(task.id, { status: "failed" as TaskStatus });
+        } catch (terminalError) {
+          logger.error(
+            "[TaskManager] Failed to force task to terminal state — manual cleanup required",
+            {
+              taskId: task.id,
+              error: String(terminalError),
+            },
+          );
+        }
+      }
       throw err;
     }
 
@@ -288,13 +313,15 @@ export class TaskManager {
       }
     }
 
+    const shouldClearHistory =
+      updates.mode !== undefined && updates.mode !== "continuation";
+
     // Special-case: mode changes require sessionId handling
     if (updates.mode !== undefined) {
       if (updates.mode === "continuation" && !existing.sessionId) {
         taskUpdates.sessionId = `session_${nanoid(12)}`;
       } else if (updates.mode !== "continuation") {
         taskUpdates.sessionId = undefined;
-        await store.clearHistory(taskId);
       }
     }
 
@@ -302,8 +329,40 @@ export class TaskManager {
 
     // Re-schedule if schedule changed and task is active
     if (updates.schedule && updated.status === "active") {
+      const attemptedSchedule = updated.schedule;
       await backend.cancel(taskId);
-      await backend.schedule(updated, (t) => this.onTaskTick(t));
+      try {
+        await backend.schedule(updated, (t) => this.onTaskTick(t));
+      } catch (error) {
+        await this.restoreScheduledTask(existing, "update schedule rollback");
+        await this.rollbackTaskUpdate(taskId, existing, error);
+        throw TaskError.create(
+          "SCHEDULE_FAILED",
+          `Failed to update schedule for task ${taskId}`,
+          {
+            cause: error instanceof Error ? error : undefined,
+            details: {
+              taskId,
+              previousSchedule: existing.schedule,
+              attemptedSchedule,
+            },
+          },
+        );
+      }
+    }
+
+    if (shouldClearHistory) {
+      try {
+        await store.clearHistory(taskId);
+      } catch (error) {
+        logger.warn(
+          "[TaskManager] Failed to clear task history after mode update",
+          {
+            taskId,
+            error: String(error),
+          },
+        );
+      }
     }
 
     return updated;
@@ -338,7 +397,14 @@ export class TaskManager {
     }
 
     await backend.pause(taskId);
-    const updated = await store.update(taskId, { status: "paused" });
+
+    let updated: Task;
+    try {
+      updated = await store.update(taskId, { status: "paused" });
+    } catch (error) {
+      await this.restoreScheduledTask(task, "pause rollback");
+      throw error;
+    }
 
     this.emit("task:paused", updated);
     return updated;
@@ -361,7 +427,20 @@ export class TaskManager {
     }
 
     const updated = await store.update(taskId, { status: "active" });
-    await backend.schedule(updated, (t) => this.onTaskTick(t));
+
+    try {
+      await backend.schedule(updated, (t) => this.onTaskTick(t));
+    } catch (error) {
+      await this.rollbackTaskUpdate(taskId, task, error);
+      throw TaskError.create(
+        "SCHEDULE_FAILED",
+        `Failed to resume task ${taskId}`,
+        {
+          cause: error instanceof Error ? error : undefined,
+          details: { taskId, schedule: task.schedule },
+        },
+      );
+    }
 
     this.emit("task:resumed", updated);
     return updated;
@@ -409,6 +488,52 @@ export class TaskManager {
   }
 
   // ── Internal ──────────────────────────────────────────
+
+  private async restoreScheduledTask(
+    task: Task,
+    reason: string,
+  ): Promise<void> {
+    if (task.status !== "active") {
+      return;
+    }
+
+    try {
+      await this.getBackend().schedule(task, (t) => this.onTaskTick(t));
+      logger.warn("[TaskManager] Restored task schedule after rollback", {
+        taskId: task.id,
+        reason,
+      });
+    } catch (restoreError) {
+      logger.error(
+        "[TaskManager] Failed to restore task schedule during rollback",
+        {
+          taskId: task.id,
+          reason,
+          error: String(restoreError),
+        },
+      );
+    }
+  }
+
+  private async rollbackTaskUpdate(
+    taskId: string,
+    previousTask: Task,
+    error: unknown,
+  ): Promise<Task> {
+    try {
+      return await this.getStore().update(taskId, previousTask);
+    } catch (rollbackError) {
+      logger.error(
+        "[TaskManager] Failed to roll back task update — store and in-memory state may be diverged; manual reconciliation required",
+        {
+          taskId,
+          originalError: String(error),
+          rollbackError: String(rollbackError),
+        },
+      );
+      throw rollbackError;
+    }
+  }
 
   /**
    * Called by the backend on each scheduled tick.

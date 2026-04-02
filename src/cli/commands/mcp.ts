@@ -137,6 +137,23 @@ const POPULAR_MCP_SERVERS: Record<
   },
 };
 
+const MCP_STATUS_TIMEOUT_MS = 30_000;
+
+type ToolAnnotationInfo = {
+  serverName: string;
+  serverId: string;
+  toolName: string;
+  description: string;
+  annotations: MCPToolAnnotations;
+};
+
+type AnnotatedToolTarget = {
+  name: string;
+  description: string;
+  serverId: string;
+  serverName: string;
+};
+
 /**
  * MCP CLI command factory
  */
@@ -747,7 +764,10 @@ export class MCPCommandFactory {
         : ora("Testing MCP server connections...").start();
 
       const sdk = new NeuroLink();
-      await sdk.getMCPStatus();
+      await this.getMCPStatusWithTimeout(
+        sdk,
+        Number(argv.timeout) || MCP_STATUS_TIMEOUT_MS,
+      );
       let serversToTest = await sdk.listMCPServers();
       if (targetServer) {
         serversToTest = serversToTest.filter((s) => s.name === targetServer);
@@ -861,7 +881,7 @@ export class MCPCommandFactory {
       }
 
       const sdk = new NeuroLink();
-      await sdk.getMCPStatus();
+      await this.getMCPStatusWithTimeout(sdk);
 
       // Check if server exists and is connected
       const allServers = await sdk.listMCPServers();
@@ -989,7 +1009,7 @@ export class MCPCommandFactory {
       }
 
       const sdk = new NeuroLink();
-      await sdk.getMCPStatus();
+      await this.getMCPStatusWithTimeout(sdk);
       const allServers = await sdk.listMCPServers();
       const server = allServers.find((s) => s.name === serverName);
 
@@ -2997,100 +3017,12 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
       const sdk = new NeuroLink();
       const servers = await sdk.listMCPServers();
 
-      // List mode - show all tools with annotations
       if (argv.list) {
-        const spinner = argv.quiet
-          ? null
-          : ora("Loading tool annotations...").start();
-
-        type ToolAnnotationInfo = {
-          serverName: string;
-          serverId: string;
-          toolName: string;
-          description: string;
-          annotations: MCPToolAnnotations;
-        };
-
-        const allTools: ToolAnnotationInfo[] = [];
-
-        for (const server of servers) {
-          if (server.status !== "connected") {
-            continue;
-          }
-
-          for (const tool of server.tools || []) {
-            const existing = (tool as { annotations?: MCPToolAnnotations })
-              .annotations;
-            const annotations =
-              existing ??
-              inferAnnotations({
-                name: tool.name,
-                description: tool.description,
-              });
-
-            allTools.push({
-              serverName: server.name,
-              serverId: server.id,
-              toolName: tool.name,
-              description: tool.description,
-              annotations,
-            });
-          }
-        }
-
-        if (spinner) {
-          spinner.succeed(`Found ${allTools.length} tools`);
-        }
-
-        if (argv.format === "json") {
-          logger.always(JSON.stringify(allTools, null, 2));
-          return;
-        }
-
-        logger.always(chalk.bold("\n Tool Annotations:\n"));
-
-        // Group by server
-        const byServer = allTools.reduce(
-          (acc, tool) => {
-            if (!acc[tool.serverId]) {
-              acc[tool.serverId] = {
-                serverName: tool.serverName,
-                tools: [],
-              };
-            }
-            acc[tool.serverId].tools.push(tool);
-            return acc;
-          },
-          {} as Record<
-            string,
-            { serverName: string; tools: ToolAnnotationInfo[] }
-          >,
-        );
-
-        for (const [serverId, { serverName, tools }] of Object.entries(
-          byServer,
-        )) {
-          logger.always(chalk.cyan.bold(`\n${serverName} (${serverId}):`));
-
-          for (const tool of tools) {
-            const annotationStr = getAnnotationSummary(tool.annotations);
-
-            logger.always(
-              `  ${chalk.yellow(tool.toolName)} ${chalk.gray(annotationStr)}`,
-            );
-            if (argv.detailed) {
-              logger.always(`    ${chalk.gray(tool.description)}`);
-            }
-          }
-        }
-
-        logger.always();
+        await this.listToolAnnotations(servers, argv);
         return;
       }
 
-      // Annotate specific tool
       const toolName = argv.tool as string | undefined;
-
       if (!toolName) {
         logger.error(
           chalk.red(
@@ -3100,37 +3032,8 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
         process.exit(1);
       }
 
-      // Find the tool
-      let foundTool: {
-        name: string;
-        description: string;
-        serverId: string;
-        serverName: string;
-      } | null = null;
-
       const serverId = argv.server as string | undefined;
-
-      for (const server of servers) {
-        if (serverId && server.id !== serverId) {
-          continue;
-        }
-
-        for (const tool of server.tools || []) {
-          if (tool.name === toolName) {
-            foundTool = {
-              name: tool.name,
-              description: tool.description,
-              serverId: server.id,
-              serverName: server.name,
-            };
-            break;
-          }
-        }
-        if (foundTool) {
-          break;
-        }
-      }
-
+      const foundTool = this.findToolForAnnotation(servers, toolName, serverId);
       if (!foundTool) {
         logger.error(
           chalk.red(
@@ -3145,75 +3048,8 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
         process.exit(1);
       }
 
-      // Build annotations from options
-      let annotations: MCPToolAnnotations = {};
-
-      // Parse JSON annotations if provided
-      if (argv.annotations) {
-        try {
-          const parsed = JSON.parse(argv.annotations as string);
-          annotations = { ...annotations, ...parsed };
-        } catch {
-          logger.error(chalk.red("Invalid JSON in --annotations"));
-          process.exit(1);
-        }
-      }
-
-      // Apply individual annotation flags
-      if (argv["read-only"] !== undefined) {
-        annotations.readOnlyHint = argv["read-only"] as boolean;
-      }
-      if (argv.destructive !== undefined) {
-        annotations.destructiveHint = argv.destructive as boolean;
-      }
-      if (argv.idempotent !== undefined) {
-        annotations.idempotentHint = argv.idempotent as boolean;
-      }
-      if (argv["requires-confirmation"] !== undefined) {
-        annotations.requiresConfirmation = argv[
-          "requires-confirmation"
-        ] as boolean;
-      }
-      if (argv.tags) {
-        annotations.tags = argv.tags as string[];
-      }
-      if (argv["estimated-duration"] !== undefined) {
-        annotations.estimatedDuration = argv["estimated-duration"] as number;
-      }
-      if (argv["rate-limit"] !== undefined) {
-        annotations.rateLimitHint = argv["rate-limit"] as number;
-      }
-      if (argv.cost !== undefined) {
-        annotations.costHint = argv.cost as number;
-      }
-      if (argv.complexity) {
-        annotations.complexity = argv.complexity as
-          | "simple"
-          | "medium"
-          | "complex";
-      }
-      if (argv["security-level"]) {
-        annotations.securityLevel = argv["security-level"] as
-          | "public"
-          | "internal"
-          | "restricted";
-      }
-      if (argv.audit !== undefined) {
-        annotations.auditRequired = argv.audit as boolean;
-      }
-
-      // Infer annotations if requested
-      if (argv.infer) {
-        const inferred = inferAnnotations({
-          name: foundTool.name,
-          description: foundTool.description,
-        });
-        annotations = mergeAnnotations(inferred, annotations);
-      }
-
-      // Validate annotations
+      const annotations = this.buildAnnotationsFromArgs(argv, foundTool);
       const errors = validateAnnotations(annotations);
-
       if (errors.length > 0) {
         logger.error(chalk.red("Annotation validation errors:"));
         for (const error of errors) {
@@ -3229,90 +3065,7 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
         return;
       }
 
-      // Display the annotations
-      logger.always(chalk.bold("\n Tool Annotation Update:\n"));
-      logger.always(
-        `  Server: ${chalk.cyan(foundTool.serverName)} (${foundTool.serverId})`,
-      );
-      logger.always(`  Tool: ${chalk.yellow(foundTool.name)}`);
-      logger.always(`  Description: ${chalk.gray(foundTool.description)}`);
-      logger.always();
-      logger.always(chalk.bold("  Annotations:"));
-
-      if (annotations.readOnlyHint !== undefined) {
-        logger.always(
-          `    readOnlyHint: ${annotations.readOnlyHint ? chalk.green("true") : chalk.red("false")}`,
-        );
-      }
-      if (annotations.destructiveHint !== undefined) {
-        logger.always(
-          `    destructiveHint: ${annotations.destructiveHint ? chalk.red("true") : chalk.green("false")}`,
-        );
-      }
-      if (annotations.idempotentHint !== undefined) {
-        logger.always(
-          `    idempotentHint: ${annotations.idempotentHint ? chalk.green("true") : chalk.gray("false")}`,
-        );
-      }
-      if (annotations.requiresConfirmation !== undefined) {
-        logger.always(
-          `    requiresConfirmation: ${annotations.requiresConfirmation ? chalk.yellow("true") : chalk.gray("false")}`,
-        );
-      }
-      if (annotations.tags?.length) {
-        logger.always(`    tags: ${chalk.blue(annotations.tags.join(", "))}`);
-      }
-      if (annotations.estimatedDuration !== undefined) {
-        logger.always(
-          `    estimatedDuration: ${annotations.estimatedDuration}ms`,
-        );
-      }
-      if (annotations.rateLimitHint !== undefined) {
-        logger.always(
-          `    rateLimitHint: ${annotations.rateLimitHint} calls/min`,
-        );
-      }
-      if (annotations.costHint !== undefined) {
-        logger.always(`    costHint: ${annotations.costHint}`);
-      }
-      if (annotations.complexity) {
-        logger.always(`    complexity: ${chalk.cyan(annotations.complexity)}`);
-      }
-      if (annotations.securityLevel) {
-        const secColor =
-          annotations.securityLevel === "restricted"
-            ? chalk.red
-            : annotations.securityLevel === "internal"
-              ? chalk.yellow
-              : chalk.green;
-        logger.always(
-          `    securityLevel: ${secColor(annotations.securityLevel)}`,
-        );
-      }
-      if (annotations.auditRequired !== undefined) {
-        logger.always(
-          `    auditRequired: ${annotations.auditRequired ? chalk.yellow("true") : chalk.gray("false")}`,
-        );
-      }
-
-      logger.always();
-      logger.always(
-        chalk.gray("  Summary: ") + getAnnotationSummary(annotations),
-      );
-      logger.always();
-
-      // Note: In a full implementation, this would persist the annotations
-      // to a configuration file or database. For now, we just display them.
-      logger.always(
-        chalk.blue(
-          "Note: Annotations displayed above. To persist annotations, add them to your MCP server configuration.",
-        ),
-      );
-      logger.always(
-        chalk.gray(
-          `Example: Add to your server's tool definition or use environment-specific annotation overrides.`,
-        ),
-      );
+      this.printAnnotationUpdate(foundTool, annotations);
     } catch (error) {
       logger.error(
         chalk.red(
@@ -3321,5 +3074,280 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
       );
       process.exit(1);
     }
+  }
+
+  private static async getMCPStatusWithTimeout(
+    sdk: NeuroLink,
+    timeoutMs: number = MCP_STATUS_TIMEOUT_MS,
+  ): Promise<MCPStatus> {
+    return withTimeout(
+      sdk.getMCPStatus(),
+      timeoutMs,
+      ErrorFactory.toolTimeout("mcpStatus", timeoutMs),
+    );
+  }
+
+  private static async listToolAnnotations(
+    servers: MCPServerInfo[],
+    argv: MCPCommandArgs,
+  ): Promise<void> {
+    const spinner = argv.quiet
+      ? null
+      : ora("Loading tool annotations...").start();
+    const allTools = this.collectToolAnnotations(servers);
+
+    if (spinner) {
+      spinner.succeed(`Found ${allTools.length} tools`);
+    }
+
+    if (argv.format === "json") {
+      logger.always(JSON.stringify(allTools, null, 2));
+      return;
+    }
+
+    logger.always(chalk.bold("\n Tool Annotations:\n"));
+
+    const byServer = allTools.reduce(
+      (acc, tool) => {
+        if (!acc[tool.serverId]) {
+          acc[tool.serverId] = {
+            serverName: tool.serverName,
+            tools: [],
+          };
+        }
+        acc[tool.serverId].tools.push(tool);
+        return acc;
+      },
+      {} as Record<string, { serverName: string; tools: ToolAnnotationInfo[] }>,
+    );
+
+    for (const [serverId, { serverName, tools }] of Object.entries(byServer)) {
+      logger.always(chalk.cyan.bold(`\n${serverName} (${serverId}):`));
+      for (const tool of tools) {
+        logger.always(
+          `  ${chalk.yellow(tool.toolName)} ${chalk.gray(getAnnotationSummary(tool.annotations))}`,
+        );
+        if (argv.detailed) {
+          logger.always(`    ${chalk.gray(tool.description)}`);
+        }
+      }
+    }
+
+    logger.always();
+  }
+
+  private static collectToolAnnotations(
+    servers: MCPServerInfo[],
+  ): ToolAnnotationInfo[] {
+    const allTools: ToolAnnotationInfo[] = [];
+
+    for (const server of servers) {
+      if (server.status !== "connected") {
+        continue;
+      }
+
+      for (const tool of server.tools || []) {
+        const existing = (tool as { annotations?: MCPToolAnnotations })
+          .annotations;
+        allTools.push({
+          serverName: server.name,
+          serverId: server.id,
+          toolName: tool.name,
+          description: tool.description,
+          annotations:
+            existing ??
+            inferAnnotations({
+              name: tool.name,
+              description: tool.description,
+            }),
+        });
+      }
+    }
+
+    return allTools;
+  }
+
+  private static findToolForAnnotation(
+    servers: MCPServerInfo[],
+    toolName: string,
+    serverId?: string,
+  ): AnnotatedToolTarget | null {
+    for (const server of servers) {
+      if (serverId && server.id !== serverId) {
+        continue;
+      }
+
+      for (const tool of server.tools || []) {
+        if (tool.name === toolName) {
+          return {
+            name: tool.name,
+            description: tool.description,
+            serverId: server.id,
+            serverName: server.name,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private static buildAnnotationsFromArgs(
+    argv: MCPCommandArgs,
+    foundTool: AnnotatedToolTarget,
+  ): MCPToolAnnotations {
+    let annotations: MCPToolAnnotations = {};
+
+    if (argv.annotations) {
+      try {
+        annotations = {
+          ...annotations,
+          ...(JSON.parse(argv.annotations as string) as MCPToolAnnotations),
+        };
+      } catch {
+        logger.error(chalk.red("Invalid JSON in --annotations"));
+        process.exit(1);
+      }
+    }
+
+    if (argv["read-only"] !== undefined) {
+      annotations.readOnlyHint = argv["read-only"] as boolean;
+    }
+    if (argv.destructive !== undefined) {
+      annotations.destructiveHint = argv.destructive as boolean;
+    }
+    if (argv.idempotent !== undefined) {
+      annotations.idempotentHint = argv.idempotent as boolean;
+    }
+    if (argv["requires-confirmation"] !== undefined) {
+      annotations.requiresConfirmation = argv[
+        "requires-confirmation"
+      ] as boolean;
+    }
+    if (argv.tags) {
+      annotations.tags = argv.tags as string[];
+    }
+    if (argv["estimated-duration"] !== undefined) {
+      annotations.estimatedDuration = argv["estimated-duration"] as number;
+    }
+    if (argv["rate-limit"] !== undefined) {
+      annotations.rateLimitHint = argv["rate-limit"] as number;
+    }
+    if (argv.cost !== undefined) {
+      annotations.costHint = argv.cost as number;
+    }
+    if (argv.complexity) {
+      annotations.complexity = argv.complexity as
+        | "simple"
+        | "medium"
+        | "complex";
+    }
+    if (argv["security-level"]) {
+      annotations.securityLevel = argv["security-level"] as
+        | "public"
+        | "internal"
+        | "restricted";
+    }
+    if (argv.audit !== undefined) {
+      annotations.auditRequired = argv.audit as boolean;
+    }
+
+    if (argv.infer) {
+      annotations = mergeAnnotations(
+        inferAnnotations({
+          name: foundTool.name,
+          description: foundTool.description,
+        }),
+        annotations,
+      );
+    }
+
+    return annotations;
+  }
+
+  private static printAnnotationUpdate(
+    foundTool: AnnotatedToolTarget,
+    annotations: MCPToolAnnotations,
+  ): void {
+    logger.always(chalk.bold("\n Tool Annotation Update:\n"));
+    logger.always(
+      `  Server: ${chalk.cyan(foundTool.serverName)} (${foundTool.serverId})`,
+    );
+    logger.always(`  Tool: ${chalk.yellow(foundTool.name)}`);
+    logger.always(`  Description: ${chalk.gray(foundTool.description)}`);
+    logger.always();
+    logger.always(chalk.bold("  Annotations:"));
+
+    if (annotations.readOnlyHint !== undefined) {
+      logger.always(
+        `    readOnlyHint: ${annotations.readOnlyHint ? chalk.green("true") : chalk.red("false")}`,
+      );
+    }
+    if (annotations.destructiveHint !== undefined) {
+      logger.always(
+        `    destructiveHint: ${annotations.destructiveHint ? chalk.red("true") : chalk.green("false")}`,
+      );
+    }
+    if (annotations.idempotentHint !== undefined) {
+      logger.always(
+        `    idempotentHint: ${annotations.idempotentHint ? chalk.green("true") : chalk.gray("false")}`,
+      );
+    }
+    if (annotations.requiresConfirmation !== undefined) {
+      logger.always(
+        `    requiresConfirmation: ${annotations.requiresConfirmation ? chalk.yellow("true") : chalk.gray("false")}`,
+      );
+    }
+    if (annotations.tags?.length) {
+      logger.always(`    tags: ${chalk.blue(annotations.tags.join(", "))}`);
+    }
+    if (annotations.estimatedDuration !== undefined) {
+      logger.always(
+        `    estimatedDuration: ${annotations.estimatedDuration}ms`,
+      );
+    }
+    if (annotations.rateLimitHint !== undefined) {
+      logger.always(
+        `    rateLimitHint: ${annotations.rateLimitHint} calls/min`,
+      );
+    }
+    if (annotations.costHint !== undefined) {
+      logger.always(`    costHint: ${annotations.costHint}`);
+    }
+    if (annotations.complexity) {
+      logger.always(`    complexity: ${chalk.cyan(annotations.complexity)}`);
+    }
+    if (annotations.securityLevel) {
+      const secColor =
+        annotations.securityLevel === "restricted"
+          ? chalk.red
+          : annotations.securityLevel === "internal"
+            ? chalk.yellow
+            : chalk.green;
+      logger.always(
+        `    securityLevel: ${secColor(annotations.securityLevel)}`,
+      );
+    }
+    if (annotations.auditRequired !== undefined) {
+      logger.always(
+        `    auditRequired: ${annotations.auditRequired ? chalk.yellow("true") : chalk.gray("false")}`,
+      );
+    }
+
+    logger.always();
+    logger.always(
+      chalk.gray("  Summary: ") + getAnnotationSummary(annotations),
+    );
+    logger.always();
+    logger.always(
+      chalk.blue(
+        "Note: Annotations displayed above. To persist annotations, add them to your MCP server configuration.",
+      ),
+    );
+    logger.always(
+      chalk.gray(
+        "Example: Add to your server's tool definition or use environment-specific annotation overrides.",
+      ),
+    );
   }
 }

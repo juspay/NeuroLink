@@ -92,14 +92,6 @@ async function createGoogleGenAIClient(apiKey: string): Promise<GenAIClient> {
   return new Ctor({ apiKey });
 }
 
-// Environment variable setup
-if (
-  !process.env.GOOGLE_GENERATIVE_AI_API_KEY &&
-  process.env.GOOGLE_AI_API_KEY
-) {
-  process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY;
-}
-
 /**
  * Google AI Studio provider implementation using BaseProvider
  * Migrated from original GoogleAIStudio class to new factory pattern

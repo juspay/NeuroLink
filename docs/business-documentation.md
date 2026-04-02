@@ -107,7 +107,7 @@ This hub provides comprehensive business-focused documentation for implementing 
 
 ### Week 2: Implementation
 
-1. **Follow**: [Quick Start Tutorial](./tutorials.md#quick-start-15-minutes)
+1. **Follow**: [Quick Start Tutorial](/tutorials/step-by-step#quick-start-15-minutes)
 2. **Enable**: Analytics and evaluation features
 3. **Configure**: Quality gates and cost monitoring
 4. **Test**: Validation using [Testing Guide](./testing.md)

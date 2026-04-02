@@ -14,6 +14,373 @@ import type {
 } from "../../types/scorerTypes.js";
 import { logger } from "../../utils/logger.js";
 
+type BuiltInScorerDefinition = {
+  metadata: ScorerMetadata;
+  factory: ScorerFactory;
+  aliases?: string[];
+};
+
+const BUILT_IN_LLM_SCORERS: BuiltInScorerDefinition[] = [
+  {
+    metadata: {
+      id: "hallucination",
+      name: "Hallucination Detection",
+      description:
+        "Detects factual errors, fabrications, and unsupported claims in responses",
+      type: "llm",
+      category: "accuracy",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.8,
+        weight: 1.5,
+        timeout: 30000,
+        retries: 2,
+      },
+      requiredInputs: ["query", "response"],
+      optionalInputs: ["context", "groundTruth"],
+    },
+    factory: async (config) => {
+      const { HallucinationScorer } =
+        await import("./llm/hallucinationScorer.js");
+      return new HallucinationScorer(config);
+    },
+    aliases: ["hallucination-detection", "hallucinations"],
+  },
+  {
+    metadata: {
+      id: "toxicity",
+      name: "Toxicity Analysis",
+      description:
+        "Detects harmful, offensive, or inappropriate content in responses",
+      type: "llm",
+      category: "safety",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.9,
+        weight: 2.0,
+        timeout: 20000,
+        retries: 1,
+      },
+      requiredInputs: ["response"],
+      optionalInputs: ["query"],
+    },
+    factory: async (config) => {
+      const { ToxicityScorer } = await import("./llm/toxicityScorer.js");
+      return new ToxicityScorer(config);
+    },
+    aliases: ["toxic", "safety"],
+  },
+  {
+    metadata: {
+      id: "faithfulness",
+      name: "Faithfulness",
+      description:
+        "Evaluates if the response is faithfully grounded in provided context",
+      type: "llm",
+      category: "faithfulness",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.7,
+        weight: 1.2,
+        timeout: 30000,
+        retries: 2,
+      },
+      requiredInputs: ["response", "context"],
+      optionalInputs: ["query"],
+    },
+    factory: async (config) => {
+      const { FaithfulnessScorer } =
+        await import("./llm/faithfulnessScorer.js");
+      return new FaithfulnessScorer(config);
+    },
+    aliases: ["faithful", "grounding"],
+  },
+  {
+    metadata: {
+      id: "context-relevancy",
+      name: "Context Relevancy",
+      description:
+        "Evaluates how relevant the retrieved context is to the user query",
+      type: "llm",
+      category: "relevancy",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.6,
+        weight: 1.0,
+        timeout: 25000,
+        retries: 2,
+      },
+      requiredInputs: ["query", "context"],
+      optionalInputs: ["response"],
+    },
+    factory: async (config) => {
+      const { ContextRelevancyScorer } =
+        await import("./llm/contextRelevancyScorer.js");
+      return new ContextRelevancyScorer(config);
+    },
+    aliases: ["context-relevance"],
+  },
+  {
+    metadata: {
+      id: "answer-relevancy",
+      name: "Answer Relevancy",
+      description:
+        "Evaluates how relevant the AI response is to the user query",
+      type: "llm",
+      category: "relevancy",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.7,
+        weight: 1.0,
+        timeout: 25000,
+        retries: 2,
+      },
+      requiredInputs: ["query", "response"],
+      optionalInputs: ["context"],
+    },
+    factory: async (config) => {
+      const { AnswerRelevancyScorer } =
+        await import("./llm/answerRelevancyScorer.js");
+      return new AnswerRelevancyScorer(config);
+    },
+    aliases: ["response-relevancy", "relevancy"],
+  },
+  {
+    metadata: {
+      id: "context-precision",
+      name: "Context Precision",
+      description:
+        "Measures the precision of retrieved context - whether relevant chunks are ranked higher",
+      type: "llm",
+      category: "relevancy",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.6,
+        weight: 0.8,
+        timeout: 25000,
+        retries: 2,
+      },
+      requiredInputs: ["query", "context"],
+      optionalInputs: ["groundTruth"],
+    },
+    factory: async (config) => {
+      const { ContextPrecisionScorer } =
+        await import("./llm/contextPrecisionScorer.js");
+      return new ContextPrecisionScorer(config);
+    },
+    aliases: ["precision"],
+  },
+  {
+    metadata: {
+      id: "bias-detection",
+      name: "Bias Detection",
+      description: "Identifies potential biases in AI responses",
+      type: "llm",
+      category: "safety",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.8,
+        weight: 1.0,
+        timeout: 25000,
+        retries: 2,
+      },
+      requiredInputs: ["response"],
+      optionalInputs: ["query", "context"],
+    },
+    factory: async (config) => {
+      const { BiasDetectionScorer } =
+        await import("./llm/biasDetectionScorer.js");
+      return new BiasDetectionScorer(config);
+    },
+    aliases: ["bias", "fairness"],
+  },
+  {
+    metadata: {
+      id: "tone-consistency",
+      name: "Tone Consistency",
+      description: "Checks for consistent tone throughout the response",
+      type: "llm",
+      category: "quality",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.7,
+        weight: 0.8,
+        timeout: 20000,
+        retries: 1,
+      },
+      requiredInputs: ["response"],
+      optionalInputs: ["query"],
+    },
+    factory: async (config) => {
+      const { ToneConsistencyScorer } =
+        await import("./llm/toneConsistencyScorer.js");
+      return new ToneConsistencyScorer(config);
+    },
+    aliases: ["tone"],
+  },
+  {
+    metadata: {
+      id: "prompt-alignment",
+      name: "Prompt Alignment",
+      description:
+        "Measures how well the response aligns with prompt instructions",
+      type: "llm",
+      category: "quality",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.7,
+        weight: 1.0,
+        timeout: 25000,
+        retries: 2,
+      },
+      requiredInputs: ["query", "response"],
+      optionalInputs: [],
+    },
+    factory: async (config) => {
+      const { PromptAlignmentScorer } =
+        await import("./llm/promptAlignmentScorer.js");
+      return new PromptAlignmentScorer(config);
+    },
+    aliases: ["alignment", "instruction-following"],
+  },
+  {
+    metadata: {
+      id: "summarization",
+      name: "Summarization Quality",
+      description: "Evaluates the quality of AI-generated summaries",
+      type: "llm",
+      category: "quality",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.7,
+        weight: 1.0,
+        timeout: 25000,
+        retries: 2,
+      },
+      requiredInputs: ["response", "context"],
+      optionalInputs: ["query"],
+    },
+    factory: async (config) => {
+      const { SummarizationScorer } =
+        await import("./llm/summarizationScorer.js");
+      return new SummarizationScorer(config);
+    },
+    aliases: ["summary"],
+  },
+];
+
+const BUILT_IN_RULE_SCORERS: BuiltInScorerDefinition[] = [
+  {
+    metadata: {
+      id: "keyword-coverage",
+      name: "Keyword Coverage",
+      description: "Checks if response covers expected keywords and concepts",
+      type: "rule",
+      category: "quality",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.6,
+        weight: 0.8,
+        timeout: 1000,
+        retries: 0,
+      },
+      requiredInputs: ["response"],
+      optionalInputs: ["query", "custom"],
+    },
+    factory: async (config) => {
+      const { KeywordCoverageScorer } =
+        await import("./rule/keywordCoverageScorer.js");
+      return new KeywordCoverageScorer(config);
+    },
+    aliases: ["keywords"],
+  },
+  {
+    metadata: {
+      id: "content-similarity",
+      name: "Content Similarity",
+      description: "Measures text similarity between response and reference",
+      type: "rule",
+      category: "accuracy",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.5,
+        weight: 1.0,
+        timeout: 2000,
+        retries: 0,
+      },
+      requiredInputs: ["response", "groundTruth"],
+      optionalInputs: [],
+    },
+    factory: async (config) => {
+      const { ContentSimilarityScorer } =
+        await import("./rule/contentSimilarityScorer.js");
+      return new ContentSimilarityScorer(config);
+    },
+    aliases: ["similarity", "text-similarity"],
+  },
+  {
+    metadata: {
+      id: "length",
+      name: "Response Length",
+      description: "Validates response length against configured bounds",
+      type: "rule",
+      category: "quality",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.8,
+        weight: 0.5,
+        timeout: 100,
+        retries: 0,
+      },
+      requiredInputs: ["response"],
+      optionalInputs: [],
+    },
+    factory: async (config) => {
+      const { LengthScorer } = await import("./rule/lengthScorer.js");
+      return new LengthScorer(config);
+    },
+    aliases: ["response-length"],
+  },
+  {
+    metadata: {
+      id: "format",
+      name: "Format Validation",
+      description:
+        "Checks if response follows expected formatting requirements",
+      type: "rule",
+      category: "quality",
+      version: "1.0.0",
+      defaultConfig: {
+        enabled: true,
+        threshold: 0.8,
+        weight: 0.5,
+        timeout: 100,
+        retries: 0,
+      },
+      requiredInputs: ["response"],
+      optionalInputs: ["custom"],
+    },
+    factory: async (config) => {
+      const { FormatScorer } = await import("./rule/formatScorer.js");
+      return new FormatScorer(config);
+    },
+    aliases: ["formatting"],
+  },
+];
+
 /**
  * Central registry for all scorers
  * Manages registration, discovery, and instantiation
@@ -66,6 +433,26 @@ export class ScorerRegistry {
     });
   }
 
+  private static registerScorerDefinitions(
+    definitions: BuiltInScorerDefinition[],
+  ): void {
+    for (const definition of definitions) {
+      ScorerRegistry.registerScorer(
+        definition.metadata,
+        definition.factory,
+        definition.aliases || [],
+      );
+    }
+  }
+
+  private static registerBuiltInLLMScorers(): void {
+    ScorerRegistry.registerScorerDefinitions(BUILT_IN_LLM_SCORERS);
+  }
+
+  private static registerBuiltInRuleScorers(): void {
+    ScorerRegistry.registerScorerDefinitions(BUILT_IN_RULE_SCORERS);
+  }
+
   /**
    * Register built-in scorers using dynamic imports
    */
@@ -79,378 +466,8 @@ export class ScorerRegistry {
 
     ScorerRegistry.initPromise = (async () => {
       try {
-        // Register LLM-based scorers with dynamic imports
-        ScorerRegistry.registerScorer(
-          {
-            id: "hallucination",
-            name: "Hallucination Detection",
-            description:
-              "Detects factual errors, fabrications, and unsupported claims in responses",
-            type: "llm",
-            category: "accuracy",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.8,
-              weight: 1.5,
-              timeout: 30000,
-              retries: 2,
-            },
-            requiredInputs: ["query", "response"],
-            optionalInputs: ["context", "groundTruth"],
-          },
-          async (config) => {
-            const { HallucinationScorer } =
-              await import("./llm/hallucinationScorer.js");
-            return new HallucinationScorer(config);
-          },
-          ["hallucination-detection", "hallucinations"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "toxicity",
-            name: "Toxicity Analysis",
-            description:
-              "Detects harmful, offensive, or inappropriate content in responses",
-            type: "llm",
-            category: "safety",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.9,
-              weight: 2.0,
-              timeout: 20000,
-              retries: 1,
-            },
-            requiredInputs: ["response"],
-            optionalInputs: ["query"],
-          },
-          async (config) => {
-            const { ToxicityScorer } = await import("./llm/toxicityScorer.js");
-            return new ToxicityScorer(config);
-          },
-          ["toxic", "safety"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "faithfulness",
-            name: "Faithfulness",
-            description:
-              "Evaluates if the response is faithfully grounded in provided context",
-            type: "llm",
-            category: "faithfulness",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.7,
-              weight: 1.2,
-              timeout: 30000,
-              retries: 2,
-            },
-            requiredInputs: ["response", "context"],
-            optionalInputs: ["query"],
-          },
-          async (config) => {
-            const { FaithfulnessScorer } =
-              await import("./llm/faithfulnessScorer.js");
-            return new FaithfulnessScorer(config);
-          },
-          ["faithful", "grounding"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "context-relevancy",
-            name: "Context Relevancy",
-            description:
-              "Evaluates how relevant the retrieved context is to the user query",
-            type: "llm",
-            category: "relevancy",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.6,
-              weight: 1.0,
-              timeout: 25000,
-              retries: 2,
-            },
-            requiredInputs: ["query", "context"],
-            optionalInputs: ["response"],
-          },
-          async (config) => {
-            const { ContextRelevancyScorer } =
-              await import("./llm/contextRelevancyScorer.js");
-            return new ContextRelevancyScorer(config);
-          },
-          ["context-relevance"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "answer-relevancy",
-            name: "Answer Relevancy",
-            description:
-              "Evaluates how relevant the AI response is to the user query",
-            type: "llm",
-            category: "relevancy",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.7,
-              weight: 1.0,
-              timeout: 25000,
-              retries: 2,
-            },
-            requiredInputs: ["query", "response"],
-            optionalInputs: ["context"],
-          },
-          async (config) => {
-            const { AnswerRelevancyScorer } =
-              await import("./llm/answerRelevancyScorer.js");
-            return new AnswerRelevancyScorer(config);
-          },
-          ["response-relevancy", "relevancy"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "context-precision",
-            name: "Context Precision",
-            description:
-              "Measures the precision of retrieved context - whether relevant chunks are ranked higher",
-            type: "llm",
-            category: "relevancy",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.6,
-              weight: 0.8,
-              timeout: 25000,
-              retries: 2,
-            },
-            requiredInputs: ["query", "context"],
-            optionalInputs: ["groundTruth"],
-          },
-          async (config) => {
-            const { ContextPrecisionScorer } =
-              await import("./llm/contextPrecisionScorer.js");
-            return new ContextPrecisionScorer(config);
-          },
-          ["precision"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "bias-detection",
-            name: "Bias Detection",
-            description: "Identifies potential biases in AI responses",
-            type: "llm",
-            category: "safety",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.8,
-              weight: 1.0,
-              timeout: 25000,
-              retries: 2,
-            },
-            requiredInputs: ["response"],
-            optionalInputs: ["query", "context"],
-          },
-          async (config) => {
-            const { BiasDetectionScorer } =
-              await import("./llm/biasDetectionScorer.js");
-            return new BiasDetectionScorer(config);
-          },
-          ["bias", "fairness"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "tone-consistency",
-            name: "Tone Consistency",
-            description: "Checks for consistent tone throughout the response",
-            type: "llm",
-            category: "quality",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.7,
-              weight: 0.8,
-              timeout: 20000,
-              retries: 1,
-            },
-            requiredInputs: ["response"],
-            optionalInputs: ["query"],
-          },
-          async (config) => {
-            const { ToneConsistencyScorer } =
-              await import("./llm/toneConsistencyScorer.js");
-            return new ToneConsistencyScorer(config);
-          },
-          ["tone"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "prompt-alignment",
-            name: "Prompt Alignment",
-            description:
-              "Measures how well the response aligns with prompt instructions",
-            type: "llm",
-            category: "quality",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.7,
-              weight: 1.0,
-              timeout: 25000,
-              retries: 2,
-            },
-            requiredInputs: ["query", "response"],
-            optionalInputs: [],
-          },
-          async (config) => {
-            const { PromptAlignmentScorer } =
-              await import("./llm/promptAlignmentScorer.js");
-            return new PromptAlignmentScorer(config);
-          },
-          ["alignment", "instruction-following"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "summarization",
-            name: "Summarization Quality",
-            description: "Evaluates the quality of AI-generated summaries",
-            type: "llm",
-            category: "quality",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.7,
-              weight: 1.0,
-              timeout: 25000,
-              retries: 2,
-            },
-            requiredInputs: ["response", "context"],
-            optionalInputs: ["query"],
-          },
-          async (config) => {
-            const { SummarizationScorer } =
-              await import("./llm/summarizationScorer.js");
-            return new SummarizationScorer(config);
-          },
-          ["summary"],
-        );
-
-        // Register rule-based scorers
-        ScorerRegistry.registerScorer(
-          {
-            id: "keyword-coverage",
-            name: "Keyword Coverage",
-            description:
-              "Checks if response covers expected keywords and concepts",
-            type: "rule",
-            category: "quality",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.6,
-              weight: 0.8,
-              timeout: 1000,
-              retries: 0,
-            },
-            requiredInputs: ["response"],
-            optionalInputs: ["query", "custom"],
-          },
-          async (config) => {
-            const { KeywordCoverageScorer } =
-              await import("./rule/keywordCoverageScorer.js");
-            return new KeywordCoverageScorer(config);
-          },
-          ["keywords"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "content-similarity",
-            name: "Content Similarity",
-            description:
-              "Measures text similarity between response and reference",
-            type: "rule",
-            category: "accuracy",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.5,
-              weight: 1.0,
-              timeout: 2000,
-              retries: 0,
-            },
-            requiredInputs: ["response", "groundTruth"],
-            optionalInputs: [],
-          },
-          async (config) => {
-            const { ContentSimilarityScorer } =
-              await import("./rule/contentSimilarityScorer.js");
-            return new ContentSimilarityScorer(config);
-          },
-          ["similarity", "text-similarity"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "length",
-            name: "Response Length",
-            description: "Validates response length against configured bounds",
-            type: "rule",
-            category: "quality",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.8,
-              weight: 0.5,
-              timeout: 100,
-              retries: 0,
-            },
-            requiredInputs: ["response"],
-            optionalInputs: [],
-          },
-          async (config) => {
-            const { LengthScorer } = await import("./rule/lengthScorer.js");
-            return new LengthScorer(config);
-          },
-          ["response-length"],
-        );
-
-        ScorerRegistry.registerScorer(
-          {
-            id: "format",
-            name: "Format Validation",
-            description:
-              "Checks if response follows expected formatting requirements",
-            type: "rule",
-            category: "quality",
-            version: "1.0.0",
-            defaultConfig: {
-              enabled: true,
-              threshold: 0.8,
-              weight: 0.5,
-              timeout: 100,
-              retries: 0,
-            },
-            requiredInputs: ["response"],
-            optionalInputs: ["custom"],
-          },
-          async (config) => {
-            const { FormatScorer } = await import("./rule/formatScorer.js");
-            return new FormatScorer(config);
-          },
-          ["formatting"],
-        );
+        ScorerRegistry.registerBuiltInLLMScorers();
+        ScorerRegistry.registerBuiltInRuleScorers();
 
         ScorerRegistry.initialized = true;
         logger.debug(

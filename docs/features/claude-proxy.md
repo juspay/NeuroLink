@@ -37,6 +37,16 @@ Anthropic API  /  Google AI  /  OpenAI  /  ...
 
 ## Quick Start
 
+If you do not already have the CLI installed, install it first:
+
+```bash
+pnpm add -g @juspay/neurolink
+# or
+npm install -g @juspay/neurolink
+```
+
+Then continue with the proxy setup steps below.
+
 ### One-command setup
 
 ```bash

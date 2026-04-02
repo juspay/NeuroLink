@@ -586,7 +586,11 @@ export async function loadProxyConfig(
   const accounts: Record<string, ProxyAccountConfig[]> = {};
 
   const rawAccounts = raw.accounts as Record<string, unknown[]> | undefined;
-  if (rawAccounts && typeof rawAccounts === "object") {
+  if (
+    rawAccounts &&
+    typeof rawAccounts === "object" &&
+    !Array.isArray(rawAccounts)
+  ) {
     for (const [provider, list] of Object.entries(rawAccounts)) {
       accounts[provider] = list.map((item) =>
         applyAccountDefaults(item as Partial<ProxyAccountConfig>),

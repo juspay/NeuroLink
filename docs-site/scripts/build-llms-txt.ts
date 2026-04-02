@@ -25,6 +25,8 @@ const DOCS_BASE_URL = process.env.DOCS_BASE_URL || "https://docs.neurolink.ink";
 // Summary file constraints
 const SUMMARY_MAX_SIZE_KB = 50;
 const SUMMARY_CONTENT_TRUNCATE_CHARS = 500;
+const SUMMARY_MIN_TRUNCATE_CHARS = 250;
+const SUMMARY_TRUNCATE_STEP_CHARS = 25;
 
 // Directories to exclude
 const EXCLUDED_DIRS = ["tracking", "phases", "analysis", "plans", "test-reports"];
@@ -416,7 +418,10 @@ function sortSections(sections: Map<string, DocFile[]>): string[] {
 /**
  * Build the summary llms.txt content (~50KB)
  */
-function buildSummaryLlmsTxt(files: DocFile[]): string {
+function buildSummaryLlmsTxt(
+  files: DocFile[],
+  truncateChars: number = SUMMARY_CONTENT_TRUNCATE_CHARS,
+): string {
   const timestamp = new Date().toISOString();
   const lines: string[] = [];
 
@@ -498,7 +503,7 @@ function buildSummaryLlmsTxt(files: DocFile[]): string {
       lines.push("");
 
       // Truncate content for summary
-      const truncated = truncateContent(file.content, SUMMARY_CONTENT_TRUNCATE_CHARS);
+      const truncated = truncateContent(file.content, truncateChars);
       lines.push(truncated);
       lines.push("");
       lines.push("---");
@@ -516,6 +521,27 @@ function buildSummaryLlmsTxt(files: DocFile[]): string {
   lines.push("");
 
   return lines.join("\n");
+}
+
+function buildSummaryWithinTarget(files: DocFile[]): {
+  content: string;
+  truncateChars: number;
+} {
+  let truncateChars = SUMMARY_CONTENT_TRUNCATE_CHARS;
+  let content = buildSummaryLlmsTxt(files, truncateChars);
+
+  while (
+    Buffer.byteLength(content, "utf8") > SUMMARY_MAX_SIZE_KB * 1024 &&
+    truncateChars > SUMMARY_MIN_TRUNCATE_CHARS
+  ) {
+    truncateChars = Math.max(
+      SUMMARY_MIN_TRUNCATE_CHARS,
+      truncateChars - SUMMARY_TRUNCATE_STEP_CHARS,
+    );
+    content = buildSummaryLlmsTxt(files, truncateChars);
+  }
+
+  return { content, truncateChars };
 }
 
 /**
@@ -620,15 +646,22 @@ async function buildLlmsTxtFiles(): Promise<void> {
 
   // Build summary version
   console.log("Building llms.txt (summary)...");
-  const summaryContent = buildSummaryLlmsTxt(files);
+  const summaryBuild = buildSummaryWithinTarget(files);
+  const summaryContent = summaryBuild.content;
   fs.writeFileSync(SUMMARY_OUTPUT, summaryContent, "utf-8");
   const summaryStats = fs.statSync(SUMMARY_OUTPUT);
   const summarySizeKB = (summaryStats.size / 1024).toFixed(2);
   console.log(`  Output: ${SUMMARY_OUTPUT}`);
   console.log(`  Size: ${summarySizeKB} KB`);
-
+  if (summaryBuild.truncateChars !== SUMMARY_CONTENT_TRUNCATE_CHARS) {
+    console.log(
+      `  Adjusted truncation length to ${summaryBuild.truncateChars} characters to stay within target size`,
+    );
+  }
   if (summaryStats.size > SUMMARY_MAX_SIZE_KB * 1024) {
-    console.log(`  Warning: Summary exceeds target size of ${SUMMARY_MAX_SIZE_KB}KB`);
+    console.log(
+      `  Warning: Summary still exceeds target size of ${SUMMARY_MAX_SIZE_KB}KB`,
+    );
   }
 
   // Build full version

@@ -4366,6 +4366,8 @@ async function testCloakingRuntime(): Promise<boolean | null> {
   try {
     const { CloakingPipeline } =
       await import("../dist/lib/proxy/cloaking/index.js");
+    const { parseClaudeCodeUserId } =
+      await import("../dist/lib/auth/anthropicOAuth.js");
     const { createHeaderScrubber } =
       await import("../dist/lib/proxy/cloaking/plugins/headerScrubber.js");
     const { createSessionIdentity } =
@@ -4414,15 +4416,14 @@ async function testCloakingRuntime(): Promise<boolean | null> {
       logTest("Cloaking Runtime", "FAIL", "authorization header lost");
       return false;
     }
-    // Verify session identity injected
-    if (
-      !result.request.body?.metadata?.user_id ||
-      !(result.request.body.metadata.user_id as string).startsWith("user_")
-    ) {
+    // Verify Claude Code-style session identity injected
+    const metadataUserId = result.request.body?.metadata?.user_id;
+    const parsedIdentity = parseClaudeCodeUserId(metadataUserId);
+    if (!parsedIdentity || parsedIdentity.metadataUserId !== metadataUserId) {
       logTest(
         "Cloaking Runtime",
         "FAIL",
-        `Session ID not injected: ${result.request.body?.metadata?.user_id}`,
+        `Session identity not injected in Claude Code format: ${metadataUserId}`,
       );
       return false;
     }

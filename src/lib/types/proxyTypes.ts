@@ -14,6 +14,9 @@
  * - src/lib/server/routes/claudeProxyRoutes.ts (runtime state, deps)
  */
 
+import type { Span } from "@opentelemetry/api";
+import type { ProxyTracer } from "../proxy/proxyTracer.js";
+
 /**
  * Type describing the ModelRouter contract.
  * Defined here to avoid a circular dependency between types and implementation.
@@ -266,7 +269,7 @@ export type ParsedClaudeRequest = {
     string,
     {
       description?: string;
-      inputSchema?: unknown;
+      inputSchema: unknown;
       execute?: (...args: unknown[]) => unknown;
     }
   >;
@@ -410,6 +413,19 @@ export type TlsFingerprintOptions = {
 };
 
 // =============================================================================
+// PROXY MODE
+// =============================================================================
+
+/**
+ * Proxy operating mode:
+ * - "full"        — managed accounts, retry, rotation, polyfill (default)
+ * - "passthrough" — no polyfill/retry/rotation, but body is still parsed and re-serialized
+ * - "transparent" — zero-mutation byte relay: raw body forwarded as-is, minimal header filtering,
+ *                   SSE interceptor for cache metrics only (bytes pass through unmodified)
+ */
+export type ProxyMode = "full" | "passthrough" | "transparent";
+
+// =============================================================================
 // MODEL ROUTER TYPES (from modelRouter.ts)
 // =============================================================================
 
@@ -517,6 +533,151 @@ export type RequestAttemptLogEntry = {
   traceId?: string;
   /** OTel span ID for correlation with distributed traces */
   spanId?: string;
+};
+
+export type ProxyBodyCaptureInput = {
+  phase: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  bodySize?: number;
+  contentType?: string;
+  responseStatus?: number;
+  durationMs?: number;
+  account?: string;
+  accountType?: string;
+  attempt?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type ProxyBodyCaptureLogger = (capture: ProxyBodyCaptureInput) => void;
+
+export type ClaudeFinalRequestLogger = (
+  status: number,
+  accountLabel: string,
+  accountType: string,
+  errorType?: string,
+  errorMessage?: string,
+  extra?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheCreationTokens?: number;
+    cacheReadTokens?: number;
+  },
+) => void;
+
+export type ClaudeLoggedErrorBuilder = (
+  status: number,
+  message: string,
+  errorType?: string,
+  extra?: {
+    account?: string;
+    accountType?: string;
+    attempt?: number;
+  },
+) => ClaudeErrorResponse;
+
+export type ClaudeRequestRuntimeContext = {
+  tracer?: ProxyTracer;
+  requestStartTime: number;
+  logProxyBody: ProxyBodyCaptureLogger;
+  logFinalRequest: ClaudeFinalRequestLogger;
+  buildLoggedClaudeError: ClaudeLoggedErrorBuilder;
+};
+
+export type AnthropicAttemptLogger = (
+  status: number,
+  errorType?: string,
+  errorMessage?: string,
+  extra?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheCreationTokens?: number;
+    cacheReadTokens?: number;
+  },
+) => void;
+
+export type AnthropicLoopState = {
+  lastError: unknown;
+  sawRateLimit: boolean;
+  sawNetworkError: boolean;
+  sawTransientFailure: boolean;
+  invalidRequestFailure: {
+    status: number;
+    body: string;
+    contentType?: string;
+  } | null;
+  authFailureMessage: string | null;
+  attemptNumber: number;
+};
+
+export type AnthropicUpstreamBody = {
+  bodyStr: string;
+  sessionId?: string;
+};
+
+export type AnthropicUpstreamBodyBuilder = (
+  token: string,
+) => AnthropicUpstreamBody;
+
+export type LoadedClaudeAccountContext = {
+  accounts: ProxyPassthroughAccount[];
+  enabledAccounts: ProxyPassthroughAccount[];
+  orderedAccounts: ProxyPassthroughAccount[];
+  bodyStr: string;
+  requestStart: number;
+  toolCount: number;
+  url: string;
+  clientHeaders: Record<string, string | undefined>;
+  isClaudeClientRequest: boolean;
+};
+
+export type AnthropicSuccessResult =
+  | { retryNextAccount: true }
+  | { response: Response | unknown };
+
+export type AnthropicAuthRetryResult = {
+  response?: Response | unknown;
+  continueLoop: boolean;
+  lastError: unknown;
+  authFailureMessage: string | null;
+  sawRateLimit: boolean;
+  sawTransientFailure: boolean;
+  sawNetworkError: boolean;
+  upstreamSpan?: Span;
+};
+
+export type AnthropicNonOkResult = {
+  response?: Response | unknown;
+  continueLoop: boolean;
+  lastError: unknown;
+  authFailureMessage: string | null;
+  sawTransientFailure: boolean;
+  invalidRequestFailure: {
+    status: number;
+    body: string;
+    contentType?: string;
+  } | null;
+  upstreamSpan?: Span;
+};
+
+export type PreparedAnthropicAccountAttempt = {
+  continueLoop: boolean;
+  lastError: unknown;
+  authFailureMessage: string | null;
+  headers?: Record<string, string>;
+  buildUpstreamBody?: AnthropicUpstreamBodyBuilder;
+  finalBodyStr?: string;
+  fetchStartMs?: number;
+  upstreamSpan?: Span;
+};
+
+export type AnthropicUpstreamFetchResult = {
+  continueLoop: boolean;
+  response?: Response;
+  lastError: unknown;
+  sawRateLimit: boolean;
+  sawNetworkError: boolean;
+  upstreamSpan?: Span;
 };
 
 // =============================================================================

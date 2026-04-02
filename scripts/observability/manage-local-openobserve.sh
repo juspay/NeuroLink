@@ -10,10 +10,40 @@ DOCTOR_SCRIPT="${SCRIPT_DIR}/check-proxy-telemetry.mjs"
 
 load_env() {
   if [[ -f "${ENV_FILE}" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    source "${ENV_FILE}"
-    set +a
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+      [[ "${line}" =~ ^[[:space:]]*$ ]] && continue
+      [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+
+      line="${line#"${line%%[![:space:]]*}"}"
+      if [[ "${line}" =~ ^[[:space:]]*export[[:space:]]+ ]]; then
+        line="${line#export }"
+      fi
+
+      if [[ "${line}" != *=* ]]; then
+        continue
+      fi
+
+      local key="${line%%=*}"
+      local value="${line#*=}"
+
+      key="${key#"${key%%[![:space:]]*}"}"
+      key="${key%"${key##*[![:space:]]}"}"
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+
+      if [[ "${value}" =~ ^\".*\"$ || "${value}" =~ ^\'.*\'$ ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+
+      if [[ -n "${key}" ]]; then
+        if [[ ! "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+          echo "Skipping invalid env var name in ${ENV_FILE}: ${key}" >&2
+          continue
+        fi
+        printf -v "${key}" '%s' "${value}"
+        export "${key}"
+      fi
+    done < "${ENV_FILE}"
   fi
 }
 
@@ -149,7 +179,8 @@ case "${command}" in
 Local proxy observability is ready.
 
 OpenObserve UI: ${NEUROLINK_OPENOBSERVE_URL}
-OpenObserve login: ${NEUROLINK_OPENOBSERVE_USER} / ${NEUROLINK_OPENOBSERVE_PASSWORD}
+OpenObserve login user: ${NEUROLINK_OPENOBSERVE_USER}
+OpenObserve password source: ${ENV_FILE} (NEUROLINK_OPENOBSERVE_PASSWORD)
 OTLP HTTP endpoint: http://localhost:${NEUROLINK_OTLP_HTTP_PORT}
 
 Set this before starting the proxy:

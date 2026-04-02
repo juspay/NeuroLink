@@ -12,7 +12,7 @@ import type {
   ScorerInput,
 } from "../../types/scorerTypes.js";
 import { logger } from "../../utils/logger.js";
-import { withTimeout } from "../../utils/errorHandling.js";
+import { ErrorFactory, withTimeout } from "../../utils/errorHandling.js";
 import { DEFAULT_SCORE_SCALE } from "../scorers/baseScorer.js";
 import { ScorerRegistry } from "../scorers/scorerRegistry.js";
 
@@ -265,8 +265,13 @@ export class EvaluationPipeline {
       !!options?.skipScorers && options.skipScorers.length > 0;
 
     if (hasOnlyScorers && hasSkipScorers) {
-      throw new Error(
+      throw ErrorFactory.invalidConfiguration(
+        "evaluation pipeline execution options",
         "Cannot specify both 'onlyScorers' and 'skipScorers' options",
+        {
+          onlyScorers: options?.onlyScorers,
+          skipScorers: options?.skipScorers,
+        },
       );
     }
   }

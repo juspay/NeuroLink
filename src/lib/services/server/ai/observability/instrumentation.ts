@@ -42,6 +42,92 @@ import { logger } from "../../../../utils/logger.js";
 
 const LOG_PREFIX = "[OpenTelemetry]";
 
+function createOtelResource(config: LangfuseConfig, serviceName: string) {
+  return resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: serviceName,
+    [ATTR_SERVICE_VERSION]: config.release || "v1.0.0",
+    "deployment.environment": config.environment || "dev",
+  });
+}
+
+function initializeOtlpMetricsAndLogs(
+  resource: ReturnType<typeof resourceFromAttributes>,
+  otlpEndpoint: string | undefined,
+  serviceName: string,
+): void {
+  if (!otlpEndpoint) {
+    return;
+  }
+
+  try {
+    const metricExporter = new OTLPMetricExporter({
+      url: `${otlpEndpoint}/v1/metrics`,
+    });
+    const metricReader = new PeriodicExportingMetricReader({
+      exporter: metricExporter,
+      exportIntervalMillis: 15000,
+      exportTimeoutMillis: 10000,
+    });
+    meterProvider = new MeterProvider({
+      resource,
+      readers: [metricReader],
+    });
+    metrics.setGlobalMeterProvider(meterProvider);
+    logger.info(
+      `${LOG_PREFIX} OTLP metric exporter added — MeterProvider registered globally`,
+      {
+        endpoint: `${otlpEndpoint}/v1/metrics`,
+        exportIntervalMs: 15000,
+        serviceName,
+        meterProviderType: meterProvider.constructor.name,
+      },
+    );
+  } catch (metricsError) {
+    logger.warn(
+      `${LOG_PREFIX} Failed to create OTLP metric exporter (non-fatal)`,
+      {
+        error:
+          metricsError instanceof Error
+            ? metricsError.message
+            : String(metricsError),
+        endpoint: otlpEndpoint,
+      },
+    );
+  }
+
+  try {
+    const logExporter = new OTLPLogExporter({
+      url: `${otlpEndpoint}/v1/logs`,
+    });
+    const logProcessor = new BatchLogRecordProcessor(logExporter, {
+      maxQueueSize: 2048,
+      maxExportBatchSize: 512,
+      scheduledDelayMillis: 2000,
+      exportTimeoutMillis: 30000,
+    });
+    loggerProvider = new LoggerProvider({
+      resource,
+      processors: [logProcessor],
+    });
+    logger.info(
+      `${LOG_PREFIX} OTLP log exporter added — LoggerProvider created`,
+      {
+        endpoint: `${otlpEndpoint}/v1/logs`,
+        serviceName,
+      },
+    );
+  } catch (logsError) {
+    logger.warn(
+      `${LOG_PREFIX} Failed to create OTLP log exporter (non-fatal)`,
+      {
+        error:
+          logsError instanceof Error ? logsError.message : String(logsError),
+        endpoint: otlpEndpoint,
+      },
+    );
+  }
+}
+
 /**
  * Extended context for Langfuse spans
  * Supports all Langfuse trace attributes for rich observability
@@ -516,6 +602,264 @@ class ContextEnricher implements SpanProcessor {
   }
 }
 
+function createLangfuseProcessor(
+  config: LangfuseConfig,
+): LangfuseSpanProcessor {
+  return new LangfuseSpanProcessor({
+    publicKey: config.publicKey,
+    secretKey: config.secretKey,
+    baseUrl: config.baseUrl || "https://cloud.langfuse.com",
+    environment: config.environment || "dev",
+    release: config.release || "v1.0.0",
+    shouldExportSpan: () => true,
+  });
+}
+
+function initializeExternalOpenTelemetryMode(
+  config: LangfuseConfig,
+  resource: ReturnType<typeof resourceFromAttributes>,
+  otlpEndpoint: string | undefined,
+  serviceName: string,
+  langfuseRequested: boolean,
+  hasLangfuseCreds: boolean,
+): void {
+  if (langfuseRequested && !hasLangfuseCreds) {
+    if (!otlpEndpoint) {
+      logger.warn(
+        `${LOG_PREFIX} External provider mode requested Langfuse but credentials are missing, and no OTLP endpoint is configured; skipping initialization`,
+        {
+          hasPublicKey: !!config?.publicKey,
+          hasSecretKey: !!config?.secretKey,
+        },
+      );
+      isInitialized = true;
+      isCredentialsValid = false;
+      return;
+    }
+
+    logger.warn(
+      `${LOG_PREFIX} External provider mode missing Langfuse credentials; continuing with OTLP-only metrics/logs`,
+      {
+        hasPublicKey: !!config?.publicKey,
+        hasSecretKey: !!config?.secretKey,
+        otlpEnabled: true,
+      },
+    );
+  }
+
+  try {
+    currentConfig = config;
+    isCredentialsValid = hasLangfuseCreds;
+    langfuseProcessor =
+      langfuseRequested && hasLangfuseCreds
+        ? createLangfuseProcessor(config)
+        : null;
+
+    usingExternalProvider = true;
+    isInitialized = true;
+    initializeOtlpMetricsAndLogs(resource, otlpEndpoint, serviceName);
+
+    try {
+      const globalProvider = trace.getTracerProvider();
+      const provider = globalProvider as unknown as {
+        addSpanProcessor?: (processor: SpanProcessor) => void;
+      };
+
+      if (globalProvider && typeof provider.addSpanProcessor === "function") {
+        provider.addSpanProcessor(new ContextEnricher());
+
+        const skipLangfuse =
+          config.skipLangfuseSpanProcessor === true || !langfuseProcessor;
+        if (!skipLangfuse && langfuseProcessor) {
+          provider.addSpanProcessor(langfuseProcessor);
+        }
+
+        logger.info(
+          `${LOG_PREFIX} Auto-registered processors with global TracerProvider`,
+          {
+            processors: skipLangfuse
+              ? ["ContextEnricher"]
+              : ["ContextEnricher", "LangfuseSpanProcessor"],
+            reason: "External provider mode with auto-registration",
+            skippedLangfuseSpanProcessor: skipLangfuse,
+          },
+        );
+        return;
+      }
+
+      logger.info(`${LOG_PREFIX} Using external TracerProvider mode`, {
+        reason: config.useExternalTracerProvider
+          ? "useExternalTracerProvider=true"
+          : "autoDetectExternalProvider=true (trusting host signal)",
+        instructions:
+          "Add span processors to your TracerProvider using getSpanProcessors()",
+      });
+      logger.info(`${LOG_PREFIX} Span processors ready for external use`, {
+        processors: langfuseProcessor
+          ? ["ContextEnricher", "LangfuseSpanProcessor"]
+          : ["ContextEnricher"],
+        usage: "import { getSpanProcessors } from '@juspay/neurolink'",
+      });
+    } catch (autoRegisterError) {
+      logger.warn(
+        `${LOG_PREFIX} Auto-registration failed, manual registration required`,
+        {
+          error:
+            autoRegisterError instanceof Error
+              ? autoRegisterError.message
+              : String(autoRegisterError),
+          instructions:
+            "Add span processors to your TracerProvider using getSpanProcessors()",
+        },
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `${LOG_PREFIX} Failed to create span processor for external mode`,
+      {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    );
+    isInitialized = true;
+  }
+}
+
+function initializeStandaloneOpenTelemetryMode(
+  config: LangfuseConfig,
+  resource: ReturnType<typeof resourceFromAttributes>,
+  otlpEndpoint: string | undefined,
+  serviceName: string,
+  langfuseRequested: boolean,
+  hasLangfuseCreds: boolean,
+): void {
+  if ((!langfuseRequested || !hasLangfuseCreds) && !otlpEndpoint) {
+    if (langfuseRequested && !hasLangfuseCreds) {
+      logger.warn(
+        `${LOG_PREFIX} Langfuse requested but credentials are missing, and no OTLP endpoint is configured; skipping initialization`,
+        {
+          hasPublicKey: !!config.publicKey,
+          hasSecretKey: !!config.secretKey,
+        },
+      );
+    } else {
+      logger.debug(
+        `${LOG_PREFIX} Langfuse disabled and OTLP endpoint missing, skipping initialization`,
+      );
+    }
+    isInitialized = true;
+    return;
+  }
+
+  if (langfuseRequested && !hasLangfuseCreds) {
+    logger.warn(
+      `${LOG_PREFIX} Langfuse requested but credentials are missing; continuing with OTLP-only telemetry`,
+      {
+        hasPublicKey: !!config.publicKey,
+        hasSecretKey: !!config.secretKey,
+        otlpEnabled: !!otlpEndpoint,
+      },
+    );
+  }
+
+  try {
+    currentConfig = config;
+    isCredentialsValid = hasLangfuseCreds;
+    langfuseProcessor =
+      langfuseRequested && hasLangfuseCreds
+        ? createLangfuseProcessor(config)
+        : null;
+
+    logger.debug(`${LOG_PREFIX} Standalone observability mode`, {
+      langfuseEnabled: !!langfuseProcessor,
+      otlpEnabled: !!otlpEndpoint,
+      baseUrl: config.baseUrl || "https://cloud.langfuse.com",
+      environment: config.environment || "dev",
+    });
+
+    const spanProcessors: SpanProcessor[] = [new ContextEnricher()];
+    if (langfuseProcessor) {
+      spanProcessors.push(langfuseProcessor);
+    }
+
+    if (otlpEndpoint) {
+      try {
+        const otlpExporter = new OTLPTraceExporter({
+          url: `${otlpEndpoint}/v1/traces`,
+        });
+        spanProcessors.push(
+          new BatchSpanProcessor(otlpExporter, {
+            maxQueueSize: 2048,
+            maxExportBatchSize: 512,
+            scheduledDelayMillis: 1000,
+            exportTimeoutMillis: 30000,
+          }),
+        );
+        logger.info(`${LOG_PREFIX} OTLP trace exporter added`, {
+          endpoint: `${otlpEndpoint}/v1/traces`,
+          serviceName,
+        });
+      } catch (otlpError) {
+        logger.warn(
+          `${LOG_PREFIX} Failed to create OTLP exporter (non-fatal)`,
+          {
+            error:
+              otlpError instanceof Error
+                ? otlpError.message
+                : String(otlpError),
+            endpoint: otlpEndpoint,
+          },
+        );
+      }
+    }
+
+    tracerProvider = new NodeTracerProvider({ resource, spanProcessors });
+    tracerProvider.register({
+      propagator: new W3CTraceContextPropagator(),
+    });
+    usingExternalProvider = false;
+    isInitialized = true;
+    initializeOtlpMetricsAndLogs(resource, otlpEndpoint, serviceName);
+
+    logger.info(`${LOG_PREFIX} Observability initialized`, {
+      baseUrl: config.baseUrl || "https://cloud.langfuse.com",
+      environment: config.environment || "dev",
+      release: config.release || "v1.0.0",
+      mode: "standalone",
+      langfuseEnabled: !!langfuseProcessor,
+      otlpEnabled: !!otlpEndpoint,
+      serviceName,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isDuplicateError =
+      errorMessage.includes("duplicate registration") ||
+      errorMessage.includes("already registered") ||
+      errorMessage.includes("already set");
+
+    if (isDuplicateError) {
+      logger.warn(
+        `${LOG_PREFIX} TracerProvider already registered, switching to external mode`,
+        {
+          error: errorMessage,
+          recommendation:
+            "Set useExternalTracerProvider=true or autoDetectExternalProvider=true in config",
+        },
+      );
+
+      usingExternalProvider = true;
+      isInitialized = true;
+      return;
+    }
+
+    logger.error(`${LOG_PREFIX} Initialization failed`, {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  }
+}
+
 /**
  * Initialize OpenTelemetry with Langfuse span processor
  *
@@ -556,362 +900,32 @@ export function initializeOpenTelemetry(config: LangfuseConfig): void {
   const shouldUseExternal =
     config?.useExternalTracerProvider === true ||
     config?.autoDetectExternalProvider === true;
-
-  if (shouldUseExternal) {
-    // Validate credentials even in external mode
-    if (!config?.publicKey || !config?.secretKey) {
-      logger.warn(
-        `${LOG_PREFIX} External provider mode but missing credentials, skipping initialization`,
-        {
-          hasPublicKey: !!config?.publicKey,
-          hasSecretKey: !!config?.secretKey,
-        },
-      );
-      isInitialized = true;
-      isCredentialsValid = false;
-      return;
-    }
-
-    try {
-      currentConfig = config;
-      isCredentialsValid = true;
-
-      // Create span processor for external provider mode
-      // shouldExportSpan: export all spans (v5 default filters to gen_ai spans only)
-      langfuseProcessor = new LangfuseSpanProcessor({
-        publicKey: config.publicKey,
-        secretKey: config.secretKey,
-        baseUrl: config.baseUrl || "https://cloud.langfuse.com",
-        environment: config.environment || "dev",
-        release: config.release || "v1.0.0",
-        shouldExportSpan: () => true,
-      });
-
-      usingExternalProvider = true;
-      isInitialized = true;
-
-      // Auto-register ContextEnricher with the global TracerProvider
-      // This ensures trace names are set even when host doesn't call getSpanProcessors()
-      try {
-        const globalProvider = trace.getTracerProvider();
-
-        // Check if it's a real provider with addSpanProcessor method (not the no-op default)
-        if (
-          globalProvider &&
-          typeof (globalProvider as unknown as { addSpanProcessor?: unknown })
-            .addSpanProcessor === "function"
-        ) {
-          const provider = globalProvider as unknown as {
-            addSpanProcessor: (processor: SpanProcessor) => void;
-          };
-
-          // Add ContextEnricher for trace name enrichment
-          provider.addSpanProcessor(new ContextEnricher());
-
-          // Only add LangfuseSpanProcessor if the host has not already registered one.
-          // When skipLangfuseSpanProcessor is true, the host (e.g. Curator) already
-          // registers its own LangfuseSpanProcessor via a DeferredSpanProcessor, so
-          // adding another one here would cause duplicate trace exports to Langfuse.
-          const skipLangfuse = config.skipLangfuseSpanProcessor === true;
-          if (!skipLangfuse) {
-            provider.addSpanProcessor(langfuseProcessor);
-          }
-
-          logger.info(
-            `${LOG_PREFIX} Auto-registered processors with global TracerProvider`,
-            {
-              processors: skipLangfuse
-                ? ["ContextEnricher"]
-                : ["ContextEnricher", "LangfuseSpanProcessor"],
-              reason: "External provider mode with auto-registration",
-              skippedLangfuseSpanProcessor: skipLangfuse,
-            },
-          );
-        } else {
-          // No real provider found - host will need to add processors manually
-          logger.info(`${LOG_PREFIX} Using external TracerProvider mode`, {
-            reason: config.useExternalTracerProvider
-              ? "useExternalTracerProvider=true"
-              : "autoDetectExternalProvider=true (trusting host signal)",
-            instructions:
-              "Add span processors to your TracerProvider using getSpanProcessors()",
-          });
-
-          logger.info(`${LOG_PREFIX} Span processors ready for external use`, {
-            processors: ["ContextEnricher", "LangfuseSpanProcessor"],
-            usage: "import { getSpanProcessors } from '@juspay/neurolink'",
-          });
-        }
-      } catch (autoRegisterError) {
-        // Auto-registration failed - fall back to manual registration
-        logger.warn(
-          `${LOG_PREFIX} Auto-registration failed, manual registration required`,
-          {
-            error:
-              autoRegisterError instanceof Error
-                ? autoRegisterError.message
-                : String(autoRegisterError),
-            instructions:
-              "Add span processors to your TracerProvider using getSpanProcessors()",
-          },
-        );
-      }
-
-      return;
-    } catch (error) {
-      logger.error(
-        `${LOG_PREFIX} Failed to create span processor for external mode`,
-        {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-      );
-      isInitialized = true;
-      return;
-    }
-  }
-
   const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   const langfuseRequested = config?.enabled === true;
   const hasLangfuseCreds = !!config.publicKey && !!config.secretKey;
+  const serviceName = process.env.OTEL_SERVICE_NAME || "neurolink";
+  const resource = createOtelResource(config, serviceName);
 
-  // THEN: Check whether we have any standalone observability backend at all.
-  if ((!langfuseRequested || !hasLangfuseCreds) && !otlpEndpoint) {
-    if (langfuseRequested && !hasLangfuseCreds) {
-      logger.warn(
-        `${LOG_PREFIX} Langfuse requested but credentials are missing, and no OTLP endpoint is configured; skipping initialization`,
-        {
-          hasPublicKey: !!config.publicKey,
-          hasSecretKey: !!config.secretKey,
-        },
-      );
-    } else {
-      logger.debug(
-        `${LOG_PREFIX} Langfuse disabled and OTLP endpoint missing, skipping initialization`,
-      );
-    }
-    isInitialized = true;
+  if (shouldUseExternal) {
+    initializeExternalOpenTelemetryMode(
+      config,
+      resource,
+      otlpEndpoint,
+      serviceName,
+      langfuseRequested,
+      hasLangfuseCreds,
+    );
     return;
   }
 
-  if (langfuseRequested && !hasLangfuseCreds) {
-    logger.warn(
-      `${LOG_PREFIX} Langfuse requested but credentials are missing; continuing with OTLP-only telemetry`,
-      {
-        hasPublicKey: !!config.publicKey,
-        hasSecretKey: !!config.secretKey,
-        otlpEnabled: !!otlpEndpoint,
-      },
-    );
-  }
-
-  try {
-    currentConfig = config;
-    isCredentialsValid = hasLangfuseCreds;
-
-    // Step 1: Create LangfuseSpanProcessor only when Langfuse is explicitly enabled
-    // with real credentials. OTLP-only mode is valid and should not construct one.
-    if (langfuseRequested && hasLangfuseCreds) {
-      // shouldExportSpan: export all spans (v5 default filters to gen_ai spans only)
-      langfuseProcessor = new LangfuseSpanProcessor({
-        publicKey: config.publicKey,
-        secretKey: config.secretKey,
-        baseUrl: config.baseUrl || "https://cloud.langfuse.com",
-        environment: config.environment || "dev",
-        release: config.release || "v1.0.0",
-        shouldExportSpan: () => true,
-      });
-    } else {
-      langfuseProcessor = null;
-    }
-
-    logger.debug(`${LOG_PREFIX} Standalone observability mode`, {
-      langfuseEnabled: !!langfuseProcessor,
-      otlpEnabled: !!otlpEndpoint,
-      baseUrl: config.baseUrl || "https://cloud.langfuse.com",
-      environment: config.environment || "dev",
-    });
-
-    // Step 2: Create our own TracerProvider (standalone behavior)
-    // Use OTEL_SERVICE_NAME env var if available, otherwise "neurolink"
-    const serviceName = process.env.OTEL_SERVICE_NAME || "neurolink";
-    const resource = resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: serviceName,
-      [ATTR_SERVICE_VERSION]: config.release || "v1.0.0",
-      "deployment.environment": config.environment || "dev",
-    });
-
-    // Build span processor list
-    const spanProcessors: SpanProcessor[] = [new ContextEnricher()];
-    if (langfuseProcessor) {
-      spanProcessors.push(langfuseProcessor);
-    }
-
-    // Step 2b: If OTEL_EXPORTER_OTLP_ENDPOINT is set, also export via OTLP HTTP
-    // This allows sending traces to an OpenTelemetry Collector (e.g. for OpenObserve)
-    if (otlpEndpoint) {
-      try {
-        const otlpExporter = new OTLPTraceExporter({
-          url: `${otlpEndpoint}/v1/traces`,
-        });
-        const otlpBatchProcessor = new BatchSpanProcessor(otlpExporter, {
-          maxQueueSize: 2048,
-          maxExportBatchSize: 512,
-          scheduledDelayMillis: 1000,
-          exportTimeoutMillis: 30000,
-        });
-        spanProcessors.push(otlpBatchProcessor);
-        logger.info(`${LOG_PREFIX} OTLP trace exporter added`, {
-          endpoint: `${otlpEndpoint}/v1/traces`,
-          serviceName,
-        });
-      } catch (otlpError) {
-        logger.warn(
-          `${LOG_PREFIX} Failed to create OTLP exporter (non-fatal)`,
-          {
-            error:
-              otlpError instanceof Error
-                ? otlpError.message
-                : String(otlpError),
-            endpoint: otlpEndpoint,
-          },
-        );
-      }
-    }
-
-    tracerProvider = new NodeTracerProvider({
-      resource,
-      spanProcessors,
-    });
-
-    // Step 4: Register globally with explicit W3C propagator
-    // This ensures traceparent headers from calling SDKs are extracted correctly,
-    // even if another library registers a no-op propagator before us.
-    tracerProvider.register({
-      propagator: new W3CTraceContextPropagator(),
-    });
-    usingExternalProvider = false;
-    isInitialized = true;
-
-    // Step 5: If OTLP endpoint is set, also set up MeterProvider for metrics export
-    // This enables TelemetryService's metrics.getMeter() instruments to export via OTLP
-    if (otlpEndpoint) {
-      try {
-        const metricExporter = new OTLPMetricExporter({
-          url: `${otlpEndpoint}/v1/metrics`,
-        });
-        const metricReader = new PeriodicExportingMetricReader({
-          exporter: metricExporter,
-          exportIntervalMillis: 15000, // Export every 15 seconds
-          exportTimeoutMillis: 10000,
-        });
-        meterProvider = new MeterProvider({
-          resource,
-          readers: [metricReader],
-        });
-        // Register globally so TelemetryService's metrics.getMeter() picks it up
-        metrics.setGlobalMeterProvider(meterProvider);
-        logger.info(
-          `${LOG_PREFIX} OTLP metric exporter added — MeterProvider registered globally`,
-          {
-            endpoint: `${otlpEndpoint}/v1/metrics`,
-            exportIntervalMs: 15000,
-            serviceName,
-            meterProviderType: meterProvider.constructor.name,
-          },
-        );
-      } catch (metricsError) {
-        logger.warn(
-          `${LOG_PREFIX} Failed to create OTLP metric exporter (non-fatal)`,
-          {
-            error:
-              metricsError instanceof Error
-                ? metricsError.message
-                : String(metricsError),
-            endpoint: otlpEndpoint,
-          },
-        );
-      }
-
-      // Step 6: Set up LoggerProvider for OTLP log export
-      // This enables logRequest() to emit structured log records via OTLP
-      try {
-        const logExporter = new OTLPLogExporter({
-          url: `${otlpEndpoint}/v1/logs`,
-        });
-        const logProcessor = new BatchLogRecordProcessor(logExporter, {
-          maxQueueSize: 2048,
-          maxExportBatchSize: 512,
-          scheduledDelayMillis: 2000,
-          exportTimeoutMillis: 30000,
-        });
-        loggerProvider = new LoggerProvider({
-          resource,
-          processors: [logProcessor],
-        });
-        logger.info(
-          `${LOG_PREFIX} OTLP log exporter added — LoggerProvider created`,
-          {
-            endpoint: `${otlpEndpoint}/v1/logs`,
-            serviceName,
-          },
-        );
-      } catch (logsError) {
-        logger.warn(
-          `${LOG_PREFIX} Failed to create OTLP log exporter (non-fatal)`,
-          {
-            error:
-              logsError instanceof Error
-                ? logsError.message
-                : String(logsError),
-            endpoint: otlpEndpoint,
-          },
-        );
-      }
-    }
-
-    logger.info(`${LOG_PREFIX} Observability initialized`, {
-      baseUrl: config.baseUrl || "https://cloud.langfuse.com",
-      environment: config.environment || "dev",
-      release: config.release || "v1.0.0",
-      mode: "standalone",
-      langfuseEnabled: !!langfuseProcessor,
-      otlpEnabled: !!otlpEndpoint,
-      serviceName,
-    });
-  } catch (error) {
-    // Check if this is a duplicate registration error
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const isDuplicateError =
-      errorMessage.includes("duplicate registration") ||
-      errorMessage.includes("already registered") ||
-      errorMessage.includes("already set");
-
-    if (isDuplicateError) {
-      // Graceful handling: switch to external mode
-      logger.warn(
-        `${LOG_PREFIX} TracerProvider already registered, switching to external mode`,
-        {
-          error: errorMessage,
-          recommendation:
-            "Set useExternalTracerProvider=true or autoDetectExternalProvider=true in config",
-        },
-      );
-
-      usingExternalProvider = true;
-      isInitialized = true;
-
-      // Don't throw - processors are still usable
-      return;
-    }
-
-    // Other errors: log and re-throw
-    logger.error(`${LOG_PREFIX} Initialization failed`, {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    throw error;
-  }
+  initializeStandaloneOpenTelemetryMode(
+    config,
+    resource,
+    otlpEndpoint,
+    serviceName,
+    langfuseRequested,
+    hasLangfuseCreds,
+  );
 }
 
 /**

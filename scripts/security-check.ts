@@ -42,6 +42,8 @@ const IGNORED_VULNERABLE_PACKAGES = [
   "jsondiffpatch", // XSS in ai dependency - tracked separately
   "undici", // DoS in transitive dependency - requires upstream fix
   "ai", // File upload bypass - planned upgrade
+  "lodash", // Code injection in @semantic-release dev dep - no patch available
+  "lodash-es", // Code injection in @semantic-release dev dep - no patch available
 ];
 
 interface SecurityIssue {
@@ -147,13 +149,6 @@ class SecurityValidator {
           (pkg) =>
             output.includes(`│ Package             │ ${pkg}`) ||
             output.includes(`Package: ${pkg}`),
-        );
-
-        // Check if ALL vulnerabilities are from ignored packages
-        const allIgnored = IGNORED_VULNERABLE_PACKAGES.every(
-          (pkg) =>
-            !output.includes("│ Package") ||
-            output.includes(`│ Package             │ ${pkg}`),
         );
 
         if (isIgnoredPackage) {

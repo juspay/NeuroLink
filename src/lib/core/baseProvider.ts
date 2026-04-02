@@ -1,5 +1,5 @@
 import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
-import type { ModelMessage, LanguageModel, Tool } from "ai";
+import type { LanguageModel, ModelMessage, Tool } from "ai";
 import { generateText } from "ai";
 import { directAgentTools } from "../agent/directTools.js";
 import type { AIProviderName } from "../constants/enums.js";
@@ -10,7 +10,6 @@ import type { NeuroLink } from "../neurolink.js";
 import { SpanStatus, SpanType } from "../observability/types/spanTypes.js";
 import { SpanSerializer } from "../observability/utils/spanSerializer.js";
 import { ATTR, tracers } from "../telemetry/index.js";
-import { calculateCost } from "../utils/pricing.js";
 import type { JsonValue, UnknownRecord } from "../types/common.js";
 import type {
   AIProvider,
@@ -28,6 +27,7 @@ import type {
 } from "../types/typeAliases.js";
 import { isAbortError } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
+import { calculateCost } from "../utils/pricing.js";
 import {
   composeAbortSignals,
   createTimeoutController,
@@ -754,324 +754,17 @@ export abstract class BaseProvider implements AIProvider {
     });
     // Set this span as the active context so child spans (GenerationHandler, etc.) become descendants
     const activeCtx = trace.setSpan(context.active(), otelSpan);
-    let otelSpanEnded = false;
+    const otelSpanState = { ended: false };
 
-    return await context.with(activeCtx, async () => {
-      try {
-        // ===== VIDEO GENERATION MODE =====
-        // Generate video from image + prompt using Veo 3.1
-        if (options.output?.mode === "video") {
-          return await this.handleVideoGeneration(options, startTime);
-        }
-
-        // ===== IMAGE GENERATION MODE =====
-        // Route to executeImageGeneration for image generation models
-        const isImageModel = IMAGE_GENERATION_MODELS.some((m) =>
-          this.modelName.includes(m),
-        );
-
-        if (isImageModel) {
-          logger.info(
-            `Image generation model detected, routing to executeImageGeneration`,
-            {
-              provider: this.providerName,
-              model: this.modelName,
-            },
-          );
-
-          const imageResult = await this.executeImageGeneration(options);
-          return await this.enhanceResult(imageResult, options, startTime);
-        }
-
-        // ===== TTS MODE 1: Direct Input Synthesis (useAiResponse=false) =====
-        // Synthesize input text directly without AI generation
-        // This is optimal for simple read-aloud scenarios
-        if (options.tts?.enabled && !options.tts?.useAiResponse) {
-          const textToSynthesize = options.prompt ?? options.input?.text ?? "";
-
-          // Build base result structure - common to both paths
-          const baseResult: EnhancedGenerateResult = {
-            content: textToSynthesize,
-            provider: options.provider ?? this.providerName,
-            model: this.modelName,
-            usage: { input: 0, output: 0, total: 0 },
-          };
-
-          try {
-            const ttsResult = await TTSProcessor.synthesize(
-              textToSynthesize,
-              options.provider ?? this.providerName,
-              options.tts,
-            );
-            baseResult.audio = ttsResult;
-          } catch (ttsError) {
-            logger.error(
-              `TTS synthesis failed in Mode 1 (direct input synthesis):`,
-              ttsError,
-            );
-            // baseResult remains without audio - graceful degradation
-          }
-
-          // Call enhanceResult for consistency - enables analytics/evaluation for TTS-only requests
-          return await this.enhanceResult(baseResult, options, startTime);
-        }
-
-        // ===== Normal AI Generation Flow =====
-        const { tools, model } = await this.prepareGenerationContext(options);
-        const messages = await this.buildMessages(options);
-
-        // ===== VIDEO ANALYSIS FROM MESSAGES CONTENT =====
-        // Check if video files are present in messages content array
-        // If video analysis is needed, perform it via Gemini, then pass through Claude for formatting
-        if (hasVideoFrames(messages)) {
-          const videoAnalysisResult = await executeVideoAnalysis(messages, {
-            provider: options.provider,
-            providerName: this.providerName,
-            region: options.region,
-            // Don't pass the main conversation model — video analysis uses
-            // Google's Gemini API (generateContent) which only supports Gemini models.
-            // Let videoAnalysisProcessor use its own default (gemini-2.5-flash).
-          });
-
-          // Extract user's original text from messages (excluding image parts)
-          const userTextParts = messages
-            .filter((m) => m.role === "user")
-            .flatMap((m) =>
-              Array.isArray(m.content)
-                ? m.content
-                    .filter(
-                      (p): p is { type: "text"; text: string } =>
-                        p.type === "text",
-                    )
-                    .map((p) => p.text)
-                : [typeof m.content === "string" ? m.content : ""],
-            )
-            .filter(Boolean);
-          const userText = userTextParts.join("\n").trim();
-
-          // Pass Gemini's analysis through Claude for structured JSON formatting
-          // The system prompt (from Curator) includes JSON_REPORT_PROMPT_SUFFIX
-          // which instructs Claude to output {"summary": "...", "details": "..."}
-          let formattedContent = videoAnalysisResult;
-          let usage = { input: 0, output: 0, total: 0 };
-
-          if (options.systemPrompt) {
-            try {
-              const formattingPrompt = userText
-                ? `The user asked: "${userText}"\n\nHere is the video/image analysis result from the visual analysis system:\n\n${videoAnalysisResult}\n\nBased on this analysis, provide your response.`
-                : `Here is a video/image analysis result from the visual analysis system:\n\n${videoAnalysisResult}\n\nBased on this analysis, provide your response.`;
-
-              logger.debug("[VideoAnalysis] Formatting via Claude", {
-                userTextLength: userText.length,
-                analysisLength: videoAnalysisResult.length,
-              });
-
-              const formattedResult = await generateText({
-                model,
-                system: options.systemPrompt,
-                messages: [
-                  { role: "user" as const, content: formattingPrompt },
-                ],
-                maxOutputTokens: options.maxTokens || 8192,
-                temperature: 0.3,
-                abortSignal: options.abortSignal,
-                experimental_telemetry:
-                  this.telemetryHandler?.getTelemetryConfig(
-                    options,
-                    "generate",
-                  ),
-              });
-
-              formattedContent = formattedResult.text;
-              usage = {
-                input: formattedResult.usage?.inputTokens || 0,
-                output: formattedResult.usage?.outputTokens || 0,
-                total:
-                  (formattedResult.usage?.inputTokens || 0) +
-                  (formattedResult.usage?.outputTokens || 0),
-              };
-
-              logger.debug("[VideoAnalysis] Claude formatting complete", {
-                formattedLength: formattedContent.length,
-                usage,
-              });
-            } catch (error) {
-              logger.warn(
-                "[VideoAnalysis] Claude formatting failed, using raw Gemini output",
-                {
-                  error: error instanceof Error ? error.message : String(error),
-                },
-              );
-              // formattedContent remains as raw videoAnalysisResult (graceful degradation)
-            }
-          }
-
-          const videoResult: EnhancedGenerateResult = {
-            content: formattedContent,
-            provider: options.provider ?? this.providerName,
-            model: this.modelName,
-            usage,
-          };
-
-          return await this.enhanceResult(videoResult, options, startTime);
-        }
-
-        // Compose timeout signal with user-provided abort signal (mirrors stream path)
-        const timeoutController = createTimeoutController(
-          options.timeout,
-          this.providerName,
-          "generate",
-        );
-        const composedSignal = composeAbortSignals(
-          options.abortSignal,
-          timeoutController?.controller.signal,
-        );
-        const composedOptions = composedSignal
-          ? { ...options, abortSignal: composedSignal }
-          : options;
-
-        let generateResult: Awaited<ReturnType<typeof generateText>>;
-        try {
-          generateResult = await this.executeGeneration(
-            model,
-            messages,
-            tools,
-            composedOptions,
-          );
-        } finally {
-          timeoutController?.cleanup();
-        }
-
-        this.analyzeAIResponse(
-          generateResult as unknown as Record<string, unknown>,
-        );
-        this.logGenerationComplete(generateResult);
-        const responseTime = Date.now() - startTime;
-        await this.recordPerformanceMetrics(generateResult.usage, responseTime);
-
-        const { toolsUsed, toolExecutions } =
-          this.extractToolInformation(generateResult);
-        let enhancedResult = this.formatEnhancedResult(
-          generateResult,
-          tools,
-          toolsUsed,
-          toolExecutions,
-          options,
-        );
-
-        // ===== TTS MODE 2: AI Response Synthesis (useAiResponse=true) =====
-        // Synthesize AI-generated response after generation completes
-        if (options.tts?.enabled && options.tts?.useAiResponse) {
-          const aiResponse = enhancedResult.content;
-          const provider = options.provider ?? this.providerName;
-
-          // Validate AI response and provider before synthesis
-          if (aiResponse && provider) {
-            try {
-              const ttsResult = await TTSProcessor.synthesize(
-                aiResponse,
-                provider,
-                options.tts,
-              );
-
-              // Add audio to enhanced result (TTSProcessor already includes latency in metadata)
-              enhancedResult = {
-                ...enhancedResult,
-                audio: ttsResult,
-              };
-            } catch (ttsError) {
-              // Log TTS error but continue with text-only result
-              logger.error(
-                `TTS synthesis failed in Mode 2 (AI response synthesis):`,
-                ttsError,
-              );
-              // enhancedResult remains unchanged (no audio field added)
-            }
-          } else {
-            logger.warn(`TTS synthesis skipped despite being enabled`, {
-              provider: this.providerName,
-              hasAiResponse: !!aiResponse,
-              aiResponseLength: aiResponse?.length ?? 0,
-              hasProvider: !!provider,
-              ttsConfig: {
-                enabled: options.tts?.enabled,
-                useAiResponse: options.tts?.useAiResponse,
-              },
-              reason: !aiResponse
-                ? "AI response is empty or undefined"
-                : "Provider is missing",
-            });
-          }
-        }
-
-        // Observability: record successful generate span with token/cost data
-        let enrichedGenerateSpan = { ...metricsSpan };
-        if (enhancedResult?.usage) {
-          enrichedGenerateSpan = SpanSerializer.enrichWithTokenUsage(
-            enrichedGenerateSpan,
-            {
-              promptTokens: enhancedResult.usage.input || 0,
-              completionTokens: enhancedResult.usage.output || 0,
-              totalTokens: enhancedResult.usage.total || 0,
-            },
-          );
-          const cost = calculateCost(this.providerName, this.modelName, {
-            input: enhancedResult.usage.input || 0,
-            output: enhancedResult.usage.output || 0,
-            total: enhancedResult.usage.total || 0,
-          });
-          if (cost && cost > 0) {
-            enrichedGenerateSpan = SpanSerializer.enrichWithCost(
-              enrichedGenerateSpan,
-              {
-                totalCost: cost,
-              },
-            );
-          }
-        }
-        const _endedGenerateSpan = SpanSerializer.endSpan(
-          enrichedGenerateSpan,
-          SpanStatus.OK,
-        );
-        // Note: Do NOT record to getMetricsAggregator() here — the neurolink.ts
-        // generation:end listener creates an authoritative span with richer context
-        // (provider name, model, input/output) and records to both aggregators.
-        // Recording here would double-count cost and token metrics.
-
-        return await this.enhanceResult(enhancedResult, options, startTime);
-      } catch (error) {
-        // Observability: record failed generate span
-        const _endedGenerateSpan = SpanSerializer.endSpan(
-          metricsSpan,
-          SpanStatus.ERROR,
-          error instanceof Error ? error.message : String(error),
-        );
-        // Note: Do NOT record to getMetricsAggregator() here — neurolink.ts
-        // handles authoritative metrics recording to avoid double-counting.
-
-        otelSpan.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
-        });
-        otelSpan.end();
-        otelSpanEnded = true;
-
-        // Abort errors are expected when a generation is cancelled — log at info, not error
-        if (isAbortError(error)) {
-          logger.info(`Generate aborted for ${this.providerName}`, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        } else {
-          logger.error(`Generate failed for ${this.providerName}:`, error);
-        }
-        throw this.handleProviderError(error);
-      } finally {
-        if (!otelSpanEnded) {
-          otelSpan.setStatus({ code: SpanStatusCode.OK });
-          otelSpan.end();
-        }
-      }
-    }); // end context.with
+    return await context.with(activeCtx, async () =>
+      this.runGenerateInActiveContext(
+        options,
+        startTime,
+        metricsSpan,
+        otelSpan,
+        otelSpanState,
+      ),
+    );
   }
   /**
    * Alias for generate method - implements AIProvider interface
@@ -1081,6 +774,335 @@ export abstract class BaseProvider implements AIProvider {
     analysisSchema?: ValidationSchema,
   ): Promise<EnhancedGenerateResult | null> {
     return this.generate(optionsOrPrompt, analysisSchema);
+  }
+
+  private async runGenerateInActiveContext(
+    options: TextGenerationOptions,
+    startTime: number,
+    metricsSpan: ReturnType<typeof SpanSerializer.createSpan>,
+    otelSpan: ReturnType<typeof tracers.provider.startSpan>,
+    otelSpanState: { ended: boolean },
+  ): Promise<EnhancedGenerateResult | null> {
+    try {
+      if (options.output?.mode === "video") {
+        return await this.handleVideoGeneration(options, startTime);
+      }
+
+      const isImageModel = IMAGE_GENERATION_MODELS.some((m) =>
+        this.modelName.includes(m),
+      );
+      if (isImageModel) {
+        logger.info(
+          `Image generation model detected, routing to executeImageGeneration`,
+          {
+            provider: this.providerName,
+            model: this.modelName,
+          },
+        );
+
+        const imageResult = await this.executeImageGeneration(options);
+        return await this.enhanceResult(imageResult, options, startTime);
+      }
+
+      if (options.tts?.enabled && !options.tts?.useAiResponse) {
+        return this.handleDirectTTSSynthesis(options, startTime);
+      }
+
+      const { tools, model } = await this.prepareGenerationContext(options);
+      const messages = await this.buildMessages(options);
+      const videoFrameResult = await this.handleVideoFrameGeneration(
+        options,
+        messages,
+        model,
+        startTime,
+      );
+      if (videoFrameResult) {
+        return videoFrameResult;
+      }
+
+      return await this.executeStandardGenerateFlow(
+        options,
+        startTime,
+        metricsSpan,
+        model,
+        messages,
+        tools,
+      );
+    } catch (error) {
+      SpanSerializer.endSpan(
+        metricsSpan,
+        SpanStatus.ERROR,
+        error instanceof Error ? error.message : String(error),
+      );
+      otelSpan.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      otelSpan.end();
+      otelSpanState.ended = true;
+
+      if (isAbortError(error)) {
+        logger.info(`Generate aborted for ${this.providerName}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      } else {
+        logger.error(`Generate failed for ${this.providerName}:`, error);
+      }
+      throw this.handleProviderError(error);
+    } finally {
+      if (!otelSpanState.ended) {
+        otelSpan.setStatus({ code: SpanStatusCode.OK });
+        otelSpan.end();
+      }
+    }
+  }
+
+  private async handleDirectTTSSynthesis(
+    options: TextGenerationOptions,
+    startTime: number,
+  ): Promise<EnhancedGenerateResult> {
+    const textToSynthesize = options.prompt ?? options.input?.text ?? "";
+    const baseResult: EnhancedGenerateResult = {
+      content: textToSynthesize,
+      provider: options.provider ?? this.providerName,
+      model: this.modelName,
+      usage: { input: 0, output: 0, total: 0 },
+    };
+
+    try {
+      if (!options.tts) {
+        return this.enhanceResult(baseResult, options, startTime);
+      }
+      baseResult.audio = await TTSProcessor.synthesize(
+        textToSynthesize,
+        options.provider ?? this.providerName,
+        options.tts,
+      );
+    } catch (ttsError) {
+      logger.error(
+        `TTS synthesis failed in Mode 1 (direct input synthesis):`,
+        ttsError,
+      );
+    }
+
+    return this.enhanceResult(baseResult, options, startTime);
+  }
+
+  private async handleVideoFrameGeneration(
+    options: TextGenerationOptions,
+    messages: ModelMessage[],
+    model: LanguageModel,
+    startTime: number,
+  ): Promise<EnhancedGenerateResult | null> {
+    if (!hasVideoFrames(messages)) {
+      return null;
+    }
+
+    const videoAnalysisResult = await executeVideoAnalysis(messages, {
+      provider: options.provider,
+      providerName: this.providerName,
+      region: options.region,
+    });
+    const userText = messages
+      .filter((m) => m.role === "user")
+      .flatMap((m) =>
+        Array.isArray(m.content)
+          ? m.content
+              .filter(
+                (p): p is { type: "text"; text: string } => p.type === "text",
+              )
+              .map((p) => p.text)
+          : [typeof m.content === "string" ? m.content : ""],
+      )
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+
+    let formattedContent = videoAnalysisResult;
+    let usage = { input: 0, output: 0, total: 0 };
+
+    if (options.systemPrompt) {
+      try {
+        const formattingPrompt = userText
+          ? `The user asked: "${userText}"\n\nHere is the video/image analysis result from the visual analysis system:\n\n${videoAnalysisResult}\n\nBased on this analysis, provide your response.`
+          : `Here is a video/image analysis result from the visual analysis system:\n\n${videoAnalysisResult}\n\nBased on this analysis, provide your response.`;
+
+        logger.debug("[VideoAnalysis] Formatting via Claude", {
+          userTextLength: userText.length,
+          analysisLength: videoAnalysisResult.length,
+        });
+
+        const formattedResult = await generateText({
+          model,
+          system: options.systemPrompt,
+          messages: [{ role: "user" as const, content: formattingPrompt }],
+          maxOutputTokens: options.maxTokens || 8192,
+          temperature: 0.3,
+          abortSignal: options.abortSignal,
+          experimental_telemetry: this.telemetryHandler?.getTelemetryConfig(
+            options,
+            "generate",
+          ),
+        });
+        formattedContent = formattedResult.text;
+        usage = {
+          input: formattedResult.usage?.inputTokens || 0,
+          output: formattedResult.usage?.outputTokens || 0,
+          total:
+            (formattedResult.usage?.inputTokens || 0) +
+            (formattedResult.usage?.outputTokens || 0),
+        };
+
+        logger.debug("[VideoAnalysis] Claude formatting complete", {
+          formattedLength: formattedContent.length,
+          usage,
+        });
+      } catch (error) {
+        logger.warn(
+          "[VideoAnalysis] Claude formatting failed, using raw Gemini output",
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+      }
+    }
+
+    return this.enhanceResult(
+      {
+        content: formattedContent,
+        provider: options.provider ?? this.providerName,
+        model: this.modelName,
+        usage,
+      },
+      options,
+      startTime,
+    );
+  }
+
+  private async executeStandardGenerateFlow(
+    options: TextGenerationOptions,
+    startTime: number,
+    metricsSpan: ReturnType<typeof SpanSerializer.createSpan>,
+    model: LanguageModel,
+    messages: ModelMessage[],
+    tools: Record<string, Tool>,
+  ): Promise<EnhancedGenerateResult> {
+    const timeoutController = createTimeoutController(
+      options.timeout,
+      this.providerName,
+      "generate",
+    );
+    const composedSignal = composeAbortSignals(
+      options.abortSignal,
+      timeoutController?.controller.signal,
+    );
+    const composedOptions = composedSignal
+      ? { ...options, abortSignal: composedSignal }
+      : options;
+
+    let generateResult: Awaited<ReturnType<typeof generateText>>;
+    try {
+      generateResult = await this.executeGeneration(
+        model,
+        messages,
+        tools,
+        composedOptions,
+      );
+    } finally {
+      timeoutController?.cleanup();
+    }
+
+    this.analyzeAIResponse(
+      generateResult as unknown as Record<string, unknown>,
+    );
+    this.logGenerationComplete(generateResult);
+    const responseTime = Date.now() - startTime;
+    await this.recordPerformanceMetrics(generateResult.usage, responseTime);
+
+    const { toolsUsed, toolExecutions } =
+      this.extractToolInformation(generateResult);
+    let enhancedResult = this.formatEnhancedResult(
+      generateResult,
+      tools,
+      toolsUsed,
+      toolExecutions,
+      options,
+    );
+    enhancedResult = await this.synthesizeAIResponseIfNeeded(
+      enhancedResult,
+      options,
+    );
+
+    let enrichedGenerateSpan = { ...metricsSpan };
+    if (enhancedResult?.usage) {
+      enrichedGenerateSpan = SpanSerializer.enrichWithTokenUsage(
+        enrichedGenerateSpan,
+        {
+          promptTokens: enhancedResult.usage.input || 0,
+          completionTokens: enhancedResult.usage.output || 0,
+          totalTokens: enhancedResult.usage.total || 0,
+        },
+      );
+      const cost = calculateCost(this.providerName, this.modelName, {
+        input: enhancedResult.usage.input || 0,
+        output: enhancedResult.usage.output || 0,
+        total: enhancedResult.usage.total || 0,
+      });
+      if (cost && cost > 0) {
+        enrichedGenerateSpan = SpanSerializer.enrichWithCost(
+          enrichedGenerateSpan,
+          { totalCost: cost },
+        );
+      }
+    }
+    SpanSerializer.endSpan(enrichedGenerateSpan, SpanStatus.OK);
+    return this.enhanceResult(enhancedResult, options, startTime);
+  }
+
+  private async synthesizeAIResponseIfNeeded(
+    enhancedResult: EnhancedGenerateResult,
+    options: TextGenerationOptions,
+  ): Promise<EnhancedGenerateResult> {
+    if (!options.tts?.enabled || !options.tts?.useAiResponse) {
+      return enhancedResult;
+    }
+
+    const aiResponse = enhancedResult.content;
+    const provider = options.provider ?? this.providerName;
+    if (!aiResponse || !provider) {
+      logger.warn(`TTS synthesis skipped despite being enabled`, {
+        provider: this.providerName,
+        hasAiResponse: !!aiResponse,
+        aiResponseLength: aiResponse?.length ?? 0,
+        hasProvider: !!provider,
+        ttsConfig: {
+          enabled: options.tts?.enabled,
+          useAiResponse: options.tts?.useAiResponse,
+        },
+        reason: !aiResponse
+          ? "AI response is empty or undefined"
+          : "Provider is missing",
+      });
+      return enhancedResult;
+    }
+
+    try {
+      const ttsResult = await TTSProcessor.synthesize(
+        aiResponse,
+        provider,
+        options.tts,
+      );
+      return {
+        ...enhancedResult,
+        audio: ttsResult,
+      };
+    } catch (ttsError) {
+      logger.error(
+        `TTS synthesis failed in Mode 2 (AI response synthesis):`,
+        ttsError,
+      );
+      return enhancedResult;
+    }
   }
 
   /**

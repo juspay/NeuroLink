@@ -137,14 +137,17 @@ export function parseClaudeRequest(body: ClaudeRequest): ParsedClaudeRequest {
         } else if (block.type === "tool_use") {
           // Preserve assistant tool_use blocks so multi-turn tool
           // conversations retain the full call/result chain.
-          const inputStr = block.input !== undefined ? JSON.stringify(block.input) : "{}";
+          const inputStr =
+            block.input !== undefined ? JSON.stringify(block.input) : "{}";
           textParts.push(`[tool_use:${block.id}:${block.name}] ${inputStr}`);
         } else if (block.type === "tool_result") {
           const resultContent =
             typeof block.content === "string"
               ? block.content
               : Array.isArray(block.content)
-                ? block.content.map((b) => (b.type === "text" ? b.text : `[${b.type}]`)).join("\n")
+                ? block.content
+                    .map((b) => (b.type === "text" ? b.text : `[${b.type}]`))
+                    .join("\n")
                 : "";
           textParts.push(`[tool_result:${block.tool_use_id}] ${resultContent}`);
         } else if (block.type) {
@@ -152,7 +155,8 @@ export function parseClaudeRequest(body: ClaudeRequest): ParsedClaudeRequest {
           // so they are visible in translated history instead of silently dropped.
           const { type, ...rest } = block;
           const preview = JSON.stringify(rest);
-          const truncated = preview.length > 200 ? preview.slice(0, 200) + "…" : preview;
+          const truncated =
+            preview.length > 200 ? preview.slice(0, 200) + "…" : preview;
           textParts.push(`[${type}: ${truncated}]`);
         }
       }
@@ -203,12 +207,15 @@ export function parseClaudeRequest(body: ClaudeRequest): ParsedClaudeRequest {
   let thinkingConfig: ParsedClaudeRequest["thinkingConfig"];
   if (body.thinking) {
     // Claude thinking types: "enabled" (fixed budget), "adaptive" (auto budget), "disabled"
-    const isEnabled = body.thinking.type === "enabled" || body.thinking.type === "adaptive";
+    const isEnabled =
+      body.thinking.type === "enabled" || body.thinking.type === "adaptive";
     thinkingConfig = {
       enabled: isEnabled,
       budgetTokens: body.thinking.budget_tokens,
       // Pass the raw type so providers can map "adaptive" appropriately
-      ...(body.thinking.type === "adaptive" ? { thinkingLevel: "medium" as const } : {}),
+      ...(body.thinking.type === "adaptive"
+        ? { thinkingLevel: "medium" as const }
+        : {}),
     };
   }
 
@@ -261,10 +268,15 @@ function mapStopReason(finishReason: string | undefined): string | null {
 /**
  * Serialize a NeuroLink GenerateResult into a Claude Messages API response.
  */
-export function serializeClaudeResponse(result: InternalResult, requestModel: string): ClaudeResponse {
+export function serializeClaudeResponse(
+  result: InternalResult,
+  requestModel: string,
+): ClaudeResponse {
   const content: ClaudeContentBlock[] = [];
   const inferredFinishReason =
-    result.toolCalls && result.toolCalls.length > 0 && (!result.finishReason || result.finishReason === "stop")
+    result.toolCalls &&
+    result.toolCalls.length > 0 &&
+    (!result.finishReason || result.finishReason === "stop")
       ? "tool_use"
       : result.finishReason;
 
@@ -354,7 +366,11 @@ function errorTypeFromStatus(status: number): string {
 /**
  * Build a Claude-compatible error envelope.
  */
-export function buildClaudeError(status: number, message: string, errorType?: string): ClaudeErrorResponse {
+export function buildClaudeError(
+  status: number,
+  message: string,
+  errorType?: string,
+): ClaudeErrorResponse {
   return {
     type: "error",
     error: {
@@ -650,7 +666,9 @@ export class ClaudeStreamSerializer {
 
     this.outputTokens = outputTokens ?? this.outputTokens;
     const resolvedFinishReason =
-      this.sawToolUseBlock && (!finishReason || finishReason === "stop") ? "tool_use" : finishReason;
+      this.sawToolUseBlock && (!finishReason || finishReason === "stop")
+        ? "tool_use"
+        : finishReason;
 
     // Close any open content block
     yield* this.closeCurrentBlock();

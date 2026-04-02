@@ -84,7 +84,7 @@ export class RedisTaskStore implements TaskStore {
   async save(task: Task): Promise<void> {
     const client = this.getClient();
     await client.hSet(TASKS_HASH, task.id, JSON.stringify(task));
-    this.applyRetentionTTL(task);
+    this.applyRetentionTTL(task, client);
   }
 
   async get(taskId: string): Promise<Task | null> {
@@ -126,7 +126,7 @@ export class RedisTaskStore implements TaskStore {
     };
 
     await client.hSet(TASKS_HASH, taskId, JSON.stringify(updated));
-    this.applyRetentionTTL(updated);
+    this.applyRetentionTTL(updated, client);
     return updated;
   }
 
@@ -227,7 +227,7 @@ export class RedisTaskStore implements TaskStore {
    * Set Redis TTL on terminal-state tasks so they auto-expire.
    * Active and paused tasks never expire.
    */
-  private applyRetentionTTL(task: Task): void {
+  private applyRetentionTTL(task: Task, client: RedisClient): void {
     // We don't set EXPIRE on the hash field directly (Redis doesn't support per-field TTL).
     // Instead, run logs and history keys get TTL. The task hash field itself must be
     // cleaned up via manual deletion or BullMQ's built-in job cleanup.
@@ -238,20 +238,34 @@ export class RedisTaskStore implements TaskStore {
     };
 
     const ttlMs = ttlMap[task.status];
-    if (ttlMs) {
-      const client = this.getClient();
-      const ttlSeconds = Math.ceil(ttlMs / 1000);
-      // Set TTL on associated keys
-      client.expire(taskRunsKey(task.id), ttlSeconds).catch((err) => {
-        logger.debug("[TaskStore:Redis] Failed to set TTL", {
-          error: String(err),
-        });
-      });
-      client.expire(taskHistoryKey(task.id), ttlSeconds).catch((err) => {
-        logger.debug("[TaskStore:Redis] Failed to set TTL", {
-          error: String(err),
-        });
-      });
+    if (!ttlMs || !client.isOpen) {
+      return;
     }
+
+    const ttlSeconds = Math.ceil(ttlMs / 1000);
+    // Set TTL on associated keys best-effort. A successful task write should not
+    // be surfaced as a failure just because the retention metadata could not be updated.
+    client.expire(taskRunsKey(task.id), ttlSeconds).catch((err) => {
+      logger.warn(
+        "[TaskStore:Redis] Failed to set TTL on task runs key — task data may outlive retention window",
+        {
+          taskId: task.id,
+          key: taskRunsKey(task.id),
+          ttlSeconds,
+          error: String(err),
+        },
+      );
+    });
+    client.expire(taskHistoryKey(task.id), ttlSeconds).catch((err) => {
+      logger.warn(
+        "[TaskStore:Redis] Failed to set TTL on task history key — task data may outlive retention window",
+        {
+          taskId: task.id,
+          key: taskHistoryKey(task.id),
+          ttlSeconds,
+          error: String(err),
+        },
+      );
+    });
   }
 }

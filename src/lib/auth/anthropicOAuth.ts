@@ -106,6 +106,7 @@ export type ClaudeCodeIdentity = {
 };
 
 const CLAUDE_CODE_IDENTITY_TTL_MS = 3_600_000;
+const CLAUDE_CODE_IDENTITY_CACHE_MAX_ENTRIES = 1024;
 const CLAUDE_CODE_IDENTITY_NAMESPACE = "neurolink-claude-code-identity-v1";
 const claudeCodeIdentityCache = new Map<
   string,
@@ -239,6 +240,7 @@ export function getOrCreateClaudeCodeIdentity(
     }),
     expiresAt: now + CLAUDE_CODE_IDENTITY_TTL_MS,
   };
+  enforceClaudeCodeIdentityCacheLimit(now);
   claudeCodeIdentityCache.set(cacheKey, identity);
   return identity;
 }
@@ -252,6 +254,20 @@ export function purgeExpiredClaudeCodeIdentities(now = Date.now()): number {
     }
   }
   return removed;
+}
+
+function enforceClaudeCodeIdentityCacheLimit(now = Date.now()): void {
+  purgeExpiredClaudeCodeIdentities(now);
+
+  while (
+    claudeCodeIdentityCache.size >= CLAUDE_CODE_IDENTITY_CACHE_MAX_ENTRIES
+  ) {
+    const oldestKey = claudeCodeIdentityCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    claudeCodeIdentityCache.delete(oldestKey);
+  }
 }
 
 export function buildStableClaudeCodeBillingHeader(

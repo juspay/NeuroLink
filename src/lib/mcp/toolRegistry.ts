@@ -22,6 +22,7 @@ import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
 import { directAgentTools } from "../agent/directTools.js";
 import { detectCategory, createMCPServerInfo } from "../utils/mcpDefaults.js";
 import { FlexibleToolValidator } from "./flexibleToolValidator.js";
+import { ErrorFactory } from "../utils/errorHandling.js";
 import type { HITLManager } from "../types/hitlTypes.js";
 import { HITLUserRejectedError, HITLTimeoutError } from "../hitl/hitlErrors.js";
 import { withSpan, tracers, ATTR } from "../telemetry/index.js";
@@ -346,31 +347,7 @@ export class MCPToolRegistry extends MCPRegistry {
             },
           );
 
-          // Try to find the tool by fully-qualified name first
-          let tool = this.tools.get(toolName);
-          registryLogger.info(
-            `🔍 [TOOL_LOOKUP] Direct lookup result for '${toolName}':`,
-            !!tool,
-          );
-
-          // If not found, search for tool by name across all entries (for backward compatibility)
-          let toolId = toolName;
-          if (!tool) {
-            const matches = Array.from(this.tools.entries()).filter(
-              ([, toolInfo]) => toolInfo.name === toolName,
-            );
-            if (matches.length > 1) {
-              throw new Error(
-                `Ambiguous tool name '${toolName}'. Use fully-qualified name 'serverId.${toolName}'.`,
-              );
-            }
-            if (matches.length === 1) {
-              const [candidateToolId, toolInfo] = matches[0];
-              tool = toolInfo;
-              toolId = candidateToolId;
-            }
-          }
-
+          const { tool, toolId } = this.resolveToolExecutionTarget(toolName);
           if (!tool) {
             throw new Error(`Tool '${toolName}' not found in registry`);
           }
@@ -386,21 +363,7 @@ export class MCPToolRegistry extends MCPRegistry {
           span.setAttribute("tool.type", toolType);
           span.setAttribute(ATTR.MCP_SERVER_ID, serverId);
 
-          // Try to get auth context if available
-          let authUserId: string | undefined;
-          try {
-            const authCtx = getAuthContext();
-            authUserId = authCtx?.user?.id;
-          } catch {
-            // Auth context not available — that's fine
-          }
-
-          // Create execution context if not provided
-          const execContext: ExecutionContext = {
-            ...context,
-            sessionId: context?.sessionId ?? randomUUID(),
-            userId: context?.userId ?? authUserId,
-          };
+          const execContext = this.createExecutionContext(context);
 
           // Get the tool implementation using the resolved toolId
           const toolImpl = this.toolImplementations.get(toolId);
@@ -700,6 +663,52 @@ export class MCPToolRegistry extends MCPRegistry {
       `Listed ${result.length} unique tools (${filter ? "filtered" : "unfiltered"})`,
     );
     return result;
+  }
+
+  private resolveToolExecutionTarget(toolName: string): {
+    tool: ToolInfo | undefined;
+    toolId: string;
+  } {
+    let tool = this.tools.get(toolName);
+    registryLogger.info(
+      `🔍 [TOOL_LOOKUP] Direct lookup result for '${toolName}':`,
+      !!tool,
+    );
+
+    let toolId = toolName;
+    if (!tool) {
+      const matches = Array.from(this.tools.entries()).filter(
+        ([, toolInfo]) => toolInfo.name === toolName,
+      );
+      if (matches.length > 1) {
+        throw ErrorFactory.toolExecutionFailed(
+          toolName,
+          new Error(
+            `Ambiguous tool name '${toolName}'. Use fully-qualified name 'serverId.${toolName}'.`,
+          ),
+        );
+      }
+      if (matches.length === 1) {
+        [toolId, tool] = matches[0];
+      }
+    }
+
+    return { tool, toolId };
+  }
+
+  private createExecutionContext(context?: ExecutionContext): ExecutionContext {
+    let authUserId: string | undefined;
+    try {
+      authUserId = getAuthContext()?.user?.id;
+    } catch {
+      // Auth context not available — that's fine
+    }
+
+    return {
+      ...context,
+      sessionId: context?.sessionId ?? randomUUID(),
+      userId: context?.userId ?? authUserId,
+    };
   }
 
   /**

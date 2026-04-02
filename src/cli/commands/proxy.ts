@@ -13,7 +13,7 @@
 import type { CommandModule, Argv } from "yargs";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
 import { logger } from "../../lib/utils/logger.js";
@@ -386,6 +386,727 @@ export function mapClaudeErrorTypeToStatus(errorType?: string): number {
   }
 }
 
+type ProxySpinner = ReturnType<typeof ora> | null;
+type ProxyStartStrategy = "round-robin" | "fill-first";
+type ProxyModelRouterConfig = ConstructorParameters<typeof ModelRouter>[0];
+type LoadedProxyConfig = {
+  routing?: Partial<ProxyModelRouterConfig> & {
+    strategy?: ProxyStartStrategy;
+  };
+};
+type ProxyNeurolinkRuntime = Awaited<
+  ReturnType<typeof createProxyNeurolinkRuntime>
+>;
+type ProxyStartApp = Awaited<ReturnType<typeof createProxyStartApp>>;
+
+async function ensureProxyStartAllowed(spinner: ProxySpinner): Promise<void> {
+  const existingState = loadProxyState();
+  if (existingState) {
+    if (isProcessRunning(existingState.pid)) {
+      if (spinner) {
+        spinner.fail(
+          chalk.red(
+            `Proxy already running on port ${existingState.port} (PID: ${existingState.pid})`,
+          ),
+        );
+      }
+      logger.always(
+        chalk.yellow(
+          "Stop it first or use 'neurolink proxy status' to inspect",
+        ),
+      );
+      process.exit(process.ppid === 1 ? 0 : 1);
+    }
+    clearProxyState();
+  }
+
+  if (process.ppid === 1 || !(await isLaunchdManaging())) {
+    return;
+  }
+
+  if (spinner) {
+    spinner.fail(
+      chalk.red(
+        "Proxy is managed by launchd. Manual start would cause port conflicts.",
+      ),
+    );
+  }
+  logger.always(
+    chalk.yellow(
+      "Use 'neurolink proxy uninstall' to remove the service first, " +
+        "or 'launchctl kickstart gui/$(id -u)/com.neurolink.proxy' to restart.",
+    ),
+  );
+  process.exit(1);
+}
+
+async function loadProxyStartEnv(
+  argv: ProxyStartArgs,
+  spinner: ProxySpinner,
+): Promise<string | undefined> {
+  try {
+    const envResult = await loadProxyEnvFile({
+      explicitEnvFile: argv.envFile,
+    });
+    if (spinner && envResult.path) {
+      spinner.text = `Loaded proxy env from ${envResult.path}`;
+    }
+    return envResult.path;
+  } catch (error) {
+    if (spinner) {
+      spinner.fail(
+        chalk.red(error instanceof Error ? error.message : String(error)),
+      );
+    }
+    process.exit(1);
+  }
+}
+
+async function createProxyNeurolinkRuntime() {
+  process.env.NEUROLINK_SKIP_MCP = "true";
+
+  const { NeuroLink } = await import("../../lib/neurolink.js");
+  const neurolink = new NeuroLink();
+  const { initRequestLogger, cleanupLogs } =
+    await import("../../lib/proxy/requestLogger.js");
+
+  initRequestLogger(true);
+  cleanupLogs(7, 500);
+
+  return { neurolink, cleanupLogs };
+}
+
+async function loadProxyStartConfiguration(
+  argv: ProxyStartArgs,
+  spinner: ProxySpinner,
+): Promise<{
+  configPath: string;
+  proxyConfig: LoadedProxyConfig | null;
+  strategy: ProxyStartStrategy;
+  modelRouter: ModelRouter | undefined;
+  passthrough: boolean;
+}> {
+  const configPath =
+    argv.config ?? join(homedir(), ".neurolink", "proxy-config.yaml");
+  let proxyConfig: LoadedProxyConfig | null = null;
+
+  try {
+    const { loadProxyConfig } = await import("../../lib/proxy/proxyConfig.js");
+    proxyConfig = (await loadProxyConfig(configPath)) as LoadedProxyConfig;
+    if (spinner) {
+      spinner.text = `Loaded proxy config from ${configPath}`;
+    }
+  } catch (configError) {
+    if (argv.config) {
+      if (spinner) {
+        spinner.fail(chalk.red(`Failed to load proxy config: ${configPath}`));
+      }
+      process.exit(1);
+    }
+    const isNotFound =
+      configError instanceof Error &&
+      "code" in configError &&
+      (configError as NodeJS.ErrnoException).code === "ENOENT";
+    if (!isNotFound) {
+      logger.warn(
+        `[proxy] Ignoring default config ${configPath}: ${configError instanceof Error ? configError.message : String(configError)}`,
+      );
+    }
+  }
+
+  const strategy = (argv.strategy ??
+    proxyConfig?.routing?.strategy ??
+    "fill-first") as ProxyStartStrategy;
+  let modelRouter: ModelRouter | undefined;
+
+  if (proxyConfig?.routing) {
+    const { ModelRouter } = await import("../../lib/proxy/modelRouter.js");
+    modelRouter = new ModelRouter({
+      strategy,
+      modelMappings: proxyConfig.routing.modelMappings ?? [],
+      fallbackChain: proxyConfig.routing.fallbackChain ?? [],
+      passthroughModels: proxyConfig.routing.passthroughModels,
+    });
+  }
+
+  return {
+    configPath,
+    proxyConfig,
+    strategy,
+    modelRouter,
+    passthrough: argv.passthrough ?? false,
+  };
+}
+
+async function createProxyStartApp(params: {
+  neurolink: ProxyNeurolinkRuntime["neurolink"];
+  modelRouter: ModelRouter | undefined;
+  strategy: ProxyStartStrategy;
+  passthrough: boolean;
+  port: number;
+  host: string;
+  proxyConfig: LoadedProxyConfig | null;
+}) {
+  const { createClaudeProxyRoutes } =
+    await import("../../lib/server/routes/claudeProxyRoutes.js");
+  const { Hono } = await import("hono");
+
+  const app = new Hono();
+  app.onError((err, c) => {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logger.always(`[proxy] unhandled error: ${errMsg}`);
+    if (err instanceof Error && err.stack) {
+      logger.debug(`[proxy] stack: ${err.stack}`);
+    }
+    return c.json(
+      {
+        type: "error",
+        error: {
+          type: "api_error",
+          message: `Proxy internal error: ${errMsg}`,
+        },
+      },
+      502,
+    );
+  });
+
+  const routeGroup = createClaudeProxyRoutes(
+    params.modelRouter,
+    "",
+    params.strategy,
+    params.passthrough,
+  );
+
+  for (const route of routeGroup.routes) {
+    const method = route.method.toLowerCase() as "get" | "post";
+    app[method](route.path, async (c) => {
+      const emptyBody = {};
+      let body: unknown;
+      let rawBody: string | undefined;
+      if (method === "post") {
+        rawBody = await c.req.text().catch(() => undefined);
+        try {
+          body = rawBody ? JSON.parse(rawBody) : emptyBody;
+        } catch {
+          return c.json(
+            {
+              type: "error",
+              error: {
+                type: "invalid_request_error",
+                message: "Request body must be valid JSON",
+              },
+            },
+            400,
+          );
+        }
+      }
+
+      const model = (body as Record<string, unknown>)?.model ?? "-";
+      const stream = (body as Record<string, unknown>)?.stream
+        ? "stream"
+        : "non-stream";
+      const bodyRec = body as Record<string, unknown> | undefined;
+      const toolCount = Array.isArray(bodyRec?.tools)
+        ? (bodyRec.tools as unknown[]).length
+        : 0;
+      logger.always(
+        `[proxy] ${c.req.method} ${c.req.path} → model=${model} ${stream} tools=${toolCount}`,
+      );
+
+      const ctx = {
+        requestId: crypto.randomUUID(),
+        method: c.req.method,
+        path: c.req.path,
+        headers: Object.fromEntries(c.req.raw.headers.entries()),
+        query: Object.fromEntries(new URL(c.req.url).searchParams.entries()),
+        params: c.req.param() as Record<string, string>,
+        body,
+        rawBody,
+        neurolink: params.neurolink,
+        toolRegistry: params.neurolink.getToolRegistry(),
+        timestamp: Date.now(),
+        metadata: {},
+      } as unknown as Parameters<typeof route.handler>[0];
+
+      const result = await route.handler(ctx);
+      if (result instanceof Response) {
+        return result;
+      }
+
+      if (
+        result &&
+        typeof result === "object" &&
+        Symbol.asyncIterator in Object(result)
+      ) {
+        const iterator = (result as AsyncIterable<string>)[
+          Symbol.asyncIterator
+        ]();
+        let cancelled = false;
+        const responseStream = new ReadableStream({
+          async start(controller) {
+            try {
+              while (!cancelled) {
+                const { value, done } = await iterator.next();
+                if (done) {
+                  break;
+                }
+                controller.enqueue(new TextEncoder().encode(value));
+              }
+              controller.close();
+            } catch (streamErr) {
+              if (cancelled) {
+                controller.close();
+                return;
+              }
+              const errMsg =
+                streamErr instanceof Error
+                  ? streamErr.message
+                  : String(streamErr);
+              const errorEvent = `event: error\ndata: ${JSON.stringify({ type: "error", error: { type: "api_error", message: `Stream interrupted: ${errMsg}` } })}\n\n`;
+              try {
+                controller.enqueue(new TextEncoder().encode(errorEvent));
+              } catch {
+                // Controller already errored — ignore
+              }
+              controller.close();
+            }
+          },
+          async cancel() {
+            cancelled = true;
+            await iterator.return?.();
+          },
+        });
+        return new Response(responseStream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
+
+      if (
+        result &&
+        typeof result === "object" &&
+        "httpStatus" in (result as Record<string, unknown>)
+      ) {
+        const httpResult = result as Record<string, unknown>;
+        const status = (httpResult.httpStatus as number) ?? 200;
+        delete httpResult.httpStatus;
+        return c.json(result, status as 400);
+      }
+
+      if (
+        result &&
+        typeof result === "object" &&
+        "type" in result &&
+        (result as Record<string, unknown>).type === "error"
+      ) {
+        const errorResult = result as {
+          type: string;
+          error?: { type?: string };
+        };
+        const status = mapClaudeErrorTypeToStatus(errorResult.error?.type);
+        return c.json(result, status as 400);
+      }
+
+      return c.json(result ?? {});
+    });
+  }
+
+  app.get("/health", (c) =>
+    c.json({
+      status: "ok",
+      strategy: params.strategy,
+      uptime: process.uptime(),
+      version: PROXY_VERSION,
+    }),
+  );
+
+  app.get("/status", async (c) => {
+    const { getStats } = await import("../../lib/proxy/usageStats.js");
+    const stats = getStats();
+    return c.json({
+      status: "running",
+      pid: process.pid,
+      port: params.port,
+      host: params.host,
+      strategy: params.strategy,
+      uptime: process.uptime(),
+      version: PROXY_VERSION,
+      stats: {
+        totalAttempts: stats.totalAttempts,
+        totalRequests: stats.totalRequests,
+        totalSuccess: stats.totalSuccess,
+        totalErrors: stats.totalErrors,
+        totalRateLimits: stats.totalRateLimits,
+        accounts: Object.values(stats.accounts).map((account) => ({
+          label: account.label,
+          type: account.type,
+          attempts: account.attemptCount,
+          requests: account.attemptCount,
+          success: account.successCount,
+          errors: account.errorCount,
+          rateLimits: account.rateLimitCount,
+          backoffLevel: account.currentBackoffLevel,
+          cooling: account.coolingUntil
+            ? account.coolingUntil > Date.now()
+            : false,
+        })),
+      },
+      config: params.proxyConfig
+        ? { hasRouting: !!params.proxyConfig.routing }
+        : null,
+    });
+  });
+
+  return { app };
+}
+
+async function initializeProxyOpenTelemetry(): Promise<void> {
+  try {
+    const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    if (!process.env.OTEL_SERVICE_NAME) {
+      process.env.OTEL_SERVICE_NAME = "neurolink-proxy";
+    }
+
+    process.env.OTEL_RESOURCE_ATTRIBUTES = [
+      "service.name=neurolink-proxy",
+      `service.version=${PROXY_VERSION}`,
+      "deployment.environment=local",
+      process.env.OTEL_RESOURCE_ATTRIBUTES,
+    ]
+      .filter(Boolean)
+      .join(",");
+
+    const { initializeOpenTelemetry, isOpenTelemetryInitialized } =
+      await import("../../lib/services/server/ai/observability/instrumentation.js");
+    const { buildObservabilityConfigFromEnv } =
+      await import("../../lib/utils/observabilityHelpers.js");
+
+    if (isOpenTelemetryInitialized()) {
+      return;
+    }
+
+    const observabilityConfig = buildObservabilityConfigFromEnv();
+    const langfuseConfig = observabilityConfig?.langfuse;
+    const langfuseEnabled = langfuseConfig?.enabled === true;
+    initializeOpenTelemetry({
+      enabled: langfuseEnabled,
+      publicKey: langfuseConfig?.publicKey || "",
+      secretKey: langfuseConfig?.secretKey || "",
+      baseUrl: langfuseConfig?.baseUrl,
+      environment: "proxy",
+      release: PROXY_VERSION,
+      userId: "neurolink-proxy",
+      autoDetectOperationName: true,
+    });
+
+    if (langfuseEnabled) {
+      logger.always(
+        `[proxy] Langfuse enabled — exporting to ${langfuseConfig.baseUrl || "https://cloud.langfuse.com"} (environment=proxy)`,
+      );
+    }
+    if (otlpEndpoint) {
+      logger.always(
+        `[proxy] OTLP exporter enabled — exporting to ${otlpEndpoint} (service.name=neurolink-proxy)`,
+      );
+    }
+    if (!langfuseEnabled && !otlpEndpoint) {
+      logger.always(
+        "[proxy] OpenTelemetry exporters disabled — set OTEL_EXPORTER_OTLP_ENDPOINT or Langfuse credentials to enable proxy observability",
+      );
+    }
+  } catch (error) {
+    logger.debug(
+      `[proxy] OpenTelemetry init failed (non-fatal): ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+async function refreshProxyTokensInBackground(): Promise<void> {
+  const { needsRefresh, refreshToken, persistTokens } =
+    await import("../../lib/proxy/tokenRefresh.js");
+  const { tokenStore } = await import("../../lib/auth/tokenStore.js");
+
+  try {
+    const allKeys = await tokenStore.listProviders();
+    const anthropicKeys = allKeys.filter((key) => key.startsWith("anthropic:"));
+    for (const key of anthropicKeys) {
+      try {
+        const tokens = await tokenStore.loadTokens(key);
+        if (!tokens) {
+          continue;
+        }
+        const account = {
+          label: key,
+          token: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: tokens.expiresAt,
+        };
+        if (needsRefresh(account)) {
+          const result = await refreshToken(account);
+          if (result.success) {
+            await persistTokens({ providerKey: key }, account);
+            logger.debug(
+              `[proxy] background token refresh succeeded for ${key}`,
+            );
+          }
+        }
+      } catch {
+        // non-fatal per-account
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+
+  try {
+    const credPath = join(
+      homedir(),
+      ".neurolink",
+      "anthropic-credentials.json",
+    );
+    const { readFileSync } = await import("fs");
+    const creds = JSON.parse(readFileSync(credPath, "utf8"));
+    if (!creds.oauth) {
+      return;
+    }
+    const account = {
+      label: "background",
+      token: creds.oauth.accessToken,
+      refreshToken: creds.oauth.refreshToken,
+      expiresAt: creds.oauth.expiresAt,
+    };
+    if (needsRefresh(account)) {
+      const result = await refreshToken(account);
+      if (result.success) {
+        await persistTokens(credPath, account);
+        logger.debug("[proxy] background token refresh succeeded");
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+}
+
+function startProxyBackgroundMaintenance(
+  cleanupLogs: (days: number, maxMb: number) => void,
+): {
+  refreshInterval: NodeJS.Timeout;
+  logCleanupInterval: NodeJS.Timeout;
+} {
+  const refreshInterval = setInterval(() => {
+    void refreshProxyTokensInBackground();
+  }, 30_000);
+  const logCleanupInterval = setInterval(
+    () => {
+      cleanupLogs(7, 500);
+    },
+    60 * 60 * 1000,
+  );
+  return { refreshInterval, logCleanupInterval };
+}
+
+function registerProxyShutdownHandlers(params: {
+  server: { close?: () => void };
+  host: string;
+  port: number;
+  refreshInterval: NodeJS.Timeout;
+  logCleanupInterval: NodeJS.Timeout;
+}): void {
+  const shutdown = async (signal: string) => {
+    clearInterval(params.refreshInterval);
+    clearInterval(params.logCleanupInterval);
+    logger.always(`\nShutting down proxy (${signal})...`);
+
+    try {
+      const { flushOpenTelemetry, shutdownOpenTelemetry } =
+        await import("../../lib/services/server/ai/observability/instrumentation.js");
+      await flushOpenTelemetry();
+      await shutdownOpenTelemetry();
+    } catch {
+      // non-fatal — proxy shutdown must not block on OTel
+    }
+
+    if (signal === "SIGINT") {
+      try {
+        const shutdownHost =
+          params.host === "0.0.0.0" ? "localhost" : params.host;
+        await clearClaudeProxySettings(`http://${shutdownHost}:${params.port}`);
+      } catch {
+        // non-fatal
+      }
+    }
+
+    try {
+      params.server.close?.();
+    } catch {
+      // Best-effort close
+    }
+    clearProxyState();
+    process.exit(signal === "SIGINT" ? 0 : 1);
+  };
+
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
+}
+
+async function startProxyRuntime(params: {
+  argv: ProxyStartArgs;
+  spinner: ProxySpinner;
+  app: ProxyStartApp["app"];
+  host: string;
+  port: number;
+  strategy: ProxyStartStrategy;
+  proxyConfig: LoadedProxyConfig | null;
+  loadedEnvFile: string | undefined;
+  passthrough: boolean;
+  cleanupLogs: ProxyNeurolinkRuntime["cleanupLogs"];
+}): Promise<void> {
+  const { serve } = await import("@hono/node-server");
+  const server = serve({
+    fetch: params.app.fetch,
+    port: params.port,
+    hostname: params.host,
+  });
+  const guardPid = spawnFailOpenGuard(params.host, params.port, process.pid);
+  const fallbackChain: FallbackInfo[] | undefined =
+    params.proxyConfig?.routing?.fallbackChain?.map((entry) => ({
+      provider: entry.provider as string,
+      model: entry.model as string,
+    }));
+
+  saveProxyState({
+    pid: process.pid,
+    port: params.port,
+    host: params.host,
+    strategy: params.strategy,
+    startTime: new Date().toISOString(),
+    envFile: params.loadedEnvFile,
+    fallbackChain,
+    guardPid,
+    managedBy:
+      process.platform === "darwin" && process.ppid === 1
+        ? "launchd"
+        : "manual",
+    passthrough: params.passthrough,
+  });
+
+  if (params.spinner) {
+    params.spinner.succeed(chalk.green("Claude proxy started successfully"));
+  }
+
+  const normalizedHost = params.host === "0.0.0.0" ? "localhost" : params.host;
+  const url = `http://${normalizedHost}:${params.port}`;
+  printProxyBanner(url, params.strategy);
+  logger.always(
+    `  ${chalk.bold("Mode:")}       ${chalk.cyan(params.passthrough ? "passthrough" : "full")}`,
+  );
+  if (params.passthrough) {
+    logger.always(
+      chalk.yellow(
+        "  ! Passthrough mode forwards client auth directly to Anthropic",
+      ),
+    );
+    logger.always(
+      chalk.dim(
+        "    Stored proxy OAuth/API credentials are ignored; clients need their own valid Anthropic auth.",
+      ),
+    );
+  }
+  if (params.loadedEnvFile) {
+    logger.always(
+      `  ${chalk.bold("Env File:")}   ${chalk.cyan(params.loadedEnvFile)}`,
+    );
+  }
+
+  try {
+    await setClaudeProxySettings(url);
+    logger.always(chalk.green("  ✓ Auto-configured Claude Code settings"));
+    logger.always(
+      chalk.dim("    Restart Claude Code to connect through proxy"),
+    );
+  } catch (error) {
+    logger.debug(
+      "[proxy] Failed to auto-configure Claude Code: " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
+
+  const maintenance = startProxyBackgroundMaintenance(params.cleanupLogs);
+  registerProxyShutdownHandlers({
+    server,
+    host: params.host,
+    port: params.port,
+    ...maintenance,
+  });
+}
+
+async function startProxyCommandHandler(argv: ProxyStartArgs): Promise<void> {
+  const spinner = argv.quiet ? null : ora("Starting Claude proxy...").start();
+
+  try {
+    await ensureProxyStartAllowed(spinner);
+    const loadedEnvFile = await loadProxyStartEnv(argv, spinner);
+    const { neurolink, cleanupLogs } = await createProxyNeurolinkRuntime();
+    const { proxyConfig, strategy, modelRouter, passthrough } =
+      await loadProxyStartConfiguration(argv, spinner);
+
+    if (spinner) {
+      spinner.text = "Configuring server...";
+    }
+
+    const port = argv.port ?? 55669;
+    const host = argv.host ?? "127.0.0.1";
+    const { app } = await createProxyStartApp({
+      neurolink,
+      modelRouter,
+      strategy,
+      passthrough,
+      port,
+      host,
+      proxyConfig,
+    });
+
+    await initializeProxyOpenTelemetry();
+
+    if (spinner) {
+      spinner.text = `Starting proxy on ${host}:${port}...`;
+    }
+
+    await startProxyRuntime({
+      argv,
+      spinner,
+      app,
+      host,
+      port,
+      strategy,
+      proxyConfig,
+      loadedEnvFile,
+      passthrough,
+      cleanupLogs,
+    });
+  } catch (error) {
+    if (spinner) {
+      spinner.fail(chalk.red("Failed to start proxy"));
+    }
+    logger.error(
+      chalk.red(
+        `Error: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    );
+    if (argv.debug && error instanceof Error && error.stack) {
+      logger.error(chalk.gray(error.stack));
+    }
+    process.exit(1);
+  }
+}
+
 // =============================================================================
 // PROXY START COMMAND
 // =============================================================================
@@ -464,664 +1185,7 @@ export const proxyStartCommand: CommandModule<object, ProxyStartArgs> = {
       ) as Argv<ProxyStartArgs>;
   },
   handler: async (argv) => {
-    const spinner = argv.quiet ? null : ora("Starting Claude proxy...").start();
-
-    try {
-      // Guard: proxy already running
-      const existingState = loadProxyState();
-      if (existingState) {
-        if (isProcessRunning(existingState.pid)) {
-          if (spinner) {
-            spinner.fail(
-              chalk.red(
-                `Proxy already running on port ${existingState.port} (PID: ${existingState.pid})`,
-              ),
-            );
-          }
-          logger.always(
-            chalk.yellow(
-              "Stop it first or use 'neurolink proxy status' to inspect",
-            ),
-          );
-          // Exit cleanly when managed by launchd so it doesn't treat this
-          // as a crash and spam-restart every ThrottleInterval seconds.
-          // For manual invocations, use non-zero so scripts/CI detect failure.
-          process.exit(process.ppid === 1 ? 0 : 1);
-        } else {
-          // Stale state file from a previous process that is no longer running.
-          // Clear it so subsequent startup logic doesn't get confused.
-          clearProxyState();
-        }
-      }
-
-      // Guard: launchd is managing the service — don't start manually.
-      // Skip this guard when WE are the process launchd is managing
-      // (PPID 1 = launched by launchd on macOS).
-      if (process.ppid !== 1 && (await isLaunchdManaging())) {
-        if (spinner) {
-          spinner.fail(
-            chalk.red(
-              "Proxy is managed by launchd. Manual start would cause port conflicts.",
-            ),
-          );
-        }
-        logger.always(
-          chalk.yellow(
-            "Use 'neurolink proxy uninstall' to remove the service first, " +
-              "or 'launchctl kickstart gui/$(id -u)/com.neurolink.proxy' to restart.",
-          ),
-        );
-        // This guard only runs for manual invocations (ppid !== 1),
-        // so launchd KeepAlive is unaffected. Use non-zero exit code
-        // so scripts/CI can detect that the proxy was not started.
-        process.exit(1);
-      }
-
-      // -----------------------------------------------------------------
-      // 1. Create NeuroLink instance — reads all env vars automatically
-      // -----------------------------------------------------------------
-
-      let loadedEnvFile: string | undefined;
-      try {
-        const envResult = await loadProxyEnvFile({
-          explicitEnvFile: argv.envFile,
-        });
-        loadedEnvFile = envResult.path;
-        if (spinner && loadedEnvFile) {
-          spinner.text = `Loaded proxy env from ${loadedEnvFile}`;
-        }
-      } catch (envError) {
-        if (spinner) {
-          spinner.fail(
-            chalk.red(
-              envError instanceof Error ? envError.message : String(envError),
-            ),
-          );
-        }
-        process.exit(1);
-      }
-
-      // Skip MCP initialization for proxy — tools come from Claude Code, not MCP servers
-      process.env.NEUROLINK_SKIP_MCP = "true";
-
-      const { NeuroLink } = await import("../../lib/neurolink.js");
-      const neurolink = new NeuroLink();
-
-      // Initialize request logger and usage stats
-      const { initRequestLogger, cleanupLogs } =
-        await import("../../lib/proxy/requestLogger.js");
-      const { getStats: _getStats, resetStats: _resetStats } =
-        await import("../../lib/proxy/usageStats.js");
-      initRequestLogger(true);
-      cleanupLogs(7, 500); // Delete logs older than 7 days or if total exceeds 500 MB
-
-      // -----------------------------------------------------------------
-      // 2. Load proxy config file (if --config or default exists)
-      // -----------------------------------------------------------------
-
-      const configPath =
-        argv.config ?? join(homedir(), ".neurolink", "proxy-config.yaml");
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let proxyConfig: any = null;
-      try {
-        const { loadProxyConfig } =
-          await import("../../lib/proxy/proxyConfig.js");
-        proxyConfig = await loadProxyConfig(configPath);
-        if (spinner) {
-          spinner.text = `Loaded proxy config from ${configPath}`;
-        }
-      } catch (configError) {
-        if (argv.config) {
-          if (spinner) {
-            spinner.fail(
-              chalk.red(`Failed to load proxy config: ${configPath}`),
-            );
-          }
-          process.exit(1);
-        }
-        // Only silently ignore file-not-found for the default config path.
-        // Log a warning for other errors (parse failures, permission issues, etc.)
-        const isNotFound =
-          configError instanceof Error &&
-          "code" in configError &&
-          (configError as NodeJS.ErrnoException).code === "ENOENT";
-        if (!isNotFound) {
-          logger.warn(
-            `[proxy] Ignoring default config ${configPath}: ${configError instanceof Error ? configError.message : String(configError)}`,
-          );
-        }
-      }
-
-      // -----------------------------------------------------------------
-      // 3. Create ModelRouter from config (if routing configured)
-      // -----------------------------------------------------------------
-
-      const strategy =
-        argv.strategy ?? proxyConfig?.routing?.strategy ?? "fill-first";
-      let modelRouter: ModelRouter | undefined;
-
-      if (proxyConfig?.routing) {
-        const { ModelRouter } = await import("../../lib/proxy/modelRouter.js");
-        modelRouter = new ModelRouter({
-          strategy: strategy as "round-robin" | "fill-first",
-          modelMappings: proxyConfig.routing.modelMappings ?? [],
-          fallbackChain: proxyConfig.routing.fallbackChain ?? [],
-          passthroughModels: proxyConfig.routing.passthroughModels,
-        });
-      }
-
-      if (spinner) {
-        spinner.text = "Configuring server...";
-      }
-
-      // -----------------------------------------------------------------
-      // 4. Build Hono app with Claude proxy routes and NeuroLink context
-      // -----------------------------------------------------------------
-
-      const { createClaudeProxyRoutes } =
-        await import("../../lib/server/routes/claudeProxyRoutes.js");
-      const { Hono } = await import("hono");
-      const { serve } = await import("@hono/node-server");
-
-      const app = new Hono();
-
-      app.onError((err, c) => {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logger.always(`[proxy] unhandled error: ${errMsg}`);
-        if (err instanceof Error && err.stack) {
-          logger.debug(`[proxy] stack: ${err.stack}`);
-        }
-        return c.json(
-          {
-            type: "error",
-            error: {
-              type: "api_error",
-              message: `Proxy internal error: ${errMsg}`,
-            },
-          },
-          502,
-        );
-      });
-
-      const passthrough = argv.passthrough ?? false;
-
-      const routeGroup = createClaudeProxyRoutes(
-        modelRouter,
-        "",
-        strategy as "round-robin" | "fill-first",
-        passthrough,
-      );
-
-      // Register proxy routes — inject NeuroLink into ServerContext
-      for (const route of routeGroup.routes) {
-        const method = route.method.toLowerCase() as "get" | "post";
-        app[method](route.path, async (c) => {
-          const emptyBody = {};
-          let body: unknown;
-          let rawBody: string | undefined;
-          if (method === "post") {
-            rawBody = await c.req.text().catch(() => undefined);
-            try {
-              body = rawBody ? JSON.parse(rawBody) : emptyBody;
-            } catch {
-              body = emptyBody;
-            }
-          }
-
-          // Log incoming request
-          const model = (body as Record<string, unknown>)?.model ?? "-";
-          const stream = (body as Record<string, unknown>)?.stream
-            ? "stream"
-            : "non-stream";
-          const bodyRec = body as Record<string, unknown> | undefined;
-          const toolCount = Array.isArray(bodyRec?.tools)
-            ? (bodyRec.tools as unknown[]).length
-            : 0;
-          logger.always(
-            `[proxy] ${c.req.method} ${c.req.path} → model=${model} ${stream} tools=${toolCount}`,
-          );
-
-          // Build ServerContext with the real NeuroLink instance
-          const ctx = {
-            requestId: crypto.randomUUID(),
-            method: c.req.method,
-            path: c.req.path,
-            headers: Object.fromEntries(c.req.raw.headers.entries()),
-            query: Object.fromEntries(
-              new URL(c.req.url).searchParams.entries(),
-            ),
-            params: c.req.param() as Record<string, string>,
-            body,
-            rawBody, // Preserve original bytes for passthrough mode
-            neurolink, // NeuroLink instance for generate/stream
-            toolRegistry: neurolink.getToolRegistry(),
-            timestamp: Date.now(),
-            metadata: {},
-          } as unknown as Parameters<typeof route.handler>[0];
-
-          const result = await route.handler(ctx);
-
-          // Handle raw Response objects (passthrough streaming from upstream)
-          if (result instanceof Response) {
-            return result;
-          }
-
-          // Handle streaming response (async iterable)
-          if (
-            result &&
-            typeof result === "object" &&
-            Symbol.asyncIterator in Object(result)
-          ) {
-            const iterator = (result as AsyncIterable<string>)[
-              Symbol.asyncIterator
-            ]();
-            let cancelled = false;
-            const stream = new ReadableStream({
-              async start(controller) {
-                try {
-                  while (!cancelled) {
-                    const { value, done } = await iterator.next();
-                    if (done) {
-                      break;
-                    }
-                    controller.enqueue(new TextEncoder().encode(value));
-                  }
-                  controller.close();
-                } catch (streamErr) {
-                  if (cancelled) {
-                    // Client disconnected — just close
-                    controller.close();
-                    return;
-                  }
-                  // Emit an SSE error frame so the client gets a meaningful
-                  // error instead of a silent EOF / connection drop.
-                  const errMsg =
-                    streamErr instanceof Error
-                      ? streamErr.message
-                      : String(streamErr);
-                  const errorEvent = `event: error\ndata: ${JSON.stringify({ type: "error", error: { type: "api_error", message: `Stream interrupted: ${errMsg}` } })}\n\n`;
-                  try {
-                    controller.enqueue(new TextEncoder().encode(errorEvent));
-                  } catch {
-                    // Controller already errored — ignore
-                  }
-                  controller.close();
-                }
-              },
-              async cancel() {
-                cancelled = true;
-                await iterator.return?.();
-              },
-            });
-            return new Response(stream, {
-              headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                Connection: "keep-alive",
-              },
-            });
-          }
-
-          // Handle error responses with httpStatus field
-          if (
-            result &&
-            typeof result === "object" &&
-            "httpStatus" in (result as Record<string, unknown>)
-          ) {
-            const httpResult = result as Record<string, unknown>;
-            const status = (httpResult.httpStatus as number) ?? 200;
-            delete httpResult.httpStatus;
-            return c.json(result, status as 400);
-          }
-
-          // Handle Anthropic-style error responses
-          if (
-            result &&
-            typeof result === "object" &&
-            "type" in result &&
-            (result as Record<string, unknown>).type === "error"
-          ) {
-            const errorResult = result as {
-              type: string;
-              error?: { type?: string };
-            };
-            const status = mapClaudeErrorTypeToStatus(errorResult.error?.type);
-            return c.json(result, status as 400);
-          }
-
-          return c.json(result ?? {});
-        });
-      }
-
-      // Health endpoint
-      app.get("/health", (c) =>
-        c.json({
-          status: "ok",
-          strategy,
-          uptime: process.uptime(),
-          version: PROXY_VERSION,
-        }),
-      );
-
-      // Status endpoint (detailed)
-      app.get("/status", async (c) => {
-        const { getStats } = await import("../../lib/proxy/usageStats.js");
-        const stats = getStats();
-        return c.json({
-          status: "running",
-          pid: process.pid,
-          port,
-          host,
-          strategy,
-          uptime: process.uptime(),
-          version: PROXY_VERSION,
-          stats: {
-            totalAttempts: stats.totalAttempts,
-            totalRequests: stats.totalRequests,
-            totalSuccess: stats.totalSuccess,
-            totalErrors: stats.totalErrors,
-            totalRateLimits: stats.totalRateLimits,
-            accounts: Object.values(stats.accounts).map((a) => ({
-              label: a.label,
-              type: a.type,
-              attempts: a.attemptCount,
-              requests: a.attemptCount,
-              success: a.successCount,
-              errors: a.errorCount,
-              rateLimits: a.rateLimitCount,
-              backoffLevel: a.currentBackoffLevel,
-              cooling: a.coolingUntil ? a.coolingUntil > Date.now() : false,
-            })),
-          },
-          config: proxyConfig ? { hasRouting: !!proxyConfig.routing } : null,
-        });
-      });
-
-      // -----------------------------------------------------------------
-      // 5. Initialize OpenTelemetry for proxy observability
-      // -----------------------------------------------------------------
-
-      try {
-        const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-        if (!process.env.OTEL_SERVICE_NAME) {
-          process.env.OTEL_SERVICE_NAME = "neurolink-proxy";
-        }
-
-        // Merge resource attributes (preserving any existing ones)
-        process.env.OTEL_RESOURCE_ATTRIBUTES = [
-          `service.name=neurolink-proxy`,
-          `service.version=${PROXY_VERSION}`,
-          `deployment.environment=local`,
-          process.env.OTEL_RESOURCE_ATTRIBUTES,
-        ]
-          .filter(Boolean)
-          .join(",");
-
-        const { initializeOpenTelemetry, isOpenTelemetryInitialized } =
-          await import("../../lib/services/server/ai/observability/instrumentation.js");
-        const { buildObservabilityConfigFromEnv } =
-          await import("../../lib/utils/observabilityHelpers.js");
-
-        if (!isOpenTelemetryInitialized()) {
-          const observabilityConfig = buildObservabilityConfigFromEnv();
-          const langfuseConfig = observabilityConfig?.langfuse;
-          const langfuseEnabled = langfuseConfig?.enabled === true;
-          initializeOpenTelemetry({
-            enabled: langfuseEnabled,
-            publicKey: langfuseConfig?.publicKey || "",
-            secretKey: langfuseConfig?.secretKey || "",
-            baseUrl: langfuseConfig?.baseUrl,
-            environment: "proxy",
-            release: PROXY_VERSION,
-            userId: "neurolink-proxy",
-            autoDetectOperationName: true,
-          });
-
-          if (langfuseEnabled) {
-            logger.always(
-              `[proxy] Langfuse enabled — exporting to ${langfuseConfig.baseUrl || "https://cloud.langfuse.com"} (environment=proxy)`,
-            );
-          }
-
-          if (otlpEndpoint) {
-            logger.always(
-              `[proxy] OTLP exporter enabled — exporting to ${otlpEndpoint} (service.name=neurolink-proxy)`,
-            );
-          }
-
-          if (!langfuseEnabled && !otlpEndpoint) {
-            logger.always(
-              "[proxy] OpenTelemetry exporters disabled — set OTEL_EXPORTER_OTLP_ENDPOINT or Langfuse credentials to enable proxy observability",
-            );
-          }
-        }
-      } catch (otelError) {
-        // OTel is non-critical — proxy must still work without it
-        logger.debug(
-          `[proxy] OpenTelemetry init failed (non-fatal): ${otelError instanceof Error ? otelError.message : String(otelError)}`,
-        );
-      }
-
-      // -----------------------------------------------------------------
-      // 6. Start listening
-      // -----------------------------------------------------------------
-
-      const port = argv.port ?? 55669;
-      const host = argv.host ?? "127.0.0.1";
-
-      if (spinner) {
-        spinner.text = `Starting proxy on ${host}:${port}...`;
-      }
-
-      const server = serve({
-        fetch: app.fetch,
-        port,
-        hostname: host,
-      });
-
-      const guardPid = spawnFailOpenGuard(host, port, process.pid);
-
-      // Extract fallback chain from proxy config (if available)
-      const fallbackChain: FallbackInfo[] | undefined =
-        proxyConfig?.routing?.fallbackChain?.map(
-          (e: { provider: string; model: string }) => ({
-            provider: e.provider,
-            model: e.model,
-          }),
-        );
-
-      // Persist state (including fallback chain for `proxy status`)
-      const state: ProxyState = {
-        pid: process.pid,
-        port,
-        host,
-        strategy,
-        startTime: new Date().toISOString(),
-        envFile: loadedEnvFile,
-        fallbackChain,
-        guardPid,
-        managedBy:
-          process.platform === "darwin" && process.ppid === 1
-            ? "launchd"
-            : "manual",
-        passthrough,
-      };
-      saveProxyState(state);
-
-      if (spinner) {
-        spinner.succeed(chalk.green("Claude proxy started successfully"));
-      }
-
-      const normalizedHost = host === "0.0.0.0" ? "localhost" : host;
-      const url = `http://${normalizedHost}:${port}`;
-      printProxyBanner(url, strategy);
-      logger.always(
-        `  ${chalk.bold("Mode:")}       ${chalk.cyan(passthrough ? "passthrough" : "full")}`,
-      );
-      if (loadedEnvFile) {
-        logger.always(
-          `  ${chalk.bold("Env File:")}   ${chalk.cyan(loadedEnvFile)}`,
-        );
-      }
-
-      // Auto-configure Claude Code — use the normalized URL (localhost, not 0.0.0.0)
-      try {
-        await setClaudeProxySettings(url);
-        logger.always(chalk.green("  ✓ Auto-configured Claude Code settings"));
-        logger.always(
-          chalk.dim("    Restart Claude Code to connect through proxy"),
-        );
-      } catch (e) {
-        logger.debug(
-          "[proxy] Failed to auto-configure Claude Code: " +
-            (e instanceof Error ? e.message : String(e)),
-        );
-      }
-
-      // -----------------------------------------------------------------
-      // 7. Background token refresh (every 30 seconds)
-      // -----------------------------------------------------------------
-      const { needsRefresh, refreshToken, persistTokens } =
-        await import("../../lib/proxy/tokenRefresh.js");
-      const { tokenStore } = await import("../../lib/auth/tokenStore.js");
-      const refreshInterval = setInterval(async () => {
-        // Refresh token-pool accounts
-        try {
-          const allKeys = await tokenStore.listProviders();
-          const anthropicKeys = allKeys.filter((k) =>
-            k.startsWith("anthropic:"),
-          );
-          for (const key of anthropicKeys) {
-            try {
-              const tokens = await tokenStore.loadTokens(key);
-              if (!tokens) {
-                continue;
-              }
-              const account = {
-                label: key,
-                token: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-                expiresAt: tokens.expiresAt,
-              };
-              if (needsRefresh(account)) {
-                const result = await refreshToken(account);
-                if (result.success) {
-                  await persistTokens({ providerKey: key }, account);
-                  logger.debug(
-                    `[proxy] background token refresh succeeded for ${key}`,
-                  );
-                }
-              }
-            } catch {
-              /* non-fatal per-account */
-            }
-          }
-        } catch {
-          /* non-fatal */
-        }
-
-        // Refresh legacy credentials file
-        try {
-          const credPath = join(
-            homedir(),
-            ".neurolink",
-            "anthropic-credentials.json",
-          );
-          const { readFileSync } = await import("fs");
-          const creds = JSON.parse(readFileSync(credPath, "utf8"));
-          if (creds.oauth) {
-            const account = {
-              label: "background",
-              token: creds.oauth.accessToken,
-              refreshToken: creds.oauth.refreshToken,
-              expiresAt: creds.oauth.expiresAt,
-            };
-            if (needsRefresh(account)) {
-              const result = await refreshToken(account);
-              if (result.success) {
-                await persistTokens(credPath, account);
-                logger.debug("[proxy] background token refresh succeeded");
-              }
-            }
-          }
-        } catch {
-          /* non-fatal */
-        }
-      }, 30_000);
-
-      // Hourly log cleanup
-      const logCleanupInterval = setInterval(
-        () => {
-          cleanupLogs(7, 500);
-        },
-        60 * 60 * 1000,
-      );
-
-      // -----------------------------------------------------------------
-      // 8. Graceful shutdown
-      // -----------------------------------------------------------------
-
-      const shutdown = async (signal: string) => {
-        clearInterval(refreshInterval);
-        clearInterval(logCleanupInterval);
-        logger.always(`\nShutting down proxy (${signal})...`);
-
-        // Flush and shutdown OpenTelemetry before closing the server
-        try {
-          const { flushOpenTelemetry, shutdownOpenTelemetry } =
-            await import("../../lib/services/server/ai/observability/instrumentation.js");
-          await flushOpenTelemetry();
-          await shutdownOpenTelemetry();
-        } catch {
-          /* non-fatal — proxy shutdown must not block on OTel */
-        }
-
-        // Only clear Claude settings on user-initiated stop (SIGINT).
-        // On SIGTERM (launchd restart cycle), leave settings intact so
-        // the restarted proxy picks up seamlessly.
-        if (signal === "SIGINT") {
-          try {
-            const shutdownHost = host === "0.0.0.0" ? "localhost" : host;
-            await clearClaudeProxySettings(`http://${shutdownHost}:${port}`);
-          } catch {
-            /* non-fatal */
-          }
-        }
-
-        try {
-          if (
-            server &&
-            typeof (server as { close?: () => void }).close === "function"
-          ) {
-            (server as { close: () => void }).close();
-          }
-        } catch {
-          // Best-effort close
-        }
-        clearProxyState();
-
-        // SIGINT = user pressed Ctrl+C → exit 0 (launchd won't restart)
-        // SIGTERM = launchd/system stop → exit 1 (launchd WILL restart)
-        process.exit(signal === "SIGINT" ? 0 : 1);
-      };
-
-      process.on("SIGTERM", () => shutdown("SIGTERM"));
-      process.on("SIGINT", () => shutdown("SIGINT"));
-    } catch (error) {
-      if (spinner) {
-        spinner.fail(chalk.red("Failed to start proxy"));
-      }
-      logger.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : String(error)}`,
-        ),
-      );
-      if (argv.debug && error instanceof Error && error.stack) {
-        logger.error(chalk.gray(error.stack));
-      }
-      process.exit(1);
-    }
+    await startProxyCommandHandler(argv);
   },
 };
 
@@ -1209,6 +1273,7 @@ export const proxyStatusCommand: CommandModule<object, ProxyStatusArgs> = {
         pid: null as number | null,
         port: null as number | null,
         host: null as string | null,
+        mode: null as "full" | "passthrough" | null,
         strategy: null as string | null,
         uptime: null as number | null,
         startTime: null as string | null,
@@ -1222,6 +1287,7 @@ export const proxyStatusCommand: CommandModule<object, ProxyStatusArgs> = {
         status.pid = state.pid;
         status.port = state.port;
         status.host = state.host;
+        status.mode = state.passthrough ? "passthrough" : "full";
         status.strategy = state.strategy;
         status.startTime = state.startTime;
         status.uptime = Date.now() - new Date(state.startTime).getTime();
@@ -1270,6 +1336,9 @@ export const proxyStatusCommand: CommandModule<object, ProxyStatusArgs> = {
         );
         logger.always(
           `  ${chalk.bold("Strategy:")}   ${chalk.cyan(status.strategy)}`,
+        );
+        logger.always(
+          `  ${chalk.bold("Mode:")}       ${chalk.cyan(status.mode ?? "full")}`,
         );
         logger.always(
           `  ${chalk.bold("Started:")}    ${chalk.cyan(status.startTime)}`,
@@ -2067,8 +2136,9 @@ export const proxyInstallCommand: CommandModule = {
     });
     const envFile = envResolution.path;
     const explicitConfig = (argv as { config?: string }).config;
-    const configPath =
-      explicitConfig ?? join(homedir(), ".neurolink", "proxy-config.yaml");
+    const configPath = explicitConfig
+      ? resolve(explicitConfig)
+      : join(homedir(), ".neurolink", "proxy-config.yaml");
     if (explicitConfig && !existsSync(configPath)) {
       console.info(chalk.red(`Proxy config file not found: ${configPath}`));
       process.exit(1);
