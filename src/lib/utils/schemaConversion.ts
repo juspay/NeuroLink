@@ -188,6 +188,16 @@ export function convertZodToJsonSchema(zodSchema: ZodUnknownSchema): object {
   }
 }
 
+export function normalizeJsonSchemaObject(
+  schema: Record<string, unknown> | undefined | null,
+): Record<string, unknown> {
+  return ensureTypeField(
+    inlineJsonSchema(
+      schema ? { ...schema } : { type: "object", properties: {} },
+    ),
+  );
+}
+
 /**
  * Ensure a JSON Schema object has a `type` field (required by Vertex/Gemini).
  */

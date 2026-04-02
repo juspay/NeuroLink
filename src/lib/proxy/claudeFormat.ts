@@ -27,6 +27,7 @@ import type {
   SSEMessageStart,
   StreamLifecycleState,
 } from "../types/index.js";
+import { normalizeJsonSchemaObject } from "../utils/schemaConversion.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -177,7 +178,11 @@ export function parseClaudeRequest(body: ClaudeRequest): ParsedClaudeRequest {
         // Fallback providers consume AI SDK-style tools, not Claude wire-format
         // tool descriptors. Wrap the raw JSON schema once here so every
         // downstream provider sees a canonical `inputSchema` shape.
-        inputSchema: jsonSchema(t.input_schema ?? { type: "object" as const }),
+        inputSchema: jsonSchema(
+          normalizeJsonSchemaObject(
+            t.input_schema ?? { type: "object" as const },
+          ),
+        ),
       });
     }
   }

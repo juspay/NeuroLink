@@ -912,6 +912,10 @@ export type ProxyState = {
   host: string;
   strategy: string;
   startTime: string;
+  ready?: boolean;
+  readyAt?: string;
+  healthPath?: string;
+  statusPath?: string;
   envFile?: string;
   /** Fallback chain from proxy config (persisted at start time) */
   fallbackChain?: FallbackInfo[];

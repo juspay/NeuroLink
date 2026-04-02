@@ -649,6 +649,7 @@ export type AnthropicAuthRetryResult = {
 export type AnthropicNonOkResult = {
   response?: Response | unknown;
   continueLoop: boolean;
+  retrySameAccount?: boolean;
   lastError: unknown;
   authFailureMessage: string | null;
   sawTransientFailure: boolean;
@@ -673,6 +674,7 @@ export type PreparedAnthropicAccountAttempt = {
 
 export type AnthropicUpstreamFetchResult = {
   continueLoop: boolean;
+  retrySameAccount?: boolean;
   response?: Response;
   lastError: unknown;
   sawRateLimit: boolean;
@@ -764,6 +766,10 @@ export type RuntimeAccountState = {
   backoffLevel: number;
   consecutiveRefreshFailures: number;
   permanentlyDisabled: boolean;
+  requestClassCooldowns?: Record<string, number>;
+  modelTierCooldowns?: Record<string, number>;
+  requestClassBackoffLevels?: Record<string, number>;
+  modelTierBackoffLevels?: Record<string, number>;
   lastToken?: string;
   lastRefreshToken?: string;
 };
@@ -830,4 +836,111 @@ export type CloseHandler = () => void;
 export type CachedSession = {
   userId: string;
   expiresAt: number;
+};
+
+// =============================================================================
+// PROXY ROUTING POLICY TYPES (from routingPolicy.ts)
+// =============================================================================
+
+/** Model tier classification for proxy routing decisions. */
+export type ClaudeProxyModelTier = "opus" | "sonnet" | "haiku" | "other";
+
+/** Request class for proxy routing policy. */
+export type ClaudeProxyRequestClass =
+  | "multimodal"
+  | "high-tool-count-non-stream-structured"
+  | "strong-tool-fidelity"
+  | "streaming-conversational"
+  | "standard";
+
+/** Full classification profile for a proxy request. */
+export type ClaudeProxyRequestProfile = {
+  requestedModel: string;
+  modelTier: ClaudeProxyModelTier;
+  primaryClass: ClaudeProxyRequestClass;
+  classes: ClaudeProxyRequestClass[];
+  stream: boolean;
+  toolCount: number;
+  hasImages: boolean;
+  hasThinking: boolean;
+  hasToolHistory: boolean;
+  requiresToolUse: boolean;
+  requiresSpecificTool: boolean;
+  requiresStrongToolFidelity: boolean;
+  isHighToolCountNonStream: boolean;
+  isStreamingConversational: boolean;
+  isMultimodal: boolean;
+};
+
+/** Outcome of evaluating a single fallback candidate. */
+export type FallbackEligibilityDecision = {
+  provider?: string;
+  model?: string;
+  eligible: boolean;
+  reason: string;
+};
+
+/** A single provider attempt in the proxy translation plan. */
+export type ProxyTranslationAttempt = {
+  provider?: string;
+  model?: string;
+  label: string;
+};
+
+/** Ordered plan of provider attempts and skipped candidates. */
+export type ProxyTranslationPlan = {
+  profile: ClaudeProxyRequestProfile;
+  attempts: ProxyTranslationAttempt[];
+  skipped: FallbackEligibilityDecision[];
+};
+
+/** Discriminated union describing why a cooldown is active. */
+export type CooldownScope =
+  | {
+      scope: "request_class";
+      key: string;
+      until: number;
+    }
+  | {
+      scope: "model_tier";
+      key: string;
+      until: number;
+    }
+  | {
+      scope: "generic";
+      key: "generic";
+      until: number;
+    };
+
+/** An account skipped during partitioning, with the cooldown that caused it. */
+export type CooldownSkippedAccount<T> = {
+  account: T;
+  cooldown: CooldownScope;
+};
+
+// =============================================================================
+// PROXY HEALTH / READINESS TYPES (from proxyHealth.ts)
+// =============================================================================
+
+/** Mutable readiness state tracked by the proxy process. */
+export type ProxyReadinessState = {
+  startTimeMs: number;
+  acceptingConnections: boolean;
+  ready: boolean;
+  readyAtMs?: number;
+};
+
+/** Structured response returned by the proxy /health endpoint. */
+export type ProxyHealthResponse = {
+  status: "ok" | "starting";
+  ready: boolean;
+  acceptingConnections: boolean;
+  strategy: string;
+  passthrough: boolean;
+  version: string;
+  startedAt: string;
+  readyAt: string | null;
+  uptime: number;
+  healthPath: "/health";
+  statusPath: "/status";
 };

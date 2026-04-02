@@ -229,12 +229,19 @@ export abstract class BaseProvider implements AIProvider {
       }
 
       // CRITICAL: Image generation models don't support real streaming
-      // Force fake streaming for image models to ensure image output is yielded
+      // Force fake streaming for image models to ensure image output is yielded.
+      // Skip this path when the caller explicitly requests non-image output (e.g.
+      // JSON analysis) so dual-mode models like gemini-3.1-flash-image-preview
+      // can still perform text/structured generation.
       const isImageModel = IMAGE_GENERATION_MODELS.some((m) =>
         this.modelName.includes(m),
       );
+      const requestsNonImageOutput =
+        options.output?.format === "json" ||
+        options.output?.format === "structured" ||
+        options.output?.format === "text";
 
-      if (isImageModel) {
+      if (isImageModel && !requestsNonImageOutput) {
         logger.info(`Image model detected, forcing fake streaming`, {
           provider: this.providerName,
           model: this.modelName,
@@ -791,7 +798,11 @@ export abstract class BaseProvider implements AIProvider {
       const isImageModel = IMAGE_GENERATION_MODELS.some((m) =>
         this.modelName.includes(m),
       );
-      if (isImageModel) {
+      const requestsNonImageOutput =
+        options.output?.format === "json" ||
+        options.output?.format === "structured" ||
+        options.output?.format === "text";
+      if (isImageModel && !requestsNonImageOutput) {
         logger.info(
           `Image generation model detected, routing to executeImageGeneration`,
           {

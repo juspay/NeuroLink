@@ -345,12 +345,31 @@ export type ToolExecutionContext = {
 export type ToolExecutionEvent = {
   type: "tool:start" | "tool:end";
   tool: string;
+  /** Compatibility alias for older consumers that expect `toolName`. */
+  toolName?: string;
   input?: unknown;
   result?: unknown;
   error?: string;
   timestamp: number;
   duration?: number;
   executionId: string;
+};
+
+/**
+ * Payload emitted for tool:start and tool:end events.
+ * Always includes both `tool` and `toolName` for backward compatibility.
+ */
+export type ToolEventPayload = {
+  tool: string;
+  toolName: string;
+  input?: unknown;
+  result?: unknown;
+  error?: string;
+  success?: boolean;
+  responseTime?: number;
+  timestamp?: number;
+  duration?: number;
+  executionId?: string;
 };
 
 /**

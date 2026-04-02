@@ -18,12 +18,13 @@
 import type { Tool } from "ai";
 import { tool as createAISDKTool, jsonSchema } from "ai";
 import { z } from "zod";
+import { createToolEventPayload } from "../toolEvents.js";
 import type {
   AIProviderName,
   StandardRecord,
   ToolUtilities,
 } from "../../types/index.js";
-import type { ToolArgs } from "../../types/tools.js";
+import type { ToolArgs, ToolEventPayload } from "../../types/tools.js";
 import type { JsonObject } from "../../types/common.js";
 import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
 import { SpanStatusCode } from "@opentelemetry/api";
@@ -64,6 +65,18 @@ export class ToolsManager {
   setSessionContext(sessionId?: string, userId?: string): void {
     this.sessionId = sessionId;
     this.userId = userId;
+  }
+
+  private emitToolEvent(
+    eventName: "tool:start" | "tool:end",
+    toolName: string,
+    payload: Omit<ToolEventPayload, "tool" | "toolName">,
+  ): void {
+    if (this.neurolink?.getEventEmitter) {
+      this.neurolink
+        .getEventEmitter()
+        .emit(eventName, createToolEventPayload(toolName, payload));
+    }
   }
 
   /**
@@ -234,30 +247,25 @@ export class ToolsManager {
         tools[toolName] = {
           ...(directTool as Tool),
           execute: async (params: unknown) => {
-            // 🔧 EMIT TOOL START EVENT - Bedrock-compatible format
-            if (this.neurolink?.getEventEmitter) {
-              const emitter = this.neurolink.getEventEmitter();
-              emitter.emit("tool:start", { tool: toolName, input: params });
-            }
+            const startTime = Date.now();
+            this.emitToolEvent("tool:start", toolName, { input: params });
 
             try {
               const result = await originalExecute(params);
-
-              // 🔧 EMIT TOOL END EVENT - Bedrock-compatible format
-              if (this.neurolink?.getEventEmitter) {
-                const emitter = this.neurolink.getEventEmitter();
-                emitter.emit("tool:end", { tool: toolName, result });
-              }
-
+              this.emitToolEvent("tool:end", toolName, {
+                result,
+                success: true,
+                responseTime: Date.now() - startTime,
+              });
               return result;
             } catch (error) {
-              // 🔧 EMIT TOOL END EVENT FOR ERROR - Bedrock-compatible format
-              if (this.neurolink?.getEventEmitter) {
-                const emitter = this.neurolink.getEventEmitter();
-                const errorMsg =
-                  error instanceof Error ? error.message : String(error);
-                emitter.emit("tool:end", { tool: toolName, error: errorMsg });
-              }
+              const errorMsg =
+                error instanceof Error ? error.message : String(error);
+              this.emitToolEvent("tool:end", toolName, {
+                error: errorMsg,
+                success: false,
+                responseTime: Date.now() - startTime,
+              });
               throw error;
             }
           },
@@ -627,11 +635,8 @@ export class ToolsManager {
         description: tool.description || `External MCP tool ${tool.name}`,
         inputSchema: finalSchema, // AI SDK v6 uses inputSchema (not parameters)
         execute: async (params: unknown) => {
-          // Emit tool start event
-          if (this.neurolink?.getEventEmitter) {
-            const emitter = this.neurolink.getEventEmitter();
-            emitter.emit("tool:start", { tool: tool.name, input: params });
-          }
+          const startTime = Date.now();
+          this.emitToolEvent("tool:start", tool.name, { input: params });
 
           // Execute via NeuroLink's direct tool execution
           if (
@@ -645,42 +650,33 @@ export class ToolsManager {
                 params as JsonObject,
               );
 
-              // Emit tool end event (success)
-              if (this.neurolink?.getEventEmitter) {
-                const emitter = this.neurolink.getEventEmitter();
-                emitter.emit("tool:end", { tool: tool.name, result });
-              }
-
+              this.emitToolEvent("tool:end", tool.name, {
+                result,
+                success: true,
+                responseTime: Date.now() - startTime,
+              });
               return result;
             } catch (mcpError) {
-              // Emit tool end event (error)
-              if (this.neurolink?.getEventEmitter) {
-                const emitter = this.neurolink.getEventEmitter();
-                const errorMsg =
-                  mcpError instanceof Error
-                    ? mcpError.message
-                    : String(mcpError);
-                emitter.emit("tool:end", { tool: tool.name, error: errorMsg });
-              }
-
+              const errorMsg =
+                mcpError instanceof Error ? mcpError.message : String(mcpError);
+              this.emitToolEvent("tool:end", tool.name, {
+                error: errorMsg,
+                success: false,
+                responseTime: Date.now() - startTime,
+              });
               logger.error(`External MCP tool failed: ${tool.name}`, {
                 serverId: tool.serverId,
-                error:
-                  mcpError instanceof Error
-                    ? mcpError.message
-                    : String(mcpError),
+                error: errorMsg,
               });
               throw mcpError;
             }
           } else {
             const error = `Cannot execute external MCP tool: NeuroLink executeExternalMCPTool not available`;
-
-            // Emit tool end event (error - no executor)
-            if (this.neurolink?.getEventEmitter) {
-              const emitter = this.neurolink.getEventEmitter();
-              emitter.emit("tool:end", { tool: tool.name, error });
-            }
-
+            this.emitToolEvent("tool:end", tool.name, {
+              error,
+              success: false,
+              responseTime: Date.now() - startTime,
+            });
             logger.error(error);
             throw new Error(error);
           }

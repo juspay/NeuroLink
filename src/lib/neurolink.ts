@@ -49,6 +49,7 @@ import {
 import { ContextBudgetExceededError } from "./context/errors.js";
 import { repairToolPairs } from "./context/toolPairRepair.js";
 import { SYSTEM_LIMITS } from "./core/constants.js";
+import { createToolEventPayload } from "./core/toolEvents.js";
 import { ConversationMemoryManager } from "./core/conversationMemoryManager.js";
 import { AIProviderFactory } from "./core/factory.js";
 import type { RedisConversationMemoryManager } from "./core/redisConversationMemoryManager.js";
@@ -531,14 +532,16 @@ export class NeuroLink {
     // Emit tool end event (NeuroLink format - enhanced with result/error)
     // Serialize error to string for consumer compatibility (event listeners
     // commonly check `typeof event.error === "string"`).
-    this.emitter.emit("tool:end", {
-      toolName,
-      responseTime: Date.now() - startTime,
-      success,
-      timestamp: Date.now(),
-      result: result, // Enhanced: include actual result
-      error: error ? error.message : undefined, // Emit as string, not Error object
-    });
+    this.emitter.emit(
+      "tool:end",
+      createToolEventPayload(toolName, {
+        responseTime: Date.now() - startTime,
+        success,
+        timestamp: Date.now(),
+        result,
+        error: error ? error.message : undefined,
+      }) as Record<string, unknown>,
+    );
   }
   // Conversation memory support
   public conversationMemory?:
@@ -6627,24 +6630,48 @@ Current user's request: ${currentInput}`;
       captureEvent("response:chunk", { content: chunk });
     };
     const onToolStart = (...args: unknown[]) => {
-      const data = args[0] as { toolName: string; timestamp: number };
-      captureEvent("tool:start", data);
+      const data = args[0] as {
+        tool?: string;
+        toolName?: string;
+        timestamp: number;
+      };
+      captureEvent("tool:start", {
+        ...data,
+        toolName: data.toolName ?? data.tool,
+      });
     };
     const onToolEnd = (...args: unknown[]) => {
       const data = args[0] as {
-        toolName: string;
-        success: boolean;
-        responseTime: number;
+        tool?: string;
+        toolName?: string;
+        success?: boolean;
+        responseTime?: number;
+        duration?: number;
+        error?: string;
         result?: { uiComponent?: boolean; [key: string]: unknown };
         [key: string]: unknown;
       };
-      captureEvent("tool:end", data);
+      const toolName = data.toolName ?? data.tool;
+      const responseTime =
+        data.responseTime ?? (data.duration as number | undefined);
+      const success =
+        data.success ?? (data.error !== undefined ? false : undefined);
+      const augmented = {
+        ...data,
+        toolName,
+        ...(responseTime !== undefined ? { responseTime } : {}),
+        ...(success !== undefined ? { success } : {}),
+        ...(data.error !== undefined ? { error: data.error } : {}),
+      };
+      captureEvent("tool:end", augmented);
 
-      if (data.result && data.result.uiComponent === true) {
+      if (augmented.result && augmented.result.uiComponent === true) {
         captureEvent("ui-component", {
-          toolName: data.toolName,
-          componentData: data.result,
+          toolName,
+          componentData: augmented.result,
           timestamp: Date.now(),
+          ...(success !== undefined ? { success } : {}),
+          ...(responseTime !== undefined ? { responseTime } : {}),
         });
       }
     };
@@ -7685,12 +7712,14 @@ Current user's request: ${currentInput}`;
     this.currentStreamToolExecutions.push(context);
 
     // Emit event (NeuroLinkEvents format for compatibility)
-    this.emitter.emit("tool:start", {
-      tool: toolName,
-      input,
-      timestamp: startTime,
-      executionId,
-    });
+    this.emitter.emit(
+      "tool:start",
+      createToolEventPayload(toolName, {
+        input,
+        timestamp: startTime,
+        executionId,
+      }),
+    );
 
     logger.debug(`tool:start emitted for ${toolName}`, {
       toolName,
@@ -7766,14 +7795,18 @@ Current user's request: ${currentInput}`;
     this.toolExecutionHistory.push(summary);
 
     // Emit event (NeuroLinkEvents format for compatibility)
-    this.emitter.emit("tool:end", {
-      tool: toolName,
-      result,
-      error,
-      timestamp: endTime,
-      duration,
-      executionId: finalExecutionId,
-    });
+    this.emitter.emit(
+      "tool:end",
+      createToolEventPayload(toolName, {
+        result,
+        error,
+        success,
+        responseTime: duration,
+        timestamp: endTime,
+        duration,
+        executionId: finalExecutionId,
+      }),
+    );
 
     logger.debug(`tool:end emitted for ${toolName}`, {
       toolName,
@@ -8601,11 +8634,13 @@ Current user's request: ${currentInput}`;
       options,
       hasExternalManager: !!this.externalServerManager,
     });
-    this.emitter.emit("tool:start", {
-      toolName,
-      timestamp: executionContext.executionStartTime,
-      input: params,
-    });
+    this.emitter.emit(
+      "tool:start",
+      createToolEventPayload(toolName, {
+        timestamp: executionContext.executionStartTime,
+        input: params,
+      }),
+    );
 
     const toolInfo = this.toolRegistry.getToolInfo(toolName);
     const finalOptions = {

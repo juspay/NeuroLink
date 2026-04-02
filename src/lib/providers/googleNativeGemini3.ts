@@ -26,6 +26,7 @@ import {
   convertZodToJsonSchema,
   inlineJsonSchema,
   isZodSchema,
+  normalizeJsonSchemaObject,
 } from "../utils/schemaConversion.js";
 import type { ThinkingConfig } from "../types/configTypes.js";
 import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
@@ -234,6 +235,58 @@ export function sanitizeToolsForGemini(tools: Record<string, Tool>): {
   }
 
   return { tools: sanitized, dropped };
+}
+
+export function normalizeToolsForJsonSchemaProvider(
+  tools: Record<string, Tool>,
+): {
+  tools: Record<string, Tool>;
+  normalized: string[];
+} {
+  const normalizedTools: Record<string, Tool> = {};
+  const normalized: string[] = [];
+
+  for (const [name, tool] of Object.entries(tools)) {
+    const legacyTool = tool as ToolWithLegacyParams;
+    const toolParams = legacyTool.parameters || tool.inputSchema;
+    let rawSchema: Record<string, unknown>;
+
+    if (isZodSchema(toolParams)) {
+      rawSchema = convertZodToJsonSchema(
+        toolParams as ZodUnknownSchema,
+      ) as Record<string, unknown>;
+    } else if (toolParams && typeof toolParams === "object") {
+      rawSchema = toolParams as Record<string, unknown>;
+    } else {
+      rawSchema = { type: "object", properties: {} };
+    }
+
+    if (
+      rawSchema.jsonSchema &&
+      typeof rawSchema.jsonSchema === "object" &&
+      !rawSchema.type
+    ) {
+      rawSchema = rawSchema.jsonSchema as Record<string, unknown>;
+    }
+
+    const schemaBefore = JSON.stringify(rawSchema);
+    const normalizedSchema = normalizeJsonSchemaObject(rawSchema);
+    if (JSON.stringify(normalizedSchema) !== schemaBefore) {
+      normalized.push(name);
+    }
+
+    const wrappedSchema = aiJsonSchema(normalizedSchema);
+    normalizedTools[name] = {
+      ...tool,
+      inputSchema: wrappedSchema,
+      ...(legacyTool.parameters ? { parameters: wrappedSchema } : {}),
+    } as Tool;
+  }
+
+  return {
+    tools: normalizedTools,
+    normalized,
+  };
 }
 
 /**

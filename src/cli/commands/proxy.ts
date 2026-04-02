@@ -16,6 +16,12 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
+import {
+  buildProxyHealthResponse,
+  createProxyReadinessState,
+  markProxyReady,
+  waitForProxyReadiness,
+} from "../../lib/proxy/proxyHealth.js";
 import { logger } from "../../lib/utils/logger.js";
 import {
   formatUptime,
@@ -552,6 +558,7 @@ async function createProxyStartApp(params: {
   const { Hono } = await import("hono");
 
   const app = new Hono();
+  const readiness = createProxyReadinessState();
   app.onError((err, c) => {
     const errMsg = err instanceof Error ? err.message : String(err);
     logger.always(`[proxy] unhandled error: ${errMsg}`);
@@ -715,25 +722,35 @@ async function createProxyStartApp(params: {
   }
 
   app.get("/health", (c) =>
-    c.json({
-      status: "ok",
-      strategy: params.strategy,
-      uptime: process.uptime(),
-      version: PROXY_VERSION,
-    }),
+    c.json(
+      buildProxyHealthResponse(readiness, {
+        strategy: params.strategy,
+        passthrough: params.passthrough,
+        version: PROXY_VERSION,
+      }),
+    ),
   );
 
   app.get("/status", async (c) => {
     const { getStats } = await import("../../lib/proxy/usageStats.js");
     const stats = getStats();
+    const health = buildProxyHealthResponse(readiness, {
+      strategy: params.strategy,
+      passthrough: params.passthrough,
+      version: PROXY_VERSION,
+    });
     return c.json({
       status: "running",
+      ready: health.ready,
+      acceptingConnections: health.acceptingConnections,
+      readyAt: health.readyAt,
       pid: process.pid,
       port: params.port,
       host: params.host,
       strategy: params.strategy,
       uptime: process.uptime(),
       version: PROXY_VERSION,
+      health,
       stats: {
         totalAttempts: stats.totalAttempts,
         totalRequests: stats.totalRequests,
@@ -760,7 +777,7 @@ async function createProxyStartApp(params: {
     });
   });
 
-  return { app };
+  return { app, readiness };
 }
 
 async function initializeProxyOpenTelemetry(): Promise<void> {
@@ -960,6 +977,7 @@ async function startProxyRuntime(params: {
   argv: ProxyStartArgs;
   spinner: ProxySpinner;
   app: ProxyStartApp["app"];
+  readiness: ProxyStartApp["readiness"];
   host: string;
   port: number;
   strategy: ProxyStartStrategy;
@@ -975,6 +993,12 @@ async function startProxyRuntime(params: {
     hostname: params.host,
   });
   const guardPid = spawnFailOpenGuard(params.host, params.port, process.pid);
+  const readinessHost = params.host === "0.0.0.0" ? "127.0.0.1" : params.host;
+  await waitForProxyReadiness({
+    host: readinessHost,
+    port: params.port,
+  });
+  markProxyReady(params.readiness);
   const fallbackChain: FallbackInfo[] | undefined =
     params.proxyConfig?.routing?.fallbackChain?.map((entry) => ({
       provider: entry.provider as string,
@@ -987,6 +1011,12 @@ async function startProxyRuntime(params: {
     host: params.host,
     strategy: params.strategy,
     startTime: new Date().toISOString(),
+    ready: true,
+    readyAt: params.readiness.readyAtMs
+      ? new Date(params.readiness.readyAtMs).toISOString()
+      : undefined,
+    healthPath: "/health",
+    statusPath: "/status",
     envFile: params.loadedEnvFile,
     fallbackChain,
     guardPid,
@@ -1063,7 +1093,7 @@ async function startProxyCommandHandler(argv: ProxyStartArgs): Promise<void> {
 
     const port = argv.port ?? 55669;
     const host = argv.host ?? "127.0.0.1";
-    const { app } = await createProxyStartApp({
+    const { app, readiness } = await createProxyStartApp({
       neurolink,
       modelRouter,
       strategy,
@@ -1083,6 +1113,7 @@ async function startProxyCommandHandler(argv: ProxyStartArgs): Promise<void> {
       argv,
       spinner,
       app,
+      readiness,
       host,
       port,
       strategy,

@@ -88,6 +88,7 @@ import {
   executeNativeToolCalls,
   extractTextFromParts,
   handleMaxStepsTermination,
+  normalizeToolsForJsonSchemaProvider,
   type NativeToolsConfig,
   pushModelResponseToHistory,
   sanitizeToolsForGemini,
@@ -1223,7 +1224,15 @@ export class GoogleVertexProvider extends BaseProvider {
       tools =
         Object.keys(sanitized.tools).length > 0 ? sanitized.tools : undefined;
     } else if (isAnthropic && Object.keys(rawTools).length > 0) {
-      tools = rawTools;
+      const normalized = normalizeToolsForJsonSchemaProvider(rawTools);
+      if (normalized.normalized.length > 0) {
+        logger.debug("[GoogleVertex] Normalized Anthropic tool schema(s)", {
+          toolCount: normalized.normalized.length,
+          toolNames: normalized.normalized,
+        });
+      }
+      tools =
+        Object.keys(normalized.tools).length > 0 ? normalized.tools : undefined;
     } else {
       tools = undefined;
     }

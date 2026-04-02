@@ -10,8 +10,7 @@
  * Without a router, models are passed through to the Anthropic provider.
  */
 
-import { randomUUID } from "node:crypto";
-import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -47,6 +46,17 @@ import {
   persistTokens,
   refreshToken,
 } from "../../proxy/tokenRefresh.js";
+import {
+  applyRateLimitCooldownScope,
+  buildProxyTranslationPlan,
+  classifyClaudeProxyRequest,
+  getActiveCooldownScope,
+  partitionAccountsByCooldown,
+  summarizeSkippedFallbacks,
+  type ClaudeProxyRequestProfile,
+  type ProxyTranslationPlan,
+} from "../../proxy/routingPolicy.js";
+import { writeJsonSnapshotAtomically } from "../../proxy/snapshotPersistence.js";
 import {
   recordAttempt,
   recordAttemptError,
@@ -104,10 +114,11 @@ let lastKnownAccountCount = 0;
 
 const MAX_AUTH_RETRIES = 5;
 const MAX_CONSECUTIVE_REFRESH_FAILURES = 15;
+const MAX_TRANSIENT_SAME_ACCOUNT_RETRIES = 2;
+const TRANSIENT_SAME_ACCOUNT_RETRY_DELAYS_MS = [250, 1_000] as const;
 
 /** Decision 8: Cooldowns only for 401 and 429. */
 const AUTH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes for 401
-const RATE_LIMIT_BACKOFF_BASE_MS = 1000; // 1 second base for 429
 const RATE_LIMIT_BACKOFF_CAP_MS = 10 * 60 * 1000; // 10 minute cap for 429
 /** Timeout for upstream requests to Anthropic. Must be generous enough
  *  to cover the full lifecycle of streaming responses, including extended
@@ -377,11 +388,7 @@ async function persistClaudeSnapshot(
   snapshot: ClaudeSnapshot,
 ): Promise<void> {
   const snapshotPath = getSnapshotPath(accountLabel);
-  const dirPath = join(homedir(), ".neurolink", "header-snapshots");
-  await mkdir(dirPath, { recursive: true });
-  const tmpPath = `${snapshotPath}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(snapshot, null, 2), { mode: 0o600 });
-  await rename(tmpPath, snapshotPath);
+  await writeJsonSnapshotAtomically(snapshotPath, snapshot, 0o600);
   snapshotCache.set(getSnapshotSafeLabel(accountLabel), {
     snapshot,
     loadedAt: Date.now(),
@@ -426,7 +433,18 @@ async function maybeRefreshClaudeSnapshot(
     return existing;
   }
 
-  await persistClaudeSnapshot(accountLabel, next);
+  try {
+    await persistClaudeSnapshot(accountLabel, next);
+  } catch (error) {
+    logger.warn("[proxy] failed to persist Claude snapshot", {
+      accountLabel,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    snapshotCache.set(getSnapshotSafeLabel(accountLabel), {
+      snapshot: next,
+      loadedAt: Date.now(),
+    });
+  }
   return next;
 }
 
@@ -622,14 +640,17 @@ async function handleTranslatedClaudeRequest(args: {
   } = args;
   tracer?.setMode("full");
   const parsed = parseClaudeRequest(body);
-  const attempts = buildProxyTranslationAttempts(
+  const plan = buildProxyTranslationPlan(
     {
       provider: route.provider,
       model: route.model,
     },
-    modelRouter,
+    modelRouter?.getFallbackChain() ?? [],
+    body.model,
     parsed,
   );
+  logProxyRoutingPlan(logProxyBody, "translated_request", plan);
+  const attempts = plan.attempts;
 
   if (body.stream) {
     return handleTranslatedClaudeStreamRequest({
@@ -650,6 +671,23 @@ async function handleTranslatedClaudeRequest(args: {
     tracer,
     requestStartTime,
     logProxyBody,
+  });
+}
+
+function logProxyRoutingPlan(
+  logProxyBody: ProxyBodyCaptureLogger,
+  stage: string,
+  plan: Pick<ProxyTranslationPlan, "profile" | "attempts" | "skipped">,
+): void {
+  logProxyBody({
+    phase: "routing_decision",
+    contentType: "application/json",
+    body: {
+      stage,
+      requestProfile: plan.profile,
+      attempts: plan.attempts,
+      skipped: plan.skipped,
+    },
   });
 }
 
@@ -1822,6 +1860,8 @@ async function executeClaudeFallbackTranslation(args: {
 async function tryConfiguredClaudeFallbackChain(args: {
   ctx: ServerContext;
   body: ClaudeRequest;
+  parsedFallbackRequest: ParsedClaudeRequest;
+  requestProfile: ClaudeProxyRequestProfile;
   modelRouter?: ModelRouter;
   tracer?: ProxyTracer;
   requestStartTime: number;
@@ -1839,30 +1879,46 @@ async function tryConfiguredClaudeFallbackChain(args: {
       cacheReadTokens?: number;
     },
   ) => void;
-}): Promise<unknown | null> {
+}): Promise<{ response: unknown | null; fallbackPolicyReason: string | null }> {
   const {
     ctx,
     body,
+    parsedFallbackRequest,
+    requestProfile,
     modelRouter,
     tracer,
     requestStartTime,
     logProxyBody,
     logFinalRequest,
   } = args;
-  const parsedFallbackRequest = parseClaudeRequest(body);
   const chain = modelRouter?.getFallbackChain() ?? [];
+  const fallbackPlan = buildProxyTranslationPlan(
+    { provider: "anthropic", model: body.model },
+    chain,
+    body.model,
+    parsedFallbackRequest,
+  );
+  const fallbackPolicyReason = summarizeSkippedFallbacks(fallbackPlan);
 
-  for (const fallback of chain) {
-    if (
-      shouldSkipTranslationTarget(
-        fallback.provider,
-        fallback.model,
-        parsedFallbackRequest,
-      )
-    ) {
-      logger.debug(
-        `[proxy] skipping fallback ${fallback.provider}/${fallback.model}: incompatible with request shape`,
-      );
+  logProxyBody({
+    phase: "routing_decision",
+    contentType: "application/json",
+    body: {
+      stage: "anthropic_fallback",
+      requestProfile,
+      attempts: fallbackPlan.attempts.slice(1),
+      skipped: fallbackPlan.skipped,
+    },
+  });
+  for (const skipped of fallbackPlan.skipped) {
+    const label = skipped.provider
+      ? `${skipped.provider}/${skipped.model ?? "unknown"}`
+      : "auto-provider";
+    logger.always(`[proxy] skipping fallback ${label}: ${skipped.reason}`);
+  }
+
+  for (const fallback of fallbackPlan.attempts.slice(1)) {
+    if (!fallback.provider || !fallback.model) {
       continue;
     }
 
@@ -1872,10 +1928,9 @@ async function tryConfiguredClaudeFallbackChain(args: {
         fallback.model,
       );
     if (!availability.available) {
-      logger.debug(
-        `[proxy] skipping fallback ${fallback.provider}/${fallback.model}: ${availability.reason ?? "provider unavailable"}`,
+      logger.always(
+        `[proxy] fallback ${fallback.provider}/${fallback.model} health-check failed (${availability.reason ?? "provider unavailable"}), attempting anyway`,
       );
-      continue;
     }
 
     try {
@@ -1886,7 +1941,7 @@ async function tryConfiguredClaudeFallbackChain(args: {
         provider: fallback.provider,
         model: fallback.model,
       });
-      return await executeClaudeFallbackTranslation({
+      const response = await executeClaudeFallbackTranslation({
         ctx,
         body,
         tracer,
@@ -1896,14 +1951,21 @@ async function tryConfiguredClaudeFallbackChain(args: {
         options: options as Parameters<ServerContext["neurolink"]["stream"]>[0],
         providerLabel: fallback.provider,
       });
+      return {
+        response,
+        fallbackPolicyReason,
+      };
     } catch (fallbackErr) {
-      logger.debug(
+      logger.always(
         `[proxy] fallback ${fallback.provider}/${fallback.model} failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
       );
     }
   }
 
-  return null;
+  return {
+    response: null,
+    fallbackPolicyReason,
+  };
 }
 
 async function tryAutoClaudeFallback(args: {
@@ -1929,8 +1991,21 @@ async function tryAutoClaudeFallback(args: {
   const { ctx, body, tracer, requestStartTime, logProxyBody, logFinalRequest } =
     args;
   try {
-    logger.always("[proxy] fallback → auto-provider");
     const parsed = parseClaudeRequest(body);
+    const plan = buildProxyTranslationPlan(
+      { provider: "anthropic", model: body.model },
+      [],
+      body.model,
+      parsed,
+    );
+    logProxyRoutingPlan(logProxyBody, "auto_fallback", plan);
+    const autoAttempt = plan.attempts.find(
+      (attempt) => attempt.label === "auto-provider",
+    );
+    if (!autoAttempt) {
+      return null;
+    }
+    logger.always("[proxy] fallback → auto-provider");
     const options = buildProxyFallbackOptions(parsed);
     return await executeClaudeFallbackTranslation({
       ctx,
@@ -1966,6 +2041,8 @@ function buildClaudeAnthropicFailureResponse(args: {
   sawRateLimit: boolean;
   lastError: unknown;
   orderedAccounts: ProxyPassthroughAccount[];
+  requestProfile: ClaudeProxyRequestProfile;
+  fallbackPolicyReason: string | null;
   buildLoggedClaudeError: ClaudeLoggedErrorBuilder;
   logProxyBody: ProxyBodyCaptureLogger;
   logFinalRequest: (
@@ -1992,6 +2069,8 @@ function buildClaudeAnthropicFailureResponse(args: {
     sawRateLimit,
     lastError,
     orderedAccounts,
+    requestProfile,
+    fallbackPolicyReason,
     buildLoggedClaudeError,
     logProxyBody,
     logFinalRequest,
@@ -2063,23 +2142,29 @@ function buildClaudeAnthropicFailureResponse(args: {
   }
 
   const earliestRecovery = orderedAccounts.reduce((min, account) => {
-    const coolingUntil = getOrCreateRuntimeState(account.key).coolingUntil;
-    return coolingUntil ? Math.min(min, coolingUntil) : min;
+    const cooldown = getActiveCooldownScope(
+      getOrCreateRuntimeState(account.key),
+      requestProfile,
+    );
+    return cooldown ? Math.min(min, cooldown.until) : min;
   }, Infinity);
   const retryAfterSec = Number.isFinite(earliestRecovery)
     ? Math.max(1, Math.ceil((earliestRecovery - Date.now()) / 1000))
     : 60;
+  const contractMessage = fallbackPolicyReason
+    ? ` ${fallbackPolicyReason}`
+    : "";
   logger.always(
-    `[proxy] all accounts rate-limited, retry in ${retryAfterSec}s`,
+    `[proxy] all accounts rate-limited for request-class=${requestProfile.primaryClass}, retry in ${retryAfterSec}s`,
   );
   const errorBody = buildClaudeError(
     429,
-    `All accounts rate-limited. Earliest recovery in ${retryAfterSec}s.`,
+    `All accounts rate-limited. Earliest recovery in ${retryAfterSec}s.${contractMessage}`,
     "overloaded_error",
   );
   tracer?.setError(
     "rate_limit_error",
-    `All accounts rate-limited. Retry in ${retryAfterSec}s.`,
+    `All accounts rate-limited. Retry in ${retryAfterSec}s.${contractMessage}`,
   );
   tracer?.end(429, Date.now() - requestStartTime);
   recordFinalError(429);
@@ -2088,7 +2173,7 @@ function buildClaudeAnthropicFailureResponse(args: {
     "",
     "final",
     "rate_limit_error",
-    `All accounts rate-limited. Retry in ${retryAfterSec}s.`,
+    `All accounts rate-limited. Retry in ${retryAfterSec}s.${contractMessage}`,
   );
   const errorBodyText = JSON.stringify(errorBody);
   logProxyBody({
@@ -2117,6 +2202,7 @@ async function handleAnthropicSuccessfulResponse(args: {
   body: ClaudeRequest;
   account: ProxyPassthroughAccount;
   accountState: RuntimeAccountState;
+  requestProfile: ClaudeProxyRequestProfile;
   response: Response;
   tracer?: ProxyTracer;
   requestStartTime: number;
@@ -2144,6 +2230,7 @@ async function handleAnthropicSuccessfulResponse(args: {
     body,
     account,
     accountState,
+    requestProfile,
     response,
     tracer,
     requestStartTime,
@@ -2157,6 +2244,22 @@ async function handleAnthropicSuccessfulResponse(args: {
   accountState.backoffLevel = 0;
   accountState.coolingUntil = undefined;
   accountState.consecutiveRefreshFailures = 0;
+  if (accountState.requestClassCooldowns) {
+    delete accountState.requestClassCooldowns[
+      `${requestProfile.primaryClass}:${requestProfile.requestedModel.toLowerCase()}`
+    ];
+  }
+  if (accountState.modelTierCooldowns) {
+    delete accountState.modelTierCooldowns[requestProfile.modelTier];
+  }
+  if (accountState.requestClassBackoffLevels) {
+    delete accountState.requestClassBackoffLevels[
+      `${requestProfile.primaryClass}:${requestProfile.requestedModel.toLowerCase()}`
+    ];
+  }
+  if (accountState.modelTierBackoffLevels) {
+    delete accountState.modelTierBackoffLevels[requestProfile.modelTier];
+  }
   logger.always(`[proxy] ← ${response.status} account=${account.label}`);
 
   const quota = parseQuotaHeaders(response.headers);
@@ -3029,6 +3132,7 @@ async function handleAnthropicAuthRetry(args: {
   body: ClaudeRequest;
   account: ProxyPassthroughAccount;
   accountState: RuntimeAccountState;
+  requestProfile: ClaudeProxyRequestProfile;
   headers: Record<string, string>;
   buildUpstreamBody: (token: string) => { bodyStr: string; sessionId?: string };
   enabledAccounts: ProxyPassthroughAccount[];
@@ -3076,6 +3180,7 @@ async function handleAnthropicAuthRetry(args: {
     body,
     account,
     accountState,
+    requestProfile,
     headers,
     buildUpstreamBody,
     enabledAccounts,
@@ -3197,7 +3302,12 @@ async function handleAnthropicAuthRetry(args: {
         const cooldownMs = Number.isNaN(parsedRetryAfter)
           ? 60_000
           : Math.max(1, parsedRetryAfter) * 1000;
-        accountState.coolingUntil = Date.now() + cooldownMs;
+        const cooldown = applyRateLimitCooldownScope({
+          state: accountState,
+          profile: requestProfile,
+          retryAfterMs: cooldownMs,
+          capMs: RATE_LIMIT_BACKOFF_CAP_MS,
+        });
         advancePrimaryIfCurrent(
           account.key,
           enabledAccounts.length,
@@ -3206,7 +3316,7 @@ async function handleAnthropicAuthRetry(args: {
         recordCooldown(
           account.label,
           account.type,
-          accountState.coolingUntil,
+          Date.now() + cooldown.backoffMs,
           accountState.backoffLevel,
         );
         break;
@@ -3620,7 +3730,7 @@ async function handleAnthropicNonOkResponse(args: {
     recordAttemptError(account.label, account.type, response.status);
     currentSawTransientFailure = true;
     logger.always(
-      `[proxy] ← ${response.status} account=${account.label} (transient, rotating)`,
+      `[proxy] ← ${response.status} account=${account.label} (transient)`,
     );
     currentLastError = errBody;
     logAttempt(response.status, "api_error", summarizeErrorMessage(errBody));
@@ -3628,6 +3738,7 @@ async function handleAnthropicNonOkResponse(args: {
     tracer?.recordRetry(account.label, "transient");
     return {
       continueLoop: true,
+      retrySameAccount: true,
       lastError: currentLastError,
       authFailureMessage: currentAuthFailureMessage,
       sawTransientFailure: currentSawTransientFailure,
@@ -4050,6 +4161,7 @@ async function fetchAnthropicAccountResponse(args: {
   finalBodyStr: string;
   account: ProxyPassthroughAccount;
   accountState: RuntimeAccountState;
+  requestProfile: ClaudeProxyRequestProfile;
   enabledAccounts: ProxyPassthroughAccount[];
   orderedAccounts: ProxyPassthroughAccount[];
   tracer?: ProxyTracer;
@@ -4065,6 +4177,7 @@ async function fetchAnthropicAccountResponse(args: {
     finalBodyStr,
     account,
     accountState,
+    requestProfile,
     enabledAccounts,
     orderedAccounts,
     tracer,
@@ -4098,7 +4211,7 @@ async function fetchAnthropicAccountResponse(args: {
       fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
     lastError = errorMessage;
     logger.always(
-      `[proxy] fetch error account=${account.label} code=${errorCode} (rotating): ${errorMessage}`,
+      `[proxy] fetch error account=${account.label} code=${errorCode} (retryable): ${errorMessage}`,
     );
     logAttempt(502, "network_error", errorMessage);
     tracer?.setError("network_error", errorMessage);
@@ -4106,6 +4219,7 @@ async function fetchAnthropicAccountResponse(args: {
     currentUpstreamSpan?.end();
     return {
       continueLoop: true,
+      retrySameAccount: true,
       lastError,
       sawRateLimit,
       sawNetworkError,
@@ -4129,15 +4243,12 @@ async function fetchAnthropicAccountResponse(args: {
       }
     }
 
-    const level = accountState.backoffLevel;
-    const baseCooldown =
-      cooldownMs > 0 ? cooldownMs : RATE_LIMIT_BACKOFF_BASE_MS;
-    const backoffMs = Math.min(
-      baseCooldown * 2 ** level,
-      RATE_LIMIT_BACKOFF_CAP_MS,
-    );
-    accountState.coolingUntil = Date.now() + backoffMs;
-    accountState.backoffLevel += 1;
+    const cooldown = applyRateLimitCooldownScope({
+      state: accountState,
+      profile: requestProfile,
+      retryAfterMs: cooldownMs > 0 ? cooldownMs : undefined,
+      capMs: RATE_LIMIT_BACKOFF_CAP_MS,
+    });
     advancePrimaryIfCurrent(
       account.key,
       enabledAccounts.length,
@@ -4147,12 +4258,12 @@ async function fetchAnthropicAccountResponse(args: {
     recordCooldown(
       account.label,
       account.type,
-      accountState.coolingUntil,
+      Date.now() + cooldown.backoffMs,
       accountState.backoffLevel,
     );
     lastError = await response.text();
     logger.always(
-      `[proxy] ← 429 account=${account.label} backoff-level=${accountState.backoffLevel} cooldown=${Math.round(backoffMs / 1000)}s`,
+      `[proxy] ← 429 account=${account.label} backoff-level=${accountState.backoffLevel} cooldown=${Math.round(cooldown.backoffMs / 1000)}s request-class=${cooldown.requestClassKey} model-tier=${cooldown.modelTierKey}`,
     );
     logAttempt(429, "rate_limit_error", String(lastError));
     tracer?.setError("rate_limit_error", String(lastError).slice(0, 500));
@@ -4199,6 +4310,8 @@ async function handleAnthropicRoutedClaudeRequest(args: {
     logProxyBody,
     logFinalRequest,
   } = args;
+  const parsedRequest = parseClaudeRequest(body);
+  const requestProfile = classifyClaudeProxyRequest(body.model, parsedRequest);
   const loadedAccounts = await loadClaudeProxyAccounts({
     ctx,
     body,
@@ -4232,98 +4345,221 @@ async function handleAnthropicRoutedClaudeRequest(args: {
     attemptNumber: 0,
   };
   const acctSelectionSpan = tracer?.startAccountSelection();
+  const accountPartition = partitionAccountsByCooldown(
+    orderedAccounts,
+    (account) => getOrCreateRuntimeState(account.key),
+    requestProfile,
+  );
+  for (const skippedAccount of accountPartition.skipped) {
+    if (
+      skippedAccount.cooldown.scope === "request_class" ||
+      skippedAccount.cooldown.scope === "model_tier"
+    ) {
+      loopState.sawRateLimit = true;
+    }
+    loopState.lastError = `Skipped account=${skippedAccount.account.label} due to ${skippedAccount.cooldown.scope} cooldown ${skippedAccount.cooldown.key}`;
+    logger.always(
+      `[proxy] skipping account=${skippedAccount.account.label} due to ${skippedAccount.cooldown.scope} cooldown=${skippedAccount.cooldown.key} remaining=${Math.max(1, Math.ceil((skippedAccount.cooldown.until - Date.now()) / 1000))}s`,
+    );
+  }
 
-  for (const account of orderedAccounts) {
+  accountLoop: for (const account of accountPartition.eligible) {
     const accountState = getOrCreateRuntimeState(account.key);
-    if (accountState.coolingUntil && accountState.coolingUntil > Date.now()) {
-      continue;
-    }
+    let transientSameAccountRetries = 0;
 
-    loopState.attemptNumber += 1;
-    if (tracer && loopState.attemptNumber === 1 && acctSelectionSpan) {
-      tracer.setAccountSelection({
-        strategy: accountStrategy,
-        accountsTotal: accounts.length,
-        accountsHealthy: enabledAccounts.length,
-        selectedAccount: account.label,
-        accountType: account.type,
+    while (true) {
+      loopState.attemptNumber += 1;
+      if (tracer && loopState.attemptNumber === 1 && acctSelectionSpan) {
+        tracer.setAccountSelection({
+          strategy: accountStrategy,
+          accountsTotal: accounts.length,
+          accountsHealthy: enabledAccounts.length,
+          selectedAccount: account.label,
+          accountType: account.type,
+        });
+        acctSelectionSpan.end();
+      }
+
+      const logAttempt = createAnthropicAttemptLogger({
+        ctx,
+        body,
+        toolCount,
+        requestStart,
+        tracer,
+        account,
+        attemptNumber: loopState.attemptNumber,
       });
-      acctSelectionSpan.end();
-    }
+      const preparedAttempt = await prepareAnthropicAccountAttempt({
+        account,
+        accountState,
+        bodyStr,
+        clientHeaders,
+        isClaudeClientRequest,
+        url,
+        tracer,
+        attemptNumber: loopState.attemptNumber,
+        currentLastError: loopState.lastError,
+        currentAuthFailureMessage: loopState.authFailureMessage,
+        logAttempt,
+        logProxyBody,
+      });
+      loopState.lastError = preparedAttempt.lastError;
+      loopState.authFailureMessage = preparedAttempt.authFailureMessage;
+      if (
+        preparedAttempt.continueLoop ||
+        !preparedAttempt.headers ||
+        !preparedAttempt.buildUpstreamBody ||
+        !preparedAttempt.finalBodyStr ||
+        preparedAttempt.fetchStartMs === undefined
+      ) {
+        continue accountLoop;
+      }
 
-    const logAttempt = createAnthropicAttemptLogger({
-      ctx,
-      body,
-      toolCount,
-      requestStart,
-      tracer,
-      account,
-      attemptNumber: loopState.attemptNumber,
-    });
-    const preparedAttempt = await prepareAnthropicAccountAttempt({
-      account,
-      accountState,
-      bodyStr,
-      clientHeaders,
-      isClaudeClientRequest,
-      url,
-      tracer,
-      attemptNumber: loopState.attemptNumber,
-      currentLastError: loopState.lastError,
-      currentAuthFailureMessage: loopState.authFailureMessage,
-      logAttempt,
-      logProxyBody,
-    });
-    loopState.lastError = preparedAttempt.lastError;
-    loopState.authFailureMessage = preparedAttempt.authFailureMessage;
-    if (
-      preparedAttempt.continueLoop ||
-      !preparedAttempt.headers ||
-      !preparedAttempt.buildUpstreamBody ||
-      !preparedAttempt.finalBodyStr ||
-      preparedAttempt.fetchStartMs === undefined
-    ) {
-      continue;
-    }
+      const fetchResult = await fetchAnthropicAccountResponse({
+        url,
+        headers: preparedAttempt.headers,
+        finalBodyStr: preparedAttempt.finalBodyStr,
+        account,
+        accountState,
+        requestProfile,
+        enabledAccounts,
+        orderedAccounts,
+        tracer,
+        logAttempt,
+        currentLastError: loopState.lastError,
+        currentSawRateLimit: loopState.sawRateLimit,
+        currentSawNetworkError: loopState.sawNetworkError,
+        upstreamSpan: preparedAttempt.upstreamSpan,
+      });
+      loopState.lastError = fetchResult.lastError;
+      loopState.sawRateLimit = fetchResult.sawRateLimit;
+      loopState.sawNetworkError = fetchResult.sawNetworkError;
+      if (fetchResult.continueLoop || !fetchResult.response) {
+        if (
+          fetchResult.retrySameAccount &&
+          transientSameAccountRetries < MAX_TRANSIENT_SAME_ACCOUNT_RETRIES
+        ) {
+          transientSameAccountRetries += 1;
+          const delayMs = getTransientSameAccountRetryDelayMs(
+            transientSameAccountRetries,
+          );
+          logger.always(
+            `[proxy] retrying same account=${account.label} after transient network error (${transientSameAccountRetries}/${MAX_TRANSIENT_SAME_ACCOUNT_RETRIES}) in ${delayMs}ms`,
+          );
+          await sleep(delayMs);
+          continue;
+        }
+        if (fetchResult.retrySameAccount) {
+          logger.always(
+            `[proxy] exhausted transient same-account retries for account=${account.label}; rotating`,
+          );
+        }
+        continue accountLoop;
+      }
 
-    const fetchResult = await fetchAnthropicAccountResponse({
-      url,
-      headers: preparedAttempt.headers,
-      finalBodyStr: preparedAttempt.finalBodyStr,
-      account,
-      accountState,
-      enabledAccounts,
-      orderedAccounts,
-      tracer,
-      logAttempt,
-      currentLastError: loopState.lastError,
-      currentSawRateLimit: loopState.sawRateLimit,
-      currentSawNetworkError: loopState.sawNetworkError,
-      upstreamSpan: preparedAttempt.upstreamSpan,
-    });
-    loopState.lastError = fetchResult.lastError;
-    loopState.sawRateLimit = fetchResult.sawRateLimit;
-    loopState.sawNetworkError = fetchResult.sawNetworkError;
-    if (fetchResult.continueLoop || !fetchResult.response) {
-      continue;
-    }
+      let upstreamSpan = fetchResult.upstreamSpan;
+      const response = fetchResult.response;
+      if (
+        response.status === 401 &&
+        account.type === "oauth" &&
+        account.refreshToken
+      ) {
+        const authRetryResult = await handleAnthropicAuthRetry({
+          ctx,
+          body,
+          account,
+          accountState,
+          requestProfile,
+          headers: preparedAttempt.headers,
+          buildUpstreamBody: preparedAttempt.buildUpstreamBody,
+          enabledAccounts,
+          orderedAccounts,
+          response,
+          tracer,
+          requestStartTime,
+          fetchStartMs: preparedAttempt.fetchStartMs,
+          attemptNumber: loopState.attemptNumber,
+          finalBodyStr: preparedAttempt.finalBodyStr,
+          upstreamSpan,
+          logAttempt,
+          logProxyBody,
+          logFinalRequest,
+          lastError: loopState.lastError,
+          authFailureMessage: loopState.authFailureMessage,
+          sawRateLimit: loopState.sawRateLimit,
+          sawTransientFailure: loopState.sawTransientFailure,
+          sawNetworkError: loopState.sawNetworkError,
+        });
+        loopState.lastError = authRetryResult.lastError;
+        loopState.authFailureMessage = authRetryResult.authFailureMessage;
+        loopState.sawRateLimit = authRetryResult.sawRateLimit;
+        loopState.sawTransientFailure = authRetryResult.sawTransientFailure;
+        loopState.sawNetworkError = authRetryResult.sawNetworkError;
+        upstreamSpan = authRetryResult.upstreamSpan;
+        if (authRetryResult.response !== undefined) {
+          return authRetryResult.response;
+        }
+        if (authRetryResult.continueLoop) {
+          continue accountLoop;
+        }
+      }
 
-    let upstreamSpan = fetchResult.upstreamSpan;
-    const response = fetchResult.response;
-    if (
-      response.status === 401 &&
-      account.type === "oauth" &&
-      account.refreshToken
-    ) {
-      const authRetryResult = await handleAnthropicAuthRetry({
+      if (!response.ok) {
+        const nonOkResult = await handleAnthropicNonOkResponse({
+          response,
+          account,
+          accountState,
+          tracer,
+          requestStartTime,
+          fetchStartMs: preparedAttempt.fetchStartMs,
+          attemptNumber: loopState.attemptNumber,
+          logAttempt,
+          logProxyBody,
+          logFinalRequest,
+          lastError: loopState.lastError,
+          authFailureMessage: loopState.authFailureMessage,
+          sawTransientFailure: loopState.sawTransientFailure,
+          invalidRequestFailure: loopState.invalidRequestFailure,
+          maxConsecutiveRefreshFailures: MAX_CONSECUTIVE_REFRESH_FAILURES,
+        });
+        loopState.lastError = nonOkResult.lastError;
+        loopState.authFailureMessage = nonOkResult.authFailureMessage;
+        loopState.sawTransientFailure = nonOkResult.sawTransientFailure;
+        loopState.invalidRequestFailure = nonOkResult.invalidRequestFailure;
+        if (nonOkResult.response !== undefined) {
+          return nonOkResult.response;
+        }
+        if (nonOkResult.continueLoop) {
+          if (
+            nonOkResult.retrySameAccount &&
+            transientSameAccountRetries < MAX_TRANSIENT_SAME_ACCOUNT_RETRIES
+          ) {
+            transientSameAccountRetries += 1;
+            const delayMs = getTransientSameAccountRetryDelayMs(
+              transientSameAccountRetries,
+            );
+            logger.always(
+              `[proxy] retrying same account=${account.label} after transient upstream ${response.status} (${transientSameAccountRetries}/${MAX_TRANSIENT_SAME_ACCOUNT_RETRIES}) in ${delayMs}ms`,
+            );
+            await sleep(delayMs);
+            continue;
+          }
+          if (nonOkResult.retrySameAccount) {
+            logger.always(
+              `[proxy] exhausted transient same-account retries for account=${account.label}; rotating`,
+            );
+          }
+          continue accountLoop;
+        }
+        break accountLoop;
+      }
+
+      const successResult = await handleAnthropicSuccessfulResponse({
         ctx,
         body,
         account,
         accountState,
-        headers: preparedAttempt.headers,
-        buildUpstreamBody: preparedAttempt.buildUpstreamBody,
-        enabledAccounts,
-        orderedAccounts,
+        requestProfile,
         response,
         tracer,
         requestStartTime,
@@ -4331,96 +4567,33 @@ async function handleAnthropicRoutedClaudeRequest(args: {
         attemptNumber: loopState.attemptNumber,
         finalBodyStr: preparedAttempt.finalBodyStr,
         upstreamSpan,
-        logAttempt,
         logProxyBody,
         logFinalRequest,
-        lastError: loopState.lastError,
-        authFailureMessage: loopState.authFailureMessage,
-        sawRateLimit: loopState.sawRateLimit,
-        sawTransientFailure: loopState.sawTransientFailure,
-        sawNetworkError: loopState.sawNetworkError,
       });
-      loopState.lastError = authRetryResult.lastError;
-      loopState.authFailureMessage = authRetryResult.authFailureMessage;
-      loopState.sawRateLimit = authRetryResult.sawRateLimit;
-      loopState.sawTransientFailure = authRetryResult.sawTransientFailure;
-      loopState.sawNetworkError = authRetryResult.sawNetworkError;
-      upstreamSpan = authRetryResult.upstreamSpan;
-      if (authRetryResult.response !== undefined) {
-        return authRetryResult.response;
+      if ("retryNextAccount" in successResult) {
+        continue accountLoop;
       }
-      if (authRetryResult.continueLoop) {
-        continue;
-      }
+      return successResult.response;
     }
-
-    if (!response.ok) {
-      const nonOkResult = await handleAnthropicNonOkResponse({
-        response,
-        account,
-        accountState,
-        tracer,
-        requestStartTime,
-        fetchStartMs: preparedAttempt.fetchStartMs,
-        attemptNumber: loopState.attemptNumber,
-        logAttempt,
-        logProxyBody,
-        logFinalRequest,
-        lastError: loopState.lastError,
-        authFailureMessage: loopState.authFailureMessage,
-        sawTransientFailure: loopState.sawTransientFailure,
-        invalidRequestFailure: loopState.invalidRequestFailure,
-        maxConsecutiveRefreshFailures: MAX_CONSECUTIVE_REFRESH_FAILURES,
-      });
-      loopState.lastError = nonOkResult.lastError;
-      loopState.authFailureMessage = nonOkResult.authFailureMessage;
-      loopState.sawTransientFailure = nonOkResult.sawTransientFailure;
-      loopState.invalidRequestFailure = nonOkResult.invalidRequestFailure;
-      if (nonOkResult.response !== undefined) {
-        return nonOkResult.response;
-      }
-      if (nonOkResult.continueLoop) {
-        continue;
-      }
-      break;
-    }
-
-    const successResult = await handleAnthropicSuccessfulResponse({
-      ctx,
-      body,
-      account,
-      accountState,
-      response,
-      tracer,
-      requestStartTime,
-      fetchStartMs: preparedAttempt.fetchStartMs,
-      attemptNumber: loopState.attemptNumber,
-      finalBodyStr: preparedAttempt.finalBodyStr,
-      upstreamSpan,
-      logProxyBody,
-      logFinalRequest,
-    });
-    if ("retryNextAccount" in successResult) {
-      continue;
-    }
-    return successResult.response;
   }
 
   if (loopState.attemptNumber === 0) {
     acctSelectionSpan?.end();
   }
 
-  const configuredFallbackResponse = await tryConfiguredClaudeFallbackChain({
+  const configuredFallbackResult = await tryConfiguredClaudeFallbackChain({
     ctx,
     body,
+    parsedFallbackRequest: parsedRequest,
+    requestProfile,
     modelRouter,
     tracer,
     requestStartTime,
     logProxyBody,
     logFinalRequest,
   });
-  if (configuredFallbackResponse) {
-    return configuredFallbackResponse;
+  if (configuredFallbackResult.response) {
+    return configuredFallbackResult.response;
   }
 
   const configuredChain = modelRouter?.getFallbackChain() ?? [];
@@ -4448,6 +4621,8 @@ async function handleAnthropicRoutedClaudeRequest(args: {
     sawRateLimit: loopState.sawRateLimit,
     lastError: loopState.lastError,
     orderedAccounts,
+    requestProfile,
+    fallbackPolicyReason: configuredFallbackResult.fallbackPolicyReason,
     buildLoggedClaudeError,
     logProxyBody,
     logFinalRequest,
@@ -4736,6 +4911,8 @@ function getOrCreateRuntimeState(accountKey: string): RuntimeAccountState {
     backoffLevel: 0,
     consecutiveRefreshFailures: 0,
     permanentlyDisabled: false,
+    requestClassCooldowns: {},
+    modelTierCooldowns: {},
   };
   accountRuntimeState.set(accountKey, initial);
   return initial;
@@ -4778,6 +4955,16 @@ function summarizeErrorMessage(
     return compact;
   }
   return `${compact.slice(0, maxLength)}...`;
+}
+
+export function getTransientSameAccountRetryDelayMs(
+  retryNumber: number,
+): number {
+  const index = Math.min(
+    Math.max(retryNumber - 1, 0),
+    TRANSIENT_SAME_ACCOUNT_RETRY_DELAYS_MS.length - 1,
+  );
+  return TRANSIENT_SAME_ACCOUNT_RETRY_DELAYS_MS[index] ?? 0;
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -4986,47 +5173,6 @@ export function buildProxyFallbackOptions(
   };
 }
 
-export function buildProxyTranslationAttempts(
-  primary: { provider: string; model?: string },
-  modelRouter?: ModelRouter,
-  parsed?: Pick<ParsedClaudeRequest, "images" | "thinkingConfig">,
-): ProxyTranslationAttempt[] {
-  const attempts: ProxyTranslationAttempt[] = [
-    {
-      provider: primary.provider,
-      model: primary.model,
-      label: `${primary.provider}/${primary.model ?? "unknown"}`,
-    },
-  ];
-
-  const chain = modelRouter?.getFallbackChain() ?? [];
-  for (const fallback of chain) {
-    if (
-      fallback.provider === primary.provider &&
-      fallback.model === primary.model
-    ) {
-      continue;
-    }
-    if (
-      shouldSkipTranslationTarget(fallback.provider, fallback.model, parsed)
-    ) {
-      continue;
-    }
-
-    attempts.push({
-      provider: fallback.provider,
-      model: fallback.model,
-      label: `${fallback.provider}/${fallback.model}`,
-    });
-  }
-
-  if (chain.length === 0) {
-    attempts.push({ label: "auto-provider" });
-  }
-
-  return attempts;
-}
-
 function hasTranslatedOutput(
   collectedText: string,
   toolCalls: unknown[] | undefined,
@@ -5047,22 +5193,6 @@ function shouldOmitThinkingConfigForTarget(
   model?: string,
 ): boolean {
   return provider === "vertex" && model === "gemini-2.5-flash";
-}
-
-function shouldSkipTranslationTarget(
-  provider?: string,
-  model?: string,
-  parsed?: Pick<ParsedClaudeRequest, "images" | "thinkingConfig">,
-): boolean {
-  if (
-    provider === "ollama" &&
-    model === "qwen2.5:0.5b" &&
-    (parsed?.images.length ?? 0) > 0
-  ) {
-    return true;
-  }
-
-  return false;
 }
 
 function extractToolArgs(toolCall: unknown): unknown {
