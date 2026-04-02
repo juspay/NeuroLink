@@ -1,11 +1,13 @@
 import http from "node:http";
-import { exec } from "node:child_process";
+import { exec, execFile as execFileCb } from "node:child_process";
 import { promises as fs } from "node:fs";
 import crypto from "node:crypto";
 import { promisify } from "node:util";
 import path from "node:path";
+import os from "node:os";
 import { pullSnapshot } from "./pullSnapshot.js";
-import { resolveDiffId, pullDiff } from "./snapshotStorage.js";
+
+const execFile = promisify(execFileCb);
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -16,11 +18,16 @@ const JOB_TTL_MS = Number(process.env.CHECK_RUNNER_JOB_TTL_MS || 3_600_000);
 const CLEANUP_INTERVAL_MS = Number(process.env.CHECK_RUNNER_JOB_CLEANUP_INTERVAL_MS || 60_000);
 const MAX_JOBS = Number(process.env.CHECK_RUNNER_MAX_JOBS || 500);
 const DEFAULT_TIMEOUT_MS = Number(process.env.CHECK_RUNNER_COMMAND_TIMEOUT_MS || 600_000);
+const GIT_CLONE_TIMEOUT_MS = Number(process.env.CHECK_RUNNER_GIT_CLONE_TIMEOUT_MS || 300_000); // 5 min
+// e.g. https://bitbucket.juspay.net/scm/bz/lighthouse.git — used to derive the base URL for any repo
+const GIT_REPO_URL      = process.env.GIT_REPO_URL      || "";
+const GIT_READ_USERNAME = process.env.GIT_READ_USERNAME  || "";
+const GIT_READ_TOKEN    = process.env.GIT_READ_TOKEN     || "";
 const MAX_BODY_BYTES = 1 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 100 * 1024;
 
 // Env vars that commands are allowed to see.
-// JWT secret and cloud credentials never reach subprocesses.
+// JWT secret, git credentials, and cloud credentials never reach subprocesses.
 // NODE_OPTIONS is forced to cap memory — lighthouse scripts request 8GB but the pod only has 4GB.
 const COMMAND_ENV = {
   ...Object.fromEntries(
@@ -43,7 +50,7 @@ const E = {
   BAD_REQUEST:     "BAD_REQUEST",
   BAD_JSON:        "BAD_JSON",
   PULL_FAILED:     "PULL_FAILED",
-  OVERLAY_FAILED:  "OVERLAY_FAILED",
+  DIFF_FAILED:     "DIFF_FAILED",
   INSTALL_FAILED:  "INSTALL_FAILED",
   COMMAND_FAILED:  "COMMAND_FAILED",
   COMMAND_TIMEOUT: "COMMAND_TIMEOUT",
@@ -186,70 +193,112 @@ function validateAndNormalize(raw) {
 }
 
 // ---------------------------------------------------------------------------
-// Diff overlay — extract diff tarball over beta snapshot
+// Git helpers — build authenticated repo URL from pod env vars
 // ---------------------------------------------------------------------------
 
 /**
- * Apply a diff overlay onto the beta snapshot working directory.
- * The diff tarball contains changed/added files and optionally a
- * `.neurolink-deleted` manifest listing files removed in the branch.
- *
- * @param {string} workDir  - extracted beta snapshot path
- * @param {string} diffPath - path to the extracted diff tarball directory
- * @returns {Promise<{ lockfileChanged: boolean }>}
+ * Build an authenticated HTTPS clone URL for a given repo.
+ * Derives the base from GIT_REPO_URL, injects GIT_READ_USERNAME:GIT_READ_TOKEN.
+ * @param {string} repoName
+ * @returns {string}
  */
-async function applyDiffOverlay(workDir, diffPath) {
-  const deletedManifest = path.join(diffPath, ".neurolink-deleted");
-  let lockfileChanged = false;
-
-  // Delete files listed in the manifest (if present).
-  try {
-    const content = await fs.readFile(deletedManifest, "utf8");
-    const deleted = content.split("\n").map((f) => f.trim()).filter(Boolean);
-    for (const f of deleted) {
-      await fs.rm(path.join(workDir, f), { force: true });
-    }
-    // Remove the manifest so it doesn't end up in the working tree.
-    await fs.rm(deletedManifest, { force: true });
-  } catch (e) {
-    if (e.code !== "ENOENT") throw e;
-    // No manifest — no deletions.
+function buildRepoUrl(repoName) {
+  if (!GIT_REPO_URL || !GIT_READ_USERNAME || !GIT_READ_TOKEN) {
+    throw new Error("GIT_REPO_URL, GIT_READ_USERNAME, and GIT_READ_TOKEN must be configured");
   }
-
-  // Copy all diff files over the snapshot.
-  await copyDir(diffPath, workDir);
-
-  // Check if lockfile was part of the diff.
-  try {
-    await fs.access(path.join(diffPath, "pnpm-lock.yaml"));
-    lockfileChanged = true;
-  } catch { /* not in diff */ }
-
-  return { lockfileChanged };
+  const parsed = new URL(GIT_REPO_URL);
+  parsed.username = GIT_READ_USERNAME;
+  parsed.password = GIT_READ_TOKEN;
+  parsed.pathname = parsed.pathname.replace(/\/[^/]+$/, `/${repoName}.git`);
+  return parsed.toString();
 }
 
+// ---------------------------------------------------------------------------
+// Branch diff via git — clone branch, replace snapshot files to match branch exactly
+// ---------------------------------------------------------------------------
+
 /**
- * Recursively copy src directory contents into dest, overwriting existing files.
- * Unlinks destination before copying to break hardlinks (protects cache base).
+ * Recursively collect all file paths (relative) under a directory.
+ * @param {string} baseDir
+ * @param {string} relDir
+ * @param {Set<string>} fileSet
+ * @param {Set<string>} skipDirs - directory names to skip (e.g. ".git", "node_modules")
  */
-async function copyDir(src, dest) {
-  const entries = await fs.readdir(src, { withFileTypes: true });
+async function walkFiles(baseDir, relDir, fileSet, skipDirs) {
+  const fullDir = relDir ? path.join(baseDir, relDir) : baseDir;
+  const entries = await fs.readdir(fullDir, { withFileTypes: true });
   for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
+    if (skipDirs.has(entry.name)) continue;
+    const relPath = relDir ? path.join(relDir, entry.name) : entry.name;
     if (entry.isDirectory()) {
-      await fs.mkdir(destPath, { recursive: true });
-      await copyDir(srcPath, destPath);
+      await walkFiles(baseDir, relPath, fileSet, skipDirs);
     } else {
-      await fs.mkdir(path.dirname(destPath), { recursive: true });
-      try { await fs.unlink(destPath); } catch { /* may not exist */ }
-      await fs.copyFile(srcPath, destPath);
+      fileSet.add(relPath);
     }
   }
 }
 
+/**
+ * Clone the branch (depth=1) and make the snapshot workDir an exact replica.
+ * No merge-base, no diff filters — just replace files, add new ones, delete stale ones.
+ * This gives us the exact state of the user's local branch.
+ *
+ * @param {string} repoName
+ * @param {string} branchRef
+ * @param {string} workDir - snapshot directory to overlay onto
+ * @returns {Promise<{ copiedCount: number; deletedCount: number; branchDir: string }>}
+ */
+async function applyBranchDiff(repoName, branchRef, workDir) {
+  const repoUrl = buildRepoUrl(repoName);
+  const branchDir = await fs.mkdtemp(path.join(os.tmpdir(), `cr-branch-${repoName}-`));
+
+  try {
+    // Clone just the latest commit — we only need the current file state.
+    await execFile(
+      "git", ["clone", "--depth=1", "--branch", branchRef, "--single-branch", repoUrl, branchDir],
+      { timeout: GIT_CLONE_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 },
+    );
+
+    const SKIP = new Set([".git", "node_modules"]);
+
+    // Collect all files from the branch clone.
+    const branchFiles = new Set();
+    await walkFiles(branchDir, "", branchFiles, SKIP);
+
+    // Copy every branch file into workDir (overwrite existing, create new).
+    let copiedCount = 0;
+    for (const relPath of branchFiles) {
+      const src = path.join(branchDir, relPath);
+      const dest = path.join(workDir, relPath);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      try { await fs.unlink(dest); } catch { /* may not exist */ }
+      await fs.copyFile(src, dest);
+      copiedCount++;
+    }
+
+    // Delete files in workDir that don't exist in the branch (stale beta files).
+    const workFiles = new Set();
+    await walkFiles(workDir, "", workFiles, SKIP);
+
+    let deletedCount = 0;
+    for (const relPath of workFiles) {
+      if (!branchFiles.has(relPath)) {
+        await fs.rm(path.join(workDir, relPath), { force: true });
+        deletedCount++;
+      }
+    }
+
+    console.log(`[DIFF] ${copiedCount} copied, ${deletedCount} deleted`);
+    return { copiedCount, deletedCount, branchDir };
+
+  } catch (err) {
+    await fs.rm(branchDir, { recursive: true, force: true });
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
-// pnpm install (only when lockfile changed)
+// pnpm install
 // ---------------------------------------------------------------------------
 
 async function runPnpmInstall(workDir, timeoutMs) {
@@ -341,35 +390,33 @@ function toResponse(job) {
 async function executeJob(job) {
   const { repoName, branchRef, commands, commandTimeoutMs } = /** @type {JobInput} */ (job.input);
   let workDir = "";
-  let diffDir = "";
-  let snapshotId = undefined;
+  let branchDir = "";
 
   try {
     // --- 1. Pull beta snapshot from GCS ---
     stamp(job, { status: "running", stage: "pull" });
     console.log(`[JOB ${job.jobId}] starting | repo: ${repoName} | branch: ${branchRef} | commands: ${commands.length}`);
 
+    let snapshotId;
     try {
       ({ workDir, snapshotId } = await pullSnapshot(repoName));
-      console.log(`[JOB ${job.jobId}] pull complete: ${snapshotId} -> ${workDir}`);
+      console.log(`[JOB ${job.jobId}] snapshot pulled: ${snapshotId} -> ${workDir}`);
     } catch (err) {
       stamp(job, { status: "failed", stage: "pull", error: { code: E.PULL_FAILED, message: errMsg(err) } });
       return;
     }
     stamp(job, { snapshotId: snapshotId ?? null });
 
-    // --- 2. Pull diff overlay from GCS and apply ---
-    stamp(job, { stage: "overlay" });
-    console.log(`[JOB ${job.jobId}] pulling diff overlay for branch: ${branchRef}`);
+    // --- 2. Fetch branch diff via git and overlay onto snapshot ---
+    stamp(job, { stage: "diff" });
+    console.log(`[JOB ${job.jobId}] fetching branch diff for: ${branchRef}`);
 
     try {
-      const diffId = await resolveDiffId({ repoName, branchRef });
-      console.log(`[JOB ${job.jobId}] resolved diff: ${diffId}. pulling...`);
-      diffDir = await pullDiff(diffId);
-      await applyDiffOverlay(workDir, diffDir);
-      console.log(`[JOB ${job.jobId}] overlay applied`);
+      const result = await applyBranchDiff(repoName, branchRef, workDir);
+      branchDir = result.branchDir;
+      console.log(`[JOB ${job.jobId}] diff applied (${result.changedCount} changed, ${result.deletedCount} deleted)`);
     } catch (err) {
-      stamp(job, { status: "failed", stage: "overlay", error: { code: E.OVERLAY_FAILED, message: errMsg(err) } });
+      stamp(job, { status: "failed", stage: "diff", error: { code: E.DIFF_FAILED, message: errMsg(err) } });
       return;
     }
 
@@ -409,8 +456,8 @@ async function executeJob(job) {
     if (workDir) {
       try { await fs.rm(workDir, { recursive: true, force: true }); } catch { /* best effort */ }
     }
-    if (diffDir) {
-      try { await fs.rm(diffDir, { recursive: true, force: true }); } catch { /* best effort */ }
+    if (branchDir) {
+      try { await fs.rm(branchDir, { recursive: true, force: true }); } catch { /* best effort */ }
     }
   }
 }
