@@ -162,7 +162,11 @@ export class CLICommandFactory {
       type: "string" as const,
       choices: ["raw", "markdown", "json"],
       default: "raw",
-      description: "CSV output format (raw recommended for large files)",
+      description:
+        "CSV output format:\n" +
+        "  • raw: Plain CSV text (fastest, minimal tokens, best for large files)\n" +
+        "  • markdown: Formatted table (readable, best for small files <100 rows)\n" +
+        "  • json: Structured JSON array (best for programmatic use, higher tokens)",
     },
     model: {
       type: "string" as const,
@@ -1402,6 +1406,18 @@ export class CLICommandFactory {
             .example(
               '$0 generate "Describe this video" --video path/to/video.mp4',
               "Analyze video content",
+            )
+            .example(
+              '$0 generate "Analyze sales" --csv data.csv --csv-format raw',
+              "CSV with raw format (fast, minimal tokens)",
+            )
+            .example(
+              '$0 generate "Summarize data" --csv small.csv --csv-format markdown',
+              "CSV with markdown table (readable)",
+            )
+            .example(
+              '$0 generate "Process data" --csv records.csv --csv-format json',
+              "CSV with JSON format (structured)",
             )
             .example(
               '$0 generate "Product showcase video" --image ./product.jpg --outputMode video --videoOutput ./output.mp4',
