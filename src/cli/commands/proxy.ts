@@ -13,7 +13,7 @@
 import type { CommandModule, Argv } from "yargs";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import chalk from "chalk";
 import ora from "ora";
 import {
@@ -2040,6 +2040,34 @@ function escapeXml(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
+/**
+ * Build a PATH for the launchd plist that includes the current Node/pnpm
+ * bin directories so the guard process can find npm/pnpm for update checks.
+ */
+function buildLaunchdPath(): string {
+  const fallback = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin";
+  const nodeDir = dirname(process.execPath);
+  const segments = new Set<string>();
+
+  // Add the directory containing the Node binary that launched this process
+  if (nodeDir && nodeDir !== ".") {
+    segments.add(nodeDir);
+  }
+
+  // Add pnpm home if available (e.g., ~/.local/share/pnpm)
+  const pnpmHome = process.env.PNPM_HOME;
+  if (pnpmHome) {
+    segments.add(pnpmHome);
+  }
+
+  // Add the standard system paths
+  for (const p of fallback.split(":")) {
+    segments.add(p);
+  }
+
+  return [...segments].join(":");
+}
+
 function buildPlist(
   port: number,
   host: string,
@@ -2105,7 +2133,7 @@ ${configArgs}
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <string>${buildLaunchdPath()}</string>
     <key>HOME</key>
     <string>${homedir()}</string>
   </dict>

@@ -185,7 +185,8 @@ export class TokenStore {
         : JSON.stringify(storageData, null, 2);
 
       // Write to temporary file first for atomic operation
-      const tempPath = `${this.storagePath}.tmp`;
+      // Use PID-scoped temp file to avoid cross-process race conditions
+      const tempPath = `${this.storagePath}.tmp.${process.pid}`;
       await writeFile(tempPath, content, "utf-8");
 
       // Set restrictive permissions before moving to final location
@@ -796,7 +797,8 @@ export class TokenStore {
         ? this.obfuscate(JSON.stringify(data))
         : JSON.stringify(data, null, 2);
 
-      const tmpPath = `${this.storagePath}.tmp`;
+      // Use PID-scoped temp file to avoid cross-process race conditions
+      const tmpPath = `${this.storagePath}.tmp.${process.pid}`;
       await writeFile(tmpPath, content, "utf-8");
       await chmod(tmpPath, TokenStore.FILE_PERMISSIONS);
       await rename(tmpPath, this.storagePath);
