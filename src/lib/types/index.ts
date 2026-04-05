@@ -175,8 +175,8 @@ export type {
   StreamAnalyticsData,
   TokenUsage,
 } from "./analytics.js";
-// Content types for multimodal support (includes multimodal re-exports for backward compatibility)
-export * from "./content.js";
+// Content types for multimodal support (direct export from canonical source)
+export * from "./multimodal.js";
 // Domain factory types
 export type {
   DomainConfig,
