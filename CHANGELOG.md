@@ -1,3 +1,9 @@
+## [9.48.0](https://github.com/juspay/neurolink/compare/v9.47.0...v9.48.0) (2026-04-05)
+
+### Features
+
+- **(docs):** generate unique OG images per page for rich social previews ([cb1998d](https://github.com/juspay/neurolink/commit/cb1998d5f4c57e17c1b7a7619516f98020112afe))
+
 ## [9.47.0](https://github.com/juspay/neurolink/compare/v9.46.1...v9.47.0) (2026-04-04)
 
 ### Features
