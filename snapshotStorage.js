@@ -1,10 +1,18 @@
 /**
- * GCS storage helpers for snapshot pulls.
+ * S3 storage helpers for snapshot pulls.
+ * Credentials are resolved via the default AWS provider chain (IRSA on EKS,
+ * ECS task role, EC2 instance profile, env vars, or ~/.aws/credentials).
+ *
+ * Env vars (match the names already defined in lighthouse/Jenkinsfile):
+ *   S3_BUCKET      — e.g. "atoms-sdk"
+ *   S3_BASE_PATH   — e.g. "lighthouse"
+ *   S3_EXTRA_PATH  — e.g. "client"
+ *   AWS_REGION     — e.g. "ap-south-1"
  */
 
-import { Storage } from "@google-cloud/storage";
+import { S3Client, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
-const { GCP_BUCKET_NAME, GCP_BUCKET_NAME_RELEASE, GCS_BASE_PATH, GCS_EXTRA_PATH } = process.env;
+const { S3_BUCKET, S3_BASE_PATH, S3_EXTRA_PATH, AWS_REGION } = process.env;
 
 // ---------------------------------------------------------------------------
 // Bucket
@@ -12,11 +20,8 @@ const { GCP_BUCKET_NAME, GCP_BUCKET_NAME_RELEASE, GCS_BASE_PATH, GCS_EXTRA_PATH 
 
 /** @returns {string} */
 export function bucketName() {
-  const name =
-    (GCP_BUCKET_NAME_RELEASE && GCP_BUCKET_NAME_RELEASE.trim()) ||
-    (GCP_BUCKET_NAME && GCP_BUCKET_NAME.trim()) ||
-    "";
-  if (!name) throw new Error("GCP_BUCKET_NAME_RELEASE or GCP_BUCKET_NAME must be set");
+  const name = (S3_BUCKET && S3_BUCKET.trim()) || "";
+  if (!name) throw new Error("S3_BUCKET must be set");
   return name;
 }
 
@@ -26,14 +31,14 @@ export function bucketName() {
 
 /** @param {string} snapshotId */
 export function storageKey(snapshotId) {
-  if (!GCS_BASE_PATH || !GCS_EXTRA_PATH) throw new Error("GCS_BASE_PATH and GCS_EXTRA_PATH must be set");
-  return `${GCS_BASE_PATH}/${GCS_EXTRA_PATH}/snapshots/${snapshotId}`.replace(/\/+/g, "/");
+  if (!S3_BASE_PATH || !S3_EXTRA_PATH) throw new Error("S3_BASE_PATH and S3_EXTRA_PATH must be set");
+  return `${S3_BASE_PATH}/${S3_EXTRA_PATH}/snapshots/${snapshotId}`.replace(/\/+/g, "/");
 }
 
 /** @returns {string} */
 export function snapshotsPrefix() {
-  if (!GCS_BASE_PATH || !GCS_EXTRA_PATH) throw new Error("GCS_BASE_PATH and GCS_EXTRA_PATH must be set");
-  return `${GCS_BASE_PATH}/${GCS_EXTRA_PATH}/snapshots/`.replace(/\/+/g, "/");
+  if (!S3_BASE_PATH || !S3_EXTRA_PATH) throw new Error("S3_BASE_PATH and S3_EXTRA_PATH must be set");
+  return `${S3_BASE_PATH}/${S3_EXTRA_PATH}/snapshots/`.replace(/\/+/g, "/");
 }
 
 // ---------------------------------------------------------------------------
@@ -55,25 +60,59 @@ export async function resolveSnapshotId({ repoName }) {
   }
 
   const snapshotId = `${repoName.trim()}-snapshot-latest.tar.gz`;
-  const key = storageKey(snapshotId);
+  const Key = storageKey(snapshotId);
+  const Bucket = bucketName();
 
-  const [exists] = await gcs().bucket(bucketName()).file(key).exists();
-  if (!exists) {
-    throw new Error(`No snapshot found for repo '${repoName}' (expected key: ${key})`);
+  try {
+    await s3().send(new HeadObjectCommand({ Bucket, Key }));
+  } catch (err) {
+    const notFound = err && (err.name === "NotFound" || err.$metadata?.httpStatusCode === 404);
+    if (notFound) {
+      throw new Error(`No snapshot found for repo '${repoName}' (expected key: s3://${Bucket}/${Key})`);
+    }
+    throw err;
   }
 
   return snapshotId;
 }
 
 // ---------------------------------------------------------------------------
-// Lazy GCS client
+// Lazy S3 client
 // ---------------------------------------------------------------------------
 
-/** @type {Storage | null} */
-let _gcs = null;
+/** @type {S3Client | null} */
+let _s3 = null;
 
-/** @returns {Storage} */
-export function gcs() {
-  if (!_gcs) _gcs = new Storage();
-  return _gcs;
+/** @returns {S3Client} */
+export function s3() {
+  if (!_s3) {
+    /** @type {import("@aws-sdk/client-s3").S3ClientConfig} */
+    const config = {};
+    if (AWS_REGION) config.region = AWS_REGION;
+    // When an endpoint override is set (e.g. MinIO or another S3-compatible
+    // server for local testing), switch to path-style addressing. Real AWS
+    // S3 accepts both, so this flag is safe in production too.
+    if (process.env.AWS_ENDPOINT_URL_S3 || process.env.AWS_ENDPOINT_URL) {
+      config.forcePathStyle = true;
+    }
+    _s3 = new S3Client(config);
+  }
+  return _s3;
+}
+
+// ---------------------------------------------------------------------------
+// Download a snapshot object as a Node.js Readable stream (for piping to disk)
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {string} snapshotId
+ * @returns {Promise<NodeJS.ReadableStream>}
+ */
+export async function getSnapshotStream(snapshotId) {
+  const Key = storageKey(snapshotId);
+  const Bucket = bucketName();
+  const res = await s3().send(new GetObjectCommand({ Bucket, Key }));
+  if (!res.Body) throw new Error(`S3 GetObject returned empty body for s3://${Bucket}/${Key}`);
+  // In Node.js, the SDK v3 Body is a Readable stream.
+  return /** @type {NodeJS.ReadableStream} */ (res.Body);
 }

@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { execFile as execFileCb } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
-import { storageKey, gcs, bucketName, resolveSnapshotId } from "./snapshotStorage.js";
+import { getSnapshotStream, resolveSnapshotId } from "./snapshotStorage.js";
 
 const pipe = promisify(pipeline);
 const execFile = promisify(execFileCb);
@@ -25,7 +25,7 @@ function withTimeout(promise, ms, label) {
 }
 
 /**
- * Download and extract the latest snapshot for a repo from GCS.
+ * Download and extract the latest snapshot for a repo from S3.
  *
  * @param {string} repoName  e.g. "lighthouse"
  * @returns {Promise<{ workDir: string; snapshotId: string }>}
@@ -47,11 +47,10 @@ export async function pullSnapshot(repoName) {
   await fs.rm(snapshotDir, { recursive: true, force: true });
   mkdirSync(snapshotDir, { recursive: true });
 
-  const key = storageKey(snapshotId);
   const writeStream = createWriteStream(archivePath);
 
   try {
-    const readStream = gcs().bucket(bucketName()).file(key).createReadStream();
+    const readStream = await getSnapshotStream(snapshotId);
     await withTimeout(pipe(readStream, writeStream), PULL_TIMEOUT_MS, "Snapshot download");
     await withTimeout(execFile("tar", ["-xzf", archivePath, "-C", snapshotDir]), PULL_TIMEOUT_MS, "Snapshot extraction");
   } finally {

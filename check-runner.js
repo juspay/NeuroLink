@@ -1,4 +1,5 @@
 import http from "node:http";
+import https from "node:https";
 import { exec, execFile as execFileCb } from "node:child_process";
 import { promises as fs } from "node:fs";
 import crypto from "node:crypto";
@@ -281,52 +282,117 @@ async function diagRun(cmd, timeoutMs = 15_000, extraEnv = {}) {
  * Run a series of network/auth probes from inside the pod so we can see
  * exactly why git clone is failing. Output is embedded in the job error.
  */
+/**
+ * Issue a single HTTPS GET using Node's built-in modules (no curl dependency).
+ * If `viaProxy` is true and PROXY_URL is set, tunnels via the HTTP proxy's CONNECT.
+ * Returns { status, error } — status is the HTTP response code, or null on failure.
+ */
+function nodeProbe(targetUrl, { viaProxy = false, withAuth = true } = {}) {
+  return new Promise((resolve) => {
+    const url = new URL(targetUrl);
+    const headers = { Host: url.host, "User-Agent": "check-runner-diag/1.0" };
+    if (withAuth && GIT_READ_USERNAME && GIT_READ_TOKEN) {
+      headers.Authorization = "Basic " + Buffer.from(`${GIT_READ_USERNAME}:${GIT_READ_TOKEN}`).toString("base64");
+    }
+
+    const timeoutMs = 10_000;
+    let settled = false;
+    const done = (result) => { if (!settled) { settled = true; resolve(result); } };
+
+    if (viaProxy && PROXY_URL) {
+      // CONNECT tunnel through the HTTP proxy, then issue HTTPS over the tunnel.
+      const proxy = new URL(PROXY_URL);
+      const req = http.request({
+        host: proxy.hostname,
+        port: Number(proxy.port),
+        method: "CONNECT",
+        path: `${url.hostname}:${url.port || 443}`,
+        timeout: timeoutMs,
+        headers: { Host: `${url.hostname}:${url.port || 443}` },
+      });
+      req.on("connect", (res, socket) => {
+        if (res.statusCode !== 200) { done({ status: null, error: `proxy CONNECT → ${res.statusCode}` }); return; }
+        const tlsReq = https.request({
+          host: url.hostname,
+          port: Number(url.port || 443),
+          method: "GET",
+          path: url.pathname + url.search,
+          headers,
+          socket,
+          agent: false,
+          timeout: timeoutMs,
+        }, (r) => { done({ status: r.statusCode, error: null }); r.resume(); });
+        tlsReq.on("error", (e) => done({ status: null, error: `tls: ${e.message}` }));
+        tlsReq.on("timeout", () => { tlsReq.destroy(); done({ status: null, error: "tls timeout" }); });
+        tlsReq.end();
+      });
+      req.on("error", (e) => done({ status: null, error: `proxy: ${e.message}` }));
+      req.on("timeout", () => { req.destroy(); done({ status: null, error: "proxy connect timeout" }); });
+      req.end();
+    } else {
+      const req = https.request({
+        host: url.hostname,
+        port: Number(url.port || 443),
+        method: "GET",
+        path: url.pathname + url.search,
+        headers,
+        timeout: timeoutMs,
+      }, (r) => { done({ status: r.statusCode, error: null }); r.resume(); });
+      req.on("error", (e) => done({ status: null, error: e.message }));
+      req.on("timeout", () => { req.destroy(); done({ status: null, error: "timeout" }); });
+      req.end();
+    }
+  });
+}
+
+/**
+ * Run a series of network probes from inside the pod when git clone fails,
+ * so we can see exactly where the request is being blocked. All probes use
+ * Node's built-in https/http modules — curl is not installed in the image.
+ */
 async function collectDiffDiagnostics(repoUrl) {
   const redactedUrl = repoUrl.replace(/:[^:@]+@/, ":[REDACTED]@");
   const lines = [];
-  lines.push(`=== DIAGNOSTICS ===`);
-  lines.push(`Redacted URL: ${redactedUrl}`);
-  lines.push(`HTTP_PROXY_HOST: ${HTTP_PROXY_HOST || "(unset)"}`);
-  lines.push(`HTTP_PROXY_PORT: ${HTTP_PROXY_PORT || "(unset)"}`);
-  lines.push(`PROXY_URL (derived): ${PROXY_URL || "(none)"}`);
-  lines.push(`env HTTPS_PROXY: ${process.env.HTTPS_PROXY || "(unset)"}`);
-  lines.push(`env HTTP_PROXY: ${process.env.HTTP_PROXY || "(unset)"}`);
-  lines.push(`env NO_PROXY: ${process.env.NO_PROXY || "(unset)"}`);
+  lines.push("=== DIAGNOSTICS ===");
+  lines.push(`Redacted URL:          ${redactedUrl}`);
+  lines.push(`HTTP_PROXY_HOST:       ${HTTP_PROXY_HOST || "(unset)"}`);
+  lines.push(`HTTP_PROXY_PORT:       ${HTTP_PROXY_PORT || "(unset)"}`);
+  lines.push(`PROXY_URL (derived):   ${PROXY_URL || "(none)"}`);
+  lines.push(`env HTTPS_PROXY:       ${process.env.HTTPS_PROXY || "(unset)"}`);
+  lines.push(`env HTTP_PROXY:        ${process.env.HTTP_PROXY || "(unset)"}`);
+  lines.push(`env NO_PROXY:          ${process.env.NO_PROXY || "(unset)"}`);
 
-  // DNS resolution
+  // DNS + TCP reachability
   const dns = await diagRun("getent hosts bitbucket.juspay.net");
-  lines.push(`\n[DNS getent] exit=${dns.exitCode} stdout=${dns.stdout.trim()} stderr=${dns.stderr.trim()}`);
-
-  // TCP connect 443
+  lines.push(`\n[DNS] exit=${dns.exitCode} ${dns.stdout.trim()}`);
   const tcp = await diagRun("timeout 5 bash -c '</dev/tcp/bitbucket.juspay.net/443' && echo OPEN || echo CLOSED");
-  lines.push(`[TCP 443] exit=${tcp.exitCode} stdout=${tcp.stdout.trim()} stderr=${tcp.stderr.trim()}`);
+  lines.push(`[TCP 443] exit=${tcp.exitCode} ${tcp.stdout.trim()}`);
 
-  // curl direct (no proxy) unauthenticated
-  const curlDirectNoAuth = await diagRun(
-    `curl -sS -o /dev/null -w "code=%{http_code}" --max-time 10 --noproxy '*' https://bitbucket.juspay.net/scm/bz/lighthouse.git/info/refs?service=git-upload-pack`,
-  );
-  lines.push(`[CURL direct noauth] exit=${curlDirectNoAuth.exitCode} stdout=${curlDirectNoAuth.stdout.trim()} stderr=${curlDirectNoAuth.stderr.trim()}`);
+  // HTTPS probes to the git protocol endpoint
+  const gitEndpoint = "https://bitbucket.juspay.net/scm/bz/lighthouse.git/info/refs?service=git-upload-pack";
+  const directNoAuth = await nodeProbe(gitEndpoint, { withAuth: false });
+  lines.push(`\n[HTTPS direct noauth] status=${directNoAuth.status ?? "ERR"} ${directNoAuth.error || ""}`);
+  const directAuth = await nodeProbe(gitEndpoint, { withAuth: true });
+  lines.push(`[HTTPS direct auth]   status=${directAuth.status ?? "ERR"} ${directAuth.error || ""}`);
 
-  // curl direct (no proxy) authenticated
-  const curlDirectAuth = await diagRun(
-    `curl -sS -o /dev/null -w "code=%{http_code}" --max-time 10 --noproxy '*' -u '${GIT_READ_USERNAME}:${GIT_READ_TOKEN}' https://bitbucket.juspay.net/scm/bz/lighthouse.git/info/refs?service=git-upload-pack`,
-  );
-  lines.push(`[CURL direct auth] exit=${curlDirectAuth.exitCode} stdout=${curlDirectAuth.stdout.trim()} stderr=${curlDirectAuth.stderr.trim()}`);
-
-  // curl via proxy authenticated
   if (PROXY_URL) {
-    const curlProxyAuth = await diagRun(
-      `curl -sS -o /dev/null -w "code=%{http_code}" --max-time 10 --proxy '${PROXY_URL}' -u '${GIT_READ_USERNAME}:${GIT_READ_TOKEN}' https://bitbucket.juspay.net/scm/bz/lighthouse.git/info/refs?service=git-upload-pack`,
-    );
-    lines.push(`[CURL via proxy auth] exit=${curlProxyAuth.exitCode} stdout=${curlProxyAuth.stdout.trim()} stderr=${curlProxyAuth.stderr.trim()}`);
+    const proxyAuth = await nodeProbe(gitEndpoint, { withAuth: true, viaProxy: true });
+    lines.push(`[HTTPS via proxy]     status=${proxyAuth.status ?? "ERR"} ${proxyAuth.error || ""}`);
 
-    // git ls-remote via proxy
+    // git ls-remote via the proxy
     const gitProxy = await diagRun(`git ls-remote '${repoUrl}' HEAD`, 15_000, {
       HTTPS_PROXY: PROXY_URL,
       HTTP_PROXY: PROXY_URL,
     });
-    lines.push(`[GIT ls-remote via proxy] exit=${gitProxy.exitCode} stdout=${gitProxy.stdout.trim()} stderr=${gitProxy.stderr.trim()}`);
+    lines.push(`\n[git ls-remote via proxy] exit=${gitProxy.exitCode} stderr=${gitProxy.stderr.trim().slice(0, 300)}`);
   }
+
+  // git ls-remote direct (no proxy) — baseline
+  const gitDirect = await diagRun(`git -c http.proxy= ls-remote '${repoUrl}' HEAD`, 15_000, {
+    HTTPS_PROXY: "",
+    HTTP_PROXY: "",
+  });
+  lines.push(`[git ls-remote direct]    exit=${gitDirect.exitCode} stderr=${gitDirect.stderr.trim().slice(0, 300)}`);
 
   return lines.join("\n");
 }
