@@ -3,14 +3,14 @@
  * Creates appropriate conversation memory manager based on configuration
  */
 
+import type { StorageType } from "../types/common.js";
 import type {
   ConversationMemoryConfig,
   RedisStorageConfig,
 } from "../types/conversation.js";
-import type { StorageType } from "../types/common.js";
+import { logger } from "../utils/logger.js";
 import { ConversationMemoryManager } from "./conversationMemoryManager.js";
 import { RedisConversationMemoryManager } from "./redisConversationMemoryManager.js";
-import { logger } from "../utils/logger.js";
 
 /**
  * Creates a conversation memory manager based on configuration
@@ -151,6 +151,7 @@ export function getRedisConfigFromEnv(): RedisStorageConfig {
   logger.debug(
     "[conversationMemoryFactory] Reading Redis configuration from environment",
     {
+      REDIS_URL: process.env.REDIS_URL ? "******" : "(not set)",
       REDIS_HOST: process.env.REDIS_HOST || "(not set)",
       REDIS_PORT: process.env.REDIS_PORT || "(not set)",
       REDIS_PASSWORD: process.env.REDIS_PASSWORD ? "******" : "(not set)",
@@ -163,7 +164,7 @@ export function getRedisConfigFromEnv(): RedisStorageConfig {
     },
   );
 
-  const config = {
+  const config: RedisStorageConfig = {
     host: process.env.REDIS_HOST,
     port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : undefined,
     password: process.env.REDIS_PASSWORD,
@@ -182,6 +183,11 @@ export function getRedisConfigFromEnv(): RedisStorageConfig {
         : undefined,
     },
   };
+
+  if (process.env.REDIS_URL) {
+    logger.debug("[conversationMemoryFactory] Using REDIS_URL for connection");
+    config.url = process.env.REDIS_URL;
+  }
 
   logger.debug("[conversationMemoryFactory] Redis configuration normalized", {
     host: config.host || "localhost",

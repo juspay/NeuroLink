@@ -592,6 +592,9 @@ export type ConversationSummary = ConversationBase & {
  * Redis storage configuration
  */
 export type RedisStorageConfig = {
+  /** Redis connection URL (e.g., 'rediss://host:6379' for TLS) */
+  url?: string;
+
   /** Redis host (default: 'localhost') */
   host?: string;
 

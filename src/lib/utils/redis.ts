@@ -4,12 +4,12 @@
  */
 
 import { createClient, type RedisClientOptions } from "redis";
-import { logger } from "./logger.js";
 import type {
   ChatMessage,
-  RedisStorageConfig,
   RedisConversationObject,
+  RedisStorageConfig,
 } from "../types/conversation.js";
+import { logger } from "./logger.js";
 
 // Redis client type
 type RedisClient = ReturnType<typeof createClient>;
@@ -30,7 +30,9 @@ const pendingConnections = new Map<string, Promise<RedisClient>>();
 export async function getPooledRedisClient(
   config: Required<RedisStorageConfig>,
 ): Promise<RedisClient> {
-  const key = `${config.host}:${config.port}:${config.db}:${config.password ? "auth" : "noauth"}`;
+  const key = config.url
+    ? `url:${config.url.replace(/:\/\/[^:]+:[^@]+@/, "://[redacted]@")}`
+    : `${config.host}:${config.port}:${config.db}:${config.password ? "auth" : "noauth"}`;
   const existing = connectionPool.get(key);
 
   if (existing && existing.client.isOpen) {
@@ -146,7 +148,8 @@ export function getPoolStats(): Array<{
 export async function createRedisClient(
   config: Required<RedisStorageConfig>,
 ): Promise<RedisClient> {
-  const url = `redis://${config.host}:${config.port}/${config.db}`;
+  const url =
+    config.url || `redis://${config.host}:${config.port}/${config.db}`;
 
   // Create client options
   const clientOptions: RedisClientOptions = {
@@ -160,7 +163,7 @@ export async function createRedisClient(
         }
         const delay = Math.min(
           (config.connectionOptions?.retryDelayOnFailover || 100) *
-            Math.pow(2, retries),
+            2 ** retries,
           10000,
         );
         return delay;
@@ -168,7 +171,7 @@ export async function createRedisClient(
     },
   };
 
-  if (config.password) {
+  if (config.password && !config.url) {
     clientOptions.password = config.password;
   }
 
@@ -448,11 +451,40 @@ export function getNormalizedConfig(
     "user:sessions:",
   );
 
+  let host = config.host || "localhost";
+  let port = config.port || 6379;
+  let password = config.password || "";
+  let db = config.db || 0;
+  let url = config.url;
+
+  if (url) {
+    try {
+      const parsedUrl = new URL(url);
+      host = parsedUrl.hostname;
+      port = parsedUrl.port ? parseInt(parsedUrl.port) : 6379;
+      password = parsedUrl.password || password;
+      db = parsedUrl.pathname
+        ? parseInt(parsedUrl.pathname.replace("/", "")) || 0
+        : 0;
+    } catch (e) {
+      const sanitizedUrl = url.replace(/:\/\/[^:]+:[^@]+@/, "://[redacted]@");
+      logger.warn(
+        "[redisUtils] Failed to parse Redis URL, falling back to component-based connection",
+        {
+          url: sanitizedUrl,
+          error: e instanceof Error ? e.message : String(e),
+        },
+      );
+      url = undefined;
+    }
+  }
+
   return {
-    host: config.host || "localhost",
-    port: config.port || 6379,
-    password: config.password || "",
-    db: config.db || 0,
+    url: url || "",
+    host,
+    port,
+    password,
+    db,
     keyPrefix,
     userSessionsKeyPrefix:
       config.userSessionsKeyPrefix || defaultUserSessionsPrefix,
