@@ -1,3 +1,9 @@
+## [9.50.0](https://github.com/juspay/neurolink/compare/v9.49.0...v9.50.0) (2026-04-08)
+
+### Features
+
+- **(image-compression):** add sharp-based compression for AI providers ([75645bf](https://github.com/juspay/neurolink/commit/75645bf69d9eb21bf46763c5b058cb92146c71f2)), closes [#553](https://github.com/juspay/neurolink/issues/553)
+
 ## [9.49.0](https://github.com/juspay/neurolink/compare/v9.48.3...v9.49.0) (2026-04-08)
 
 ### Features
