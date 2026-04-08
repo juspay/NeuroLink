@@ -1,3 +1,9 @@
+## [9.48.2](https://github.com/juspay/neurolink/compare/v9.48.1...v9.48.2) (2026-04-08)
+
+### Bug Fixes
+
+- **(release):** remove npm downgrade that breaks OIDC token persistence ([0ba4e22](https://github.com/juspay/neurolink/commit/0ba4e223af87e8f1dde31f2eb1d425ce4da3e985))
+
 ## [9.48.1](https://github.com/juspay/neurolink/compare/v9.48.0...v9.48.1) (2026-04-06)
 
 ### Bug Fixes
