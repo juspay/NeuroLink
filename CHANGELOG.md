@@ -1,3 +1,9 @@
+## [9.50.2](https://github.com/juspay/neurolink/compare/v9.50.1...v9.50.2) (2026-04-09)
+
+### Bug Fixes
+
+- **(sdk):** curator production fixes — compaction, timeout, MCP events, Langfuse ([220b582](https://github.com/juspay/neurolink/commit/220b582bee0b7b141d5d1d1ec680d040284385fd))
+
 ## [9.50.1](https://github.com/juspay/neurolink/compare/v9.50.0...v9.50.1) (2026-04-09)
 
 ### Bug Fixes
