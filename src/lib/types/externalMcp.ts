@@ -306,6 +306,7 @@ export type ExternalMCPServerEvents = {
   /** Server status changed */
   statusChanged: {
     serverId: string;
+    serverName: string;
     oldStatus: ExternalMCPServerStatus;
     newStatus: ExternalMCPServerStatus;
     timestamp: Date;
@@ -314,6 +315,7 @@ export type ExternalMCPServerEvents = {
   /** Server connected successfully */
   connected: {
     serverId: string;
+    serverName: string;
     toolCount: number;
     timestamp: Date;
   };
@@ -321,6 +323,7 @@ export type ExternalMCPServerEvents = {
   /** Server disconnected */
   disconnected: {
     serverId: string;
+    serverName: string;
     reason?: string;
     timestamp: Date;
   };
@@ -328,6 +331,7 @@ export type ExternalMCPServerEvents = {
   /** Server failed */
   failed: {
     serverId: string;
+    serverName: string;
     error: string;
     timestamp: Date;
   };
@@ -335,6 +339,7 @@ export type ExternalMCPServerEvents = {
   /** Tool discovered */
   toolDiscovered: {
     serverId: string;
+    serverName: string;
     toolName: string;
     toolInfo: ExternalMCPToolInfo;
     timestamp: Date;
@@ -343,6 +348,7 @@ export type ExternalMCPServerEvents = {
   /** Tool removed */
   toolRemoved: {
     serverId: string;
+    serverName: string;
     toolName: string;
     timestamp: Date;
   };
@@ -350,6 +356,7 @@ export type ExternalMCPServerEvents = {
   /** Health check completed */
   healthCheck: {
     serverId: string;
+    serverName: string;
     health: ExternalMCPServerHealth;
     timestamp: Date;
   };

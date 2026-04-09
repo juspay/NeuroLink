@@ -256,11 +256,17 @@ export class ExternalServerManager extends EventEmitter {
 
     // Forward tool discovery events
     this.toolDiscovery.on("toolRegistered", (event) => {
-      this.emit("toolDiscovered", event);
+      this.emit("toolDiscovered", {
+        ...event,
+        serverName: this.getServerName(event.serverId),
+      });
     });
 
     this.toolDiscovery.on("toolUnregistered", (event) => {
-      this.emit("toolRemoved", event);
+      this.emit("toolRemoved", {
+        ...event,
+        serverName: this.getServerName(event.serverId),
+      });
     });
 
     // Handle process cleanup
@@ -291,6 +297,15 @@ export class ExternalServerManager extends EventEmitter {
    */
   getHITLManager(): HITLManager | undefined {
     return this.hitlManager;
+  }
+
+  /**
+   * Resolve the human-readable server name for an event payload.
+   * Falls back to serverId if the instance or config.name isn't available.
+   */
+  getServerName(serverId: string): string {
+    const instance = this.servers.get(serverId);
+    return instance?.config?.name || serverId;
   }
 
   /**
@@ -935,6 +950,9 @@ export class ExternalServerManager extends EventEmitter {
 
       mcpLogger.info(`[ExternalServerManager] Removing server: ${serverId}`);
 
+      // Capture name before deletion removes the instance
+      const serverName = this.getServerName(serverId);
+
       // Stop the server
       await this.stopServer(serverId);
 
@@ -944,6 +962,7 @@ export class ExternalServerManager extends EventEmitter {
       // Emit event
       this.emit("disconnected", {
         serverId,
+        serverName,
         reason: "Manually removed",
         timestamp: new Date(),
       } satisfies ExternalMCPServerEvents["disconnected"]);
@@ -1078,6 +1097,7 @@ export class ExternalServerManager extends EventEmitter {
       // Emit connected event
       this.emit("connected", {
         serverId,
+        serverName: this.getServerName(serverId),
         toolCount: instance.toolsMap.size,
         timestamp: new Date(),
       } satisfies ExternalMCPServerEvents["connected"]);
@@ -1221,6 +1241,7 @@ export class ExternalServerManager extends EventEmitter {
     // Emit status change event
     this.emit("statusChanged", {
       serverId,
+      serverName: this.getServerName(serverId),
       oldStatus,
       newStatus,
       timestamp: new Date(),
@@ -1251,6 +1272,7 @@ export class ExternalServerManager extends EventEmitter {
     // Emit failed event
     this.emit("failed", {
       serverId,
+      serverName: this.getServerName(serverId),
       error: error.message,
       timestamp: new Date(),
     } satisfies ExternalMCPServerEvents["failed"]);
@@ -1281,6 +1303,7 @@ export class ExternalServerManager extends EventEmitter {
     // Emit disconnected event
     this.emit("disconnected", {
       serverId,
+      serverName: this.getServerName(serverId),
       reason,
       timestamp: new Date(),
     } satisfies ExternalMCPServerEvents["disconnected"]);
@@ -1433,6 +1456,7 @@ export class ExternalServerManager extends EventEmitter {
       // Emit health check event
       this.emit("healthCheck", {
         serverId,
+        serverName: this.getServerName(serverId),
         health,
         timestamp: new Date(),
       } satisfies ExternalMCPServerEvents["healthCheck"]);

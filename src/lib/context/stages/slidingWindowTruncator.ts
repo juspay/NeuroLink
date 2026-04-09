@@ -7,7 +7,7 @@
  *
  * Features:
  * - Adaptive truncation (PERF-001): calculates fraction from actual overage
- *   instead of fixed 50%, with iterative refinement up to 3 passes.
+ *   instead of fixed 50%, with iterative refinement up to 6 passes.
  * - Small conversation handling (BUG-005): for <= 4 messages, truncates
  *   message content proportionally instead of returning no-op.
  */
@@ -214,8 +214,8 @@ export function truncateWithSlidingWindow(
           messagesRemoved: evenRemoveCount,
         };
       }
-      // Not enough -- increase fraction by 25% for next iteration
-      currentFraction = Math.min(0.95, currentFraction + 0.25);
+      // Not enough -- increase fraction by 10% for finer-grained escalation
+      currentFraction = Math.min(0.95, currentFraction + 0.1);
       continue;
     }
 

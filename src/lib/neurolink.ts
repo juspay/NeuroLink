@@ -91,6 +91,7 @@ import {
   getLangfuseHealthStatus,
   initializeOpenTelemetry,
   isOpenTelemetryInitialized,
+  runWithCurrentLangfuseContext,
   setLangfuseContext,
   shutdownOpenTelemetry,
 } from "./services/server/ai/observability/instrumentation.js";
@@ -1715,7 +1716,10 @@ Current user's request: ${currentInput}`;
     userId: string,
     additionalUsers?: AdditionalMemoryUser[],
   ): void {
-    setImmediate(async () => {
+    // Preserve AsyncLocalStorage context across setImmediate boundary so that
+    // memory writes appear under the originating Langfuse trace instead of
+    // becoming orphan spans.
+    const wrappedMemoryWrite = runWithCurrentLangfuseContext(async () => {
       try {
         const client = this.ensureMemoryReady();
         if (!client) {
@@ -1738,11 +1742,21 @@ Current user's request: ${currentInput}`;
           writeOps.push(client.add(user.userId, content, addOptions));
         }
 
-        await Promise.all(writeOps);
+        // withTimeout races against Promise.all — if the timeout fires, the
+        // await resolves with an error but the underlying client.add() calls
+        // may still complete in the background. This is acceptable: the memory
+        // client API (Mem0) doesn't support AbortSignal, and these are
+        // fire-and-forget background writes where a stale completion is harmless.
+        await withTimeout(
+          Promise.all(writeOps),
+          30_000,
+          new Error("Background memory write timed out after 30s"),
+        );
       } catch (error) {
         logger.warn("Memory storage failed:", error);
       }
     });
+    setImmediate(wrappedMemoryWrite);
   }
 
   /**
@@ -5261,6 +5275,25 @@ Current user's request: ${currentInput}`;
       shouldCompact: budgetResult.shouldCompact,
     });
 
+    // Scale timeout for large contexts if caller didn't set one explicitly.
+    // Providers read options.timeout via getTimeout(), so setting it here
+    // propagates to any downstream provider call.
+    if (
+      options.timeout === undefined &&
+      budgetResult.estimatedInputTokens > 100_000
+    ) {
+      // >100K → 1.5x, >200K → 2x, >300K → 2.5x (capped at 4x) of 60s base
+      const scale =
+        1 + Math.floor((budgetResult.estimatedInputTokens - 1) / 100_000) * 0.5;
+      const scaledMs = Math.round(60_000 * Math.min(scale, 4));
+      options.timeout = scaledMs;
+      logger.info("[TokenBudget] Scaled timeout for large context", {
+        requestId,
+        estimatedTokens: budgetResult.estimatedInputTokens,
+        scaledTimeoutMs: scaledMs,
+      });
+    }
+
     const compactionSessionId = this.getCompactionSessionId(options);
     const lastCompactionCount =
       this.lastCompactionMessageCount.get(compactionSessionId) ?? 0;
@@ -5399,6 +5432,9 @@ Current user's request: ${currentInput}`;
     });
 
     if (!finalBudget.withinBudget) {
+      // Clear watermark so handleContextOverflow recovery can re-compact
+      this.lastCompactionMessageCount.delete(compactionSessionId);
+
       throw new ContextBudgetExceededError(
         `Context exceeds model budget after all compaction stages. ` +
           `Estimated: ${finalBudget.estimatedInputTokens} tokens, ` +
@@ -5701,6 +5737,9 @@ Current user's request: ${currentInput}`;
             });
 
             if (!finalBudget.withinBudget) {
+              // Clear watermark so handleContextOverflow recovery can re-compact
+              this.lastCompactionMessageCount.delete(dpgCompactionSessionId);
+
               throw new ContextBudgetExceededError(
                 `Context exceeds model budget after all compaction stages. ` +
                   `Estimated: ${finalBudget.estimatedInputTokens} tokens, ` +
@@ -7195,6 +7234,9 @@ Current user's request: ${currentInput}`;
         });
 
         if (!finalBudget.withinBudget) {
+          // Clear watermark so handleContextOverflow recovery can re-compact
+          this.lastCompactionMessageCount.delete(streamCompactionSessionId);
+
           throw new ContextBudgetExceededError(
             `Stream context exceeds model budget after all compaction stages. ` +
               `Estimated: ${finalBudget.estimatedInputTokens} tokens, ` +
@@ -10745,6 +10787,7 @@ Current user's request: ${currentInput}`;
         // Emit server added event
         this.emitter.emit("externalMCP:serverAdded", {
           serverId,
+          serverName: config.name || serverId,
           config,
           toolCount: result.metadata?.toolsDiscovered || 0,
           timestamp: Date.now(),
@@ -10781,6 +10824,9 @@ Current user's request: ${currentInput}`;
     try {
       mcpLogger.info(`[NeuroLink] Removing external MCP server: ${serverId}`);
 
+      // Capture the configured name before removal destroys the instance
+      const serverName = this.externalServerManager.getServerName(serverId);
+
       const result = await this.externalServerManager.removeServer(serverId);
 
       if (result.success) {
@@ -10791,6 +10837,7 @@ Current user's request: ${currentInput}`;
         // Emit server removed event
         this.emitter.emit("externalMCP:serverRemoved", {
           serverId,
+          serverName,
           timestamp: Date.now(),
         });
       } else {

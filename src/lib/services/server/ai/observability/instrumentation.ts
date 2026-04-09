@@ -668,8 +668,54 @@ function initializeExternalOpenTelemetryMode(
       if (globalProvider && typeof provider.addSpanProcessor === "function") {
         provider.addSpanProcessor(new ContextEnricher());
 
+        // Auto-detect: skip if consumer already registered a LangfuseSpanProcessor.
+        //
+        // Detection strategy (ordered by robustness):
+        // 1. `instanceof LangfuseSpanProcessor` — reliable when both sides use
+        //    the same @langfuse/otel package instance (same module identity).
+        // 2. Duck-type check for Langfuse-specific public member
+        //    (`langfuseClient` property) — survives minification.
+        // 3. `constructor.name === "LangfuseSpanProcessor"` — last resort,
+        //    brittle under minification or bundler renaming.
+        //
+        // NOTE: `_registeredSpanProcessors` is an internal OpenTelemetry field.
+        // If the OTel SDK removes or renames it, the array defaults to [] and
+        // `hasExistingLangfuse` is false — NeuroLink registers its own processor
+        // (same behavior as before this check). Consumers can always force skip
+        // via `skipLangfuseSpanProcessor: true`.
+        const existingProcessors =
+          (provider as { _registeredSpanProcessors?: unknown[] })
+            ._registeredSpanProcessors ?? [];
+        const hasExistingLangfuse = existingProcessors.some((p) => {
+          if (p === null || p === undefined || typeof p !== "object") {
+            return false;
+          }
+          // Prefer instanceof — works when same @langfuse/otel package is shared
+          if (p instanceof LangfuseSpanProcessor) {
+            return true;
+          }
+          // Duck-type: Langfuse processor exposes a langfuseClient property
+          if ("langfuseClient" in p) {
+            return true;
+          }
+          // Fallback: constructor name (brittle under minification)
+          return (
+            (p as { constructor?: { name?: string } }).constructor?.name ===
+            "LangfuseSpanProcessor"
+          );
+        });
+
         const skipLangfuse =
-          config.skipLangfuseSpanProcessor === true || !langfuseProcessor;
+          config.skipLangfuseSpanProcessor === true ||
+          !langfuseProcessor ||
+          hasExistingLangfuse;
+
+        if (hasExistingLangfuse && !config.skipLangfuseSpanProcessor) {
+          logger.info(
+            `${LOG_PREFIX} Auto-detected existing LangfuseSpanProcessor — skipping SDK registration to avoid duplicates`,
+          );
+        }
+
         if (!skipLangfuse && langfuseProcessor) {
           provider.addSpanProcessor(langfuseProcessor);
         }

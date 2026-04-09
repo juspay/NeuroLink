@@ -44,7 +44,7 @@ const DEFAULT_CONFIG: Required<CompactionConfig> = {
   enableSummarize: true,
   enableTruncate: true,
   pruneProtectTokens: 40_000,
-  pruneMinimumSavings: 20_000,
+  pruneMinimumSavings: 500,
   pruneProtectedTools: ["skill"],
   summarizationProvider: "vertex",
   summarizationModel: "gemini-2.5-flash",
@@ -225,7 +225,7 @@ export class ContextCompactor {
           targetTokens: targetTokens,
           provider: provider,
           adaptiveBuffer: 0.15,
-          maxIterations: 3,
+          maxIterations: 6,
         });
         if (truncResult.truncated) {
           currentMessages = truncResult.messages;
