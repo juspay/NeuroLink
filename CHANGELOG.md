@@ -1,3 +1,9 @@
+## [9.51.1](https://github.com/juspay/neurolink/compare/v9.51.0...v9.51.1) (2026-04-10)
+
+### Bug Fixes
+
+- **(sdk):** call stack exceeded fix for large base64 images ([c8286e1](https://github.com/juspay/neurolink/commit/c8286e145596fe3d4f957511a2a69ca3f022e57c))
+
 ## [9.51.0](https://github.com/juspay/neurolink/compare/v9.50.2...v9.51.0) (2026-04-10)
 
 ### Features
