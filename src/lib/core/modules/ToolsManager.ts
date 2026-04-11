@@ -31,6 +31,7 @@ import { SpanStatusCode } from "@opentelemetry/api";
 import { logger } from "../../utils/logger.js";
 import { getKeyCount } from "../../utils/transformationUtils.js";
 import { convertJsonSchemaToZod } from "../../utils/schemaConversion.js";
+import { generateToolOutputPreview } from "../../context/toolOutputLimits.js";
 import type { NeuroLink } from "../../neurolink.js";
 
 /**
@@ -57,6 +58,104 @@ export class ToolsManager {
     private readonly utilities?: ToolUtilities,
   ) {
     this.mcpTools = {};
+  }
+
+  /**
+   * BZ-666: Wrap tool execute with output truncation to prevent
+   * context overflow when large results flow into the AI SDK accumulator.
+   */
+  private wrapExecuteWithTruncation(
+    toolName: string,
+    originalExecute: (params: unknown) => Promise<unknown>,
+  ): (params: unknown) => Promise<unknown> {
+    return async (params: unknown): Promise<unknown> => {
+      const result = await originalExecute(params);
+      return this.truncateToolResult(toolName, result);
+    };
+  }
+
+  /**
+   * BZ-666: Apply generateToolOutputPreview to tool results to prevent
+   * context overflow when large results flow into the AI SDK accumulator.
+   */
+  private truncateToolResult(toolName: string, result: unknown): unknown {
+    if (result === null || result === undefined) {
+      return result;
+    }
+
+    // Handle string results directly
+    if (typeof result === "string") {
+      const { preview, truncated, originalSize } =
+        generateToolOutputPreview(result);
+      if (truncated) {
+        logger.debug(
+          `[ToolsManager] Truncated '${toolName}' string output: ${originalSize} bytes → ${Buffer.byteLength(preview, "utf-8")} bytes`,
+        );
+      }
+      return truncated ? preview : result;
+    }
+
+    // Handle object results (e.g. readFile returns { content, ... })
+    if (typeof result === "object") {
+      const obj = result as Record<string, unknown>;
+      let nextObj: Record<string, unknown> | null = null;
+
+      // Truncate "content" if present and oversized
+      if (typeof obj.content === "string") {
+        const { preview, truncated, originalSize } = generateToolOutputPreview(
+          obj.content,
+        );
+        if (truncated) {
+          logger.debug(
+            `[ToolsManager] Truncated '${toolName}' content field: ${originalSize} bytes → ${Buffer.byteLength(preview, "utf-8")} bytes`,
+          );
+          nextObj = { ...(nextObj ?? obj), content: preview };
+        }
+      }
+
+      // Truncate "data" if present and oversized — both fields can coexist
+      if (typeof obj.data === "string") {
+        const { preview, truncated, originalSize } = generateToolOutputPreview(
+          obj.data,
+        );
+        if (truncated) {
+          logger.debug(
+            `[ToolsManager] Truncated '${toolName}' data field: ${originalSize} bytes → ${Buffer.byteLength(preview, "utf-8")} bytes`,
+          );
+          nextObj = { ...(nextObj ?? obj), data: preview };
+        }
+      }
+
+      if (nextObj) {
+        return nextObj;
+      }
+
+      // For other objects, check if their JSON serialization is too large.
+      // Use UTF-8 byte length, not string length, to match the 50KB budget.
+      try {
+        const jsonStr = JSON.stringify(result);
+        if (Buffer.byteLength(jsonStr, "utf-8") > 51_200) {
+          const { preview, truncated, originalSize } =
+            generateToolOutputPreview(jsonStr);
+          if (truncated) {
+            logger.debug(
+              `[ToolsManager] Truncated '${toolName}' JSON output: ${originalSize} bytes → ${Buffer.byteLength(preview, "utf-8")} bytes`,
+            );
+            // Preserve object shape so callers reading structured fields don't
+            // get a type surprise. Attach the preview under a sentinel field.
+            return {
+              _truncated: true,
+              _originalSize: originalSize,
+              _preview: preview,
+            };
+          }
+        }
+      } catch {
+        // JSON serialization failed — return as-is
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -243,7 +342,11 @@ export class ToolsManager {
           directTool as { execute: (params: unknown) => Promise<unknown> }
         ).execute;
 
-        // Create a new tool with wrapped execute function
+        // Create a new tool with wrapped execute function (BZ-666/BZ-664 guards applied)
+        const guardedExecute = this.wrapExecuteWithTruncation(
+          toolName,
+          originalExecute,
+        );
         tools[toolName] = {
           ...(directTool as Tool),
           execute: async (params: unknown) => {
@@ -251,7 +354,7 @@ export class ToolsManager {
             this.emitToolEvent("tool:start", toolName, { input: params });
 
             try {
-              const result = await originalExecute(params);
+              const result = await guardedExecute(params);
               this.emitToolEvent("tool:end", toolName, {
                 result,
                 success: true,
@@ -307,6 +410,14 @@ export class ToolsManager {
           },
         );
         if (tool && !tools[toolName]) {
+          // BZ-666/BZ-664: Wrap custom tool execute with guards
+          const origExec = (
+            tool as { execute?: (p: unknown) => Promise<unknown> }
+          ).execute;
+          if (origExec) {
+            const guarded = this.wrapExecuteWithTruncation(toolName, origExec);
+            (tool as Record<string, unknown>).execute = guarded;
+          }
           tools[toolName] = tool;
         }
       }
@@ -631,6 +742,27 @@ export class ToolsManager {
           : z.object({});
       }
 
+      // BZ-666/BZ-664: Wrap the raw MCP execute with guards before event wrapping
+      const rawExecute = async (params: unknown): Promise<unknown> => {
+        if (
+          this.neurolink &&
+          typeof this.neurolink.executeExternalMCPTool === "function"
+        ) {
+          return this.neurolink.executeExternalMCPTool(
+            tool.serverId || "unknown",
+            tool.name,
+            params as JsonObject,
+          );
+        }
+        throw new Error(
+          `Cannot execute external MCP tool: NeuroLink executeExternalMCPTool not available`,
+        );
+      };
+      const guardedExecute = this.wrapExecuteWithTruncation(
+        tool.name,
+        rawExecute,
+      );
+
       return createAISDKTool<unknown, unknown>({
         description: tool.description || `External MCP tool ${tool.name}`,
         inputSchema: finalSchema, // AI SDK v6 uses inputSchema (not parameters)
@@ -638,47 +770,27 @@ export class ToolsManager {
           const startTime = Date.now();
           this.emitToolEvent("tool:start", tool.name, { input: params });
 
-          // Execute via NeuroLink's direct tool execution
-          if (
-            this.neurolink &&
-            typeof this.neurolink.executeExternalMCPTool === "function"
-          ) {
-            try {
-              const result = await this.neurolink.executeExternalMCPTool(
-                tool.serverId || "unknown",
-                tool.name,
-                params as JsonObject,
-              );
-
-              this.emitToolEvent("tool:end", tool.name, {
-                result,
-                success: true,
-                responseTime: Date.now() - startTime,
-              });
-              return result;
-            } catch (mcpError) {
-              const errorMsg =
-                mcpError instanceof Error ? mcpError.message : String(mcpError);
-              this.emitToolEvent("tool:end", tool.name, {
-                error: errorMsg,
-                success: false,
-                responseTime: Date.now() - startTime,
-              });
-              logger.error(`External MCP tool failed: ${tool.name}`, {
-                serverId: tool.serverId,
-                error: errorMsg,
-              });
-              throw mcpError;
-            }
-          } else {
-            const error = `Cannot execute external MCP tool: NeuroLink executeExternalMCPTool not available`;
+          try {
+            const result = await guardedExecute(params);
             this.emitToolEvent("tool:end", tool.name, {
-              error,
+              result,
+              success: true,
+              responseTime: Date.now() - startTime,
+            });
+            return result;
+          } catch (mcpError) {
+            const errorMsg =
+              mcpError instanceof Error ? mcpError.message : String(mcpError);
+            this.emitToolEvent("tool:end", tool.name, {
+              error: errorMsg,
               success: false,
               responseTime: Date.now() - startTime,
             });
-            logger.error(error);
-            throw new Error(error);
+            logger.error(`External MCP tool failed: ${tool.name}`, {
+              serverId: tool.serverId,
+              error: errorMsg,
+            });
+            throw mcpError;
           }
         },
       });
