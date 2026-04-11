@@ -44,6 +44,7 @@ import { LoopSession } from "../loop/session.js";
 import { initializeCliParser } from "../parser.js";
 import { formatFileSize, saveAudioToFile } from "../utils/audioFileUtils.js";
 import { resolveFilePaths } from "../utils/pathResolver.js";
+import { animatedWrite } from "../utils/typewriter.js";
 import {
   formatVideoFileSize,
   getVideoMetadataSummary,
@@ -2755,7 +2756,7 @@ export class CLICommandFactory {
     let fullContent = "";
 
     for (const chunk of chunks) {
-      process.stdout.write(chunk);
+      await animatedWrite(chunk);
       fullContent += chunk;
       await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate streaming delay
     }
@@ -3083,7 +3084,7 @@ export class CLICommandFactory {
         };
 
         if (isText(evt)) {
-          process.stdout.write(evt.content);
+          await animatedWrite(evt.content);
           fullContent += evt.content;
         } else if (isAudio(evt)) {
           if (options.debug && !options.quiet) {

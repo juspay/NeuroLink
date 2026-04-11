@@ -63,7 +63,7 @@ export type NeurolinkConstructorConfig = {
  * Configuration for MCP enhancement modules wired into generate()/stream() paths.
  *
  * These modules are automatically applied during tool execution when configured:
- * - cache: Tool result caching (disabled by default)
+ * - cache: Tool result caching (enabled by default, opt out with enabled: false)
  * - annotations: Auto-infer tool safety metadata (enabled by default)
  * - router: Multi-server tool routing (auto-activates with 2+ servers)
  * - batcher: Batch programmatic tool calls (disabled by default)
@@ -71,7 +71,7 @@ export type NeurolinkConstructorConfig = {
  * - middleware: Global tool execution middleware chain (empty by default)
  */
 export type MCPEnhancementsConfig = {
-  /** Tool result caching. Default: disabled. Enable to cache read-only tool results. */
+  /** Tool result caching. Default: enabled. Set enabled: false to opt out. */
   cache?: {
     enabled?: boolean;
     /** Cache TTL in milliseconds. Default: 300000 (5 min) */

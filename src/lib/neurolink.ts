@@ -1272,17 +1272,18 @@ export class NeuroLink {
     const mcpConfig = config?.mcp;
     this.mcpEnhancementsConfig = mcpConfig;
 
-    // ToolCache — disabled by default, opt-in
-    if (mcpConfig?.cache?.enabled) {
+    // BZ-664: ToolCache — enabled by default to prevent duplicate tool calls.
+    // Callers can explicitly opt out via mcp.cache.enabled = false.
+    if (mcpConfig?.cache?.enabled !== false) {
       this.mcpToolResultCache = new ToolResultCache({
-        ttl: mcpConfig.cache.ttl ?? 300_000,
-        maxSize: mcpConfig.cache.maxSize ?? 500,
-        strategy: mcpConfig.cache.strategy ?? "lru",
+        ttl: mcpConfig?.cache?.ttl ?? 300_000,
+        maxSize: mcpConfig?.cache?.maxSize ?? 500,
+        strategy: mcpConfig?.cache?.strategy ?? "lru",
       });
       logger.debug("[NeuroLink] MCP tool result cache initialized", {
-        ttl: mcpConfig.cache.ttl ?? 300_000,
-        maxSize: mcpConfig.cache.maxSize ?? 500,
-        strategy: mcpConfig.cache.strategy ?? "lru",
+        ttl: mcpConfig?.cache?.ttl ?? 300_000,
+        maxSize: mcpConfig?.cache?.maxSize ?? 500,
+        strategy: mcpConfig?.cache?.strategy ?? "lru",
       });
     }
 
@@ -10917,12 +10918,49 @@ Current user's request: ${currentInput}`;
         `[NeuroLink] Executing external MCP tool: ${toolName} on ${serverId}`,
       );
 
+      // BZ-664: Check existing ToolResultCache before executing to avoid
+      // duplicate identical calls within the same session.
+      //
+      // Safety guards aligned with executeToolInternal():
+      // - Skip destructive tools (destructiveHint annotation)
+      // - Scope cache key by serverId (two servers can expose same tool name)
+      //   and toolExecutionContext (prevents cross-session/user leaks)
+      const toolAnnotations = this.getToolAnnotationsForExecution(toolName);
+      const cacheEnabled =
+        !!this.mcpToolResultCache &&
+        !this._disableToolCacheForCurrentRequest &&
+        !toolAnnotations?.destructiveHint;
+      const cacheKeyArgs = {
+        __serverId: serverId,
+        __args: parameters,
+        ...(this.toolExecutionContext
+          ? { __ctx: this.toolExecutionContext }
+          : {}),
+      };
+      if (cacheEnabled && this.mcpToolResultCache) {
+        const cached = this.mcpToolResultCache.getCachedResult(
+          toolName,
+          cacheKeyArgs,
+        );
+        if (cached !== undefined) {
+          mcpLogger.debug(
+            `[NeuroLink] Tool result cache HIT: ${toolName} on ${serverId}`,
+          );
+          return cached;
+        }
+      }
+
       const result = await this.externalServerManager.executeTool(
         serverId,
         toolName,
         parameters,
         options,
       );
+
+      // BZ-664: Store result in cache after successful execution
+      if (cacheEnabled && this.mcpToolResultCache) {
+        this.mcpToolResultCache.cacheResult(toolName, cacheKeyArgs, result);
+      }
 
       mcpLogger.debug(
         `[NeuroLink] External MCP tool executed successfully: ${toolName}`,
