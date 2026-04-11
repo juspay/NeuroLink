@@ -659,10 +659,10 @@ export class OllamaProvider extends BaseProvider {
   private baseUrl: string;
   private timeout: number;
 
-  constructor(modelName?: string) {
+  constructor(modelName?: string, credentials?: { baseURL?: string }) {
     super(modelName, "ollama" as AIProviderName);
 
-    this.baseUrl = getOllamaBaseUrl();
+    this.baseUrl = credentials?.baseURL ?? getOllamaBaseUrl();
     this.timeout = getOllamaTimeout();
 
     // Initialize Ollama model

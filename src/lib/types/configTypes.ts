@@ -27,6 +27,7 @@ import type {
   KeycloakConfig,
   AuthenticatedContext,
 } from "./authTypes.js";
+import type { NeurolinkCredentials } from "./providers.js";
 
 /**
  * Main NeuroLink configuration type
@@ -57,6 +58,12 @@ export type NeurolinkConstructorConfig = {
   auth?: NeuroLinkAuthConfig;
   /** TaskManager configuration (scheduled and self-running tasks) */
   tasks?: TaskManagerConfig;
+  /**
+   * Per-provider credential overrides.
+   * When set here, applies as the default for all generate()/stream() calls
+   * from this NeuroLink instance. Per-call credentials override these.
+   */
+  credentials?: NeurolinkCredentials;
 };
 
 /**

@@ -115,6 +115,58 @@ export type AWSCredentialConfig = {
 };
 
 /**
+ * Per-provider credential overrides for generate() / stream() calls.
+ *
+ * When set on `NeurolinkConstructorConfig.credentials`, applies as the default
+ * for all calls from that NeuroLink instance. When set on
+ * `GenerateOptions.credentials` or `StreamOptions.credentials`, overrides the
+ * instance default for that single call.
+ *
+ * Unset providers fall through to environment variables (existing behaviour).
+ */
+export type NeurolinkCredentials = {
+  openai?: { apiKey?: string; baseURL?: string };
+  anthropic?: { apiKey?: string; oauthToken?: string };
+  googleAiStudio?: { apiKey?: string };
+  vertex?: {
+    projectId?: string;
+    location?: string;
+    /** Vertex Express Mode — simplified API-key auth */
+    apiKey?: string;
+    /** Full service-account JSON string */
+    serviceAccountKey?: string;
+    /** Inline service-account fields (alternative to serviceAccountKey) */
+    clientEmail?: string;
+    privateKey?: string;
+  };
+  bedrock?: {
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    sessionToken?: string;
+    region?: string;
+  };
+  sagemaker?: {
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    sessionToken?: string;
+    region?: string;
+    endpoint?: string;
+  };
+  azure?: {
+    apiKey?: string;
+    resourceName?: string;
+    deploymentName?: string;
+    apiVersion?: string;
+  };
+  mistral?: { apiKey?: string };
+  huggingFace?: { apiKey?: string; baseURL?: string };
+  openrouter?: { apiKey?: string; baseURL?: string };
+  litellm?: { apiKey?: string; baseURL?: string };
+  openaiCompatible?: { apiKey?: string; baseURL?: string };
+  ollama?: { baseURL?: string };
+};
+
+/**
  * AWS Credential Validation Result
  */
 export type CredentialValidationResult = {

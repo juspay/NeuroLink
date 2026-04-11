@@ -2,7 +2,10 @@ import { ProviderFactory } from "./providerFactory.js";
 // Lazy loading all providers to avoid circular dependencies
 // Removed all static imports - providers loaded dynamically when needed
 // This breaks the circular dependency chain completely
-import type { ProviderRegistryOptions } from "../types/index.js";
+import type {
+  NeurolinkCredentials,
+  ProviderRegistryOptions,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
@@ -52,7 +55,13 @@ export class ProviderRegistry {
 
   /**
    * Internal registration implementation
+   *
+   * This method is a flat list of 13 provider registrations. Each registration
+   * is self-contained and extracting helpers would add indirection without
+   * reducing complexity — the function is long because there are many providers,
+   * not because any single registration is complex.
    */
+  // eslint-disable-next-line max-lines-per-function
   private static async _doRegister(): Promise<void> {
     try {
       // Register providers with dynamic import factory functions
@@ -65,12 +74,17 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const googleAiCreds =
+            credentials as NeurolinkCredentials["googleAiStudio"];
           const { GoogleAIStudioProvider } =
             await import("../providers/googleAiStudio.js");
           return new GoogleAIStudioProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            googleAiCreds,
           );
         },
         GoogleAIModels.GEMINI_2_5_FLASH,
@@ -84,11 +98,16 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const openaiCreds = credentials as NeurolinkCredentials["openai"];
           const { OpenAIProvider } = await import("../providers/openAI.js");
           return new OpenAIProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            undefined,
+            openaiCreds,
           );
         },
         OpenAIModels.GPT_4O_MINI,
@@ -102,12 +121,18 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const anthropicCreds =
+            credentials as NeurolinkCredentials["anthropic"];
           const { AnthropicProvider } =
             await import("../providers/anthropic.js");
           return new AnthropicProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            undefined,
+            anthropicCreds,
           );
         },
         AnthropicModels.CLAUDE_SONNET_4_6,
@@ -122,13 +147,16 @@ export class ProviderRegistry {
           _providerName?: string,
           sdk?: UnknownRecord,
           region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const bedrockCreds = credentials as NeurolinkCredentials["bedrock"];
           const { AmazonBedrockProvider } =
             await import("../providers/amazonBedrock.js");
           return new AmazonBedrockProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
             region,
+            bedrockCreds,
           );
         },
         undefined, // Let provider read BEDROCK_MODEL from .env
@@ -142,12 +170,17 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const azureCreds = credentials as NeurolinkCredentials["azure"];
           const { AzureOpenAIProvider } =
             await import("../providers/azureOpenai.js");
           return new AzureOpenAIProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            undefined,
+            azureCreds,
           );
         },
         process.env.AZURE_MODEL ||
@@ -166,7 +199,9 @@ export class ProviderRegistry {
           providerName?: string,
           sdk?: UnknownRecord,
           region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const vertexCreds = credentials as NeurolinkCredentials["vertex"];
           const { GoogleVertexProvider } =
             await import("../providers/googleVertex.js");
           return new GoogleVertexProvider(
@@ -174,6 +209,7 @@ export class ProviderRegistry {
             providerName,
             sdk as unknown as NeuroLink | undefined,
             region,
+            vertexCreds,
           );
         },
         VertexModels.CLAUDE_4_6_SONNET,
@@ -183,10 +219,17 @@ export class ProviderRegistry {
       // Register Hugging Face provider (Unified Router implementation)
       ProviderFactory.registerProvider(
         AIProviderName.HUGGINGFACE,
-        async (modelName?: string) => {
+        async (
+          modelName?: string,
+          _providerName?: string,
+          _sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
+        ) => {
+          const hfCreds = credentials as NeurolinkCredentials["huggingFace"];
           const { HuggingFaceProvider } =
             await import("../providers/huggingFace.js");
-          return new HuggingFaceProvider(modelName);
+          return new HuggingFaceProvider(modelName, undefined, hfCreds);
         },
         process.env.HUGGINGFACE_MODEL ||
           HuggingFaceModels.QWEN_2_5_72B_INSTRUCT,
@@ -200,11 +243,16 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const mistralCreds = credentials as NeurolinkCredentials["mistral"];
           const { MistralProvider } = await import("../providers/mistral.js");
           return new MistralProvider(
             modelName,
             sdk as unknown as MistralProviderType | undefined,
+            undefined,
+            mistralCreds,
           );
         },
         MistralModels.MISTRAL_LARGE_LATEST,
@@ -214,9 +262,16 @@ export class ProviderRegistry {
       // Register Ollama provider
       ProviderFactory.registerProvider(
         AIProviderName.OLLAMA,
-        async (modelName?: string) => {
+        async (
+          modelName?: string,
+          _providerName?: string,
+          _sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
+        ) => {
+          const ollamaCreds = credentials as NeurolinkCredentials["ollama"];
           const { OllamaProvider } = await import("../providers/ollama.js");
-          return new OllamaProvider(modelName);
+          return new OllamaProvider(modelName, ollamaCreds);
         },
         process.env.OLLAMA_MODEL || OllamaModels.LLAMA3_2_LATEST,
         ["ollama", "local"],
@@ -229,11 +284,16 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const litellmCreds = credentials as NeurolinkCredentials["litellm"];
           const { LiteLLMProvider } = await import("../providers/litellm.js");
           return new LiteLLMProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            undefined,
+            litellmCreds,
           );
         },
         process.env.LITELLM_MODEL || LiteLLMModels.OPENAI_GPT_4O_MINI,
@@ -247,12 +307,18 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const openaiCompatCreds =
+            credentials as NeurolinkCredentials["openaiCompatible"];
           const { OpenAICompatibleProvider } =
             await import("../providers/openaiCompatible.js");
           return new OpenAICompatibleProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            undefined,
+            openaiCompatCreds,
           );
         },
         process.env.OPENAI_COMPATIBLE_MODEL || undefined, // Enable auto-discovery when no model specified
@@ -266,12 +332,18 @@ export class ProviderRegistry {
           modelName?: string,
           _providerName?: string,
           sdk?: UnknownRecord,
+          _region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const openrouterCreds =
+            credentials as NeurolinkCredentials["openrouter"];
           const { OpenRouterProvider } =
             await import("../providers/openRouter.js");
           return new OpenRouterProvider(
             modelName,
             sdk as unknown as NeuroLink | undefined,
+            undefined,
+            openrouterCreds,
           );
         },
         process.env.OPENROUTER_MODEL || "anthropic/claude-3-5-sonnet",
@@ -286,10 +358,19 @@ export class ProviderRegistry {
           _providerName?: string,
           _sdk?: UnknownRecord,
           region?: string,
+          credentials?: UnknownRecord,
         ) => {
+          const sagemakerCreds =
+            credentials as NeurolinkCredentials["sagemaker"];
           const { AmazonSageMakerProvider } =
             await import("../providers/amazonSagemaker.js");
-          return new AmazonSageMakerProvider(modelName, undefined, region);
+          return new AmazonSageMakerProvider(
+            modelName,
+            undefined,
+            region,
+            undefined,
+            sagemakerCreds,
+          );
         },
         process.env.SAGEMAKER_MODEL || "sagemaker-model",
         ["sagemaker", "aws-sagemaker"],

@@ -274,6 +274,30 @@ await neurolink.generate({ prompt: "...", thinkingLevel: "high" });
 
 Levels: `minimal` | `low` | `medium` (default) | `high`
 
+### Per-Request Credentials
+
+Pass provider credentials at instance level or per-call. Per-call wins over instance, instance wins over env vars.
+
+```typescript
+// Instance-level default
+const nl = new NeuroLink({
+  credentials: { openai: { apiKey: "sk-..." } },
+});
+
+// Per-call override
+await nl.generate({
+  input: { text: "hello" },
+  provider: "openai",
+  credentials: { openai: { apiKey: "sk-user-key" } },
+});
+```
+
+Credentials flow through the factory chain (`neurolink.ts` → `core/factory.ts` → `providerFactory.ts` → `providerRegistry.ts` → provider constructor). Each provider's constructor accepts a provider-scoped slice (e.g. `{ apiKey }` for OpenAI, `{ accessKeyId, secretAccessKey }` for Bedrock, `{ projectId, serviceAccountKey }` for Vertex).
+
+CLI-only usage still relies on env vars — credentials field is excluded from `textGenerationOptionsSchema` to avoid shell-history leaks.
+
+See `docs/features/per-request-credentials.md` for the full provider reference.
+
 ---
 
 ## Common Patterns

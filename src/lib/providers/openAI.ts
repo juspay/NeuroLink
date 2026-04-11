@@ -72,13 +72,22 @@ const streamTracer = trace.getTracer("neurolink.provider.openai");
  */
 export class OpenAIProvider extends BaseProvider {
   private model: LanguageModel;
+  private credentials?: { apiKey?: string; baseURL?: string };
 
-  constructor(modelName?: string, neurolink?: NeuroLink) {
+  constructor(
+    modelName?: string,
+    neurolink?: NeuroLink,
+    _region?: string,
+    credentials?: { apiKey?: string; baseURL?: string },
+  ) {
     super(modelName || getOpenAIModel(), AIProviderName.OPENAI, neurolink);
+
+    this.credentials = credentials;
 
     // Initialize OpenAI provider with proxy support
     const openai = createOpenAI({
-      apiKey: getOpenAIApiKey(),
+      apiKey: credentials?.apiKey ?? getOpenAIApiKey(),
+      ...(credentials?.baseURL ? { baseURL: credentials.baseURL } : {}),
       fetch: createProxyFetch(),
     });
 
@@ -760,9 +769,12 @@ export class OpenAIProvider extends BaseProvider {
 
     try {
       // Create embedding model using the AI SDK
-      // Create the OpenAI provider
+      // Create the OpenAI provider, preferring per-instance credentials over env vars
       const openai = createOpenAI({
-        apiKey: getOpenAIApiKey(),
+        apiKey: this.credentials?.apiKey ?? getOpenAIApiKey(),
+        ...(this.credentials?.baseURL
+          ? { baseURL: this.credentials.baseURL }
+          : {}),
         fetch: createProxyFetch(),
       });
 
@@ -809,8 +821,12 @@ export class OpenAIProvider extends BaseProvider {
     });
 
     try {
+      // Prefer per-instance credentials over env vars
       const openai = createOpenAI({
-        apiKey: getOpenAIApiKey(),
+        apiKey: this.credentials?.apiKey ?? getOpenAIApiKey(),
+        ...(this.credentials?.baseURL
+          ? { baseURL: this.credentials.baseURL }
+          : {}),
         fetch: createProxyFetch(),
       });
 

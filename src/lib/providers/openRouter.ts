@@ -79,6 +79,7 @@ const getDefaultOpenRouterModel = (): string => {
 export class OpenRouterProvider extends BaseProvider {
   private model: LanguageModel;
   private openRouterClient: ReturnType<typeof createOpenRouter>;
+  private config: OpenRouterConfig;
 
   // Cache for available models to avoid repeated API calls
   private static modelsCache: string[] = [];
@@ -89,11 +90,25 @@ export class OpenRouterProvider extends BaseProvider {
   private static toolCapableModels: Set<string> = new Set();
   private static capabilitiesCached = false;
 
-  constructor(modelName?: string, sdk?: unknown) {
+  constructor(
+    modelName?: string,
+    sdk?: unknown,
+    _region?: string,
+    credentials?: { apiKey?: string; baseURL?: string },
+  ) {
     super(modelName, AIProviderName.OPENROUTER, sdk as NeuroLink | undefined);
 
-    // Initialize OpenRouter using the official SDK
-    const config = getOpenRouterConfig();
+    // Build config: prefer credentials over env vars to avoid throwing when env vars are absent
+    if (credentials?.apiKey) {
+      this.config = {
+        apiKey: credentials.apiKey,
+        referer: process.env.OPENROUTER_REFERER,
+        appName: process.env.OPENROUTER_APP_NAME,
+      };
+    } else {
+      this.config = getOpenRouterConfig(); // throws if OPENROUTER_API_KEY missing
+    }
+    const config = this.config;
 
     // Build headers for attribution on openrouter.ai/activity dashboard
     const headers: Record<string, string> = {};
@@ -107,6 +122,7 @@ export class OpenRouterProvider extends BaseProvider {
     // Create OpenRouter client with optional attribution headers
     this.openRouterClient = createOpenRouter({
       apiKey: config.apiKey,
+      ...(credentials?.baseURL ? { baseURL: credentials.baseURL } : {}),
       ...(Object.keys(headers).length > 0 && { headers }),
     });
 
@@ -599,7 +615,7 @@ export class OpenRouterProvider extends BaseProvider {
    */
   private async fetchModelsFromAPI(): Promise<string[]> {
     const functionTag = "OpenRouterProvider.fetchModelsFromAPI";
-    const config = getOpenRouterConfig();
+    const config = this.config;
     const modelsUrl = "https://openrouter.ai/api/v1/models";
 
     const controller = new AbortController();
@@ -686,7 +702,7 @@ export class OpenRouterProvider extends BaseProvider {
     }
 
     try {
-      const config = getOpenRouterConfig();
+      const config = this.config;
       const modelsUrl = "https://openrouter.ai/api/v1/models";
 
       const controller = new AbortController();

@@ -1,6 +1,6 @@
 import type { AIProviderName } from "../constants/enums.js";
 import type { UnknownRecord } from "../types/common.js";
-import type { AIProvider } from "../types/index.js";
+import type { AIProvider, NeurolinkCredentials } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 
 // Pure factory pattern with no hardcoded imports
@@ -80,6 +80,7 @@ export class ProviderFactory {
     modelName?: string,
     sdk?: UnknownRecord,
     region?: string,
+    credentials?: NeurolinkCredentials,
   ): Promise<AIProvider> {
     // Note: Providers are registered explicitly by ProviderRegistry to avoid circular dependencies
 
@@ -113,6 +114,23 @@ export class ProviderFactory {
       model = model || registration.defaultModel;
     }
 
+    // Map registered provider names to NeurolinkCredentials keys.
+    // Most names match (openai, anthropic, vertex, bedrock, etc.)
+    // but some differ (google-ai → googleAiStudio, openai-compatible → openaiCompatible).
+    const credentialKeyMap: Record<string, string> = {
+      "google-ai": "googleAiStudio",
+      "openai-compatible": "openaiCompatible",
+      huggingface: "huggingFace",
+    };
+    const credKey = credentialKeyMap[normalizedName] ?? normalizedName;
+
+    // Extract provider-scoped credential slice (e.g. credentials.openai for OpenAI)
+    const scopedCredentials = credentials
+      ? ((credentials as Record<string, unknown>)[credKey] as
+          | Record<string, unknown>
+          | undefined)
+      : undefined;
+
     try {
       if (typeof registration.constructor !== "function") {
         throw new Error(
@@ -129,8 +147,9 @@ export class ProviderFactory {
             providerName?: string,
             sdk?: UnknownRecord,
             region?: string,
+            credentials?: Record<string, unknown>,
           ) => Promise<AIProvider> | AIProvider
-        )(model, resolvedProviderName, sdk, region);
+        )(model, resolvedProviderName, sdk, region, scopedCredentials);
 
         // Handle both sync and async results
         result =
@@ -149,7 +168,14 @@ export class ProviderFactory {
               providerName?: string,
               sdk?: UnknownRecord,
               region?: string,
-            ) => AIProvider)(model, resolvedProviderName, sdk, region);
+              credentials?: Record<string, unknown>,
+            ) => AIProvider)(
+              model,
+              resolvedProviderName,
+              sdk,
+              region,
+              scopedCredentials,
+            );
           } catch (constructorError) {
             throw new Error(
               `Both factory function and constructor failed. Factory error: ${factoryError}. Constructor error: ${constructorError}`,
@@ -254,8 +280,15 @@ export class ProviderFactory {
     modelName?: string,
     enableMCP?: boolean,
     sdk?: UnknownRecord,
+    credentials?: NeurolinkCredentials,
   ): Promise<AIProvider> {
-    return await ProviderFactory.createProvider(providerName, modelName, sdk);
+    return await ProviderFactory.createProvider(
+      providerName,
+      modelName,
+      sdk,
+      undefined,
+      credentials,
+    );
   }
 }
 
@@ -265,6 +298,13 @@ export class ProviderFactory {
 export async function createAIProvider(
   providerName: AIProviderName | string,
   modelName?: string,
+  credentials?: NeurolinkCredentials,
 ): Promise<AIProvider> {
-  return await ProviderFactory.createProvider(providerName, modelName);
+  return await ProviderFactory.createProvider(
+    providerName,
+    modelName,
+    undefined,
+    undefined,
+    credentials,
+  );
 }

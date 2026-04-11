@@ -49,7 +49,11 @@ import type {
   EnhancedGenerateResult,
   TextGenerationOptions,
 } from "../types/generateTypes.js";
-import type { GenAIClient, GoogleGenAIClass } from "../types/providers.js";
+import type {
+  GenAIClient,
+  GoogleGenAIClass,
+  NeurolinkCredentials,
+} from "../types/providers.js";
 import type {
   StreamOptions,
   StreamResult,
@@ -184,9 +188,10 @@ let cachedCredentialsPath: string | null = null;
 // Enhanced Vertex settings creation with authentication fallback and proxy support
 const createVertexSettings = async (
   region?: string,
+  credentials?: NeurolinkCredentials["vertex"],
 ): Promise<GoogleVertexProviderSettings> => {
-  const location = region || getVertexLocation();
-  const project = getVertexProjectId();
+  const location = credentials?.location || region || getVertexLocation();
+  const project = credentials?.projectId || getVertexProjectId();
 
   const baseSettings: GoogleVertexProviderSettings = {
     project,
@@ -204,6 +209,40 @@ const createVertexSettings = async (
       location,
       project,
     });
+  }
+
+  // ── Per-request credentials (highest priority, never touches module-level cache) ──
+  if (credentials) {
+    // Express Mode: API key auth (Vertex Express)
+    if (credentials.apiKey) {
+      return { ...baseSettings, apiKey: credentials.apiKey };
+    }
+
+    // Resolve client_email / private_key from inline fields or serviceAccountKey JSON
+    const resolvedClientEmail =
+      credentials.clientEmail ||
+      (credentials.serviceAccountKey
+        ? (JSON.parse(credentials.serviceAccountKey) as Record<string, string>)
+            .client_email
+        : undefined);
+    const resolvedPrivateKey =
+      credentials.privateKey ||
+      (credentials.serviceAccountKey
+        ? (JSON.parse(credentials.serviceAccountKey) as Record<string, string>)
+            .private_key
+        : undefined);
+
+    if (resolvedClientEmail && resolvedPrivateKey) {
+      return {
+        ...baseSettings,
+        googleAuthOptions: {
+          credentials: {
+            client_email: resolvedClientEmail,
+            private_key: resolvedPrivateKey.replace(/\\n/g, "\n"),
+          },
+        },
+      };
+    }
   }
 
   // 🎯 OPTION 2: Create credentials file from environment variables at runtime
@@ -411,6 +450,7 @@ const createVertexSettings = async (
 // Create Anthropic-specific Vertex settings with the same authentication and proxy support
 const createVertexAnthropicSettings = async (
   region?: string,
+  credentials?: NeurolinkCredentials["vertex"],
 ): Promise<GoogleVertexAnthropicProviderSettings> => {
   // The @ai-sdk/google-vertex SDK constructs Anthropic URLs as:
   //   https://{location}-aiplatform.googleapis.com/...
@@ -418,7 +458,10 @@ const createVertexAnthropicSettings = async (
   // which is invalid. The correct global endpoint omits the region prefix entirely.
   // Since the SDK doesn't handle this, redirect "global" to "us-east5" for Anthropic.
   const anthropicRegion = !region || region === "global" ? "us-east5" : region;
-  const baseVertexSettings = await createVertexSettings(anthropicRegion);
+  const baseVertexSettings = await createVertexSettings(
+    anthropicRegion,
+    credentials,
+  );
 
   // GoogleVertexAnthropicProviderSettings extends GoogleVertexProviderSettings
   // so we can use the same settings with proper typing
@@ -426,6 +469,7 @@ const createVertexAnthropicSettings = async (
     project: baseVertexSettings.project,
     location: baseVertexSettings.location,
     fetch: baseVertexSettings.fetch,
+    ...(baseVertexSettings.apiKey && { apiKey: baseVertexSettings.apiKey }),
     ...(baseVertexSettings.googleAuthOptions && {
       googleAuthOptions: baseVertexSettings.googleAuthOptions,
     }),
@@ -529,6 +573,7 @@ export class GoogleVertexProvider extends BaseProvider {
     }
   > = new Map();
   private toolContext: Record<string, unknown> = {};
+  private credentials: NeurolinkCredentials["vertex"] | undefined;
 
   // Memory-managed cache for model configuration lookups to avoid repeated calls
   // Uses WeakMap for automatic cleanup and bounded LRU for recently used models
@@ -546,17 +591,21 @@ export class GoogleVertexProvider extends BaseProvider {
     _providerName?: string,
     sdk?: unknown,
     region?: string,
+    credentials?: NeurolinkCredentials["vertex"],
   ) {
     super(modelName, "vertex" as AIProviderName, sdk as NeuroLink | undefined);
 
+    this.credentials = credentials;
+
     // Validate Google Cloud credentials - now using consolidated utility
-    if (!hasGoogleCredentials()) {
+    // Skip env-var validation when per-request credentials are provided
+    if (!credentials && !hasGoogleCredentials()) {
       validateApiKey(createGoogleAuthConfig());
     }
 
     // Initialize Google Cloud configuration
-    this.projectId = getVertexProjectId();
-    this.location = region || getVertexLocation();
+    this.projectId = credentials?.projectId || getVertexProjectId();
+    this.location = credentials?.location || region || getVertexLocation();
 
     logger.debug("[GoogleVertexProvider] Constructor initialized", {
       regionParam: region,
@@ -748,7 +797,10 @@ export class GoogleVertexProvider extends BaseProvider {
     );
 
     try {
-      const vertexSettings = await createVertexSettings(this.location);
+      const vertexSettings = await createVertexSettings(
+        this.location,
+        this.credentials,
+      );
 
       const vertexSettingsEndTime = process.hrtime.bigint();
       const vertexSettingsDurationNs =
@@ -1561,8 +1613,12 @@ export class GoogleVertexProvider extends BaseProvider {
   private async createVertexGenAIClient(
     regionOverride?: string,
   ): Promise<GenAIClient> {
-    const project = getVertexProjectId();
-    const location = regionOverride || this.location || getVertexLocation();
+    const project = this.credentials?.projectId || getVertexProjectId();
+    const location =
+      this.credentials?.location ||
+      regionOverride ||
+      this.location ||
+      getVertexLocation();
 
     const mod: unknown = await import("@google/genai");
     const ctor = (mod as Record<string, unknown>).GoogleGenAI as unknown;
@@ -1579,7 +1635,57 @@ export class GoogleVertexProvider extends BaseProvider {
 
     const Ctor = ctor as GoogleGenAIClass;
 
-    // Use vertexai mode with project and location
+    // Per-request credentials: Express Mode (API key)
+    if (this.credentials?.apiKey) {
+      // Cast via unknown because GoogleGenAIClass union doesn't include apiKey+vertexai
+      return new (Ctor as new (cfg: unknown) => GenAIClient)({
+        vertexai: true,
+        project,
+        location,
+        apiKey: this.credentials.apiKey,
+      });
+    }
+
+    // Per-request credentials: inline service account
+    if (this.credentials?.clientEmail || this.credentials?.serviceAccountKey) {
+      const clientEmail =
+        this.credentials.clientEmail ||
+        (this.credentials.serviceAccountKey
+          ? (
+              JSON.parse(this.credentials.serviceAccountKey) as Record<
+                string,
+                string
+              >
+            ).client_email
+          : undefined);
+      const privateKey =
+        this.credentials.privateKey ||
+        (this.credentials.serviceAccountKey
+          ? (
+              JSON.parse(this.credentials.serviceAccountKey) as Record<
+                string,
+                string
+              >
+            ).private_key
+          : undefined);
+
+      if (clientEmail && privateKey) {
+        // Cast via unknown because GoogleGenAIClass union doesn't include googleAuthOptions
+        return new (Ctor as new (cfg: unknown) => GenAIClient)({
+          vertexai: true,
+          project,
+          location,
+          googleAuthOptions: {
+            credentials: {
+              client_email: clientEmail,
+              private_key: privateKey.replace(/\\n/g, "\n"),
+            },
+          },
+        });
+      }
+    }
+
+    // Fallback: env-var / ADC auth
     return new Ctor({
       vertexai: true,
       project,
@@ -2706,7 +2812,16 @@ export class GoogleVertexProvider extends BaseProvider {
     }
 
     // 2. Authentication Validation
-    const authValidation = await this.validateVertexAuthentication();
+    // Per-request credentials bypass env-var auth checks entirely
+    const hasPerRequestAuth =
+      this.credentials &&
+      (this.credentials.apiKey ||
+        this.credentials.clientEmail ||
+        this.credentials.privateKey ||
+        this.credentials.serviceAccountKey);
+    const authValidation = hasPerRequestAuth
+      ? { isValid: true, method: "per_request_credentials", issues: [] }
+      : await this.validateVertexAuthentication();
     if (!authValidation.isValid) {
       logger.error(
         "[GoogleVertexProvider] ❌ Authentication validation failed",
@@ -2802,6 +2917,7 @@ export class GoogleVertexProvider extends BaseProvider {
 
       const vertexAnthropicSettings = await createVertexAnthropicSettings(
         this.location,
+        this.credentials,
       );
 
       // 7. Settings Validation
@@ -4068,7 +4184,10 @@ export class GoogleVertexProvider extends BaseProvider {
 
     try {
       // Create the Vertex provider with current settings
-      const vertexSettings = await createVertexSettings(this.location);
+      const vertexSettings = await createVertexSettings(
+        this.location,
+        this.credentials,
+      );
       const vertex = createVertex(vertexSettings);
 
       // Get the text embedding model
@@ -4115,7 +4234,10 @@ export class GoogleVertexProvider extends BaseProvider {
     });
 
     try {
-      const vertexSettings = await createVertexSettings(this.location);
+      const vertexSettings = await createVertexSettings(
+        this.location,
+        this.credentials,
+      );
       const vertex = createVertex(vertexSettings);
 
       const embeddingModel = vertex.textEmbeddingModel(embeddingModelName);

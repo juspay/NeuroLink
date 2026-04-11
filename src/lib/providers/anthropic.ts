@@ -322,14 +322,28 @@ export class AnthropicProvider extends BaseProvider {
     modelName?: string,
     sdk?: unknown,
     config?: AnthropicProviderConfig,
+    credentials?: { apiKey?: string; oauthToken?: string },
   ) {
-    // Pre-compute effective model with tier validation before calling super
-    const oauthToken = config?.oauthToken ?? getOAuthToken();
+    // Pre-compute effective model with tier validation before calling super.
+    //
+    // When per-request credentials supply an apiKey (without oauthToken),
+    // force api_key auth — skip OAuth detection entirely so the caller's
+    // key is used rather than a stale OAuth token from ~/.neurolink/.
+    const forceApiKey = !!(credentials?.apiKey && !credentials?.oauthToken);
+    const oauthToken = forceApiKey
+      ? null
+      : ((credentials?.oauthToken
+          ? { accessToken: credentials.oauthToken }
+          : null) ??
+        config?.oauthToken ??
+        getOAuthToken());
     // Resolve auth method FIRST so that tier detection uses the chosen method.
     // If ANTHROPIC_AUTH_METHOD=api_key wins over an existing OAuth token, the
     // tier must reflect api_key mode (full model access) rather than the OAuth
     // token's subscription level.
-    const authMethod = config?.authMethod ?? detectAuthMethod(oauthToken);
+    const authMethod = forceApiKey
+      ? ("api_key" as AnthropicAuthMethod)
+      : (config?.authMethod ?? detectAuthMethod(oauthToken));
     const subscriptionTier =
       config?.subscriptionTier ??
       (authMethod === "oauth" ? detectSubscriptionTier(oauthToken) : "api");
@@ -435,7 +449,8 @@ export class AnthropicProvider extends BaseProvider {
       });
     } else {
       // Traditional API key authentication
-      const apiKeyToUse = config?.apiKey ?? getAnthropicApiKey();
+      const apiKeyToUse =
+        credentials?.apiKey ?? config?.apiKey ?? getAnthropicApiKey();
 
       anthropic = createAnthropic({
         apiKey: apiKeyToUse,

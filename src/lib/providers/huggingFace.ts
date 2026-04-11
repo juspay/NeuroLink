@@ -15,6 +15,7 @@ import { BaseProvider } from "../core/baseProvider.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type { UnknownRecord } from "../types/common.js";
+import type { NeurolinkCredentials } from "../types/providers.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -38,7 +39,7 @@ const getDefaultHuggingFaceModel = (): string => {
   return getProviderModel("HUGGINGFACE_MODEL", "microsoft/DialoGPT-medium");
 };
 
-// Note: hasHuggingFaceCredentials now directly imported from consolidated utility
+// Note: hasNeurolinkCredentials["huggingFace"] now directly imported from consolidated utility
 
 /**
  * HuggingFace Provider - BaseProvider Implementation
@@ -47,16 +48,20 @@ const getDefaultHuggingFaceModel = (): string => {
 export class HuggingFaceProvider extends BaseProvider {
   private model: LanguageModel;
 
-  constructor(modelName?: string) {
+  constructor(
+    modelName?: string,
+    _sdk?: unknown,
+    credentials?: NeurolinkCredentials["huggingFace"],
+  ) {
     super(modelName, "huggingface" as AIProviderName);
 
     // Get API key and validate
-    const apiKey = getHuggingFaceApiKey();
+    const apiKey = credentials?.apiKey ?? getHuggingFaceApiKey();
 
     // Create HuggingFace provider using unified router endpoint (2025) with proxy support
     const huggingface = createOpenAI({
       apiKey: apiKey,
-      baseURL: "https://router.huggingface.co/v1",
+      baseURL: credentials?.baseURL ?? "https://router.huggingface.co/v1",
       fetch: createProxyFetch(),
     });
 

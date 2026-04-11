@@ -154,6 +154,7 @@ import type {
 import type {
   AnalyticsData,
   EvaluationData,
+  NeurolinkCredentials,
   ProviderStatus,
   TextGenerationOptions,
   TextGenerationResult,
@@ -570,6 +571,66 @@ export class NeuroLink {
   private authProvider?: MastraAuthProvider;
   private pendingAuthConfig?: NeuroLinkAuthConfig;
   private authInitPromise?: Promise<void>;
+
+  // Per-provider credential overrides (instance-level default)
+  private credentials?: NeurolinkCredentials;
+
+  /**
+   * Merge instance-level credentials with per-call credentials.
+   *
+   * Semantics: **deep merge at the provider level.** For each provider key
+   * present in both `this.credentials` and `callCredentials`, the per-call
+   * fields are merged ON TOP of the instance-level fields, so fields not
+   * mentioned in the per-call slice are preserved.
+   *
+   * Example:
+   * ```
+   * instance:  { openai: { apiKey: "key1", baseURL: "url1" } }
+   * per-call:  { openai: { apiKey: "key2" } }
+   * merged:    { openai: { apiKey: "key2", baseURL: "url1" } }   // baseURL preserved
+   * ```
+   *
+   * Providers present only in one source are carried through unchanged.
+   * Unrelated providers (not overridden in callCredentials) are carried through
+   * from instance credentials unchanged.
+   */
+  private resolveCredentials(
+    callCredentials?: NeurolinkCredentials,
+  ): NeurolinkCredentials | undefined {
+    if (!this.credentials && !callCredentials) {
+      return undefined;
+    }
+    if (!this.credentials) {
+      return callCredentials;
+    }
+    if (!callCredentials) {
+      return this.credentials;
+    }
+
+    // Per-provider deep merge: for each provider key in the per-call
+    // override, merge its fields on top of the instance-level slice so
+    // individual fields (e.g. baseURL) are preserved when only apiKey
+    // is overridden per-call.
+    const merged = { ...this.credentials } as Record<string, unknown>;
+    for (const key of Object.keys(callCredentials)) {
+      const instanceSlice = (this.credentials as Record<string, unknown>)[key];
+      const callSlice = (callCredentials as Record<string, unknown>)[key];
+      if (
+        instanceSlice &&
+        callSlice &&
+        typeof instanceSlice === "object" &&
+        typeof callSlice === "object"
+      ) {
+        merged[key] = {
+          ...(instanceSlice as object),
+          ...(callSlice as object),
+        };
+      } else {
+        merged[key] = callSlice ?? instanceSlice;
+      }
+    }
+    return merged as NeurolinkCredentials;
+  }
 
   // HITL (Human-in-the-Loop) support
   private hitlManager?: HITLManager;
@@ -1027,6 +1088,11 @@ export class NeuroLink {
     // Store auth config for lazy initialization
     if (config?.auth) {
       this.pendingAuthConfig = config.auth;
+    }
+
+    // Store per-provider credential overrides
+    if (config?.credentials) {
+      this.credentials = config.credentials;
     }
 
     // Store task config for lazy initialization
@@ -2996,6 +3062,7 @@ Current user's request: ${currentInput}`;
       }
 
       logger.debug("[NeuroLink] Graceful shutdown completed");
+      this.credentials = undefined;
     } catch (error) {
       logger.error("[NeuroLink] Shutdown failed:", error);
       throw error;
@@ -3679,6 +3746,7 @@ Current user's request: ${currentInput}`;
       skipToolPromptInjection: options.skipToolPromptInjection,
       middleware: options.middleware,
       conversationMessages: options.conversationMessages,
+      credentials: options.credentials,
     };
 
     const extraContext = options as Record<string, unknown>;
@@ -3907,6 +3975,8 @@ Current user's request: ${currentInput}`;
       options.model,
       true,
       this as unknown as Record<string, unknown>,
+      undefined,
+      this.resolveCredentials(options.credentials),
     );
 
     // Resolve effective PPT provider (may auto-select if current is not PPT-compatible)
@@ -5480,6 +5550,7 @@ Current user's request: ${currentInput}`;
       !options.disableTools,
       this as unknown as UnknownRecord,
       options.region,
+      this.resolveCredentials(options.credentials),
     );
 
     provider.setTraceContext(this._metricsTraceContext);
@@ -5763,6 +5834,7 @@ Current user's request: ${currentInput}`;
           !options.disableTools, // Pass disableTools as inverse of enableMCP
           this as unknown as UnknownRecord, // Pass SDK instance
           options.region, // Pass region parameter
+          this.resolveCredentials(options.credentials),
         );
 
         // Propagate trace context for parent-child span hierarchy
@@ -6816,6 +6888,10 @@ Current user's request: ${currentInput}`;
       const fallbackProvider = await AIProviderFactory.createProvider(
         fallbackRoute.provider,
         fallbackRoute.model,
+        true,
+        undefined,
+        undefined,
+        this.resolveCredentials(enhancedOptions.credentials),
       );
 
       // Ensure fallback provider can execute tools
@@ -7086,6 +7162,7 @@ Current user's request: ${currentInput}`;
       !options.disableTools, // Pass disableTools as inverse of enableMCP
       this as unknown as UnknownRecord, // Pass SDK instance
       options.region, // Pass region parameter
+      this.resolveCredentials(options.credentials),
     );
 
     // Propagate trace context for parent-child span hierarchy
@@ -7422,6 +7499,10 @@ Current user's request: ${currentInput}`;
     const provider = await AIProviderFactory.createProvider(
       providerName,
       options.model,
+      true,
+      undefined,
+      undefined,
+      this.resolveCredentials(options.credentials),
     );
     const fallbackStreamResult = await provider.stream({
       input: { text: options.input.text },
@@ -12172,6 +12253,7 @@ Current user's request: ${currentInput}`;
         this.mcpInitialized = false;
         this.mcpInitPromise = null;
         this.conversationMemoryNeedsInit = false;
+        this.credentials = undefined;
         logger.debug("[NeuroLink] Initialization state reset successfully");
       } catch (error) {
         const err =

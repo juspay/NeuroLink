@@ -7,6 +7,7 @@ import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type { UnknownRecord } from "../types/common.js";
+import type { NeurolinkCredentials } from "../types/providers.js";
 import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
 import type { ValidationSchema } from "../types/typeAliases.js";
 import { logger } from "../utils/logger.js";
@@ -40,7 +41,12 @@ const getDefaultMistralModel = (): string => {
 export class MistralProvider extends BaseProvider {
   private model: LanguageModel;
 
-  constructor(modelName?: string, sdk?: unknown) {
+  constructor(
+    modelName?: string,
+    sdk?: unknown,
+    _region?: string,
+    credentials?: NeurolinkCredentials["mistral"],
+  ) {
     // Type guard for NeuroLink parameter validation
     const validatedNeurolink =
       sdk && typeof sdk === "object" && "getInMemoryServers" in sdk
@@ -54,7 +60,7 @@ export class MistralProvider extends BaseProvider {
     );
 
     // Initialize Mistral model with API key validation and proxy support
-    const apiKey = getMistralApiKey();
+    const apiKey = credentials?.apiKey ?? getMistralApiKey();
     const mistral = createMistral({
       apiKey: apiKey,
       fetch: createProxyFetch(),

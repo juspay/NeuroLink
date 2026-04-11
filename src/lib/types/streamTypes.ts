@@ -18,7 +18,10 @@ import type { JsonValue, UnknownRecord } from "./common.js";
 import type { Content, ImageWithAltText } from "./content.js";
 import type { ChatMessage } from "./conversation.js";
 import type { AdditionalMemoryUser } from "./generateTypes.js";
-import type { AIModelProviderConfig } from "./providers.js";
+import type {
+  AIModelProviderConfig,
+  NeurolinkCredentials,
+} from "./providers.js";
 import type { TTSChunk, TTSOptions } from "./ttsTypes.js";
 import type { StandardRecord, ValidationSchema } from "./typeAliases.js";
 
@@ -525,6 +528,13 @@ export type StreamOptions = {
 
   /** Raw auth token — validated by configured auth provider */
   auth?: { token: string };
+
+  /**
+   * Per-provider credential overrides for this request.
+   * Overrides instance-level credentials set in `new NeuroLink({ credentials })`.
+   * Unset providers fall through to instance credentials, then environment variables.
+   */
+  credentials?: NeurolinkCredentials;
 
   /**
    * Per-call memory control.

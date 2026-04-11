@@ -24,6 +24,7 @@ import type {
   ValidationSchema,
   ZodUnknownSchema,
 } from "./typeAliases.js";
+import type { NeurolinkCredentials } from "./providers.js";
 
 /**
  * Generate function options type - Primary method for content generation
@@ -477,6 +478,13 @@ export type GenerateOptions = {
 
   /** Raw auth token — validated by configured auth provider */
   auth?: { token: string };
+
+  /**
+   * Per-provider credential overrides for this request.
+   * Overrides instance-level credentials set in `new NeuroLink({ credentials })`.
+   * Unset providers fall through to instance credentials, then environment variables.
+   */
+  credentials?: NeurolinkCredentials;
 
   /**
    * Per-call memory control.
@@ -1046,6 +1054,13 @@ export type TextGenerationOptions = {
     /** Thinking level (Gemini 3: minimal|low|medium|high). Ignored for Anthropic. */
     thinkingLevel?: "minimal" | "low" | "medium" | "high";
   };
+
+  /**
+   * Per-provider credential overrides for this request.
+   * Overrides instance-level credentials set in `new NeuroLink({ credentials })`.
+   * Unset providers fall through to instance credentials, then environment variables.
+   */
+  credentials?: NeurolinkCredentials;
 
   /**
    * Optional request identifier for observability and log correlation.

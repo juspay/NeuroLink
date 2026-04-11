@@ -75,15 +75,31 @@ export class OpenAICompatibleProvider extends BaseProvider {
   private discoveredModel?: string;
   private customOpenAI: ReturnType<typeof createOpenAI>;
 
-  constructor(modelName?: string, sdk?: unknown) {
+  constructor(
+    modelName?: string,
+    sdk?: unknown,
+    _region?: string,
+    credentials?: { apiKey?: string; baseURL?: string },
+  ) {
     super(
       modelName,
       "openai-compatible" as AIProviderName,
       sdk as NeuroLink | undefined,
     );
 
-    // Initialize OpenAI Compatible configuration
-    this.config = getOpenAICompatibleConfig();
+    // Build config: prefer credentials over env vars to avoid throwing when env vars are absent
+    if (credentials?.apiKey && credentials?.baseURL) {
+      this.config = {
+        apiKey: credentials.apiKey,
+        baseURL: credentials.baseURL,
+      };
+    } else {
+      const envConfig = getOpenAICompatibleConfig(); // throws if env vars missing
+      this.config = {
+        apiKey: credentials?.apiKey ?? envConfig.apiKey,
+        baseURL: credentials?.baseURL ?? envConfig.baseURL,
+      };
+    }
 
     // Create OpenAI SDK instance configured for custom endpoint
     // This allows us to use OpenAI-compatible API by simply changing the baseURL

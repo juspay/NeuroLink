@@ -8,7 +8,11 @@ import { getBestProvider } from "../utils/providerUtils.js";
 import { logger } from "../utils/logger.js";
 import { dynamicModelProvider } from "./dynamicModels.js";
 import { withTimeout, ErrorFactory } from "../utils/errorHandling.js";
-import type { AIProvider, SupportedModelName } from "../types/index.js";
+import type {
+  AIProvider,
+  SupportedModelName,
+  NeurolinkCredentials,
+} from "../types/index.js";
 import { AIProviderName } from "../constants/enums.js";
 import type { UnknownRecord } from "../types/common.js";
 import type { ProviderPairResult } from "../types/typeAliases.js";
@@ -243,6 +247,7 @@ export class AIProviderFactory {
     sdk: UnknownRecord | undefined,
     region: string | undefined,
     functionTag: string,
+    credentials?: NeurolinkCredentials,
   ): Promise<{
     normalizedName: string;
     finalModelName: string | undefined;
@@ -273,6 +278,7 @@ export class AIProviderFactory {
         finalModelName,
         sdk,
         region,
+        credentials,
       ),
       30_000,
       ErrorFactory.toolTimeout(`provider-creation:${normalizedName}`, 30_000),
@@ -295,6 +301,7 @@ export class AIProviderFactory {
     enableMCP: boolean = true,
     sdk?: UnknownRecord,
     region?: string,
+    credentials?: NeurolinkCredentials,
   ): Promise<AIProvider> {
     const functionTag = "AIProviderFactory.createProvider";
 
@@ -352,6 +359,7 @@ export class AIProviderFactory {
               sdk,
               region,
               functionTag,
+              credentials,
             );
 
           // Summary logging in format expected by debugging tools

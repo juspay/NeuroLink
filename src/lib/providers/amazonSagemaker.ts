@@ -41,12 +41,37 @@ export class AmazonSageMakerProvider extends BaseProvider {
     endpointName?: string,
     region?: string,
     neurolink?: NeuroLink,
+    credentials?: {
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      sessionToken?: string;
+      region?: string;
+      endpoint?: string;
+    },
   ) {
     super(modelName, "sagemaker" as AIProviderName, neurolink);
 
     try {
-      // Load and validate configuration
-      this.sagemakerConfig = getSageMakerConfig(region);
+      // Load and validate configuration, then overlay per-request credentials
+      const baseConfig = getSageMakerConfig(credentials?.region ?? region);
+      this.sagemakerConfig = {
+        ...baseConfig,
+        ...(credentials?.region !== undefined && {
+          region: credentials.region,
+        }),
+        ...(credentials?.accessKeyId !== undefined && {
+          accessKeyId: credentials.accessKeyId,
+        }),
+        ...(credentials?.secretAccessKey !== undefined && {
+          secretAccessKey: credentials.secretAccessKey,
+        }),
+        ...(credentials?.sessionToken !== undefined && {
+          sessionToken: credentials.sessionToken,
+        }),
+        ...(credentials?.endpoint !== undefined && {
+          endpoint: credentials.endpoint,
+        }),
+      };
       this.modelConfig = getSageMakerModelConfig(
         endpointName || getDefaultSageMakerEndpoint(),
       );

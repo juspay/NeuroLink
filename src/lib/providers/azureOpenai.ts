@@ -20,6 +20,7 @@ import {
   TimeoutError,
 } from "../utils/timeout.js";
 import { resolveToolChoice } from "../utils/toolChoice.js";
+import type { NeurolinkCredentials } from "../types/providers.js";
 
 export class AzureOpenAIProvider extends BaseProvider {
   private apiKey: string;
@@ -28,23 +29,33 @@ export class AzureOpenAIProvider extends BaseProvider {
   private apiVersion: string;
   private azureProvider: ReturnType<typeof createAzure>;
 
-  constructor(modelName?: string, sdk?: unknown) {
+  constructor(
+    modelName?: string,
+    sdk?: unknown,
+    _region?: string,
+    credentials?: NeurolinkCredentials["azure"],
+  ) {
     super(modelName, "azure" as AIProviderName, sdk as NeuroLink | undefined);
 
-    this.apiKey = process.env.AZURE_OPENAI_API_KEY || "";
+    this.apiKey = credentials?.apiKey || process.env.AZURE_OPENAI_API_KEY || "";
     const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "";
-    this.resourceName = endpoint
+    const envResourceName = endpoint
       .replace("https://", "")
       .replace(/\/+$/, "") // Remove trailing slashes
       .replace(".openai.azure.com", "")
       .replace(".cognitiveservices.azure.com", "");
+    this.resourceName = credentials?.resourceName || envResourceName;
     this.deployment =
+      credentials?.deploymentName ||
       modelName ||
       process.env.AZURE_OPENAI_MODEL ||
       process.env.AZURE_OPENAI_DEPLOYMENT ||
       process.env.AZURE_OPENAI_DEPLOYMENT_ID ||
       "gpt-4o";
-    this.apiVersion = process.env.AZURE_API_VERSION || APIVersions.AZURE_LATEST;
+    this.apiVersion =
+      credentials?.apiVersion ||
+      process.env.AZURE_API_VERSION ||
+      APIVersions.AZURE_LATEST;
 
     // Configuration validation - now using consolidated utility
     if (!this.apiKey) {

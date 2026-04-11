@@ -74,14 +74,23 @@ const getDefaultLiteLLMModel = (): string => {
  */
 export class LiteLLMProvider extends BaseProvider {
   private model: LanguageModel;
+  private credentials?: { apiKey?: string; baseURL?: string };
 
   // Cache for available models to avoid repeated API calls
   private static modelsCache: string[] = [];
   private static modelsCacheTime = 0;
   private static readonly MODELS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
-  constructor(modelName?: string, sdk?: unknown) {
+  constructor(
+    modelName?: string,
+    sdk?: unknown,
+    _region?: string,
+    credentials?: { apiKey?: string; baseURL?: string },
+  ) {
     super(modelName, "litellm" as AIProviderName, sdk as NeuroLink | undefined);
+
+    // Store per-request credentials for use in embed/embedMany/fetchModelsFromAPI
+    this.credentials = credentials;
 
     // Initialize LiteLLM using OpenAI SDK with explicit configuration
     const config = getLiteLLMConfig();
@@ -92,8 +101,8 @@ export class LiteLLMProvider extends BaseProvider {
     // with a custom baseURL and apiKey. This ensures all requests are routed through the LiteLLM
     // proxy, allowing access to multiple models and custom authentication.
     const customOpenAI = createOpenAI({
-      baseURL: config.baseURL,
-      apiKey: config.apiKey,
+      baseURL: credentials?.baseURL ?? config.baseURL,
+      apiKey: credentials?.apiKey ?? config.apiKey,
       fetch: createProxyFetch(),
     });
 
@@ -544,8 +553,8 @@ export class LiteLLMProvider extends BaseProvider {
       "gemini-embedding-001";
 
     const customOpenAI = createOpenAI({
-      baseURL: config.baseURL,
-      apiKey: config.apiKey,
+      baseURL: this.credentials?.baseURL ?? config.baseURL,
+      apiKey: this.credentials?.apiKey ?? config.apiKey,
       fetch: createProxyFetch(),
     });
 
@@ -568,8 +577,8 @@ export class LiteLLMProvider extends BaseProvider {
       "gemini-embedding-001";
 
     const customOpenAI = createOpenAI({
-      baseURL: config.baseURL,
-      apiKey: config.apiKey,
+      baseURL: this.credentials?.baseURL ?? config.baseURL,
+      apiKey: this.credentials?.apiKey ?? config.apiKey,
       fetch: createProxyFetch(),
     });
 
@@ -645,7 +654,9 @@ export class LiteLLMProvider extends BaseProvider {
   private async fetchModelsFromAPI(): Promise<string[]> {
     const functionTag = "LiteLLMProvider.fetchModelsFromAPI";
     const config = getLiteLLMConfig();
-    const modelsUrl = `${config.baseURL}/v1/models`;
+    const resolvedBaseURL = this.credentials?.baseURL ?? config.baseURL;
+    const resolvedApiKey = this.credentials?.apiKey ?? config.apiKey;
+    const modelsUrl = `${resolvedBaseURL}/v1/models`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -657,7 +668,7 @@ export class LiteLLMProvider extends BaseProvider {
       const response = await proxyFetch(modelsUrl, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${config.apiKey}`,
+          Authorization: `Bearer ${resolvedApiKey}`,
           "Content-Type": "application/json",
         },
         signal: controller.signal,

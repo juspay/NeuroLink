@@ -61,9 +61,20 @@ export class AmazonBedrockProvider extends BaseProvider {
   private conversationHistory: BedrockMessage[] = [];
   private region: string;
 
-  constructor(modelName?: string, neurolink?: NeuroLink, region?: string) {
+  constructor(
+    modelName?: string,
+    neurolink?: NeuroLink,
+    region?: string,
+    credentials?: {
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      sessionToken?: string;
+      region?: string;
+    },
+  ) {
     super(modelName, "bedrock" as AIProviderName, neurolink);
-    this.region = region || process.env.AWS_REGION || "us-east-1";
+    this.region =
+      credentials?.region || region || process.env.AWS_REGION || "us-east-1";
 
     logger.debug(
       "[AmazonBedrockProvider] Starting constructor with extensive logging for debugging",
@@ -88,6 +99,17 @@ export class AmazonBedrockProvider extends BaseProvider {
         // 2. Environment variables
         // 3. AWS config files
         // 4. Instance metadata
+        ...(credentials?.accessKeyId && credentials?.secretAccessKey
+          ? {
+              credentials: {
+                accessKeyId: credentials.accessKeyId,
+                secretAccessKey: credentials.secretAccessKey,
+                ...(credentials.sessionToken
+                  ? { sessionToken: credentials.sessionToken }
+                  : {}),
+              },
+            }
+          : {}),
       });
 
       logger.debug(

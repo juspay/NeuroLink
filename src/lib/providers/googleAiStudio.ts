@@ -124,12 +124,19 @@ async function createGoogleGenAIClient(apiKey: string): Promise<GenAIClient> {
  *       Solution: Simplify schema or use disableTools: true
  */
 export class GoogleAIStudioProvider extends BaseProvider {
-  constructor(modelName?: string, sdk?: unknown) {
+  private credentials?: { apiKey?: string };
+
+  constructor(
+    modelName?: string,
+    sdk?: unknown,
+    credentials?: { apiKey?: string },
+  ) {
     super(
       modelName,
       "google-ai" as AIProviderName,
       sdk as NeuroLink | undefined,
     );
+    this.credentials = credentials;
     logger.debug("GoogleAIStudioProvider initialized", {
       model: this.modelName,
       provider: this.providerName,
@@ -588,12 +595,6 @@ export class GoogleAIStudioProvider extends BaseProvider {
     this.validateStreamOptions(options);
 
     const startTime = Date.now();
-    const apiKey = this.getApiKey();
-
-    // Ensure environment variable is set for @ai-sdk/google
-    if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
-    }
 
     const model = await this.getAISDKModelWithMiddleware(options);
 
@@ -1664,7 +1665,9 @@ export class GoogleAIStudioProvider extends BaseProvider {
 
   private getApiKey(): string {
     const apiKey =
-      process.env.GOOGLE_AI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+      this.credentials?.apiKey ||
+      process.env.GOOGLE_AI_API_KEY ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     if (!apiKey) {
       throw new AuthenticationError(
