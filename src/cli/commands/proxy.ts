@@ -2420,6 +2420,8 @@ function buildSystemdUnit(
 
   const logsDir = join(homedir(), ".neurolink", "logs");
 
+  const envFileLine = envFile ? `EnvironmentFile=${envFile}\n` : "";
+
   return `[Unit]
 Description=NeuroLink Claude Proxy
 After=network.target
@@ -2431,8 +2433,7 @@ Restart=on-failure
 RestartSec=5
 Environment=HOME=${homedir()}
 Environment=PATH=${path}
-${envFile ? `EnvironmentFile=${envFile}` : ""}
-StandardOutput=append:${join(logsDir, "proxy-systemd-stdout.log")}
+${envFileLine}StandardOutput=append:${join(logsDir, "proxy-systemd-stdout.log")}
 StandardError=append:${join(logsDir, "proxy-systemd-stderr.log")}
 
 [Install]
