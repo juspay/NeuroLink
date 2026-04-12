@@ -1267,6 +1267,9 @@ async function handleCreateApiKeyOAuth(
   logger.always("3. Copy the authorization code shown on the page");
   logger.always("4. Paste the code below");
   logger.always("");
+  logger.always(chalk.dim("  Authentication URL:"));
+  logger.always(chalk.cyan(`  ${authUrl.toString()}`));
+  logger.always("");
 
   // Prompt user to enter the authorization code
   const { authCode } = await inquirer.prompt([
@@ -1483,6 +1486,9 @@ async function handleOAuthAuth(provider: SupportedProvider): Promise<void> {
   logger.always("2. Authorize the application");
   logger.always("3. Copy the authorization code shown on the page");
   logger.always("4. Paste the code below");
+  logger.always("");
+  logger.always(chalk.dim("  Authentication URL:"));
+  logger.always(chalk.cyan(`  ${authUrl.toString()}`));
   logger.always("");
 
   // Prompt user to enter the authorization code
