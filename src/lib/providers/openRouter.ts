@@ -366,6 +366,7 @@ export class OpenRouterProvider extends BaseProvider {
         ),
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
+        experimental_repairToolCall: this.getToolCallRepairFn(options),
 
         onError: (event: { error: unknown }) => {
           const error = event.error;

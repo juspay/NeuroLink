@@ -45,6 +45,7 @@ import { initializeCliParser } from "../parser.js";
 import { formatFileSize, saveAudioToFile } from "../utils/audioFileUtils.js";
 import { resolveFilePaths } from "../utils/pathResolver.js";
 import { animatedWrite } from "../utils/typewriter.js";
+import { createStreamAbortHandler } from "../utils/abortHandler.js";
 import {
   formatVideoFileSize,
   getVideoMetadataSummary,
@@ -2992,6 +2993,15 @@ export class CLICommandFactory {
     let lastImageBase64: string | undefined;
     let contentReceived = false;
     const abortController = new AbortController();
+    // BZ-667: Wire SIGINT to abort stream gracefully
+    const abortHandler = createStreamAbortHandler();
+    abortHandler.signal.addEventListener(
+      "abort",
+      () => {
+        abortController.abort();
+      },
+      { once: true },
+    );
 
     // Create timeout promise for stream consumption (default: 30 seconds, respects user-provided timeout)
     const streamTimeout =
@@ -3019,23 +3029,43 @@ export class CLICommandFactory {
       });
     });
 
+    const streamIterator = stream.stream[Symbol.asyncIterator]();
     try {
       // Process the stream with timeout handling
-      const streamIterator = stream.stream[Symbol.asyncIterator]();
       let timeoutActive = true;
+
+      // BZ-667: Create an abort promise that rejects when the user presses Ctrl+C,
+      // so we can race it against streamIterator.next() and unblock pending reads.
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (abortHandler.signal.aborted) {
+          reject(new DOMException("Stream aborted", "AbortError"));
+          return;
+        }
+        abortHandler.signal.addEventListener(
+          "abort",
+          () => {
+            reject(new DOMException("Stream aborted", "AbortError"));
+          },
+          { once: true },
+        );
+      });
 
       while (true) {
         let nextResult;
 
         if (timeoutActive && !contentReceived) {
-          // Race between next chunk and timeout for first chunk only
+          // Race between next chunk, timeout, and abort signal
           nextResult = await Promise.race([
             streamIterator.next(),
             timeoutPromise,
+            abortPromise,
           ]);
         } else {
-          // No timeout for subsequent chunks
-          nextResult = await streamIterator.next();
+          // Race between next chunk and abort signal
+          nextResult = await Promise.race([
+            streamIterator.next(),
+            abortPromise,
+          ]);
         }
 
         if (nextResult.done) {
@@ -3099,8 +3129,28 @@ export class CLICommandFactory {
       }
     } catch (error) {
       abortController.abort(); // Clean up timeout
+      // BZ-667: Close the stream iterator so the provider connection is released.
+      // Wrap in try/catch to prevent cleanup failures from masking the original error.
+      try {
+        await streamIterator.return?.();
+      } catch {
+        // Iterator cleanup failed — swallow so the original error propagates
+      }
+      abortHandler.cleanup();
+      // BZ-667: Handle graceful abort — return partial content instead of throwing
+      if (
+        abortHandler.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        if (!options.quiet) {
+          process.stdout.write("\n");
+        }
+        return { content: fullContent, imageBase64: lastImageBase64 };
+      }
       throw error;
     }
+
+    abortHandler.cleanup();
 
     if (!contentReceived) {
       throw new Error(

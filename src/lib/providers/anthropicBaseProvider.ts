@@ -165,6 +165,7 @@ export class AnthropicProviderV2 extends BaseProvider {
           ),
           experimental_telemetry:
             this.telemetryHandler.getTelemetryConfig(options),
+          experimental_repairToolCall: this.getToolCallRepairFn(options),
           onStepFinish: ({ toolCalls, toolResults }) => {
             this.handleToolExecutionStorage(
               toolCalls,

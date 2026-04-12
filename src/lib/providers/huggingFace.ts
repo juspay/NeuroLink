@@ -213,6 +213,7 @@ export class HuggingFaceProvider extends BaseProvider {
         ),
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
+        experimental_repairToolCall: this.getToolCallRepairFn(options),
         onStepFinish: ({ toolCalls, toolResults }) => {
           this.handleToolExecutionStorage(
             toolCalls,

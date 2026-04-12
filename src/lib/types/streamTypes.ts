@@ -376,6 +376,8 @@ export type StreamOptions = {
   /** AbortSignal for external cancellation of the AI call */
   abortSignal?: AbortSignal;
   disableTools?: boolean;
+  /** Disable the schema-driven tool call repair mechanism (BZ-665). Default: false (repair enabled). */
+  disableToolCallRepair?: boolean;
   maxSteps?: number; // Maximum tool execution steps. Defaults to 5 in the implementation if not specified.
 
   /**
@@ -513,6 +515,10 @@ export type StreamOptions = {
    * @internal Set by NeuroLink SDK — not typically used directly by consumers.
    */
   fileRegistry?: unknown;
+  /** BZ-1341: Override fallback provider name (takes precedence over env/model config). */
+  fallbackProvider?: string;
+  /** BZ-1341: Override fallback model name (takes precedence over env/model config). */
+  fallbackModel?: string;
 
   /** Callback invoked when streaming completes successfully. */
   onFinish?: OnFinishCallback;

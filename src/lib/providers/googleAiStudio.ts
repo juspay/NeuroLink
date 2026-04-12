@@ -659,6 +659,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
         ),
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
+        experimental_repairToolCall: this.getToolCallRepairFn(options),
         // Gemini 3: use thinkingLevel via providerOptions
         // Gemini 2.5: use thinkingBudget via providerOptions
         ...(options.thinkingConfig?.enabled && {

@@ -1403,6 +1403,7 @@ export class GoogleVertexProvider extends BaseProvider {
         timeoutController?.controller.signal,
       ),
       experimental_telemetry: this.telemetryHandler.getTelemetryConfig(options),
+      experimental_repairToolCall: this.getToolCallRepairFn(options),
       ...(options.thinkingConfig?.enabled && {
         providerOptions: {
           vertex: {

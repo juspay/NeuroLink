@@ -287,6 +287,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
         ),
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
+        experimental_repairToolCall: this.getToolCallRepairFn(options),
         onStepFinish: (event: StepFinishEvent) => {
           this.handleToolExecutionStorage(
             [...event.toolCalls],

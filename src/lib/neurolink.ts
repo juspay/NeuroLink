@@ -6889,7 +6889,15 @@ Current user's request: ${currentInput}`;
       /* non-blocking */
     }
 
-    const fallbackRoute = ModelRouter.getFallbackRoute(
+    // BZ-1341: Support fallback provider override via options or env vars
+    const optFallbackProvider =
+      enhancedOptions.fallbackProvider?.trim() || undefined;
+    const optFallbackModel = enhancedOptions.fallbackModel?.trim() || undefined;
+    const envFallbackProvider =
+      process.env.FALLBACK_PROVIDER?.trim() || undefined;
+    const envFallbackModel = process.env.FALLBACK_MODEL?.trim() || undefined;
+
+    const modelConfigRoute = ModelRouter.getFallbackRoute(
       originalPrompt || enhancedOptions.input.text || "",
       {
         provider: providerName,
@@ -6900,9 +6908,23 @@ Current user's request: ${currentInput}`;
       { fallbackStrategy: "auto" },
     );
 
+    const fallbackRoute = {
+      ...modelConfigRoute,
+      provider:
+        optFallbackProvider ?? envFallbackProvider ?? modelConfigRoute.provider,
+      model: optFallbackModel ?? envFallbackModel ?? modelConfigRoute.model,
+    };
+
     logger.warn("Retrying with fallback provider", {
       originalProvider: providerName,
       fallbackProvider: fallbackRoute.provider,
+      fallbackModel: fallbackRoute.model,
+      fallbackSource:
+        optFallbackProvider || optFallbackModel
+          ? "options"
+          : envFallbackProvider || envFallbackModel
+            ? "env"
+            : "model_config",
       reason: errorMsg,
     });
 

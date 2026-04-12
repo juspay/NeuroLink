@@ -1,5 +1,11 @@
 import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
-import type { LanguageModel, ModelMessage, Tool } from "ai";
+import type {
+  LanguageModel,
+  ModelMessage,
+  Tool,
+  ToolCallRepairFunction,
+  ToolSet,
+} from "ai";
 import { generateText } from "ai";
 import { directAgentTools } from "../agent/directTools.js";
 import type { AIProviderName } from "../constants/enums.js";
@@ -1257,6 +1263,31 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   // ===================
+  // ===================
+  // BZ-665: Schema-driven tool call repair
+  // ===================
+
+  /**
+   * Create an `experimental_repairToolCall` handler for streamText/generateText.
+   * Dynamically reads the tool's JSON schema to repair wrong names and params.
+   * Returns undefined when repair is disabled via options.
+   */
+  protected getToolCallRepairFn(
+    options?: StreamOptions | TextGenerationOptions,
+  ): ToolCallRepairFunction<ToolSet> | undefined {
+    if (
+      (options as Record<string, unknown> | undefined)?.disableToolCallRepair
+    ) {
+      return undefined;
+    }
+    // Lazy import to avoid circular dependency at module load time
+    return (async (...args: Parameters<ToolCallRepairFunction<ToolSet>>) => {
+      const { createToolCallRepair } =
+        await import("../utils/toolCallRepair.js");
+      return createToolCallRepair()(...args);
+    }) as ToolCallRepairFunction<ToolSet>;
+  }
+
   // ABSTRACT METHODS - MUST BE IMPLEMENTED BY SUBCLASSES
   // ===================
 

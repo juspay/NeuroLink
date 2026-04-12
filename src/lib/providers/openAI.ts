@@ -474,6 +474,7 @@ export class OpenAIProvider extends BaseProvider {
             options.abortSignal,
             timeoutController?.controller.signal,
           ),
+          experimental_repairToolCall: this.getToolCallRepairFn(options),
           experimental_telemetry:
             this.telemetryHandler.getTelemetryConfig(options),
           onStepFinish: ({ toolCalls, toolResults }) => {
