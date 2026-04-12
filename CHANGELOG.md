@@ -1,3 +1,9 @@
+## [9.51.4](https://github.com/juspay/neurolink/compare/v9.51.3...v9.51.4) (2026-04-12)
+
+### Bug Fixes
+
+- **(mcp):** large-response externalization, retrieve_context tool, and exec cleanup ([8e802d9](https://github.com/juspay/neurolink/commit/8e802d99782b7c365557fbaeeb67bc77a8aab9f1))
+
 ## [9.51.3](https://github.com/juspay/neurolink/compare/v9.51.2...v9.51.3) (2026-04-12)
 
 ### Bug Fixes
