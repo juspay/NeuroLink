@@ -9,190 +9,20 @@
  * @since 8.39.0
  */
 
-import type { JsonObject } from "../types/common.js";
 import type {
+  JsonObject,
   NeuroLinkExecutionContext,
+  MCPServerTool,
+  MCPToolAnnotations,
   ToolResult,
-} from "../types/mcpTypes.js";
-import type { MCPServerTool, MCPToolAnnotations } from "./toolAnnotations.js";
+  ExposableAgent,
+  ExposableWorkflow,
+  ExposureOptions,
+  ExposureResult,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
-
-/**
- * Agent definition for MCP exposure
- */
-export type ExposableAgent = {
-  /**
-   * Unique agent identifier
-   */
-  id: string;
-
-  /**
-   * Human-readable agent name
-   */
-  name: string;
-
-  /**
-   * Agent description for AI models
-   */
-  description: string;
-
-  /**
-   * Input schema for the agent
-   */
-  inputSchema?: JsonObject;
-
-  /**
-   * Output schema for the agent
-   */
-  outputSchema?: JsonObject;
-
-  /**
-   * Agent execution function
-   */
-  execute: (
-    input: unknown,
-    context?: NeuroLinkExecutionContext,
-  ) => Promise<unknown>;
-
-  /**
-   * Additional agent metadata
-   */
-  metadata?: {
-    version?: string;
-    author?: string;
-    category?: string;
-    tags?: string[];
-    estimatedDuration?: number;
-    costHint?: number;
-  };
-};
-
-/**
- * Workflow definition for MCP exposure
- */
-export type ExposableWorkflow = {
-  /**
-   * Unique workflow identifier
-   */
-  id: string;
-
-  /**
-   * Human-readable workflow name
-   */
-  name: string;
-
-  /**
-   * Workflow description
-   */
-  description: string;
-
-  /**
-   * Workflow steps (for documentation)
-   */
-  steps?: Array<{
-    id: string;
-    name: string;
-    description?: string;
-  }>;
-
-  /**
-   * Input schema for the workflow
-   */
-  inputSchema?: JsonObject;
-
-  /**
-   * Output schema for the workflow
-   */
-  outputSchema?: JsonObject;
-
-  /**
-   * Workflow execution function
-   */
-  execute: (
-    input: unknown,
-    context?: NeuroLinkExecutionContext,
-  ) => Promise<unknown>;
-
-  /**
-   * Workflow metadata
-   */
-  metadata?: {
-    version?: string;
-    author?: string;
-    category?: string;
-    tags?: string[];
-    estimatedDuration?: number;
-    retriable?: boolean;
-    idempotent?: boolean;
-  };
-};
-
-/**
- * Options for exposing agents/workflows as MCP tools
- */
-export type ExposureOptions = {
-  /**
-   * Prefix for tool names
-   */
-  prefix?: string;
-
-  /**
-   * Default annotations for all exposed tools
-   */
-  defaultAnnotations?: MCPToolAnnotations;
-
-  /**
-   * Whether to include metadata in tool description
-   */
-  includeMetadataInDescription?: boolean;
-
-  /**
-   * Custom name transformer
-   */
-  nameTransformer?: (name: string) => string;
-
-  /**
-   * Add execution context wrapper
-   */
-  wrapWithContext?: boolean;
-
-  /**
-   * Timeout for agent/workflow execution (ms)
-   */
-  executionTimeout?: number;
-
-  /**
-   * Enable execution logging
-   */
-  enableLogging?: boolean;
-};
-
-/**
- * Exposure result
- */
-export type ExposureResult = {
-  /**
-   * Generated MCP tool
-   */
-  tool: MCPServerTool;
-
-  /**
-   * Original source type
-   */
-  sourceType: "agent" | "workflow";
-
-  /**
-   * Original source ID
-   */
-  sourceId: string;
-
-  /**
-   * Generated tool name
-   */
-  toolName: string;
-};
 
 /**
  * Expose an agent as an MCP tool

@@ -8,8 +8,11 @@
  * - streamAnalytics.ts
  */
 
-import type { TokenUsage } from "../types/analytics.js";
-import type { RawUsageObject, TokenExtractionOptions } from "../types/index.js";
+import type {
+  TokenUsage,
+  RawUsageObject,
+  TokenExtractionOptions,
+} from "../types/index.js";
 
 /**
  * Extract input token count from various provider formats

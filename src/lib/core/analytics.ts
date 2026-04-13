@@ -6,9 +6,14 @@
  */
 
 import { logger } from "../utils/logger.js";
-import type { JsonValue, UnknownRecord } from "../types/common.js";
+import type {
+  JsonValue,
+  UnknownRecord,
+  TokenUsage,
+  AnalyticsData,
+} from "../types/index.js";
 import { modelConfig } from "./modelConfiguration.js";
-import type { TokenUsage, AnalyticsData } from "../types/analytics.js";
+
 import { extractTokenUsage as extractTokenUsageUtil } from "../utils/tokenUtils.js";
 import { calculateCost, hasPricing } from "../utils/pricing.js";
 

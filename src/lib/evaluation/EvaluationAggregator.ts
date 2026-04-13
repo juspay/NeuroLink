@@ -3,13 +3,13 @@
  * Provides statistical analysis, trend detection, and summary generation.
  */
 
-import type { EvaluationData } from "../types/evaluation.js";
+import type { EvaluationData } from "../types/index.js";
 import { evaluationErrors } from "./errors/EvaluationError.js";
 
 /**
  * Statistical summary of evaluation scores.
  */
-export interface ScoreStatistics {
+type ScoreStatistics = {
   /** Minimum score */
   min: number;
   /** Maximum score */
@@ -30,12 +30,12 @@ export interface ScoreStatistics {
   p90: number;
   /** 95th percentile */
   p95: number;
-}
+};
 
 /**
  * Score distribution across ranges.
  */
-export interface ScoreDistribution {
+type ScoreDistribution = {
   /** Items scoring 1-3 (poor) */
   poor: number;
   /** Items scoring 4-5 (below average) */
@@ -46,12 +46,12 @@ export interface ScoreDistribution {
   good: number;
   /** Items scoring 10 (excellent) */
   excellent: number;
-}
+};
 
 /**
  * Trend analysis results.
  */
-export interface TrendAnalysis {
+type TrendAnalysis = {
   /** Direction of the trend */
   direction: "improving" | "declining" | "stable";
   /** Slope of the linear regression */
@@ -62,12 +62,12 @@ export interface TrendAnalysis {
   percentChange: number;
   /** Moving average of last N evaluations */
   movingAverage: number;
-}
+};
 
 /**
  * Dimension-specific analysis for RAGAS metrics.
  */
-export interface DimensionAnalysis {
+type DimensionAnalysis = {
   /** Relevance score statistics */
   relevance: ScoreStatistics;
   /** Accuracy score statistics */
@@ -82,12 +82,12 @@ export interface DimensionAnalysis {
     relevanceCompleteness: number;
     accuracyCompleteness: number;
   };
-}
+};
 
 /**
  * Quality alerts summary.
  */
-export interface AlertSummary {
+type AlertSummary = {
   /** Total number of alerts */
   total: number;
   /** Number of high severity alerts */
@@ -98,12 +98,12 @@ export interface AlertSummary {
   offTopic: number;
   /** Alert rate as percentage */
   alertRate: number;
-}
+};
 
 /**
  * Comprehensive aggregation result.
  */
-export interface AggregationResult {
+type AggregationResult = {
   /** Number of evaluations aggregated */
   count: number;
   /** Statistics for overall scores */
@@ -126,7 +126,7 @@ export interface AggregationResult {
     threshold: number;
     evaluationModels: string[];
   };
-}
+};
 
 /**
  * EvaluationAggregator - Aggregates evaluation results and provides analytics.

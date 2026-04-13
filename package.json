@@ -129,7 +129,7 @@
     "validate": "tsx scripts/build-validations.ts",
     "validate:env": "tsx scripts/env-validation.ts",
     "validate:security": "tsx scripts/security-check.ts",
-    "validate:all": "pnpm run validate && pnpm run validate:env && pnpm run validate:security",
+    "validate:all": "pnpm run validate && pnpm run lint && pnpm run validate:env && pnpm run validate:security",
     "validate:commit": "tsx scripts/commit-validation.ts",
     "quality:metrics": "tsx scripts/quality-metrics.ts",
     "quality:report": "pnpm run quality:metrics && echo 'Quality metrics saved to quality-metrics.json'",
@@ -174,9 +174,9 @@
       "default": "./dist/client/index.js"
     },
     "./types": {
-      "types": "./dist/types/sdkTypes.d.ts",
-      "import": "./dist/types/sdkTypes.js",
-      "default": "./dist/types/sdkTypes.js"
+      "types": "./dist/types/sdk.d.ts",
+      "import": "./dist/types/sdk.js",
+      "default": "./dist/types/sdk.js"
     },
     "./package.json": "./package.json",
     "./cli": {

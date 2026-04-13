@@ -22,16 +22,7 @@ import type {
   FileSummarizationCheckResult,
   FileSummarizationPromptParams,
   FileSummarizationPlanEntry,
-} from "../types/contextTypes.js";
-
-export type {
-  FileForSummarization,
-  FileSummarizationCheckParams,
-  FileSummarizationCheckResult,
-  FileSummarizationPromptParams,
-  SummarizedFile,
-  FileSummarizationPlanEntry,
-} from "../types/contextTypes.js";
+} from "../types/index.js";
 
 // ---------------------------------------------------------------------------
 // Constants

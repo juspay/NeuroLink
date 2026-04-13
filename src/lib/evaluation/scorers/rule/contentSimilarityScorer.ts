@@ -8,14 +8,14 @@ import type {
   ScoreResult,
   ScorerInput,
   ScorerMetadata,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseScorer } from "../baseScorer.js";
 import { DEFAULT_RULE_SCORER_CONFIG } from "./baseRuleScorer.js";
 
 /**
  * Similarity metric types
  */
-export type SimilarityMetric =
+type SimilarityMetric =
   | "jaccard"
   | "cosine"
   | "levenshtein"
@@ -25,7 +25,7 @@ export type SimilarityMetric =
 /**
  * Configuration specific to content similarity scoring
  */
-export type ContentSimilarityConfig = RuleScorerConfig & {
+type ContentSimilarityConfig = RuleScorerConfig & {
   /** Similarity metric to use */
   metric?: SimilarityMetric;
   /** Multiple metrics to combine */
@@ -421,7 +421,7 @@ export class ContentSimilarityScorer extends BaseScorer {
       {
         metadata: {
           similarityDetails:
-            details as unknown as import("../../../types/common.js").JsonArray,
+            details as unknown as import("../../../types/index.js").JsonArray,
           combinedScore,
           compareWith: this._similarityConfig.compareWith ?? "groundTruth",
           tokenLevel: this._similarityConfig.tokenLevel ?? "word",

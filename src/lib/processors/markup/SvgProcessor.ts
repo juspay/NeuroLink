@@ -34,9 +34,10 @@ import {
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedSvg,
+} from "../../types/index.js";
 
 // =============================================================================
 // CONSTANTS
@@ -52,11 +53,7 @@ const SUPPORTED_SVG_EXTENSIONS = [".svg"] as const;
 // TYPES
 // =============================================================================
 
-export type { ProcessedSvg } from "../base/types.js";
-
 // Re-import for local use within this file
-import type { ProcessedSvg } from "../base/types.js";
-
 // =============================================================================
 // SVG PROCESSOR
 // =============================================================================
@@ -289,6 +286,6 @@ export function validateSvgSize(sizeBytes: number): boolean {
 export async function processSvg(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedSvg>> {
+): Promise<ProcessorFileProcessingResult<ProcessedSvg>> {
   return svgProcessor.processFile(fileInfo, options);
 }

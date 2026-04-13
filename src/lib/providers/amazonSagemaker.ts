@@ -13,9 +13,11 @@ import type { NeuroLink } from "../neurolink.js";
 import type {
   SageMakerConfig,
   SageMakerModelConfig,
-} from "../types/providers.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { ConnectivityResult } from "../types/typeAliases.js";
+  StreamOptions,
+  StreamResult,
+  ConnectivityResult,
+  SageMakerAsLanguageModel,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 // SageMaker-specific imports
 import {
@@ -26,7 +28,6 @@ import {
 } from "./sagemaker/config.js";
 import { handleSageMakerError, SageMakerError } from "./sagemaker/errors.js";
 import { SageMakerLanguageModel } from "./sagemaker/language-model.js";
-import type { SageMakerAsLanguageModel } from "../types/index.js";
 
 /**
  * Amazon SageMaker Provider extending BaseProvider

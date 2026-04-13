@@ -400,38 +400,3 @@ export function getMimeTypeForExtension(ext: string): string {
 // =============================================================================
 // TYPE EXPORTS
 // =============================================================================
-
-/** Type for image MIME type values */
-export type ImageMimeType =
-  (typeof IMAGE_MIME_TYPES)[keyof typeof IMAGE_MIME_TYPES];
-
-/** Type for document MIME type values */
-export type DocumentMimeType =
-  (typeof DOCUMENT_MIME_TYPES)[keyof typeof DOCUMENT_MIME_TYPES];
-
-/** Type for data format MIME type values */
-export type DataMimeType =
-  (typeof DATA_MIME_TYPES)[keyof typeof DATA_MIME_TYPES];
-
-/** Type for text MIME type values */
-export type TextMimeType =
-  (typeof TEXT_MIME_TYPES)[keyof typeof TEXT_MIME_TYPES];
-
-/** Type for source code MIME type values */
-export type SourceCodeMimeType =
-  (typeof SOURCE_CODE_MIME_TYPES)[keyof typeof SOURCE_CODE_MIME_TYPES];
-
-/** Type for archive MIME type values */
-export type ArchiveMimeType =
-  (typeof ARCHIVE_MIME_TYPES)[keyof typeof ARCHIVE_MIME_TYPES];
-
-/** Type for video MIME type values */
-export type VideoMimeType =
-  (typeof VIDEO_MIME_TYPES)[keyof typeof VIDEO_MIME_TYPES];
-
-/** Type for audio MIME type values */
-export type AudioMimeType =
-  (typeof AUDIO_MIME_TYPES)[keyof typeof AUDIO_MIME_TYPES];
-
-/** Type for all MIME type values */
-export type MimeType = (typeof MIME_TYPES)[keyof typeof MIME_TYPES];

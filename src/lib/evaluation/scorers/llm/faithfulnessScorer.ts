@@ -7,7 +7,7 @@ import type {
   LLMScorerConfig,
   ScoreResult,
   ScorerInput,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseLLMScorer } from "./baseLLMScorer.js";
 
 const FAITHFULNESS_PROMPT = `You are an expert at evaluating faithfulness in AI responses.

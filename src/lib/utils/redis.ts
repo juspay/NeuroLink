@@ -8,7 +8,7 @@ import type {
   ChatMessage,
   RedisConversationObject,
   RedisStorageConfig,
-} from "../types/conversation.js";
+} from "../types/index.js";
 import { logger } from "./logger.js";
 
 // Redis client type

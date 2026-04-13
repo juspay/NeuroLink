@@ -19,32 +19,32 @@ import {
   SpanStatus,
   getMetricsAggregator,
 } from "../../observability/index.js";
-import type { JsonValue } from "../../types/common.js";
+import type {
+  EnsembleExecutionResult,
+  JudgeScoreResult,
+  EnsembleResponse,
+  ExecutionConfig,
+  JudgeScores,
+  MultiJudgeScores,
+  RunWorkflowOptions,
+  WorkflowConfig,
+  WorkflowResult,
+} from "../../types/index.js";
 import {
   getModelGroups,
   PLACEHOLDER_MODEL,
   PLACEHOLDER_PROVIDER,
   usesModelGroups,
 } from "../config.js";
-import type {
-  EnsembleResponse,
-  ExecutionConfig,
-  JudgeScores,
-  MultiJudgeScores,
-  WorkflowConfig,
-  WorkflowResult,
-} from "../types.js";
 import { validateWorkflow } from "../utils/workflowValidation.js";
 import { executeEnsemble, executeModelGroups } from "./ensembleExecutor.js";
 import { scoreEnsemble } from "./judgeScorer.js";
 import { conditionResponse } from "./responseConditioner.js";
-import type { EnsembleExecutionResult } from "./types/ensembleTypes.js";
-import type { ScoreResult } from "./types/judgeTypes.js";
 
 /**
  * Progressive workflow response for streaming
  */
-export type WorkflowStreamChunk = {
+type WorkflowStreamChunk = {
   /**
    * Type of response chunk
    */
@@ -59,46 +59,6 @@ export type WorkflowStreamChunk = {
    * Partial workflow result (only ensemble data for preliminary)
    */
   partialResult?: Partial<WorkflowResult>;
-};
-
-/**
- * Options for workflow execution
- */
-export type RunWorkflowOptions = {
-  /**
-   * The user's prompt/query to send to models
-   */
-  prompt: string;
-
-  /**
-   * Optional conversation history for context
-   */
-  conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
-
-  /**
-   * Override default timeout (ms) for this execution
-   */
-  timeout?: number;
-
-  /**
-   * Override default parallelism for this execution
-   */
-  parallelism?: number;
-
-  /**
-   * Enable verbose logging for debugging
-   */
-  verbose?: boolean;
-
-  /**
-   * Optional context/metadata to pass through
-   */
-  metadata?: Record<string, JsonValue>;
-
-  /**
-   * Enable progressive streaming (yield preliminary response)
-   */
-  streaming?: boolean;
 };
 
 /**
@@ -404,7 +364,7 @@ async function scoreResponses(
   config: WorkflowConfig,
   responses: EnsembleResponse[],
   options: RunWorkflowOptions,
-): Promise<ScoreResult> {
+): Promise<JudgeScoreResult> {
   // Use judges array if defined, otherwise use single judge
   const judges =
     config.judges && config.judges.length > 0

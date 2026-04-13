@@ -15,7 +15,6 @@ export {
   createRegexScorer,
   createScorerMetadata,
   createSimpleLengthScorer,
-  type ScorerFunction,
 } from "./customScorerUtils.js";
 
 // LLM Scorers

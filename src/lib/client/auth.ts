@@ -8,11 +8,11 @@
  */
 
 import type {
-  Middleware,
-  AuthConfig,
+  ClientMiddleware,
+  ClientAuthConfig,
   ClientOAuth2Config,
   ClientTokenRefreshResult,
-} from "../types/clientTypes.js";
+} from "../types/index.js";
 
 // =============================================================================
 // OAuth2 Token Manager
@@ -273,7 +273,7 @@ export class JWTTokenManager {
 }
 
 // =============================================================================
-// Authentication Middleware
+// Authentication ClientMiddleware
 // =============================================================================
 
 /**
@@ -288,7 +288,7 @@ export class JWTTokenManager {
 export function createApiKeyMiddleware(
   apiKey: string,
   headerName: string = "X-API-Key",
-): Middleware {
+): ClientMiddleware {
   return async (request, next) => {
     request.headers[headerName] = apiKey;
     return next();
@@ -304,7 +304,7 @@ export function createApiKeyMiddleware(
  * client.use(createBearerTokenMiddleware('your-jwt-token'));
  * ```
  */
-export function createBearerTokenMiddleware(token: string): Middleware {
+export function createBearerTokenMiddleware(token: string): ClientMiddleware {
   return async (request, next) => {
     request.headers["Authorization"] = `Bearer ${token}`;
     return next();
@@ -328,7 +328,7 @@ export function createBearerTokenMiddleware(token: string): Middleware {
  */
 export function createTokenManagerMiddleware(
   tokenManager: OAuth2TokenManager | JWTTokenManager,
-): Middleware {
+): ClientMiddleware {
   return async (request, next) => {
     const token = await tokenManager.getToken();
     request.headers["Authorization"] = `Bearer ${token}`;
@@ -352,7 +352,7 @@ export function createTokenManagerMiddleware(
 export function createAuthWithRetryMiddleware(
   tokenManager: OAuth2TokenManager,
   maxRetries: number = 1,
-): Middleware {
+): ClientMiddleware {
   return async (request, next) => {
     let retries = 0;
 
@@ -389,7 +389,9 @@ export function createAuthWithRetryMiddleware(
  * }));
  * ```
  */
-export function createMultiAuthMiddleware(config: AuthConfig): Middleware {
+export function createMultiAuthMiddleware(
+  config: ClientAuthConfig,
+): ClientMiddleware {
   return async (request, next) => {
     // Add API key if provided
     if (config.apiKey) {

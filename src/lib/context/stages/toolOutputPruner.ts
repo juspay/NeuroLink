@@ -5,11 +5,13 @@
  * replace older tool results with "[Tool result cleared]".
  */
 
-import type { ChatMessage } from "../../types/conversation.js";
-import type { PruneConfig, PruneResult } from "../../types/contextTypes.js";
-import { estimateTokens } from "../../utils/tokenEstimation.js";
+import type {
+  ChatMessage,
+  PruneConfig,
+  PruneResult,
+} from "../../types/index.js";
 
-export type { PruneConfig, PruneResult } from "../../types/contextTypes.js";
+import { estimateTokens } from "../../utils/tokenEstimation.js";
 
 const CLEARED_PLACEHOLDER = "[Tool result cleared]";
 const DEFAULT_PROTECT_TOKENS = 40_000;

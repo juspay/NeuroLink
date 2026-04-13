@@ -27,7 +27,7 @@ import type {
   Chunk,
   ChunkingStrategy,
   RAGCommandArgs,
-} from "../../lib/rag/types.js";
+} from "../../lib/types/index.js";
 import { globalSession } from "../../lib/session/globalSessionState.js";
 import { logger } from "../../lib/utils/logger.js";
 import { getBestProvider } from "../../lib/utils/providerUtils.js";

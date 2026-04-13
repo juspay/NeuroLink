@@ -5,9 +5,11 @@
  * Factory patterns need to work with both generate() and stream() methods
  */
 
-import type { GenerateOptions } from "../types/generateTypes.js";
-import type { StreamOptions } from "../types/streamTypes.js";
-import type { UnknownRecord } from "../types/common.js";
+import type {
+  GenerateOptions,
+  StreamOptions,
+  UnknownRecord,
+} from "../types/index.js";
 
 /**
  * Convert GenerateOptions to StreamOptions

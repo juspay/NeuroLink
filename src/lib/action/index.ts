@@ -31,19 +31,3 @@ export {
 } from "./githubIntegration.js";
 
 // Re-export types for convenience
-export type {
-  ActionInputs,
-  ActionExecutionResult,
-  ActionCommentResult,
-  ActionOutput,
-  ActionProviderKeys,
-  ActionAWSConfig,
-  ActionGoogleCloudConfig,
-  ActionThinkingConfig,
-  ActionMultimodalInputs,
-  ActionTokenUsage,
-  ActionEvaluation,
-  ActionInputValidation,
-  CliResponse,
-  CliTokenUsage,
-} from "../types/actionTypes.js";

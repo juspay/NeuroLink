@@ -42,10 +42,11 @@ import { createRequire } from "node:module";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
-  OperationResult,
+  ProcessorFileProcessingResult,
+  ProcessorOperationResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedXml,
+} from "../../types/index.js";
 import { SIZE_LIMITS_MB } from "../config/index.js";
 import { createFileError, FileErrorCode } from "../errors/index.js";
 
@@ -55,11 +56,7 @@ const require = createRequire(import.meta.url);
 // TYPES
 // =============================================================================
 
-export type { ProcessedXml } from "../base/types.js";
-
 // Re-import for local use within this file
-import type { ProcessedXml } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -180,7 +177,7 @@ export class XmlProcessor extends BaseFileProcessor<ProcessedXml> {
   protected override async validateDownloadedFileWithResult(
     buffer: Buffer,
     fileInfo: FileInfo,
-  ): Promise<OperationResult<void>> {
+  ): Promise<ProcessorOperationResult<void>> {
     try {
       const content = buffer.toString("utf-8");
 
@@ -334,6 +331,6 @@ export function validateXmlSize(sizeBytes: number): boolean {
 export function processXml(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedXml>> {
+): Promise<ProcessorFileProcessingResult<ProcessedXml>> {
   return xmlProcessor.processFile(fileInfo, options);
 }

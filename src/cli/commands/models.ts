@@ -6,8 +6,14 @@
 
 import type { CommandModule, Argv } from "yargs";
 import type { AIProviderName } from "../../lib/constants/enums.js";
-import type { ModelsCommandArgs } from "../../lib/types/index.js";
-import type { ModelPricing } from "../../lib/types/index.js";
+import type {
+  ModelsCommandArgs,
+  ModelPricing,
+  RecommendationContext,
+  ModelSearchFilters,
+  ModelCapabilities,
+  UseCaseSuitability,
+} from "../../lib/types/index.js";
 import {
   ModelResolver,
   formatSearchResults,
@@ -20,12 +26,6 @@ import {
   getAvailableProviders,
   formatModelForDisplay,
 } from "../../lib/models/modelRegistry.js";
-import type {
-  RecommendationContext,
-  ModelSearchFilters,
-  ModelCapabilities,
-  UseCaseSuitability,
-} from "../../lib/types/index.js";
 import chalk from "chalk";
 import ora from "ora";
 

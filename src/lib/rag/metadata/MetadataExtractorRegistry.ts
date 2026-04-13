@@ -13,7 +13,7 @@ import type {
   MetadataExtractorConfig,
   MetadataExtractorMetadata,
   MetadataExtractorType,
-} from "./MetadataExtractorFactory.js";
+} from "../../types/index.js";
 
 /**
  * Default metadata extractor metadata entries

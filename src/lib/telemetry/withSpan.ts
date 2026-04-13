@@ -1,16 +1,5 @@
-import {
-  type Span,
-  type Tracer,
-  SpanKind,
-  SpanStatusCode,
-} from "@opentelemetry/api";
-
-export type SpanOptions = {
-  name: string;
-  tracer: Tracer;
-  kind?: SpanKind;
-  attributes?: Record<string, string | number | boolean | undefined>;
-};
+import { type Span, SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import type { SpanOptions } from "../types/index.js";
 
 export async function withSpan<T>(
   options: SpanOptions,

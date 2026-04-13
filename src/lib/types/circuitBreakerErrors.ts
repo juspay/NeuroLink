@@ -4,7 +4,7 @@
  * Lives in types/ to avoid circular dependencies between utils/ and mcp/.
  */
 
-import type { CircuitBreakerState } from "./mcpTypes.js";
+import type { CircuitBreakerState } from "./mcp.js";
 
 /**
  * Typed error thrown when a circuit breaker is open or half-open call limit is reached.

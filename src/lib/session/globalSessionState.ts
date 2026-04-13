@@ -1,9 +1,12 @@
 import { nanoid } from "nanoid";
 import { NeuroLink } from "../neurolink.js";
-import type { ConversationMemoryConfig } from "../types/conversation.js";
-import type { NeurolinkConstructorConfig } from "../types/configTypes.js";
+import type {
+  ConversationMemoryConfig,
+  NeurolinkConstructorConfig,
+  McpOutputStrategy,
+} from "../types/index.js";
+
 import { buildObservabilityConfigFromEnv } from "../utils/observabilityHelpers.js";
-import type { McpOutputStrategy } from "../types/mcpOutputTypes.js";
 
 /**
  * Build mcp.outputLimits config from environment variables.

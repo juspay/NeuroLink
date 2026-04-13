@@ -4,33 +4,29 @@ import chalk from "chalk";
 import ora from "ora";
 import type { Argv, CommandModule } from "yargs";
 import { ModelResolver } from "../../lib/models/modelResolver.js";
-import type { ChunkingStrategy } from "../../lib/rag/types.js";
-import { globalSession } from "../../lib/session/globalSessionState.js";
 import type {
+  ChunkingStrategy,
+  JsonValue,
+  AnalyticsData,
+  TokenUsage,
   BaseCommandArgs,
   BatchCommandArgs,
   GenerateCommandArgs,
-  GenerateResult,
+  CliGenerateResult,
   StreamCommandArgs,
+  ConversationMemoryConfig,
+  ConversationSummary,
+  AnthropicAuthConfig,
+  AnthropicAuthMethod,
+  ClaudeSubscriptionTier,
 } from "../../lib/types/index.js";
-import type { JsonValue } from "../../lib/types/index.js";
+import { globalSession } from "../../lib/session/globalSessionState.js";
 // Use TokenUsage from standard types - no local interface needed
 import {
   type BaseContext,
   type ContextConfig,
   ContextFactory,
 } from "../../lib/types/index.js";
-import type {
-  ConversationMemoryConfig,
-  ConversationSummary,
-} from "../../lib/types/index.js";
-import type { AnalyticsData, TokenUsage } from "../../lib/types/index.js";
-import type {
-  AnthropicAuthConfig,
-  AnthropicAuthMethod,
-  ClaudeSubscriptionTier,
-} from "../../lib/types/index.js";
-
 import { checkRedisAvailability } from "../../lib/utils/conversationMemory.js";
 import { normalizeEvaluationData } from "../../lib/utils/evaluationUtils.js";
 import { logger } from "../../lib/utils/logger.js";
@@ -843,7 +839,7 @@ export class CLICommandFactory {
 
   // Helper method to handle output
   private static handleOutput(
-    result: GenerateResult | unknown,
+    result: CliGenerateResult | unknown,
     options: BaseCommandArgs & Record<string, unknown>,
   ) {
     let output: string;
@@ -857,7 +853,7 @@ export class CLICommandFactory {
       if (typeof result === "string") {
         output = result;
       } else if (result && typeof result === "object" && "content" in result) {
-        const generateResult = result as GenerateResult;
+        const generateResult = result as CliGenerateResult;
         output = generateResult.content;
 
         // 🔧 Handle image generation output
@@ -933,7 +929,7 @@ export class CLICommandFactory {
    * Saves audio to file when --tts-output flag is provided
    */
   private static async handleTTSOutput(
-    result: GenerateResult | unknown,
+    result: CliGenerateResult | unknown,
     options: BaseCommandArgs & Record<string, unknown>,
   ): Promise<void> {
     // Check if --tts-output flag is provided
@@ -946,7 +942,7 @@ export class CLICommandFactory {
     if (!result || typeof result !== "object") {
       return;
     }
-    const generateResult = result as GenerateResult;
+    const generateResult = result as CliGenerateResult;
     const audio = generateResult.audio;
 
     if (!audio) {
@@ -1117,7 +1113,7 @@ export class CLICommandFactory {
    * Saves generated video to file when --videoOutput flag is provided
    */
   private static async handleVideoOutput(
-    result: GenerateResult | unknown,
+    result: CliGenerateResult | unknown,
     options: BaseCommandArgs & Record<string, unknown>,
   ): Promise<void> {
     // Check if --videoOutput flag is provided
@@ -1130,7 +1126,7 @@ export class CLICommandFactory {
     if (!result || typeof result !== "object") {
       return;
     }
-    const generateResult = result as GenerateResult;
+    const generateResult = result as CliGenerateResult;
     const video = generateResult.video;
 
     if (!video) {
@@ -1175,14 +1171,14 @@ export class CLICommandFactory {
    * Displays PPT generation result info
    */
   private static async handlePPTOutput(
-    result: GenerateResult | unknown,
+    result: CliGenerateResult | unknown,
     options: BaseCommandArgs & Record<string, unknown>,
   ): Promise<void> {
     // Extract PPT from result with proper type checking
     if (!result || typeof result !== "object") {
       return;
     }
-    const generateResult = result as GenerateResult;
+    const generateResult = result as CliGenerateResult;
     const ppt = generateResult.ppt;
 
     if (!ppt) {
@@ -1296,7 +1292,7 @@ export class CLICommandFactory {
   }
 
   // Helper method to format analytics for text mode display
-  private static formatAnalyticsForTextMode(result: GenerateResult): string {
+  private static formatAnalyticsForTextMode(result: CliGenerateResult): string {
     if (!result.analytics) {
       return "";
     }
@@ -2426,13 +2422,13 @@ export class CLICommandFactory {
    * Handle successful generation result
    */
   private static async handleGenerateSuccess(
-    result: GenerateResult | unknown,
+    result: CliGenerateResult | unknown,
     options: BaseCommandArgs & Record<string, unknown>,
     isVideoMode: boolean,
     isPPTMode: boolean,
     spinner: ReturnType<typeof ora> | null,
   ): Promise<void> {
-    const genResult = result as GenerateResult;
+    const genResult = result as CliGenerateResult;
     if (spinner) {
       if (isVideoMode) {
         spinner.succeed(chalk.green("✅ Video generated successfully!"));
@@ -2781,7 +2777,7 @@ export class CLICommandFactory {
         context: contextMetadata as JsonValue,
       };
 
-      const mockGenerateResult: GenerateResult = {
+      const mockGenerateResult: CliGenerateResult = {
         success: true,
         content: fullContent,
         analytics: mockAnalytics,
@@ -3192,7 +3188,7 @@ export class CLICommandFactory {
         toolsUsed: stream.toolCalls?.map((tc) => tc.toolName) || [],
       };
       const analyticsDisplay = CLICommandFactory.formatAnalyticsForTextMode(
-        streamAnalytics as unknown as GenerateResult,
+        streamAnalytics as unknown as CliGenerateResult,
       );
       logger.always(analyticsDisplay);
     }

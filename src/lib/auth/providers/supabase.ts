@@ -10,7 +10,7 @@ import type {
   AuthRequestContext,
   AuthHealthCheck,
   AuthProviderType,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { createProxyFetch } from "../../proxy/proxyFetch.js";
 import * as jose from "jose";

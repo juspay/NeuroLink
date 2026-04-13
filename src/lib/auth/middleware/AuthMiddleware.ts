@@ -22,7 +22,7 @@ import type {
   AuthUser,
   RBACMiddlewareConfig,
   TokenExtractionConfig,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 
 // =============================================================================
 // ERROR FACTORY
@@ -76,7 +76,7 @@ function createAuthErrorInfo(
  * Avoids `any` for Express/Koa/Hono request objects while remaining
  * compatible with any framework that exposes these standard fields.
  */
-export type IncomingRequest = {
+type IncomingRequest = {
   method?: string;
   url?: string;
   path?: string;
@@ -94,7 +94,7 @@ export type IncomingRequest = {
 /**
  * Minimal response object for Express-style middleware.
  */
-export type OutgoingResponse = {
+type OutgoingResponse = {
   status(code: number): OutgoingResponse;
   json(body: unknown): void;
 };
@@ -102,14 +102,14 @@ export type OutgoingResponse = {
 /**
  * Middleware handler function type
  */
-export type MiddlewareHandler<TContext = AuthRequestContext> = (
+type MiddlewareHandler<TContext = AuthRequestContext> = (
   context: TContext,
 ) => Promise<MiddlewareResult>;
 
 /**
  * Middleware result
  */
-export type MiddlewareResult = {
+type MiddlewareResult = {
   /** Whether to proceed to next handler */
   proceed: boolean;
   /** Updated context (if authenticated) */
@@ -125,12 +125,12 @@ export type MiddlewareResult = {
 /**
  * Next function for middleware chaining
  */
-export type NextFunction = () => Promise<void>;
+type NextFunction = () => Promise<void>;
 
 /**
  * Express-style middleware function
  */
-export type ExpressMiddleware = (
+type ExpressMiddleware = (
   req: IncomingRequest,
   res: OutgoingResponse,
   next: NextFunction,

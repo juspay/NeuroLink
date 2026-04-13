@@ -1114,9 +1114,7 @@ async function startProxyCommandHandler(argv: ProxyStartArgs): Promise<void> {
 
   try {
     // In dev mode: redirect writable state to .neurolink-dev/ and skip singleton check
-    let devPaths:
-      | import("../../lib/proxy/proxyPaths.js").ProxyPaths
-      | undefined;
+    let devPaths: import("../../lib/types/index.js").ProxyPaths | undefined;
     if (isDev) {
       const { resolveProxyPaths } =
         await import("../../lib/proxy/proxyPaths.js");

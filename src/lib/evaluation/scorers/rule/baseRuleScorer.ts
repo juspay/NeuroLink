@@ -11,7 +11,7 @@ import type {
   ScorerInput,
   ScorerMetadata,
   ScorerRule,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { logger } from "../../../utils/logger.js";
 import { BaseScorer, DEFAULT_SCORE_SCALE } from "../baseScorer.js";
 

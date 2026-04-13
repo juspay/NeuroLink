@@ -3,26 +3,18 @@
  * Helper functions for creating custom scorers
  */
 
-import type { JsonObject } from "../../types/common.js";
 import type {
+  JsonObject,
+  ScorerFunction,
   ScoreResult,
   ScorerCategory,
   ScorerConfig,
   ScorerInput,
   ScorerMetadata,
   ScorerType,
-} from "../../types/scorerTypes.js";
+} from "../../types/index.js";
 import { BaseScorer, DEFAULT_SCORE_SCALE } from "./baseScorer.js";
 import { evaluationErrors } from "../errors/EvaluationError.js";
-
-/**
- * Function scorer - a simple function-based scorer
- */
-export type ScorerFunction = (input: ScorerInput) => Promise<{
-  score: number;
-  reasoning: string;
-  metadata?: JsonObject;
-}>;
 
 /**
  * Create scorer metadata with defaults

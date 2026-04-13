@@ -36,8 +36,9 @@ import {
 import { AsyncLocalStorage } from "async_hooks";
 import type {
   LangfuseConfig,
+  LangfuseContext,
   LangfuseSpanAttributes,
-} from "../../../../types/observability.js";
+} from "../../../../types/index.js";
 import { logger } from "../../../../utils/logger.js";
 
 const LOG_PREFIX = "[OpenTelemetry]";
@@ -127,74 +128,6 @@ function initializeOtlpMetricsAndLogs(
     );
   }
 }
-
-/**
- * Extended context for Langfuse spans
- * Supports all Langfuse trace attributes for rich observability
- */
-export type LangfuseContext = {
-  userId?: string | null;
-  sessionId?: string | null;
-  /** Conversation/thread identifier for grouping related traces */
-  conversationId?: string | null;
-  /** Request identifier for correlating with application logs */
-  requestId?: string | null;
-  /** Custom trace name for better organization in Langfuse UI */
-  traceName?: string | null;
-  /** Custom metadata to attach to spans */
-  metadata?: Record<string, unknown> | null;
-
-  // Operation Name Support
-
-  /**
-   * Explicit operation name (e.g., "ai.streamText", "chat", "embeddings")
-   *
-   * If set, this overrides auto-detection from the span name.
-   * Use this when you want a custom operation name that doesn't match
-   * the auto-detected Vercel AI SDK operation.
-   *
-   * @example
-   * await setLangfuseContext({
-   *   userId: "user@email.com",
-   *   operationName: "customer-support-chat"
-   * }, async () => {
-   *   // Trace name: "user@email.com:customer-support-chat"
-   * });
-   */
-  operationName?: string | null;
-
-  /**
-   * Override global autoDetectOperationName setting for this context.
-   *
-   * When undefined, uses the global setting from LangfuseConfig.
-   * Set to false to disable auto-detection for this specific context.
-   *
-   * @default undefined (uses global setting, which defaults to true)
-   */
-  autoDetectOperationName?: boolean;
-
-  /**
-   * Custom attributes to set on all spans within this context.
-   *
-   * These attributes are propagated to every span created within the
-   * AsyncLocalStorage context, enabling application-level context
-   * (e.g., Slack channel name, feature flag, tenant ID) to appear
-   * on all SDK-internal spans.
-   *
-   * @example
-   * await setLangfuseContext({
-   *   userId: "user@email.com",
-   *   customAttributes: {
-   *     "app.slack.channel": "engineering",
-   *     "app.tenant.id": "tenant-123",
-   *     "app.feature.flag": true,
-   *   }
-   * }, async () => {
-   *   // All spans created here will have these attributes
-   * });
-   */
-  customAttributes?: Record<string, string | number | boolean>;
-};
 
 const contextStorage = new AsyncLocalStorage<LangfuseContext>();
 

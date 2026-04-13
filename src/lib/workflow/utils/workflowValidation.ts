@@ -13,14 +13,13 @@ import {
 } from "../config.js";
 import type {
   JudgeConfig,
-  ModelConfig,
+  WorkflowModelConfig,
   WorkflowConfig,
   WorkflowValidationError,
   WorkflowValidationResult,
   WorkflowValidationWarning,
-} from "../types.js";
-import type { ValidationIssues } from "./types/index.js";
-
+  ValidationIssues,
+} from "../../types/index.js";
 const functionTag = "WorkflowValidation";
 
 // ============================================================================
@@ -90,7 +89,7 @@ export function validateWorkflow(
  * @param models - Array of model configurations to validate
  * @returns Validation issues including errors and warnings
  */
-function validateModels(models: ModelConfig[]): ValidationIssues {
+function validateModels(models: WorkflowModelConfig[]): ValidationIssues {
   const errors: WorkflowValidationError[] = [];
   const warnings: WorkflowValidationWarning[] = [];
 

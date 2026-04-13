@@ -11,7 +11,7 @@ import { createSageMakerProvider } from "./index.js";
 /**
  * Simple diagnostic result interface
  */
-export type DiagnosticResult = {
+type DiagnosticResult = {
   name: string;
   category: "configuration" | "connectivity" | "streaming";
   status: "pass" | "fail" | "warning";
@@ -23,7 +23,7 @@ export type DiagnosticResult = {
 /**
  * Diagnostic report interface
  */
-export type DiagnosticReport = {
+type DiagnosticReport = {
   overallStatus: "healthy" | "issues" | "critical";
   results: DiagnosticResult[];
   summary: {

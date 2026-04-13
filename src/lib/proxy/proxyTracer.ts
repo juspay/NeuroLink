@@ -947,9 +947,3 @@ export function recordFallbackAttempt(attrs: {
 }
 
 export { ProxyTracer };
-export type {
-  ProxyRequestContext,
-  AccountSelectionContext,
-  UpstreamAttemptContext,
-  UsageContext,
-};

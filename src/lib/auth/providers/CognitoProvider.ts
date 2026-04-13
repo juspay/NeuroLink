@@ -6,15 +6,15 @@
 
 import { importJWK, jwtVerify } from "jose";
 import { logger } from "../../utils/logger.js";
-import type { JsonValue } from "../../types/common.js";
 import type {
+  JsonValue,
   AuthProviderConfig,
   AuthUser,
   CognitoConfig,
   JWKS,
   TokenClaims,
   TokenValidationResult,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 import { AuthError } from "../errors.js";
 import { BaseAuthProvider } from "./BaseAuthProvider.js";
 

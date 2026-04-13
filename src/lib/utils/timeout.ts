@@ -5,7 +5,7 @@
  * Supports multiple time formats: milliseconds, seconds, minutes, hours.
  */
 
-import type { TimeoutConfig, TimeoutResult } from "../types/utilities.js";
+import type { TimeoutConfig, TimeoutResult } from "../types/index.js";
 
 /**
  * Custom error class for timeout operations

@@ -19,7 +19,7 @@ import type {
   CachedImage,
   ImageCacheConfig,
   ImageCacheStats,
-} from "../types/utilities.js";
+} from "../types/index.js";
 
 /**
  * LRU Cache for downloaded images

@@ -14,107 +14,24 @@
 import { EventEmitter } from "events";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { ExternalMCPToolInfo } from "../types/externalMcp.js";
-import type { MCPServerInfo, ToolDiscoveryResult } from "../types/mcpTypes.js";
-import type { JsonObject } from "../types/common.js";
+import type {
+  ExternalMCPToolInfo,
+  MCPServerInfo,
+  ToolDiscoveryResult,
+  JsonObject,
+  UnifiedTool,
+  CompatibilityCheckResult,
+  EnhancedToolInfo,
+  ToolSearchCriteria,
+  ToolSearchResult,
+  MCPToolAnnotations,
+} from "../types/index.js";
+
 import { logger } from "../utils/logger.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
-import {
-  inferAnnotations,
-  type MCPToolAnnotations,
-} from "./toolAnnotations.js";
-import { MultiServerManager, type UnifiedTool } from "./multiServerManager.js";
-
-/**
- * Enhanced tool info with annotations
- */
-export type EnhancedToolInfo = ExternalMCPToolInfo & {
-  annotations?: MCPToolAnnotations;
-  version?: string;
-  compatibleWith?: string[];
-  aliases?: string[];
-  examples?: Array<{
-    name: string;
-    description: string;
-    params: JsonObject;
-  }>;
-};
-
-/**
- * Tool search criteria
- */
-export type ToolSearchCriteria = {
-  /**
-   * Search by name (partial match)
-   */
-  name?: string;
-
-  /**
-   * Search by description (keyword match)
-   */
-  description?: string;
-
-  /**
-   * Filter by server IDs
-   */
-  serverIds?: string[];
-
-  /**
-   * Filter by category
-   */
-  category?: string;
-
-  /**
-   * Filter by tags
-   */
-  tags?: string[];
-
-  /**
-   * Filter by annotation flags
-   */
-  annotations?: Partial<MCPToolAnnotations>;
-
-  /**
-   * Include unavailable tools
-   */
-  includeUnavailable?: boolean;
-
-  /**
-   * Maximum results
-   */
-  limit?: number;
-
-  /**
-   * Sort by field
-   */
-  sortBy?: "name" | "calls" | "successRate" | "avgExecutionTime";
-
-  /**
-   * Sort direction
-   */
-  sortDirection?: "asc" | "desc";
-};
-
-/**
- * Tool search result
- */
-export type ToolSearchResult = {
-  tools: EnhancedToolInfo[];
-  totalCount: number;
-  criteria: ToolSearchCriteria;
-  executionTime: number;
-};
-
-/**
- * Tool compatibility check result
- */
-export type CompatibilityCheckResult = {
-  compatible: boolean;
-  issues: string[];
-  warnings: string[];
-  recommendations: string[];
-};
+import { inferAnnotations } from "./toolAnnotations.js";
+import { MultiServerManager } from "./multiServerManager.js";
 
 /**
  * Enhanced Tool Discovery Service

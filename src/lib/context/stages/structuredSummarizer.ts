@@ -9,19 +9,12 @@ import { randomUUID } from "crypto";
 import type {
   SummarizeConfig,
   SummarizeResult,
-} from "../../types/contextTypes.js";
-import type {
   ChatMessage,
   ConversationMemoryConfig,
-} from "../../types/conversation.js";
+} from "../../types/index.js";
 import { generateSummary } from "../../utils/conversationMemory.js";
 import { estimateTokens } from "../../utils/tokenEstimation.js";
 import { logger } from "../../utils/logger.js";
-
-export type {
-  SummarizeConfig,
-  SummarizeResult,
-} from "../../types/contextTypes.js";
 
 /**
  * Find the split index using token counting — walk backward from the end,

@@ -33,9 +33,10 @@
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedMarkdown,
+} from "../../types/index.js";
 import {
   MARKDOWN_EXTENSIONS,
   SIZE_LIMITS,
@@ -68,11 +69,7 @@ const MARKDOWN_TIMEOUT_MS = 30000;
 // TYPES
 // =============================================================================
 
-export type { ProcessedMarkdown } from "../base/types.js";
-
 // Re-import for local use within this file
-import type { ProcessedMarkdown } from "../base/types.js";
-
 // =============================================================================
 // MARKDOWN PROCESSOR
 // =============================================================================
@@ -288,6 +285,6 @@ export function validateMarkdownSize(sizeBytes: number): boolean {
 export async function processMarkdown(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedMarkdown>> {
+): Promise<ProcessorFileProcessingResult<ProcessedMarkdown>> {
   return markdownProcessor.processFile(fileInfo, options);
 }

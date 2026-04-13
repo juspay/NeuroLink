@@ -27,14 +27,9 @@ import type {
   ArtifactMeta,
   ArtifactRef,
   ArtifactStore,
-} from "../types/artifactTypes.js";
+} from "../types/index.js";
 
 // Re-export so callers can import everything from one place
-export type {
-  ArtifactMeta,
-  ArtifactRef,
-  ArtifactStore,
-} from "../types/artifactTypes.js";
 
 // ---------------------------------------------------------------------------
 // LocalTempArtifactStore

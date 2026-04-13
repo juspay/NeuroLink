@@ -3,13 +3,13 @@
  * Provides configurable rate limiting for server adapters
  */
 
-import type { MiddlewareDefinition, ServerContext } from "../types.js";
+import type { MiddlewareDefinition, ServerContext } from "../../types/index.js";
 import { RateLimitError as ServerRateLimitError } from "../errors.js";
 
 /**
  * Rate limit middleware configuration
  */
-export type RateLimitMiddlewareConfig = {
+type RateLimitMiddlewareConfig = {
   /** Maximum requests per window */
   maxRequests: number;
 
@@ -43,7 +43,7 @@ export type RateLimitMiddlewareConfig = {
 /**
  * Rate limit entry
  */
-export type RateLimitEntry = {
+type RateLimitEntry = {
   count: number;
   resetAt: number;
 };
@@ -52,7 +52,7 @@ export type RateLimitEntry = {
  * Rate limit store interface
  * Implement this for custom storage (Redis, etc.)
  */
-export type RateLimitStore = {
+type RateLimitStore = {
   /**
    * Get the current entry for a key
    */
@@ -333,7 +333,7 @@ export { InMemoryRateLimitStore as MemoryRateLimitStore };
 /**
  * Fixed window rate limit configuration (for standalone signature)
  */
-export type FixedWindowRateLimitConfig = {
+type FixedWindowRateLimitConfig = {
   /** Maximum requests per window */
   maxRequests: number;
   /** Time window in milliseconds */

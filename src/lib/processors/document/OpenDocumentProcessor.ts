@@ -12,17 +12,15 @@ import { createRequire } from "node:module";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedOpenDocument,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 
 const require = createRequire(import.meta.url);
 
-export type { ProcessedOpenDocument } from "../base/types.js";
-
 // Re-import for local use within this file
-import type { ProcessedOpenDocument } from "../base/types.js";
 
 /**
  * OpenDocument Processor - handles .odt, .ods, .odp files
@@ -259,7 +257,7 @@ export function validateOpenDocumentSize(sizeBytes: number): boolean {
 export async function processOpenDocument(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedOpenDocument>> {
+): Promise<ProcessorFileProcessingResult<ProcessedOpenDocument>> {
   return openDocumentProcessor.processFile(fileInfo, options);
 }
 

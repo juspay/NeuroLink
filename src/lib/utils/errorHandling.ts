@@ -3,9 +3,9 @@
  * Provides structured error management for tool execution and system operations
  */
 import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
-import type { StructuredError } from "../types/utilities.js";
+import type { StructuredError } from "../types/index.js";
 import { logger } from "./logger.js";
-import { CircuitBreakerOpenError } from "../types/circuitBreakerErrors.js";
+import { CircuitBreakerOpenError } from "../types/index.js";
 
 // Error codes for different scenarios
 export const ERROR_CODES = {

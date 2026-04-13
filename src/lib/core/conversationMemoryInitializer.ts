@@ -3,7 +3,7 @@
  * Provides integration with Redis storage for conversation memory
  */
 
-import type { ConversationMemoryConfig } from "../types/conversation.js";
+import type { ConversationMemoryConfig } from "../types/index.js";
 import { applyConversationMemoryDefaults } from "../utils/conversationMemory.js";
 import { logger } from "../utils/logger.js";
 import {

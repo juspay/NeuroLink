@@ -3,15 +3,15 @@
  * Metrics tracking and collection for workflow execution
  */
 
-import type { JsonValue } from "../../types/common.js";
-import { logger } from "../../utils/logger.js";
-import type { EnsembleResponse, WorkflowResult } from "../types.js";
 import type {
+  JsonValue,
+  EnsembleResponse,
+  WorkflowResult,
   SummaryStats,
   WorkflowComparison,
   WorkflowExecutionMetrics,
-} from "./types/index.js";
-
+} from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
 const functionTag = "WorkflowMetrics";
 
 /**

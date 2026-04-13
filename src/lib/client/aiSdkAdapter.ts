@@ -11,17 +11,17 @@
 import { logger } from "../utils/logger.js";
 import type {
   // ClientConfig - not currently used but may be needed for future implementations
-  LanguageModel,
-  LanguageModelCallOptions,
-  LanguageModelResponse,
-  LanguageModelStreamResponse,
+  ClientLanguageModel,
+  ClientLanguageModelCallOptions,
+  ClientLanguageModelResponse,
+  ClientLanguageModelStreamResponse,
   NeuroLinkProviderOptions,
-  ModelOptions,
-} from "../types/clientTypes.js";
+  ClientModelOptions,
+} from "../types/index.js";
 import { createClient, NeuroLinkClient } from "./httpClient.js";
 
 // =============================================================================
-// LanguageModel Implementation
+// ClientLanguageModel Implementation
 // =============================================================================
 
 /**
@@ -45,17 +45,17 @@ import { createClient, NeuroLinkClient } from "./httpClient.js";
  * });
  * ```
  */
-export class NeuroLinkLanguageModel implements LanguageModel {
+export class NeuroLinkLanguageModel implements ClientLanguageModel {
   readonly modelId: string;
   readonly provider: string;
   private client: NeuroLinkClient;
-  private options: ModelOptions;
+  private options: ClientModelOptions;
 
   constructor(
     client: NeuroLinkClient,
     modelId: string,
     provider: string,
-    options: ModelOptions = {},
+    options: ClientModelOptions = {},
   ) {
     this.client = client;
     this.modelId = modelId;
@@ -67,8 +67,8 @@ export class NeuroLinkLanguageModel implements LanguageModel {
    * Generate a non-streaming response
    */
   async doGenerate(
-    options: LanguageModelCallOptions,
-  ): Promise<LanguageModelResponse> {
+    options: ClientLanguageModelCallOptions,
+  ): Promise<ClientLanguageModelResponse> {
     const { prompt, system, messages, temperature, maxTokens, abortSignal } =
       options;
 
@@ -126,8 +126,8 @@ export class NeuroLinkLanguageModel implements LanguageModel {
    * to the consumer immediately, rather than buffering the entire response.
    */
   async doStream(
-    options: LanguageModelCallOptions,
-  ): Promise<LanguageModelStreamResponse> {
+    options: ClientLanguageModelCallOptions,
+  ): Promise<ClientLanguageModelStreamResponse> {
     const { prompt, system, messages, temperature, maxTokens, abortSignal } =
       options;
 
@@ -272,20 +272,21 @@ export class NeuroLinkLanguageModel implements LanguageModel {
    */
   private mapFinishReason(
     reason?: string,
-  ): LanguageModelResponse["finishReason"] {
+  ): ClientLanguageModelResponse["finishReason"] {
     if (!reason) {
       return "stop";
     }
 
-    const mapping: Record<string, LanguageModelResponse["finishReason"]> = {
-      stop: "stop",
-      length: "length",
-      "tool-calls": "tool-calls",
-      tool_calls: "tool-calls",
-      "content-filter": "content-filter",
-      content_filter: "content-filter",
-      error: "error",
-    };
+    const mapping: Record<string, ClientLanguageModelResponse["finishReason"]> =
+      {
+        stop: "stop",
+        length: "length",
+        "tool-calls": "tool-calls",
+        tool_calls: "tool-calls",
+        "content-filter": "content-filter",
+        content_filter: "content-filter",
+        error: "error",
+      };
 
     return mapping[reason] ?? "other";
   }
@@ -341,7 +342,10 @@ export class NeuroLinkProvider {
    * @param modelId - Model ID (e.g., 'gpt-4o', 'claude-3-opus')
    * @param options - Additional model options
    */
-  model(modelId?: string, options?: ModelOptions): NeuroLinkLanguageModel {
+  model(
+    modelId?: string,
+    options?: ClientModelOptions,
+  ): NeuroLinkLanguageModel {
     const model = modelId ?? this.defaultModel;
     const provider = options?.provider ?? this.inferProvider(model);
 
@@ -351,7 +355,7 @@ export class NeuroLinkProvider {
   /**
    * Alias for model() - makes the provider callable
    */
-  call(modelId?: string, options?: ModelOptions): NeuroLinkLanguageModel {
+  call(modelId?: string, options?: ClientModelOptions): NeuroLinkLanguageModel {
     return this.model(modelId, options);
   }
 
@@ -413,11 +417,14 @@ export class NeuroLinkProvider {
 export function createNeuroLinkProvider(
   options: NeuroLinkProviderOptions,
 ): NeuroLinkProvider &
-  ((modelId?: string, modelOptions?: ModelOptions) => NeuroLinkLanguageModel) {
+  ((
+    modelId?: string,
+    modelOptions?: ClientModelOptions,
+  ) => NeuroLinkLanguageModel) {
   const provider = new NeuroLinkProvider(options);
 
   // Make the provider callable
-  const callable = (modelId?: string, modelOptions?: ModelOptions) =>
+  const callable = (modelId?: string, modelOptions?: ClientModelOptions) =>
     provider.model(modelId, modelOptions);
 
   // Copy all methods from provider to callable
@@ -429,7 +436,10 @@ export function createNeuroLinkProvider(
   });
 
   return callable as NeuroLinkProvider &
-    ((modelId?: string, modelOptions?: ModelOptions) => NeuroLinkLanguageModel);
+    ((
+      modelId?: string,
+      modelOptions?: ClientModelOptions,
+    ) => NeuroLinkLanguageModel);
 }
 
 /**
@@ -601,12 +611,4 @@ export async function createStreamingResponse(
 // =============================================================================
 
 // Re-export types from ./types.js for convenience
-// Note: NeuroLinkProviderOptions and ModelOptions are defined and exported above
-export type {
-  LanguageModel,
-  LanguageModelCallOptions,
-  LanguageModelResponse,
-  LanguageModelStreamResponse,
-  NeuroLinkProviderOptions,
-  ModelOptions,
-} from "../types/clientTypes.js";
+// Note: NeuroLinkProviderOptions and ClientModelOptions are defined and exported above

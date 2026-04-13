@@ -2,7 +2,7 @@
  * Utility for building observability configs from environment variables
  */
 
-import type { ObservabilityConfig } from "../types/observability.js";
+import type { ObservabilityConfig } from "../types/index.js";
 
 /**
  * Build observability config from environment variables

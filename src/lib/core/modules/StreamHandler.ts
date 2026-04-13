@@ -18,9 +18,13 @@ import {
   context as otelContext,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import type { StreamOptions, StreamResult } from "../../types/streamTypes.js";
-import type { UnknownRecord } from "../../types/common.js";
-import type { AIProviderName } from "../../types/index.js";
+import type {
+  StreamOptions,
+  StreamResult,
+  UnknownRecord,
+  AIProviderName,
+} from "../../types/index.js";
+
 import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
 import { logger } from "../../utils/logger.js";
 import {

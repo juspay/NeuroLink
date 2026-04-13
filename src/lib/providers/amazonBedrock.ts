@@ -25,23 +25,23 @@ import { createAnalytics } from "../core/analytics.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import type { NeuroLink } from "../neurolink.js";
-import type { JsonValue } from "../types/common.js";
 import type {
+  JsonValue,
+  StreamOptions,
+  StreamResult,
+  ToolArgs,
+  ToolDefinition,
+  ZodUnknownSchema,
+  ToolWithLegacyParams,
+  ToolParameterSchema,
   MessageContent,
   MultimodalChatMessage,
-} from "../types/conversation.js";
-import type {
   EnhancedGenerateResult,
   TextGenerationOptions,
-} from "../types/index.js";
-import type {
   BedrockContentBlock,
   BedrockMessage,
-} from "../types/providers.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { ToolArgs, ToolDefinition } from "../types/tools.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import { AuthenticationError, ProviderError } from "../types/errors.js";
+} from "../types/index.js";
+import { AuthenticationError, ProviderError } from "../types/index.js";
 import { isAbortError, withTimeout } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
 import { calculateCost } from "../utils/pricing.js";
@@ -49,8 +49,6 @@ import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
 import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
 import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
 import { type Span, trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import type { ToolWithLegacyParams } from "../types/index.js";
-import type { ToolParameterSchema } from "../types/tools.js";
 
 const bedrockTracer = trace.getTracer("neurolink.bedrock");
 

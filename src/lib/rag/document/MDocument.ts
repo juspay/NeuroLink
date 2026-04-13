@@ -31,7 +31,7 @@ import type {
   DocumentType,
   ExtractParams,
   MDocumentConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Document processing state

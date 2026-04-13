@@ -4,11 +4,11 @@
  */
 
 import { z } from "zod";
-import type { Unknown } from "../../../types/common.js";
 import type {
+  Unknown,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "../../../types/mcpTypes.js";
+} from "../../../types/index.js";
 import { createMCPServer } from "../../factory.js";
 import { logger } from "../../../utils/logger.js";
 

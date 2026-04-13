@@ -6,19 +6,18 @@
 import type {
   EvaluationTraceContext,
   ScoreResult,
-} from "../../types/scorerTypes.js";
+  PipelineResult,
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
-import type { PipelineResult } from "../pipeline/evaluationPipeline.js";
-
 /**
  * Event handler type
  */
-export type EventHandler<T> = (event: T) => void | Promise<void>;
+type EventHandler<T> = (event: T) => void | Promise<void>;
 
 /**
  * Evaluation events
  */
-export type EvaluationEvents = {
+type EvaluationEvents = {
   "scorer:start": {
     scorerId: string;
     scorerName: string;
@@ -259,7 +258,7 @@ export function createMetricsCollectorHook(collector: {
 /**
  * OpenTelemetry span attributes
  */
-export type SpanAttributes = Record<string, string | number | boolean>;
+type SpanAttributes = Record<string, string | number | boolean>;
 
 /**
  * Create span attributes from scorer result

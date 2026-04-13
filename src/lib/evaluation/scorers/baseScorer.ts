@@ -3,15 +3,15 @@
  * All scorers extend this class for consistent behavior
  */
 
-import type { JsonObject } from "../../types/common.js";
 import type {
+  JsonObject,
   ScoreResult,
   Scorer,
   ScorerConfig,
   ScorerInput,
   ScorerMetadata,
   ScoreScale,
-} from "../../types/scorerTypes.js";
+} from "../../types/index.js";
 import { withTimeout, ErrorFactory } from "../../utils/errorHandling.js";
 import { logger } from "../../utils/logger.js";
 

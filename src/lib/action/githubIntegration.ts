@@ -11,7 +11,7 @@ import type {
   ActionExecutionResult,
   ActionCommentResult,
   ActionOutput,
-} from "../types/actionTypes.js";
+} from "../types/index.js";
 
 /**
  * Build comment body for PR/issue

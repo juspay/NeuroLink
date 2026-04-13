@@ -17,7 +17,7 @@ import type {
   ClassificationScores,
   ClassificationStats,
   ClassificationValidation,
-} from "../types/taskClassificationTypes.js";
+} from "../types/index.js";
 
 /**
  * Binary Task Classifier

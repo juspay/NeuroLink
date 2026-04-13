@@ -40,9 +40,10 @@ import { basename as pathBasename } from "node:path";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedSourceCode,
+} from "../../types/index.js";
 import {
   EXACT_FILENAME_MAP,
   SIZE_LIMITS,
@@ -54,11 +55,7 @@ import { detectLanguageFromFilename } from "../config/languageMap.js";
 // TYPES
 // =============================================================================
 
-export type { ProcessedSourceCode } from "../base/types.js";
-
 // Re-import for local use within this file
-import type { ProcessedSourceCode } from "../base/types.js";
-
 // =============================================================================
 // SOURCE CODE PROCESSOR
 // =============================================================================
@@ -332,7 +329,7 @@ export function validateSourceCodeSize(sizeBytes: number): boolean {
 export async function processSourceCode(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedSourceCode>> {
+): Promise<ProcessorFileProcessingResult<ProcessedSourceCode>> {
   return sourceCodeProcessor.processFile(fileInfo, options);
 }
 

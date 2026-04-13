@@ -13,22 +13,13 @@ import {
   estimateTokens,
   TOKENS_PER_MESSAGE,
 } from "../utils/tokenEstimation.js";
-import type {
-  BudgetCheckResult,
-  BudgetCheckParams,
-} from "../types/contextTypes.js";
+import type { BudgetCheckResult, BudgetCheckParams } from "../types/index.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
-
-export type {
-  BudgetCheckResult,
-  BudgetCheckParams,
-} from "../types/contextTypes.js";
-
 /** Default compaction threshold (80% of available input) */
 const DEFAULT_COMPACTION_THRESHOLD = 0.8;
 

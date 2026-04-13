@@ -5,14 +5,15 @@
 
 import { z } from "zod";
 import { logger } from "../utils/logger.js";
-import type { MCPServerInfo, MCPServerCategory } from "../types/mcpTypes.js";
 import type {
+  MCPServerInfo,
+  MCPServerCategory,
+  JsonValue,
   ToolArgs,
   SimpleTool as CoreSimpleTool,
   ZodUnknownSchema,
   SDKToolContext,
-} from "../types/tools.js";
-import type { JsonValue } from "../types/common.js";
+} from "../types/index.js";
 import { createMCPServerInfo } from "../utils/mcpDefaults.js";
 import {
   validateToolName,
@@ -101,13 +102,13 @@ const VALIDATION_CONFIG = {
  * Context provided to tools during execution
  * Type alias for backward compatibility
  */
-export type ToolContext = SDKToolContext;
+type ToolContext = SDKToolContext;
 
 /**
  * Simple tool interface for SDK users
  * Extends the core SimpleTool with specific types
  */
-export type SimpleTool<TArgs = ToolArgs, TResult = JsonValue> = Omit<
+type SimpleTool<TArgs = ToolArgs, TResult = JsonValue> = Omit<
   CoreSimpleTool<TArgs, TResult>,
   "execute"
 > & {

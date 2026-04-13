@@ -13,7 +13,7 @@ import {
   type SpanEvent,
   SpanStatus,
   SpanType,
-} from "../types/index.js";
+} from "../../types/index.js";
 
 /**
  * Utility class for span creation and serialization

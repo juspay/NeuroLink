@@ -3,8 +3,11 @@
  * Generates OpenAPI documentation from NeuroLink server routes
  */
 
-import type { JsonObject } from "../../types/common.js";
-import type { RouteDefinition, ServerAdapterConfig } from "../types.js";
+import type {
+  JsonObject,
+  RouteDefinition,
+  ServerAdapterConfig,
+} from "../../types/index.js";
 import { OpenAPISchemas } from "./schemas.js";
 import {
   CommonParameters,
@@ -28,7 +31,7 @@ import {
 /**
  * OpenAPI generator configuration
  */
-export type OpenAPIGeneratorConfig = {
+type OpenAPIGeneratorConfig = {
   /** API info override */
   info?: {
     title?: string;
@@ -58,7 +61,7 @@ export type OpenAPIGeneratorConfig = {
 /**
  * Generated OpenAPI specification
  */
-export type OpenAPISpec = {
+type OpenAPISpec = {
   openapi: "3.1.0";
   info: JsonObject;
   servers: JsonObject[];

@@ -42,25 +42,6 @@ export {
 } from "./errors.js";
 
 // Type exports
-export type {
-  SageMakerConfig,
-  SageMakerModelConfig,
-  SageMakerEndpointInfo,
-  SageMakerUsage,
-  InvokeEndpointParams,
-  InvokeEndpointResponse,
-  SageMakerStreamChunk,
-  SageMakerToolCall,
-  SageMakerToolResult,
-  SageMakerGenerationOptions,
-  SageMakerGenerationResponse,
-  SageMakerErrorCode,
-  SageMakerErrorInfo,
-  BatchInferenceConfig,
-  ModelDeploymentConfig,
-  EndpointMetrics,
-  CostEstimate,
-} from "../../types/providers.js";
 
 /**
  * Factory function to create a SageMaker Provider

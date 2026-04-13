@@ -35,11 +35,68 @@ import {
   TOOL_TIMEOUTS,
 } from "./constants/index.js";
 import { checkContextBudget } from "./context/budgetChecker.js";
-import {
-  type CompactionConfig,
-  type CompactionResult,
-  ContextCompactor,
-} from "./context/contextCompactor.js";
+import { ContextCompactor } from "./context/contextCompactor.js";
+import type {
+  CompactionConfig,
+  CompactionResult,
+  ArtifactStore,
+  SpanData,
+  ConfirmationResponseEvent,
+  HITLConfig,
+  ObservabilityConfig,
+  TaskManagerConfig,
+  WorkflowConfig,
+  ToolMiddleware,
+  MetricsSummary,
+  MCPServerTool,
+  MCPToolAnnotations,
+  TraceView,
+  AuthenticatedContext,
+  AuthProviderConfig,
+  AuthProviderType,
+  MastraAuthProvider,
+  JsonObject,
+  JsonValue,
+  NeuroLinkEvents,
+  TypedEventEmitter,
+  UnknownRecord,
+  MCPEnhancementsConfig,
+  NeuroLinkAuthConfig,
+  NeurolinkConstructorConfig,
+  ChatMessage,
+  ConversationMemoryConfig,
+  ProviderDetails,
+  ExternalMCPOperationResult,
+  ExternalMCPServerInstance,
+  ExternalMCPToolInfo,
+  AdditionalMemoryUser,
+  GenerateOptions,
+  GenerateResult,
+  AnalyticsData,
+  EvaluationData,
+  NeurolinkCredentials,
+  ProviderStatus,
+  TextGenerationOptions,
+  TextGenerationResult,
+  TokenUsage,
+  MCPExecutableTool,
+  MCPServerCategory,
+  MCPServerInfo,
+  MCPStatus,
+  AudioChunk,
+  StreamOptions,
+  StreamResult,
+  StreamToolCall,
+  StreamToolResult,
+  ToolExecutionContext,
+  ToolExecutionSummary,
+  ToolInfo,
+  ToolRegistrationOptions,
+  BatchOperationResult,
+  OrchestrationResult,
+  MCPTool,
+  RoutingDecision,
+} from "./types/index.js";
 import { emergencyContentTruncation } from "./context/emergencyTruncation.js";
 import {
   getContextOverflowProvider,
@@ -68,30 +125,30 @@ import {
   DEFAULT_WARN_MCP_OUTPUT_BYTES,
 } from "./mcp/mcpOutputNormalizer.js";
 import { LocalTempArtifactStore } from "./artifacts/artifactStore.js";
-import type { ArtifactStore } from "./artifacts/artifactStore.js";
-import type { MCPTool, RoutingDecision } from "./mcp/routing/index.js";
 import { ToolRouter } from "./mcp/routing/index.js";
 // Import direct tools server for automatic registration
 import { directToolsServer } from "./mcp/servers/agent/directToolsServer.js";
-import type { MCPToolAnnotations } from "./mcp/toolAnnotations.js";
 import { inferAnnotations, isSafeToRetry } from "./mcp/toolAnnotations.js";
-import type { ToolMiddleware } from "./mcp/toolIntegration.js";
 import { MCPToolRegistry } from "./mcp/toolRegistry.js";
 import {
   type HippocampusConfig,
   initializeHippocampus,
 } from "./memory/hippocampusInitializer.js";
 import { createMemoryRetrievalTools } from "./memory/memoryRetrievalTools.js";
-import type {
-  MetricsSummary,
-  TraceView,
-} from "./observability/metricsAggregator.js";
 import {
   getMetricsAggregator,
   MetricsAggregator,
 } from "./observability/metricsAggregator.js";
-import type { SpanData } from "./observability/types/spanTypes.js";
-import { SpanStatus, SpanType } from "./observability/types/spanTypes.js";
+
+import {
+  SpanStatus,
+  SpanType,
+  CircuitBreakerOpenError,
+  ConversationMemoryError,
+  AuthenticationError,
+  AuthorizationError,
+  InvalidModelError,
+} from "./types/index.js";
 import { SpanSerializer } from "./observability/utils/spanSerializer.js";
 import {
   flushOpenTelemetry,
@@ -106,85 +163,7 @@ import { TaskManager } from "./tasks/taskManager.js";
 import { createTaskTools } from "./tasks/tools/taskTools.js";
 import { ATTR } from "./telemetry/attributes.js";
 import { tracers } from "./telemetry/tracers.js";
-import type {
-  AuthenticatedContext,
-  AuthProviderConfig,
-  AuthProviderType,
-  MastraAuthProvider,
-} from "./types/authTypes.js";
-import { CircuitBreakerOpenError } from "./types/circuitBreakerErrors.js";
-import type {
-  JsonObject,
-  JsonValue,
-  NeuroLinkEvents,
-  TypedEventEmitter,
-  UnknownRecord,
-} from "./types/common.js";
-import type {
-  MCPEnhancementsConfig,
-  NeuroLinkAuthConfig,
-  NeurolinkConstructorConfig,
-} from "./types/configTypes.js";
-import type {
-  ChatMessage,
-  ConversationMemoryConfig,
-  ProviderDetails,
-} from "./types/conversation.js";
-import { ConversationMemoryError } from "./types/conversation.js";
-import {
-  AuthenticationError,
-  AuthorizationError,
-  InvalidModelError,
-} from "./types/errors.js";
-import type {
-  ExternalMCPOperationResult,
-  ExternalMCPServerInstance,
-  ExternalMCPToolInfo,
-} from "./types/externalMcp.js";
 // NEW: Generate function imports
-import type {
-  AdditionalMemoryUser,
-  GenerateOptions,
-  GenerateResult,
-} from "./types/generateTypes.js";
-import type {
-  ConfirmationResponseEvent,
-  HITLConfig,
-} from "./types/hitlTypes.js";
-import type {
-  AnalyticsData,
-  EvaluationData,
-  NeurolinkCredentials,
-  ProviderStatus,
-  TextGenerationOptions,
-  TextGenerationResult,
-  TokenUsage,
-} from "./types/index.js";
-import type {
-  MCPExecutableTool,
-  MCPServerCategory,
-  MCPServerInfo,
-  MCPStatus,
-} from "./types/mcpTypes.js";
-import type { ObservabilityConfig } from "./types/observability.js";
-import type {
-  AudioChunk,
-  StreamOptions,
-  StreamResult,
-  ToolCall,
-  ToolResult,
-} from "./types/streamTypes.js";
-import type { TaskManagerConfig } from "./types/taskTypes.js";
-import type {
-  ToolExecutionContext,
-  ToolExecutionSummary,
-  ToolInfo,
-  ToolRegistrationOptions,
-} from "./types/tools.js";
-import type {
-  BatchOperationResult,
-  ToolExecutionResult,
-} from "./types/typeAliases.js";
 import {
   getConversationMessages,
   storeConversationTurn,
@@ -237,7 +216,6 @@ import {
 import { isNonNullObject } from "./utils/typeUtils.js";
 import { getWorkflow } from "./workflow/core/workflowRegistry.js";
 import { runWorkflow } from "./workflow/core/workflowRunner.js";
-import type { WorkflowConfig } from "./workflow/types.js";
 
 /**
  * NL-002: Classify MCP error messages into categories for AI disambiguation.
@@ -481,7 +459,7 @@ export class NeuroLink {
   private readonly toolCacheDuration: number;
 
   // NL-004: Model alias/deprecation configuration
-  private modelAliasConfig?: import("./types/generateTypes.js").ModelAliasConfig;
+  private modelAliasConfig?: import("./types/index.js").ModelAliasConfig;
 
   // Compaction watermark: prevents re-triggering compaction on already-compacted messages
   // Per-session map to avoid cross-session pollution in server mode
@@ -3995,7 +3973,7 @@ Current user's request: ${currentInput}`;
     const pptResult = await generatePresentation({
       context: pptContext,
       provider:
-        effectiveProvider.provider as import("./types/providers.js").AIProvider,
+        effectiveProvider.provider as import("./types/index.js").AIProvider,
       providerName: effectiveProvider.providerName,
       modelName: effectiveProvider.modelName,
       neurolink: this,
@@ -4188,9 +4166,8 @@ Current user's request: ${currentInput}`;
     });
 
     // Store final result for metadata
-    let finalResult: Partial<
-      import("./workflow/types.js").WorkflowResult
-    > | null = null;
+    let finalResult: Partial<import("./types/index.js").WorkflowResult> | null =
+      null;
     let preliminaryTime = 0;
 
     // Create a generator that yields progressive chunks
@@ -4253,7 +4230,7 @@ Current user's request: ${currentInput}`;
       // After stream completes, update result with final workflow data
       if (finalResult) {
         const result = finalResult as Partial<
-          import("./workflow/types.js").WorkflowResult
+          import("./types/index.js").WorkflowResult
         >;
         const responseTime = Date.now() - startTime;
 
@@ -4724,7 +4701,7 @@ Current user's request: ${currentInput}`;
         truncationFraction: Math.min(0.9, requiredReduction + 0.15),
       });
       const compactionResult = await compactor.compact(
-        originalMessages as import("./types/conversation.js").ChatMessage[],
+        originalMessages as import("./types/index.js").ChatMessage[],
         compactionTarget,
         undefined,
         (options.context as Record<string, unknown>)?.requestId as
@@ -5744,7 +5721,7 @@ Current user's request: ${currentInput}`;
                 ?.summarizationModel,
           });
           const compactionResult = await compactor.compact(
-            conversationMessages as import("./types/conversation.js").ChatMessage[],
+            conversationMessages as import("./types/index.js").ChatMessage[],
             budgetCheck.availableInputTokens,
             this.conversationMemoryConfig?.conversationMemory,
             (options.context as Record<string, unknown>)?.requestId as
@@ -5789,7 +5766,7 @@ Current user's request: ${currentInput}`;
             );
 
             conversationMessages = emergencyContentTruncation(
-              conversationMessages as import("./types/conversation.js").ChatMessage[],
+              conversationMessages as import("./types/index.js").ChatMessage[],
               postCompactBudget.availableInputTokens,
               postCompactBudget.breakdown,
               providerName,
@@ -6064,7 +6041,7 @@ Current user's request: ${currentInput}`;
   private async detectAndExecuteTools(
     prompt: string,
     _domainType?: string,
-  ): Promise<ToolExecutionResult> {
+  ): Promise<OrchestrationResult> {
     const functionTag = "NeuroLink.detectAndExecuteTools";
 
     try {
@@ -6853,8 +6830,8 @@ Current user's request: ${currentInput}`;
     },
     streamState: {
       finishReason: string;
-      toolCalls: ToolCall[];
-      toolResults: ToolResult[];
+      toolCalls: StreamToolCall[];
+      toolResults: StreamToolResult[];
     },
     originalPrompt: string | undefined,
     enhancedOptions: StreamOptions,
@@ -7194,8 +7171,8 @@ Current user's request: ${currentInput}`;
     usage?: { input: number; output: number; total: number };
     model?: string;
     finishReason?: string;
-    toolCalls: ToolCall[];
-    toolResults: ToolResult[];
+    toolCalls: StreamToolCall[];
+    toolResults: StreamToolResult[];
     analytics?: AnalyticsData | Promise<AnalyticsData>;
   }> {
     // Simplified placeholder - in the actual implementation this would contain the complex MCP stream logic
@@ -7287,7 +7264,7 @@ Current user's request: ${currentInput}`;
           this.conversationMemoryConfig?.conversationMemory?.summarizationModel,
       });
       const compactionResult = await compactor.compact(
-        conversationMessages as import("./types/conversation.js").ChatMessage[],
+        conversationMessages as import("./types/index.js").ChatMessage[],
         streamBudget.availableInputTokens,
         this.conversationMemoryConfig?.conversationMemory,
         (options.context as Record<string, unknown> | undefined)?.requestId as
@@ -7334,7 +7311,7 @@ Current user's request: ${currentInput}`;
         );
 
         conversationMessages = emergencyContentTruncation(
-          conversationMessages as import("./types/conversation.js").ChatMessage[],
+          conversationMessages as import("./types/index.js").ChatMessage[],
           postCompactBudget.availableInputTokens,
           postCompactBudget.breakdown,
           providerName,
@@ -7415,8 +7392,8 @@ Current user's request: ${currentInput}`;
     content: string;
     usage?: TokenUsage;
     finishReason: string;
-    toolCalls: ToolCall[];
-    toolResults: ToolResult[];
+    toolCalls: StreamToolCall[];
+    toolResults: StreamToolResult[];
     analytics?: AnalyticsData;
     evaluation?: EvaluationData;
   }> {
@@ -7451,8 +7428,8 @@ Current user's request: ${currentInput}`;
       content: string;
       usage?: TokenUsage;
       finishReason: string;
-      toolCalls: ToolCall[];
-      toolResults: ToolResult[];
+      toolCalls: StreamToolCall[];
+      toolResults: StreamToolResult[];
       analytics?: AnalyticsData;
       evaluation?: EvaluationData;
     },
@@ -8239,7 +8216,7 @@ Current user's request: ${currentInput}`;
    * @returns this (for chaining)
    */
   useToolMiddleware(
-    middleware: import("./mcp/toolIntegration.js").ToolMiddleware,
+    middleware: import("./types/index.js").ToolMiddleware,
   ): this {
     this.mcpToolMiddlewares.push(middleware);
     logger.debug(
@@ -8251,7 +8228,7 @@ Current user's request: ${currentInput}`;
   /**
    * Get all registered tool middlewares
    */
-  getToolMiddlewares(): import("./mcp/toolIntegration.js").ToolMiddleware[] {
+  getToolMiddlewares(): import("./types/index.js").ToolMiddleware[] {
     return [...this.mcpToolMiddlewares];
   }
 
@@ -8292,7 +8269,7 @@ Current user's request: ${currentInput}`;
    */
   async updateAgenticLoopReport(
     sessionId: string,
-    report: import("./types/conversation.js").AgenticLoopReportMetadata,
+    report: import("./types/index.js").AgenticLoopReportMetadata,
     userId?: string,
   ): Promise<void> {
     if (!this.conversationMemory) {
@@ -9275,11 +9252,11 @@ Current user's request: ${currentInput}`;
             inputSchema: {},
             annotations: toolAnnotations,
             execute: async () => ({}),
-          } as import("./mcp/toolAnnotations.js").MCPServerTool;
+          } as MCPServerTool;
           // Provide minimal context — elicitation is optional for most middleware
           const middlewareContext = {
             toolMeta: { name: toolName, annotations: toolAnnotations },
-          } as unknown as import("./mcp/toolIntegration.js").EnhancedExecutionContext;
+          } as unknown as import("./types/index.js").EnhancedExecutionContext;
           return middleware(toolStub, params, middlewareContext, next);
         }
         return executeFn();
@@ -9452,7 +9429,7 @@ Current user's request: ${currentInput}`;
             description: "",
             annotations: toolAnnotations,
             execute: async () => ({}),
-          } as import("./mcp/toolAnnotations.js").MCPServerTool)
+          } as MCPServerTool)
         : undefined;
       if (
         toolStubForRetry &&
@@ -10283,7 +10260,7 @@ Current user's request: ${currentInput}`;
    * @param config - Model alias configuration with aliases map
    */
   setModelAliasConfig(
-    config: import("./types/generateTypes.js").ModelAliasConfig,
+    config: import("./types/index.js").ModelAliasConfig,
   ): void {
     this.modelAliasConfig = config;
     logger.info(
@@ -11740,7 +11717,7 @@ Current user's request: ${currentInput}`;
    */
   async createEvaluationPipeline(
     configOrPreset:
-      | import("./types/scorerTypes.js").PipelineConfig
+      | import("./types/index.js").PipelineConfig
       | "safety"
       | "rag"
       | "quality"
@@ -11758,7 +11735,7 @@ Current user's request: ${currentInput}`;
       ErrorFactory.evaluationTimeout("evaluation module load", 10000),
     );
 
-    let config: import("./types/scorerTypes.js").PipelineConfig;
+    let config: import("./types/index.js").PipelineConfig;
 
     if (typeof configOrPreset === "string") {
       // It's a preset name
@@ -11831,7 +11808,7 @@ Current user's request: ${currentInput}`;
    * ```
    */
   async evaluate(
-    input: import("./types/scorerTypes.js").ScorerInput,
+    input: import("./types/index.js").ScorerInput,
     options?: {
       /** Pipeline preset to use */
       pipeline?:
@@ -11854,16 +11831,14 @@ Current user's request: ${currentInput}`;
       /** Overall evaluation timeout in milliseconds */
       timeoutMs?: number;
     },
-  ): Promise<
-    import("./evaluation/pipeline/evaluationPipeline.js").PipelineResult
-  > {
+  ): Promise<import("./types/index.js").PipelineResult> {
     const { EvaluationPipeline, getPreset } = await withTimeout(
       import("./evaluation/pipeline/index.js"),
       10000,
       ErrorFactory.evaluationTimeout("evaluation module load", 10000),
     );
 
-    let config: import("./types/scorerTypes.js").PipelineConfig;
+    let config: import("./types/index.js").PipelineConfig;
 
     // Fail fast on conflicting or empty evaluator selection
     if (options?.pipeline && options?.scorers) {
@@ -11972,9 +11947,9 @@ Current user's request: ${currentInput}`;
    */
   async score(
     scorerId: string,
-    input: import("./types/scorerTypes.js").ScorerInput,
-    config?: import("./types/scorerTypes.js").ScorerConfig,
-  ): Promise<import("./types/scorerTypes.js").ScoreResult> {
+    input: import("./types/index.js").ScorerInput,
+    config?: import("./types/index.js").ScorerConfig,
+  ): Promise<import("./types/index.js").ScoreResult> {
     const { ScorerRegistry } = await withTimeout(
       import("./evaluation/scorers/index.js"),
       10000,
@@ -12058,10 +12033,10 @@ Current user's request: ${currentInput}`;
    */
   async getAvailableScorers(options?: {
     /** Filter by category */
-    category?: import("./types/scorerTypes.js").ScorerCategory;
+    category?: import("./types/index.js").ScorerCategory;
     /** Filter by type */
-    type?: import("./types/scorerTypes.js").ScorerType;
-  }): Promise<import("./types/scorerTypes.js").ScorerMetadata[]> {
+    type?: import("./types/index.js").ScorerType;
+  }): Promise<import("./types/index.js").ScorerMetadata[]> {
     const { ScorerRegistry } = await withTimeout(
       import("./evaluation/scorers/index.js"),
       10000,
@@ -12135,7 +12110,7 @@ Current user's request: ${currentInput}`;
       | "summarization"
       | "customerSupport"
       | "codeGeneration",
-  ): Promise<import("./types/scorerTypes.js").PipelineConfig> {
+  ): Promise<import("./types/index.js").PipelineConfig> {
     const { getPreset } = await withTimeout(
       import("./evaluation/pipeline/index.js"),
       10000,

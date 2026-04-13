@@ -6,7 +6,7 @@
  */
 
 import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
-import type { ModelAliasConfig } from "../types/generateTypes.js";
+import type { ModelAliasConfig } from "../types/index.js";
 import { NeuroLinkError } from "./errorHandling.js";
 import { logger } from "./logger.js";
 

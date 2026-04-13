@@ -26,8 +26,8 @@ import type {
   ServerAdapterConfig,
   ServerAdapterEvents,
   ServerContext,
-} from "../types.js";
-import type { FastifyRateLimitContext } from "../../types/index.js";
+  FastifyRateLimitContext,
+} from "../../types/index.js";
 import { isErrorResponse } from "../utils/validation.js";
 
 /**

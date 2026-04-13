@@ -13,41 +13,11 @@ import { AuthProviderFactory } from "../../lib/auth/AuthProviderFactory.js";
 import type {
   AuthProviderConfig,
   AuthProviderType,
+  AuthHealthArgs,
+  AuthProvidersArgs,
+  AuthValidateArgs,
 } from "../../lib/types/index.js";
 import { logger } from "../../lib/utils/logger.js";
-
-/**
- * Auth command argument types
- */
-export type AuthProvidersArgs = {
-  format?: "text" | "json" | "table";
-};
-
-export type AuthValidateArgs = {
-  token: string;
-  provider: AuthProviderType;
-  domain?: string;
-  clientId?: string;
-  secretKey?: string;
-  secret?: string;
-  url?: string;
-  anonKey?: string;
-  apiKey?: string;
-  format?: "text" | "json";
-};
-
-export type AuthHealthArgs = {
-  provider: AuthProviderType;
-  domain?: string;
-  clientId?: string;
-  secretKey?: string;
-  secret?: string;
-  url?: string;
-  anonKey?: string;
-  apiKey?: string;
-  format?: "text" | "json";
-};
-
 /**
  * Provider information for display
  */

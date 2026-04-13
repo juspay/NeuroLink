@@ -8,7 +8,7 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { logger } from "../utils/logger.js";
-import type { ResearchConfig } from "../types/autoresearchTypes.js";
+import type { ResearchConfig } from "../types/index.js";
 
 export class RepoPolicy {
   private resolvedMutablePaths: string[];

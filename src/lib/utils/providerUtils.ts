@@ -4,8 +4,11 @@
  */
 import { AIProviderFactory } from "../core/factory.js";
 import { logger } from "./logger.js";
-import type { ProviderError } from "../types/providers.js";
-import type { EnvVarValidationResult } from "../types/utilities.js";
+import type {
+  ProviderErrorLike,
+  EnvVarValidationResult,
+} from "../types/index.js";
+
 import { AIProviderName } from "../constants/enums.js";
 import { ProviderHealthChecker } from "./providerHealth.js";
 import {
@@ -555,6 +558,6 @@ export function isValidProvider(provider: string): boolean {
 /**
  * Type guard for provider error
  */
-export function isProviderError(error: unknown): error is ProviderError {
+export function isProviderError(error: unknown): error is ProviderErrorLike {
   return error instanceof Error && "provider" in error;
 }

@@ -13,12 +13,12 @@ import type {
   CircuitBreakerConfig,
   CircuitBreakerStats,
   CircuitBreakerEvents,
-} from "../types/mcpTypes.js";
+} from "../types/index.js";
 
-import { CircuitBreakerOpenError } from "../types/circuitBreakerErrors.js";
+import { CircuitBreakerOpenError } from "../types/index.js";
 
 // Re-export CircuitBreakerOpenError from shared types to preserve public API
-export { CircuitBreakerOpenError } from "../types/circuitBreakerErrors.js";
+export { CircuitBreakerOpenError } from "../types/index.js";
 
 /**
  * Default operation timeout for circuit breaker protected operations.

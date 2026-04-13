@@ -20,7 +20,7 @@
 // Types
 // ---------------------------------------------------------------------------
 
-export type SSEContentBlock = {
+type SSEContentBlock = {
   index: number;
   type: "text" | "thinking" | "tool_use" | "tool_result";
   /** Accumulated text for text blocks. Capped at MAX_BLOCK_CONTENT_BYTES. */
@@ -35,7 +35,7 @@ export type SSEContentBlock = {
   toolInput?: string;
 };
 
-export type SSETelemetry = {
+type SSETelemetry = {
   /** Message id from message_start. */
   messageId: string;
   /** Model string from message_start. */
@@ -505,7 +505,7 @@ function processEvent(
 // Public API
 // ---------------------------------------------------------------------------
 
-export type SSEInterceptorResult = {
+type SSEInterceptorResult = {
   /** Pipe the upstream response through this stream. */
   stream: TransformStream<Uint8Array, Uint8Array>;
   /**
@@ -516,7 +516,7 @@ export type SSEInterceptorResult = {
   telemetry: Promise<SSETelemetry>;
 };
 
-export type SSEInterceptorOptions = {
+type SSEInterceptorOptions = {
   captureRawText?: boolean;
 };
 

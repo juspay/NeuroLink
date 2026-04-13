@@ -1,3 +1,5 @@
+import type { ProcessorErrorMessageTemplate } from "../../types/index.js";
+
 /**
  * File Processing Error Codes
  *
@@ -110,24 +112,13 @@ export enum FileErrorCode {
 }
 
 /**
- * Error message template with user-friendly messaging and retry information.
- */
-export type ErrorMessageTemplate = {
-  /** Technical error message */
-  message: string;
-  /** User-friendly error message */
-  userMessage: string;
-  /** Suggested action to resolve the error */
-  suggestedAction: string;
-  /** Whether this error is potentially retryable */
-  retryable: boolean;
-};
-
-/**
  * Error messages map with technical and user-friendly messaging for each error code.
  * All messages are designed to be clear, actionable, and free of technical jargon.
  */
-export const ERROR_MESSAGES: Record<FileErrorCode, ErrorMessageTemplate> = {
+export const ERROR_MESSAGES: Record<
+  FileErrorCode,
+  ProcessorErrorMessageTemplate
+> = {
   // Download errors
   [FileErrorCode.DOWNLOAD_FAILED]: {
     message: "Failed to download the file from the source.",
@@ -336,7 +327,9 @@ export const ERROR_MESSAGES: Record<FileErrorCode, ErrorMessageTemplate> = {
  * @param code - The FileErrorCode to get the template for
  * @returns The ErrorMessageTemplate for the given code
  */
-export function getErrorTemplate(code: FileErrorCode): ErrorMessageTemplate {
+export function getErrorTemplate(
+  code: FileErrorCode,
+): ProcessorErrorMessageTemplate {
   return ERROR_MESSAGES[code] ?? ERROR_MESSAGES[FileErrorCode.UNKNOWN_ERROR];
 }
 

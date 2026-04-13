@@ -15,7 +15,7 @@ import type { VideoGenerationResult } from "../../lib/types/index.js";
 /**
  * Result of saving video to file
  */
-export type VideoSaveResult = {
+type VideoSaveResult = {
   /** Whether the save was successful */
   success: boolean;
   /** Full path to the saved file */

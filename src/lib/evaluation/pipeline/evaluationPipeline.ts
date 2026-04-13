@@ -3,48 +3,18 @@
  * Multi-scorer orchestration with configurable execution
  */
 
-import type { JsonObject } from "../../types/common.js";
 import type {
-  AggregatedScores,
+  PipelineExecutionOptions,
+  PipelineResult,
   PipelineConfig,
   ScoreResult,
   Scorer,
   ScorerInput,
-} from "../../types/scorerTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { ErrorFactory, withTimeout } from "../../utils/errorHandling.js";
 import { DEFAULT_SCORE_SCALE } from "../scorers/baseScorer.js";
 import { ScorerRegistry } from "../scorers/scorerRegistry.js";
-
-/**
- * Pipeline execution options
- */
-export type PipelineExecutionOptions = {
-  /** Correlation ID for tracing */
-  correlationId?: string;
-  /** Custom timeout override */
-  timeout?: number;
-  /** Skip specific scorers. Mutually exclusive with onlyScorers. */
-  skipScorers?: string[];
-  /** Only run specific scorers. Mutually exclusive with skipScorers. */
-  onlyScorers?: string[];
-  /** Additional metadata to attach */
-  metadata?: JsonObject;
-};
-
-/**
- * Pipeline execution result
- */
-export type PipelineResult = AggregatedScores & {
-  /** Pipeline configuration used */
-  pipelineConfig: PipelineConfig;
-  /** Execution options used */
-  executionOptions?: PipelineExecutionOptions;
-  /** Errors that occurred during execution */
-  errors: Array<{ scorerId: string; error: string }>;
-  /** Scorers that were skipped */
-  skippedScorers: string[];
-};
 
 /**
  * Evaluation Pipeline for running multiple scorers

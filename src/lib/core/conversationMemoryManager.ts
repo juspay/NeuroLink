@@ -19,9 +19,9 @@ import type {
   ConversationMemoryStats,
   SessionMemory,
   StoreConversationTurnOptions,
-} from "../types/conversation.js";
-import { ConversationMemoryError } from "../types/conversation.js";
-import type { IConversationMemoryManager } from "../types/conversationMemoryInterface.js";
+  IConversationMemoryManager,
+} from "../types/index.js";
+import { ConversationMemoryError } from "../types/index.js";
 import {
   buildContextFromPointer,
   getEffectiveTokenThreshold,

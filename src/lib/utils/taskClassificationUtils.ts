@@ -12,7 +12,7 @@ import {
   CLASSIFICATION_THRESHOLDS,
   DOMAIN_PATTERNS,
 } from "../config/taskClassificationConfig.js";
-import type { ClassificationScores } from "../types/taskClassificationTypes.js";
+import type { ClassificationScores } from "../types/index.js";
 
 /**
  * Analyze prompt length and apply scoring bonuses

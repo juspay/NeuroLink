@@ -10,7 +10,7 @@ import type {
   NeuroLinkMCPTool,
   NeuroLinkMCPServer,
   MCPServerConfig,
-} from "../types/mcpTypes.js";
+} from "../types/index.js";
 import {
   validateMCPTool,
   ValidationError,

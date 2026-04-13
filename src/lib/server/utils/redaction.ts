@@ -1,12 +1,4 @@
-/**
- * Stream Chunk Redaction Utilities
- * Sanitizes sensitive data from stream chunks before client delivery
- *
- * NOTE: Redaction is DISABLED by default. Enable via config.enabled = true
- */
-
-import type { DataStreamEvent } from "../streaming/dataStream.js";
-import type { RedactionConfig } from "../types.js";
+import type { RedactionConfig, DataStreamEvent } from "../../types/index.js";
 
 /**
  * Default fields to redact from stream chunks

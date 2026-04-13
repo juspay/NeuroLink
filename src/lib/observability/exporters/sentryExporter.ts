@@ -9,8 +9,8 @@ import type {
   ExportResult,
   SentryExporterConfig,
   SpanData,
-} from "../types/index.js";
-import { SpanStatus } from "../types/spanTypes.js";
+} from "../../types/index.js";
+import { SpanStatus } from "../../types/index.js";
 import { BaseExporter } from "./baseExporter.js";
 
 // Sentry types - optional dependency

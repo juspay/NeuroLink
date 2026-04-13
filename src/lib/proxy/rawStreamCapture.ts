@@ -1,10 +1,10 @@
-export type RawStreamCapture = {
+type RawStreamCapture = {
   totalBytes: number;
   text: string;
   truncated: boolean;
 };
 
-export type RawStreamCaptureResult = {
+type RawStreamCaptureResult = {
   stream: TransformStream<Uint8Array, Uint8Array>;
   capture: Promise<RawStreamCapture>;
 };

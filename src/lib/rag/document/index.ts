@@ -4,7 +4,6 @@
 
 export { MDocument } from "./MDocument.js";
 export {
-  type DocumentLoader,
   TextLoader,
   MarkdownLoader,
   HTMLLoader,
@@ -14,8 +13,4 @@ export {
   WebLoader,
   loadDocument,
   loadDocuments,
-  type LoaderOptions,
-  type WebLoaderOptions,
-  type PDFLoaderOptions,
-  type CSVLoaderOptions,
 } from "./loaders.js";

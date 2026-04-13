@@ -945,24 +945,24 @@ if (shouldEnableBashTool()) {
 /**
  * Type aliases for specific tool categories
  */
-export type BasicToolsMap = {
+type BasicToolsMap = {
   getCurrentTime: typeof directAgentTools.getCurrentTime;
   calculateMath: typeof directAgentTools.calculateMath;
 };
 
-export type FilesystemToolsMap = {
+type FilesystemToolsMap = {
   readFile: typeof directAgentTools.readFile;
   listDirectory: typeof directAgentTools.listDirectory;
   writeFile: typeof directAgentTools.writeFile;
 };
 
-export type UtilityToolsMap = {
+type UtilityToolsMap = {
   getCurrentTime: typeof directAgentTools.getCurrentTime;
   calculateMath: typeof directAgentTools.calculateMath;
   listDirectory: typeof directAgentTools.listDirectory;
 };
 
-export type AllToolsMap = typeof directAgentTools & {
+type AllToolsMap = typeof directAgentTools & {
   executeBashCommand?: typeof bashTool;
 };
 

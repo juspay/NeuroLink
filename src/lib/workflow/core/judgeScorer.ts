@@ -17,14 +17,11 @@ import type {
   JudgeConfig,
   JudgeScores,
   MultiJudgeScores,
-} from "../types.js";
-import { WorkflowError } from "../types.js";
-import type {
   ParsedJudgeResponse,
   ScoreOptions,
-  ScoreResult,
-} from "./types/index.js";
-
+  JudgeScoreResult,
+} from "../../types/index.js";
+import { WorkflowError } from "../../types/index.js";
 const functionTag = "JudgeScorer";
 
 // ============================================================================
@@ -38,7 +35,7 @@ const functionTag = "JudgeScorer";
  */
 export async function scoreEnsemble(
   options: ScoreOptions,
-): Promise<ScoreResult> {
+): Promise<JudgeScoreResult> {
   const startTime = Date.now();
   const {
     judges,

@@ -9,13 +9,10 @@ import type {
   ScorerInput,
   ScorerRule,
   ScorerType,
-} from "../../types/scorerTypes.js";
+  ScorerFunction,
+} from "../../types/index.js";
 import type { BaseScorer } from "./baseScorer.js";
-import {
-  composeScorers,
-  createFunctionScorer,
-  type ScorerFunction,
-} from "./customScorerUtils.js";
+import { composeScorers, createFunctionScorer } from "./customScorerUtils.js";
 
 /**
  * Fluent builder for creating custom scorers

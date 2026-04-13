@@ -21,7 +21,7 @@ import type {
   PhaseToolPolicy,
   ResearchConfig,
   ResearchState,
-} from "../types/autoresearchTypes.js";
+} from "../types/index.js";
 import { withTimeout } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
 import { resolveConfig, validateConfig } from "./config.js";

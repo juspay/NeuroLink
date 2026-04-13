@@ -10,8 +10,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import type { CommandModule } from "yargs";
-import type { WorkflowConfig } from "../../lib/workflow/types.js";
-import type { BaseCommandArgs } from "../../lib/types/index.js";
+import type { WorkflowConfig, BaseCommandArgs } from "../../lib/types/index.js";
+
 import type { AIProviderName } from "../../lib/constants/enums.js";
 
 /**

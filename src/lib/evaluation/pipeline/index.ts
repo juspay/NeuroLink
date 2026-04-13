@@ -7,8 +7,6 @@ export {
   createAndInitializePipeline,
   createPipeline,
   EvaluationPipeline,
-  type PipelineExecutionOptions,
-  type PipelineResult,
 } from "./evaluationPipeline.js";
 
 export { PipelineBuilder, Pipelines } from "./pipelineBuilder.js";

@@ -8,7 +8,7 @@ import type {
   ReadyResponse,
   RouteGroup,
   ServerContext,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Create health check routes

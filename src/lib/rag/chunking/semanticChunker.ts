@@ -15,7 +15,7 @@ import type {
   Chunker,
   ChunkerValidationResult,
   SemanticChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Semantic chunker implementation

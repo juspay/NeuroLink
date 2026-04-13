@@ -9,7 +9,7 @@
 
 import { logger } from "./logger.js";
 import { ErrorFactory } from "./errorHandling.js";
-import type { RateLimiterConfig } from "../types/configTypes.js";
+import type { RateLimiterConfig } from "../types/index.js";
 
 /**
  * Default configuration: 10 downloads per second

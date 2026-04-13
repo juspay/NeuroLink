@@ -6,10 +6,14 @@ import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { NeurolinkCredentials } from "../types/providers.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { ValidationSchema } from "../types/typeAliases.js";
+import type {
+  UnknownRecord,
+  NeurolinkCredentials,
+  StreamOptions,
+  StreamResult,
+  ValidationSchema,
+} from "../types/index.js";
+
 import { logger } from "../utils/logger.js";
 import {
   createMistralConfig,

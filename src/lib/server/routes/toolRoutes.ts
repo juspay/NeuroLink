@@ -8,7 +8,7 @@ import type {
   ServerContext,
   ToolExecuteRequest,
   ToolExecuteResponse,
-} from "../types.js";
+} from "../../types/index.js";
 import {
   createErrorResponse,
   ToolArgumentsSchema,

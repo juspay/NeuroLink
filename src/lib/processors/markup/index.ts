@@ -69,7 +69,6 @@ export {
   // Helper functions
   isSvgFile,
   // Types
-  type ProcessedSvg,
   processSvg,
   // Processor class
   SvgProcessor,
@@ -90,7 +89,6 @@ export {
   // Helper functions
   isHtmlFile,
   // Types
-  type ProcessedHtml,
   processHtml,
   validateHtmlSize,
 } from "./HtmlProcessor.js";
@@ -107,7 +105,6 @@ export {
   // Singleton instance
   markdownProcessor,
   // Types
-  type ProcessedMarkdown,
   processMarkdown,
   validateMarkdownSize,
 } from "./MarkdownProcessor.js";
@@ -120,7 +117,6 @@ export {
   // Helper functions
   isTextFile,
   // Types
-  type ProcessedText,
   processText,
   // Processor class
   TextProcessor,

@@ -40,91 +40,19 @@ import { withTimeout } from "../../utils/errorHandling.js";
 import type { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessedFileBase,
-  ProcessOptions,
   ProcessorMatch,
-} from "../base/types.js";
+  BatchFileProcessingResult,
+  FileProcessingOptions,
+} from "../../types/index.js";
 import { getProcessorRegistry } from "../registry/index.js";
-
 // =============================================================================
 // PROCESSING OPTIONS
 // =============================================================================
-
-/**
- * Options for processing files through the registry.
- * Extends base ProcessOptions with registry-specific options.
- *
- * @example
- * ```typescript
- * const options: FileProcessingOptions = {
- *   // Base options
- *   authHeaders: { Authorization: "Bearer token" },
- *   timeout: 60000,
- *
- *   // Registry-specific options
- *   preferredProcessor: "pdf",      // Use specific processor
- *   allowFallback: true,            // Allow fallback if no processor found
- *   maxFiles: 50,                   // Limit batch processing
- * };
- * ```
- */
-export type FileProcessingOptions = ProcessOptions & {
-  /** Preferred processor name (bypasses auto-detection) */
-  preferredProcessor?: string;
-  /** Whether to fall back to default processing if no processor found */
-  allowFallback?: boolean;
-  /** Maximum number of files to process (default: 100) */
-  maxFiles?: number;
-};
-
 // =============================================================================
 // BATCH PROCESSING RESULT
 // =============================================================================
-
-/**
- * Result of processing multiple files through the registry.
- * Categorizes files into successful, failed, and skipped.
- *
- * @example
- * ```typescript
- * const result = await processBatchWithRegistry(files);
- *
- * // Handle successful files
- * for (const { fileInfo, processorName, result } of result.successful) {
- *   console.log(`${fileInfo.name}: processed by ${processorName}`);
- * }
- *
- * // Handle failed files
- * for (const { fileInfo, error } of result.failed) {
- *   console.error(`${fileInfo.name}: ${error}`);
- * }
- *
- * // Handle skipped files
- * for (const { fileInfo, reason } of result.skipped) {
- *   console.warn(`${fileInfo.name}: ${reason}`);
- * }
- * ```
- */
-export type BatchFileProcessingResult = {
-  /** Successfully processed files */
-  successful: Array<{
-    fileInfo: FileInfo;
-    processorName: string;
-    result: FileProcessingResult<ProcessedFileBase>;
-  }>;
-  /** Files that failed to process */
-  failed: Array<{
-    fileInfo: FileInfo;
-    error: string;
-  }>;
-  /** Files that were skipped (no processor found or over limit) */
-  skipped: Array<{
-    fileInfo: FileInfo;
-    reason: string;
-  }>;
-};
-
 // =============================================================================
 // SINGLE FILE PROCESSING
 // =============================================================================
@@ -169,7 +97,7 @@ export async function processFileWithRegistry(
   options?: FileProcessingOptions,
 ): Promise<{
   processorName: string | null;
-  result: FileProcessingResult<ProcessedFileBase> | null;
+  result: ProcessorFileProcessingResult<ProcessedFileBase> | null;
 }> {
   const registry = await getProcessorRegistry();
 

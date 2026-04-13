@@ -20,7 +20,7 @@ import type {
   OAuth2Config,
   SupabaseConfig,
   WorkOSConfig,
-} from "../types/authTypes.js";
+} from "../types/index.js";
 
 /**
  * Narrow `AuthProviderConfig` to a specific provider variant.

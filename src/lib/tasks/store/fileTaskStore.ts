@@ -28,7 +28,7 @@ import {
   type TaskManagerConfig,
   type ConversationEntry,
   TASK_DEFAULTS,
-} from "../../types/taskTypes.js";
+} from "../../types/index.js";
 
 export class FileTaskStore implements TaskStore {
   readonly type = "file" as const;

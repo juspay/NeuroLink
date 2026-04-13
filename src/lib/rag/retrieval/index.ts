@@ -5,7 +5,6 @@
 export {
   createVectorQueryTool,
   InMemoryVectorStore,
-  type VectorStore,
 } from "./vectorQueryTool.js";
 
 export {
@@ -13,6 +12,4 @@ export {
   InMemoryBM25Index,
   reciprocalRankFusion,
   linearCombination,
-  type BM25Index,
-  type HybridSearchOptions,
 } from "./hybridSearch.js";

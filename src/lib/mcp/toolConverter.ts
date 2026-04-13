@@ -9,122 +9,19 @@
  * @since 8.39.0
  */
 
-import type { JsonObject, JsonValue } from "../types/common.js";
 import type {
+  JsonObject,
+  JsonValue,
+  MCPServerTool,
+  MCPToolAnnotations,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "../types/mcpTypes.js";
-import type { MCPServerTool, MCPToolAnnotations } from "./toolAnnotations.js";
+  MCPProtocolTool,
+  NeuroLinkTool,
+  ToolConverterOptions,
+} from "../types/index.js";
 import { inferAnnotations } from "./toolAnnotations.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
-
-/**
- * NeuroLink internal tool format
- */
-export type NeuroLinkTool = {
-  /**
-   * Tool name
-   */
-  name: string;
-
-  /**
-   * Tool description
-   */
-  description: string;
-
-  /**
-   * Input parameters schema
-   */
-  parameters?: JsonObject;
-
-  /**
-   * Tool execution function
-   */
-  execute: (
-    params: unknown,
-    context?: NeuroLinkExecutionContext,
-  ) => Promise<ToolResult | unknown>;
-
-  /**
-   * Category for organization
-   */
-  category?: string;
-
-  /**
-   * Tags for filtering
-   */
-  tags?: string[];
-
-  /**
-   * Whether the tool is async
-   */
-  isAsync?: boolean;
-
-  /**
-   * Custom metadata
-   */
-  metadata?: Record<string, JsonValue>;
-};
-
-/**
- * MCP protocol tool format (from @modelcontextprotocol/sdk)
- */
-export type MCPProtocolTool = {
-  /**
-   * Tool name
-   */
-  name: string;
-
-  /**
-   * Tool description
-   */
-  description?: string;
-
-  /**
-   * JSON Schema for input
-   */
-  inputSchema: {
-    type: "object";
-    properties?: Record<string, JsonObject>;
-    required?: string[];
-  };
-
-  /**
-   * Optional annotations (MCP 2024-11-05+)
-   */
-  annotations?: {
-    title?: string;
-    readOnlyHint?: boolean;
-    destructiveHint?: boolean;
-    idempotentHint?: boolean;
-    openWorldHint?: boolean;
-  };
-};
-
-/**
- * Tool converter options
- */
-export type ToolConverterOptions = {
-  /**
-   * Automatically infer annotations from tool definition
-   */
-  inferAnnotations?: boolean;
-
-  /**
-   * Default annotations to apply
-   */
-  defaultAnnotations?: MCPToolAnnotations;
-
-  /**
-   * Whether to preserve original metadata
-   */
-  preserveMetadata?: boolean;
-
-  /**
-   * Namespace prefix for tool names
-   */
-  namespacePrefix?: string;
-};
 
 /**
  * Convert NeuroLink tool to MCP server tool format

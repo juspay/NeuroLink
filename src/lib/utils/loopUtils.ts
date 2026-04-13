@@ -9,8 +9,11 @@ import path from "path";
 import os from "os";
 import { globalSession } from "../session/globalSessionState.js";
 import { logger } from "./logger.js";
-import type { ChatMessage, ConversationData } from "../types/conversation.js";
-import type { SessionRestoreResult } from "../types/cli.js";
+import type {
+  ChatMessage,
+  ConversationData,
+  SessionRestoreResult,
+} from "../types/index.js";
 
 /**
  * Verify that conversation context is accessible and properly loaded

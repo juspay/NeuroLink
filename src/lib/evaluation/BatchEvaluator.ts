@@ -4,10 +4,13 @@
  */
 
 import type { LanguageModelV3CallOptions } from "@ai-sdk/provider";
-import type { GenerateResult } from "../types/generateTypes.js";
-import type { EvaluationConfig } from "../types/evaluationTypes.js";
-import type { EvaluationData } from "../types/evaluation.js";
-import type { AutoEvaluationConfig } from "../types/middlewareTypes.js";
+import type {
+  GenerateResult,
+  EvaluationConfig,
+  EvaluationData,
+  AutoEvaluationConfig,
+} from "../types/index.js";
+
 import { Evaluator } from "./index.js";
 import {
   createBatchEvaluationError,
@@ -19,7 +22,7 @@ import { NeuroLinkFeatureError } from "../core/infrastructure/index.js";
 /**
  * Configuration for batch evaluation.
  */
-export interface BatchEvaluationConfig extends EvaluationConfig {
+type BatchEvaluationConfig = EvaluationConfig & {
   /** Maximum number of concurrent evaluations (default: 5) */
   concurrency?: number;
   /** Whether to continue on individual failures (default: true) */
@@ -32,12 +35,12 @@ export interface BatchEvaluationConfig extends EvaluationConfig {
   onProgress?: (progress: BatchProgress) => void;
   /** Callback for individual evaluation completion */
   onItemComplete?: (result: BatchEvaluationItemResult) => void;
-}
+};
 
 /**
  * Progress information for batch evaluation.
  */
-export interface BatchProgress {
+type BatchProgress = {
   /** Total items to evaluate */
   total: number;
   /** Items completed (success + failed) */
@@ -50,12 +53,12 @@ export interface BatchProgress {
   pending: number;
   /** Percentage complete */
   percentComplete: number;
-}
+};
 
 /**
  * Input item for batch evaluation.
  */
-export interface BatchEvaluationItem {
+type BatchEvaluationItem = {
   /** Unique identifier for this item */
   id: string;
   /** The generation options */
@@ -64,12 +67,12 @@ export interface BatchEvaluationItem {
   result: GenerateResult;
   /** Optional item-specific threshold override */
   threshold?: number;
-}
+};
 
 /**
  * Result for a single item in batch evaluation.
  */
-export interface BatchEvaluationItemResult {
+type BatchEvaluationItemResult = {
   /** The item ID */
   id: string;
   /** Whether the evaluation succeeded */
@@ -86,12 +89,12 @@ export interface BatchEvaluationItemResult {
   duration: number;
   /** Number of retry attempts (if any) */
   retryCount: number;
-}
+};
 
 /**
  * Result of a batch evaluation operation.
  */
-export interface BatchEvaluationResult {
+type BatchEvaluationResult = {
   /** All item results */
   results: BatchEvaluationItemResult[];
   /** Summary statistics */
@@ -113,7 +116,7 @@ export interface BatchEvaluationResult {
   };
   /** Whether all evaluations succeeded */
   allSucceeded: boolean;
-}
+};
 
 function hasEvaluationData(
   result: BatchEvaluationItemResult,

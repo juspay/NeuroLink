@@ -2,7 +2,7 @@ import type { LanguageModelMiddleware } from "ai";
 import type {
   NeuroLinkMiddleware,
   NeuroLinkMiddlewareMetadata,
-} from "../../types/middlewareTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**

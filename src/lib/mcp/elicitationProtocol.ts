@@ -17,131 +17,28 @@
  */
 
 import { randomUUID } from "crypto";
-import type { JsonValue } from "../types/common.js";
-import { logger } from "../utils/logger.js";
-import { withTimeout } from "../utils/async/withTimeout.js";
 import type {
+  JsonValue,
+  ElicitationCancelMessage,
+  ElicitationProtocolAdapterConfig,
+  ElicitationProtocolHandler,
+  ElicitationProtocolPayload,
+  ElicitationRequestMessage,
+  ElicitationRequestParams,
+  ElicitationResponseMessage,
+  ElicitationResponseParams,
   Elicitation,
   ElicitationResponse,
-  ElicitationType,
   ElicitationHandler,
   FormField,
   SelectOption,
-} from "./elicitation/types.js";
+} from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import { withTimeout } from "../utils/async/withTimeout.js";
 import {
   ElicitationManager,
   globalElicitationManager,
 } from "./elicitation/elicitationManager.js";
-
-/**
- * MCP elicitation protocol message types
- */
-export type ElicitationProtocolMessageType =
-  | "elicitation/request"
-  | "elicitation/response"
-  | "elicitation/cancel";
-
-/**
- * Request params type
- */
-export type ElicitationRequestParams = {
-  type: ElicitationType;
-  message: string;
-  toolName: string;
-  serverId?: string;
-  timeout?: number;
-  optional?: boolean;
-  defaultValue?: JsonValue;
-  options?: Record<string, JsonValue>;
-};
-
-/**
- * Response params type
- */
-export type ElicitationResponseParams = {
-  requestId: string;
-  responded: boolean;
-  value?: JsonValue;
-  cancelled?: boolean;
-  timedOut?: boolean;
-  error?: string;
-};
-
-/**
- * Cancel params type
- */
-export type ElicitationCancelParams = {
-  requestId: string;
-  reason?: string;
-};
-
-/**
- * Base protocol message structure
- */
-export type ElicitationProtocolMessage = {
-  jsonrpc: "2.0";
-  id: string;
-  method: ElicitationProtocolMessageType;
-  params:
-    | ElicitationRequestParams
-    | ElicitationResponseParams
-    | ElicitationCancelParams;
-};
-
-/**
- * Elicitation request protocol message
- */
-export type ElicitationRequestMessage = {
-  jsonrpc: "2.0";
-  id: string;
-  method: "elicitation/request";
-  params: ElicitationRequestParams;
-};
-
-/**
- * Elicitation response protocol message
- */
-export type ElicitationResponseMessage = {
-  jsonrpc: "2.0";
-  id: string;
-  method: "elicitation/response";
-  params: ElicitationResponseParams;
-};
-
-/**
- * Elicitation cancel protocol message
- */
-export type ElicitationCancelMessage = {
-  jsonrpc: "2.0";
-  id: string;
-  method: "elicitation/cancel";
-  params: ElicitationCancelParams;
-};
-
-/**
- * Protocol message union type
- */
-export type ElicitationProtocolPayload =
-  | ElicitationRequestMessage
-  | ElicitationResponseMessage
-  | ElicitationCancelMessage;
-
-/**
- * Protocol handler function type
- */
-export type ElicitationProtocolHandler = (
-  message: ElicitationProtocolPayload,
-) => Promise<ElicitationProtocolPayload | void>;
-
-/**
- * Protocol adapter configuration
- */
-export type ElicitationProtocolAdapterConfig = {
-  manager?: ElicitationManager;
-  defaultTimeout?: number;
-  enableLogging?: boolean;
-  customHandler?: ElicitationProtocolHandler;
-};
 
 /**
  * Create an elicitation request protocol message

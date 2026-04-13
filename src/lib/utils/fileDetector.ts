@@ -17,7 +17,7 @@ import type {
   FileProcessingResult,
   FileSource,
   FileType,
-} from "../types/fileTypes.js";
+} from "../types/index.js";
 import { tracers, ATTR, withSpan } from "../telemetry/index.js";
 import { CSVProcessor } from "./csvProcessor.js";
 import { ImageProcessor } from "./imageProcessor.js";

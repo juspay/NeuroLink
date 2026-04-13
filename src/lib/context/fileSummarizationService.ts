@@ -15,14 +15,14 @@
 import { estimateTokens } from "../utils/tokenEstimation.js";
 import {
   buildFileSummarizationPrompt,
-  type FileForSummarization,
-  type FileSummarizationCheckParams,
   planFileSummarization,
-  type SummarizedFile,
 } from "./fileSummarizer.js";
-import type { RawFileInput } from "../types/contextTypes.js";
-
-export type { RawFileInput } from "../types/contextTypes.js";
+import type {
+  FileSummarizationCheckParams,
+  FileForSummarization,
+  RawFileInput,
+  SummarizedFile,
+} from "../types/index.js";
 
 // ---------------------------------------------------------------------------
 // Types

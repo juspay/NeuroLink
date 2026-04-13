@@ -16,11 +16,6 @@ import type {
   RAGCircuitBreakerStats,
 } from "../../types/index.js";
 
-export type { CircuitState } from "../../types/index.js";
-export type { RAGCircuitBreakerConfig } from "../../types/index.js";
-export type { RAGCircuitBreakerStats } from "../../types/index.js";
-export type { RAGCircuitBreakerEvents } from "../../types/index.js";
-
 /**
  * Call record for statistics
  */

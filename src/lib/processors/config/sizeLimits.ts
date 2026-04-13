@@ -316,15 +316,3 @@ export function validateFileSize(
 // =============================================================================
 // TYPE EXPORTS
 // =============================================================================
-
-/** Type for SIZE_LIMITS_MB keys */
-export type SizeLimitMBKey = keyof typeof SIZE_LIMITS_MB;
-
-/** Type for SIZE_LIMITS_BYTES keys */
-export type SizeLimitBytesKey = keyof typeof SIZE_LIMITS_BYTES;
-
-/** Type for PROCESSING_LIMITS keys */
-export type ProcessingLimitKey = keyof typeof PROCESSING_LIMITS;
-
-/** Type for the SIZE_LIMITS object */
-export type SizeLimits = typeof SIZE_LIMITS;

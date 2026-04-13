@@ -17,7 +17,7 @@ import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type {
   ProviderHealthCheckOptions,
   ProviderHealthStatusOptions,
-} from "../types/providers.js";
+} from "../types/index.js";
 
 export class ProviderHealthChecker {
   private static healthCache = new Map<

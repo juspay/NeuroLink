@@ -11,7 +11,6 @@ export {
   NeverSampler,
   PrioritySampler,
   RatioSampler,
-  type Sampler,
   SamplerFactory,
   TraceIdRatioSampler,
 } from "./samplers.js";

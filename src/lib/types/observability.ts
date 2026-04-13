@@ -5,6 +5,7 @@
  */
 
 import type { AttributeValue } from "@opentelemetry/api";
+import type { SpanData } from "./span.js";
 
 /**
  * Trace name format for Langfuse traces
@@ -204,9 +205,7 @@ export type RetryPolicy = {
   readonly name: string;
 
   /** Decide whether to retry */
-  shouldRetry(
-    context: import("../observability/retryPolicy.js").RetryContext,
-  ): import("../observability/retryPolicy.js").RetryDecision;
+  shouldRetry(context: RetryContext): RetryDecision;
 
   /** Maximum attempts allowed */
   readonly maxAttempts: number;
@@ -223,9 +222,7 @@ export type Sampler = {
   readonly name: string;
 
   /** Determine if a span should be sampled */
-  shouldSample(
-    span: import("../observability/types/spanTypes.js").SpanData,
-  ): boolean;
+  shouldSample(span: SpanData): boolean;
 
   /** Get sampling decision description */
   getDescription(): string;
@@ -239,15 +236,249 @@ export type SpanProcessor = {
   readonly name: string;
 
   /** Process a span before export, returns null to drop the span */
-  process(
-    span: import("../observability/types/spanTypes.js").SpanData,
-  ): import("../observability/types/spanTypes.js").SpanData | null;
+  process(span: SpanData): SpanData | null;
 
   /** Optional async processing (for external lookups, etc.) */
-  processAsync?(
-    span: import("../observability/types/spanTypes.js").SpanData,
-  ): Promise<import("../observability/types/spanTypes.js").SpanData | null>;
+  processAsync?(span: SpanData): Promise<SpanData | null>;
 
   /** Shutdown the processor (cleanup resources) */
   shutdown?(): Promise<void>;
+};
+
+// =============================================================================
+// TRACE VIEW (moved from observability/metricsAggregator.ts)
+// =============================================================================
+
+/**
+ * Hierarchical trace view grouping related spans
+ */
+export type TraceView = {
+  /** Trace identifier shared by all spans in this trace */
+  traceId: string;
+  /** The root/parent span of this trace */
+  rootSpan: SpanData;
+  /** Child spans linked to the root */
+  childSpans: SpanData[];
+  /** Total duration from first to last span */
+  totalDurationMs: number;
+  /** Total number of spans in this trace */
+  spanCount: number;
+  /** Overall trace status */
+  status: "ok" | "error" | "partial";
+};
+
+// =============================================================================
+// LANGFUSE CONTEXT (moved from services/server/ai/observability/instrumentation.ts)
+// =============================================================================
+
+/**
+ * Extended context for Langfuse spans.
+ * Supports all Langfuse trace attributes for rich observability.
+ */
+export type LangfuseContext = {
+  userId?: string | null;
+  sessionId?: string | null;
+  /** Conversation/thread identifier for grouping related traces */
+  conversationId?: string | null;
+  /** Request identifier for correlating with application logs */
+  requestId?: string | null;
+  /** Custom trace name for better organization in Langfuse UI */
+  traceName?: string | null;
+  /** Custom metadata to attach to spans */
+  metadata?: Record<string, unknown> | null;
+  /**
+   * Explicit operation name (e.g., "ai.streamText", "chat", "embeddings").
+   * If set, overrides auto-detection from the span name.
+   */
+  operationName?: string | null;
+  /**
+   * Override global autoDetectOperationName setting for this context.
+   * When undefined, uses the global setting (defaults to true).
+   */
+  autoDetectOperationName?: boolean;
+  /**
+   * Custom attributes to set on all spans within this context.
+   * These attributes are propagated to every span created within the
+   * AsyncLocalStorage context.
+   */
+  customAttributes?: Record<string, string | number | boolean>;
+};
+
+/**
+ * Latency statistics with percentile calculations
+ */
+
+export type LatencyStats = {
+  /** Minimum latency in milliseconds */
+  min: number;
+  /** Maximum latency in milliseconds */
+  max: number;
+  /** Mean/average latency in milliseconds */
+  mean: number;
+  /** Median latency (p50) in milliseconds */
+  median: number;
+  /** 50th percentile latency in milliseconds */
+  p50: number;
+  /** 75th percentile latency in milliseconds */
+  p75: number;
+  /** 90th percentile latency in milliseconds */
+  p90: number;
+  /** 95th percentile latency in milliseconds */
+  p95: number;
+  /** 99th percentile latency in milliseconds */
+  p99: number;
+  /** Standard deviation in milliseconds */
+  stdDev: number;
+  /** Total number of samples */
+  count: number;
+};
+
+/**
+ * Cost breakdown by provider
+ */
+
+export type ProviderCostStats = {
+  provider: string;
+  totalCost: number;
+  requestCount: number;
+  avgCostPerRequest: number;
+  inputCost: number;
+  outputCost: number;
+};
+
+/**
+ * Cost breakdown by model
+ */
+
+export type ModelCostStats = {
+  model: string;
+  provider: string;
+  totalCost: number;
+  requestCount: number;
+  avgCostPerRequest: number;
+  inputTokens: number;
+  outputTokens: number;
+  inputCost: number;
+  outputCost: number;
+};
+
+/**
+ * Aggregated metrics summary
+ */
+
+export type MetricsSummary = {
+  /** Total number of spans tracked */
+  totalSpans: number;
+  /** Number of successful spans */
+  successfulSpans: number;
+  /** Number of failed spans */
+  failedSpans: number;
+  /** Overall success rate (0-1) */
+  successRate: number;
+  /** Latency statistics */
+  latency: LatencyStats;
+  /** Token usage statistics */
+  tokens: TokenUsageStats;
+  /** Cost by provider */
+  costByProvider: ProviderCostStats[];
+  /** Cost by model */
+  costByModel: ModelCostStats[];
+  /** Total cost across all providers */
+  totalCost: number;
+  /** Span count by type */
+  spansByType: Record<string, number>;
+  /** Timestamp of first span */
+  firstSpanTime?: Date;
+  /** Timestamp of last span */
+  lastSpanTime?: Date;
+  /** Tracking duration in milliseconds */
+  trackingDurationMs?: number;
+};
+
+/**
+ * Result of a retry decision
+ */
+
+export type RetryDecision = {
+  /** Whether to retry */
+  shouldRetry: boolean;
+  /** Delay before retry in milliseconds */
+  delayMs: number;
+  /** Reason for the decision */
+  reason: string;
+};
+
+/**
+ * Context for retry decision making
+ */
+
+export type RetryContext = {
+  /** Current attempt number (0-indexed) */
+  attempt: number;
+  /** The error that triggered the retry */
+  error: Error;
+  /** Total elapsed time since first attempt */
+  elapsedMs: number;
+  /** Operation name for logging */
+  operationName: string;
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Token usage statistics by provider
+ */
+export type ProviderTokenStats = {
+  provider: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cost: number;
+  requestCount: number;
+};
+
+/**
+ * Token usage statistics by model
+ */
+export type ModelTokenStats = {
+  model: string;
+  provider: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cost: number;
+  requestCount: number;
+  avgTokensPerRequest: number;
+};
+
+/**
+ * Aggregated token usage statistics
+ */
+export type TokenUsageStats = {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  reasoningTokens: number;
+  totalCost: number;
+  byProvider: Map<string, ProviderTokenStats>;
+  byModel: Map<string, ModelTokenStats>;
+  bySpanType: Map<string, number>;
+};
+
+export type HealthMetrics = {
+  timestamp: number;
+  memoryUsage: NodeJS.MemoryUsage;
+  uptime: number;
+  activeConnections: number;
+  errorRate: number;
+  averageResponseTime: number;
+};
+
+export type SpanOptions = {
+  name: string;
+  tracer: import("@opentelemetry/api").Tracer;
+  kind?: import("@opentelemetry/api").SpanKind;
+  attributes?: Record<string, string | number | boolean | undefined>;
 };

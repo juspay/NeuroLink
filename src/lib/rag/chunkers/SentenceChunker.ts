@@ -4,7 +4,11 @@
  * Splits text by sentence boundaries for semantically meaningful chunks.
  */
 
-import type { Chunk, ChunkerConfig, ChunkingStrategy } from "../types.js";
+import type {
+  Chunk,
+  ChunkerConfig,
+  ChunkingStrategy,
+} from "../../types/index.js";
 import { BaseChunker, DEFAULT_CHUNKER_CONFIG } from "./BaseChunker.js";
 
 /**

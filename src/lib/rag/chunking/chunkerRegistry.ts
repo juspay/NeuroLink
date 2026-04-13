@@ -6,7 +6,7 @@
  */
 
 import { SemanticMarkdownChunker } from "../chunkers/SemanticMarkdownChunker.js";
-import type { Chunker, ChunkingStrategy } from "../types.js";
+import type { Chunker, ChunkingStrategy } from "../../types/index.js";
 import { CharacterChunker } from "./characterChunker.js";
 import { HTMLChunker } from "./htmlChunker.js";
 import { JSONChunker } from "./jsonChunker.js";

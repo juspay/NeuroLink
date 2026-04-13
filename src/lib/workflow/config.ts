@@ -7,16 +7,15 @@
 
 import { z } from "zod";
 import { AIProviderName } from "../constants/enums.js";
-import type { JsonValue } from "../types/common.js";
 import type {
+  JsonValue,
   ConditioningConfig,
   ExecutionConfig,
   JudgeConfig,
-  ModelConfig,
+  WorkflowModelConfig,
   ModelGroup,
   WorkflowConfig,
-} from "./types.js";
-
+} from "../types/index.js";
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -287,7 +286,7 @@ export function usesModelGroups(config: WorkflowConfig): boolean {
  * @param config - Workflow configuration
  * @returns Array of all model configs
  */
-export function getAllModels(config: WorkflowConfig): ModelConfig[] {
+export function getAllModels(config: WorkflowConfig): WorkflowModelConfig[] {
   if (usesModelGroups(config)) {
     return config.modelGroups?.flatMap((group) => group.models) ?? [];
   }
@@ -354,7 +353,7 @@ export function mergeWithDefaults(config: WorkflowConfig): WorkflowConfig {
 /**
  * Validation result for workflow configuration
  */
-export type WorkflowConfigValidationResult = {
+type WorkflowConfigValidationResult = {
   success: boolean;
   data?: WorkflowConfig;
   error?: z.ZodError;
@@ -406,9 +405,9 @@ export function createWorkflowConfig(
 /**
  * Validation result for model configuration
  */
-export type ModelConfigValidationResult = {
+type ModelConfigValidationResult = {
   success: boolean;
-  data?: ModelConfig;
+  data?: WorkflowModelConfig;
   error?: z.ZodError;
 };
 
@@ -418,12 +417,12 @@ export type ModelConfigValidationResult = {
  * @returns Validation result with parsed data or error details
  */
 export function validateModelConfig(
-  config: Partial<ModelConfig>,
+  config: Partial<WorkflowModelConfig>,
 ): ModelConfigValidationResult {
   const result = ModelConfigSchema.safeParse(config);
 
   if (result.success) {
-    return { success: true, data: result.data as ModelConfig };
+    return { success: true, data: result.data as WorkflowModelConfig };
   }
   return { success: false, error: result.error };
 }
@@ -431,7 +430,7 @@ export function validateModelConfig(
 /**
  * Validation result for judge configuration
  */
-export type JudgeConfigValidationResult = {
+type JudgeConfigValidationResult = {
   success: boolean;
   data?: JudgeConfig;
   error?: z.ZodError;

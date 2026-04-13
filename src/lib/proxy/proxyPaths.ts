@@ -15,17 +15,7 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-
-export type ProxyPaths = {
-  /** Base directory for proxy state files */
-  stateDir: string;
-  /** logs/ — request/response logs */
-  logsDir: string;
-  /** account-quotas.json — per-account rate limit state */
-  quotaFile: string;
-  /** Whether this is a dev-mode isolated instance */
-  isDev: boolean;
-};
+import type { ProxyPaths } from "../types/index.js";
 
 export function resolveProxyPaths(dev: boolean): ProxyPaths {
   if (dev) {

@@ -9,7 +9,7 @@ import type {
   PipelineConfig,
   ScoreResult,
   ScorerConfig,
-} from "../../types/scorerTypes.js";
+} from "../../types/index.js";
 import { EvaluationPipeline } from "./evaluationPipeline.js";
 
 /**

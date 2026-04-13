@@ -15,78 +15,21 @@
  */
 
 import { EventEmitter } from "events";
-import type { JsonValue } from "../types/common.js";
 import type {
-  MCPServerInfo,
-  MCPTransportType,
+  MCPServerBaseConfig,
   MCPServerCategory,
+  MCPServerInfo,
+  MCPServerTool,
+  MCPToolAnnotations,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "../types/mcpTypes.js";
-import type { MCPToolAnnotations, MCPServerTool } from "./toolAnnotations.js";
+} from "../types/index.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
 
 /**
  * MCPServerBase configuration
  */
-export type MCPServerBaseConfig = {
-  /**
-   * Unique server identifier
-   */
-  id: string;
-
-  /**
-   * Human-readable server name
-   */
-  name: string;
-
-  /**
-   * Server description
-   */
-  description?: string;
-
-  /**
-   * Server version
-   */
-  version?: string;
-
-  /**
-   * Server category for organization
-   */
-  category?: MCPServerCategory;
-
-  /**
-   * Transport protocol preference
-   */
-  transport?: MCPTransportType;
-
-  /**
-   * Custom metadata
-   */
-  metadata?: Record<string, JsonValue>;
-
-  /**
-   * Default timeout for tool execution in milliseconds (default: 30000)
-   */
-  defaultTimeoutMs?: number;
-
-  /**
-   * Global tool annotations applied to all tools
-   */
-  defaultAnnotations?: MCPToolAnnotations;
-};
-
-/**
- * Server lifecycle events
- */
-export type MCPServerEvents = {
-  toolRegistered: { toolName: string; tool: MCPServerTool };
-  toolExecuted: { toolName: string; duration: number; success: boolean };
-  toolError: { toolName: string; error: Error };
-  serverReady: { tools: string[] };
-  serverStopped: { reason?: string };
-};
 
 /**
  * Abstract base class for MCP servers
@@ -539,6 +482,3 @@ export abstract class MCPServerBase extends EventEmitter {
     return this.isRunning;
   }
 }
-
-// Re-export types from toolAnnotations for convenience
-export type { MCPToolAnnotations, MCPServerTool } from "./toolAnnotations.js";

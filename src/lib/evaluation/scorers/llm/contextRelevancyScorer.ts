@@ -7,7 +7,7 @@ import type {
   LLMScorerConfig,
   ScoreResult,
   ScorerInput,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseLLMScorer } from "./baseLLMScorer.js";
 
 const CONTEXT_RELEVANCY_PROMPT = `You are an expert at evaluating retrieval quality in RAG systems.

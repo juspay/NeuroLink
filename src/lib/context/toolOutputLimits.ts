@@ -7,11 +7,7 @@
 import type {
   ToolOutputPreviewOptions,
   ToolOutputPreviewResult,
-} from "../types/contextTypes.js";
-export type {
-  ToolOutputPreviewOptions,
-  ToolOutputPreviewResult,
-} from "../types/contextTypes.js";
+} from "../types/index.js";
 
 /** Default maximum preview size in bytes (50KB) */
 export const DEFAULT_MAX_PREVIEW_BYTES = 50 * 1024;

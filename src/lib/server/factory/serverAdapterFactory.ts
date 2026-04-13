@@ -11,7 +11,7 @@ import type {
   ServerAdapterConfig,
   ServerAdapterFactoryOptions,
   ServerFramework,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Factory for creating server adapters

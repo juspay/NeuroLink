@@ -6,26 +6,18 @@
  */
 
 import { BaseFactory } from "../../core/infrastructure/index.js";
-import type { AIProvider } from "../../types/providers.js";
-import { logger } from "../../utils/logger.js";
-import { RAGErrorCodes, RerankerError } from "../errors/RAGError.js";
 import type {
+  AIProvider,
   RerankerOptions,
   RerankResult,
   VectorQueryResult,
-} from "../types.js";
-import type {
   Reranker,
   RerankerConfig,
   RerankerMetadata,
   RerankerType,
-} from "../../types/ragTypes.js";
-
-export type { RerankerType } from "../../types/ragTypes.js";
-export type { Reranker } from "../../types/ragTypes.js";
-export type { RerankerConfig } from "../../types/ragTypes.js";
-export type { RerankerMetadata } from "../../types/ragTypes.js";
-
+} from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
+import { RAGErrorCodes, RerankerError } from "../errors/RAGError.js";
 /**
  * Default reranker metadata entries
  */
@@ -252,7 +244,9 @@ export class RerankerFactory extends BaseFactory<Reranker, RerankerConfig> {
     CrossEncoderClass: typeof import("./reranker.js").CrossEncoderReranker,
     config?: RerankerConfig,
   ): Reranker {
-    const encoder = new CrossEncoderClass(config?.model);
+    const encoder = new CrossEncoderClass(
+      typeof config?.model === "string" ? config.model : undefined,
+    );
     return {
       type: "cross-encoder" as RerankerType,
       async rerank(
@@ -289,7 +283,9 @@ export class RerankerFactory extends BaseFactory<Reranker, RerankerConfig> {
     CohereClass: typeof import("./reranker.js").CohereRelevanceScorer,
     config?: RerankerConfig,
   ): Reranker {
-    const scorer = new CohereClass(config?.model);
+    const scorer = new CohereClass(
+      typeof config?.model === "string" ? config.model : undefined,
+    );
     return {
       type: "cohere" as RerankerType,
       async rerank(

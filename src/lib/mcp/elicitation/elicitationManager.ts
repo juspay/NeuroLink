@@ -23,7 +23,7 @@ import type {
   MultiSelectElicitation,
   FormElicitation,
   SecretElicitation,
-} from "./types.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**

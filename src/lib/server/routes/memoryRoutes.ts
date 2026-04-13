@@ -3,7 +3,7 @@
  * Endpoints for conversation memory management
  */
 
-import type { RouteGroup, ServerContext } from "../types.js";
+import type { RouteGroup, ServerContext } from "../../types/index.js";
 import {
   createErrorResponse,
   IdParamSchema,

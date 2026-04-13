@@ -8,8 +8,8 @@ import type {
   ExportResult,
   LangfuseExporterConfig,
   SpanData,
-} from "../types/index.js";
-import { SpanType } from "../types/spanTypes.js";
+} from "../../types/index.js";
+import { SpanType } from "../../types/index.js";
 import { SpanSerializer } from "../utils/spanSerializer.js";
 import { BaseExporter } from "./baseExporter.js";
 

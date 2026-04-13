@@ -28,7 +28,7 @@ import type { ReactNode } from "react";
 
 import type {
   ClientConfig,
-  ApiError,
+  ClientApiError,
   NeuroLinkProviderProps,
   UseChatOptions,
   UseChatReturn,
@@ -43,21 +43,20 @@ import type {
   UseToolsOptions,
   UseToolsReturn,
   ClientChatMessage as ChatMessage,
-  AgentExecuteOptions,
-  AgentExecuteResult,
-  WorkflowExecuteOptions,
-  WorkflowExecuteResult,
-  StreamCallbacks,
+  ClientAgentExecuteOptions,
+  ClientAgentExecuteResult,
+  ClientWorkflowExecuteOptions,
+  ClientWorkflowExecuteResult,
+  ClientStreamCallbacks,
   ClientStreamEvent as StreamEvent,
-  ToolInfo,
+  ClientToolInfo,
   SpeechRecognitionInternal,
   SpeechRecognitionEventInternal,
   SpeechRecognitionErrorEventInternal,
-} from "../types/clientTypes.js";
+  UnknownRecord,
+  StreamToolCall,
+} from "../types/index.js";
 import { NeuroLinkClient, createClient } from "./httpClient.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { ToolCall } from "../types/streamTypes.js";
-
 // =============================================================================
 // Context and Provider
 // =============================================================================
@@ -185,8 +184,8 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<ApiError | null>(null);
-  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const [error, setError] = useState<ClientApiError | null>(null);
+  const [toolCalls, setToolCalls] = useState<StreamToolCall[]>([]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const sessionIdRef = useRef<string | undefined>(initialSessionId);
@@ -226,7 +225,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
       abortControllerRef.current = new AbortController();
 
       const assistantId = generateId();
-      const currentToolCalls: ToolCall[] = [];
+      const currentToolCalls: StreamToolCall[] = [];
       let assistantContent = "";
 
       // Add placeholder for assistant message
@@ -330,7 +329,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         if ((err as Error).name === "AbortError") {
           return null;
         }
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
         return null;
@@ -482,8 +481,8 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [result, setResult] = useState<AgentExecuteResult | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [result, setResult] = useState<ClientAgentExecuteResult | null>(null);
+  const [error, setError] = useState<ClientApiError | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const hasAutoExecuted = useRef(false);
@@ -500,8 +499,8 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
   const execute = useCallback(
     async (
       input: string,
-      executeOptions?: Partial<AgentExecuteOptions>,
-    ): Promise<AgentExecuteResult> => {
+      executeOptions?: Partial<ClientAgentExecuteOptions>,
+    ): Promise<ClientAgentExecuteResult> => {
       setIsLoading(true);
       setError(null);
 
@@ -525,7 +524,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
 
         return agentResult;
       } catch (err) {
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
         throw err;
@@ -541,7 +540,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
    * Stream agent execution
    */
   const stream = useCallback(
-    async (input: string, callbacks?: StreamCallbacks): Promise<void> => {
+    async (input: string, callbacks?: ClientStreamCallbacks): Promise<void> => {
       setIsStreaming(true);
       setIsLoading(true);
       setError(null);
@@ -575,7 +574,7 @@ export function useAgent(options: UseAgentOptions): UseAgentReturn {
           { signal: abortControllerRef.current.signal },
         );
       } catch (err) {
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
       } finally {
@@ -674,12 +673,14 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
 
   const client = useNeuroLinkClient();
   const [runId, setRunId] = useState<string | null>(null);
-  const [status, setStatus] = useState<WorkflowExecuteResult["status"] | null>(
+  const [status, setStatus] = useState<
+    ClientWorkflowExecuteResult["status"] | null
+  >(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<ClientWorkflowExecuteResult | null>(
     null,
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<WorkflowExecuteResult | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [error, setError] = useState<ClientApiError | null>(null);
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousStepsRef = useRef<Set<string>>(new Set());
@@ -741,7 +742,7 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
       } catch (err) {
         stopPolling();
         setIsLoading(false);
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
       }
@@ -769,8 +770,8 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
   const execute = useCallback(
     async (
       input: UnknownRecord,
-      executeOptions?: Partial<WorkflowExecuteOptions>,
-    ): Promise<WorkflowExecuteResult> => {
+      executeOptions?: Partial<ClientWorkflowExecuteOptions>,
+    ): Promise<ClientWorkflowExecuteResult> => {
       setIsLoading(true);
       setError(null);
       setStatus(null);
@@ -806,7 +807,7 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
         return workflowResult;
       } catch (err) {
         setIsLoading(false);
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
         throw err;
@@ -822,7 +823,7 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
     async (
       resumeToken: string,
       resumeData?: UnknownRecord,
-    ): Promise<WorkflowExecuteResult> => {
+    ): Promise<ClientWorkflowExecuteResult> => {
       setIsLoading(true);
       setError(null);
 
@@ -849,7 +850,7 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
         return workflowResult;
       } catch (err) {
         setIsLoading(false);
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
         throw err;
@@ -862,7 +863,7 @@ export function useWorkflow(options: UseWorkflowOptions): UseWorkflowReturn {
    * Get workflow status
    */
   const getStatus = useCallback(
-    async (statusRunId: string): Promise<WorkflowExecuteResult> => {
+    async (statusRunId: string): Promise<ClientWorkflowExecuteResult> => {
       const response = await client.getWorkflowStatus(workflowId, statusRunId);
       return response.data;
     },
@@ -969,7 +970,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState<string | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [error, setError] = useState<ClientApiError | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionInternal | null>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -1025,7 +1026,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEventInternal) => {
-      const apiError: ApiError = {
+      const apiError: ClientApiError = {
         code: "SPEECH_RECOGNITION_ERROR",
         message: event.error,
         status: 500,
@@ -1103,7 +1104,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
             utterance.onerror = (event) => {
               setIsSpeaking(false);
-              const apiError: ApiError = {
+              const apiError: ClientApiError = {
                 code: "SPEECH_SYNTHESIS_ERROR",
                 message: event.error,
                 status: 500,
@@ -1119,7 +1120,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
         }
       } catch (err) {
         setIsSpeaking(false);
-        const apiError: ApiError = {
+        const apiError: ClientApiError = {
           code: "TTS_ERROR",
           message: (err as Error).message,
           status: 500,
@@ -1173,7 +1174,7 @@ export function useVoice(options: UseVoiceOptions = {}): UseVoiceReturn {
 
         return responseText;
       } catch (err) {
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         onError?.(apiError);
         throw err;
@@ -1242,7 +1243,7 @@ export function useStream(options: UseStreamOptions = {}): UseStreamReturn {
   const [text, setText] = useState("");
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [error, setError] = useState<ClientApiError | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -1327,7 +1328,7 @@ export function useStream(options: UseStreamOptions = {}): UseStreamReturn {
         if ((err as Error).name === "AbortError") {
           return;
         }
-        const apiError = err as ApiError;
+        const apiError = err as ClientApiError;
         setError(apiError);
         callbacks?.onError?.(apiError);
       } finally {
@@ -1397,9 +1398,9 @@ export function useTools(options: UseToolsOptions = {}): UseToolsReturn {
   const { category, serverId, refreshInterval } = options;
 
   const client = useNeuroLinkClient();
-  const [tools, setTools] = useState<ToolInfo[]>([]);
+  const [tools, setTools] = useState<ClientToolInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [error, setError] = useState<ClientApiError | null>(null);
 
   /**
    * Refresh tool list
@@ -1412,7 +1413,7 @@ export function useTools(options: UseToolsOptions = {}): UseToolsReturn {
       const response = await client.listTools({ category, serverId });
       setTools(response.data);
     } catch (err) {
-      const apiError = err as ApiError;
+      const apiError = err as ClientApiError;
       setError(apiError);
     } finally {
       setIsLoading(false);
@@ -1452,27 +1453,6 @@ export function useTools(options: UseToolsOptions = {}): UseToolsReturn {
     error,
   };
 }
-
-// =============================================================================
-// Type Exports
-// =============================================================================
-
-export type {
-  NeuroLinkProviderProps,
-  UseChatOptions,
-  UseChatReturn,
-  UseAgentOptions,
-  UseAgentReturn,
-  UseWorkflowOptions,
-  UseWorkflowReturn,
-  UseVoiceOptions,
-  UseVoiceReturn,
-  UseStreamOptions,
-  UseStreamReturn,
-  UseToolsOptions,
-  UseToolsReturn,
-  ChatMessage,
-};
 
 // Type augmentation for SpeechRecognition (browser APIs)
 declare global {

@@ -8,65 +8,22 @@
  * @since 8.39.0
  */
 
-import type { JsonObject } from "../types/common.js";
 import type {
+  JsonObject,
   NeuroLinkExecutionContext,
+  MCPServerTool,
   ToolResult,
-} from "../types/mcpTypes.js";
-import type { MCPServerTool, MCPToolAnnotations } from "./toolAnnotations.js";
-import type {
+  EnhancedExecutionContext,
+  ToolMiddleware,
+  ToolWrapperOptions,
   ElicitationContext,
   ElicitationHandler,
   Elicitation,
   FormField,
-} from "./elicitation/types.js";
+} from "../types/index.js";
 import { ElicitationManager } from "./elicitation/elicitationManager.js";
 import { ErrorFactory, withTimeout } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
-
-/**
- * Tool execution context with elicitation support
- */
-export type EnhancedExecutionContext = NeuroLinkExecutionContext & {
-  /**
-   * Elicitation context for interactive input
-   */
-  elicitation: ElicitationContext;
-
-  /**
-   * Tool metadata
-   */
-  toolMeta: {
-    name: string;
-    serverId?: string;
-    annotations?: MCPToolAnnotations;
-  };
-};
-
-/**
- * Tool wrapper options
- */
-export type ToolWrapperOptions = {
-  /**
-   * Elicitation manager to use
-   */
-  elicitationManager?: ElicitationManager;
-
-  /**
-   * Auto-confirm destructive operations
-   */
-  autoConfirmDestructive?: boolean;
-
-  /**
-   * Default timeout for elicitations
-   */
-  elicitationTimeout?: number;
-
-  /**
-   * Enable logging
-   */
-  enableLogging?: boolean;
-};
 
 /**
  * Create elicitation context for a tool
@@ -210,16 +167,6 @@ export function wrapToolsWithElicitation(
 ): MCPServerTool[] {
   return tools.map((tool) => wrapToolWithElicitation(tool, options));
 }
-
-/**
- * Tool execution middleware
- */
-export type ToolMiddleware = (
-  tool: MCPServerTool,
-  params: unknown,
-  context: EnhancedExecutionContext,
-  next: () => Promise<ToolResult | unknown>,
-) => Promise<ToolResult | unknown>;
 
 /**
  * Create a middleware chain for tool execution

@@ -20,17 +20,9 @@ import {
   DEFAULT_MAX_STEPS,
   DEFAULT_TOOL_MAX_RETRIES,
 } from "../core/constants.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
-import { logger } from "../utils/logger.js";
-import {
-  convertZodToJsonSchema,
-  inlineJsonSchema,
-  isZodSchema,
-  normalizeJsonSchemaObject,
-} from "../utils/schemaConversion.js";
-import type { ThinkingConfig } from "../types/configTypes.js";
-import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
 import type {
+  ZodUnknownSchema,
+  ThinkingConfig,
   CollectedChunkResult,
   NativeFunctionCall,
   NativeFunctionDeclaration,
@@ -40,7 +32,15 @@ import type {
   TextChannel,
   ToolWithLegacyParams,
 } from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import {
+  convertZodToJsonSchema,
+  inlineJsonSchema,
+  isZodSchema,
+  normalizeJsonSchemaObject,
+} from "../utils/schemaConversion.js";
 
+import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
 export type {
   CollectedChunkResult,
   NativeFunctionCall,

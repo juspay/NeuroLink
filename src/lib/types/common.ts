@@ -13,7 +13,7 @@ import type {
   AutoresearchRevertEvent,
   AutoresearchRevertFailedEvent,
   AutoresearchStateUpdatedEvent,
-} from "./autoresearchTypes.js";
+} from "./autoresearch.js";
 
 /**
  * Type-safe unknown value - use when type is truly unknown
@@ -156,7 +156,7 @@ export function toErrorInfo(error: unknown): ErrorInfo {
 /**
  * Stream event types for real-time communication
  */
-export type StreamEvent = {
+export type InternalStreamEvent = {
   type: "stream:chunk" | "stream:complete" | "stream:error";
   content?: string;
   metadata?: JsonObject;
@@ -308,6 +308,22 @@ export type SafeParseResult<T> = {
   success: boolean;
   data: T | null;
   error: Error | null;
+};
+
+// =============================================================================
+// INFRASTRUCTURE RETRY OPTIONS (moved from core/infrastructure/retry.ts)
+// =============================================================================
+
+/**
+ * Simple retry options for infrastructure-level retry logic.
+ * Named InfraRetryOptions to avoid collision with utilities.ts RetryOptions and
+ * common.ts AsyncRetryOptions.
+ */
+export type InfraRetryOptions = {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs?: number;
+  shouldRetry?: (error: Error) => boolean;
 };
 
 // =============================================================================
@@ -466,6 +482,8 @@ export type ErrorCode = string;
 // =============================================================================
 
 import type { z } from "zod";
+import type { TTSOptions, TTSResult, TTSVoice } from "./tts.js";
+import type { SageMakerStreamChunk, SageMakerUsage } from "./providers.js";
 
 /** Utility functions for tool management. */
 export type ToolUtilities = {
@@ -476,3 +494,142 @@ export type ToolUtilities = {
     schema: Record<string, unknown>,
   ) => Record<string, unknown>;
 };
+
+/**
+ * TTS Handler interface for provider-specific implementations
+ *
+ * Each provider (Google AI, OpenAI, etc.) implements this interface
+ * to provide TTS generation capabilities using their respective APIs.
+ *
+ * **Timeout Handling:**
+ * Implementations MUST handle their own timeouts for the `synthesize()` method.
+ * Recommended timeout: 30 seconds. Implementations should use `withTimeout()` utility
+ * or provider-specific timeout mechanisms (e.g., Google Cloud client timeout).
+ *
+ * **Error Handling:**
+ * Implementations should throw TTSError for all failures, including timeouts.
+ * Use appropriate error codes from TTS_ERROR_CODES.
+ *
+ * @example
+ * ```typescript
+ * class MyTTSHandler implements TTSHandler {
+ *   async synthesize(text: string, options: TTSOptions): Promise<TTSResult> {
+ *     // REQUIRED: Implement timeout handling
+ *     return await withTimeout(
+ *       this.actualSynthesis(text, options),
+ *       30000, // 30 second timeout
+ *       'TTS synthesis timed out'
+ *     );
+ *   }
+ *
+ *   isConfigured(): boolean {
+ *     return !!process.env.MY_TTS_API_KEY;
+ *   }
+ * }
+ * ```
+ */
+
+export type TTSHandler = {
+  /**
+   * Generate audio from text using provider-specific TTS API
+   *
+   * **IMPORTANT: Timeout Responsibility**
+   * Implementations MUST enforce their own timeouts (recommended: 30 seconds).
+   * Use the `withTimeout()` utility or provider-specific timeout mechanisms.
+   *
+   * @param text - Text to convert to speech (pre-validated, non-empty, within length limits)
+   * @param options - TTS configuration options (voice, format, speed, etc.)
+   * @returns Audio buffer with metadata
+   * @throws {TTSError} On synthesis failure, timeout, or configuration issues
+   */
+  synthesize(text: string, options: TTSOptions): Promise<TTSResult>;
+
+  /**
+   * Get available voices for the provider
+   *
+   * @param languageCode - Optional language filter (e.g., "en-US")
+   * @returns List of available voices
+   */
+  getVoices?(languageCode?: string): Promise<TTSVoice[]>;
+
+  /**
+   * Validate that the provider is properly configured
+   *
+   * @returns True if provider can generate TTS
+   */
+  isConfigured(): boolean;
+
+  /**
+   * Maximum text length supported by this provider (in bytes)
+   * Different providers have different limits
+   *
+   * @default 3000 if not specified
+   */
+  maxTextLength?: number;
+};
+
+// Initial backoff on rate limit detection (ms)
+
+/**
+ * Streaming capability information for an endpoint
+ */
+
+export type StreamingCapability = {
+  /** Whether streaming is supported */
+  supported: boolean;
+  /** Detected streaming protocol */
+  protocol: "sse" | "jsonl" | "chunked" | "none";
+  /** Detected model framework */
+  modelType: "huggingface" | "llama" | "pytorch" | "tensorflow" | "custom";
+  /** Test endpoint for streaming validation */
+  testEndpoint?: string;
+  /** Required parameters for streaming */
+  parameters?: Record<string, unknown>;
+  /** Confidence level of detection (0-1) */
+  confidence: number;
+  /** Additional metadata about the model */
+  metadata?: {
+    modelName?: string;
+    framework?: string;
+    version?: string;
+    tags?: string[];
+  };
+};
+
+// Minimum length for JSON object "{}"
+
+/**
+ * Shared bracket counting state and utilities
+ * Used by both validateJSONCompleteness and StructuredOutputParser
+ */
+
+export type BracketCountingState = {
+  braceCount: number;
+  bracketCount: number;
+  inString: boolean;
+  escapeNext: boolean;
+};
+
+/**
+ * Base interface for streaming response parsers
+ */
+
+export type StreamingParser = {
+  /** Parse a chunk of streaming data */
+  parse(chunk: Uint8Array): SageMakerStreamChunk[];
+
+  /** Check if a chunk indicates completion */
+  isComplete(chunk: SageMakerStreamChunk): boolean;
+
+  /** Extract final usage information */
+  extractUsage(finalChunk: SageMakerStreamChunk): SageMakerUsage | undefined;
+
+  /** Get parser name for debugging */
+  getName(): string;
+
+  /** Reset parser state for new stream */
+  reset(): void;
+};
+
+export type HippocampusMemory =
+  import("@juspay/hippocampus").HippocampusConfig & { enabled?: boolean };

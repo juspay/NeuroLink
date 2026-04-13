@@ -7,7 +7,7 @@ import type {
   LLMScorerConfig,
   ScoreResult,
   ScorerInput,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseLLMScorer } from "./baseLLMScorer.js";
 
 const ANSWER_RELEVANCY_PROMPT = `You are evaluating if an AI response directly addresses the user's question.

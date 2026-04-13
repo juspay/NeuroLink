@@ -7,7 +7,7 @@
  * are tagged instead of deleted.
  */
 
-import type { ChatMessage } from "../types/conversation.js";
+import type { ChatMessage } from "../types/index.js";
 
 /**
  * Get the effective (visible) history from a message array.

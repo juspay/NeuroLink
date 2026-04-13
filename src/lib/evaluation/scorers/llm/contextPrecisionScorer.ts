@@ -7,7 +7,7 @@ import type {
   LLMScorerConfig,
   ScoreResult,
   ScorerInput,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseLLMScorer } from "./baseLLMScorer.js";
 
 const CONTEXT_PRECISION_PROMPT = `Given a question and retrieved context chunks, evaluate if the relevant information appears earlier in the context.

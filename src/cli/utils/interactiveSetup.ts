@@ -10,9 +10,10 @@ import { NeuroLink } from "../../lib/neurolink.js";
 import chalk from "chalk";
 import ora from "ora";
 import { logger } from "../../lib/utils/logger.js";
+import type { SetupResult } from "../../lib/types/index.js";
 
 // Provider configuration definitions
-export type ProviderConfig = {
+type ProviderConfig = {
   id: AIProviderName;
   name: string;
   description: string;
@@ -222,18 +223,6 @@ export const PROVIDER_CONFIGS: ProviderConfig[] = [
     ],
   },
 ];
-
-export type SetupResult = {
-  selectedProviders: AIProviderName[];
-  credentials: Record<string, string>;
-  envFileBackup?: string;
-  testResults: Array<{
-    provider: AIProviderName;
-    status: "working" | "failed";
-    error?: string;
-    responseTime?: number;
-  }>;
-};
 
 /**
  * Run the interactive setup wizard

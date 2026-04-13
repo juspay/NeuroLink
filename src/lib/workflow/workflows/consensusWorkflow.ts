@@ -14,7 +14,7 @@
 
 import { AIProviderName } from "../../constants/enums.js";
 import { WORKFLOW_CREATION_DATE } from "../config.js";
-import type { WorkflowConfig } from "../types.js";
+import type { WorkflowConfig } from "../../types/index.js";
 
 /**
  * Consensus-3 Workflow Configuration

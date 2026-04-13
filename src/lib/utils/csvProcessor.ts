@@ -14,7 +14,7 @@ import type {
   CSVColumnDataType,
   CSVColumnMetadata,
   CSVDataQualityWarning,
-} from "../types/fileTypes.js";
+} from "../types/index.js";
 
 // ============================================================================
 // Data Type Detection Patterns

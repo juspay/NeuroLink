@@ -31,8 +31,8 @@ import type {
   ImageGenConfig,
   ImageGenOptions,
   ImageGenResult,
-} from "./types.js";
-import { DEFAULT_IMAGE_GEN_CONFIG } from "./types.js";
+} from "../types/index.js";
+import { DEFAULT_IMAGE_GEN_CONFIG } from "../types/index.js";
 
 /**
  * NeuroLink instance type (avoiding circular dependencies)

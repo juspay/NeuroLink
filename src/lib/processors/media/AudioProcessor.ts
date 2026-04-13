@@ -42,75 +42,16 @@ import { parseBuffer, selectCover } from "music-metadata";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
-  ProcessedFileBase,
+  ProcessedAudio,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+} from "../../types/index.js";
 import { SIZE_LIMITS_MB } from "../config/index.js";
 import { FileErrorCode } from "../errors/index.js";
 
 // =============================================================================
 // TYPES
 // =============================================================================
-
-/**
- * Processed audio file result.
- * Extends ProcessedFileBase with audio-specific metadata, tags, and transcript info.
- */
-export type ProcessedAudio = ProcessedFileBase & {
-  /** LLM-friendly text representation of the audio file metadata and tags */
-  textContent: string;
-  /** Audio stream metadata (codec, duration, bitrate, etc.) */
-  metadata: {
-    /** Duration in seconds */
-    duration: number;
-    /** Human-readable duration string (e.g., "3:45", "1:02:30") */
-    durationFormatted: string;
-    /** Audio codec name (e.g., "MPEG 1 Layer 3", "FLAC", "AAC") */
-    codec: string;
-    /** Codec profile if available (e.g., "CBR", "VBR") */
-    codecProfile?: string;
-    /** Bitrate in bits per second */
-    bitrate?: number;
-    /** Sample rate in Hz (e.g., 44100, 48000) */
-    sampleRate?: number;
-    /** Number of audio channels (e.g., 1 for mono, 2 for stereo) */
-    channels?: number;
-    /** Bits per sample (e.g., 16, 24) */
-    bitsPerSample?: number;
-    /** Whether the codec is lossless (e.g., FLAC, WAV) */
-    lossless: boolean;
-    /** File size in bytes */
-    fileSize: number;
-  };
-  /** Extracted ID3/Vorbis/APE tags */
-  tags: {
-    /** Track title */
-    title?: string;
-    /** Track artist */
-    artist?: string;
-    /** Album title */
-    album?: string;
-    /** Release year */
-    year?: number;
-    /** Genre tags */
-    genre?: string[];
-    /** Track number within album */
-    track?: { no: number | null; of: number | null };
-    /** Comment text (first comment if multiple) */
-    comment?: string;
-    /** Composer name (first composer if multiple) */
-    composer?: string;
-  };
-  /** Transcribed text content, if transcription was performed */
-  transcript?: string;
-  /** Whether a transcript is available */
-  hasTranscript: boolean;
-  /** Transcription provider used (e.g., "openai-whisper") */
-  transcriptionProvider?: string;
-  /** Embedded cover art image buffer, if present */
-  coverArt?: Buffer;
-};
 
 // =============================================================================
 // CONSTANTS
@@ -259,7 +200,7 @@ export class AudioProcessor extends BaseFileProcessor<ProcessedAudio> {
   override async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<ProcessedAudio>> {
+  ): Promise<ProcessorFileProcessingResult<ProcessedAudio>> {
     try {
       // Step 1: Validate file type and size
       const validationResult = this.validateFileWithResult(fileInfo);
@@ -896,6 +837,6 @@ export function isAudioFile(mimetype: string, filename: string): boolean {
 export async function processAudio(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedAudio>> {
+): Promise<ProcessorFileProcessingResult<ProcessedAudio>> {
   return audioProcessor.processFile(fileInfo, options);
 }

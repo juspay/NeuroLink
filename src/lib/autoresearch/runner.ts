@@ -7,10 +7,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { logger } from "../utils/logger.js";
 import { parseExperimentSummary } from "./summaryParser.js";
-import type {
-  ExperimentSummary,
-  ResearchConfig,
-} from "../types/autoresearchTypes.js";
+import type { ExperimentSummary, ResearchConfig } from "../types/index.js";
 
 export class ExperimentRunner {
   constructor(private config: ResearchConfig) {}

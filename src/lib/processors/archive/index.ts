@@ -37,14 +37,11 @@
 
 export {
   // Types
-  type ArchiveEntry,
-  type ArchiveFormat,
   // Class
   ArchiveProcessor,
   // Singleton instance
   archiveProcessor,
   // Helper functions
   isArchiveFile,
-  type ProcessedArchive,
   processArchive,
 } from "./ArchiveProcessor.js";

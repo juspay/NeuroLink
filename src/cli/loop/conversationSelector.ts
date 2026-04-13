@@ -8,12 +8,10 @@ import chalk from "chalk";
 import type {
   RedisConversationObject,
   ConversationSummary,
-} from "../../lib/types/index.js";
-import type { RedisStorageConfig } from "../../lib/types/index.js";
-import type {
+  RedisStorageConfig,
   ConversationChoice,
   MenuChoice,
-  RedisClient,
+  CliRedisClient,
 } from "../../lib/types/index.js";
 import {
   createRedisClient,
@@ -32,7 +30,7 @@ import {
 } from "../../lib/utils/loopUtils.js";
 
 export class ConversationSelector {
-  private redisClient: RedisClient | null = null;
+  private redisClient: CliRedisClient | null = null;
   private redisConfig: Required<RedisStorageConfig>;
   private conversationCache: ConversationSummary[] | null = null;
   private cacheTimestamp: number = 0;
@@ -47,11 +45,11 @@ export class ConversationSelector {
   private async initializeRedis(): Promise<void> {
     if (!this.redisClient) {
       // Cast is necessary: createRedisClient returns the ioredis client type which
-      // does not structurally match our RedisClient interface due to overloaded
+      // does not structurally match our CliRedisClient interface due to overloaded
       // method signatures. The runtime value is fully compatible.
       this.redisClient = (await createRedisClient(
         this.redisConfig,
-      )) as unknown as RedisClient;
+      )) as unknown as CliRedisClient;
     }
   }
 

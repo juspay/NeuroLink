@@ -5,7 +5,7 @@
  * this truncates the CONTENT of the longest messages as a last resort.
  */
 
-import type { ChatMessage } from "../types/conversation.js";
+import type { ChatMessage } from "../types/index.js";
 import {
   estimateTokens,
   estimateMessagesTokens,

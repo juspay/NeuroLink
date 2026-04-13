@@ -9,32 +9,18 @@
  */
 
 import type {
-  StreamCallbacks,
+  ClientStreamCallbacks,
   ClientStreamEvent as StreamEvent,
   ClientStreamResult as StreamResult,
-  ApiError,
-  WSClientState,
-  WSClientConfig,
-  WSClientMessage,
-  WSClientEventHandlers,
-} from "../types/clientTypes.js";
-
+  ClientApiError,
+  WebSocketEventHandlers,
+  ClientClientWebSocketState,
+  ClientWebSocketMessage,
+  ClientWebSocketConfig,
+} from "../types/index.js";
 // =============================================================================
 // Type Aliases (re-export canonical types under the original public names)
 // =============================================================================
-
-/** @see WSClientState */
-export type WebSocketState = WSClientState;
-
-/** @see WSClientConfig */
-export type WebSocketConfig = WSClientConfig;
-
-/** @see WSClientMessage */
-export type WebSocketMessage = WSClientMessage;
-
-/** @see WSClientEventHandlers */
-export type WebSocketEventHandlers = WSClientEventHandlers;
-
 // =============================================================================
 // Internal Types
 // =============================================================================
@@ -85,12 +71,12 @@ type InternalConfig = {
 export class NeuroLinkWebSocket {
   private ws: WebSocket | null = null;
   private config: InternalConfig;
-  private state: WebSocketState = "disconnected";
+  private state: ClientClientWebSocketState = "disconnected";
   private reconnectAttempts = 0;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  private messageQueue: WebSocketMessage[] = [];
+  private messageQueue: ClientWebSocketMessage[] = [];
   private eventHandlers: WebSocketEventHandlers = {};
-  private subscriptions = new Map<string, StreamCallbacks>();
+  private subscriptions = new Map<string, ClientStreamCallbacks>();
   private pendingAuth = false;
 
   /**
@@ -100,7 +86,7 @@ export class NeuroLinkWebSocket {
    */
   private disconnectRequested = false;
 
-  constructor(config: WebSocketConfig) {
+  constructor(config: ClientWebSocketConfig) {
     this.config = {
       baseUrl: config.baseUrl,
       apiKey: config.apiKey ?? "",
@@ -119,7 +105,7 @@ export class NeuroLinkWebSocket {
   /**
    * Get current connection state
    */
-  getState(): WebSocketState {
+  getState(): ClientClientWebSocketState {
     return this.state;
   }
 
@@ -204,7 +190,7 @@ export class NeuroLinkWebSocket {
   /**
    * Send a message through WebSocket
    */
-  send(message: WebSocketMessage): void {
+  send(message: ClientWebSocketMessage): void {
     if (this.isConnected() && this.ws) {
       this.ws.send(JSON.stringify(message));
     } else {
@@ -218,7 +204,7 @@ export class NeuroLinkWebSocket {
   /**
    * Subscribe to a channel with streaming callbacks
    */
-  subscribe(channel: string, callbacks: StreamCallbacks): void {
+  subscribe(channel: string, callbacks: ClientStreamCallbacks): void {
     this.subscriptions.set(channel, callbacks);
     this.send({
       type: "subscribe",
@@ -242,7 +228,7 @@ export class NeuroLinkWebSocket {
    */
   stream(
     prompt: string,
-    options?: { channel?: string } & StreamCallbacks,
+    options?: { channel?: string } & ClientStreamCallbacks,
   ): void {
     const channel = options?.channel ?? `stream_${Date.now()}`;
 
@@ -351,7 +337,7 @@ export class NeuroLinkWebSocket {
 
   private dispatchToCallbacks(
     event: StreamEvent,
-    callbacks: StreamCallbacks,
+    callbacks: ClientStreamCallbacks,
   ): void {
     switch (event.type) {
       case "text":
@@ -384,7 +370,7 @@ export class NeuroLinkWebSocket {
     }
   }
 
-  private setState(state: WebSocketState): void {
+  private setState(state: ClientClientWebSocketState): void {
     this.state = state;
     this.eventHandlers.onStateChange?.(state);
   }
@@ -473,7 +459,7 @@ export class NeuroLinkWebSocket {
  * ```
  */
 export function createWebSocketClient(
-  config: WebSocketConfig,
+  config: ClientWebSocketConfig,
 ): NeuroLinkWebSocket {
   return new NeuroLinkWebSocket(config);
 }
@@ -482,4 +468,9 @@ export function createWebSocketClient(
 // Type Exports
 // =============================================================================
 
-export type { StreamCallbacks, StreamEvent, StreamResult, ApiError };
+export type {
+  ClientStreamCallbacks,
+  StreamEvent,
+  StreamResult,
+  ClientApiError,
+};

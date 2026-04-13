@@ -31,7 +31,7 @@ import type {
   FileSearchMatch,
   FileSearchResult,
   StreamingReaderOptions,
-} from "./types.js";
+} from "../types/index.js";
 
 /** Default token budget if none specified */
 const DEFAULT_TOKEN_BUDGET = 50_000;

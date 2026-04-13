@@ -5,7 +5,7 @@ import type { InfraRegistryEntry } from "../../types/index.js";
  * Local alias: the canonical type was renamed to InfraRegistryEntry to avoid
  * collision with other RegistryEntry types in the codebase.
  */
-export type RegistryEntry<TItem, TMetadata = unknown> = InfraRegistryEntry<
+type RegistryEntry<TItem, TMetadata = unknown> = InfraRegistryEntry<
   TItem,
   TMetadata
 >;

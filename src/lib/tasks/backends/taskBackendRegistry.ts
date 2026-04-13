@@ -10,7 +10,7 @@ import type {
   TaskBackendFactoryFn,
   TaskManagerConfig,
   TaskBackend,
-} from "../../types/taskTypes.js";
+} from "../../types/index.js";
 
 export class TaskBackendRegistry {
   private static factories = new Map<string, TaskBackendFactoryFn>();

@@ -41,17 +41,15 @@ import {
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedHtml,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 
 // Re-export for consumers who import from this module
-export type { ProcessedHtml } from "../base/types.js";
 
 // Import for local use
-import type { ProcessedHtml } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -294,6 +292,6 @@ export function validateHtmlSize(sizeBytes: number): boolean {
 export async function processHtml(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedHtml>> {
+): Promise<ProcessorFileProcessingResult<ProcessedHtml>> {
   return htmlProcessor.processFile(fileInfo, options);
 }

@@ -81,11 +81,11 @@ import type {
   ProxyBodyCaptureLogger,
   ProxyPassthroughAccount,
   RuntimeAccountState,
+  RouteGroup,
+  ServerContext,
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { ProviderHealthChecker } from "../../utils/providerHealth.js";
-import type { RouteGroup, ServerContext } from "../types.js";
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

@@ -10,11 +10,12 @@ import type {
   NeuroLinkMiddleware,
   NeuroLinkMiddlewareMetadata,
   AutoEvaluationConfig,
-} from "../../types/middlewareTypes.js";
-import type { GenerateResult } from "../../types/generateTypes.js";
+  GenerateResult,
+  StandardRecord,
+} from "../../types/index.js";
 import { Evaluator } from "../../evaluation/index.js";
 import type { LanguageModelMiddleware } from "ai";
-import type { StandardRecord } from "../../types/typeAliases.js";
+
 import { logger } from "../../utils/logger.js";
 
 /**

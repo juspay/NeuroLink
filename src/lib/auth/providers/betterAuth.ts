@@ -7,7 +7,7 @@ import type {
   TokenValidationResult,
   AuthRequestContext,
   AuthHealthCheck,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 import { createProxyFetch } from "../../proxy/proxyFetch.js";
 import { AuthError } from "../errors.js";
 import * as jose from "jose";

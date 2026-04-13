@@ -12,7 +12,7 @@ import type {
   AuthProviderConfig,
   AuthProviderMetadata,
   MastraAuthProvider,
-} from "../types/authTypes.js";
+} from "../types/index.js";
 
 // =============================================================================
 // TYPES

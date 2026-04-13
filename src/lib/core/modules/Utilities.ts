@@ -21,10 +21,10 @@ import { z } from "zod";
 import type {
   AIProviderName,
   TextGenerationOptions,
+  StreamOptions,
+  MiddlewareFactoryOptions,
+  ZodUnknownSchema,
 } from "../../types/index.js";
-import type { StreamOptions } from "../../types/streamTypes.js";
-import type { MiddlewareFactoryOptions } from "../../types/middlewareTypes.js";
-import type { ZodUnknownSchema } from "../../types/typeAliases.js";
 import { logger } from "../../utils/logger.js";
 import { getSafeMaxTokens } from "../../utils/tokenLimits.js";
 import {

@@ -10,21 +10,6 @@
 import { MiddlewareFactory } from "./factory.js";
 
 // Core types and interfaces
-export type {
-  NeuroLinkMiddleware,
-  MiddlewareConfig,
-  MiddlewareContext,
-  MiddlewareConditions,
-  MiddlewareRegistrationOptions,
-  MiddlewareExecutionResult,
-  MiddlewareChainStats,
-  MiddlewarePreset,
-  MiddlewareFactoryOptions,
-  BuiltInMiddlewareType,
-} from "../types/middlewareTypes.js";
-
-// Export AI SDK middleware type
-export type { LanguageModelMiddleware } from "ai";
 
 // Factory for creating and applying middleware chains
 export { MiddlewareFactory };

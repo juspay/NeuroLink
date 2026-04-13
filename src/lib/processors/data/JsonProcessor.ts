@@ -31,17 +31,15 @@
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedJson,
+} from "../../types/index.js";
 import { SIZE_LIMITS_MB } from "../config/index.js";
 
 // Re-export for consumers who import from this module
-export type { ProcessedJson } from "../base/types.js";
 
 // Import for local use
-import type { ProcessedJson } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -233,6 +231,6 @@ export function validateJsonSize(sizeBytes: number): boolean {
 export function processJson(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedJson>> {
+): Promise<ProcessorFileProcessingResult<ProcessedJson>> {
   return jsonProcessor.processFile(fileInfo, options);
 }

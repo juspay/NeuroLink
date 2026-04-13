@@ -49,8 +49,6 @@ export {
   createFileError,
   createProcessingSummary,
   extractHttpStatus,
-  type FileProcessingError,
-  type FileProcessingSummary,
   formatFileError,
   getRetryDelay,
   isFileProcessingError,
@@ -61,8 +59,6 @@ export {
 export {
   extractSafeMetadata,
   generateErrorFingerprint,
-  type SerializedError,
-  type SerializeOptions,
   safeStringify,
   serializeError,
   summarizeError,
@@ -70,7 +66,6 @@ export {
 // Error codes and message templates
 export {
   ERROR_MESSAGES,
-  type ErrorMessageTemplate,
   FileErrorCode,
   getErrorTemplate,
   isRetryableErrorCode,

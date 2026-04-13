@@ -11,7 +11,7 @@ import type {
   ActionInputValidation,
   ActionAWSConfig,
   ActionGoogleCloudConfig,
-} from "../types/actionTypes.js";
+} from "../types/index.js";
 import { AIProviderName } from "../constants/enums.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
 

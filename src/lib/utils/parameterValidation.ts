@@ -9,22 +9,18 @@ import { SYSTEM_LIMITS } from "../core/constants.js";
 import type {
   GenerateOptions,
   TextGenerationOptions,
-} from "../types/generateTypes.js";
-import type { NeuroLinkMCPTool } from "../types/mcpTypes.js";
-import type { VideoOutputOptions } from "../types/multimodal.js";
-import type {
+  NeuroLinkMCPTool,
+  VideoOutputOptions,
+  StreamOptions,
+  EnhancedValidationResult,
   AudienceOption,
   PPTOutputOptions,
   ThemeOption,
   ToneOption,
-} from "../types/pptTypes.js";
-import type { StreamOptions } from "../types/streamTypes.js";
-import type { EnhancedValidationResult } from "../types/tools.js";
-import type {
   StandardRecord,
   StringArray,
   ValidationSchema,
-} from "../types/typeAliases.js";
+} from "../types/index.js";
 import { ErrorFactory, type NeuroLinkError } from "./errorHandling.js";
 import { isNonNullObject } from "./typeUtils.js";
 

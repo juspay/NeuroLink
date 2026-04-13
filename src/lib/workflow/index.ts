@@ -1,49 +1,3 @@
-/**
- * Workflow Engine - Public API
- * ============================
- *
- * Central exports for the Neurolink Workflow Engine
- *
- * @module workflow
- */
-
-// ============================================================================
-// CORE TYPES
-// ============================================================================
-
-export type {
-  AggregatedUsage,
-  ConditioningConfig,
-  // Response types
-  EnsembleResponse,
-  ExecutionConfig,
-  ExecutionStrategy,
-  JudgeConfig,
-  JudgeOutputFormat,
-  JudgeScores,
-  ModelConfig,
-  ModelGroup,
-  MultiJudgeScores,
-  ToneAdjustment,
-  // Analytics and metrics
-  WorkflowAnalytics,
-  // Workflow configuration
-  WorkflowConfig,
-  // Errors
-  WorkflowError,
-  WorkflowErrorDetails,
-  WorkflowGenerateOptions,
-  // Input/Output
-  WorkflowInput,
-  WorkflowResult,
-  // Workflow types
-  WorkflowType,
-  WorkflowValidationError,
-  // Validation
-  WorkflowValidationResult,
-  WorkflowValidationWarning,
-} from "./types.js";
-
 // ============================================================================
 // CORE FUNCTIONS
 // ============================================================================
@@ -67,7 +21,6 @@ export {
   registerWorkflow,
   unregisterWorkflow,
 } from "./core/workflowRegistry.js";
-export type { RunWorkflowOptions } from "./core/workflowRunner.js";
 // Workflow execution
 export { runWorkflow } from "./core/workflowRunner.js";
 // Metrics and analytics
@@ -132,25 +85,6 @@ export {
 // ============================================================================
 // TYPE EXPORTS (for advanced users)
 // ============================================================================
-
-export type {
-  ConditionOptions,
-  ConditionResult,
-} from "./core/types/conditionerTypes.js";
-export type {
-  EnsembleExecutionResult,
-  ExecuteEnsembleOptions,
-} from "./core/types/ensembleTypes.js";
-export type { ScoreOptions, ScoreResult } from "./core/types/judgeTypes.js";
-export type {
-  ExecuteLayerOptions,
-  LayerExecutionResult,
-} from "./core/types/layerTypes.js";
-export type {
-  RegisterOptions,
-  RegisterResult,
-  RegistryStats,
-} from "./core/types/registryTypes.js";
 
 // ============================================================================
 // CONSTANTS

@@ -8,8 +8,6 @@ import type {
   OptionSchema,
   RestorationToolContext,
   SessionRestoreResult,
-} from "../../lib/types/index.js";
-import type {
   ConversationData,
   ConversationMemoryConfig,
   NeurolinkOptions,

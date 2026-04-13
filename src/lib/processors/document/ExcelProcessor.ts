@@ -44,18 +44,17 @@ type CellValue = ExcelJS.CellValue;
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ExcelWorksheet,
+  ProcessedExcel,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 import { FileErrorCode } from "../errors/index.js";
 
 // Re-export for consumers who import from this module
-export type { ExcelWorksheet, ProcessedExcel } from "../base/types.js";
 
 // Import for local use
-import type { ExcelWorksheet, ProcessedExcel } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -191,7 +190,7 @@ export class ExcelProcessor extends BaseFileProcessor<ProcessedExcel> {
   override async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<ProcessedExcel>> {
+  ): Promise<ProcessorFileProcessingResult<ProcessedExcel>> {
     try {
       // Step 1: Validate file type and size
       const validationResult = this.validateFileWithResult(fileInfo);
@@ -677,7 +676,7 @@ export function validateExcelSize(sizeBytes: number): boolean {
 export async function processExcel(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedExcel>> {
+): Promise<ProcessorFileProcessingResult<ProcessedExcel>> {
   return excelProcessor.processFile(fileInfo, options);
 }
 

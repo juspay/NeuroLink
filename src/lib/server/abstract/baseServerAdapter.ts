@@ -8,8 +8,8 @@ import { EventEmitter } from "events";
 import type { ExternalServerManager } from "../../mcp/externalServerManager.js";
 import type { MCPToolRegistry } from "../../mcp/toolRegistry.js";
 import type { NeuroLink } from "../../neurolink.js";
-import { getMetricsAggregator } from "../../observability/index.js";
 import {
+  getMetricsAggregator,
   SpanSerializer,
   SpanStatus,
   SpanType,
@@ -33,7 +33,7 @@ import type {
   ServerLifecycleState,
   ServerStatus,
   TrackedConnection,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Abstract base class for server adapters

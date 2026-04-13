@@ -10,139 +10,14 @@
  */
 
 import { EventEmitter } from "events";
-import type { ToolInfo } from "../../types/tools.js";
+import type {
+  AffinityRule,
+  MCPTool,
+  RoutingDecision,
+  RoutingStrategy,
+  ToolRouterConfig,
+} from "../../types/index.js";
 import { ErrorFactory } from "../../utils/errorHandling.js";
-import type { MCPToolAnnotations } from "../mcpServerBase.js";
-
-/**
- * Routing strategy types
- */
-export type RoutingStrategy =
-  | "round-robin" // Distribute evenly across servers
-  | "least-loaded" // Route to server with fewest active connections
-  | "capability-based" // Route based on server capabilities/features
-  | "affinity" // Route based on session/user affinity
-  | "priority" // Route based on server priority weights
-  | "random"; // Random selection for load distribution
-
-/**
- * Server routing weight configuration
- */
-export type ServerWeight = {
-  serverId: string;
-  weight: number; // 0-100, higher = more traffic
-  capabilities?: string[];
-};
-
-/**
- * Category to server mapping
- */
-export type CategoryMapping = {
-  category: string;
-  serverIds: string[];
-  priority?: number;
-};
-
-/**
- * Affinity rule for session-based routing
- */
-export type AffinityRule = {
-  key: string; // e.g., "sessionId", "userId"
-  serverId: string;
-  expiresAt?: number;
-};
-
-/**
- * Tool Router configuration
- */
-export type ToolRouterConfig = {
-  /**
-   * Primary routing strategy
-   */
-  strategy: RoutingStrategy;
-
-  /**
-   * Enable session/user affinity for consistent routing
-   */
-  enableAffinity?: boolean;
-
-  /**
-   * Category to server mapping for capability-based routing
-   */
-  categoryMapping?: Record<string, string[]>;
-
-  /**
-   * Server weights for priority-based routing
-   */
-  serverWeights?: ServerWeight[];
-
-  /**
-   * Fallback strategy if primary fails
-   */
-  fallbackStrategy?: RoutingStrategy;
-
-  /**
-   * Maximum retries for failed routes
-   */
-  maxRetries?: number;
-
-  /**
-   * Health check interval in milliseconds
-   */
-  healthCheckInterval?: number;
-
-  /**
-   * Affinity TTL in milliseconds (default: 30 minutes)
-   */
-  affinityTtl?: number;
-};
-
-/**
- * Routing decision result
- */
-export type RoutingDecision = {
-  serverId: string;
-  strategy: RoutingStrategy;
-  confidence: number; // 0-1, how confident the router is in this decision
-  alternates?: string[]; // Fallback servers
-  reason?: string;
-};
-
-/**
- * Tool Router events
- */
-export type ToolRouterEvents = {
-  routeDecision: {
-    toolName: string;
-    decision: RoutingDecision;
-  };
-  routeFailed: {
-    toolName: string;
-    error: Error;
-    attemptedServers: string[];
-  };
-  affinitySet: {
-    key: string;
-    serverId: string;
-  };
-  affinityExpired: {
-    key: string;
-  };
-  healthUpdate: {
-    serverId: string;
-    healthy: boolean;
-  };
-};
-
-/**
- * MCP Tool type with annotations
- */
-export type MCPTool = ToolInfo & {
-  annotations?: MCPToolAnnotations;
-  serverId?: string;
-  category?: string;
-};
-
 /**
  * Default router configuration for common use cases
  */

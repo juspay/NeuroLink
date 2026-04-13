@@ -1,7 +1,7 @@
 import type {
   EnhancedEvaluationContext,
   GetPromptFunction,
-} from "../types/evaluationTypes.js";
+} from "../types/index.js";
 
 /**
  * A flexible class for building evaluation prompts. It allows for custom prompt

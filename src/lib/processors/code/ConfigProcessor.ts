@@ -41,20 +41,17 @@ import { basename as pathBasename } from "node:path";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedConfig,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-export type { ProcessedConfig } from "../base/types.js";
-
 // Re-import for local use within this file
-import type { ProcessedConfig } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -474,6 +471,6 @@ export function isConfigFile(mimetype: string, filename: string): boolean {
 export async function processConfig(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedConfig>> {
+): Promise<ProcessorFileProcessingResult<ProcessedConfig>> {
   return configProcessor.processFile(fileInfo, options);
 }

@@ -11,7 +11,7 @@ import * as path from "path";
 import { hasProviderEnvVars } from "../../utils/providerUtils.js";
 import { logger } from "../../utils/logger.js";
 import { AIProviderName } from "../../constants/enums.js";
-import { PPTError, PPT_ERROR_CODES } from "../../types/pptTypes.js";
+import { PPTError, PPT_ERROR_CODES } from "./pptError.js";
 import type {
   PPTGenerationContext,
   AspectRatioOption,
@@ -19,9 +19,8 @@ import type {
   ImageValidationResult,
   TextSegment,
   LogoConfig,
-} from "./types.js";
-import type { GenerateOptions } from "../../types/generateTypes.js";
-
+  GenerateOptions,
+} from "../../types/index.js";
 // ============================================================================
 // CONTEXT EXTRACTION
 // ============================================================================

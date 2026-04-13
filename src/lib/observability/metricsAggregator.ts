@@ -1,71 +1,17 @@
-/**
- * Metrics Aggregator
- * Comprehensive metrics aggregation with latency percentiles, token usage, and cost tracking
- */
-
-import type { TokenUsageStats } from "./tokenTracker.js";
 import { TokenTracker } from "./tokenTracker.js";
-import type { SpanData } from "./types/spanTypes.js";
-
-/**
- * Latency statistics with percentile calculations
- */
-export type LatencyStats = {
-  /** Minimum latency in milliseconds */
-  min: number;
-  /** Maximum latency in milliseconds */
-  max: number;
-  /** Mean/average latency in milliseconds */
-  mean: number;
-  /** Median latency (p50) in milliseconds */
-  median: number;
-  /** 50th percentile latency in milliseconds */
-  p50: number;
-  /** 75th percentile latency in milliseconds */
-  p75: number;
-  /** 90th percentile latency in milliseconds */
-  p90: number;
-  /** 95th percentile latency in milliseconds */
-  p95: number;
-  /** 99th percentile latency in milliseconds */
-  p99: number;
-  /** Standard deviation in milliseconds */
-  stdDev: number;
-  /** Total number of samples */
-  count: number;
-};
-
-/**
- * Cost breakdown by provider
- */
-export type ProviderCostStats = {
-  provider: string;
-  totalCost: number;
-  requestCount: number;
-  avgCostPerRequest: number;
-  inputCost: number;
-  outputCost: number;
-};
-
-/**
- * Cost breakdown by model
- */
-export type ModelCostStats = {
-  model: string;
-  provider: string;
-  totalCost: number;
-  requestCount: number;
-  avgCostPerRequest: number;
-  inputTokens: number;
-  outputTokens: number;
-  inputCost: number;
-  outputCost: number;
-};
-
+import type {
+  SpanData,
+  TraceView,
+  TokenUsageStats,
+  LatencyStats,
+  MetricsSummary,
+  ModelCostStats,
+  ProviderCostStats,
+} from "../types/index.js";
 /**
  * Time window statistics
  */
-export type TimeWindowStats = {
+type TimeWindowStats = {
   windowStart: Date;
   windowEnd: Date;
   windowDurationMs: number;
@@ -78,61 +24,10 @@ export type TimeWindowStats = {
   costByProvider: Map<string, ProviderCostStats>;
   costByModel: Map<string, ModelCostStats>;
 };
-
-/**
- * Aggregated metrics summary
- */
-export type MetricsSummary = {
-  /** Total number of spans tracked */
-  totalSpans: number;
-  /** Number of successful spans */
-  successfulSpans: number;
-  /** Number of failed spans */
-  failedSpans: number;
-  /** Overall success rate (0-1) */
-  successRate: number;
-  /** Latency statistics */
-  latency: LatencyStats;
-  /** Token usage statistics */
-  tokens: TokenUsageStats;
-  /** Cost by provider */
-  costByProvider: ProviderCostStats[];
-  /** Cost by model */
-  costByModel: ModelCostStats[];
-  /** Total cost across all providers */
-  totalCost: number;
-  /** Span count by type */
-  spansByType: Record<string, number>;
-  /** Timestamp of first span */
-  firstSpanTime?: Date;
-  /** Timestamp of last span */
-  lastSpanTime?: Date;
-  /** Tracking duration in milliseconds */
-  trackingDurationMs?: number;
-};
-
-/**
- * Hierarchical trace view grouping related spans
- */
-export type TraceView = {
-  /** Trace identifier shared by all spans in this trace */
-  traceId: string;
-  /** The root/parent span of this trace */
-  rootSpan: SpanData;
-  /** Child spans linked to the root */
-  childSpans: SpanData[];
-  /** Total duration from first to last span */
-  totalDurationMs: number;
-  /** Total number of spans in this trace */
-  spanCount: number;
-  /** Overall trace status */
-  status: "ok" | "error" | "partial";
-};
-
 /**
  * Configuration for the metrics aggregator
  */
-export type MetricsAggregatorConfig = {
+type MetricsAggregatorConfig = {
   /** Maximum spans to retain in memory */
   maxSpansRetained?: number;
   /** Enable time-window statistics */

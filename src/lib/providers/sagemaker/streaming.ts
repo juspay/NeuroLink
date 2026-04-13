@@ -10,15 +10,14 @@ import type {
   SageMakerStreamChunk,
   SageMakerUsage,
   SageMakerConfig,
-} from "../../types/providers.js";
+  StreamingCapability,
+  StreamingParser,
+} from "../../types/index.js";
 import { handleSageMakerError, SageMakerError } from "./errors.js";
 import { logger } from "../../utils/logger.js";
 import { estimateTokens } from "../../utils/tokenEstimation.js";
-import {
-  createSageMakerDetector,
-  type StreamingCapability,
-} from "./detection.js";
-import { StreamingParserFactory, type StreamingParser } from "./parsers.js";
+import { createSageMakerDetector } from "./detection.js";
+import { StreamingParserFactory } from "./parsers.js";
 
 /**
  * Synthetic streaming delay in milliseconds for simulating real-time response

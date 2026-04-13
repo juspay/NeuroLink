@@ -9,14 +9,14 @@
  */
 
 import { nanoid } from "nanoid";
-import type { AutoresearchEmitter } from "../types/autoresearchTypes.js";
 import type {
+  AutoresearchEmitter,
   ConversationEntry,
   NeuroLinkExecutable,
   Task,
   TaskRunResult,
   TaskStore,
-} from "../types/taskTypes.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { executeAutoresearchTick } from "./autoresearchTaskExecutor.js";
 

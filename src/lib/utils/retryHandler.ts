@@ -5,7 +5,7 @@
 
 import { logger } from "./logger.js";
 import { SYSTEM_LIMITS } from "../core/constants.js";
-import type { RetryOptions } from "../types/utilities.js";
+import type { RetryOptions } from "../types/index.js";
 
 /**
  * Calculate exponential backoff delay with jitter

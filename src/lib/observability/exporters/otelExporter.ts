@@ -10,7 +10,7 @@ import type {
   OtelExporterConfig,
   OtelProtocol,
   SpanData,
-} from "../types/index.js";
+} from "../../types/index.js";
 import { SpanSerializer } from "../utils/spanSerializer.js";
 import { BaseExporter } from "./baseExporter.js";
 

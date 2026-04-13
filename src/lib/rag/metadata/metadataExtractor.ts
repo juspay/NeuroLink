@@ -14,7 +14,7 @@ import type {
   KeywordExtractorConfig,
   QuestionExtractorConfig,
   CustomSchemaExtractorConfig,
-} from "../types.js";
+} from "../../types/index.js";
 import { ProviderFactory } from "../../factories/providerFactory.js";
 import { logger } from "../../utils/logger.js";
 

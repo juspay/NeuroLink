@@ -6,9 +6,7 @@
  * and preview mode for very large files.
  */
 
-import type { BudgetFileInput } from "../types/contextTypes.js";
-
-export type { BudgetFileInput } from "../types/contextTypes.js";
+import type { BudgetFileInput } from "../types/index.js";
 
 /** Percentage of remaining context to allocate for file reads */
 export const FILE_READ_BUDGET_PERCENT = 0.6;

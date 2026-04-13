@@ -5,7 +5,7 @@ import type {
   MiddlewareContext,
   MiddlewareRegistrationOptions,
   MiddlewareExecutionResult,
-} from "../types/middlewareTypes.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 
 /**

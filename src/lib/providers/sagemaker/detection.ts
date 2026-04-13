@@ -9,45 +9,19 @@ import type {
   SageMakerConfig,
   SageMakerModelConfig,
   InvokeEndpointResponse,
-} from "../../types/providers.js";
+  StreamingCapability,
+} from "../../types/index.js";
 import { SageMakerRuntimeClient } from "./client.js";
 import { logger } from "../../utils/logger.js";
-
 /**
  * Configurable constants for detection timing and performance
  */
 const DETECTION_STAGGER_DELAY_MS = 25; // Delay between staggered test starts (ms)
 const DETECTION_RATE_LIMIT_BACKOFF_MS = 200; // Initial backoff on rate limit detection (ms)
-
-/**
- * Streaming capability information for an endpoint
- */
-export type StreamingCapability = {
-  /** Whether streaming is supported */
-  supported: boolean;
-  /** Detected streaming protocol */
-  protocol: "sse" | "jsonl" | "chunked" | "none";
-  /** Detected model framework */
-  modelType: "huggingface" | "llama" | "pytorch" | "tensorflow" | "custom";
-  /** Test endpoint for streaming validation */
-  testEndpoint?: string;
-  /** Required parameters for streaming */
-  parameters?: Record<string, unknown>;
-  /** Confidence level of detection (0-1) */
-  confidence: number;
-  /** Additional metadata about the model */
-  metadata?: {
-    modelName?: string;
-    framework?: string;
-    version?: string;
-    tags?: string[];
-  };
-};
-
 /**
  * Model type detection result
  */
-export type ModelDetectionResult = {
+type ModelDetectionResult = {
   /** Primary model type */
   type: StreamingCapability["modelType"];
   /** Detection confidence (0-1) */
@@ -61,7 +35,7 @@ export type ModelDetectionResult = {
 /**
  * Endpoint health and metadata information
  */
-export type EndpointHealth = {
+type EndpointHealth = {
   /** Health status */
   status: "healthy" | "unhealthy" | "unknown";
   /** Response time in milliseconds */

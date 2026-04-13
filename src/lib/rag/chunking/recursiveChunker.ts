@@ -13,7 +13,7 @@ import type {
   ChunkerValidationResult,
   RecursiveChunkerConfig,
   BaseChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Recursive chunker implementation

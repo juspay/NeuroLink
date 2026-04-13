@@ -32,8 +32,8 @@ import type {
   LogoConfig,
   SlideGeneratorConfig,
   SlideGenerationBatchResult,
-} from "./types.js";
-import { SLIDE_DIMENSIONS } from "./types.js";
+} from "../../types/index.js";
+import { SLIDE_DIMENSIONS } from "../../types/index.js";
 import {
   getTheme,
   isImageSlideType,
@@ -51,8 +51,8 @@ import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../../observability/index.js";
-import { getMetricsAggregator } from "../../observability/index.js";
 import { NeuroLink } from "../../neurolink.js";
 import {
   LAYOUT_POSITIONS,

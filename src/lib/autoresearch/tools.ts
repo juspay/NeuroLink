@@ -13,10 +13,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { tool } from "ai";
 import { z } from "zod";
-import type {
-  ExperimentRecord,
-  ResearchConfig,
-} from "../types/autoresearchTypes.js";
+import type { ExperimentRecord, ResearchConfig } from "../types/index.js";
 import { withTimeout } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
 import type { RepoPolicy } from "./repoPolicy.js";
@@ -28,7 +25,7 @@ import { parseExperimentSummary } from "./summaryParser.js";
 /**
  * Dependencies required to create research tools.
  */
-export type ResearchToolsDeps = {
+type ResearchToolsDeps = {
   config: ResearchConfig;
   stateStore: ResearchStateStore;
   repoPolicy: RepoPolicy;
@@ -704,8 +701,3 @@ export function createResearchTools(deps: ResearchToolsDeps) {
     }),
   };
 }
-
-/**
- * Type for the research tools returned by createResearchTools
- */
-export type ResearchTools = ReturnType<typeof createResearchTools>;

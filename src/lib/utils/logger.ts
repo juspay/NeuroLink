@@ -14,7 +14,7 @@
  * - Tabular data display
  */
 
-import type { LogEntry, LogLevel } from "../types/utilities.js";
+import type { LogEntry, LogLevel } from "../types/index.js";
 
 // OTel trace context for log correlation (optional — gracefully no-ops if OTel not initialized)
 let traceApi: typeof import("@opentelemetry/api") | null = null;

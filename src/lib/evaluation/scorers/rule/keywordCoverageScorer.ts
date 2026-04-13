@@ -9,13 +9,13 @@ import type {
   ScorerInput,
   ScorerMetadata,
   ScorerRule,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseRuleScorer } from "./baseRuleScorer.js";
 
 /**
  * Configuration specific to keyword coverage scoring
  */
-export type KeywordCoverageConfig = RuleScorerConfig & {
+type KeywordCoverageConfig = RuleScorerConfig & {
   /** Keywords to check for */
   keywords?: string[];
   /** Minimum coverage ratio (0-1) to pass */

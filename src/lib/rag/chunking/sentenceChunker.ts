@@ -12,7 +12,7 @@ import type {
   Chunker,
   ChunkerValidationResult,
   SentenceChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Sentence-aware chunker implementation

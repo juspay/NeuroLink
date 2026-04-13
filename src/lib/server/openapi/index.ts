@@ -9,8 +9,6 @@ export {
   createOpenAPIGenerator,
   generateOpenAPISpec,
   generateOpenAPIFromConfig,
-  type OpenAPIGeneratorConfig,
-  type OpenAPISpec,
 } from "./generator.js";
 
 // Schemas

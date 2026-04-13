@@ -18,14 +18,12 @@ import {
   PipelinePresets,
 } from "../../lib/evaluation/pipeline/index.js";
 import { ScorerRegistry } from "../../lib/evaluation/scorers/index.js";
-import {
-  ReportGenerator,
-  type ReportData,
-} from "../../lib/evaluation/reporting/reportGenerator.js";
+import { ReportGenerator } from "../../lib/evaluation/reporting/reportGenerator.js";
 import type {
   PipelineConfig,
   ScorerInput,
   ReportFormat,
+  ReportData,
 } from "../../lib/types/index.js";
 import { logger } from "../../lib/utils/logger.js";
 

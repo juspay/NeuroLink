@@ -4,13 +4,14 @@
  */
 
 import { z } from "zod";
-import type { Unknown, UnknownRecord } from "../../../types/common.js";
 import type {
+  Unknown,
+  UnknownRecord,
+  AIProvider,
   NeuroLinkMCPTool,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "../../../types/mcpTypes.js";
-import type { AIProvider } from "../../../types/index.js";
+} from "../../../types/index.js";
 import { AIProviderFactory } from "../../../core/factory.js";
 import { getBestProvider } from "../../../utils/providerUtils.js";
 import { DEFAULT_MAX_TOKENS } from "../../../core/constants.js";

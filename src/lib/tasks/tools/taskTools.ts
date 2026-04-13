@@ -13,7 +13,7 @@ import { z } from "zod";
 import { logger } from "../../utils/logger.js";
 import { TaskError } from "../errors.js";
 import type { TaskManager } from "../taskManager.js";
-import type { TaskSchedule } from "../../types/taskTypes.js";
+import type { TaskSchedule } from "../../types/index.js";
 
 /**
  * Parse a schedule object from tool input.

@@ -12,7 +12,7 @@ import type {
   Chunker,
   ChunkerValidationResult,
   LaTeXChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * LaTeX-aware chunker implementation

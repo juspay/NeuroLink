@@ -3,13 +3,13 @@
  * Provides schema-based request validation for server adapters
  */
 
-import type { MiddlewareDefinition, ServerContext } from "../types.js";
+import type { MiddlewareDefinition, ServerContext } from "../../types/index.js";
 import { ValidationError as ServerValidationError } from "../errors.js";
 
 /**
  * Validation configuration
  */
-export type ValidationConfig = {
+type ValidationConfig = {
   /** Schema for validating request body */
   bodySchema?: ValidationSchema;
 
@@ -39,7 +39,7 @@ export type ValidationConfig = {
  * Simple validation schema
  * Can be extended with JSON Schema or Zod integration
  */
-export type ValidationSchema = {
+type ValidationSchema = {
   /** Required fields */
   required?: string[];
 
@@ -53,7 +53,7 @@ export type ValidationSchema = {
 /**
  * Property schema definition
  */
-export type PropertySchema = {
+type PropertySchema = {
   /** Property type */
   type: "string" | "number" | "boolean" | "object" | "array";
 
@@ -451,14 +451,14 @@ export const createValidationMiddleware = createRequestValidationMiddleware;
 /**
  * Extended property schema for common schemas
  */
-export type ExtendedPropertySchema = PropertySchema & {
+type ExtendedPropertySchema = PropertySchema & {
   format?: string;
 };
 
 /**
  * Extended validation schema for common schemas
  */
-export type ExtendedValidationSchema = {
+type ExtendedValidationSchema = {
   type?: string;
   format?: string;
   required?: string[];

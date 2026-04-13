@@ -6,8 +6,7 @@
  */
 
 import type { LanguageModel, streamText } from "ai";
-import type { StreamTextResult } from "../types/streamTypes.js";
-import type { LanguageModelObject } from "../types/index.js";
+import type { StreamTextResult, LanguageModelObject } from "../types/index.js";
 
 /**
  * Type guard: checks whether a LanguageModel value is an object with `modelId`

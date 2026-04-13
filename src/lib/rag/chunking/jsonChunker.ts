@@ -12,7 +12,7 @@ import type {
   ChunkerValidationResult,
   JSONChunkerConfig,
   BaseChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Options for extractChunks method

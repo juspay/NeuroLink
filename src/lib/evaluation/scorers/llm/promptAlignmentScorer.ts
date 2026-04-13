@@ -7,7 +7,7 @@ import type {
   LLMScorerConfig,
   ScoreResult,
   ScorerInput,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { BaseLLMScorer } from "./baseLLMScorer.js";
 
 const PROMPT_ALIGNMENT_PROMPT = `You are an expert at evaluating how well AI responses follow instructions.

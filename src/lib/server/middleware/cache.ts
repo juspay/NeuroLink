@@ -3,77 +3,21 @@
  * Provides response caching for server adapters
  */
 
-import type { MiddlewareDefinition, ServerContext } from "../types.js";
-import type { ResponseCacheEntry } from "../../types/index.js";
-
-/**
- * Cache configuration
- */
-export type CacheConfig = {
-  /** Default TTL in milliseconds */
-  ttlMs: number;
-
-  /** Maximum cache size (number of entries) */
-  maxSize?: number;
-
-  /**
-   * Custom key generator
-   * Default: method + path + sorted query params
-   */
-  keyGenerator?: (ctx: ServerContext) => string;
-
-  /**
-   * Methods to cache (default: GET only)
-   */
-  methods?: string[];
-
-  /**
-   * Paths to cache (default: all paths)
-   */
-  paths?: string[];
-
-  /**
-   * Paths to exclude from caching
-   */
-  excludePaths?: string[];
-
-  /**
-   * Custom cache store
-   * Default: in-memory store
-   */
-  store?: CacheStore;
-
-  /**
-   * Whether to include query params in cache key
-   * Default: true
-   */
-  includeQuery?: boolean;
-
-  /**
-   * Custom TTL per path pattern
-   */
-  ttlByPath?: Record<string, number>;
-};
-
+import type {
+  CacheEntry,
+  MiddlewareDefinition,
+  ResponseCacheEntry,
+  ServerCacheConfig,
+  ServerContext,
+} from "../../types/index.js";
+import type { CacheStore } from "../../types/index.js";
 /**
  * Cache entry
  */
-export type CacheEntry = {
-  data: unknown;
-  createdAt: number;
-  ttlMs: number;
-  headers?: Record<string, string>;
-};
 
 /**
  * Cache store interface
  */
-export type CacheStore = {
-  get(key: string): Promise<CacheEntry | undefined>;
-  set(key: string, entry: CacheEntry): Promise<void>;
-  delete(key: string): Promise<void>;
-  clear(): Promise<void>;
-};
 
 /**
  * In-memory LRU cache store
@@ -161,7 +105,7 @@ export class InMemoryCacheStore implements CacheStore {
  * ```
  */
 export function createCacheMiddleware(
-  config: CacheConfig,
+  config: ServerCacheConfig,
 ): MiddlewareDefinition {
   const {
     ttlMs,

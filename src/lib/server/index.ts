@@ -82,7 +82,6 @@ export {
   ServerAdapterFactory,
 } from "./factory/serverAdapterFactory.js";
 export {
-  type AbortSignalMiddlewareOptions,
   createAbortSignalMiddleware,
   createExpressAbortMiddleware,
 } from "./middleware/abortSignal.js";
@@ -90,16 +89,11 @@ export {
 // Middleware
 // ============================================
 export {
-  type AuthConfig,
-  type AuthResult,
   createAuthMiddleware,
   createRoleMiddleware,
 } from "./middleware/auth.js";
 
 export {
-  type CacheConfig,
-  type CacheEntry,
-  type CacheStore,
   createCacheInvalidator,
   createCacheMiddleware,
   InMemoryCacheStore,
@@ -112,10 +106,7 @@ export {
   createSecurityHeadersMiddleware,
   createTimingMiddleware,
 } from "./middleware/common.js";
-export {
-  createDeprecationMiddleware,
-  type DeprecationConfig,
-} from "./middleware/deprecation.js";
+export { createDeprecationMiddleware } from "./middleware/deprecation.js";
 export {
   createMCPBodyAttachmentMiddleware,
   fastifyMCPBodyHook,
@@ -125,17 +116,12 @@ export {
   createSlidingWindowRateLimitMiddleware,
   InMemoryRateLimitStore,
   RateLimitError,
-  type RateLimitMiddlewareConfig,
-  type RateLimitStore,
 } from "./middleware/rateLimit.js";
 export {
   CommonSchemas,
   createFieldValidator,
   createRequestValidationMiddleware,
-  type PropertySchema,
-  type ValidationConfig,
   ValidationError,
-  type ValidationSchema,
 } from "./middleware/validation.js";
 // ============================================
 // OpenAPI
@@ -176,9 +162,7 @@ export {
   NeuroLinkApiInfo,
   // Generator
   OpenAPIGenerator,
-  type OpenAPIGeneratorConfig,
   OpenAPISchemas,
-  type OpenAPISpec,
   ProviderInfoSchema,
   ReadyResponseSchema,
   SessionSchema,
@@ -197,7 +181,6 @@ export {
 // Routes
 // ============================================
 export {
-  type CreateRoutesOptions,
   createAgentRoutes,
   createAllRoutes,
   createHealthRoutes,
@@ -216,86 +199,29 @@ export {
   createDataStreamWriter,
   createNDJSONHeaders,
   createSSEHeaders,
-  type DataEvent,
-  type DataStreamEvent,
   // Types
-  type DataStreamEventType,
   DataStreamResponse,
   // Response
-  type DataStreamResponseConfig,
   // Writer
-  type DataStreamWriterConfig,
-  type ErrorEvent,
-  type FinishEvent,
   formatSSEEvent,
   // Helpers
   pipeAsyncIterableToDataStream,
-  type SSEEventOptions,
-  type TextDeltaEvent,
-  type TextEndEvent,
-  type TextStartEvent,
-  type ToolCallEvent,
-  type ToolResultEvent,
   WebStreamWriter,
 } from "./streaming/index.js";
 // ============================================
 // Types
 // ============================================
-export type {
-  AgentExecuteRequest,
-  AgentExecuteResponse,
-  AuthConfig as WebSocketAuthConfig,
-  AuthenticatedUser,
-  AuthStrategy,
-  BodyParserConfig,
-  CORSConfig,
-  DataStreamWriter,
-  // Error Types
-  ErrorCategoryType,
-  ErrorSeverityType,
-  HealthResponse,
-  HttpMethod,
-  LoggingConfig,
-  MCPServerStatusResponse,
-  MiddlewareDefinition,
-  MiddlewareHandler,
-  RateLimitConfig,
-  ReadyResponse,
-  RequiredServerAdapterConfig,
-  RouteDefinition,
-  RouteGroup,
-  RouteHandler,
-  ServerAdapterConfig,
-  ServerAdapterErrorCodeType,
-  ServerAdapterErrorContext,
-  ServerAdapterEvents,
-  ServerAdapterFactoryOptions,
-  ServerContext,
-  ServerFramework,
-  ServerResponse,
-  ServerStatus,
-  SSEWriteOptions,
-  StreamingConfig,
-  ToolExecuteRequest,
-  ToolExecuteResponse,
-  // WebSocket Types
-  WebSocketConfig,
-  WebSocketConnection,
-  WebSocketHandler,
-  WebSocketMessage,
-  WebSocketMessageType,
-} from "./types.js";
+
 // Export error constants
 export {
   ErrorCategory,
   ErrorSeverity,
   ServerAdapterErrorCode,
-} from "./types.js";
+} from "../types/index.js";
 export { createStreamRedactor, redactStreamChunk } from "./utils/redaction.js";
 // ============================================
 // Validation Utilities
 // ============================================
-export type { ErrorResponse, ValidationResult } from "./utils/validation.js";
 export {
   AgentExecuteRequestSchema,
   createErrorResponse,

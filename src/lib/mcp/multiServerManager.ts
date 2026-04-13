@@ -16,152 +16,17 @@
  */
 
 import { EventEmitter } from "events";
-import type { MCPServerInfo } from "../types/mcpTypes.js";
-import type { JsonObject } from "../types/common.js";
+import type {
+  MCPServerInfo,
+  JsonObject,
+  LoadBalancingStrategy,
+  MultiServerManagerConfig,
+  ServerGroup,
+  UnifiedTool,
+} from "../types/index.js";
+
 import { logger } from "../utils/logger.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
-
-/**
- * Load balancing strategies
- */
-export type LoadBalancingStrategy =
-  | "round-robin" // Rotate through servers
-  | "least-loaded" // Prefer server with fewest active requests
-  | "random" // Random selection
-  | "weighted" // Weighted random based on priority
-  | "failover-only"; // Use primary, failover only on failure
-
-/**
- * Server weight for weighted load balancing
- */
-export type ServerWeight = {
-  serverId: string;
-  weight: number; // 0-100, higher = more traffic
-  priority: number; // Lower = higher priority for failover
-};
-
-/**
- * Server group definition
- */
-export type ServerGroup = {
-  /**
-   * Group identifier
-   */
-  id: string;
-
-  /**
-   * Human-readable name
-   */
-  name: string;
-
-  /**
-   * Description of the group
-   */
-  description?: string;
-
-  /**
-   * Server IDs in this group
-   */
-  servers: string[];
-
-  /**
-   * Load balancing strategy for this group
-   */
-  strategy: LoadBalancingStrategy;
-
-  /**
-   * Weights for weighted strategy
-   */
-  weights?: ServerWeight[];
-
-  /**
-   * Whether to enable health-aware routing
-   */
-  healthAware?: boolean;
-
-  /**
-   * Minimum healthy servers before alerting
-   */
-  minHealthyServers?: number;
-};
-
-/**
- * Unified tool entry from multiple servers
- */
-export type UnifiedTool = {
-  /**
-   * Tool name
-   */
-  name: string;
-
-  /**
-   * Tool description
-   */
-  description: string;
-
-  /**
-   * Servers that provide this tool
-   */
-  servers: Array<{
-    serverId: string;
-    serverName: string;
-    inputSchema?: JsonObject;
-    priority: number;
-  }>;
-
-  /**
-   * Whether this tool has naming conflicts
-   */
-  hasConflict: boolean;
-
-  /**
-   * Preferred server for this tool
-   */
-  preferredServerId?: string;
-};
-
-/**
- * Multi-server manager configuration
- */
-export type MultiServerManagerConfig = {
-  /**
-   * Default load balancing strategy
-   */
-  defaultStrategy?: LoadBalancingStrategy;
-
-  /**
-   * Enable health-aware routing by default
-   */
-  healthAwareRouting?: boolean;
-
-  /**
-   * Health check interval in milliseconds
-   */
-  healthCheckInterval?: number;
-
-  /**
-   * Maximum retries on failover
-   */
-  maxFailoverRetries?: number;
-
-  /**
-   * Tool namespace separator
-   */
-  namespaceSeparator?: string;
-
-  /**
-   * Enable automatic tool namespace prefixing
-   */
-  autoNamespace?: boolean;
-
-  /**
-   * Conflict resolution strategy.
-   * Reserved for future conflict resolution strategy — currently stored but not
-   * consumed by any routing or tool-merge logic.
-   */
-  conflictResolution?: "first-wins" | "last-wins" | "namespace" | "explicit";
-};
-
 /**
  * Server metrics for load balancing
  */

@@ -17,7 +17,7 @@ import type {
   NeuroLinkMiddleware,
   NeuroLinkMiddlewareMetadata,
   LifecycleMiddlewareConfig,
-} from "../../types/middlewareTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { isRecoverableError } from "../../utils/errorHandling.js";
 

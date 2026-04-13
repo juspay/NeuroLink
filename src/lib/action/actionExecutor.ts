@@ -14,7 +14,7 @@ import type {
   CliResponse,
   ActionTokenUsage,
   ActionEvaluation,
-} from "../types/actionTypes.js";
+} from "../types/index.js";
 import { buildEnvironmentVariables } from "./actionInputs.js";
 import { withTimeout } from "../utils/errorHandling.js";
 

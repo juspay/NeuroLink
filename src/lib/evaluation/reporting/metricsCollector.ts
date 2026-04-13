@@ -3,13 +3,11 @@
  * Collect and aggregate evaluation metrics
  */
 
-import type { ScoreResult } from "../../types/scorerTypes.js";
-import type { PipelineResult } from "../pipeline/evaluationPipeline.js";
-
+import type { ScoreResult, PipelineResult } from "../../types/index.js";
 /**
  * Scorer metrics
  */
-export type ScorerMetrics = {
+type ScorerMetrics = {
   scorerId: string;
   scorerName: string;
   totalExecutions: number;
@@ -30,7 +28,7 @@ export type ScorerMetrics = {
 /**
  * Pipeline metrics
  */
-export type PipelineMetrics = {
+type PipelineMetrics = {
   pipelineName: string;
   totalExecutions: number;
   passedCount: number;
@@ -49,7 +47,7 @@ export type PipelineMetrics = {
 /**
  * Aggregated metrics
  */
-export type AggregatedMetrics = {
+type AggregatedMetrics = {
   totalEvaluations: number;
   overallPassRate: number;
   averageScore: number;

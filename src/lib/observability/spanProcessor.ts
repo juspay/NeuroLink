@@ -4,8 +4,11 @@
  * Fills the 9% gap in pattern compliance
  */
 
-import type { SpanAttributes, SpanData } from "./types/index.js";
-import type { SpanProcessor } from "../types/observability.js";
+import type {
+  SpanAttributes,
+  SpanData,
+  SpanProcessor,
+} from "../types/index.js";
 
 export type { SpanProcessor };
 

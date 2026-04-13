@@ -12,12 +12,10 @@
 import type {
   ChatMessage,
   ConversationMemoryConfig,
-} from "../types/conversation.js";
-import type {
   CompactionResult,
   CompactionConfig,
   CompactionStage,
-} from "../types/contextTypes.js";
+} from "../types/index.js";
 import { estimateMessagesTokens } from "../utils/tokenEstimation.js";
 import { logger } from "../utils/logger.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
@@ -25,18 +23,12 @@ import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
 import { pruneToolOutputs } from "./stages/toolOutputPruner.js";
 import { deduplicateFileReads } from "./stages/fileReadDeduplicator.js";
 import { truncateWithSlidingWindow } from "./stages/slidingWindowTruncator.js";
 import { summarizeMessages } from "./stages/structuredSummarizer.js";
-
-export type {
-  CompactionConfig,
-  CompactionResult,
-  CompactionStage,
-} from "../types/contextTypes.js";
 
 const DEFAULT_CONFIG: Required<CompactionConfig> = {
   enablePrune: true,

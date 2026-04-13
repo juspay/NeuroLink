@@ -482,9 +482,3 @@ export function getSupportedFilenames(): string[] {
 // =============================================================================
 // TYPE EXPORTS
 // =============================================================================
-
-/** Type for the LANGUAGE_MAP object */
-export type LanguageMap = typeof LANGUAGE_MAP;
-
-/** Type for the EXACT_FILENAME_MAP object */
-export type ExactFilenameMap = typeof EXACT_FILENAME_MAP;

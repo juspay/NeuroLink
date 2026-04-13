@@ -11,7 +11,7 @@ import type {
   ScorerMetadata,
   ScorerRegistryEntry,
   ScorerType,
-} from "../../types/scorerTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 type BuiltInScorerDefinition = {

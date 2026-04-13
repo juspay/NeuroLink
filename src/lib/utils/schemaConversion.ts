@@ -1,7 +1,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { jsonSchemaToZod } from "json-schema-to-zod";
 import { z } from "zod";
-import type { ZodUnknownSchema, ZodToJsonSchemaInput } from "../types/tools.js";
+import type { ZodUnknownSchema, ZodToJsonSchemaInput } from "../types/index.js";
 import { logger } from "./logger.js";
 
 /**

@@ -3,8 +3,8 @@ import type { LanguageModelMiddleware } from "ai";
 import type {
   NeuroLinkMiddleware,
   NeuroLinkMiddlewareMetadata,
-} from "../../types/middlewareTypes.js";
-import type { GuardrailsMiddlewareConfig } from "../../types/guardrails.js";
+  GuardrailsMiddlewareConfig,
+} from "../../types/index.js";
 import {
   createBlockedResponse,
   createBlockedStream,

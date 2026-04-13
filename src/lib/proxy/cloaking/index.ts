@@ -97,12 +97,3 @@ export class CloakingPipeline {
 }
 
 // Re-export types for convenience
-export type {
-  CloakingPlugin,
-  CloakingContext,
-  CloakingResponse,
-  CloakingConfig,
-  CloakingMode,
-  CloakingAccount,
-  CloakingRequest,
-} from "../../types/index.js";

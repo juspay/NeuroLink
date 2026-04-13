@@ -10,8 +10,8 @@ import type {
   ExportResult,
   PostHogExporterConfig,
   SpanData,
-} from "../types/index.js";
-import { SpanStatus, SpanType } from "../types/spanTypes.js";
+} from "../../types/index.js";
+import { SpanStatus, SpanType } from "../../types/index.js";
 import { BaseExporter } from "./baseExporter.js";
 
 /**

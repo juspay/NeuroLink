@@ -3,35 +3,17 @@
  * Generate evaluation reports in various formats
  */
 
-import type { JsonObject } from "../../types/common.js";
 import type {
-  AggregatedScores,
+  JsonObject,
+  PipelineResult,
+  ReportData,
   ReportConfig,
   ReportFormat,
-} from "../../types/scorerTypes.js";
-import type { PipelineResult } from "../pipeline/evaluationPipeline.js";
-
-/**
- * Report data structure
- */
-export type ReportData = {
-  /** Report title */
-  title: string;
-  /** Timestamp */
-  timestamp: number;
-  /** Evaluation result */
-  result: PipelineResult | AggregatedScores;
-  /** Optional custom sections */
-  customSections?: Array<{
-    title: string;
-    content: string | JsonObject;
-  }>;
-};
-
+} from "../../types/index.js";
 /**
  * Generated report
  */
-export type GeneratedReport = {
+type GeneratedReport = {
   /** Report format */
   format: ReportFormat;
   /** Report content */

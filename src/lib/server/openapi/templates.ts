@@ -3,7 +3,7 @@
  * Reusable OpenAPI path and operation templates
  */
 
-import type { JsonObject } from "../../types/common.js";
+import type { JsonObject } from "../../types/index.js";
 
 // ============================================
 // Response Templates

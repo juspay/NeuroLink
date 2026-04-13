@@ -29,17 +29,18 @@ import {
   FILE_READ_BUDGET_PERCENT,
 } from "../context/fileTokenBudget.js";
 import type { FileReferenceRegistry } from "../files/fileReferenceRegistry.js";
-import { SIZE_TIER_THRESHOLDS } from "../files/types.js";
+import { SIZE_TIER_THRESHOLDS } from "../types/index.js";
 import type {
   ChatMessage,
   MessageContent,
   MultimodalChatMessage,
-} from "../types/conversation.js";
-import type { FileWithMetadata } from "../types/fileTypes.js";
-import type { GenerateOptions } from "../types/generateTypes.js";
-import type { TextGenerationOptions } from "../types/index.js";
-import type { Content, ImageWithAltText } from "../types/multimodal.js";
-import type { StreamOptions } from "../types/streamTypes.js";
+  FileWithMetadata,
+  GenerateOptions,
+  TextGenerationOptions,
+  Content,
+  ImageWithAltText,
+  StreamOptions,
+} from "../types/index.js";
 import { tracers, ATTR, withSpan } from "../telemetry/index.js";
 import { FileDetector } from "./fileDetector.js";
 import { getImageCache } from "./imageCache.js";

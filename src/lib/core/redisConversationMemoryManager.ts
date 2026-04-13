@@ -23,11 +23,12 @@ import type {
   SessionMetadata,
   StoreConversationTurnOptions,
   AgenticLoopReportMetadata,
-} from "../types/conversation.js";
-import { ConversationMemoryError } from "../types/conversation.js";
-import type { IConversationMemoryManager } from "../types/conversationMemoryInterface.js";
+  IConversationMemoryManager,
+  PendingToolExecution,
+} from "../types/index.js";
+import { ConversationMemoryError } from "../types/index.js";
 import { withTimeout } from "../utils/errorHandling.js";
-import type { PendingToolExecution } from "../types/tools.js";
+
 import {
   buildContextFromPointer,
   getEffectiveTokenThreshold,

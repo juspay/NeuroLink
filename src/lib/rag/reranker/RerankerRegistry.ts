@@ -13,7 +13,7 @@ import type {
   RerankerConfig,
   RerankerMetadata,
   RerankerType,
-} from "./RerankerFactory.js";
+} from "../../types/index.js";
 
 /**
  * Default reranker metadata entries

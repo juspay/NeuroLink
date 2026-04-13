@@ -4,11 +4,15 @@
  * Processes factory configuration and ensures it flows through to AI providers
  */
 
-import type { GenerateOptions } from "../types/generateTypes.js";
-import type { StreamOptions } from "../types/streamTypes.js";
-import type { TextGenerationOptions } from "../types/index.js";
-import type { UnknownRecord, JsonValue } from "../types/common.js";
-import type { StandardRecord } from "../types/typeAliases.js";
+import type {
+  GenerateOptions,
+  StreamOptions,
+  TextGenerationOptions,
+  UnknownRecord,
+  JsonValue,
+  StandardRecord,
+} from "../types/index.js";
+
 import { logger } from "./logger.js";
 import { isNonNullObject } from "./typeUtils.js";
 // Removed crypto import - using faster string-based hash instead

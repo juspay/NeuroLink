@@ -12,7 +12,7 @@ import type {
   Chunker,
   ChunkerValidationResult,
   HTMLChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * HTML-aware chunker implementation

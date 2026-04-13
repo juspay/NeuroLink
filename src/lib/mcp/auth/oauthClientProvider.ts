@@ -13,7 +13,7 @@ import type {
   TokenExchangeRequest,
   PKCEChallenge,
   TokenResponse,
-} from "../../types/mcpTypes.js";
+} from "../../types/index.js";
 import {
   InMemoryTokenStorage,
   isTokenExpired,

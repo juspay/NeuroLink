@@ -5,14 +5,14 @@
 import type {
   EnhancedEvaluationContext,
   EvaluationResult,
-} from "../types/evaluationTypes.js";
-import type { EvaluationData } from "../types/evaluation.js";
+  EvaluationData,
+} from "../types/index.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
 
 /**
  * Maps a raw `EvaluationResult` to the structured `EvaluationData` format.

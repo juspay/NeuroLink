@@ -113,7 +113,7 @@ function parseClientControlMessage(data: string): ClientControlMessage | null {
   }
 }
 
-export type Message = {
+type Message = {
   role: "system" | "user" | "assistant";
   content: string;
 };

@@ -10,7 +10,7 @@ import type {
   MiddlewarePreset,
   NeuroLinkMiddleware,
   MiddlewareRegistrationOptions,
-} from "../types/middlewareTypes.js";
+} from "../types/index.js";
 import { MiddlewareRegistry } from "./registry.js";
 import { createAnalyticsMiddleware } from "./builtin/analytics.js";
 import { createGuardrailsMiddleware } from "./builtin/guardrails.js";

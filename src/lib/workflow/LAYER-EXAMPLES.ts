@@ -6,7 +6,7 @@
  */
 
 import { AIProviderName } from "../constants/enums.js";
-import type { WorkflowConfig } from "./types.js";
+import type { WorkflowConfig } from "../types/index.js";
 
 // ============================================================================
 // EXAMPLE 1: Simple Parallel (Backward Compatible - Flat Models Array)

@@ -9,7 +9,7 @@ import type {
   ScorerInput,
   ScorerMetadata,
   ScorerRule,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import {
   BaseRuleScorer,
   DEFAULT_RULE_SCORER_CONFIG,
@@ -18,7 +18,7 @@ import {
 /**
  * Length measurement unit
  */
-export type LengthUnit =
+type LengthUnit =
   | "words"
   | "characters"
   | "sentences"
@@ -28,17 +28,12 @@ export type LengthUnit =
 /**
  * Length constraint type
  */
-export type LengthConstraintType =
-  | "exact"
-  | "range"
-  | "minimum"
-  | "maximum"
-  | "ratio";
+type LengthConstraintType = "exact" | "range" | "minimum" | "maximum" | "ratio";
 
 /**
  * Configuration specific to length scoring
  */
-export type LengthScorerConfig = RuleScorerConfig & {
+type LengthScorerConfig = RuleScorerConfig & {
   /** Unit of measurement */
   unit?: LengthUnit;
   /** Constraint type */
@@ -398,7 +393,7 @@ export class LengthScorer extends BaseRuleScorer {
       metadata: {
         ...result.metadata,
         lengthMeasurement:
-          measurement as unknown as import("../../../types/common.js").JsonObject,
+          measurement as unknown as import("../../../types/index.js").JsonObject,
         configuredUnit: unit,
         configuredConstraint: this._lengthConfig.constraintType ?? "range",
         actualLength: this._getLengthInUnit(input.response, unit),

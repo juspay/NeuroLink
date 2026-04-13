@@ -40,12 +40,14 @@ import * as path from "path";
 
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
+  ArchiveEntry,
+  ArchiveFormat,
   FileInfo,
   FileProcessingError,
-  FileProcessingResult,
-  ProcessedFileBase,
+  ProcessedArchive,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+} from "../../types/index.js";
 import { SIZE_LIMITS_MB } from "../config/index.js";
 import { FileErrorCode } from "../errors/index.js";
 
@@ -53,49 +55,6 @@ import { FileErrorCode } from "../errors/index.js";
 // TYPES
 // =============================================================================
 
-/**
- * Supported archive format identifiers.
- */
-export type ArchiveFormat = "zip" | "tar" | "tar.gz" | "tar.bz2" | "gz" | "rar" | "7z";
-
-/**
- * Metadata about an individual entry within an archive.
- */
-export type ArchiveEntry = {
-  /** Relative path/name of the entry within the archive */
-  name: string;
-  /** Uncompressed size in bytes */
-  uncompressedSize: number;
-  /** Compressed size in bytes (0 if unknown) */
-  compressedSize: number;
-  /** Whether this entry is a directory */
-  isDirectory: boolean;
-};
-
-/**
- * Processed archive result.
- * Extends ProcessedFileBase with archive-specific metadata, entry listing,
- * and any security warnings encountered during processing.
- */
-export type ProcessedArchive = ProcessedFileBase & {
-  /** Structured text content describing the archive for LLM consumption */
-  textContent: string;
-  /** High-level archive metadata */
-  archiveMetadata: {
-    /** Detected archive format */
-    format: ArchiveFormat;
-    /** Total number of entries (files + directories) */
-    totalEntries: number;
-    /** Sum of uncompressed sizes across all entries in bytes */
-    totalUncompressedSize: number;
-    /** Sum of compressed sizes across all entries in bytes */
-    totalCompressedSize: number;
-  };
-  /** Individual entry metadata */
-  entries: ArchiveEntry[];
-  /** Security warnings raised during processing (non-fatal) */
-  securityWarnings: string[];
-};
 
 // =============================================================================
 // SECURITY CONFIGURATION
@@ -322,7 +281,7 @@ export class ArchiveProcessor extends BaseFileProcessor<ProcessedArchive> {
   override async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<ProcessedArchive>> {
+  ): Promise<ProcessorFileProcessingResult<ProcessedArchive>> {
     try {
       // Step 1: Validate file type and size
       const validationResult = this.validateFileWithResult(fileInfo);
@@ -1587,6 +1546,6 @@ export function isArchiveFile(mimetype: string, filename: string): boolean {
 export async function processArchive(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedArchive>> {
+): Promise<ProcessorFileProcessingResult<ProcessedArchive>> {
   return archiveProcessor.processFile(fileInfo, options);
 }

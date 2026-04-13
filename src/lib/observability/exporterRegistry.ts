@@ -11,7 +11,7 @@ import type {
   ExporterHealthStatus,
   ExportResult,
   SpanData,
-} from "./types/index.js";
+} from "../types/index.js";
 
 /** Default timeout for exporter API calls (30 seconds) */
 const DEFAULT_EXPORT_TIMEOUT_MS = 30_000;

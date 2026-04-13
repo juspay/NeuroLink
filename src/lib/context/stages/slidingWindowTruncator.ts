@@ -12,11 +12,11 @@
  *   message content proportionally instead of returning no-op.
  */
 
-import type { ChatMessage } from "../../types/conversation.js";
 import type {
+  ChatMessage,
   TruncationConfig,
   TruncationResult,
-} from "../../types/contextTypes.js";
+} from "../../types/index.js";
 import {
   estimateTokens,
   estimateMessagesTokens,
@@ -24,11 +24,6 @@ import {
 } from "../../utils/tokenEstimation.js";
 import { logger } from "../../utils/logger.js";
 import { randomUUID } from "crypto";
-
-export type {
-  TruncationConfig,
-  TruncationResult,
-} from "../../types/contextTypes.js";
 
 const TRUNCATION_MARKER_CONTENT =
   "[Earlier conversation history was truncated to fit within context limits]";

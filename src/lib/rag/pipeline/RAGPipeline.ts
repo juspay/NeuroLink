@@ -27,22 +27,30 @@
  */
 
 import { randomUUID } from "crypto";
-import type { Chunk, VectorQueryResult } from "../types.js";
+import type {
+  Chunk,
+  VectorQueryResult,
+  VectorStore,
+  BM25Index,
+  AIProvider,
+  RAGPipelineConfig,
+  IngestOptions,
+  QueryOptions,
+  RAGResponse,
+  PipelineStats,
+} from "../../types/index.js";
 import { MDocument } from "../document/MDocument.js";
 import { loadDocument } from "../document/loaders.js";
-import {
-  InMemoryVectorStore,
-  type VectorStore,
-} from "../retrieval/vectorQueryTool.js";
+import { InMemoryVectorStore } from "../retrieval/vectorQueryTool.js";
 import {
   InMemoryBM25Index,
   createHybridSearch,
-  type BM25Index,
 } from "../retrieval/hybridSearch.js";
+
 import { GraphRAG } from "../graphRag/graphRAG.js";
 import { rerank } from "../reranker/reranker.js";
 import { ProviderFactory } from "../../factories/providerFactory.js";
-import type { AIProvider } from "../../types/providers.js";
+
 import {
   SpanSerializer,
   SpanType,
@@ -51,22 +59,6 @@ import {
 } from "../../observability/index.js";
 import { logger } from "../../utils/logger.js";
 import { withTimeout } from "../../utils/async/withTimeout.js";
-import type {
-  RAGPipelineConfig,
-  IngestOptions,
-  QueryOptions,
-  RAGResponse,
-  PipelineStats,
-} from "../../types/ragTypes.js";
-
-export type { EmbeddingModelConfig } from "../../types/ragTypes.js";
-export type { GenerationModelConfig } from "../../types/ragTypes.js";
-export type { RAGPipelineConfig } from "../../types/ragTypes.js";
-export type { IngestOptions } from "../../types/ragTypes.js";
-export type { QueryOptions } from "../../types/ragTypes.js";
-export type { RAGResponse } from "../../types/ragTypes.js";
-export type { PipelineStats } from "../../types/ragTypes.js";
-
 /**
  * RAG Pipeline Orchestrator
  *

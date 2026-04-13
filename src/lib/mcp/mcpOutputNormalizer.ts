@@ -21,23 +21,17 @@
  * @module mcp/mcpOutputNormalizer
  */
 
-import type { ArtifactStore, ArtifactRef } from "../artifacts/artifactStore.js";
+import type {
+  ArtifactStore,
+  ArtifactRef,
+  McpOutputNormalizerConfig,
+  McpOutputContext,
+  NormalizedMcpOutput,
+} from "../types/index.js";
 import { generateToolOutputPreview } from "../context/toolOutputLimits.js";
 import { logger } from "../utils/logger.js";
 import { withTimeout } from "../utils/errorHandling.js";
-import type {
-  McpOutputNormalizerConfig,
-  McpOutputContext,
-  NormalizedMcpOutput,
-} from "../types/mcpOutputTypes.js";
-
 // Re-export so callers can import everything from one place
-export type {
-  McpOutputStrategy,
-  McpOutputNormalizerConfig,
-  McpOutputContext,
-  NormalizedMcpOutput,
-} from "../types/mcpOutputTypes.js";
 
 // ---------------------------------------------------------------------------
 // Public constants

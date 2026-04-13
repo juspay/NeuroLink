@@ -1,4 +1,4 @@
-import type { StreamOptions } from "../types/streamTypes.js";
+import type { StreamOptions } from "../types/index.js";
 
 /**
  * Builds a normalized multimodal options payload for streaming providers.

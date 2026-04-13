@@ -5,18 +5,18 @@
 
 import { BaseRegistry } from "../core/infrastructure/index.js";
 import type { LanguageModelV3CallOptions } from "@ai-sdk/provider";
-import type { GenerateResult } from "../types/generateTypes.js";
 import type {
+  GenerateResult,
   EvaluationResult,
   EnhancedEvaluationContext,
-} from "../types/evaluationTypes.js";
+} from "../types/index.js";
 import { createStrategyNotFoundError } from "./errors/EvaluationError.js";
 import { withTimeout, ErrorFactory } from "../utils/errorHandling.js";
 
 /**
  * A function that performs evaluation and returns results.
  */
-export type EvaluationStrategyFunction = (
+type EvaluationStrategyFunction = (
   options: LanguageModelV3CallOptions,
   result: GenerateResult,
   config?: EvaluationStrategyConfig,
@@ -28,7 +28,7 @@ export type EvaluationStrategyFunction = (
 /**
  * Configuration for evaluation strategies.
  */
-export interface EvaluationStrategyConfig {
+type EvaluationStrategyConfig = {
   /** The model to use for evaluation */
   evaluationModel?: string;
   /** The provider to use for evaluation */
@@ -45,12 +45,12 @@ export interface EvaluationStrategyConfig {
   }) => string;
   /** Additional strategy-specific options */
   options?: Record<string, unknown>;
-}
+};
 
 /**
  * Metadata for registered evaluation strategies.
  */
-export interface EvaluationStrategyMetadata {
+type EvaluationStrategyMetadata = {
   /** Human-readable name for the strategy */
   name: string;
   /** Description of what the strategy does */
@@ -65,7 +65,7 @@ export interface EvaluationStrategyMetadata {
   version: string;
   /** Supported features */
   features: string[];
-}
+};
 
 /**
  * Registry for evaluation strategies.

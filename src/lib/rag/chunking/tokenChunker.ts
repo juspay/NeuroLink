@@ -12,7 +12,7 @@ import type {
   ChunkerValidationResult,
   TokenChunkerConfig,
   BaseChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Token-aware chunker implementation

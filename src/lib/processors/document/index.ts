@@ -57,7 +57,6 @@ export {
   // Helper functions
   isWordFile,
   // Types
-  type ProcessedWord,
   processWord,
   validateWordSize,
   // Class
@@ -74,7 +73,6 @@ export {
   // Class
   ExcelProcessor,
   // Types
-  type ExcelWorksheet,
   // Singleton instance
   excelProcessor,
   // Helper functions
@@ -82,7 +80,6 @@ export {
   getExcelMaxSheets,
   getExcelMaxSizeMB,
   isExcelFile,
-  type ProcessedExcel,
   processExcel,
   validateExcelSize,
 } from "./ExcelProcessor.js";
@@ -103,7 +100,6 @@ export {
 export {
   // Helper functions
   isRtfFile,
-  type ProcessedRtf,
   processRtf,
   // Class
   RtfProcessor,
@@ -124,7 +120,6 @@ export {
   OpenDocumentProcessor,
   // Singleton instance
   openDocumentProcessor,
-  type ProcessedOpenDocument,
   processOpenDocument,
   validateOpenDocumentSize,
 } from "./OpenDocumentProcessor.js";

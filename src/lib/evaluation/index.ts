@@ -3,14 +3,14 @@
  */
 
 import type { LanguageModelV3CallOptions } from "@ai-sdk/provider";
-import type { EvaluationData } from "../types/evaluation.js";
 import type {
+  EvaluationData,
+  GenerateResult,
+  AutoEvaluationConfig,
   EnhancedEvaluationContext,
   EvaluationConfig,
   EvaluationResult,
-} from "../types/evaluationTypes.js";
-import type { GenerateResult } from "../types/generateTypes.js";
-import type { AutoEvaluationConfig } from "../types/middlewareTypes.js";
+} from "../types/index.js";
 import { ContextBuilder } from "./contextBuilder.js";
 import { RAGASEvaluator } from "./ragasEvaluator.js";
 import { mapToEvaluationData } from "./scoring.js";
@@ -29,36 +29,15 @@ export * from "./reporting/index.js";
 export * from "./scorers/index.js";
 
 // Re-export Factory and Registry (Mastra-inspired patterns)
-export {
-  BatchEvaluator,
-  type BatchEvaluationConfig,
-  type BatchEvaluationItem,
-  type BatchEvaluationItemResult,
-  type BatchEvaluationResult,
-} from "./BatchEvaluator.js";
+export { BatchEvaluator } from "./BatchEvaluator.js";
 
-export {
-  EvaluationAggregator,
-  type ScoreStatistics,
-  type ScoreDistribution,
-  type TrendAnalysis,
-  type DimensionAnalysis,
-  type AlertSummary,
-  type AggregationResult,
-} from "./EvaluationAggregator.js";
+export { EvaluationAggregator } from "./EvaluationAggregator.js";
 
-export {
-  EvaluatorFactory,
-  getEvaluatorFactory,
-  type EvaluatorPreset,
-} from "./EvaluatorFactory.js";
+export { EvaluatorFactory, getEvaluatorFactory } from "./EvaluatorFactory.js";
 
 export {
   EvaluatorRegistry,
   getEvaluatorRegistry,
-  type EvaluationStrategyFunction,
-  type EvaluationStrategyConfig,
-  type EvaluationStrategyMetadata,
 } from "./EvaluatorRegistry.js";
 
 /**

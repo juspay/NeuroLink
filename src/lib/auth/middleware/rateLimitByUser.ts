@@ -4,7 +4,7 @@ import type {
   AuthenticatedContext,
   AuthRequestContext,
   AuthUser,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /** Mask a userId for safe log output (first 4 chars + "***"). */
@@ -27,7 +27,7 @@ type TokenBucket = {
 /**
  * Rate limit configuration per user or role
  */
-export type RateLimitConfig = {
+type RateLimitConfig = {
   /** Maximum requests allowed in the window */
   maxRequests: number;
   /** Time window in milliseconds */
@@ -45,7 +45,7 @@ export type RateLimitConfig = {
 /**
  * Rate limit result
  */
-export type RateLimitResult = {
+type RateLimitResult = {
   /** Whether the request is allowed */
   allowed: boolean;
   /** Remaining requests in the current window */
@@ -61,7 +61,7 @@ export type RateLimitResult = {
 /**
  * Result of an atomic consume operation
  */
-export type AtomicConsumeResult = {
+type AtomicConsumeResult = {
   /** Updated bucket after the operation */
   bucket: TokenBucket;
   /** Whether a token was successfully consumed */
@@ -71,7 +71,7 @@ export type AtomicConsumeResult = {
 /**
  * Interface for rate limit storage backends
  */
-export interface RateLimitStorage {
+type RateLimitStorage = {
   /** Get the current bucket for a user */
   getBucket(userId: string): Promise<TokenBucket | null>;
   /** Set the bucket for a user */
@@ -100,7 +100,7 @@ export interface RateLimitStorage {
     windowMs: number,
     nowMs: number,
   ): Promise<AtomicConsumeResult | null>;
-}
+};
 
 /**
  * In-memory storage for rate limiting (single instance deployments)
@@ -616,7 +616,7 @@ export class UserRateLimiter {
 /**
  * Middleware result type
  */
-export type RateLimitMiddlewareResult = {
+type RateLimitMiddlewareResult = {
   /** Whether to proceed with the request */
   proceed: boolean;
   /** Rate limit result */

@@ -33,12 +33,11 @@
  * - Current time (ISO): `new Date().toISOString()`
  */
 
-import type {
-  Memory,
-  StorageConfig,
-} from "../memory/hippocampusInitializer.js";
+import type { HippocampusMemory } from "./common.js";
+import type { ObservabilityConfig } from "./observability.js";
 
-export type { Memory, StorageConfig };
+export type StorageConfig = import("@juspay/hippocampus").StorageConfig;
+export type { HippocampusMemory };
 
 /**
  * Configuration for conversation memory feature
@@ -63,7 +62,7 @@ export type ConversationMemoryConfig = {
   summarizationModel?: string;
 
   /** Memory SDK config (condensed key-value memory per user). Set enabled: true to activate. */
-  memory?: Memory;
+  memory?: HippocampusMemory;
 
   /** Redis configuration (optional) - overrides environment variables */
   redisConfig?: RedisStorageConfig;
@@ -408,7 +407,7 @@ export type NeurolinkOptions = {
   sessionId?: string;
 
   /** Observability configuration */
-  observability?: import("./observability.js").ObservabilityConfig;
+  observability?: ObservabilityConfig;
 };
 
 /**

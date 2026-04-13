@@ -4,7 +4,7 @@
  * Compliant with OpenAPI 3.1 / JSON Schema 2020-12
  */
 
-import type { JsonObject } from "../../types/common.js";
+import type { JsonObject } from "../../types/index.js";
 
 // ============================================
 // Common Schemas

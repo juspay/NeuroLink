@@ -3,54 +3,15 @@
  * Aggregates token usage and cost across spans
  */
 
-import type { SpanAttributes, SpanData } from "./types/spanTypes.js";
-
-/**
- * Token usage statistics by provider
- */
-export type ProviderTokenStats = {
-  provider: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  cost: number;
-  requestCount: number;
-};
-
-/**
- * Token usage statistics by model
- */
-export type ModelTokenStats = {
-  model: string;
-  provider: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  cost: number;
-  requestCount: number;
-  avgTokensPerRequest: number;
-};
-
-/**
- * Aggregated token usage statistics
- */
-export type TokenUsageStats = {
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-  reasoningTokens: number;
-  totalCost: number;
-  byProvider: Map<string, ProviderTokenStats>;
-  byModel: Map<string, ModelTokenStats>;
-  bySpanType: Map<string, number>;
-};
-
+import type {
+  SpanAttributes,
+  SpanData,
+  TokenUsageStats,
+} from "../types/index.js";
 /**
  * Model pricing information
  */
-export type ModelPricing = {
+type ModelPricing = {
   inputPricePerMillion: number;
   outputPricePerMillion: number;
   cachedInputPricePerMillion?: number;

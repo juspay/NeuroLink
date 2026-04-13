@@ -7,7 +7,7 @@ import {
   NeuroLinkFeatureError,
   createErrorFactory,
 } from "../../core/infrastructure/index.js";
-import type { EnhancedEvaluationContext } from "../../types/evaluationTypes.js";
+import type { EnhancedEvaluationContext } from "../../types/index.js";
 
 /**
  * Error codes for the Evaluation feature.
@@ -43,7 +43,7 @@ export const EvaluationErrorCodes = {
 /**
  * Type for evaluation error codes
  */
-export type EvaluationErrorCode =
+type EvaluationErrorCode =
   (typeof EvaluationErrorCodes)[keyof typeof EvaluationErrorCodes];
 
 /**
@@ -59,7 +59,7 @@ export const evaluationErrors = createErrorFactory(
  * Extended evaluation context for error details.
  * Provides rich debugging information when errors occur.
  */
-export interface EvaluationErrorContext {
+type EvaluationErrorContext = {
   /** Length of the user query (redacted for safety) */
   userQueryLength?: number;
   /** Length of the AI response (redacted for safety) */
@@ -78,7 +78,7 @@ export interface EvaluationErrorContext {
   rawResponseLength?: number;
   /** Any additional context */
   additionalContext?: Record<string, unknown>;
-}
+};
 
 /**
  * Checks if an error is retryable based on its code.

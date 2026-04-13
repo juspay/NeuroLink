@@ -8,7 +8,6 @@
  */
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import { TTSError, TTS_ERROR_CODES } from "../../utils/ttsProcessor.js";
-import type { TTSHandler } from "../../utils/ttsProcessor.js";
 import type {
   Gender,
   GoogleAudioEncoding,
@@ -16,15 +15,16 @@ import type {
   TTSResult,
   TTSVoice,
   VoiceType,
-} from "../../types/ttsTypes.js";
+  TTSHandler,
+} from "../../types/index.js";
 import { ErrorCategory, ErrorSeverity } from "../../constants/enums.js";
 import { logger } from "../../utils/logger.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../../observability/index.js";
-import { getMetricsAggregator } from "../../observability/index.js";
 
 export class GoogleTTSHandler implements TTSHandler {
   private client: TextToSpeechClient | null = null;

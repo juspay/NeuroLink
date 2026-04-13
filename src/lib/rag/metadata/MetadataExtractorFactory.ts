@@ -8,19 +8,15 @@
 import { BaseFactory } from "../../core/infrastructure/index.js";
 import { logger } from "../../utils/logger.js";
 import { MetadataExtractionError, RAGErrorCodes } from "../errors/RAGError.js";
-import type { Chunk, ExtractionResult, ExtractParams } from "../types.js";
 import type {
+  Chunk,
+  ExtractionResult,
+  ExtractParams,
   MetadataExtractor,
   MetadataExtractorConfig,
   MetadataExtractorMetadata,
   MetadataExtractorType,
-} from "../../types/ragTypes.js";
-
-export type { MetadataExtractorType } from "../../types/ragTypes.js";
-export type { MetadataExtractor } from "../../types/ragTypes.js";
-export type { MetadataExtractorConfig } from "../../types/ragTypes.js";
-export type { MetadataExtractorMetadata } from "../../types/ragTypes.js";
-
+} from "../../types/index.js";
 /**
  * Default metadata extractor metadata entries
  */

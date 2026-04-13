@@ -6,7 +6,11 @@
  * on row boundaries when a table exceeds the max chunk size.
  */
 
-import type { Chunk, ChunkerConfig, ChunkingStrategy } from "../types.js";
+import type {
+  Chunk,
+  ChunkerConfig,
+  ChunkingStrategy,
+} from "../../types/index.js";
 import { BaseChunker, DEFAULT_CHUNKER_CONFIG } from "./BaseChunker.js";
 
 /** Matches a markdown table separator row like |---|---| or |:--:|---:| */

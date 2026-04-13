@@ -13,7 +13,7 @@
  *   // Base processor infrastructure
  *   BaseFileProcessor,
  *   type FileInfo,
- *   type FileProcessingResult,
+ *   type ProcessorFileProcessingResult,
  *   type ProcessedFileBase,
  *
  *   // Configuration
@@ -73,52 +73,18 @@ export {
   // Base class
   BaseFileProcessor,
   // ALL types (single source of truth: base/types.ts)
-  type BatchProcessingSummary,
   // Constants
   DEFAULT_IMAGE_MAX_SIZE_MB,
   DEFAULT_IMAGE_TIMEOUT_MS,
   DEFAULT_RETRY_CONFIG,
   DEFAULT_TEXT_MAX_SIZE_MB,
   DEFAULT_TEXT_TIMEOUT_MS,
-  type ExcelWorksheet,
-  type FailedFileInfo,
-  type FileInfo,
-  type FileProcessingError,
-  type FileProcessingResult,
-  type FileProcessorConfig,
-  type FileWarning,
   // Utility functions
   getDefaultImageMaxSizeMB,
   getDefaultImageTimeout,
   getDefaultTextMaxSizeMB,
   getDefaultTextTimeout,
-  type JsonTypeGuard,
-  type OperationResult,
   PROCESSOR_PRIORITIES,
-  type ProcessedConfig,
-  type ProcessedExcel,
-  type ProcessedFileBase,
-  type ProcessedFileInfo,
-  type ProcessedHtml,
-  type ProcessedJson,
-  type ProcessedMarkdown,
-  type ProcessedOpenDocument,
-  type ProcessedRtf,
-  type ProcessedSourceCode,
-  type ProcessedSvg,
-  type ProcessedText,
-  type ProcessedWord,
-  type ProcessedYaml,
-  type ProcessOptions,
-  type ProcessorInfo,
-  type ProcessorMatch,
-  type ProcessorPriorityKey,
-  type ProcessorPriorityValue,
-  type RegistryOptions,
-  type RegistryProcessResult,
-  type RetryConfig,
-  type SkippedFileInfo,
-  type UnsupportedFileError,
 } from "./base/index.js";
 
 // =============================================================================
@@ -130,33 +96,22 @@ export {
   ARCHIVE_EXTENSIONS,
   ARCHIVE_LIMITS,
   ARCHIVE_MIME_TYPES,
-  type ArchiveExtension,
-  type ArchiveMimeType,
   AUDIO_EXTENSIONS,
   AUDIO_MIME_TYPES,
-  type AudioExtension,
-  type AudioMimeType,
   bytesToMB,
   CONFIG_EXTENSIONS,
-  type ConfigExtension,
   CSV_EXTENSIONS,
   DATA_EXTENSIONS,
   DATA_MIME_TYPES,
   DATABASE_EXTENSIONS,
-  type DataExtension,
-  type DataMimeType,
   DESIGN_EXTENSIONS,
   DOCUMENT_EXTENSIONS,
   DOCUMENT_MIME_TYPES,
-  type DocumentExtension,
-  type DocumentMimeType,
   detectLanguageFromFilename,
   EXACT_FILENAME_MAP,
   EXCEL_EXTENSIONS,
   EXECUTABLE_EXTENSIONS,
-  type ExactFilenameMap,
   FILE_EXTENSIONS,
-  type FileExtensions,
   formatBytes,
   getLanguageIdentifier,
   getSizeLimitForType,
@@ -165,41 +120,27 @@ export {
   HTML_EXTENSIONS,
   IMAGE_EXTENSIONS,
   IMAGE_MIME_TYPES,
-  type ImageExtension,
-  type ImageMimeType,
   isSourceCodeFile,
   isWithinSizeLimit,
   JSON_EXTENSIONS,
   LANGUAGE_MAP,
-  type LanguageMap,
   MARKDOWN_EXTENSIONS,
   MIME_TYPES,
-  type MimeType,
   mbToBytes,
   OPENDOCUMENT_EXTENSIONS,
   PDF_EXTENSIONS,
   POWERPOINT_EXTENSIONS,
   PROCESSING_LIMITS,
-  type ProcessingLimitKey,
   RTF_EXTENSIONS,
   SIZE_LIMITS,
   SIZE_LIMITS_BYTES,
   SIZE_LIMITS_MB,
-  type SizeLimitBytesKey,
-  type SizeLimitMBKey,
-  type SizeLimits,
   SOURCE_CODE_EXTENSIONS,
   SOURCE_CODE_MIME_TYPES,
-  type SourceCodeExtension,
-  type SourceCodeMimeType,
   TEXT_EXTENSIONS,
   TEXT_MIME_TYPES,
-  type TextExtension,
-  type TextMimeType,
   VIDEO_EXTENSIONS,
   VIDEO_MIME_TYPES,
-  type VideoExtension,
-  type VideoMimeType,
   validateFileSize,
   WORD_EXTENSIONS,
   XML_EXTENSIONS,
@@ -217,13 +158,10 @@ export {
   createFileError,
   createProcessingSummary,
   ERROR_MESSAGES,
-  type ErrorMessageTemplate,
   extractHttpStatus,
   extractSafeMetadata,
   FileErrorCode,
   // Re-export FileProcessingError as ProcessingError alias for backward compat
-  type FileProcessingError as ProcessingError,
-  type FileProcessingSummary,
   formatFileError,
   generateErrorFingerprint,
   getErrorTemplate,
@@ -232,8 +170,6 @@ export {
   isRetryableError,
   isRetryableErrorCode,
   mapErrorToCode,
-  type SerializedError,
-  type SerializeOptions,
   safeStringify,
   serializeError,
   summarizeError,
@@ -246,7 +182,6 @@ export {
 export {
   getProcessorRegistry,
   getProcessorRegistrySync,
-  type ProcessorRegistration,
   ProcessorRegistry,
 } from "./registry/index.js";
 
@@ -349,14 +284,12 @@ export {
 // MEDIA PROCESSORS
 // =============================================================================
 
-export type { ProcessedAudio } from "./media/AudioProcessor.js";
 export {
   AudioProcessor,
   audioProcessor,
   isAudioFile,
   processAudio,
 } from "./media/AudioProcessor.js";
-export type { ProcessedVideo } from "./media/VideoProcessor.js";
 export {
   isVideoFile,
   processVideo,
@@ -368,7 +301,6 @@ export {
 // ARCHIVE PROCESSORS
 // =============================================================================
 
-export type { ProcessedArchive } from "./archive/ArchiveProcessor.js";
 export {
   ArchiveProcessor,
   archiveProcessor,
@@ -381,8 +313,6 @@ export {
 // =============================================================================
 
 export {
-  type BatchFileProcessingResult,
-  type FileProcessingOptions,
   getProcessorForFile,
   getSupportedFileTypes,
   isFileTypeSupported,
@@ -395,8 +325,6 @@ export {
 // =============================================================================
 
 export {
-  type CliFileProcessingOptions,
-  type CliProcessingResult,
   detectMimeType,
   fileExists,
   getCliUsage,
@@ -405,5 +333,4 @@ export {
   listSupportedFileTypes,
   loadFileFromPath,
   processFileFromPath,
-  type SupportedFileTypeInfo,
 } from "./cli/index.js";

@@ -16,7 +16,7 @@ import type {
   ExperimentRecord,
   ExperimentStats,
   ResearchConfig,
-} from "../types/autoresearchTypes.js";
+} from "../types/index.js";
 
 export class ResultRecorder {
   private tsvPath: string;

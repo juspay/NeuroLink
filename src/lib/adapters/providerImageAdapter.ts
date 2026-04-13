@@ -3,7 +3,7 @@
  * Handles provider-specific image formatting and vision capability validation
  */
 
-import type { Content, ImageWithAltText } from "../types/multimodal.js";
+import type { Content, ImageWithAltText } from "../types/index.js";
 import { ImageProcessor } from "../utils/imageProcessor.js";
 import { logger } from "../utils/logger.js";
 

@@ -584,33 +584,3 @@ export const FILE_EXTENSIONS = {
 // =============================================================================
 // TYPE EXPORTS
 // =============================================================================
-
-/** Type for image file extension values */
-export type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
-
-/** Type for document file extension values */
-export type DocumentExtension = (typeof DOCUMENT_EXTENSIONS)[number];
-
-/** Type for data file extension values */
-export type DataExtension = (typeof DATA_EXTENSIONS)[number];
-
-/** Type for text file extension values */
-export type TextExtension = (typeof TEXT_EXTENSIONS)[number];
-
-/** Type for source code file extension values */
-export type SourceCodeExtension = (typeof SOURCE_CODE_EXTENSIONS)[number];
-
-/** Type for config file extension values */
-export type ConfigExtension = (typeof CONFIG_EXTENSIONS)[number];
-
-/** Type for archive file extension values */
-export type ArchiveExtension = (typeof ARCHIVE_EXTENSIONS)[number];
-
-/** Type for video file extension values */
-export type VideoExtension = (typeof VIDEO_EXTENSIONS)[number];
-
-/** Type for audio file extension values */
-export type AudioExtension = (typeof AUDIO_EXTENSIONS)[number];
-
-/** Type for the FILE_EXTENSIONS object */
-export type FileExtensions = typeof FILE_EXTENSIONS;

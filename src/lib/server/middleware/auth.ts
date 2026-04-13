@@ -7,12 +7,14 @@ import type {
   MiddlewareDefinition,
   ServerContext,
   AuthenticatedUser,
-} from "../types.js";
+  ServerServerAuthConfig,
+} from "../../types/index.js";
 import {
   AuthenticationError,
   AuthorizationError,
   InvalidAuthenticationError,
 } from "../errors.js";
+import type { AuthResult } from "../../types/index.js";
 
 /**
  * Check if request is from development playground.
@@ -49,64 +51,9 @@ export const DEV_PLAYGROUND_USER: AuthResult = {
   id: "playground",
   roles: ["developer"],
 };
-
-/**
- * Authentication configuration
- */
-export type AuthConfig = {
-  /** Authentication type */
-  type: "bearer" | "api-key" | "basic" | "custom";
-
-  /**
-   * Token validation function
-   * Returns user information if valid, throws or returns null if invalid
-   */
-  validate: (token: string, ctx: ServerContext) => Promise<AuthResult | null>;
-
-  /** Header name for token (default: "Authorization" for bearer, "X-API-Key" for api-key) */
-  headerName?: string;
-
-  /** Skip authentication for certain paths */
-  skipPaths?: string[];
-
-  /** Custom error message */
-  errorMessage?: string;
-
-  /**
-   * Optional token extractor for custom authentication schemes
-   * Only used when type is "custom"
-   */
-  extractToken?: (ctx: ServerContext) => string | null;
-
-  /**
-   * Skip authentication for dev playground requests in non-production.
-   * When true (default), requests with x-neurolink-dev-playground or
-   * x-neurolink-playground header set to "true" will bypass authentication
-   * and receive a default developer user context.
-   *
-   * Only applies when NODE_ENV is not "production".
-   *
-   * @default true
-   */
-  skipDevPlayground?: boolean;
-};
-
 /**
  * Authentication result
  */
-export type AuthResult = {
-  /** User ID */
-  id: string;
-
-  /** User email (optional) */
-  email?: string;
-
-  /** User roles (optional) */
-  roles?: string[];
-
-  /** Additional user data */
-  metadata?: Record<string, unknown>;
-};
 
 /**
  * Create authentication middleware
@@ -125,7 +72,9 @@ export type AuthResult = {
  * server.registerMiddleware(authMiddleware);
  * ```
  */
-export function createAuthMiddleware(config: AuthConfig): MiddlewareDefinition {
+export function createAuthMiddleware(
+  config: ServerServerAuthConfig,
+): MiddlewareDefinition {
   const {
     type,
     validate,
@@ -202,7 +151,7 @@ export function createAuthMiddleware(config: AuthConfig): MiddlewareDefinition {
 /**
  * Get default header name for auth type
  */
-function getDefaultHeaderName(type: AuthConfig["type"]): string {
+function getDefaultHeaderName(type: ServerServerAuthConfig["type"]): string {
   switch (type) {
     case "bearer":
     case "basic":
@@ -221,7 +170,7 @@ function getDefaultHeaderName(type: AuthConfig["type"]): string {
  */
 function extractToken(
   ctx: ServerContext,
-  type: AuthConfig["type"],
+  type: ServerServerAuthConfig["type"],
   headerName: string,
   customExtractor?: (ctx: ServerContext) => string | null,
 ): string | null {
@@ -385,7 +334,7 @@ export class ApiKeyStore {
 /**
  * Options for bearer auth middleware
  */
-export type BearerAuthOptions = {
+type BearerAuthOptions = {
   /** Whether authentication is required (default: true) */
   required?: boolean;
   /** Header name (default: "authorization") */
@@ -397,7 +346,7 @@ export type BearerAuthOptions = {
 /**
  * Token validation function type
  */
-export type TokenValidator = (
+type TokenValidator = (
   token: string,
 ) => Promise<AuthenticatedUser | null> | AuthenticatedUser | null;
 
@@ -467,7 +416,7 @@ export function createBearerAuthMiddleware(
 /**
  * Options for API key auth middleware
  */
-export type ApiKeyAuthOptions = {
+type ApiKeyAuthOptions = {
   /** Header name (default: "x-api-key") */
   headerName?: string;
   /** Paths to skip authentication */

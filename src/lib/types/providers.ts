@@ -12,13 +12,13 @@ import {
   VertexModels,
 } from "../constants/enums.js";
 import type { Tool } from "ai";
-import type { ValidationSchema } from "./typeAliases.js";
+import type { ValidationSchema } from "./aliases.js";
 import type {
   EnhancedGenerateResult,
   GenerateResult,
   TextGenerationOptions,
-} from "./generateTypes.js";
-import type { StreamOptions, StreamResult } from "./streamTypes.js";
+} from "./generate.js";
+import type { StreamOptions, StreamResult } from "./stream.js";
 import type { ExternalMCPToolInfo } from "./externalMcp.js";
 
 // Subscription types for Claude/Anthropic authentication and tier management
@@ -27,7 +27,8 @@ import type {
   AnthropicAuthMethod,
   AnthropicAuthConfig,
   SubscriptionInfo,
-} from "./subscriptionTypes.js";
+  OAuthToken,
+} from "./subscription.js";
 
 // Re-export subscription types for convenience
 export type {
@@ -35,7 +36,7 @@ export type {
   AnthropicAuthMethod,
   AnthropicAuthConfig,
   SubscriptionInfo,
-} from "./subscriptionTypes.js";
+} from "./subscription.js";
 
 // ============================================================================
 // TYPE ALIASES
@@ -87,9 +88,10 @@ export type ProviderStatus = {
 };
 
 /**
- * Provider error information
+ * Structural type for provider errors from external sources.
+ * For throwing errors, use the ProviderError class from errors.ts.
  */
-export type ProviderError = Error & {
+export type ProviderErrorLike = Error & {
   code?: string | number;
   statusCode?: number;
   provider?: string;
@@ -406,7 +408,7 @@ export type AnthropicProviderConfig = IndividualProviderConfig & {
    * OAuth token for OAuth authentication.
    * Required when authMethod is "oauth".
    */
-  oauthToken?: import("./subscriptionTypes.js").OAuthToken;
+  oauthToken?: OAuthToken;
 
   /**
    * OAuth configuration for OAuth-based authentication

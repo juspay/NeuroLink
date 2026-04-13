@@ -43,8 +43,6 @@
 
 // Export service
 export { ImageGenService } from "./ImageGenService.js";
-// Export tool types
-export type { ImageGenToolDefinition } from "./imageGenTools.js";
 
 // Export tools
 export {
@@ -55,4 +53,4 @@ export {
   getImageGenTools,
 } from "./imageGenTools.js";
 // Export types
-export * from "./types.js";
+export * from "../types/index.js";

@@ -1,5 +1,5 @@
 import { logger } from "../../utils/logger.js";
-import type { Frame } from "./types.js";
+import type { Frame } from "../../types/index.js";
 
 export class FrameBus {
   private handlers: Partial<

@@ -7,16 +7,14 @@
 import type {
   GenerateOptions,
   UnifiedGenerationOptions,
-} from "../types/generateTypes.js";
-import type { StreamOptions } from "../types/streamTypes.js";
-import { ContextConverter } from "../types/contextTypes.js";
-import { logger } from "./logger.js";
-import type {
+  StreamOptions,
   ConflictDetectionPlugin,
   EnhancementOptions,
   EnhancementResult,
   EnhancementType,
-} from "../types/utilities.js";
+} from "../types/index.js";
+import { ContextConverter } from "../types/index.js";
+import { logger } from "./logger.js";
 
 /**
  * Options Enhancement Utility Class

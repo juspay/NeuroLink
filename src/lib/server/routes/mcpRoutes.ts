@@ -8,7 +8,7 @@ import type {
   MCPServerStatusResponse,
   RouteGroup,
   ServerContext,
-} from "../types.js";
+} from "../../types/index.js";
 import {
   createErrorResponse,
   ServerNameParamSchema,

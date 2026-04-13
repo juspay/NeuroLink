@@ -11,7 +11,7 @@
  */
 
 import { registryLogger } from "../utils/logger.js";
-import type { FlexibleValidationResult } from "../types/mcpTypes.js";
+import type { FlexibleValidationResult } from "../types/index.js";
 
 export class FlexibleToolValidator {
   // Universal safety limits (generous to support all legitimate tools)

@@ -5,20 +5,19 @@ import { BaseProvider } from "../core/baseProvider.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { modelConfig } from "../core/modelConfiguration.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import type { JsonValue } from "../types/common.js";
 import type {
+  JsonValue,
+  StreamOptions,
+  StreamResult,
+  ToolArgs,
+  ZodUnknownSchema,
   MessageContent,
   MultimodalChatMessage,
-} from "../types/conversation.js";
-import type {
   OllamaAsLanguageModel,
   OllamaMessage,
   OllamaToolCall,
   OllamaToolResult,
-} from "../types/providers.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type { ToolArgs } from "../types/tools.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { buildMultimodalMessagesArray } from "../utils/messageBuilder.js";
 import { buildMultimodalOptions } from "../utils/multimodalOptionsBuilder.js";
@@ -27,7 +26,7 @@ import {
   InvalidModelError,
   NetworkError,
   ProviderError,
-} from "../types/errors.js";
+} from "../types/index.js";
 import { tracers, ATTR, withClientSpan } from "../telemetry/index.js";
 import { TimeoutError } from "../utils/timeout.js";
 
@@ -1664,24 +1663,24 @@ export class OllamaProvider extends BaseProvider {
     aiTools: Record<string, import("ai").Tool>,
   ): Record<
     string,
-    import("../types/tools.js").ToolDefinition<ToolArgs, JsonValue>
+    import("../types/index.js").ToolDefinition<ToolArgs, JsonValue>
   > {
     const result: Record<
       string,
-      import("../types/tools.js").ToolDefinition<ToolArgs, JsonValue>
+      import("../types/index.js").ToolDefinition<ToolArgs, JsonValue>
     > = {};
 
     for (const [name, tool] of Object.entries(aiTools)) {
       if ("description" in tool && tool.description) {
         // AI SDK v6 uses `inputSchema`; legacy tools may still use `parameters`
         const toolSchema:
-          | import("../types/tools.js").ToolParameterSchema
+          | import("../types/index.js").ToolParameterSchema
           | undefined =
           "inputSchema" in tool
-            ? (tool.inputSchema as import("../types/tools.js").ToolParameterSchema)
+            ? (tool.inputSchema as import("../types/index.js").ToolParameterSchema)
             : "parameters" in tool
               ? ((tool as Record<string, unknown>)
-                  .parameters as import("../types/tools.js").ToolParameterSchema)
+                  .parameters as import("../types/index.js").ToolParameterSchema)
               : undefined;
         result[name] = {
           description: tool.description,

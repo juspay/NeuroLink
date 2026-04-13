@@ -13,7 +13,7 @@ import type {
   EmbedResponse,
   RouteGroup,
   ServerContext,
-} from "../types.js";
+} from "../../types/index.js";
 import { createStreamRedactor } from "../utils/redaction.js";
 import {
   AgentExecuteRequestSchema,

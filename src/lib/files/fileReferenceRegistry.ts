@@ -17,10 +17,9 @@ import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { estimatePostProcessingTokens } from "../context/fileTokenBudget.js";
-import type { FileSource, FileType } from "../types/fileTypes.js";
-import { logger } from "../utils/logger.js";
-import { StreamingReader } from "./streamingReader.js";
 import type {
+  FileSource,
+  FileType,
   FileExtractionParams,
   FileExtractionResult,
   FileReadResult,
@@ -29,8 +28,10 @@ import type {
   FileRegistryOptions,
   FileSearchResult,
   SizeTier,
-} from "./types.js";
-import { SIZE_TIER_THRESHOLDS } from "./types.js";
+} from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import { StreamingReader } from "./streamingReader.js";
+import { SIZE_TIER_THRESHOLDS } from "../types/index.js";
 
 /** Default maximum files in registry before LRU eviction */
 const DEFAULT_MAX_FILES = 100;

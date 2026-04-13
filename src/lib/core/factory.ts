@@ -12,11 +12,10 @@ import type {
   AIProvider,
   SupportedModelName,
   NeurolinkCredentials,
+  UnknownRecord,
+  ProviderPairResult,
 } from "../types/index.js";
 import { AIProviderName } from "../constants/enums.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { ProviderPairResult } from "../types/typeAliases.js";
-
 const componentIdentifier = "aiProviderFactory";
 const factoryTracer = tracers.factory;
 

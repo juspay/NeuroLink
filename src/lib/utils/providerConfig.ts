@@ -6,25 +6,18 @@
  * Extended with Claude subscription OAuth support
  */
 
-import type { APIValidationResult } from "../types/utilities.js";
-import type { ProviderConfigOptions } from "../types/providers.js";
-import { logger } from "./logger.js";
 import type {
+  APIValidationResult,
+  ProviderConfigOptions,
   AnthropicAuthMethod,
   ClaudeSubscriptionTier,
   AnthropicAuthConfig,
   OAuthToken,
   AnthropicAuthConfigResult,
-} from "../types/subscriptionTypes.js";
+} from "../types/index.js";
 
+import { logger } from "./logger.js";
 // Re-export subscription types for convenience
-export type {
-  AnthropicAuthMethod,
-  ClaudeSubscriptionTier,
-  AnthropicAuthConfig,
-  OAuthToken,
-  AnthropicAuthConfigResult,
-} from "../types/subscriptionTypes.js";
 
 /**
  * API key format validation patterns (extracted from advanced validation system)

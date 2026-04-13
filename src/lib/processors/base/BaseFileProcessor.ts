@@ -61,16 +61,16 @@ import type {
   FailedFileInfo,
   FileInfo,
   FileProcessingError,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   FileProcessorConfig,
   FileWarning,
-  OperationResult,
+  ProcessorOperationResult,
   ProcessedFileBase,
   ProcessedFileInfo,
   ProcessOptions,
   SkippedFileInfo,
-} from "./types.js";
-import { DEFAULT_RETRY_CONFIG } from "./types.js";
+} from "../../types/index.js";
+import { DEFAULT_RETRY_CONFIG } from "../../types/index.js";
 
 const gunzipAsync = promisify(gunzip);
 
@@ -134,7 +134,7 @@ export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
   async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<T>> {
+  ): Promise<ProcessorFileProcessingResult<T>> {
     try {
       // Step 1: Validate file type and size
       const validationResult = this.validateFileWithResult(fileInfo);
@@ -376,7 +376,7 @@ export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
   protected async validateDownloadedFileWithResult(
     buffer: Buffer,
     fileInfo: FileInfo,
-  ): Promise<OperationResult<void>> {
+  ): Promise<ProcessorOperationResult<void>> {
     // Call the legacy validation method for backward compatibility
     const errorMessage = await this.validateDownloadedFile(buffer, fileInfo);
     if (errorMessage) {
@@ -401,7 +401,7 @@ export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
   protected async buildProcessedResultWithResult(
     buffer: Buffer,
     fileInfo: FileInfo,
-  ): Promise<FileProcessingResult<T>> {
+  ): Promise<ProcessorFileProcessingResult<T>> {
     try {
       const result = await this.buildProcessedResult(buffer, fileInfo);
       return { success: true, data: result };
@@ -516,7 +516,7 @@ export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
   protected async downloadFileWithRetry(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<OperationResult<Buffer>> {
+  ): Promise<ProcessorOperationResult<Buffer>> {
     const url = fileInfo.url;
     if (!url) {
       return {
@@ -580,7 +580,9 @@ export abstract class BaseFileProcessor<T extends ProcessedFileBase> {
    * @param fileInfo - File information to validate
    * @returns Success result or error result
    */
-  protected validateFileWithResult(fileInfo: FileInfo): OperationResult<void> {
+  protected validateFileWithResult(
+    fileInfo: FileInfo,
+  ): ProcessorOperationResult<void> {
     // Validate file type
     if (!this.isFileSupported(fileInfo.mimetype, fileInfo.name || "")) {
       return {

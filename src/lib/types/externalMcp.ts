@@ -11,8 +11,8 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 /**
  * Supported MCP transport protocols - imported from mcpTypes.js (canonical definition)
  */
-import type { MCPTransportType } from "./mcpTypes.js";
-export type { MCPTransportType } from "./mcpTypes.js";
+import type { MCPTransportType, MCPServerInfo } from "./mcp.js";
+export type { MCPTransportType } from "./mcp.js";
 
 /**
  * External MCP server configuration for process spawning
@@ -399,7 +399,7 @@ export type ExternalMCPManagerConfig = {
  * configuration fields from MCPServerInfo with runtime-only state needed for
  * active server management (process handles, clients, metrics, etc.)
  */
-export type RuntimeMCPServerInfo = import("./mcpTypes.js").MCPServerInfo & {
+export type RuntimeMCPServerInfo = MCPServerInfo & {
   /** Child process handle (for stdio transport, null for HTTP transports) */
   process: import("child_process").ChildProcess | null;
   /** MCP client instance for communication */
@@ -440,5 +440,5 @@ export type RuntimeMCPServerInfo = import("./mcpTypes.js").MCPServerInfo & {
     inputSchema?: object;
   }>;
   /** Compatibility field for existing code - stores MCPServerInfo config */
-  config: import("./mcpTypes.js").MCPServerInfo;
+  config: MCPServerInfo;
 };

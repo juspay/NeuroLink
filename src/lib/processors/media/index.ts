@@ -28,7 +28,6 @@
 // VIDEO PROCESSOR
 // =============================================================================
 
-export type { ProcessedVideo } from "./VideoProcessor.js";
 export {
   isVideoFile,
   processVideo,

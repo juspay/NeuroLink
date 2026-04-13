@@ -49,14 +49,6 @@ export {
   withRetry,
   TypedEventEmitter,
 } from "./core/infrastructure/index.js";
-export type {
-  ErrorCode,
-  FactoryFunction,
-  FactoryRegistration,
-  RegistryEntry as CoreRegistryEntry,
-  RetryOptions,
-} from "./core/infrastructure/index.js";
-
 // ============================================================================
 // CLIENT SDK EXPORTS - Type-safe API access for browser and Node.js
 // Note: React hooks are NOT re-exported here. Import from '@juspay/neurolink/client'.
@@ -136,70 +128,6 @@ export {
   isApiError,
 } from "./client/index.js";
 
-export type {
-  // Client Config Types
-  ClientConfig,
-  RequestOptions,
-  ApiResponse,
-  ApiError,
-  RetryConfig,
-  Middleware as ClientMiddleware,
-  MiddlewareRequest,
-  MiddlewareResponse,
-  MiddlewareContext as ClientMiddlewareContext,
-  // Stream Types
-  StreamCallbacks,
-  StreamEvent,
-  StreamResult,
-  // Generation Types
-  GenerateRequestOptions,
-  GenerateResponse,
-  StreamRequestOptions,
-  // Agent Types
-  AgentExecuteOptions,
-  AgentExecuteResult,
-  AgentInfo,
-  // Workflow Types
-  WorkflowExecuteOptions,
-  WorkflowExecuteResult,
-  WorkflowInfo,
-  // Tool Types
-  ToolInfo as ClientToolInfo,
-  ProviderStatus,
-  // WebSocket Types
-  WebSocketOptions,
-  WebSocketState,
-  WebSocketMessageHandler,
-  // AI SDK Types
-  NeuroLinkProviderOptions,
-  ModelOptions,
-  LanguageModel,
-  LanguageModelCallOptions,
-  LanguageModelResponse,
-  LanguageModelStreamResponse,
-  // Interceptor Types
-  LoggingInterceptorOptions,
-  RetryInterceptorOptions,
-  RateLimiterOptions,
-  CacheInterceptorOptions,
-  TimeoutInterceptorOptions,
-  ErrorHandlerOptions,
-  // Streaming Types
-  SSEConnectionOptions,
-  SSEConnectionState,
-  StreamingRequestOptions,
-  StreamingEventEmitter,
-  StreamingClientConfig,
-  // Voice Types
-  SpeechRecognitionResult,
-  SpeechSynthesisOptions,
-  // Auth Types
-  AuthConfig as ClientAuthConfig,
-  OAuth2Config,
-  TokenRefreshResult,
-  // Error Types
-  ErrorCodeType,
-} from "./client/index.js";
 export {
   AIProviderName,
   BedrockModels,
@@ -212,7 +140,6 @@ export { dynamicModelProvider } from "./core/dynamicModels.js";
 export { validateTool } from "./sdk/toolRegistration.js";
 // Export ALL types from the centralized type barrel
 export * from "./types/index.js";
-export type { DynamicModelConfig, ModelRegistry } from "./types/modelTypes.js";
 // Error utilities
 export { isAbortError } from "./utils/errorHandling.js";
 // Pricing utilities
@@ -229,16 +156,8 @@ export { TTSProcessor } from "./utils/ttsProcessor.js";
 // Main NeuroLink wrapper class and diagnostic types
 import { NeuroLink } from "./neurolink.js";
 export { NeuroLink };
-export type { MCPServerInfo } from "./types/mcpTypes.js";
 
 // Observability configuration types
-export type {
-  LangfuseConfig,
-  LangfuseSpanAttributes,
-  ObservabilityConfig,
-  OpenTelemetryConfig,
-  TraceNameFormat,
-} from "./types/observability.js";
 
 export { buildObservabilityConfigFromEnv } from "./utils/observabilityHelpers.js";
 
@@ -260,8 +179,6 @@ import {
   setLangfuseContext,
   shutdownOpenTelemetry,
 } from "./services/server/ai/observability/instrumentation.js";
-
-export type { LangfuseContext } from "./services/server/ai/observability/instrumentation.js";
 
 import {
   getTelemetryStatus as getStatus,
@@ -298,13 +215,6 @@ export { createLifecycleMiddleware } from "./middleware/builtin/lifecycle.js";
 export { MiddlewareFactory } from "./middleware/factory.js";
 export { ExporterRegistry } from "./observability/exporterRegistry.js";
 export { NoOpExporter } from "./observability/exporters/baseExporter.js";
-export type {
-  LatencyStats,
-  MetricsSummary,
-  ModelCostStats,
-  ProviderCostStats,
-  TraceView,
-} from "./observability/metricsAggregator.js";
 // Observability modules and types
 export {
   getMetricsAggregator,
@@ -316,25 +226,9 @@ export {
   NeverSampler,
 } from "./observability/sampling/samplers.js";
 export { TokenTracker } from "./observability/tokenTracker.js";
-export type {
-  SpanAttributes,
-  SpanData,
-  SpanEvent,
-} from "./observability/types/spanTypes.js";
-export {
-  GENAI_ATTRIBUTES,
-  SpanStatus,
-  SpanType,
-} from "./observability/types/spanTypes.js";
+export { GENAI_ATTRIBUTES, SpanStatus, SpanType } from "./types/index.js";
 export { SpanSerializer } from "./observability/utils/spanSerializer.js";
 // Middleware exports
-export type {
-  MiddlewareConfig,
-  MiddlewareContext,
-  MiddlewareFactoryOptions,
-  MiddlewarePreset,
-  NeuroLinkMiddleware,
-} from "./types/middlewareTypes.js";
 
 // Version
 export const VERSION = "1.0.0";
@@ -634,128 +528,6 @@ export {
   createFormRequest,
 } from "./mcp/index.js";
 
-export type {
-  // Routing types
-  RoutingStrategy,
-  ToolRouterConfig,
-  RoutingDecision,
-  MCPTool,
-  ToolRouterEvents,
-  AffinityRule,
-  CategoryMapping,
-  RouterServerWeight,
-  // Caching types
-  CacheStrategy,
-  CacheConfig as MCPCacheConfig,
-  CacheStats,
-  CacheEvents,
-  // Batching types
-  BatchConfig,
-  BatchResult,
-  BatchExecutor,
-  BatcherEvents,
-  // Tool Annotations types
-  MCPToolAnnotations,
-  MCPServerTool,
-  // Tool Converter types
-  ToolConverterOptions,
-  MCPProtocolTool,
-  NeuroLinkTool,
-  // Tool Integration types
-  ToolMiddleware,
-  EnhancedExecutionContext,
-  ToolWrapperOptions,
-  // Agent Exposure types
-  ExposableAgent,
-  ExposableWorkflow,
-  ExposureOptions,
-  ExposureResult,
-  // Server Capabilities types
-  MCPResource,
-  MCPPrompt,
-  ServerCapabilitiesConfig,
-  PromptGenerator,
-  PromptMessage,
-  PromptResult,
-  RegisteredPrompt,
-  RegisteredResource,
-  ResourceContent,
-  ResourceReader,
-  ResourceSubscriptionCallback,
-  // Registry Client types
-  RegistryEntry,
-  RegistryEntry as MCPRegistryEntry,
-  RegistrySearchOptions,
-  RegistrySearchResult,
-  RegistrySourceType,
-  RegistryConfig,
-  MCPRegistryClientConfig,
-  // Multi-Server Manager types
-  LoadBalancingStrategy,
-  ServerGroup,
-  UnifiedTool,
-  MultiServerManagerConfig,
-  ServerWeight,
-  // MCP Server Base types
-  MCPServerBaseConfig,
-  MCPServerEvents,
-  // Enhanced Tool Discovery types
-  EnhancedToolInfo,
-  ToolSearchCriteria,
-  ToolSearchResult,
-  CompatibilityCheckResult,
-  // Elicitation types
-  ElicitationType,
-  Elicitation,
-  ElicitationResponse,
-  ElicitationHandler,
-  ElicitationManagerConfig,
-  ElicitationRequest,
-  ElicitationContext,
-  TextElicitation,
-  SelectElicitation,
-  SelectOption,
-  MultiSelectElicitation,
-  ConfirmationElicitation,
-  FileElicitation,
-  SecretElicitation,
-  FormElicitation,
-  FormField,
-  // Elicitation Protocol types
-  ElicitationProtocolMessage,
-  ElicitationProtocolMessageType,
-  ElicitationProtocolPayload,
-  ElicitationProtocolHandler,
-  ElicitationProtocolAdapterConfig,
-  ElicitationRequestMessage,
-  ElicitationRequestParams,
-  ElicitationResponseMessage,
-  ElicitationResponseParams,
-  ElicitationCancelMessage,
-  ElicitationCancelParams,
-} from "./mcp/index.js";
-
-export type {
-  AuthorizationUrlResult,
-  DiscoveredMcp,
-  HTTPRetryConfig,
-  MCPOAuthConfig,
-  McpMetadata,
-  OAuthClientInformation,
-  OAuthTokens as McpOAuthTokens,
-  // HTTP Transport types
-  RateLimitConfig,
-  TokenExchangeRequest,
-  TokenStorage,
-} from "./types/mcpTypes.js";
-
-export type {
-  ExecutionContext,
-  ToolExecutionResult,
-  ToolInfo,
-} from "./types/tools.js";
-
-export type { LogLevel } from "./types/utilities.js";
 export { logger } from "./utils/logger.js";
 export { getPoolStats } from "./utils/redis.js";
 
@@ -827,14 +599,11 @@ export {
   // Main Evaluator
   Evaluator,
   // Factory and Registry (Mastra-inspired patterns)
-  BatchEvaluator,
   EvaluationAggregator,
   EvaluatorFactory,
   getEvaluatorFactory,
-  EvaluatorRegistry,
   getEvaluatorRegistry,
   // Error utilities
-  EvaluationErrorCodes,
   evaluationErrors,
   isRetryableEvaluationError,
   isEvaluationError,
@@ -849,7 +618,6 @@ export {
   // Hooks
   createLangfuseAdapter,
   createMockLangfuseClient,
-  LangfuseAdapter,
   startLangfuseAdapter,
   createConsoleLoggerHook,
   createMetricsCollectorHook,
@@ -869,7 +637,6 @@ export {
   getPreset,
   getPresetNames,
   MINIMAL_PIPELINE,
-  PipelinePresets,
   QUALITY_PIPELINE,
   RAG_PIPELINE,
   SAFETY_PIPELINE,
@@ -928,15 +695,11 @@ export {
   // Scorers - Rule-based
   BaseRuleScorer,
   DEFAULT_RULE_SCORER_CONFIG,
-  ContentSimilarityScorer,
   createContentSimilarityScorer,
   createFormatScorer,
-  FormatScorer,
   FormatScorerPresets,
   createKeywordCoverageScorer,
-  KeywordCoverageScorer,
   createLengthScorer,
-  LengthScorer,
   LengthScorerPresets,
   // Scorers - Builder & Registry
   ScorerBuilder,
@@ -944,70 +707,11 @@ export {
   ScorerRegistry,
 } from "./evaluation/index.js";
 
-export type {
-  // Hooks types
-  LangfuseAdapterConfig,
-  LangfuseClient,
-  EvaluationEvents,
-  EventHandler,
-  SpanAttributes as EvalSpanAttributes,
-  // Pipeline types
-  PipelineExecutionOptions,
-  PipelineResult,
-  // Reporting types
-  AggregatedMetrics,
-  PipelineMetrics,
-  ScorerMetrics,
-  GeneratedReport,
-  ReportData,
-  // Strategies types
-  BatchConfig as EvalBatchConfig,
-  BatchItemResult,
-  BatchProgress as PipelineBatchProgress,
-  BatchResult as EvalBatchResult,
-  // Scorers types
-  ScorerFunction,
-  ContentSimilarityConfig,
-  SimilarityMetric,
-  CodeLanguage,
-  FormatScorerConfig,
-  FormatType,
-  KeywordCoverageConfig,
-  LengthConstraintType,
-  LengthScorerConfig,
-  LengthUnit,
-  // Factory and Registry types (Mastra-inspired patterns)
-  BatchEvaluationConfig,
-  BatchProgress,
-  BatchEvaluationItem,
-  BatchEvaluationItemResult,
-  BatchEvaluationResult,
-  ScoreStatistics,
-  ScoreDistribution,
-  TrendAnalysis,
-  DimensionAnalysis,
-  AlertSummary,
-  AggregationResult,
-  EvaluatorPreset,
-  EvaluationStrategyFunction,
-  EvaluationStrategyConfig,
-  EvaluationStrategyMetadata,
-  // Error types
-  EvaluationErrorCode,
-  EvaluationErrorContext,
-} from "./evaluation/index.js";
-
 // ============================================================================
 // BACKWARD COMPATIBILITY: Legacy generateText Function Exports
 // ============================================================================
 
 // Export legacy types for backward compatibility
-export type {
-  AnalyticsData,
-  EvaluationData,
-  TextGenerationOptions,
-  TextGenerationResult,
-} from "./types/index.js";
 
 /**
  * Legacy generateText function for backward compatibility.
@@ -1096,7 +800,6 @@ export {
   listWorkflows,
   registerWorkflow,
 } from "./workflow/core/workflowRegistry.js";
-export type { RunWorkflowOptions } from "./workflow/core/workflowRunner.js";
 // Workflow execution
 export { runWorkflow } from "./workflow/core/workflowRunner.js";
 // Workflow constants
@@ -1105,19 +808,6 @@ export {
   WORKFLOW_ENGINE_VERSION,
 } from "./workflow/index.js";
 // Core workflow types
-export type {
-  EnsembleResponse,
-  ExecutionStrategy,
-  JudgeConfig,
-  JudgeScores,
-  ModelConfig,
-  ModelGroup,
-  MultiJudgeScores,
-  WorkflowConfig,
-  WorkflowResult,
-  WorkflowType,
-  WorkflowValidationResult,
-} from "./workflow/types.js";
 export {
   calculateModelMetrics,
   compareWorkflows,
@@ -1156,78 +846,7 @@ export {
 // ============================================================================
 
 // Server Types
-export type {
-  AgentExecuteRequest,
-  AgentExecuteResponse,
-  AuthConfig,
-  AuthenticatedUser,
-  AuthResult,
-  AuthStrategy,
-  BodyParserConfig,
-  CacheConfig,
-  CacheEntry,
-  CacheStore,
-  CORSConfig,
-  // Route Types
-  CreateRoutesOptions,
-  DataEvent,
-  DataStreamEvent,
-  DataStreamEventType,
-  DataStreamResponseConfig,
-  DataStreamWriter,
-  DataStreamWriterConfig,
-  // Error Types
-  ErrorCategoryType,
-  ErrorEvent,
-  ErrorResponse,
-  ErrorSeverityType,
-  FinishEvent,
-  HealthResponse,
-  HttpMethod,
-  LoggingConfig,
-  MCPServerStatusResponse,
-  MiddlewareDefinition,
-  MiddlewareHandler,
-  OpenAPIGeneratorConfig,
-  OpenAPISpec,
-  PropertySchema,
-  RateLimitConfig as ServerRateLimitConfig,
-  RateLimitMiddlewareConfig,
-  RateLimitStore,
-  ReadyResponse,
-  RequiredServerAdapterConfig,
-  RouteDefinition,
-  RouteGroup,
-  RouteHandler,
-  ServerAdapterConfig,
-  ServerAdapterErrorCodeType,
-  ServerAdapterErrorContext,
-  ServerAdapterEvents,
-  ServerAdapterFactoryOptions,
-  ServerContext,
-  ServerFramework,
-  ServerResponse,
-  ServerStatus,
-  SSEWriteOptions,
-  StreamingConfig,
-  TextDeltaEvent,
-  TextEndEvent,
-  TextStartEvent,
-  ToolCallEvent,
-  ToolExecuteRequest,
-  ToolExecuteResponse,
-  ToolResultEvent,
-  ValidationConfig,
-  ValidationResult,
-  ValidationSchema,
-  WebSocketAuthConfig,
-  // WebSocket Types
-  WebSocketConfig,
-  WebSocketConnection,
-  WebSocketHandler,
-  WebSocketMessage,
-  WebSocketMessageType,
-} from "./server/index.js";
+
 /**
  * Server Adapters for exposing NeuroLink as HTTP APIs
  *
@@ -1287,7 +906,6 @@ export {
   createSSEHeaders,
   createTimingMiddleware,
   createToolRoutes,
-  DataStreamResponse,
   // Error Constants
   ErrorCategory,
   ErrorRecoveryStrategies,
@@ -1305,7 +923,6 @@ export {
   MissingDependencyError,
   NotRunningError,
   // OpenAPI
-  OpenAPIGenerator,
   pipeAsyncIterableToDataStream,
   RateLimitError,
   RouteConflictError,
@@ -1345,73 +962,7 @@ export {
 // ============================================================================
 
 // Export RAG types
-export type {
-  // Chunker configs
-  BaseChunkerConfig,
-  BM25Result,
-  CharacterChunkerConfig,
-  Chunk,
-  ChunkingStrategy,
-  ChunkMetadata,
-  ChunkParams,
-  CitationFormat,
-  // Context
-  ContextAssemblyOptions,
-  ContextWindow,
-  CSVLoaderOptions,
-  // Document types
-  DocumentType,
-  EmbeddingModelConfig,
-  ExtractionResult,
-  // Metadata types
-  ExtractParams,
-  GenerationModelConfig,
-  GraphChunk,
-  GraphEdge,
-  GraphEmbedding,
-  // Graph RAG
-  GraphNode,
-  GraphQueryParams,
-  GraphRAGConfig,
-  GraphStats,
-  HTMLChunkerConfig,
-  // Hybrid search
-  HybridSearchConfig,
-  HybridSearchResult,
-  IngestOptions,
-  JSONChunkerConfig,
-  LaTeXChunkerConfig,
-  // Loader options
-  LoaderOptions,
-  MarkdownChunkerConfig,
-  MDocumentConfig,
-  MetadataFilter,
-  PDFLoaderOptions,
-  PipelineStats,
-  QueryOptions as RAGQueryOptions,
-  // CLI
-  RAGCommandArgs,
-  // RAG Integration
-  RAGConfig,
-  // Pipeline
-  RAGPipelineConfig,
-  RAGResponse,
-  RankedNode,
-  RecursiveChunkerConfig,
-  // Reranker
-  RerankerConfig,
-  RerankerOptions,
-  RerankResult,
-  SemanticChunkerConfig,
-  SentenceChunkerConfig,
-  TokenChunkerConfig,
-  VectorQueryResponse,
-  VectorQueryResult,
-  VectorQueryToolConfig,
-  // Vector types
-  VectorStore,
-  WebLoaderOptions,
-} from "./rag/index.js";
+
 /**
  * RAG (Retrieval-Augmented Generation) Document Processing
  *
@@ -1490,10 +1041,7 @@ export {
   prepareRAGTool,
   processDocument,
   RAGCircuitBreaker,
-  type RAGCircuitBreakerConfig,
-  type RAGCircuitBreakerEvents,
   RAGCircuitBreakerManager,
-  type RAGCircuitBreakerStats,
   RAGPipeline,
   RAGRetryHandler,
   RecursiveChunker,
@@ -1542,10 +1090,6 @@ export {
   extractToken,
   AuthMiddlewareError,
   AuthMiddlewareErrorCodes,
-  type MiddlewareHandler as AuthMiddlewareHandler,
-  type MiddlewareResult,
-  type NextFunction,
-  type ExpressMiddleware,
   // Rate Limiting Middleware
   UserRateLimiter,
   MemoryRateLimitStorage,
@@ -1553,16 +1097,11 @@ export {
   createRateLimitByUserMiddleware,
   createAuthenticatedRateLimitMiddleware,
   createRateLimitStorage,
-  type RateLimitConfig as AuthRateLimitConfig,
-  type RateLimitResult,
-  type RateLimitMiddlewareResult,
-  type RateLimitStorage,
   // Session Management
   SessionManager,
   MemorySessionStorage,
   RedisSessionStorage,
   createSessionStorage,
-  type SessionStorageInterface,
   // Auth Context
   AuthContextHolder,
   globalAuthContext,

@@ -1,4 +1,4 @@
-import type { TokenUsage } from "../types/analytics.js";
+import type { TokenUsage } from "../types/index.js";
 
 /**
  * Per-token pricing data (USD per token). Updated Feb 2026.

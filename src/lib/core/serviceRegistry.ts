@@ -4,10 +4,7 @@
  */
 
 import { logger } from "../utils/logger.js";
-import type {
-  ServiceFactory,
-  ServiceRegistration,
-} from "../types/serviceTypes.js";
+import type { ServiceFactory, ServiceRegistration } from "../types/index.js";
 
 export class ServiceRegistry {
   private static services = new Map<string, ServiceRegistration<unknown>>();

@@ -11,8 +11,8 @@ import type {
   WebSocketConnection,
   WebSocketMessage,
   AuthenticatedUser,
-  AuthConfig as _AuthConfig,
-} from "../types.js";
+  ServerAuthConfig as _AuthConfig,
+} from "../../types/index.js";
 import { WebSocketError, WebSocketConnectionError } from "../errors.js";
 import { logger } from "../../utils/logger.js";
 

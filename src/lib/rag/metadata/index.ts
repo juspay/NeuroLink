@@ -8,11 +8,7 @@ export {
   getAvailableExtractorTypes,
   getExtractorDefaultConfig,
   getExtractorMetadata,
-  type MetadataExtractor,
-  type MetadataExtractorConfig,
   MetadataExtractorFactory,
-  type MetadataExtractorMetadata,
-  type MetadataExtractorType,
   metadataExtractorFactory,
 } from "./MetadataExtractorFactory.js";
 // Registry pattern exports

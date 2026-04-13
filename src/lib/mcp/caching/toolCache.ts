@@ -11,46 +11,7 @@
 import { createHash } from "crypto";
 import { EventEmitter } from "events";
 import { withTimeout } from "../../utils/async/withTimeout.js";
-
-/**
- * Cache eviction strategy
- */
-export type CacheStrategy = "lru" | "fifo" | "lfu";
-
-/**
- * Cache configuration options
- */
-export type CacheConfig = {
-  /**
-   * Time-to-live in milliseconds (default: 5 minutes)
-   */
-  ttl: number;
-
-  /**
-   * Maximum number of entries (default: 500)
-   */
-  maxSize: number;
-
-  /**
-   * Eviction strategy (default: 'lru')
-   */
-  strategy: CacheStrategy;
-
-  /**
-   * Enable automatic cleanup of expired entries
-   */
-  enableAutoCleanup?: boolean;
-
-  /**
-   * Cleanup interval in milliseconds (default: 60 seconds)
-   */
-  cleanupInterval?: number;
-
-  /**
-   * Namespace for cache keys (optional)
-   */
-  namespace?: string;
-};
+import type { CacheStats, McpCacheConfig } from "../../types/index.js";
 
 /**
  * Cached entry with metadata
@@ -62,29 +23,6 @@ type CacheEntry<T> = {
   accessedAt: number;
   accessCount: number;
   key: string;
-};
-
-/**
- * Cache statistics
- */
-export type CacheStats = {
-  hits: number;
-  misses: number;
-  evictions: number;
-  size: number;
-  maxSize: number;
-  hitRate: number;
-};
-
-/**
- * Cache events
- */
-export type CacheEvents = {
-  hit: { key: string; value: unknown };
-  miss: { key: string };
-  set: { key: string; value: unknown; ttl: number };
-  evict: { key: string; reason: "expired" | "capacity" | "manual" };
-  clear: { entriesRemoved: number };
 };
 
 /**
@@ -110,11 +48,11 @@ export type CacheEvents = {
  */
 export class ToolCache<T = unknown> extends EventEmitter {
   private cache: Map<string, CacheEntry<T>> = new Map();
-  private config: Required<CacheConfig>;
+  private config: Required<McpCacheConfig>;
   private stats: CacheStats;
   private cleanupTimer?: ReturnType<typeof setInterval>;
 
-  constructor(config: CacheConfig) {
+  constructor(config: McpCacheConfig) {
     super();
 
     this.config = {
@@ -515,13 +453,13 @@ export class ToolCache<T = unknown> extends EventEmitter {
  * Factory function to create a ToolCache instance
  */
 export const createToolCache = <T = unknown>(
-  config: CacheConfig,
+  config: McpCacheConfig,
 ): ToolCache<T> => new ToolCache<T>(config);
 
 /**
  * Default cache configuration
  */
-export const DEFAULT_CACHE_CONFIG: CacheConfig = {
+export const DEFAULT_CACHE_CONFIG: McpCacheConfig = {
   ttl: 5 * 60 * 1000, // 5 minutes
   maxSize: 500,
   strategy: "lru",
@@ -535,7 +473,7 @@ export const DEFAULT_CACHE_CONFIG: CacheConfig = {
 export class ToolResultCache {
   private cache: ToolCache<unknown>;
 
-  constructor(config?: Partial<CacheConfig>) {
+  constructor(config?: Partial<McpCacheConfig>) {
     this.cache = new ToolCache({
       ...DEFAULT_CACHE_CONFIG,
       ...config,
@@ -605,5 +543,5 @@ export class ToolResultCache {
  * Create a tool result cache instance
  */
 export const createToolResultCache = (
-  config?: Partial<CacheConfig>,
+  config?: Partial<McpCacheConfig>,
 ): ToolResultCache => new ToolResultCache(config);

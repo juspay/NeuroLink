@@ -13,7 +13,7 @@ import type {
   ResearchConfig,
   ResearchState,
   ExperimentRecord,
-} from "../types/autoresearchTypes.js";
+} from "../types/index.js";
 
 export class PromptCompiler {
   constructor(private config: ResearchConfig) {}

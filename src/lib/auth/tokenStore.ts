@@ -18,13 +18,13 @@ import { join } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { logger } from "../utils/logger.js";
-import { TokenStoreError } from "../types/errors.js";
+import { TokenStoreError } from "../types/index.js";
 import { AsyncMutex } from "../utils/asyncMutex.js";
 import type {
   TokenStorageData,
   StoredOAuthTokens,
   TokenRefresher,
-} from "../types/authTypes.js";
+} from "../types/index.js";
 
 // Re-export so existing consumers of `../auth/tokenStore.js` keep working.
 export type { StoredOAuthTokens, TokenRefresher };

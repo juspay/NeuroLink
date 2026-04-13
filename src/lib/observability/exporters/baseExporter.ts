@@ -9,7 +9,7 @@ import type {
   ExporterHealthStatus,
   ExportResult,
   SpanData,
-} from "../types/index.js";
+} from "../../types/index.js";
 
 /**
  * Abstract base class for all observability exporters

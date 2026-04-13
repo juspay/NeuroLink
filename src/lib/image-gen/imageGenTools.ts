@@ -25,33 +25,10 @@ import { ImageGenService } from "./ImageGenService.js";
 import type {
   ImageGenConfig,
   ImageGenToolContext,
+  ImageGenToolDefinition,
   ImageGenToolParams,
   ImageGenToolResponse,
-} from "./types.js";
-
-/**
- * Tool definition interface compatible with AI SDK / MCP
- */
-export type ImageGenToolDefinition = {
-  name: string;
-  description: string;
-  inputSchema: {
-    type: "object";
-    properties: Record<
-      string,
-      {
-        type: string;
-        description: string;
-        enum?: string[];
-      }
-    >;
-    required: string[];
-  };
-  execute: (
-    params: ImageGenToolParams,
-    context?: ImageGenToolContext,
-  ) => Promise<ImageGenToolResponse>;
-};
+} from "../types/index.js";
 
 /**
  * Create an image generation tool for use with AI models

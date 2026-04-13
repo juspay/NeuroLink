@@ -10,7 +10,7 @@ import type {
   ChunkerConfig,
   ChunkingStrategy,
   RecursiveChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 import { BaseChunker, DEFAULT_CHUNKER_CONFIG } from "./BaseChunker.js";
 
 /**

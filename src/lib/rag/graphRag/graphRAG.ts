@@ -16,7 +16,7 @@ import type {
   GraphRAGConfig,
   GraphQueryParams,
   GraphStats,
-} from "../types.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**

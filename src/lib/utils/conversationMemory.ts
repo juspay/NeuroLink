@@ -21,11 +21,9 @@ import type {
   ConversationMemoryConfig,
   ProviderDetails,
   SessionMemory,
-} from "../types/conversation.js";
-import type {
   TextGenerationOptions,
   TextGenerationResult,
-} from "../types/generateTypes.js";
+} from "../types/index.js";
 import { logger } from "./logger.js";
 
 const memoryTracer = tracers.memory;

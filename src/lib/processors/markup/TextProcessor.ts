@@ -30,17 +30,15 @@
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedText,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 
 // Re-export for consumers who import from this module
-export type { ProcessedText } from "../base/types.js";
 
 // Import for local use
-import type { ProcessedText } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -215,6 +213,6 @@ export function isTextFile(mimetype: string, filename: string): boolean {
 export async function processText(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedText>> {
+): Promise<ProcessorFileProcessingResult<ProcessedText>> {
   return textProcessor.processFile(fileInfo, options);
 }

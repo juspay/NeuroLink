@@ -12,7 +12,7 @@ import type {
   ChunkerValidationResult,
   CharacterChunkerConfig,
   BaseChunkerConfig,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Character-based chunker implementation

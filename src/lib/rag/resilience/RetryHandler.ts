@@ -7,7 +7,10 @@
  */
 
 import { withRetry } from "../../core/infrastructure/index.js";
-import type { AsyncRetryOptions as _RetryOptions } from "../../types/index.js";
+import type {
+  AsyncRetryOptions as _RetryOptions,
+  RAGRetryConfig,
+} from "../../types/index.js";
 import { isAbortError } from "../../utils/errorHandling.js";
 import { logger } from "../../utils/logger.js";
 import {
@@ -18,10 +21,6 @@ import {
   RAGErrorCodes,
   VectorQueryError,
 } from "../errors/RAGError.js";
-
-import type { RAGRetryConfig } from "../../types/ragTypes.js";
-
-export type { RAGRetryConfig } from "../../types/ragTypes.js";
 
 /**
  * Default retry configuration

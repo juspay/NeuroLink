@@ -66,7 +66,7 @@ export const RAGErrorCodes = {
   INVALID_CONFIGURATION: "RAG_INVALID_CONFIGURATION",
 } as const;
 
-export type RAGErrorCode = (typeof RAGErrorCodes)[keyof typeof RAGErrorCodes];
+type RAGErrorCode = (typeof RAGErrorCodes)[keyof typeof RAGErrorCodes];
 
 /**
  * RAG error factory using the infrastructure pattern

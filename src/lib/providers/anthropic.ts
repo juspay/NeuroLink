@@ -31,28 +31,28 @@ import {
 import type { NeuroLink } from "../neurolink.js";
 import { createOAuthFetch } from "../proxy/oauthFetch.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import type { JsonValue, UnknownRecord } from "../types/common.js";
-import {
-  AuthenticationError,
-  NetworkError,
-  ProviderError,
-  RateLimitError,
-} from "../types/errors.js";
 import type {
+  JsonValue,
+  UnknownRecord,
+  AnthropicProviderConfig,
+  StreamOptions,
+  StreamResult,
+  ValidationSchema,
   EnhancedGenerateResult,
   TextGenerationOptions,
-} from "../types/generateTypes.js";
-import type { AnthropicProviderConfig } from "../types/providers.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
-import type {
   AnthropicAuthMethod,
   AnthropicRateLimitInfo,
   AnthropicResponseMetadata,
   ClaudeSubscriptionTier,
   ClaudeUsageInfo,
   OAuthToken,
-} from "../types/subscriptionTypes.js";
-import type { ValidationSchema } from "../types/typeAliases.js";
+} from "../types/index.js";
+import {
+  AuthenticationError,
+  NetworkError,
+  ProviderError,
+  RateLimitError,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { calculateCost } from "../utils/pricing.js";
 import {
@@ -88,7 +88,6 @@ const ANTHROPIC_BETA_HEADERS = {
 
 // AnthropicProviderConfig is imported from types/providers.ts
 // Re-export for backward compatibility
-export type { AnthropicProviderConfig } from "../types/providers.js";
 
 // Configuration helpers - now using consolidated utility
 const getAnthropicApiKey = (): string => {

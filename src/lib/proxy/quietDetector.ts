@@ -10,11 +10,11 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 
 /** Result of a traffic-quiet check. */
-export interface QuietStatus {
+type QuietStatus = {
   isQuiet: boolean;
   lastActivityAt: Date | null;
   silenceDurationMs: number;
-}
+};
 
 /** Default quiet threshold: 2 minutes of no traffic. */
 const DEFAULT_QUIET_THRESHOLD_MS = 120_000;

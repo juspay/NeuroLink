@@ -24,7 +24,9 @@ import type {
   RouteGroup,
   ServerAdapterConfig,
   ServerFramework,
-} from "../../lib/server/types.js";
+  ServeCommandArgs,
+  ServerConfigFile,
+} from "../../lib/types/index.js";
 import { withTimeout } from "../../lib/utils/errorHandling.js";
 import { logger } from "../../lib/utils/logger.js";
 import {
@@ -32,11 +34,6 @@ import {
   isProcessRunning,
   StateFileManager,
 } from "../utils/serverUtils.js";
-import type {
-  ServeCommandArgs,
-  ServerConfigFile,
-} from "../../lib/types/index.js";
-
 /**
  * Minimal interface for the server instance returned by createServer.
  * Avoids importing BaseServerAdapter (which is dynamically loaded).

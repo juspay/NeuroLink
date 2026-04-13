@@ -3,7 +3,7 @@
  * Pre-configured evaluation pipelines for common use cases
  */
 
-import type { PipelineConfig } from "../../types/scorerTypes.js";
+import type { PipelineConfig } from "../../types/index.js";
 
 /**
  * Safety evaluation preset

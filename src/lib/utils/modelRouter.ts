@@ -8,10 +8,10 @@ import { BinaryTaskClassifier } from "./taskClassifier.js";
 import type {
   TaskType,
   TaskClassification,
-} from "../types/taskClassificationTypes.js";
+  ModelRoute,
+  ModelRoutingOptions,
+} from "../types/index.js";
 import { redactForRouting } from "./promptRedaction.js";
-import type { ModelRoute, ModelRoutingOptions } from "../types/modelTypes.js";
-
 /**
  * Routing configuration constants
  */

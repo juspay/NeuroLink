@@ -9,7 +9,7 @@ import type {
   ExperimentSummary,
   MetricConfig,
   MemoryMetricConfig,
-} from "../types/autoresearchTypes.js";
+} from "../types/index.js";
 
 /**
  * Parse experiment output into a structured summary.

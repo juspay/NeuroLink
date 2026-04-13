@@ -9,9 +9,9 @@ import type {
   NeuroLinkMCPTool,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "../../../types/mcpTypes.js";
+  AIProvider,
+} from "../../../types/index.js";
 import { AIProviderFactory } from "../../../core/factory.js";
-import type { AIProvider } from "../../../types/index.js";
 import {
   getBestProvider,
   getAvailableProviders,

@@ -5,10 +5,7 @@
  * replace earlier reads with a notice.
  */
 
-import type { ChatMessage } from "../../types/conversation.js";
-import type { DeduplicationResult } from "../../types/contextTypes.js";
-
-export type { DeduplicationResult } from "../../types/contextTypes.js";
+import type { ChatMessage, DeduplicationResult } from "../../types/index.js";
 
 const FILE_READ_PATTERN =
   /(?:read|reading|read_file|readFile|Read file|cat)\s+['"`]?([^\s'"`\n]+)/i;

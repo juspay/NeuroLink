@@ -23,9 +23,10 @@ import type {
   AIProviderName,
   StandardRecord,
   ToolUtilities,
+  ToolArgs,
+  ToolEventPayload,
+  JsonObject,
 } from "../../types/index.js";
-import type { ToolArgs, ToolEventPayload } from "../../types/tools.js";
-import type { JsonObject } from "../../types/common.js";
 import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { logger } from "../../utils/logger.js";

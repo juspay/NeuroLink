@@ -12,10 +12,7 @@ import {
 import path from "node:path";
 import { logger } from "../utils/logger.js";
 import { AutoresearchError } from "./errors.js";
-import type {
-  ResearchState,
-  ExperimentPhase,
-} from "../types/autoresearchTypes.js";
+import type { ResearchState, ExperimentPhase } from "../types/index.js";
 
 export class ResearchStateStore {
   private filePath: string;

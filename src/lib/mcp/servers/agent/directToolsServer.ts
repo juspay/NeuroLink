@@ -3,13 +3,14 @@
  * Wraps the agent direct tools as an MCP server for proper registration
  */
 
-import type { Unknown, UnknownRecord } from "../../../types/common.js";
-import { z } from "zod";
-import { createMCPServer } from "../../factory.js";
 import type {
+  Unknown,
+  UnknownRecord,
   NeuroLinkExecutionContext,
   ToolResult,
-} from "../../../types/mcpTypes.js";
+} from "../../../types/index.js";
+import { z } from "zod";
+import { createMCPServer } from "../../factory.js";
 import { directAgentTools } from "../../../agent/directTools.js";
 import { logger } from "../../../utils/logger.js";
 import { shouldDisableBuiltinTools } from "../../../utils/toolUtils.js";

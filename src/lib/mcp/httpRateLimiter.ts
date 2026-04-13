@@ -5,19 +5,21 @@
  */
 
 import { mcpLogger } from "../utils/logger.js";
-import type { RateLimitConfig, RateLimiterStats } from "../types/mcpTypes.js";
+import type {
+  TokenBucketRateLimitConfig,
+  RateLimiterStats,
+} from "../types/index.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
-
 /**
  * Default rate limit configuration
  * Provides sensible defaults for most MCP HTTP transport use cases
  */
-export const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = {
+export const DEFAULT_RATE_LIMIT_CONFIG: TokenBucketRateLimitConfig = {
   requestsPerWindow: 60,
   windowMs: 60000,
   useTokenBucket: true,
@@ -38,14 +40,14 @@ export const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = {
 export class HTTPRateLimiter {
   private tokens: number;
   private lastRefill: number;
-  private config: RateLimitConfig;
+  private config: TokenBucketRateLimitConfig;
   private waitQueue: Array<{
     resolve: () => void;
     reject: (error: Error) => void;
   }> = [];
   private processingQueue = false;
 
-  constructor(config: Partial<RateLimitConfig> = {}) {
+  constructor(config: Partial<TokenBucketRateLimitConfig> = {}) {
     this.config = { ...DEFAULT_RATE_LIMIT_CONFIG, ...config };
     this.tokens = this.config.maxBurst;
     this.lastRefill = Date.now();
@@ -329,7 +331,7 @@ export class HTTPRateLimiter {
    * Update configuration dynamically
    * Useful when server provides rate limit information
    */
-  updateConfig(config: Partial<RateLimitConfig>): void {
+  updateConfig(config: Partial<TokenBucketRateLimitConfig>): void {
     Object.assign(this.config, config);
     mcpLogger.info(`[HTTPRateLimiter] Configuration updated:`, config);
   }
@@ -337,7 +339,7 @@ export class HTTPRateLimiter {
   /**
    * Get current configuration
    */
-  getConfig(): Readonly<RateLimitConfig> {
+  getConfig(): Readonly<TokenBucketRateLimitConfig> {
     return { ...this.config };
   }
 }
@@ -359,7 +361,7 @@ export class RateLimiterManager {
    */
   getLimiter(
     serverId: string,
-    config?: Partial<RateLimitConfig>,
+    config?: Partial<TokenBucketRateLimitConfig>,
   ): HTTPRateLimiter {
     let limiter = this.limiters.get(serverId);
 

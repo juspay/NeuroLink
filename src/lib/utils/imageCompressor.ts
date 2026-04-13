@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { withTimeout } from "./async/index.js";
-import type { ProviderName } from "../types/providers.js";
+import type { ProviderName } from "../types/index.js";
 
 const SUPPORTED_FORMATS = ["jpeg", "png", "webp"] as const;
 type SupportedFormat = (typeof SUPPORTED_FORMATS)[number];
@@ -27,14 +27,14 @@ export const PROVIDER_IMAGE_LIMITS: Record<ProviderName, number> = {
   auto: 5 * 1024 * 1024, // 5MB (conservative fallback)
 };
 
-export interface CompressionOptions {
+type CompressionOptions = {
   provider: ProviderName;
   quality?: number; // 1-100, default 80
   maxDimension?: number; // Max width/height in pixels
   format?: SupportedFormat;
-}
+};
 
-export interface CompressionResult {
+type CompressionResult = {
   buffer: Buffer;
   originalSize: number;
   compressedSize: number;
@@ -44,7 +44,7 @@ export interface CompressionResult {
     height: number;
     format: string;
   };
-}
+};
 
 /**
  * Compress an image to meet provider-specific size limits

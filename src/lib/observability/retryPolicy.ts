@@ -4,36 +4,11 @@
  */
 
 import { logger } from "../utils/logger.js";
-import type { RetryPolicy } from "../types/observability.js";
-
-/**
- * Result of a retry decision
- */
-export type RetryDecision = {
-  /** Whether to retry */
-  shouldRetry: boolean;
-  /** Delay before retry in milliseconds */
-  delayMs: number;
-  /** Reason for the decision */
-  reason: string;
-};
-
-/**
- * Context for retry decision making
- */
-export type RetryContext = {
-  /** Current attempt number (0-indexed) */
-  attempt: number;
-  /** The error that triggered the retry */
-  error: Error;
-  /** Total elapsed time since first attempt */
-  elapsedMs: number;
-  /** Operation name for logging */
-  operationName: string;
-  /** Additional metadata */
-  metadata?: Record<string, unknown>;
-};
-
+import type {
+  RetryPolicy,
+  RetryContext,
+  RetryDecision,
+} from "../types/index.js";
 export type { RetryPolicy };
 
 /**

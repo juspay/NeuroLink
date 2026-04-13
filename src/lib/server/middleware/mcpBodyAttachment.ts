@@ -3,7 +3,7 @@
  * Attaches parsed body to raw request for MCP SDK compatibility
  */
 
-import type { MiddlewareDefinition, ServerContext } from "../types.js";
+import type { MiddlewareDefinition, ServerContext } from "../../types/index.js";
 
 /**
  * Create MCP body attachment middleware for Fastify.

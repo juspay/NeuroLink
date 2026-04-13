@@ -37,18 +37,16 @@ import * as mammoth from "mammoth";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedWord,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 import { FileErrorCode } from "../errors/index.js";
 
 // Re-export for consumers who import from this module
-export type { ProcessedWord } from "../base/types.js";
 
 // Import for local use
-import type { ProcessedWord } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -200,7 +198,7 @@ export class WordProcessor extends BaseFileProcessor<ProcessedWord> {
   override async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<ProcessedWord>> {
+  ): Promise<ProcessorFileProcessingResult<ProcessedWord>> {
     try {
       // Step 1: Validate file type and size
       const validationResult = this.validateFileWithResult(fileInfo);
@@ -419,6 +417,6 @@ export function validateWordSize(sizeBytes: number): boolean {
 export async function processWord(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedWord>> {
+): Promise<ProcessorFileProcessingResult<ProcessedWord>> {
   return wordProcessor.processFile(fileInfo, options);
 }

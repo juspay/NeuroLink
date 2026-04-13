@@ -1,7 +1,8 @@
 import { AIProviderName } from "../../lib/constants/enums.js";
-import type { OptionSchema } from "../../lib/types/index.js";
-import type { TextGenerationOptions } from "../../lib/types/index.js";
-
+import type {
+  OptionSchema,
+  TextGenerationOptions,
+} from "../../lib/types/index.js";
 /**
  * Master schema for all text generation options.
  * This object provides metadata for validation and help text in the CLI loop.

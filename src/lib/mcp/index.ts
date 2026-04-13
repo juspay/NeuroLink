@@ -10,20 +10,11 @@
  * - Multi-Server Manager - Load balancing and coordination
  * - Enhanced Tool Discovery - Advanced search and filtering
  */
-import type { McpMetadata } from "../types/mcpTypes.js";
+import type { McpMetadata } from "../types/index.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
 
 // HTTP Transport types - exported from centralized types
-export type {
-  AuthorizationUrlResult,
-  HTTPRetryConfig,
-  MCPOAuthConfig,
-  OAuthClientInformation,
-  OAuthTokens,
-  RateLimitConfig,
-  TokenExchangeRequest,
-  TokenStorage,
-} from "../types/mcpTypes.js";
+
 export { mcpLogger } from "../utils/logger.js";
 // MCP Server Factory
 export {
@@ -72,12 +63,6 @@ export { MCPClientFactory } from "./mcpClientFactory.js";
 // MCP ENHANCEMENTS (Phase 8.39.0)
 // ========================================
 
-export type {
-  ExposableAgent,
-  ExposableWorkflow,
-  ExposureOptions,
-  ExposureResult,
-} from "./agentExposure.js";
 // Agent and Workflow Exposure
 export {
   AgentExposureManager,
@@ -87,44 +72,12 @@ export {
   exposeWorkflowsAsTools,
   globalAgentExposureManager,
 } from "./agentExposure.js";
-export type {
-  ConfirmationElicitation,
-  Elicitation,
-  ElicitationContext,
-  ElicitationHandler,
-  ElicitationManagerConfig,
-  ElicitationRequest,
-  ElicitationResponse,
-  ElicitationType,
-  FileElicitation,
-  FormElicitation,
-  FormField,
-  MultiSelectElicitation,
-  SecretElicitation,
-  SelectElicitation,
-  SelectOption,
-  TextElicitation,
-} from "./elicitation/index.js";
 
 // Elicitation Protocol - Manager
 export {
   ElicitationManager,
   globalElicitationManager,
 } from "./elicitation/index.js";
-export type {
-  ElicitationCancelMessage,
-  ElicitationCancelParams,
-  ElicitationProtocolAdapterConfig,
-  ElicitationProtocolHandler,
-  ElicitationProtocolMessage,
-  ElicitationProtocolMessageType,
-  ElicitationProtocolPayload,
-  ElicitationRequestMessage,
-  ElicitationRequestParams,
-  ElicitationResponseMessage,
-  ElicitationResponseParams,
-} from "./elicitationProtocol.js";
-
 // Elicitation Protocol - Protocol Layer
 export {
   createConfirmationRequest,
@@ -140,22 +93,8 @@ export {
   isElicitationProtocolMessage,
   protocolMessageToElicitation,
 } from "./elicitationProtocol.js";
-export type {
-  CompatibilityCheckResult,
-  EnhancedToolInfo,
-  ToolSearchCriteria,
-  ToolSearchResult,
-} from "./enhancedToolDiscovery.js";
 // Enhanced Tool Discovery
 export { EnhancedToolDiscovery } from "./enhancedToolDiscovery.js";
-export type {
-  MCPRegistryClientConfig,
-  RegistryConfig,
-  RegistryEntry,
-  RegistrySearchOptions,
-  RegistrySearchResult,
-  RegistrySourceType,
-} from "./mcpRegistryClient.js";
 // MCP Registry Client
 export {
   getAllWellKnownServers,
@@ -163,39 +102,13 @@ export {
   globalMCPRegistryClient,
   MCPRegistryClient,
 } from "./mcpRegistryClient.js";
-export type {
-  MCPServerBaseConfig,
-  MCPServerEvents,
-  MCPServerTool,
-  MCPToolAnnotations,
-} from "./mcpServerBase.js";
 // MCP Server Base Class
 export { MCPServerBase } from "./mcpServerBase.js";
-export type {
-  LoadBalancingStrategy,
-  MultiServerManagerConfig,
-  ServerGroup,
-  ServerWeight,
-  UnifiedTool,
-} from "./multiServerManager.js";
 // Multi-Server Manager
 export {
   globalMultiServerManager,
   MultiServerManager,
 } from "./multiServerManager.js";
-export type {
-  MCPPrompt,
-  MCPResource,
-  PromptGenerator,
-  PromptMessage,
-  PromptResult,
-  RegisteredPrompt,
-  RegisteredResource,
-  ResourceContent,
-  ResourceReader,
-  ResourceSubscriptionCallback,
-  ServerCapabilitiesConfig,
-} from "./serverCapabilities.js";
 // Server Capabilities (Resources and Prompts)
 export {
   createJsonResource,
@@ -215,11 +128,6 @@ export {
   requiresConfirmation,
   validateAnnotations,
 } from "./toolAnnotations.js";
-export type {
-  MCPProtocolTool,
-  NeuroLinkTool,
-  ToolConverterOptions,
-} from "./toolConverter.js";
 // Tool Converter Utilities
 export {
   batchConvertToMCP,
@@ -233,11 +141,6 @@ export {
   TOOL_COMPATIBILITY,
   validateToolName,
 } from "./toolConverter.js";
-export type {
-  EnhancedExecutionContext,
-  ToolMiddleware,
-  ToolWrapperOptions,
-} from "./toolIntegration.js";
 // Tool Integration with Elicitation
 export {
   confirmationMiddleware,
@@ -257,12 +160,6 @@ export {
 // ADVANCED MCP LAYERS (Phase 8.40.0)
 // ========================================
 
-export type {
-  BatchConfig,
-  BatchExecutor,
-  BatcherEvents,
-  BatchResult,
-} from "./batching/index.js";
 // Request Batcher - Efficient batch processing
 export {
   createRequestBatcher,
@@ -271,12 +168,6 @@ export {
   RequestBatcher,
   ToolCallBatcher,
 } from "./batching/index.js";
-export type {
-  CacheConfig,
-  CacheEvents,
-  CacheStats,
-  CacheStrategy,
-} from "./caching/index.js";
 // Tool Cache - Result and response caching
 export {
   createToolCache,
@@ -285,16 +176,6 @@ export {
   ToolCache,
   ToolResultCache,
 } from "./caching/index.js";
-export type {
-  AffinityRule,
-  CategoryMapping,
-  MCPTool,
-  RoutingDecision,
-  RoutingStrategy,
-  ServerWeight as RouterServerWeight,
-  ToolRouterConfig,
-  ToolRouterEvents,
-} from "./routing/index.js";
 // Tool Router - Intelligent routing for multi-server environments
 export {
   createToolRouter,

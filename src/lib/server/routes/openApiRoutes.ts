@@ -5,7 +5,7 @@
 
 import { logger } from "../../utils/logger.js";
 import { OpenAPIGenerator } from "../openapi/generator.js";
-import type { RouteDefinition, RouteGroup } from "../types.js";
+import type { RouteDefinition, RouteGroup } from "../../types/index.js";
 
 /**
  * Create OpenAPI documentation routes

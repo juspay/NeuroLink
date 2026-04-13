@@ -6,11 +6,9 @@
  * placeholders for orphaned entries.
  */
 
-import type { ChatMessage } from "../types/conversation.js";
-import type { RepairResult } from "../types/contextTypes.js";
-import { randomUUID } from "crypto";
+import type { ChatMessage, RepairResult } from "../types/index.js";
 
-export type { RepairResult } from "../types/contextTypes.js";
+import { randomUUID } from "crypto";
 
 /**
  * Repair orphaned tool_use/tool_result pairs in a message array.

@@ -10,7 +10,7 @@ import type {
   ThinkingConfig,
   CreateThinkingConfigOptions,
   NativeThinkingConfig,
-} from "../types/configTypes.js";
+} from "../types/index.js";
 
 /**
  * Default token budget for thinking operations

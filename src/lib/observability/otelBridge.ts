@@ -10,8 +10,8 @@ import {
   type SpanContext,
   trace,
 } from "@opentelemetry/api";
-import type { SpanData } from "./types/spanTypes.js";
-import { SpanStatus, type SpanType } from "./types/spanTypes.js";
+import type { SpanData } from "../types/index.js";
+import { SpanStatus, type SpanType } from "../types/index.js";
 import { SpanSerializer } from "./utils/spanSerializer.js";
 
 /**

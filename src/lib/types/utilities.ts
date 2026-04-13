@@ -3,7 +3,7 @@
  */
 
 import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
-import type { UnifiedGenerationOptions } from "./generateTypes.js";
+import type { UnifiedGenerationOptions } from "./generate.js";
 import type { ExecutionContext } from "./tools.js";
 
 /**

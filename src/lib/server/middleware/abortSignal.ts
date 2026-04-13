@@ -3,12 +3,12 @@
  * Provides client disconnection handling for long-running requests
  */
 
-import type { MiddlewareDefinition, ServerContext } from "../types.js";
+import type { MiddlewareDefinition, ServerContext } from "../../types/index.js";
 
 /**
  * Abort signal middleware options
  */
-export type AbortSignalMiddlewareOptions = {
+type AbortSignalMiddlewareOptions = {
   /** Callback when abort is triggered */
   onAbort?: (ctx: ServerContext) => void;
   /** Request timeout in milliseconds */

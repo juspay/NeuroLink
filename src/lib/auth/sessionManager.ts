@@ -5,7 +5,8 @@ import type {
   AuthUser,
   AuthSession,
   SessionConfig,
-} from "../types/authTypes.js";
+  SessionManagerStorage,
+} from "../types/index.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
 import { logger } from "../utils/logger.js";
 
@@ -19,39 +20,6 @@ function maskId(id: string): string {
 
 const REDIS_CONNECT_TIMEOUT_MS = 5000;
 type RedisClient = RedisClientType;
-
-/**
- * Session storage interface for SessionManager
- *
- * Defines the contract for session storage backends (memory, Redis, custom).
- * Note: This is a SessionManager-specific interface that uses `set()`/`getUserSessions()`/
- * `deleteUserSessions()`/`isHealthy()` method names, which differ from the canonical
- * `SessionStorage` type in `../types/authTypes.js` (which uses `save()`/`getForUser()`/
- * `deleteAllForUser()`/`exists()`/`touch()`). Both interfaces coexist because
- * SessionManager and BaseAuthProvider have separate storage patterns.
- */
-export interface SessionManagerStorage {
-  /** Get a session by ID */
-  get(sessionId: string): Promise<AuthSession | null>;
-
-  /** Store a session */
-  set(session: AuthSession): Promise<void>;
-
-  /** Delete a session */
-  delete(sessionId: string): Promise<void>;
-
-  /** Get all sessions for a user */
-  getUserSessions(userId: string): Promise<AuthSession[]>;
-
-  /** Delete all sessions for a user */
-  deleteUserSessions(userId: string): Promise<void>;
-
-  /** Clear all sessions (for cleanup) */
-  clear(): Promise<void>;
-
-  /** Health check */
-  isHealthy(): Promise<boolean>;
-}
 
 /**
  * In-memory session storage

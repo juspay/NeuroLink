@@ -23,8 +23,9 @@ import type {
 import { generateText, NoObjectGeneratedError, Output, stepCountIs } from "ai";
 import { getModelId } from "../../providers/providerTypeUtils.js";
 import { tracers } from "../../telemetry/tracers.js";
-import type { UnknownRecord } from "../../types/common.js";
 import type {
+  UnknownRecord,
+  ToolCallObject,
   AIProviderName,
   AISDKGenerateResult,
   EnhancedGenerateResult,
@@ -32,7 +33,6 @@ import type {
   StandardRecord,
   TextGenerationOptions,
 } from "../../types/index.js";
-import type { ToolCallObject } from "../../types/tools.js";
 import { logger } from "../../utils/logger.js";
 import { calculateCost } from "../../utils/pricing.js";
 import { withProviderRetry } from "../../utils/providerRetry.js";

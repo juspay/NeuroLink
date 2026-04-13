@@ -57,9 +57,3 @@ export {
 // =============================================================================
 // TYPE EXPORTS
 // =============================================================================
-
-export type {
-  CliFileProcessingOptions,
-  CliProcessingResult,
-  SupportedFileTypeInfo,
-} from "./fileProcessorCli.js";

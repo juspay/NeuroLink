@@ -1,44 +1,8 @@
-/**
- * PPT Generation Module
- *
- * Exports all presentation generation components.
- *
- * Architecture:
- * - types.ts: Internal types (SlideSchema, ContentPlan, etc.)
- * - constants.ts: Themes, prompts, validation constants
- * - contentPlanner.ts: AI-powered content planning
- * - slideGenerator.ts: Individual slide generation (Step 3)
- * - orchestrator.ts: Main orchestration logic (Step 4)
- */
-
-// Types - only types actually used in the PPT module
-export type {
-  SlideType,
-  SlideLayout,
-  BulletPoint,
-  SlideContent,
-  SlideSchema,
-  ContentPlan,
-  // Data types for slides (used in slideRenderers.ts)
-  TableRow,
-  ChartSeries,
-  Statistic,
-  TimelineItem,
-  ProcessStep,
-  FeatureItem,
-  ComparisonColumn,
-  // Theme types
-  PresentationTheme,
-  PPTGenerationContext,
-  CompleteSlide,
-} from "./types.js";
-
+export { PPTError, PPT_ERROR_CODES } from "./pptError.js";
 export {
-  PPTError,
-  PPT_ERROR_CODES,
   // Validation helpers from pptTypes
   SLIDE_DIMENSIONS,
-} from "./types.js";
+} from "../../types/index.js";
 
 export { extractPPTContext } from "./utils.js";
 
@@ -66,13 +30,6 @@ export {
 } from "./slideRenderers.js";
 
 // Re-export types from the types module (not from implementation files)
-export type {
-  BackgroundStyle,
-  SlideGeneratorConfig,
-  SlideGenerationBatchResult,
-  LogoConfig,
-  PresentationGenerationOptions,
-} from "./types.js";
 
 // Slide Type Inference
 export {
@@ -144,7 +101,6 @@ export {
 } from "../../utils/parameterValidation.js";
 
 // Re-export EnhancedValidationResult for PPT validation results
-export type { EnhancedValidationResult as PPTValidationResult } from "../../types/tools.js";
 
 // PPT Provider Utilities and Helper Functions
 export {
@@ -162,4 +118,3 @@ export {
 } from "./utils.js";
 
 // Re-export EffectivePPTProviderResult type from types
-export type { EffectivePPTProviderResult } from "./types.js";

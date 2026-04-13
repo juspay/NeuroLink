@@ -32,7 +32,7 @@ import type {
   Statistic,
   TableRow,
   TimelineItem,
-} from "./types.js";
+} from "../../types/index.js";
 import {
   bufferToDataUrl,
   calculateFontSize,

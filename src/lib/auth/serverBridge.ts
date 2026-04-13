@@ -4,10 +4,7 @@
  * callback expected by the existing createAuthMiddleware.
  */
 
-import type {
-  AuthRequestContext,
-  MastraAuthProvider,
-} from "../types/authTypes.js";
+import type { AuthRequestContext, MastraAuthProvider } from "../types/index.js";
 
 /**
  * Create a validate function for server auth middleware from an auth provider.

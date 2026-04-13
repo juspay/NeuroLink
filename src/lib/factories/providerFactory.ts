@@ -1,6 +1,10 @@
 import type { AIProviderName } from "../constants/enums.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { AIProvider, NeurolinkCredentials } from "../types/index.js";
+import type {
+  UnknownRecord,
+  AIProvider,
+  NeurolinkCredentials,
+} from "../types/index.js";
+
 import { logger } from "../utils/logger.js";
 
 // Pure factory pattern with no hardcoded imports

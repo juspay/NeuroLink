@@ -9,7 +9,7 @@ import { z } from "zod";
 import type {
   SageMakerConfig,
   SageMakerModelConfig,
-} from "../../types/providers.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**

@@ -14,9 +14,13 @@ import type { AIProviderName } from "../constants/enums.js";
 import { BaseProvider } from "../core/baseProvider.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { NeurolinkCredentials } from "../types/providers.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type {
+  UnknownRecord,
+  NeurolinkCredentials,
+  StreamOptions,
+  StreamResult,
+} from "../types/index.js";
+
 import { logger } from "../utils/logger.js";
 import {
   createHuggingFaceConfig,

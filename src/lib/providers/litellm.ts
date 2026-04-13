@@ -16,21 +16,21 @@ import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import type { UnknownRecord } from "../types/common.js";
+import type {
+  UnknownRecord,
+  StreamOptions,
+  StreamResult,
+  StreamTextResult,
+  StreamToolCall,
+  StreamToolResult,
+} from "../types/index.js";
 import {
   AuthenticationError,
   InvalidModelError,
   NetworkError,
   ProviderError,
   RateLimitError,
-} from "../types/errors.js";
-import type {
-  StreamOptions,
-  StreamResult,
-  StreamTextResult,
-  ToolCall,
-  ToolResult,
-} from "../types/streamTypes.js";
+} from "../types/index.js";
 import { isAbortError } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
 import { calculateCost } from "../utils/pricing.js";
@@ -334,7 +334,8 @@ export class LiteLLMProvider extends BaseProvider {
               status: rawToolResult.error ? "failure" : "success",
               output:
                 ((rawToolResult.output ??
-                  rawToolResult.result) as ToolResult["output"]) ?? undefined,
+                  rawToolResult.result) as StreamToolResult["output"]) ??
+                undefined,
               error: rawToolResult.error,
               id: rawToolResult.toolCallId ?? toolResult.toolName,
             });
@@ -386,8 +387,8 @@ export class LiteLLMProvider extends BaseProvider {
       );
 
       let result: ReturnType<typeof streamText>;
-      const collectedToolCalls: ToolCall[] = [];
-      const collectedToolResults: ToolResult[] = [];
+      const collectedToolCalls: StreamToolCall[] = [];
+      const collectedToolResults: StreamToolResult[] = [];
       try {
         result = streamText(streamOptions);
       } catch (streamError) {

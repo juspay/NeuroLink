@@ -19,31 +19,28 @@ import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
 import type { NeuroLink } from "../neurolink.js";
 import { ATTR, tracers, withClientSpan } from "../telemetry/index.js";
-import type { AnalyticsData } from "../types/analytics.js";
-import type { UnknownRecord } from "../types/common.js";
+import type {
+  AnalyticsData,
+  UnknownRecord,
+  ZodUnknownSchema,
+  EnhancedGenerateResult,
+  TextGenerationOptions,
+  GenAIClient,
+  GoogleGenAIClass,
+  LiveServerMessage,
+  AudioChunk,
+  StreamOptions,
+  StreamResult,
+  StreamToolCall,
+  StreamToolResult,
+} from "../types/index.js";
+
 import {
   AuthenticationError,
   NetworkError,
   ProviderError,
   RateLimitError,
-} from "../types/errors.js";
-import type {
-  EnhancedGenerateResult,
-  TextGenerationOptions,
-} from "../types/generateTypes.js";
-import type {
-  GenAIClient,
-  GoogleGenAIClass,
-  LiveServerMessage,
-} from "../types/providers.js";
-import type {
-  AudioChunk,
-  StreamOptions,
-  StreamResult,
-  ToolCall,
-  ToolResult,
-} from "../types/streamTypes.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
+} from "../types/index.js";
 import { ERROR_CODES, NeuroLinkError } from "../utils/errorHandling.js";
 import { logger } from "../utils/logger.js";
 import { isGemini3Model } from "../utils/modelDetection.js";
@@ -642,8 +639,8 @@ export class GoogleAIStudioProvider extends BaseProvider {
       // Using protected helper from BaseProvider to eliminate code duplication
       const messages = await this.buildMessagesForStream(options);
 
-      const collectedToolCalls: ToolCall[] = [];
-      const collectedToolResults: ToolResult[] = [];
+      const collectedToolCalls: StreamToolCall[] = [];
+      const collectedToolResults: StreamToolResult[] = [];
 
       const result = await streamText({
         model,
@@ -704,7 +701,8 @@ export class GoogleAIStudioProvider extends BaseProvider {
               status: rawToolResult.error ? "failure" : "success",
               output:
                 ((rawToolResult.output ??
-                  rawToolResult.result) as ToolResult["output"]) ?? undefined,
+                  rawToolResult.result) as StreamToolResult["output"]) ??
+                undefined,
               error: rawToolResult.error,
               id: rawToolResult.toolCallId ?? toolResult.toolName,
             });

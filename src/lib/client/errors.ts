@@ -7,7 +7,11 @@
  * @module @neurolink/client/errors
  */
 
-import type { ApiError, JsonObject } from "../types/clientTypes.js";
+import type {
+  ClientApiError,
+  ErrorCodeType,
+  JsonObject,
+} from "../types/index.js";
 
 // =============================================================================
 // Error Codes
@@ -57,8 +61,6 @@ export const ErrorCode = {
   UNKNOWN: "UNKNOWN",
 } as const;
 
-export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
-
 // =============================================================================
 // Base Error Class
 // =============================================================================
@@ -104,7 +106,7 @@ export class NeuroLinkError extends Error {
   /**
    * Convert error to API error format
    */
-  toApiError(): ApiError {
+  toApiError(): ClientApiError {
     return {
       code: this.code,
       message: this.message,
@@ -599,7 +601,7 @@ export class ContentFilterError extends ClientProviderError {
  * Create an error from an API error response
  */
 export function createErrorFromResponse(
-  apiError: ApiError,
+  apiError: ClientApiError,
   options?: { requestId?: string },
 ): NeuroLinkError {
   const { code, message, status, details, retryable } = apiError;
@@ -757,9 +759,9 @@ export function isNeuroLinkError(error: unknown): error is NeuroLinkError {
 }
 
 /**
- * Type guard for ApiError
+ * Type guard for ClientApiError
  */
-export function isApiError(error: unknown): error is ApiError {
+export function isApiError(error: unknown): error is ClientApiError {
   if (typeof error !== "object" || error === null) {
     return false;
   }

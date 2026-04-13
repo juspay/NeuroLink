@@ -9,20 +9,19 @@
  */
 
 import { isAbortError } from "../../utils/errorHandling.js";
-import type { FileProcessingError } from "../base/types.js";
+import type {
+  FileProcessingError,
+  ProcessorErrorMessageTemplate,
+} from "../../types/index.js";
 
-import {
-  ERROR_MESSAGES,
-  type ErrorMessageTemplate,
-  FileErrorCode,
-} from "./FileErrorCode.js";
+import { ERROR_MESSAGES, FileErrorCode } from "./FileErrorCode.js";
 
 export type { FileProcessingError };
 
 /**
  * Summary of file processing operations.
  */
-export type FileProcessingSummary = {
+type FileProcessingSummary = {
   /** Total number of files attempted */
   totalFiles: number;
   /** Successfully processed files */
@@ -71,7 +70,7 @@ export function createFileError(
   details?: Record<string, unknown>,
   originalError?: Error,
 ): FileProcessingError {
-  const template: ErrorMessageTemplate = ERROR_MESSAGES[code];
+  const template: ProcessorErrorMessageTemplate = ERROR_MESSAGES[code];
 
   const result: FileProcessingError = {
     code,
@@ -116,7 +115,7 @@ export function createCustomFileError(
   customUserMessage: string,
   details?: Record<string, unknown>,
 ): FileProcessingError {
-  const template: ErrorMessageTemplate = ERROR_MESSAGES[code];
+  const template: ProcessorErrorMessageTemplate = ERROR_MESSAGES[code];
 
   return {
     code,

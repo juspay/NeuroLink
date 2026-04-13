@@ -11,37 +11,11 @@
 import { EventEmitter } from "events";
 import { logger } from "../../utils/logger.js";
 import { ErrorFactory } from "../../utils/errorHandling.js";
-
-/**
- * Batch configuration options
- */
-export type BatchConfig = {
-  /**
-   * Maximum number of requests to batch together (default: 10)
-   */
-  maxBatchSize: number;
-
-  /**
-   * Maximum time to wait for a full batch in milliseconds (default: 100ms)
-   */
-  maxWaitMs: number;
-
-  /**
-   * Enable parallel execution of batched requests (default: true).
-   * Reserved for future parallel batch execution; currently stored but not read.
-   */
-  enableParallel?: boolean;
-
-  /**
-   * Maximum concurrent batches in flight (default: 5)
-   */
-  maxConcurrentBatches?: number;
-
-  /**
-   * Group requests by server ID (default: true)
-   */
-  groupByServer?: boolean;
-};
+import type {
+  BatchConfig,
+  BatchExecutor,
+  BatchResult,
+} from "../../types/index.js";
 
 /**
  * Pending request in the batch queue
@@ -54,35 +28,6 @@ type PendingRequest<T> = {
   resolve: (value: T) => void;
   reject: (error: Error) => void;
   addedAt: number;
-};
-
-/**
- * Batch execution result
- */
-export type BatchResult<T> = {
-  id: string;
-  success: boolean;
-  result?: T;
-  error?: Error;
-  executionTime: number;
-};
-
-/**
- * Batch executor function type
- */
-export type BatchExecutor<T> = (
-  requests: Array<{ tool: string; args: unknown; serverId?: string }>,
-) => Promise<Array<{ success: boolean; result?: T; error?: Error }>>;
-
-/**
- * Batcher events
- */
-export type BatcherEvents<T> = {
-  batchStarted: { batchId: string; size: number };
-  batchCompleted: { batchId: string; results: BatchResult<T>[] };
-  batchFailed: { batchId: string; error: Error };
-  requestQueued: { requestId: string; queueSize: number };
-  flushTriggered: { reason: "size" | "timeout" | "manual"; queueSize: number };
 };
 
 /**

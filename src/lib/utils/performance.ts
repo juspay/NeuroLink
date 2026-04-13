@@ -3,7 +3,7 @@
  * Part of Sub-phase 3.3.1-3.3.2 optimization efforts
  */
 
-import type { PerformanceMetrics } from "../types/analytics.js";
+import type { PerformanceMetrics } from "../types/index.js";
 import { logger } from "./logger.js";
 
 /**

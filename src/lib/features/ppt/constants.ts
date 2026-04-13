@@ -14,7 +14,7 @@ import type {
   PresentationTheme,
   SlideType,
   SlideLayout,
-} from "./types.js";
+} from "../../types/index.js";
 
 // ============================================================================
 // THEME DEFINITIONS

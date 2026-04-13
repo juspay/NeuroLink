@@ -13,263 +13,18 @@
  */
 
 import { EventEmitter } from "events";
-import type { MCPServerInfo, MCPTransportType } from "../types/mcpTypes.js";
-import type { JsonObject } from "../types/common.js";
-
-/**
- * Registry source types
- */
-export type RegistrySourceType =
-  | "official" // Official MCP registry
-  | "npm" // NPM packages
-  | "github" // GitHub repositories
-  | "custom"; // Custom registry URL
-
-/**
- * Registry entry for an MCP server
- */
-export type RegistryEntry = {
-  /**
-   * Unique identifier
-   */
-  id: string;
-
-  /**
-   * Server name
-   */
-  name: string;
-
-  /**
-   * Server description
-   */
-  description: string;
-
-  /**
-   * Server version
-   */
-  version: string;
-
-  /**
-   * Author or maintainer
-   */
-  author?: string;
-
-  /**
-   * License
-   */
-  license?: string;
-
-  /**
-   * Homepage URL
-   */
-  homepage?: string;
-
-  /**
-   * Repository URL
-   */
-  repository?: string;
-
-  /**
-   * NPM package name (if applicable)
-   */
-  npmPackage?: string;
-
-  /**
-   * Installation command
-   */
-  installCommand?: string;
-
-  /**
-   * Command to run the server
-   */
-  command?: string;
-
-  /**
-   * Command arguments
-   */
-  args?: string[];
-
-  /**
-   * Required environment variables
-   */
-  requiredEnvVars?: string[];
-
-  /**
-   * Supported transport types
-   */
-  transports?: MCPTransportType[];
-
-  /**
-   * Server categories
-   */
-  categories?: string[];
-
-  /**
-   * Server tags
-   */
-  tags?: string[];
-
-  /**
-   * Tool names provided by the server
-   */
-  tools?: string[];
-
-  /**
-   * Download count (popularity metric)
-   */
-  downloads?: number;
-
-  /**
-   * Star count (if from GitHub)
-   */
-  stars?: number;
-
-  /**
-   * Last updated date
-   */
-  lastUpdated?: string;
-
-  /**
-   * Verification status
-   */
-  verified?: boolean;
-
-  /**
-   * Custom metadata
-   */
-  metadata?: JsonObject;
-};
-
-/**
- * Registry configuration
- */
-export type RegistryConfig = {
-  /**
-   * Registry type
-   */
-  type: RegistrySourceType;
-
-  /**
-   * Registry URL or identifier
-   */
-  url?: string;
-
-  /**
-   * Authentication token
-   */
-  authToken?: string;
-
-  /**
-   * Request timeout in milliseconds
-   */
-  timeout?: number;
-
-  /**
-   * Enable caching
-   */
-  enableCache?: boolean;
-
-  /**
-   * Cache TTL in milliseconds
-   */
-  cacheTTL?: number;
-};
-
-/**
- * Search options for registry queries
- */
-export type RegistrySearchOptions = {
-  /**
-   * Search query (name, description, tags)
-   */
-  query?: string;
-
-  /**
-   * Filter by categories
-   */
-  categories?: string[];
-
-  /**
-   * Filter by tags
-   */
-  tags?: string[];
-
-  /**
-   * Filter by transport type
-   */
-  transport?: MCPTransportType;
-
-  /**
-   * Only verified servers
-   */
-  verifiedOnly?: boolean;
-
-  /**
-   * Sort by field
-   */
-  sortBy?: "name" | "downloads" | "stars" | "lastUpdated";
-
-  /**
-   * Sort direction
-   */
-  sortDirection?: "asc" | "desc";
-
-  /**
-   * Maximum results
-   */
-  limit?: number;
-
-  /**
-   * Offset for pagination
-   */
-  offset?: number;
-};
-
-/**
- * Search result
- */
-export type RegistrySearchResult = {
-  entries: RegistryEntry[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
-};
-
-/**
- * Registry client configuration
- */
-export type MCPRegistryClientConfig = {
-  /**
-   * Default registries to use
-   */
-  registries?: RegistryConfig[];
-
-  /**
-   * Enable automatic caching
-   */
-  enableCache?: boolean;
-
-  /**
-   * Default cache TTL
-   */
-  defaultCacheTTL?: number;
-
-  /**
-   * Request timeout
-   */
-  timeout?: number;
-
-  /**
-   * User agent string
-   */
-  userAgent?: string;
-};
-
+import type {
+  MCPServerInfo,
+  MCPRegistryClientConfig,
+  RegistryConfig,
+  RegistrySearchOptions,
+  RegistrySearchResult,
+  McpRegistryEntry,
+} from "../types/index.js";
 /**
  * Well-known MCP servers catalog
  */
-const WELL_KNOWN_SERVERS: RegistryEntry[] = [
+const WELL_KNOWN_SERVERS: McpRegistryEntry[] = [
   {
     id: "filesystem",
     name: "Filesystem",
@@ -444,7 +199,7 @@ const WELL_KNOWN_SERVERS: RegistryEntry[] = [
 export class MCPRegistryClient extends EventEmitter {
   private config: Required<MCPRegistryClientConfig>;
   private cache: Map<string, { data: unknown; timestamp: number }> = new Map();
-  private customEntries: Map<string, RegistryEntry> = new Map();
+  private customEntries: Map<string, McpRegistryEntry> = new Map();
 
   constructor(config: MCPRegistryClientConfig = {}) {
     super();
@@ -552,7 +307,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get a specific entry by ID
    */
-  async getEntry(id: string): Promise<RegistryEntry | undefined> {
+  async getEntry(id: string): Promise<McpRegistryEntry | undefined> {
     // Check custom entries first
     if (this.customEntries.has(id)) {
       return this.customEntries.get(id);
@@ -571,7 +326,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get all available entries
    */
-  async getAllEntries(): Promise<RegistryEntry[]> {
+  async getAllEntries(): Promise<McpRegistryEntry[]> {
     const cacheKey = "all-entries";
 
     // Check cache
@@ -581,7 +336,7 @@ export class MCPRegistryClient extends EventEmitter {
         cached &&
         Date.now() - cached.timestamp < this.config.defaultCacheTTL
       ) {
-        return cached.data as RegistryEntry[];
+        return cached.data as McpRegistryEntry[];
       }
     }
 
@@ -604,7 +359,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get entries by category
    */
-  async getByCategory(category: string): Promise<RegistryEntry[]> {
+  async getByCategory(category: string): Promise<McpRegistryEntry[]> {
     const entries = await this.getAllEntries();
     return entries.filter((e) => e.categories?.includes(category));
   }
@@ -612,7 +367,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get entries by tag
    */
-  async getByTag(tag: string): Promise<RegistryEntry[]> {
+  async getByTag(tag: string): Promise<McpRegistryEntry[]> {
     const entries = await this.getAllEntries();
     return entries.filter((e) => e.tags?.includes(tag));
   }
@@ -652,7 +407,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Convert registry entry to MCPServerInfo
    */
-  toServerInfo(entry: RegistryEntry): MCPServerInfo {
+  toServerInfo(entry: McpRegistryEntry): MCPServerInfo {
     return {
       id: entry.id,
       name: entry.name,
@@ -685,7 +440,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Add a custom registry entry
    */
-  addCustomEntry(entry: RegistryEntry): void {
+  addCustomEntry(entry: McpRegistryEntry): void {
     this.customEntries.set(entry.id, entry);
     this.clearCache();
     this.emit("entryAdded", { entry });
@@ -724,7 +479,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Check if required environment variables are set
    */
-  checkRequiredEnvVars(entry: RegistryEntry): {
+  checkRequiredEnvVars(entry: McpRegistryEntry): {
     ready: boolean;
     missing: string[];
   } {
@@ -745,7 +500,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get installation command for an entry
    */
-  getInstallCommand(entry: RegistryEntry): string | undefined {
+  getInstallCommand(entry: McpRegistryEntry): string | undefined {
     if (entry.installCommand) {
       return entry.installCommand;
     }
@@ -760,7 +515,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get popular servers
    */
-  async getPopularServers(limit = 10): Promise<RegistryEntry[]> {
+  async getPopularServers(limit = 10): Promise<McpRegistryEntry[]> {
     const result = await this.search({
       sortBy: "downloads",
       sortDirection: "desc",
@@ -773,7 +528,7 @@ export class MCPRegistryClient extends EventEmitter {
   /**
    * Get verified servers
    */
-  async getVerifiedServers(): Promise<RegistryEntry[]> {
+  async getVerifiedServers(): Promise<McpRegistryEntry[]> {
     const result = await this.search({
       verifiedOnly: true,
     });
@@ -813,13 +568,13 @@ export const globalMCPRegistryClient = new MCPRegistryClient();
 /**
  * Quick lookup function for well-known servers
  */
-export function getWellKnownServer(id: string): RegistryEntry | undefined {
+export function getWellKnownServer(id: string): McpRegistryEntry | undefined {
   return WELL_KNOWN_SERVERS.find((s) => s.id === id);
 }
 
 /**
  * Get all well-known servers
  */
-export function getAllWellKnownServers(): RegistryEntry[] {
+export function getAllWellKnownServers(): McpRegistryEntry[] {
   return [...WELL_KNOWN_SERVERS];
 }

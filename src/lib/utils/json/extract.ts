@@ -96,10 +96,8 @@ export function extractJsonFromText(text: string): unknown | null {
   return parseJsonOrNull(jsonString);
 }
 
-export type { JsonTypeGuard } from "../../processors/base/types.js";
-
 // Re-import for local use within this file
-import type { JsonTypeGuard } from "../../processors/base/types.js";
+import type { JsonTypeGuard } from "../../types/index.js";
 
 /**
  * Parse JSON from text with optional type validation.

@@ -9,7 +9,7 @@ import type {
   ChatMessage,
   ConversationMemoryConfig,
   SessionMemory,
-} from "../types/conversation.js";
+} from "../types/index.js";
 import { TokenUtils } from "../constants/tokens.js";
 import {
   buildContextFromPointer,

@@ -2,7 +2,7 @@ import type {
   EnhancedEvaluationContext,
   EvaluationResult,
   GetPromptFunction,
-} from "../types/evaluationTypes.js";
+} from "../types/index.js";
 import { AIProviderFactory } from "../core/factory.js";
 import { PromptBuilder } from "./prompts.js";
 import { logger } from "../utils/logger.js";
@@ -10,8 +10,8 @@ import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
 
 /**
  * Implements a RAGAS-style evaluator that uses a "judge" LLM to score the

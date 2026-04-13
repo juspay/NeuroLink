@@ -8,7 +8,7 @@ import type {
   MCPExecutableTool,
   MCPServerCategory,
   MCPServerConnectionStatus,
-} from "../types/mcpTypes.js";
+} from "../types/index.js";
 
 /**
  * Smart category detection based on context

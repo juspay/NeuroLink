@@ -54,8 +54,3 @@ export {
 // =============================================================================
 // TYPE EXPORTS
 // =============================================================================
-
-export type {
-  BatchFileProcessingResult,
-  FileProcessingOptions,
-} from "./FileProcessorIntegration.js";

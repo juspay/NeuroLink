@@ -8,14 +8,13 @@
 import { isAbortError } from "../utils/errorHandling.js";
 import { calculateBackoffDelay } from "../utils/retryHandler.js";
 import { logger } from "../utils/logger.js";
-import type { HTTPRetryConfig } from "../types/mcpTypes.js";
+import type { HTTPRetryConfig } from "../types/index.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
-
 /**
  * Default HTTP retry configuration
  */

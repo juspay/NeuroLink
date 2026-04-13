@@ -35,7 +35,7 @@ export {
   OAuthTokenValidationError,
   OAuthTokenRevocationError,
   OAuthCallbackServerError,
-} from "../types/errors.js";
+} from "../types/index.js";
 
 // OAuth helper functions
 export {
@@ -48,15 +48,6 @@ export {
 } from "./anthropicOAuth.js";
 
 // OAuth types (canonical definitions in types/subscriptionTypes.ts)
-export type {
-  OAuthTokenResponse,
-  OAuthFlowTokens,
-  OAuthFlowTokens as OAuthTokens,
-  TokenValidationResult as OAuthTokenValidationResult,
-  AnthropicOAuthConfig,
-  PKCEParams,
-  CallbackResult,
-} from "../types/index.js";
 
 // =============================================================================
 // TOKEN STORE - Secure Token Storage
@@ -66,23 +57,19 @@ export type {
 export { TokenStore, tokenStore, defaultTokenStore } from "./tokenStore.js";
 
 // Token store error class (canonical definition in types/errors.ts)
-export { TokenStoreError } from "../types/errors.js";
+export { TokenStoreError } from "../types/index.js";
 
 // Token store types (canonical location: types/authTypes.ts)
-export type { StoredOAuthTokens, TokenRefresher } from "../types/authTypes.js";
 
 // =============================================================================
 // UNIFIED AUTH INTERFACE (canonical definitions in types/subscriptionTypes.ts)
 // =============================================================================
-
-export type { NeuroLinkAuthOptions, AuthStatus } from "../types/index.js";
 
 // =============================================================================
 // ACCOUNT POOL - Multi-account rotation with cooldowns
 // =============================================================================
 
 export { AccountPool } from "./accountPool.js";
-export type { ProxyAccount, AccountPoolConfig } from "../types/index.js";
 
 // =============================================================================
 // MULTI-PROVIDER AUTH SYSTEM
@@ -121,11 +108,7 @@ export {
   createProtectedMiddleware,
   createRBACMiddleware,
   createRequestContext,
-  type ExpressMiddleware,
   extractToken,
-  type MiddlewareHandler,
-  type MiddlewareResult,
-  type NextFunction,
 } from "./middleware/AuthMiddleware.js";
 
 // Rate Limiting Middleware
@@ -134,10 +117,6 @@ export {
   createRateLimitByUserMiddleware,
   createRateLimitStorage,
   MemoryRateLimitStorage,
-  type RateLimitConfig,
-  type RateLimitMiddlewareResult,
-  type RateLimitResult,
-  type RateLimitStorage,
   RedisRateLimitStorage,
   UserRateLimiter,
 } from "./middleware/rateLimitByUser.js";
@@ -148,7 +127,6 @@ export {
   MemorySessionStorage,
   RedisSessionStorage,
   SessionManager,
-  type SessionManagerStorage as SessionStorageInterface,
 } from "./sessionManager.js";
 
 // Auth Context
@@ -179,49 +157,6 @@ export {
 } from "./RequestContext.js";
 
 // Auth Types
-export type {
-  Auth0Config,
-  AuthCacheConfig,
-  AuthErrorInfo as AuthErrorType,
-  AuthErrorCode,
-  AuthEventData,
-  AuthEventHandler,
-  AuthEventType,
-  AuthenticatedContext,
-  AuthMiddlewareConfig,
-  AuthorizationResult,
-  AuthProviderConfig,
-  AuthProviderFactoryFn,
-  AuthProviderHealthCheck,
-  AuthProviderRegistration,
-  AuthProviderType,
-  AuthRequestContext,
-  AuthSession,
-  AuthUser,
-  BaseAuthProviderConfig,
-  BetterAuthConfig,
-  ClerkConfig,
-  CognitoConfig,
-  CustomAuthConfig,
-  FirebaseConfig,
-  JWK,
-  JWKS,
-  JWTConfig,
-  KeycloakConfig,
-  MastraAuthProvider,
-  OAuth2Config,
-  RBACConfig,
-  RBACMiddlewareConfig,
-  SessionConfig,
-  SessionStorage,
-  SessionValidationResult,
-  SupabaseConfig,
-  TokenClaims,
-  TokenExtractionConfig,
-  TokenValidationConfig,
-  TokenValidationResult as AuthTokenValidationResult,
-  WorkOSConfig,
-} from "../types/authTypes.js";
 
 // Server Bridge
 export { createAuthValidatorFromProvider } from "./serverBridge.js";

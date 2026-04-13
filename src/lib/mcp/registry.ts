@@ -2,9 +2,14 @@
  * MCP Registry - Industry Standard Interface with camelCase
  */
 
-import type { DiscoveredMcp, McpRegistry } from "../types/mcpTypes.js";
-import type { ToolInfo, ExecutionContext } from "../types/tools.js";
-import type { UnknownRecord } from "../types/common.js";
+import type {
+  DiscoveredMcp,
+  McpRegistry,
+  ToolInfo,
+  ExecutionContext,
+  UnknownRecord,
+} from "../types/index.js";
+
 import { registryLogger } from "../utils/logger.js";
 
 /**

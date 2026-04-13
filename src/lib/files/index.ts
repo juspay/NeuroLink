@@ -11,16 +11,5 @@
 export { FileReferenceRegistry } from "./fileReferenceRegistry.js";
 export { createFileTools } from "./fileTools.js";
 export { StreamingReader } from "./streamingReader.js";
-export type {
-  FileReadResult,
-  FileReference,
-  FileReferenceStatus,
-  FileRegistrationOptions,
-  FileRegistryOptions,
-  FileSearchMatch,
-  FileSearchResult,
-  OutlineSection,
-  SizeTier,
-  StreamingReaderOptions,
-} from "./types.js";
-export { SIZE_TIER_THRESHOLDS } from "./types.js";
+
+export { SIZE_TIER_THRESHOLDS } from "../types/index.js";

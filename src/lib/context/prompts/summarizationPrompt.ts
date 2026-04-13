@@ -5,9 +5,7 @@
  * Supports both initial summarization and incremental merging with existing summaries.
  */
 
-import type { SummarizationPromptOptions } from "../../types/contextTypes.js";
-
-export type { SummarizationPromptOptions } from "../../types/contextTypes.js";
+import type { SummarizationPromptOptions } from "../../types/index.js";
 
 const SUMMARY_SECTIONS = [
   "Primary Request and Intent",

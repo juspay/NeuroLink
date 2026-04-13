@@ -12,18 +12,15 @@
  * - Context summarization
  */
 
-import type { Chunk, VectorQueryResult } from "../types.js";
 import type {
+  Chunk,
+  VectorQueryResult,
   CitationFormat,
   ContextAssemblyOptions,
   ContextWindow,
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { estimateTokens } from "../../utils/tokenEstimation.js";
-
-export type { CitationFormat } from "../../types/index.js";
-export type { ContextAssemblyOptions } from "../../types/index.js";
-export type { ContextWindow } from "../../types/index.js";
 
 /**
  * Assemble context from retrieved results

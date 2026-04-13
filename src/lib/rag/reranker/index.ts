@@ -8,11 +8,7 @@ export {
   getAvailableRerankerTypes,
   getRerankerDefaultConfig,
   getRerankerMetadata,
-  type Reranker,
-  type RerankerConfig,
   RerankerFactory,
-  type RerankerMetadata,
-  type RerankerType,
   rerankerFactory,
 } from "./RerankerFactory.js";
 // Registry pattern exports

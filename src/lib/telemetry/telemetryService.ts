@@ -18,15 +18,7 @@ import {
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 import { logger } from "../utils/logger.js";
-
-export type HealthMetrics = {
-  timestamp: number;
-  memoryUsage: NodeJS.MemoryUsage;
-  uptime: number;
-  activeConnections: number;
-  errorRate: number;
-  averageResponseTime: number;
-};
+import type { HealthMetrics } from "../types/index.js";
 
 export class TelemetryService {
   private static instance: TelemetryService;

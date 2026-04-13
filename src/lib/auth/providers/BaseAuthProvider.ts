@@ -12,10 +12,8 @@
 
 import { randomUUID } from "crypto";
 import { EventEmitter } from "events";
-import type { JsonValue } from "../../types/common.js";
-import { logger } from "../../utils/logger.js";
-import { AuthError } from "../errors.js";
 import type {
+  JsonValue,
   AuthenticatedContext,
   AuthErrorCode,
   AuthHealthCheck,
@@ -32,8 +30,9 @@ import type {
   SessionValidationResult,
   TokenClaims,
   TokenValidationResult,
-} from "../../types/authTypes.js";
-
+} from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
+import { AuthError } from "../errors.js";
 // =============================================================================
 // BACKWARD-COMPAT RE-EXPORTS
 // =============================================================================

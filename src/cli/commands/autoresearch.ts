@@ -27,8 +27,8 @@ import type {
   MetricDirection,
   ResearchConfig,
   ResearchState,
-} from "../../lib/types/autoresearchTypes.js";
-import type { TaskManagerConfig } from "../../lib/types/index.js";
+  TaskManagerConfig,
+} from "../../lib/types/index.js";
 import { TASK_DEFAULTS } from "../../lib/types/index.js";
 
 export class AutoresearchCommandFactory {

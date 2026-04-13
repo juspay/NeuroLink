@@ -57,10 +57,10 @@ import { pipeline } from "stream/promises";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
-  ProcessedFileBase,
+  ProcessedVideo,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+} from "../../types/index.js";
 import { SIZE_LIMITS_MB } from "../config/index.js";
 import { FileErrorCode } from "../errors/index.js";
 import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
@@ -113,52 +113,6 @@ async function initFfmpegPaths(): Promise<void> {
 // =============================================================================
 // TYPES
 // =============================================================================
-
-/**
- * Processed video result.
- * Extends ProcessedFileBase with video-specific fields including metadata,
- * extracted keyframes, subtitle text, and a pre-formatted textContent block
- * suitable for sending to an LLM.
- */
-export type ProcessedVideo = ProcessedFileBase & {
-  /** Pre-formatted text description for the LLM (metadata + subtitles summary) */
-  textContent: string;
-  /** Extracted keyframes as JPEG buffers (resized to max 768px dimension) */
-  keyframes: Buffer[];
-  /** Video metadata extracted via ffprobe */
-  metadata: {
-    /** Duration in seconds */
-    duration: number;
-    /** Human-readable duration (e.g., "2m 30s") */
-    durationFormatted: string;
-    /** Video width in pixels */
-    width: number;
-    /** Video height in pixels */
-    height: number;
-    /** Video codec name (e.g., "h264", "vp9") */
-    codec: string;
-    /** Frames per second */
-    fps: number;
-    /** Video bitrate in bits/second */
-    bitrate: number;
-    /** Audio codec name if present */
-    audioCodec?: string;
-    /** Number of audio channels */
-    audioChannels?: number;
-    /** Audio sample rate in Hz */
-    audioSampleRate?: number;
-    /** Number of subtitle tracks found */
-    subtitleTracks: number;
-    /** Original file size in bytes */
-    fileSize: number;
-  };
-  /** Extracted subtitle text (combined from all subtitle tracks) */
-  subtitleText?: string;
-  /** Whether any keyframes were successfully extracted */
-  hasKeyframes: boolean;
-  /** Number of keyframes extracted */
-  frameCount: number;
-};
 
 // =============================================================================
 // CONSTANTS
@@ -347,7 +301,7 @@ export class VideoProcessor extends BaseFileProcessor<ProcessedVideo> {
   override async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<ProcessedVideo>> {
+  ): Promise<ProcessorFileProcessingResult<ProcessedVideo>> {
     const filename = this.getFilename(fileInfo);
     const sizeBytes = fileInfo.size || fileInfo.buffer?.length || 0;
 
@@ -1373,6 +1327,6 @@ export function isVideoFile(mimetype: string, filename: string): boolean {
 export async function processVideo(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedVideo>> {
+): Promise<ProcessorFileProcessingResult<ProcessedVideo>> {
   return videoProcessor.processFile(fileInfo, options);
 }

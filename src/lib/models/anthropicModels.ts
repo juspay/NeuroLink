@@ -8,8 +8,8 @@
 import type {
   ClaudeSubscriptionTier,
   AnthropicModelMetadata,
-} from "../types/subscriptionTypes.js";
-import { ModelAccessError } from "../types/errors.js";
+} from "../types/index.js";
+import { ModelAccessError } from "../types/index.js";
 
 // Re-export for convenience
 export type { ClaudeSubscriptionTier, AnthropicModelMetadata };

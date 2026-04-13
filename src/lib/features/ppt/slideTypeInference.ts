@@ -15,7 +15,7 @@ import type {
   BulletStyle,
   SlideContent,
   SlideType,
-} from "./types.js";
+} from "../../types/index.js";
 
 // ============================================================================
 // KEYWORD-BASED SLIDE TYPE INFERENCE

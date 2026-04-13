@@ -18,12 +18,10 @@ import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
 import type {
   AIProviderName,
   TextGenerationOptions,
-} from "../../types/index.js";
-import type {
   MultimodalInput,
   MultimodalChatMessage,
-} from "../../types/multimodal.js";
-import type { StreamOptions } from "../../types/streamTypes.js";
+  StreamOptions,
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import {
   buildMessagesArray,

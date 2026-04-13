@@ -12,7 +12,7 @@ import {
   type ServerAdapterErrorCodeType,
   ServerAdapterErrorCode,
   type ServerAdapterErrorContext,
-} from "./types.js";
+} from "../types/index.js";
 
 /**
  * Base error class for server adapter errors

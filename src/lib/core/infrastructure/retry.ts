@@ -1,13 +1,8 @@
-export type RetryOptions = {
-  maxRetries: number;
-  baseDelayMs: number;
-  maxDelayMs?: number;
-  shouldRetry?: (error: Error) => boolean;
-};
+import type { InfraRetryOptions } from "../../types/index.js";
 
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  options: RetryOptions,
+  options: InfraRetryOptions,
 ): Promise<T> {
   const { maxRetries, baseDelayMs, maxDelayMs = 30000, shouldRetry } = options;
   let lastError: Error | undefined;

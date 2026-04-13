@@ -9,7 +9,7 @@ import type {
   AuthUser,
   OAuth2Config,
   TokenValidationResult,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { AuthError } from "../errors.js";
 import { BaseAuthProvider } from "./BaseAuthProvider.js";

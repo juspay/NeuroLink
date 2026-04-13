@@ -3,17 +3,17 @@
  * Batch processing for evaluation pipelines
  */
 
-import type { ScorerInput } from "../../../types/scorerTypes.js";
 import type {
-  EvaluationPipeline,
+  ScorerInput,
   PipelineExecutionOptions,
   PipelineResult,
-} from "../evaluationPipeline.js";
+} from "../../../types/index.js";
+import type { EvaluationPipeline } from "../evaluationPipeline.js";
 
 /**
  * Batch processing configuration
  */
-export type BatchConfig = {
+type BatchConfig = {
   /** Maximum concurrent evaluations */
   concurrency?: number;
   /** Delay between batches (ms) */
@@ -29,7 +29,7 @@ export type BatchConfig = {
 /**
  * Batch progress information
  */
-export type BatchProgress = {
+type BatchProgress = {
   total: number;
   completed: number;
   failed: number;
@@ -41,7 +41,7 @@ export type BatchProgress = {
 /**
  * Individual batch item result
  */
-export type BatchItemResult = {
+type BatchItemResult = {
   index: number;
   input: ScorerInput;
   result?: PipelineResult;
@@ -52,7 +52,7 @@ export type BatchItemResult = {
 /**
  * Batch evaluation result
  */
-export type BatchResult = {
+type BatchResult = {
   /** All individual results */
   results: BatchItemResult[];
   /** Summary statistics */

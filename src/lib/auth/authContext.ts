@@ -6,7 +6,7 @@ import type {
   AuthenticatedContext,
   AuthProviderType,
   AuthRequestContext,
-} from "../types/authTypes.js";
+} from "../types/index.js";
 import { AsyncLocalStorage } from "async_hooks";
 import { AuthError } from "./errors.js";
 

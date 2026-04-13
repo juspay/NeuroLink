@@ -5,24 +5,11 @@
 
 export {
   // Types
-  type DataStreamEventType,
-  type DataStreamEvent,
-  type TextStartEvent,
-  type TextDeltaEvent,
-  type TextEndEvent,
-  type ToolCallEvent,
-  type ToolResultEvent,
-  type DataEvent,
-  type ErrorEvent,
-  type FinishEvent,
-  type SSEEventOptions,
 
   // Writer
-  type DataStreamWriterConfig,
   createDataStreamWriter,
 
   // Response
-  type DataStreamResponseConfig,
   DataStreamResponse,
   createDataStreamResponse,
 

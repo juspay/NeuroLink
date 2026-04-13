@@ -9,7 +9,7 @@ import type {
   ScorerInput,
   ScorerMetadata,
   ScorerRule,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { logger } from "../../../utils/logger.js";
 import {
   BaseRuleScorer,
@@ -19,7 +19,7 @@ import {
 /**
  * Expected format types
  */
-export type FormatType =
+type FormatType =
   | "json"
   | "markdown"
   | "code"
@@ -36,7 +36,7 @@ export type FormatType =
 /**
  * Code language types for code format validation
  */
-export type CodeLanguage =
+type CodeLanguage =
   | "javascript"
   | "typescript"
   | "python"
@@ -53,7 +53,7 @@ export type CodeLanguage =
 /**
  * Configuration specific to format scoring
  */
-export type FormatScorerConfig = RuleScorerConfig & {
+type FormatScorerConfig = RuleScorerConfig & {
   /** Expected format type */
   expectedFormat?: FormatType;
   /** Multiple allowed formats */
@@ -195,7 +195,7 @@ export class FormatScorer extends BaseRuleScorer {
         type: "custom" as const,
         params: {
           schema: this._formatConfig
-            .jsonSchema as import("../../../types/common.js").JsonObject,
+            .jsonSchema as import("../../../types/index.js").JsonObject,
         },
         weight: 0.5,
       });

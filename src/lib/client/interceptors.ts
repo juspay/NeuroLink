@@ -8,15 +8,18 @@
  */
 
 import type {
-  Middleware,
-  MiddlewareRequest,
-  MiddlewareResponse,
-  ClientMiddlewareContext as MiddlewareContext,
-  ClientRetryConfig as RetryConfig,
-  ApiError,
-} from "../types/clientTypes.js";
+  ClientMiddleware,
+  ClientMiddlewareRequest,
+  ClientMiddlewareResponse,
+  ClientApiError,
+  CacheInterceptorOptions,
+  ErrorHandlerOptions,
+  LoggingInterceptorOptions,
+  RateLimiterOptions,
+  RetryInterceptorOptions,
+  TimeoutInterceptorOptions,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
-
 // =============================================================================
 // Utility Functions
 // =============================================================================
@@ -66,7 +69,7 @@ function isRetryableStatus(
  * client.use(createApiKeyAuthInterceptor('your-api-key'));
  * ```
  */
-export function createApiKeyAuthInterceptor(apiKey: string): Middleware {
+export function createApiKeyAuthInterceptor(apiKey: string): ClientMiddleware {
   return async (request, next) => {
     request.headers["X-API-Key"] = apiKey;
     return next();
@@ -83,7 +86,7 @@ export function createApiKeyAuthInterceptor(apiKey: string): Middleware {
  * client.use(createBearerAuthInterceptor('your-token'));
  * ```
  */
-export function createBearerAuthInterceptor(token: string): Middleware {
+export function createBearerAuthInterceptor(token: string): ClientMiddleware {
   return async (request, next) => {
     request.headers["Authorization"] = `Bearer ${token}`;
     return next();
@@ -108,7 +111,7 @@ export function createDynamicAuthInterceptor(
   getAuth: () => Promise<
     { type: "apiKey"; key: string } | { type: "bearer"; token: string } | null
   >,
-): Middleware {
+): ClientMiddleware {
   return async (request, next) => {
     const auth = await getAuth();
 
@@ -129,24 +132,6 @@ export function createDynamicAuthInterceptor(
 // =============================================================================
 
 /**
- * Logging interceptor options
- */
-export type LoggingInterceptorOptions = {
-  /** Log request details */
-  logRequest?: boolean;
-  /** Log response details */
-  logResponse?: boolean;
-  /** Log request body */
-  logBody?: boolean;
-  /** Log response body */
-  logResponseBody?: boolean;
-  /** Custom logger function */
-  logger?: (message: string, data?: unknown) => void;
-  /** Redact sensitive fields */
-  redactFields?: string[];
-};
-
-/**
  * Logging interceptor
  *
  * Logs request and response details for debugging.
@@ -162,7 +147,7 @@ export type LoggingInterceptorOptions = {
  */
 export function createLoggingInterceptor(
   options: LoggingInterceptorOptions = {},
-): Middleware {
+): ClientMiddleware {
   const {
     logRequest = true,
     logResponse = true,
@@ -251,20 +236,6 @@ export function createLoggingInterceptor(
 // =============================================================================
 
 /**
- * Retry interceptor options
- */
-export type RetryInterceptorOptions = RetryConfig & {
-  /** Callback when a retry is attempted */
-  onRetry?: (
-    attempt: number,
-    error: Error | ApiError,
-    request: MiddlewareRequest,
-  ) => void;
-  /** Custom retry condition */
-  shouldRetry?: (response: MiddlewareResponse, attempt: number) => boolean;
-};
-
-/**
  * Retry interceptor with exponential backoff
  *
  * Automatically retries failed requests with configurable backoff.
@@ -283,7 +254,7 @@ export type RetryInterceptorOptions = RetryConfig & {
  */
 export function createRetryInterceptor(
   options: RetryInterceptorOptions,
-): Middleware {
+): ClientMiddleware {
   const {
     maxAttempts = 3,
     initialDelayMs = 1000,
@@ -313,7 +284,7 @@ export function createRetryInterceptor(
             );
             onRetry?.(
               attempt + 1,
-              { message: "Custom retry condition met" } as ApiError,
+              { message: "Custom retry condition met" } as ClientApiError,
               request,
             );
             await sleep(delay);
@@ -331,7 +302,7 @@ export function createRetryInterceptor(
               maxDelayMs,
               backoffMultiplier,
             );
-            const error: ApiError = {
+            const error: ClientApiError = {
               code: "RETRYABLE_ERROR",
               message: `HTTP ${response.status}`,
               status: response.status,
@@ -373,20 +344,6 @@ export function createRetryInterceptor(
 // =============================================================================
 // Rate Limiting Interceptors
 // =============================================================================
-
-/**
- * Rate limiter options
- */
-export type RateLimiterOptions = {
-  /** Maximum requests per window */
-  maxRequests: number;
-  /** Window size in milliseconds */
-  windowMs: number;
-  /** Strategy when limit is reached: 'queue' or 'throw' */
-  strategy?: "queue" | "throw";
-  /** Callback when rate limited */
-  onRateLimited?: (waitTime: number) => void;
-};
 
 /**
  * Token bucket rate limiter
@@ -477,7 +434,7 @@ class TokenBucket {
  */
 export function createRateLimitInterceptor(
   options: RateLimiterOptions,
-): Middleware {
+): ClientMiddleware {
   const { maxRequests, windowMs, strategy = "queue", onRateLimited } = options;
   const bucket = new TokenBucket(maxRequests, windowMs);
 
@@ -514,9 +471,9 @@ export function createRateLimitInterceptor(
  */
 export function createRequestTransformInterceptor(
   transform: (
-    request: MiddlewareRequest,
-  ) => MiddlewareRequest | Promise<MiddlewareRequest>,
-): Middleware {
+    request: ClientMiddlewareRequest,
+  ) => ClientMiddlewareRequest | Promise<ClientMiddlewareRequest>,
+): ClientMiddleware {
   return async (request, next) => {
     const transformedRequest = await transform(request);
     // Update the original request object
@@ -541,9 +498,9 @@ export function createRequestTransformInterceptor(
  */
 export function createResponseTransformInterceptor(
   transform: (
-    response: MiddlewareResponse,
-  ) => MiddlewareResponse | Promise<MiddlewareResponse>,
-): Middleware {
+    response: ClientMiddlewareResponse,
+  ) => ClientMiddlewareResponse | Promise<ClientMiddlewareResponse>,
+): ClientMiddleware {
   return async (request, next) => {
     const response = await next();
     return transform(response);
@@ -553,24 +510,6 @@ export function createResponseTransformInterceptor(
 // =============================================================================
 // Caching Interceptors
 // =============================================================================
-
-/**
- * Cache options
- */
-export type CacheInterceptorOptions = {
-  /** Cache TTL in milliseconds */
-  ttl: number;
-  /** Maximum cache size */
-  maxSize?: number;
-  /** Cache key generator */
-  keyGenerator?: (request: MiddlewareRequest) => string;
-  /** Methods to cache (default: ['GET']) */
-  methods?: string[];
-  /** Paths to cache (regex patterns) */
-  includePaths?: RegExp[];
-  /** Paths to exclude from cache */
-  excludePaths?: RegExp[];
-};
 
 /**
  * Simple in-memory cache
@@ -635,7 +574,7 @@ class SimpleCache<T> {
  */
 export function createCacheInterceptor(
   options: CacheInterceptorOptions,
-): Middleware {
+): ClientMiddleware {
   const {
     ttl,
     maxSize = 1000,
@@ -645,7 +584,7 @@ export function createCacheInterceptor(
     excludePaths,
   } = options;
 
-  const cache = new SimpleCache<MiddlewareResponse>(maxSize);
+  const cache = new SimpleCache<ClientMiddlewareResponse>(maxSize);
 
   return async (request, next) => {
     // Check if request should be cached
@@ -695,16 +634,6 @@ export function createCacheInterceptor(
 // =============================================================================
 
 /**
- * Timeout interceptor options
- */
-export type TimeoutInterceptorOptions = {
-  /** Timeout in milliseconds */
-  timeout: number;
-  /** Callback when timeout occurs */
-  onTimeout?: (request: MiddlewareRequest) => void;
-};
-
-/**
  * Timeout interceptor
  *
  * Adds a timeout to requests.
@@ -719,7 +648,7 @@ export type TimeoutInterceptorOptions = {
  */
 export function createTimeoutInterceptor(
   options: TimeoutInterceptorOptions,
-): Middleware {
+): ClientMiddleware {
   const { timeout, onTimeout } = options;
 
   return async (request, next) => {
@@ -765,21 +694,6 @@ export function createTimeoutInterceptor(
 // =============================================================================
 
 /**
- * Error handling interceptor options
- */
-export type ErrorHandlerOptions = {
-  /** Custom error handler */
-  onError?: (error: Error, request: MiddlewareRequest) => Error | void;
-  /** Transform error response */
-  transformError?: (error: unknown) => ApiError;
-  /** Report errors to external service */
-  reportError?: (
-    error: Error,
-    context: MiddlewareContext,
-  ) => void | Promise<void>;
-};
-
-/**
  * Error handling interceptor
  *
  * Provides centralized error handling and transformation.
@@ -798,7 +712,7 @@ export type ErrorHandlerOptions = {
  */
 export function createErrorHandlerInterceptor(
   options: ErrorHandlerOptions = {},
-): Middleware {
+): ClientMiddleware {
   const { onError, transformError, reportError } = options;
 
   return async (request, next) => {
@@ -847,11 +761,13 @@ export function createErrorHandlerInterceptor(
  * client.use(combinedMiddleware);
  * ```
  */
-export function composeMiddleware(...middlewares: Middleware[]): Middleware {
+export function composeMiddleware(
+  ...middlewares: ClientMiddleware[]
+): ClientMiddleware {
   return async (request, next) => {
     let index = 0;
 
-    const executeNext = async (): Promise<MiddlewareResponse> => {
+    const executeNext = async (): Promise<ClientMiddlewareResponse> => {
       if (index < middlewares.length) {
         const middleware = middlewares[index++];
         return middleware(request, executeNext);
@@ -875,9 +791,9 @@ export function composeMiddleware(...middlewares: Middleware[]): Middleware {
  * ```
  */
 export function conditionalMiddleware(
-  condition: (request: MiddlewareRequest) => boolean,
-  middleware: Middleware,
-): Middleware {
+  condition: (request: ClientMiddlewareRequest) => boolean,
+  middleware: ClientMiddleware,
+): ClientMiddleware {
   return async (request, next) => {
     if (condition(request)) {
       return middleware(request, next);

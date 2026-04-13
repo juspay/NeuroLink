@@ -50,7 +50,6 @@ export {
   detectLanguage,
   isSourceCodeFile,
   // Types
-  type ProcessedSourceCode,
   processSourceCode,
   // Processor class and singleton
   SourceCodeProcessor,
@@ -70,6 +69,5 @@ export {
   // Helper functions
   isConfigFile,
   // Types
-  type ProcessedConfig,
   processConfig,
 } from "./ConfigProcessor.js";

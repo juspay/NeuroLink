@@ -30,6 +30,32 @@ These are non-negotiable. Violating them breaks the build or introduces bugs.
 4. **CLI ≠ SDK** — CLI can use manual MCP connections; the SDK cannot. Keep concerns separate.
 5. **Backward compatibility** — Public SDK API must not break existing callers.
 6. **`formatProviderError` must return, never throw** — Any provider error formatter must return the error object, not throw it.
+7. **Zero `interface` — always use `type`** — Never use `interface`. Always use `type X = { ... }`. The only exception is `declare global { interface Window { ... } }` which TypeScript requires for declaration merging. Use intersection (`&`) instead of `extends`.
+8. **No "Types" suffix in type filenames** — Files inside `src/lib/types/` must not contain "Types" or "Type" in their name. The folder IS the types folder — `mcp.ts` not `mcpTypes.ts`, `auth.ts` not `authTypes.ts`.
+9. **Unique type names across all files** — Every exported type name must be globally unique across all files in `src/lib/types/`. Use domain prefixes to disambiguate:
+   - Client SDK types: `Client*` prefix (e.g., `ClientAuthConfig`, `ClientToolInfo`, `ClientStreamResult`)
+   - CLI types: `Cli*` prefix (e.g., `CliGenerateResult`, `CliStreamChunk`)
+   - Server types: `Server*` prefix (e.g., `ServerAuthConfig`)
+   - Stream types: `Stream*` prefix (e.g., `StreamToolCall`, `StreamToolResult`)
+   - Processor types: `Processor*` prefix (e.g., `ProcessorRetryConfig`)
+   - Workflow judge types: `Judge*` prefix (e.g., `JudgeScoreResult`)
+10. **Barrel uses `export *` only** — `src/lib/types/index.ts` must only contain `export * from "./file.js"` lines. No selective exports (`export type { X, Y }`), no aliases (`X as Y`). If adding `export *` causes a name collision, rename the type at the source with a domain prefix per rule 9.
+11. **No local `types/` directories** — There must be no `types/` directory anywhere except `src/lib/types/`. No `src/lib/observability/types/`, no `src/lib/workflow/core/types/`, etc. Move those types into the canonical `src/lib/types/` folder.
+12. **No type re-exports from non-type files** — Files outside `src/lib/types/` must not re-export types (`export type { X } from`). Consumers should import types from `src/lib/types/` directly. Module `index.ts` files should only re-export runtime values (classes, functions, constants), never types.
+
+13. **Barrel-only imports for internal types** — Code outside `src/lib/types/` must import internal types from the barrel (`../types/index.js` or `../types`), never from specific type files (`../types/rag.js`, `../types/mcp.js`). External library types (`zod`, `@ai-sdk/provider`, etc.) can be imported normally. Files inside `src/lib/types/` are exempt (they import from each other).
+
+**Enforcement:** All rules (7-13) are enforced by custom ESLint rules in `eslint-rules/`. Run `pnpm run lint` (or the pre-commit hook) — no shell scripts, no regex heuristics, everything AST-based.
+
+| Rule     | ESLint rule                              |
+| -------- | ---------------------------------------- |
+| 7        | `neurolink/no-interface`                 |
+| 8        | `neurolink/no-types-suffix-filename`     |
+| 9        | `neurolink/unique-type-names`            |
+| 10       | `neurolink/types-barrel-exports-only`    |
+| 11 & 11b | `neurolink/no-local-types-folder`        |
+| 12       | `neurolink/no-type-export-outside-types` |
+| 13       | `neurolink/barrel-type-imports`          |
 
 ---
 

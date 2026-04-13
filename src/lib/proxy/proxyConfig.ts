@@ -177,10 +177,10 @@ function failOnUnresolvedAccountCredentials(obj: unknown): void {
 // ---------------------------------------------------------------------------
 
 /** Shape of the dynamically-imported `js-yaml` module. */
-interface YamlModule {
+type YamlModule = {
   load(content: string): unknown;
   default?: { load(content: string): unknown };
-}
+};
 
 /**
  * Parse YAML content into a JS object.

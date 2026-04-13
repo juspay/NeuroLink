@@ -12,9 +12,12 @@ import { mcpLogger } from "../utils/logger.js";
 import { MCPClientFactory } from "./mcpClientFactory.js";
 import { ToolDiscoveryService } from "./toolDiscoveryService.js";
 import { toolRegistry } from "./toolRegistry.js";
-import type { HITLManager } from "../types/hitlTypes.js";
-import { HITLUserRejectedError, HITLTimeoutError } from "../hitl/hitlErrors.js";
 import type {
+  HITLManager,
+  JsonValue,
+  JsonObject,
+  UnknownRecord,
+  ServerLoadResult,
   ExternalMCPServerInstance,
   ExternalMCPServerStatus,
   ExternalMCPServerHealth,
@@ -24,15 +27,13 @@ import type {
   ExternalMCPManagerConfig,
   ExternalMCPToolInfo,
   RuntimeMCPServerInfo,
-} from "../types/externalMcp.js";
-import type {
   MCPServerInfo,
   MCPServerCategory,
   MCPTransportType,
-} from "../types/mcpTypes.js";
-import type { JsonValue, JsonObject, UnknownRecord } from "../types/common.js";
+} from "../types/index.js";
+import { HITLUserRejectedError, HITLTimeoutError } from "../hitl/hitlErrors.js";
 import { detectCategory } from "../utils/mcpDefaults.js";
-import type { ServerLoadResult } from "../types/typeAliases.js";
+
 import { isObject, isNonNullObject } from "../utils/typeUtils.js";
 import { TelemetryService } from "../telemetry/telemetryService.js";
 import { tracers } from "../telemetry/tracers.js";

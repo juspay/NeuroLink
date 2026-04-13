@@ -21,7 +21,7 @@ import type {
   ServerAdapterConfig,
   ServerAdapterEvents,
   ServerContext,
-} from "../types.js";
+} from "../../types/index.js";
 import { isErrorResponse } from "../utils/validation.js";
 
 /**

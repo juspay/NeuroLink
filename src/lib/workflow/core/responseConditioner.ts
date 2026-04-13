@@ -8,14 +8,14 @@
 
 import { logger } from "../../utils/logger.js";
 import { AIProviderFactory } from "../../core/factory.js";
-import type { ConditioningConfig } from "../types.js";
-import type { ConditionOptions, ConditionResult } from "./types/index.js";
 import type {
+  ConditioningConfig,
+  ConditionOptions,
+  ConditionResult,
   EnsembleResponse,
   JudgeScores,
   MultiJudgeScores,
-} from "../types.js";
-
+} from "../../types/index.js";
 const functionTag = "ResponseConditioner";
 
 // ============================================================================

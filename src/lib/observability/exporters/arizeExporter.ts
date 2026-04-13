@@ -8,7 +8,7 @@ import type {
   ExporterHealthStatus,
   ExportResult,
   SpanData,
-} from "../types/index.js";
+} from "../../types/index.js";
 import { BaseExporter } from "./baseExporter.js";
 
 /**

@@ -5,15 +5,15 @@
 
 import { ProviderFactory } from "../../../factories/providerFactory.js";
 import { ProviderRegistry } from "../../../factories/providerRegistry.js";
-import type { JsonObject } from "../../../types/common.js";
-import type { AIProvider } from "../../../types/providers.js";
 import type {
+  JsonObject,
+  AIProvider,
   LLMScorer,
   LLMScorerConfig,
   ScoreResult,
   ScorerInput,
   ScorerMetadata,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 import { logger } from "../../../utils/logger.js";
 import { BaseScorer } from "../baseScorer.js";
 

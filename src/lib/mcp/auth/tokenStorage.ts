@@ -4,7 +4,7 @@
  */
 
 import { logger } from "../../utils/logger.js";
-import type { OAuthTokens, TokenStorage } from "../../types/mcpTypes.js";
+import type { OAuthTokens, TokenStorage } from "../../types/index.js";
 
 /**
  * In-memory token storage implementation

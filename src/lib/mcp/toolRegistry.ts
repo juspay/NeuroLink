@@ -8,13 +8,12 @@ import type {
   ToolResult,
   MCPServerInfo,
   MCPServerCategory,
-} from "../types/mcpTypes.js";
-import type {
   ToolImplementation,
   ToolInfo,
   ExecutionContext,
-} from "../types/tools.js";
-import type { UnknownRecord } from "../types/common.js";
+  UnknownRecord,
+  HITLManager,
+} from "../types/index.js";
 import { MCPRegistry } from "./registry.js";
 import { registryLogger } from "../utils/logger.js";
 import { randomUUID } from "crypto";
@@ -23,7 +22,7 @@ import { directAgentTools } from "../agent/directTools.js";
 import { detectCategory, createMCPServerInfo } from "../utils/mcpDefaults.js";
 import { FlexibleToolValidator } from "./flexibleToolValidator.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
-import type { HITLManager } from "../types/hitlTypes.js";
+
 import { HITLUserRejectedError, HITLTimeoutError } from "../hitl/hitlErrors.js";
 import { withSpan, tracers, ATTR } from "../telemetry/index.js";
 import { getAuthContext } from "../auth/authContext.js";

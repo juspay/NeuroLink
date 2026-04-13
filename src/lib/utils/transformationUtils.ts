@@ -3,8 +3,12 @@
  * Centralizes repeated object transformation patterns to improve code reuse and maintainability
  */
 
-import type { UnknownRecord } from "../types/common.js";
-import type { StandardRecord, StringArray } from "../types/typeAliases.js";
+import type {
+  UnknownRecord,
+  StandardRecord,
+  StringArray,
+} from "../types/index.js";
+
 import { logger } from "./logger.js";
 import { inlineJsonSchema } from "./schemaConversion.js";
 

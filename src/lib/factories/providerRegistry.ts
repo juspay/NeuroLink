@@ -5,9 +5,9 @@ import { ProviderFactory } from "./providerFactory.js";
 import type {
   NeurolinkCredentials,
   ProviderRegistryOptions,
+  UnknownRecord,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
-import type { UnknownRecord } from "../types/common.js";
 import type { NeuroLink } from "../neurolink.js";
 import type { MistralProvider as MistralProviderType } from "@ai-sdk/mistral";
 import {

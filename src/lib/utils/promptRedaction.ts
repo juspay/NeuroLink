@@ -3,7 +3,7 @@
  * Provides consistent prompt masking across NeuroLink components
  */
 
-import type { PromptRedactionOptions } from "../types/utilities.js";
+import type { PromptRedactionOptions } from "../types/index.js";
 
 /**
  * Default redaction options

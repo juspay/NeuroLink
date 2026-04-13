@@ -3,9 +3,9 @@
  * Utility middleware for common server operations
  */
 
-import type { MiddlewareDefinition, ServerContext } from "../types.js";
-import { getMetricsAggregator } from "../../observability/index.js";
+import type { MiddlewareDefinition, ServerContext } from "../../types/index.js";
 import {
+  getMetricsAggregator,
   SpanSerializer,
   SpanStatus,
   SpanType,

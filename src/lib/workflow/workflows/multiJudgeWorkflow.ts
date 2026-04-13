@@ -13,7 +13,7 @@
  */
 
 import { AIProviderName } from "../../constants/enums.js";
-import type { WorkflowConfig } from "../types.js";
+import type { WorkflowConfig } from "../../types/index.js";
 import { WORKFLOW_CREATION_DATE } from "../config.js";
 
 /**

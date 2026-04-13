@@ -12,7 +12,7 @@
  * - OpenAI/GPT: 1.0x (baseline)
  */
 
-import type { ChatMessage } from "../types/conversation.js";
+import type { ChatMessage } from "../types/index.js";
 
 /** Characters per token for English text */
 export const CHARS_PER_TOKEN = 4;

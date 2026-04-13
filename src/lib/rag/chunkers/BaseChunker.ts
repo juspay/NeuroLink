@@ -13,7 +13,7 @@ import type {
   ChunkerConfig,
   ChunkingStrategy,
   ChunkMetadata,
-} from "../types.js";
+} from "../../types/index.js";
 
 /**
  * Default chunker configuration

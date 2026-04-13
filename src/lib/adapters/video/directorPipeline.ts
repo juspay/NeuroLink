@@ -14,13 +14,13 @@
 
 import pLimit from "p-limit";
 import { ErrorCategory, ErrorSeverity } from "../../constants/enums.js";
-import type { ImageWithAltText } from "../../types/content.js";
 import type {
+  ImageWithAltText,
   DirectorModeOptions,
   DirectorSegment,
   VideoGenerationResult,
   VideoOutputOptions,
-} from "../../types/multimodal.js";
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { validateImageForVideo } from "../../utils/parameterValidation.js";
 import { VIDEO_ERROR_CODES } from "../../constants/videoErrors.js";

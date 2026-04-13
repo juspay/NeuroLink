@@ -19,7 +19,8 @@ import type {
   SageMakerConfig,
   InvokeEndpointParams,
   InvokeEndpointResponse,
-} from "../../types/providers.js";
+  ConnectionResult,
+} from "../../types/index.js";
 import {
   handleSageMakerError,
   SageMakerError,
@@ -27,7 +28,6 @@ import {
   getRetryDelay,
 } from "./errors.js";
 import { logger } from "../../utils/logger.js";
-import type { ConnectionResult } from "../../types/typeAliases.js";
 
 /**
  * Enhanced SageMaker Runtime client with retry logic and error handling

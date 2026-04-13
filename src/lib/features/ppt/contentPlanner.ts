@@ -12,8 +12,8 @@
  * @module presentation/contentPlanner
  */
 
-import type { AIProvider } from "../../types/providers.js";
 import type {
+  AIProvider,
   ContentPlan,
   SlideSchema,
   SlideType,
@@ -22,8 +22,8 @@ import type {
   BulletPoint,
   SlideContent,
   BulletStyle,
-} from "./types.js";
-import { PPTError, PPT_ERROR_CODES } from "./types.js";
+} from "../../types/index.js";
+import { PPTError, PPT_ERROR_CODES } from "./pptError.js";
 import {
   CONTENT_PLANNING_SYSTEM_PROMPT,
   buildContentPlanningPrompt,

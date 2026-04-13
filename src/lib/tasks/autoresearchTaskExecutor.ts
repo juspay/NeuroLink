@@ -19,12 +19,10 @@ import type {
   AutoresearchEmitter,
   ExperimentPhase,
   ResearchConfig,
-} from "../types/autoresearchTypes.js";
-import type {
   NeuroLinkExecutable,
   Task,
   TaskRunResult,
-} from "../types/taskTypes.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 
 // ── Worker cache ────────────────────────────────────────

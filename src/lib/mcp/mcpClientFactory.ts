@@ -18,28 +18,28 @@ import type {
 import { spawn, type ChildProcess } from "child_process";
 import { mcpLogger } from "../utils/logger.js";
 import { globalCircuitBreakerManager } from "./mcpCircuitBreaker.js";
-import { CircuitBreakerOpenError } from "../types/circuitBreakerErrors.js";
+import { CircuitBreakerOpenError } from "../types/index.js";
 import {
   withHTTPRetry,
   DEFAULT_HTTP_RETRY_CONFIG,
 } from "./httpRetryHandler.js";
 import { globalRateLimiterManager } from "./httpRateLimiter.js";
 import { NeuroLinkOAuthProvider, InMemoryTokenStorage } from "./auth/index.js";
-import type { MCPOAuthConfig } from "../types/mcpTypes.js";
-import type { MCPTransportType } from "../types/externalMcp.js";
-import type { MCPServerInfo, MCPClientResult } from "../types/mcpTypes.js";
 import type {
+  MCPOAuthConfig,
+  MCPTransportType,
+  MCPServerInfo,
+  MCPClientResult,
   TransportResult,
   TransportWithProcessResult,
   NetworkTransportResult,
-} from "../types/typeAliases.js";
+} from "../types/index.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
-
 /**
  * Default timeout for MCP client creation in milliseconds.
  * Configurable via MCP_CLIENT_TIMEOUT env var.

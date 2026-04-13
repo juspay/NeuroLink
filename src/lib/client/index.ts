@@ -102,36 +102,6 @@ export {
   NeuroLinkApiError,
 } from "./httpClient.js";
 
-export type {
-  ClientConfig,
-  RequestOptions,
-  ClientApiResponse as ApiResponse,
-  ApiError,
-  ClientRetryConfig as RetryConfig,
-  Middleware,
-  MiddlewareRequest,
-  MiddlewareResponse,
-  ClientMiddlewareContext as MiddlewareContext,
-  StreamCallbacks,
-  ClientStreamEvent as StreamEvent,
-  StreamEventType,
-  ClientStreamResult as StreamResult,
-  GenerateRequestOptions,
-  GenerateResponse,
-  StreamRequestOptions,
-  AgentExecuteOptions,
-  AgentExecuteResult,
-  AgentInfo,
-  WorkflowExecuteOptions,
-  WorkflowExecuteResult,
-  WorkflowInfo,
-  ToolInfo,
-  ClientProviderStatus as ProviderStatus,
-  WebSocketOptions,
-  WebSocketState,
-  WebSocketMessageHandler,
-} from "../types/clientTypes.js";
-
 // =============================================================================
 // React Hooks Exports
 // Note: These exports require React 18+ as a peer dependency
@@ -147,31 +117,6 @@ export {
   useStream,
   useTools,
 } from "./reactHooks.js";
-
-export type { NeuroLinkProviderProps } from "./reactHooks.js";
-
-export type {
-  UseChatOptions,
-  UseChatReturn,
-  UseAgentOptions,
-  UseAgentReturn,
-  UseWorkflowOptions,
-  UseWorkflowReturn,
-  UseVoiceOptions,
-  UseVoiceReturn,
-  UseStreamOptions,
-  UseStreamReturn,
-  UseToolsOptions,
-  UseToolsReturn,
-  ClientChatMessage as ChatMessage,
-  // AI SDK Adapter types
-  NeuroLinkProviderOptions,
-  ModelOptions,
-  LanguageModel,
-  LanguageModelCallOptions,
-  LanguageModelResponse,
-  LanguageModelStreamResponse,
-} from "../types/clientTypes.js";
 
 // =============================================================================
 // AI SDK Adapter Exports
@@ -215,15 +160,6 @@ export {
   conditionalMiddleware,
 } from "./interceptors.js";
 
-export type {
-  LoggingInterceptorOptions,
-  RetryInterceptorOptions,
-  RateLimiterOptions,
-  CacheInterceptorOptions,
-  TimeoutInterceptorOptions,
-  ErrorHandlerOptions,
-} from "./interceptors.js";
-
 // =============================================================================
 // Streaming Client Exports
 // =============================================================================
@@ -236,39 +172,17 @@ export {
   collectStream,
 } from "./streamingClient.js";
 
-export type {
-  SSEConnectionOptions,
-  SSEConnectionState,
-  StreamingRequestOptions,
-  StreamingEventEmitter,
-  StreamingClientConfig,
-} from "./streamingClient.js";
-
 // =============================================================================
 // Dedicated WebSocket Client Exports
 // =============================================================================
 
 export { NeuroLinkWebSocket, createWebSocketClient } from "./wsClient.js";
 
-export type {
-  WebSocketConfig,
-  WebSocketMessage,
-  WebSocketEventHandlers,
-  WebSocketState as WSState,
-} from "./wsClient.js";
-
 // =============================================================================
 // Dedicated SSE Client Exports
 // =============================================================================
 
 export { NeuroLinkSSE, createSSEClient } from "./sseClient.js";
-
-export type {
-  SSEConfig,
-  SSERequestOptions,
-  SSEEventHandlers,
-  SSEState,
-} from "./sseClient.js";
 
 // =============================================================================
 // Authentication Exports
@@ -278,7 +192,7 @@ export {
   // Token Managers
   OAuth2TokenManager,
   JWTTokenManager,
-  // Auth Middleware
+  // Auth ClientMiddleware
   createApiKeyMiddleware,
   createBearerTokenMiddleware,
   createTokenManagerMiddleware,
@@ -294,22 +208,6 @@ export {
   getJWTExpiry,
   getApiKeyFromEnv,
 } from "./auth.js";
-
-export type {
-  AuthConfig,
-  ClientOAuth2Config as OAuth2Config,
-  ClientTokenRefreshResult as TokenRefreshResult,
-  // Voice types
-  SpeechRecognitionResult,
-  SpeechSynthesisOptions,
-  // Common types
-  JsonValue,
-  JsonObject,
-  UnknownRecord,
-  // Tool types
-  ToolCall,
-  ToolResult,
-} from "../types/clientTypes.js";
 
 // =============================================================================
 // Error Exports
@@ -349,5 +247,3 @@ export {
   isNeuroLinkError,
   isApiError,
 } from "./errors.js";
-
-export type { ErrorCodeType } from "./errors.js";

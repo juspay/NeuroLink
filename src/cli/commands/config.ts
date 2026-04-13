@@ -312,7 +312,7 @@ const ConfigSchema = z.object({
     }),
 });
 
-export type NeuroLinkConfig = z.infer<typeof ConfigSchema>;
+type NeuroLinkConfig = z.infer<typeof ConfigSchema>;
 
 export class ConfigManager {
   private configDir: string;

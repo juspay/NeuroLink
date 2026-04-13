@@ -16,7 +16,7 @@ import {
   type TaskExecutorFn,
   type TaskManagerConfig,
   TASK_DEFAULTS,
-} from "../../types/taskTypes.js";
+} from "../../types/index.js";
 
 const QUEUE_NAME = "neurolink-tasks";
 

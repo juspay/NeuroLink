@@ -6,8 +6,8 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { logger } from "../utils/logger.js";
 import { AutoresearchError } from "./errors.js";
-import type { ResearchConfig } from "../types/autoresearchTypes.js";
-import { AUTORESEARCH_DEFAULTS } from "../types/autoresearchTypes.js";
+import type { ResearchConfig } from "../types/index.js";
+import { AUTORESEARCH_DEFAULTS } from "../types/index.js";
 
 export function resolveConfig(
   partial: Partial<ResearchConfig> & {

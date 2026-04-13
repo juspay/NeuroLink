@@ -10,86 +10,25 @@
 import type {
   // ClientConfig - not currently used but may be needed for future implementations
   ClientStreamEvent as StreamEvent,
-  StreamCallbacks,
+  ClientStreamCallbacks,
   ClientStreamResult as StreamResult,
-  ApiError,
-  WebSocketOptions,
-  WebSocketState,
-  WebSocketMessageHandler,
-} from "../types/clientTypes.js";
-import type { JsonObject, UnknownRecord } from "../types/common.js";
-import type { ToolCall, ToolResult } from "../types/streamTypes.js";
+  ClientApiError,
+  ClientWebSocketOptions,
+  ClientWebSocketState,
+  ClientWebSocketMessageHandler,
+  SSEConnectionOptions,
+  SSEConnectionState,
+  StreamingClientConfig,
+  StreamingRequestOptions,
+  JsonObject,
+  StreamToolCall,
+  StreamToolResult,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { combineSignals, sleep } from "./httpClient.js";
-
 // =============================================================================
 // Types
 // =============================================================================
-
-/**
- * SSE connection options
- */
-export type SSEConnectionOptions = {
-  /** Request headers */
-  headers?: Record<string, string>;
-  /** Request credentials */
-  credentials?: RequestCredentials;
-  /** Reconnect on disconnect */
-  autoReconnect?: boolean;
-  /** Reconnect delay in milliseconds */
-  reconnectDelay?: number;
-  /** Maximum reconnect attempts */
-  maxReconnectAttempts?: number;
-  /** Signal for request cancellation */
-  signal?: AbortSignal;
-};
-
-/**
- * SSE connection state
- */
-export type SSEConnectionState =
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "reconnecting"
-  | "error";
-
-/**
- * Streaming request options
- */
-export type StreamingRequestOptions = {
-  /** Input text or data */
-  input: { text: string } & UnknownRecord;
-  /** Provider to use */
-  provider?: string;
-  /** Model to use */
-  model?: string;
-  /** Temperature */
-  temperature?: number;
-  /** Maximum tokens */
-  maxTokens?: number;
-  /** System prompt */
-  systemPrompt?: string;
-  /** Enable tools */
-  enableTools?: boolean;
-  /** Context data */
-  context?: UnknownRecord;
-};
-
-/**
- * Streaming event emitter interface
- */
-export type StreamingEventEmitter = {
-  on(event: "text", callback: (text: string) => void): void;
-  on(event: "tool-call", callback: (toolCall: ToolCall) => void): void;
-  on(event: "tool-result", callback: (toolResult: ToolResult) => void): void;
-  on(event: "error", callback: (error: ApiError) => void): void;
-  on(event: "done", callback: (result: StreamResult) => void): void;
-  on(event: "metadata", callback: (metadata: JsonObject) => void): void;
-  off(event: string, callback: (...args: unknown[]) => void): void;
-  emit(event: string, ...args: unknown[]): void;
-};
-
 // =============================================================================
 // SSE Client
 // =============================================================================
@@ -501,14 +440,15 @@ export class SSEClient {
  * ```
  */
 export class WebSocketStreamingClient {
-  private options: WebSocketOptions;
+  private options: ClientWebSocketOptions;
   private ws: WebSocket | null = null;
-  private state: WebSocketState = "disconnected";
+  private state: ClientWebSocketState = "disconnected";
   private reconnectAttempts = 0;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
-  private eventHandlers: Map<string, Set<WebSocketMessageHandler>> = new Map();
+  private eventHandlers: Map<string, Set<ClientWebSocketMessageHandler>> =
+    new Map();
 
-  constructor(options: WebSocketOptions) {
+  constructor(options: ClientWebSocketOptions) {
     this.options = {
       autoReconnect: options.autoReconnect ?? true,
       reconnectInterval: options.reconnectInterval ?? 5000,
@@ -624,7 +564,9 @@ export class WebSocketStreamingClient {
         reject(new Error(`Request timed out after ${timeout}ms`));
       }, timeout);
 
-      const responseHandler: WebSocketMessageHandler = (data: unknown) => {
+      const responseHandler: ClientWebSocketMessageHandler = (
+        data: unknown,
+      ) => {
         const response = data as { requestId?: string; data?: T };
         if (response.requestId === requestId) {
           clearTimeout(timeoutId);
@@ -713,7 +655,7 @@ export class WebSocketStreamingClient {
   /**
    * Register event handler
    */
-  on(event: string, callback: WebSocketMessageHandler): void {
+  on(event: string, callback: ClientWebSocketMessageHandler): void {
     let handlers = this.eventHandlers.get(event);
     if (!handlers) {
       handlers = new Set();
@@ -725,7 +667,7 @@ export class WebSocketStreamingClient {
   /**
    * Remove event handler
    */
-  off(event: string, callback: WebSocketMessageHandler): void {
+  off(event: string, callback: ClientWebSocketMessageHandler): void {
     this.eventHandlers.get(event)?.delete(callback);
   }
 
@@ -744,7 +686,7 @@ export class WebSocketStreamingClient {
   /**
    * Get current connection state
    */
-  getState(): WebSocketState {
+  getState(): ClientWebSocketState {
     return this.state;
   }
 
@@ -802,22 +744,6 @@ export class WebSocketStreamingClient {
 // =============================================================================
 // Streaming Client Factory
 // =============================================================================
-
-/**
- * Streaming client configuration
- */
-export type StreamingClientConfig = {
-  /** Base URL for the API */
-  baseUrl: string;
-  /** API key */
-  apiKey?: string;
-  /** Bearer token */
-  token?: string;
-  /** Default headers */
-  headers?: Record<string, string>;
-  /** Preferred transport: 'sse' or 'websocket' */
-  transport?: "sse" | "websocket";
-};
 
 /**
  * Streaming Client Factory
@@ -878,14 +804,16 @@ export function createStreamingClient(config: StreamingClientConfig) {
       connect: () => wsClient.connect(),
       disconnect: () => wsClient.disconnect(),
       stream: async (
-        options: StreamingRequestOptions & { callbacks?: StreamCallbacks },
+        options: StreamingRequestOptions & {
+          callbacks?: ClientStreamCallbacks;
+        },
       ) => {
         const { callbacks, ...requestOptions } = options;
 
         return new Promise<StreamResult>((resolve, reject) => {
           let fullContent = "";
-          const toolCalls: ToolCall[] = [];
-          const toolResults: ToolResult[] = [];
+          const toolCalls: StreamToolCall[] = [];
+          const toolResults: StreamToolResult[] = [];
 
           const messageHandler = (data: unknown) => {
             const event = data as StreamEvent;
@@ -937,16 +865,16 @@ export function createStreamingClient(config: StreamingClientConfig) {
         });
       },
       send: (data: unknown) => wsClient.send(data),
-      on: (event: string, callback: WebSocketMessageHandler) =>
+      on: (event: string, callback: ClientWebSocketMessageHandler) =>
         wsClient.on(event, callback),
-      off: (event: string, callback: WebSocketMessageHandler) =>
+      off: (event: string, callback: ClientWebSocketMessageHandler) =>
         wsClient.off(event, callback),
       getState: () => wsClient.getState(),
     };
   }
 
   // SSE transport — track connection state across stream calls
-  let sseState: WebSocketState = "disconnected";
+  let sseState: ClientWebSocketState = "disconnected";
 
   return {
     connect: () => {
@@ -957,7 +885,7 @@ export function createStreamingClient(config: StreamingClientConfig) {
       sseState = "disconnected";
     },
     stream: async (
-      options: StreamingRequestOptions & { callbacks?: StreamCallbacks },
+      options: StreamingRequestOptions & { callbacks?: ClientStreamCallbacks },
     ) => {
       const { callbacks, ...requestOptions } = options;
       const sseUrl = `${baseUrl}/api/stream`;
@@ -970,8 +898,8 @@ export function createStreamingClient(config: StreamingClientConfig) {
 
       return new Promise<StreamResult>((resolve, reject) => {
         let fullContent = "";
-        const toolCalls: ToolCall[] = [];
-        const toolResults: ToolResult[] = [];
+        const toolCalls: StreamToolCall[] = [];
+        const toolResults: StreamToolResult[] = [];
 
         sse.on("connected", () => {
           sseState = "connected";
@@ -983,13 +911,13 @@ export function createStreamingClient(config: StreamingClientConfig) {
         });
 
         sse.on("tool-call", (toolCall) => {
-          toolCalls.push(toolCall as ToolCall);
-          callbacks?.onToolCall?.(toolCall as ToolCall);
+          toolCalls.push(toolCall as StreamToolCall);
+          callbacks?.onToolCall?.(toolCall as StreamToolCall);
         });
 
         sse.on("tool-result", (toolResult) => {
-          toolResults.push(toolResult as ToolResult);
-          callbacks?.onToolResult?.(toolResult as ToolResult);
+          toolResults.push(toolResult as StreamToolResult);
+          callbacks?.onToolResult?.(toolResult as StreamToolResult);
         });
 
         sse.on("metadata", (metadata) => {
@@ -1006,7 +934,7 @@ export function createStreamingClient(config: StreamingClientConfig) {
 
         sse.on("error", (error) => {
           sseState = "disconnected";
-          callbacks?.onError?.(error as ApiError);
+          callbacks?.onError?.(error as ClientApiError);
           reject(error);
         });
 
@@ -1122,8 +1050,8 @@ export async function collectStream(
   stream: AsyncIterable<StreamEvent>,
 ): Promise<StreamResult> {
   let content = "";
-  const toolCalls: ToolCall[] = [];
-  const toolResults: ToolResult[] = [];
+  const toolCalls: StreamToolCall[] = [];
+  const toolResults: StreamToolResult[] = [];
   let finishReason: string | undefined;
   let usage: StreamResult["usage"];
   let metadata: JsonObject | undefined;

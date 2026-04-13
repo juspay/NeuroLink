@@ -329,7 +329,3 @@ export {
 export { VIDEO_ERROR_CODES } from "./videoErrors.js";
 
 // Re-export subscription types from canonical location for convenience
-export type {
-  ClaudeSubscriptionTier,
-  AnthropicAuthMethod,
-} from "../types/subscriptionTypes.js";

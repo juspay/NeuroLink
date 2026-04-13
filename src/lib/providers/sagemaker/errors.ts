@@ -8,8 +8,8 @@
 import type {
   SageMakerErrorCode,
   SageMakerErrorInfo,
-} from "../../types/providers.js";
-import type { UnknownRecord } from "../../types/common.js";
+  UnknownRecord,
+} from "../../types/index.js";
 import {
   ERROR_MESSAGE_TEMPLATES,
   ERROR_MESSAGE_PREFIXES,

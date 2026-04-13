@@ -35,56 +35,18 @@ import * as path from "path";
 
 import { logger } from "../../utils/logger.js";
 import type { BaseFileProcessor } from "../base/BaseFileProcessor.js";
-import type { FileInfo, ProcessedFileBase } from "../base/types.js";
+import type {
+  FileInfo,
+  ProcessedFileBase,
+  CliFileProcessingOptions,
+  CliProcessingResult,
+  SupportedFileTypeInfo,
+} from "../../types/index.js";
 import { getMimeTypeForExtension } from "../config/index.js";
 import { getProcessorRegistry } from "../registry/index.js";
-
 // =============================================================================
 // TYPES
 // =============================================================================
-
-/**
- * Options for CLI file processing
- */
-export type CliFileProcessingOptions = {
-  /** Verbose output - shows processing details */
-  verbose?: boolean;
-  /** Processor to use (bypasses auto-detection) */
-  processor?: string;
-  /** Output format: json, text, or raw */
-  outputFormat?: "json" | "text" | "raw";
-};
-
-/**
- * Result of CLI file processing
- */
-export type CliProcessingResult = {
-  /** Whether processing succeeded */
-  success: boolean;
-  /** Name of the processor that was used */
-  processorUsed: string | null;
-  /** Formatted output string */
-  output: string;
-  /** Error message if processing failed */
-  error?: string;
-};
-
-/**
- * Information about a supported file type
- */
-export type SupportedFileTypeInfo = {
-  /** Processor name */
-  name: string;
-  /** Priority (lower = processed first) */
-  priority: number;
-  /** Supported file extensions */
-  extensions: string[];
-  /** Supported MIME types */
-  mimeTypes: string[];
-  /** Optional description */
-  description?: string;
-};
-
 // =============================================================================
 // MIME TYPE MAPPING
 // =============================================================================

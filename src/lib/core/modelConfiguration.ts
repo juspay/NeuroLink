@@ -5,16 +5,15 @@
  * This addresses GitHub Copilot review comment about making model-specific logic configuration-based.
  */
 
-import type { JsonValue } from "../types/common.js";
-import { logger } from "../utils/logger.js";
-import fs from "fs";
-import path from "path";
 import type {
+  JsonValue,
   ModelTier,
   ProviderConfiguration,
   ConfigSource,
-} from "../types/modelTypes.js";
-
+} from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import fs from "fs";
+import path from "path";
 /**
  * Model name constants - extracted from hardcoded values for better maintainability
  * These constants can be overridden by environment variables

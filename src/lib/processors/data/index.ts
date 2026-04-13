@@ -57,7 +57,6 @@ export {
   // Singleton
   jsonProcessor,
   // Type
-  type ProcessedJson,
   processJson,
   validateJsonSize,
 } from "./JsonProcessor.js";
@@ -70,7 +69,6 @@ export {
   // Utility functions
   isYamlFile,
   // Type
-  type ProcessedYaml,
   processYaml,
   validateYamlSize,
   // Class
@@ -87,7 +85,6 @@ export {
   // Utility functions
   isXmlFile,
   // Type
-  type ProcessedXml,
   processXml,
   validateXmlSize,
   // Class

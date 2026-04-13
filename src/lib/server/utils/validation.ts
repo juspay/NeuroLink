@@ -4,6 +4,10 @@
  */
 
 import { z } from "zod";
+import type {
+  ErrorResponse,
+  ServerValidationResult,
+} from "../../types/index.js";
 
 // ============================================
 // Validation Schemas
@@ -143,24 +147,8 @@ export const EmbedManyRequestSchema = z.object({
 });
 
 // ============================================
-// Error Response Types
+// Error Response Type Guards / Helpers
 // ============================================
-
-/**
- * Standardized error response format
- */
-export type ErrorResponse = {
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
-  metadata?: {
-    timestamp: string;
-    requestId?: string;
-  };
-  httpStatus?: number;
-};
 
 /**
  * Type guard to check if a value is an ErrorResponse
@@ -229,20 +217,13 @@ export function createErrorResponse(
 }
 
 /**
- * Validation result type
- */
-export type ValidationResult<T> =
-  | { success: true; data: T; error?: undefined }
-  | { success: false; error: ErrorResponse; data?: undefined };
-
-/**
  * Validate request body against a Zod schema
  */
 export function validateRequest<T>(
   schema: z.ZodSchema<T>,
   data: unknown,
   requestId?: string,
-): ValidationResult<T> {
+): ServerValidationResult<T> {
   const result = schema.safeParse(data);
 
   if (!result.success) {
@@ -274,7 +255,7 @@ export function validateQuery<T>(
   schema: z.ZodSchema<T>,
   query: Record<string, string>,
   requestId?: string,
-): ValidationResult<T> {
+): ServerValidationResult<T> {
   const result = schema.safeParse(query);
 
   if (!result.success) {
@@ -306,7 +287,7 @@ export function validateParams<T>(
   schema: z.ZodSchema<T>,
   params: Record<string, string>,
   requestId?: string,
-): ValidationResult<T> {
+): ServerValidationResult<T> {
   const result = schema.safeParse(params);
 
   if (!result.success) {

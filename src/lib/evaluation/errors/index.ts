@@ -4,9 +4,7 @@
 
 export {
   EvaluationErrorCodes,
-  type EvaluationErrorCode,
   evaluationErrors,
-  type EvaluationErrorContext,
   isRetryableEvaluationError,
   isEvaluationError,
   createEvaluationFailedError,

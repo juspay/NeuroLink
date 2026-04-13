@@ -33,10 +33,6 @@ export {
   sanitizeDisplayName,
   sanitizeFileName,
 } from "./filename.js";
-export type {
-  SanitizeDisplayNameOptions,
-  SanitizeFileNameOptions,
-} from "../../types/index.js";
 
 // HTML escaping and sanitization
 export {
@@ -60,4 +56,3 @@ export {
   sanitizeSvgContent,
   sanitizeSvgContentDetailed,
 } from "./svg.js";
-export type { SvgSanitizationResult } from "../../types/index.js";

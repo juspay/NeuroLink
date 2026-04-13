@@ -10,16 +10,15 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { RedisConversationMemoryManager } from "../core/redisConversationMemoryManager.js";
-import type { ArtifactStore } from "../artifacts/artifactStore.js";
+import type { ArtifactStore } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { withTimeout } from "../utils/errorHandling.js";
 import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../observability/index.js";
-import { getMetricsAggregator } from "../observability/index.js";
-
 /** Maximum characters returned per retrieval request */
 const DEFAULT_RETRIEVAL_LIMIT = 50_000;
 

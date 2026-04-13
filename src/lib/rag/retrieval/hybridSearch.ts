@@ -18,10 +18,9 @@ import type {
   BM25Result,
   HybridSearchConfig,
   HybridSearchResult,
-} from "../types.js";
-import type { BM25Index, HybridSearchOptions } from "../../types/ragTypes.js";
-
-export type { BM25Index } from "../../types/ragTypes.js";
+  BM25Index,
+  HybridSearchOptions,
+} from "../../types/index.js";
 
 /**
  * In-memory BM25 implementation for testing and development
@@ -217,8 +216,6 @@ function normalizeScores(scores: Map<string, number>): Map<string, number> {
   return normalized;
 }
 
-export type { HybridSearchOptions } from "../../types/ragTypes.js";
-
 /**
  * Create a hybrid search function
  *
@@ -412,8 +409,12 @@ export function createHybridSearch(options: HybridSearchOptions) {
       // Apply reranking if configured
       if (enableReranking && rerankerConfig && fusedResults.length > 0) {
         const rerankerModel = await ProviderFactory.createProvider(
-          rerankerConfig.model.provider,
-          rerankerConfig.model.modelName,
+          typeof rerankerConfig.model === "object"
+            ? rerankerConfig.model.provider
+            : rerankerConfig.model,
+          typeof rerankerConfig.model === "object"
+            ? rerankerConfig.model.modelName
+            : rerankerConfig.model,
         );
 
         const rerankedResults = await rerank(

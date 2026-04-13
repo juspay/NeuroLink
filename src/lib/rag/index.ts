@@ -78,20 +78,15 @@ export {
 // Document Processing
 export {
   CSVLoader,
-  type CSVLoaderOptions,
-  type DocumentLoader,
   HTMLLoader,
   JSONLoader,
-  type LoaderOptions,
   loadDocument,
   loadDocuments,
   MarkdownLoader,
   MDocument,
   PDFLoader,
-  type PDFLoaderOptions,
   TextLoader,
   WebLoader,
-  type WebLoaderOptions,
 } from "./document/index.js";
 // Error handling
 export * from "./errors/index.js";
@@ -108,40 +103,26 @@ export {
   getExtractorMetadata,
   getRegisteredExtractorMetadata,
   LLMMetadataExtractor,
-  type MetadataExtractor,
-  type MetadataExtractorConfig,
   // Factory pattern
   MetadataExtractorFactory,
-  type MetadataExtractorMetadata,
   // Registry pattern
   MetadataExtractorRegistry,
-  type MetadataExtractorType,
   metadataExtractorFactory,
   metadataExtractorRegistry,
 } from "./metadata/index.js";
 // Pipeline
 export {
   assembleContext,
-  type CitationFormat,
-  type ContextAssemblyOptions,
-  type ContextWindow,
   createContextWindow,
   createRAGPipeline,
-  type EmbeddingModelConfig,
   extractKeySentences,
   formatContextWithCitations,
-  type GenerationModelConfig,
-  type IngestOptions,
   orderByDocumentStructure,
-  type PipelineStats,
-  type QueryOptions,
   RAGPipeline,
-  type RAGPipelineConfig,
-  type RAGResponse,
   summarizeContext,
 } from "./pipeline/index.js";
 // RAG Integration (for generate/stream)
-export { prepareRAGTool, type RAGPreparedTool } from "./ragIntegration.js";
+export { prepareRAGTool } from "./ragIntegration.js";
 // Reranker
 export {
   batchRerank,
@@ -154,14 +135,10 @@ export {
   getReranker,
   getRerankerDefaultConfig,
   getRerankerMetadata,
-  type Reranker,
-  type RerankerConfig,
   // Factory pattern
   RerankerFactory,
-  type RerankerMetadata,
   // Registry pattern
   RerankerRegistry,
-  type RerankerType,
   rerank,
   rerankerFactory,
   rerankerRegistry,
@@ -171,25 +148,22 @@ export {
 export * from "./resilience/index.js";
 // Retrieval
 export {
-  type BM25Index,
   createHybridSearch,
   createVectorQueryTool,
-  type HybridSearchOptions,
   InMemoryBM25Index,
   InMemoryVectorStore,
   linearCombination,
   reciprocalRankFusion,
-  type VectorStore,
 } from "./retrieval/index.js";
 
 // Types
-export * from "./types.js";
+export * from "../types/index.js";
 
 // Convenience functions
 
 import { ChunkerRegistry } from "./chunking/index.js";
 import { LLMMetadataExtractor } from "./metadata/index.js";
-import type { Chunk, ChunkingStrategy, ExtractParams } from "./types.js";
+import type { Chunk, ChunkingStrategy, ExtractParams } from "../types/index.js";
 
 /**
  * Process a document through the full RAG pipeline

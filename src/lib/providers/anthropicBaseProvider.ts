@@ -15,8 +15,8 @@ import {
   NetworkError,
   ProviderError,
   RateLimitError,
-} from "../types/errors.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+} from "../types/index.js";
+import type { StreamOptions, StreamResult } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { calculateCost } from "../utils/pricing.js";
 import {

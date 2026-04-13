@@ -4,7 +4,11 @@
  * Splits HTML content by semantic tags.
  */
 
-import type { Chunk, ChunkerConfig, ChunkingStrategy } from "../types.js";
+import type {
+  Chunk,
+  ChunkerConfig,
+  ChunkingStrategy,
+} from "../../types/index.js";
 import { BaseChunker, DEFAULT_CHUNKER_CONFIG } from "./BaseChunker.js";
 
 /**

@@ -47,19 +47,17 @@ import { createRequire } from "node:module";
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
-  OperationResult,
+  ProcessorFileProcessingResult,
+  ProcessorOperationResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedYaml,
+} from "../../types/index.js";
 import { SIZE_LIMITS_MB } from "../config/index.js";
 import { createFileError, FileErrorCode } from "../errors/index.js";
 
 // Re-export for consumers who import from this module
-export type { ProcessedYaml } from "../base/types.js";
 
 // Import for local use
-import type { ProcessedYaml } from "../base/types.js";
-
 const require = createRequire(import.meta.url);
 
 // =============================================================================
@@ -181,7 +179,7 @@ export class YamlProcessor extends BaseFileProcessor<ProcessedYaml> {
   protected override async validateDownloadedFileWithResult(
     buffer: Buffer,
     fileInfo: FileInfo,
-  ): Promise<OperationResult<void>> {
+  ): Promise<ProcessorOperationResult<void>> {
     try {
       const content = buffer.toString("utf-8");
 
@@ -335,6 +333,6 @@ export function validateYamlSize(sizeBytes: number): boolean {
 export function processYaml(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedYaml>> {
+): Promise<ProcessorFileProcessingResult<ProcessedYaml>> {
   return yamlProcessor.processFile(fileInfo, options);
 }

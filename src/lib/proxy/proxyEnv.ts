@@ -2,15 +2,15 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
-export type ProxyEnvSource = "cli" | "environment" | "default" | "none";
+type ProxyEnvSource = "cli" | "environment" | "default" | "none";
 
-export type ProxyEnvResolution = {
+type ProxyEnvResolution = {
   path?: string;
   source: ProxyEnvSource;
   required: boolean;
 };
 
-export type ProxyEnvLoadResult = {
+type ProxyEnvLoadResult = {
   loaded: boolean;
   path?: string;
   source: ProxyEnvSource;

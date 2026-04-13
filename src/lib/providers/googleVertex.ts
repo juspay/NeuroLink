@@ -36,31 +36,28 @@ import { ModelConfigurationManager } from "../core/modelConfiguration.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import { ATTR, tracers, withClientSpan } from "../telemetry/index.js";
-import type { AnalyticsData } from "../types/analytics.js";
-import type { UnknownRecord } from "../types/common.js";
+import type {
+  AnalyticsData,
+  UnknownRecord,
+  ZodUnknownSchema,
+  EnhancedGenerateResult,
+  TextGenerationOptions,
+  GenAIClient,
+  GoogleGenAIClass,
+  NeurolinkCredentials,
+  StreamOptions,
+  StreamResult,
+  StreamToolCall,
+  StreamToolResult,
+} from "../types/index.js";
+
 import {
   AuthenticationError,
   InvalidModelError,
   NetworkError,
   ProviderError,
   RateLimitError,
-} from "../types/errors.js";
-import type {
-  EnhancedGenerateResult,
-  TextGenerationOptions,
-} from "../types/generateTypes.js";
-import type {
-  GenAIClient,
-  GoogleGenAIClass,
-  NeurolinkCredentials,
-} from "../types/providers.js";
-import type {
-  StreamOptions,
-  StreamResult,
-  ToolCall,
-  ToolResult,
-} from "../types/streamTypes.js";
-import type { ZodUnknownSchema } from "../types/typeAliases.js";
+} from "../types/index.js";
 import { ERROR_CODES, NeuroLinkError } from "../utils/errorHandling.js";
 import { FileDetector } from "../utils/fileDetector.js";
 import { logger } from "../utils/logger.js";
@@ -1230,8 +1227,8 @@ export class GoogleVertexProvider extends BaseProvider {
     const functionTag = "GoogleVertexProvider.executeStream";
     const tracking = {
       chunkCount: 0,
-      collectedToolCalls: [] as ToolCall[],
-      collectedToolResults: [] as ToolResult[],
+      collectedToolCalls: [] as StreamToolCall[],
+      collectedToolResults: [] as StreamToolResult[],
     };
     const timeoutController = createTimeoutController(
       this.getTimeout(options),
@@ -1365,8 +1362,8 @@ export class GoogleVertexProvider extends BaseProvider {
     timeoutController: ReturnType<typeof createTimeoutController>;
     tracking: {
       chunkCount: number;
-      collectedToolCalls: ToolCall[];
-      collectedToolResults: ToolResult[];
+      collectedToolCalls: StreamToolCall[];
+      collectedToolResults: StreamToolResult[];
     };
   }): Parameters<typeof streamText>[0] {
     const {
@@ -1501,8 +1498,8 @@ export class GoogleVertexProvider extends BaseProvider {
       toolCallId?: string;
     }>,
     tracking: {
-      collectedToolCalls: ToolCall[];
-      collectedToolResults: ToolResult[];
+      collectedToolCalls: StreamToolCall[];
+      collectedToolResults: StreamToolResult[];
     },
   ): void {
     logger.info("Tool execution completed", { toolResults, toolCalls });
@@ -1520,8 +1517,8 @@ export class GoogleVertexProvider extends BaseProvider {
         toolName: toolResult.toolName,
         status: toolResult.error ? "failure" : "success",
         output:
-          ((toolResult.output ?? toolResult.result) as ToolResult["output"]) ??
-          undefined,
+          ((toolResult.output ??
+            toolResult.result) as StreamToolResult["output"]) ?? undefined,
         error: toolResult.error,
         id: toolResult.toolCallId ?? toolResult.toolName,
       });

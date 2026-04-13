@@ -15,13 +15,15 @@ import type {
   StandardRecord,
   StringArray,
   ZodUnknownSchema,
-} from "./typeAliases.js";
+} from "./aliases.js";
 import type { ValidationError } from "../utils/parameterValidation.js";
+import type { MCPToolAnnotations } from "./mcp.js";
+import type { Logger } from "./utilities.js";
 
 /**
  * Commonly used Zod schema type aliases for cleaner type declarations
  */
-export type { ZodUnknownSchema, ZodToJsonSchemaInput } from "./typeAliases.js";
+export type { ZodUnknownSchema, ZodToJsonSchemaInput } from "./aliases.js";
 export type ZodAnySchema = z.ZodSchema<unknown>;
 export type ZodObjectSchema = z.ZodObject<z.ZodRawShape>;
 export type ZodStringSchema = z.ZodString;
@@ -102,7 +104,7 @@ export type ToolInfo = {
   inputSchema?: StandardRecord;
   outputSchema?: StandardRecord;
   /** MCP tool annotations (safety hints, metadata). Auto-inferred when mcp.annotations.autoInfer is enabled. */
-  annotations?: import("../mcp/toolAnnotations.js").MCPToolAnnotations;
+  annotations?: MCPToolAnnotations;
   /** Per-tool timeout in milliseconds, set at registration time */
   timeoutMs?: number;
   maxRetries?: number;
@@ -256,7 +258,7 @@ export type SDKToolContext = ToolContext & {
   /**
    * Logger instance
    */
-  logger: import("./utilities.js").Logger;
+  logger: Logger;
 };
 
 /**

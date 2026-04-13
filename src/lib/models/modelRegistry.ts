@@ -4,7 +4,7 @@
  * Part of Phase 4.1 - Models Command System
  */
 
-import { DEFAULT_MODEL_ALIASES } from "../types/providers.js";
+import { DEFAULT_MODEL_ALIASES } from "../types/index.js";
 import {
   AIProviderName,
   OpenAIModels,
@@ -15,8 +15,7 @@ import {
   MistralModels,
   OllamaModels,
 } from "../constants/enums.js";
-import type { JsonValue } from "../types/common.js";
-import type { ModelInfo } from "../types/modelTypes.js";
+import type { JsonValue, ModelInfo } from "../types/index.js";
 
 /**
  * Comprehensive model registry

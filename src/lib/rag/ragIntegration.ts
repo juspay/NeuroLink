@@ -27,9 +27,8 @@ import type {
   ChunkingStrategy,
   RAGConfig,
   VectorQueryResult,
-} from "./types.js";
-import type { RAGPreparedTool } from "../types/index.js";
-
+  RAGPreparedTool,
+} from "../types/index.js";
 /**
  * Maps file extensions to recommended chunking strategies
  */
@@ -170,8 +169,6 @@ function diversifyResults(
   }
   return diversified;
 }
-
-export type { RAGPreparedTool } from "../types/index.js";
 
 /**
  * Prepare RAG tools from the provided configuration.

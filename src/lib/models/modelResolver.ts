@@ -4,7 +4,16 @@
  * Part of Phase 4.1 - Models Command System
  */
 
-import type { JsonValue } from "../types/common.js";
+import type {
+  JsonValue,
+  ModelCapabilities,
+  ModelComparison,
+  ModelInfo,
+  ModelRecommendation,
+  ModelSearchFilters,
+  ModelSearchResult,
+  RecommendationContext,
+} from "../types/index.js";
 import {
   MODEL_REGISTRY,
   MODEL_ALIASES,
@@ -17,15 +26,6 @@ import {
   formatModelForDisplay,
 } from "./modelRegistry.js";
 import { isNonNullObject } from "../utils/typeUtils.js";
-import type {
-  ModelCapabilities,
-  ModelComparison,
-  ModelInfo,
-  ModelRecommendation,
-  ModelSearchFilters,
-  ModelSearchResult,
-  RecommendationContext,
-} from "../types/modelTypes.js";
 
 /**
  * Model resolver class with advanced search and recommendation functionality

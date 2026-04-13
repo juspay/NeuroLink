@@ -7,7 +7,7 @@ import type {
   SamplingConfig,
   SamplingContext,
   SamplingDecision,
-} from "../../../types/scorerTypes.js";
+} from "../../../types/index.js";
 
 /**
  * Default sampling configuration

@@ -39,17 +39,15 @@
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessOptions,
-} from "../base/types.js";
+  ProcessedRtf,
+} from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 
 // Re-export for consumers who import from this module
-export type { ProcessedRtf } from "../base/types.js";
 
 // Import for local use
-import type { ProcessedRtf } from "../base/types.js";
-
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -405,6 +403,6 @@ export function validateRtfSize(sizeBytes: number): boolean {
 export async function processRtf(
   fileInfo: FileInfo,
   options?: ProcessOptions,
-): Promise<FileProcessingResult<ProcessedRtf>> {
+): Promise<ProcessorFileProcessingResult<ProcessedRtf>> {
   return rtfProcessor.processFile(fileInfo, options);
 }

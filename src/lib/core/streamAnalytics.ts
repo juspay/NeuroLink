@@ -1,11 +1,12 @@
-import type { AnalyticsData, TokenUsage } from "../types/analytics.js";
-import { createAnalytics } from "./analytics.js";
-import { logger } from "../utils/logger.js";
 import type {
+  AnalyticsData,
+  TokenUsage,
   StreamTextResult,
   StreamAnalyticsCollector,
   ResponseMetadata,
-} from "../types/streamTypes.js";
+} from "../types/index.js";
+import { createAnalytics } from "./analytics.js";
+import { logger } from "../utils/logger.js";
 import {
   extractTokenUsage,
   createEmptyTokenUsage,

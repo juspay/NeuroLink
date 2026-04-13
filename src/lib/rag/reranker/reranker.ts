@@ -9,8 +9,8 @@ import type {
   VectorQueryResult,
   RerankerOptions,
   RerankResult,
-} from "../types.js";
-import type { AIProvider } from "../../types/providers.js";
+  AIProvider,
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**

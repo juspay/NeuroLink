@@ -19,5 +19,4 @@ export {
   isRAGError,
   isRetryableRAGError,
   isPartialFailure,
-  type RAGErrorCode,
 } from "./RAGError.js";

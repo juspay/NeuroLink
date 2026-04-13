@@ -10,7 +10,9 @@ import type {
   SageMakerUsage,
   SageMakerStreamingToolCall,
   SageMakerStructuredOutput,
-} from "../../types/providers.js";
+  BracketCountingState,
+  StreamingParser,
+} from "../../types/index.js";
 import { isNonNullObject } from "../../utils/typeUtils.js";
 import {
   createStructuredOutputParser,
@@ -21,22 +23,10 @@ import { SageMakerError } from "./errors.js";
 import { logger } from "../../utils/logger.js";
 import { randomUUID } from "crypto";
 import { estimateTokens } from "../../utils/tokenEstimation.js";
-
 /**
  * Constants for JSON parsing and validation
  */
 const MIN_JSON_OBJECT_LENGTH = 2; // Minimum length for JSON object "{}"
-
-/**
- * Shared bracket counting state and utilities
- * Used by both validateJSONCompleteness and StructuredOutputParser
- */
-export type BracketCountingState = {
-  braceCount: number;
-  bracketCount: number;
-  inString: boolean;
-  escapeNext: boolean;
-};
 
 /**
  * Process a single character for bracket counting logic
@@ -193,26 +183,6 @@ export function parseToolCallArguments(args: string): {
     return { argumentsDelta: trimmedArgs };
   }
 }
-
-/**
- * Base interface for streaming response parsers
- */
-export type StreamingParser = {
-  /** Parse a chunk of streaming data */
-  parse(chunk: Uint8Array): SageMakerStreamChunk[];
-
-  /** Check if a chunk indicates completion */
-  isComplete(chunk: SageMakerStreamChunk): boolean;
-
-  /** Extract final usage information */
-  extractUsage(finalChunk: SageMakerStreamChunk): SageMakerUsage | undefined;
-
-  /** Get parser name for debugging */
-  getName(): string;
-
-  /** Reset parser state for new stream */
-  reset(): void;
-};
 
 /**
  * Abstract base parser with common functionality

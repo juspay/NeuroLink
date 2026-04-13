@@ -20,7 +20,7 @@ const PptxGenJSResolved =
     : (PptxGenJSImport as unknown as { default: typeof PptxGenJSImport })
         .default;
 const PptxGenJS = PptxGenJSResolved as unknown as {
-  new (): import("./types.js").PptxPresentation;
+  new (): import("../../types/index.js").PptxPresentation;
 };
 import * as fs from "fs/promises";
 import type {
@@ -28,8 +28,8 @@ import type {
   PresentationGenerationOptions,
   OrchestrationState,
   SlideGeneratorConfig,
-} from "./types.js";
-import { PPTError, PPT_ERROR_CODES } from "./types.js";
+} from "../../types/index.js";
+import { PPTError, PPT_ERROR_CODES } from "./pptError.js";
 import { generateContentPlan, postProcessPlan } from "./contentPlanner.js";
 import { SlideGenerator } from "./slideGenerator.js";
 import { PPT_GENERATION_TIMEOUT_MS } from "./constants.js";
@@ -39,8 +39,8 @@ import {
   SpanSerializer,
   SpanType,
   SpanStatus,
+  getMetricsAggregator,
 } from "../../observability/index.js";
-import { getMetricsAggregator } from "../../observability/index.js";
 import {
   generateOutputPath,
   ensureOutputDirectory,

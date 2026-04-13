@@ -2,6 +2,10 @@
 import js from "@eslint/js";
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const neurolink = require("./eslint-rules/index.cjs");
 
 export default [
   js.configs.recommended,
@@ -80,8 +84,21 @@ export default [
     },
     plugins: {
       "@typescript-eslint": tseslint,
+      neurolink,
     },
     rules: {
+      // ======================================================================
+      // NeuroLink custom type-engineering rules (CLAUDE.md Critical Rules)
+      // All rules (7-13) enforced via ESLint — zero shell scripts.
+      // ======================================================================
+      "neurolink/no-interface": "error", // Rule 7
+      "neurolink/no-types-suffix-filename": "error", // Rule 8
+      "neurolink/unique-type-names": "error", // Rule 9
+      "neurolink/types-barrel-exports-only": "error", // Rule 10
+      "neurolink/no-local-types-folder": "error", // Rules 11 & 11b
+      "neurolink/no-type-export-outside-types": "error", // Rule 12
+      "neurolink/barrel-type-imports": "error", // Rule 13
+
       // Disable base rules that are covered by TypeScript
       "no-unused-vars": "off",
       "no-undef": "off",

@@ -4,114 +4,19 @@
  * Compatible with AI SDK's data stream format
  */
 
-import type { DataStreamWriter } from "../types.js";
-import type { CloseHandler } from "../../types/index.js";
-
+import type {
+  DataStreamWriter,
+  CloseHandler,
+  DataStreamEvent,
+} from "../../types/index.js";
+import type { DataStreamEventType } from "../../types/index.js";
 // ============================================
 // Event Types
 // ============================================
-
-/**
- * Data stream event types
- */
-export type DataStreamEventType =
-  | "text-start"
-  | "text-delta"
-  | "text-end"
-  | "tool-call"
-  | "tool-result"
-  | "data"
-  | "error"
-  | "finish";
-
-/**
- * Base data stream event
- */
-export type DataStreamEvent = {
-  type: DataStreamEventType;
-  id?: string;
-  timestamp: number;
-  data: unknown;
-};
-
-/**
- * Text start event
- */
-export type TextStartEvent = DataStreamEvent & {
-  type: "text-start";
-  data: {
-    id: string;
-  };
-};
-
-/**
- * Text delta event
- */
-export type TextDeltaEvent = DataStreamEvent & {
-  type: "text-delta";
-  data: {
-    id: string;
-    delta: string;
-  };
-};
-
-/**
- * Text end event
- */
-export type TextEndEvent = DataStreamEvent & {
-  type: "text-end";
-  data: {
-    id: string;
-  };
-};
-
-/**
- * Tool call event
- */
-export type ToolCallEvent = DataStreamEvent & {
-  type: "tool-call";
-  data: {
-    id: string;
-    name: string;
-    arguments: Record<string, unknown>;
-  };
-};
-
-/**
- * Tool result event
- */
-export type ToolResultEvent = DataStreamEvent & {
-  type: "tool-result";
-  data: {
-    id: string;
-    name: string;
-    result: unknown;
-  };
-};
-
-/**
- * Data event (arbitrary data)
- */
-export type DataEvent = DataStreamEvent & {
-  type: "data";
-  data: unknown;
-};
-
-/**
- * Error event
- */
-export type ErrorEvent = DataStreamEvent & {
-  type: "error";
-  data: {
-    message: string;
-    code?: string;
-  };
-};
-
 /**
  * Finish event
  */
-export type FinishEvent = DataStreamEvent & {
+type FinishEvent = DataStreamEvent & {
   type: "finish";
   data: {
     reason?: string;
@@ -130,7 +35,7 @@ export type FinishEvent = DataStreamEvent & {
 /**
  * Configuration for DataStreamWriter
  */
-export type DataStreamWriterConfig = {
+type DataStreamWriterConfig = {
   /** Writer function to send data */
   write: (chunk: string) => void | Promise<void>;
   /** Function to close the stream */
@@ -236,7 +141,7 @@ export function createDataStreamWriter(
 /**
  * Configuration for DataStreamResponse
  */
-export type DataStreamResponseConfig = {
+type DataStreamResponseConfig = {
   /** Content type header */
   contentType?: "text/event-stream" | "application/x-ndjson";
   /** Initial headers */
@@ -569,7 +474,7 @@ export function createNDJSONHeaders(
 /**
  * SSE Event options for formatSSEEvent
  */
-export type SSEEventOptions = {
+type SSEEventOptions = {
   /** Event type (optional) */
   event?: string;
   /** Event data (required) */

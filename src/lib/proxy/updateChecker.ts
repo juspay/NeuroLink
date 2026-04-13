@@ -20,21 +20,21 @@ const NPM_VIEW_TIMEOUT_MS = 10_000;
 // Public types
 // ---------------------------------------------------------------------------
 
-export interface UpdateCheckResult {
+type UpdateCheckResult = {
   currentVersion: string;
   latestVersion: string;
   updateAvailable: boolean;
-}
+};
 
 // ---------------------------------------------------------------------------
 // Semver helpers (no external dependency)
 // ---------------------------------------------------------------------------
 
-interface SemVer {
+type SemVer = {
   major: number;
   minor: number;
   patch: number;
-}
+};
 
 /**
  * Parse a version string of the form `major.minor.patch` into numeric

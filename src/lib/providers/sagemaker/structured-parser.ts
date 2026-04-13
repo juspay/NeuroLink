@@ -5,12 +5,12 @@
  * responses from SageMaker endpoints with real-time validation.
  */
 
-import type { SageMakerStructuredOutput } from "../../types/providers.js";
+import type {
+  SageMakerStructuredOutput,
+  BracketCountingState,
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
-import {
-  type BracketCountingState,
-  processBracketCharacter,
-} from "./parsers.js";
+import { processBracketCharacter } from "./parsers.js";
 
 /**
  * Partial JSON parser for streaming structured output

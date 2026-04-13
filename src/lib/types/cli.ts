@@ -6,6 +6,14 @@ import type { UnknownRecord, JsonValue } from "./common.js";
 import type { AnalyticsData, TokenUsage } from "./analytics.js";
 import type { EvaluationData } from "./evaluation.js";
 import type { ToolCall, ToolResult } from "./tools.js";
+import type { TTSResult } from "./tts.js";
+import type { VideoGenerationResult } from "./multimodal.js";
+import type { PPTGenerationResult } from "./ppt.js";
+import type { OAuthTokens } from "./auth.js";
+import type { ClaudeSubscriptionTier } from "./subscription.js";
+import type { ServerFramework } from "./server.js";
+import type { AuthProviderType } from "./auth.js";
+import type { AIProviderName } from "./enums.js";
 
 /**
  * Ollama command utilities type
@@ -399,7 +407,7 @@ export type CommandResult = {
 /**
  * Generate command result
  */
-export type GenerateResult = CommandResult & {
+export type CliGenerateResult = CommandResult & {
   content: string;
   provider?: string;
   model?: string;
@@ -422,11 +430,11 @@ export type GenerateResult = CommandResult & {
     description: string;
   }>;
   /** TTS audio result when TTS is enabled */
-  audio?: import("./index.js").TTSResult;
+  audio?: TTSResult;
   /** Video generation result when video mode is enabled */
-  video?: import("./multimodal.js").VideoGenerationResult;
+  video?: VideoGenerationResult;
   /** PPT generation result when ppt mode is enabled */
-  ppt?: import("./pptTypes.js").PPTGenerationResult;
+  ppt?: PPTGenerationResult;
   imageOutput?: {
     base64: string;
     savedPath?: string; // Local file path where image was saved
@@ -436,7 +444,7 @@ export type GenerateResult = CommandResult & {
 /**
  * Stream result chunk
  */
-export type StreamChunk = {
+export type CliStreamChunk = {
   content?: string;
   delta?: string;
   done?: boolean;
@@ -563,12 +571,14 @@ export type RestorationToolContext = Record<string, unknown> & {
 /**
  * Type guard for generate result
  */
-export function isGenerateResult(value: unknown): value is GenerateResult {
+export function isCliGenerateResult(
+  value: unknown,
+): value is CliGenerateResult {
   return (
     typeof value === "object" &&
     value !== null &&
     "content" in value &&
-    typeof (value as GenerateResult).content === "string"
+    typeof (value as CliGenerateResult).content === "string"
   );
 }
 
@@ -936,9 +946,9 @@ export type ProxyState = {
 export type StoredCredentials = {
   type: "api-key" | "oauth";
   apiKey?: string;
-  oauth?: import("./subscriptionTypes.js").OAuthTokens;
+  oauth?: OAuthTokens;
   provider: string;
-  subscriptionTier?: import("./subscriptionTypes.js").ClaudeSubscriptionTier;
+  subscriptionTier?: ClaudeSubscriptionTier;
   email?: string;
   createdAt: number;
   updatedAt: number;
@@ -1089,7 +1099,7 @@ export type ServerState = {
   pid: number;
   port: number;
   host: string;
-  framework: import("../server/types.js").ServerFramework;
+  framework: ServerFramework;
   startTime: string;
   basePath: string;
 };
@@ -1123,7 +1133,7 @@ export type ServerConfig = {
 export type ServeCommandArgs = {
   port?: number;
   host?: string;
-  framework?: import("../server/types.js").ServerFramework;
+  framework?: ServerFramework;
   basePath?: string;
   cors?: boolean;
   rateLimit?: number;
@@ -1139,7 +1149,7 @@ export type ServeCommandArgs = {
 export type ServerConfigFile = {
   port?: number;
   host?: string;
-  framework?: import("../server/types.js").ServerFramework;
+  framework?: ServerFramework;
   basePath?: string;
   cors?: {
     enabled?: boolean;
@@ -1209,11 +1219,56 @@ export type DoGenerateModel = {
 };
 
 /** Redis client type (awaited return of createRedisClient). */
-export type RedisClient = {
+export type CliRedisClient = {
   get: (key: string) => Promise<string | null>;
   set: (key: string, value: string, options?: unknown) => Promise<unknown>;
   del: (key: string) => Promise<number>;
   keys: (pattern: string) => Promise<string[]>;
   quit: () => Promise<void>;
   [key: string]: unknown;
+};
+
+/**
+ * Auth command argument types
+ */
+
+export type AuthProvidersArgs = {
+  format?: "text" | "json" | "table";
+};
+
+export type AuthValidateArgs = {
+  token: string;
+  provider: AuthProviderType;
+  domain?: string;
+  clientId?: string;
+  secretKey?: string;
+  secret?: string;
+  url?: string;
+  anonKey?: string;
+  apiKey?: string;
+  format?: "text" | "json";
+};
+
+export type AuthHealthArgs = {
+  provider: AuthProviderType;
+  domain?: string;
+  clientId?: string;
+  secretKey?: string;
+  secret?: string;
+  url?: string;
+  anonKey?: string;
+  apiKey?: string;
+  format?: "text" | "json";
+};
+
+export type SetupResult = {
+  selectedProviders: AIProviderName[];
+  credentials: Record<string, string>;
+  envFileBackup?: string;
+  testResults: Array<{
+    provider: AIProviderName;
+    status: "working" | "failed";
+    error?: string;
+    responseTime?: number;
+  }>;
 };

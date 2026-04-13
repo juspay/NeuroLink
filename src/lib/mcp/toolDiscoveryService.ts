@@ -15,15 +15,14 @@ import {
 import type {
   ExternalMCPToolInfo,
   ExternalMCPToolResult,
-} from "../types/externalMcp.js";
-import type {
   MCPServerInfo,
   ToolDiscoveryResult,
   ExternalToolExecutionOptions,
   ToolValidationResult,
   ToolRegistryEvents,
-} from "../types/mcpTypes.js";
-import type { JsonObject, JsonValue } from "../types/common.js";
+  JsonObject,
+  JsonValue,
+} from "../types/index.js";
 import { isObject, isNullish } from "../utils/typeUtils.js";
 import {
   validateToolName,

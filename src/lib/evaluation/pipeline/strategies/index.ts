@@ -4,10 +4,6 @@
  */
 
 export {
-  type BatchConfig,
-  type BatchItemResult,
-  type BatchProgress,
-  type BatchResult,
   BatchStrategy,
   createBatchStrategy,
   evaluateBatch,

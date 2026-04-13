@@ -9,63 +9,19 @@
  */
 
 import type {
-  ClientConfig,
-  StreamCallbacks,
+  ClientStreamCallbacks,
   ClientStreamEvent as StreamEvent,
   ClientStreamResult as StreamResult,
-  ApiError,
-} from "../types/clientTypes.js";
+  ClientApiError,
+  SSEConfig,
+  SSEEventHandlers,
+  SSERequestOptions,
+  SSEState,
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
-
 // =============================================================================
 // Types
 // =============================================================================
-
-/**
- * SSE connection state
- */
-export type SSEState = "connecting" | "connected" | "disconnected" | "error";
-
-/**
- * SSE client configuration
- */
-export type SSEConfig = ClientConfig & {
-  /** Auto-reconnect on disconnect (default: true) */
-  autoReconnect?: boolean;
-  /** Maximum reconnection attempts (default: 5) */
-  maxReconnectAttempts?: number;
-  /** Initial reconnection delay in ms (default: 1000) */
-  reconnectDelay?: number;
-  /** Maximum reconnection delay in ms (default: 30000) */
-  maxReconnectDelay?: number;
-  /** Use native EventSource when available (default: false for more control) */
-  useNativeEventSource?: boolean;
-};
-
-/**
- * SSE request options
- */
-export type SSERequestOptions = {
-  /** Request body */
-  body?: unknown;
-  /** Additional headers */
-  headers?: Record<string, string>;
-  /** Abort signal */
-  signal?: AbortSignal;
-};
-
-/**
- * SSE event handlers
- */
-export type SSEEventHandlers = {
-  onOpen?: () => void;
-  onClose?: () => void;
-  onError?: (error: Error) => void;
-  onEvent?: (event: StreamEvent) => void;
-  onReconnect?: (attempt: number) => void;
-  onStateChange?: (state: SSEState) => void;
-};
-
 // =============================================================================
 // Internal Types
 // =============================================================================
@@ -151,7 +107,7 @@ export class NeuroLinkSSE {
   async stream(
     path: string,
     options: SSERequestOptions = {},
-    callbacks: StreamCallbacks = {},
+    callbacks: ClientStreamCallbacks = {},
   ): Promise<void> {
     const url = this.buildUrl(path);
     const isGetRequest = !options.body;
@@ -208,7 +164,7 @@ export class NeuroLinkSSE {
             // JSON parsing failed, return empty object as fallback
             return {};
           });
-        const apiError: ApiError = {
+        const apiError: ClientApiError = {
           code: "HTTP_ERROR",
           message: `HTTP ${response.status}: ${response.statusText}`,
           status: response.status,
@@ -254,7 +210,7 @@ export class NeuroLinkSSE {
       }
 
       this.setState("error");
-      const apiError: ApiError = {
+      const apiError: ClientApiError = {
         code: "STREAM_ERROR",
         message: (error as Error).message,
         status: 500,
@@ -306,7 +262,7 @@ export class NeuroLinkSSE {
       temperature?: number;
       maxTokens?: number;
       systemPrompt?: string;
-    } & StreamCallbacks = {},
+    } & ClientStreamCallbacks = {},
   ): Promise<string> {
     let fullContent = "";
 
@@ -346,7 +302,7 @@ export class NeuroLinkSSE {
     options: {
       agentId?: string;
       sessionId?: string;
-    } & StreamCallbacks = {},
+    } & ClientStreamCallbacks = {},
   ): Promise<string> {
     let fullContent = "";
 
@@ -381,7 +337,7 @@ export class NeuroLinkSSE {
   async executeAgent(
     agentId: string,
     input: string,
-    options: StreamCallbacks = {},
+    options: ClientStreamCallbacks = {},
   ): Promise<string> {
     let fullContent = "";
 
@@ -420,7 +376,7 @@ export class NeuroLinkSSE {
   private streamWithNativeEventSource(
     url: string,
     options: SSERequestOptions,
-    callbacks: StreamCallbacks,
+    callbacks: ClientStreamCallbacks,
   ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.setState("connecting");
@@ -439,7 +395,7 @@ export class NeuroLinkSSE {
         timeoutId = setTimeout(() => {
           es.close();
           this.setState("error");
-          const apiError: ApiError = {
+          const apiError: ClientApiError = {
             code: "TIMEOUT",
             message: `Connection timed out after ${this.config.timeout}ms`,
             status: 408,
@@ -519,7 +475,7 @@ export class NeuroLinkSSE {
         if (es.readyState === EventSource.CLOSED) {
           es.close();
           this.setState("error");
-          const apiError: ApiError = {
+          const apiError: ClientApiError = {
             code: "STREAM_ERROR",
             message: "EventSource connection closed",
             status: 500,
@@ -565,7 +521,7 @@ export class NeuroLinkSSE {
 
   private async processStream(
     response: Response,
-    callbacks: StreamCallbacks,
+    callbacks: ClientStreamCallbacks,
   ): Promise<void> {
     const reader = response.body?.getReader();
     if (!reader) {
@@ -638,7 +594,10 @@ export class NeuroLinkSSE {
     }
   }
 
-  private handleEvent(event: StreamEvent, callbacks: StreamCallbacks): void {
+  private handleEvent(
+    event: StreamEvent,
+    callbacks: ClientStreamCallbacks,
+  ): void {
     this.eventHandlers.onEvent?.(event);
 
     switch (event.type) {
@@ -683,7 +642,7 @@ export class NeuroLinkSSE {
   private async attemptReconnect(
     path: string,
     options: SSERequestOptions,
-    callbacks: StreamCallbacks,
+    callbacks: ClientStreamCallbacks,
   ): Promise<void> {
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
       const error = new Error(
@@ -746,4 +705,9 @@ export function createSSEClient(config: SSEConfig): NeuroLinkSSE {
 // Type Exports
 // =============================================================================
 
-export type { StreamCallbacks, StreamEvent, StreamResult, ApiError };
+export type {
+  ClientStreamCallbacks,
+  StreamEvent,
+  StreamResult,
+  ClientApiError,
+};

@@ -20,7 +20,7 @@ import {
   type TaskManagerConfig,
   type ConversationEntry,
   TASK_DEFAULTS,
-} from "../../types/taskTypes.js";
+} from "../../types/index.js";
 
 const KEY_PREFIX = "neurolink:";
 const TASKS_HASH = `${KEY_PREFIX}tasks`;

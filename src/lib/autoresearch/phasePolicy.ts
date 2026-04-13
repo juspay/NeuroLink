@@ -2,10 +2,7 @@
  * Phase-based tool access policy for the autoresearch experiment loop.
  */
 
-import type {
-  ExperimentPhase,
-  PhaseToolPolicy,
-} from "../types/autoresearchTypes.js";
+import type { ExperimentPhase, PhaseToolPolicy } from "../types/index.js";
 
 const PHASE_POLICIES: Record<ExperimentPhase, PhaseToolPolicy> = {
   bootstrap: {

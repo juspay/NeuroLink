@@ -8,8 +8,7 @@ import { urlDownloadRateLimiter } from "./rateLimiter.js";
 import { withRetry } from "./retryHandler.js";
 import { SYSTEM_LIMITS } from "../core/constants.js";
 import { getImageCache } from "./imageCache.js";
-import type { ProcessedImage } from "../types/multimodal.js";
-import type { FileProcessingResult } from "../types/fileTypes.js";
+import type { ProcessedImage, FileProcessingResult } from "../types/index.js";
 
 /**
  * Network error codes that should trigger a retry

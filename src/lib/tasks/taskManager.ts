@@ -20,7 +20,7 @@ import {
   type TaskRunResult,
   type TaskStatus,
   type TaskStore,
-} from "../types/taskTypes.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { clearWorkerCache } from "./autoresearchTaskExecutor.js";
 import { TaskBackendRegistry } from "./backends/taskBackendRegistry.js";

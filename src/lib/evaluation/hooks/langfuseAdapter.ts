@@ -3,15 +3,14 @@
  * Integration with Langfuse for LLM observability
  */
 
-import type { ScoreResult } from "../../types/scorerTypes.js";
+import type { ScoreResult, PipelineResult } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
-import type { PipelineResult } from "../pipeline/evaluationPipeline.js";
 import { observabilityHooks } from "./observabilityHooks.js";
 
 /**
  * Langfuse client interface (minimal for type safety)
  */
-export type LangfuseClient = {
+type LangfuseClient = {
   score: (params: {
     name: string;
     value: number;
@@ -31,7 +30,7 @@ export type LangfuseClient = {
 /**
  * Langfuse adapter configuration
  */
-export type LangfuseAdapterConfig = {
+type LangfuseAdapterConfig = {
   /** Langfuse client instance */
   client: LangfuseClient;
   /** Prefix for score names */

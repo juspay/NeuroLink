@@ -3,11 +3,11 @@
  * Creates appropriate conversation memory manager based on configuration
  */
 
-import type { StorageType } from "../types/common.js";
 import type {
+  StorageType,
   ConversationMemoryConfig,
   RedisStorageConfig,
-} from "../types/conversation.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { ConversationMemoryManager } from "./conversationMemoryManager.js";
 import { RedisConversationMemoryManager } from "./redisConversationMemoryManager.js";

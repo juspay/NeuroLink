@@ -13,7 +13,7 @@ import type {
   KeycloakConfig,
   TokenClaims,
   TokenValidationResult,
-} from "../../types/authTypes.js";
+} from "../../types/index.js";
 import { AuthError } from "../errors.js";
 import { BaseAuthProvider } from "./BaseAuthProvider.js";
 
@@ -197,7 +197,7 @@ export class KeycloakProvider extends BaseAuthProvider {
       // Convert claims to Record<string, JsonValue> by filtering out undefined
       const validClaims: Record<
         string,
-        import("../../types/common.js").JsonValue
+        import("../../types/index.js").JsonValue
       > = {};
       for (const [key, value] of Object.entries(claims)) {
         if (value !== undefined) {
@@ -356,7 +356,7 @@ export class KeycloakProvider extends BaseAuthProvider {
     // Build provider data, filtering out undefined values
     const providerData: Record<
       string,
-      import("../../types/common.js").JsonValue
+      import("../../types/index.js").JsonValue
     > = {
       provider: "keycloak",
     };
@@ -371,11 +371,11 @@ export class KeycloakProvider extends BaseAuthProvider {
     }
     if (realmAccess !== undefined) {
       providerData.realm_access =
-        realmAccess as import("../../types/common.js").JsonValue;
+        realmAccess as import("../../types/index.js").JsonValue;
     }
     if (resourceAccess !== undefined) {
       providerData.resource_access =
-        resourceAccess as import("../../types/common.js").JsonValue;
+        resourceAccess as import("../../types/index.js").JsonValue;
     }
     if (claims.azp !== undefined) {
       providerData.azp = claims.azp;
@@ -479,12 +479,11 @@ export class KeycloakProvider extends BaseAuthProvider {
       // Convert userData to Record<string, JsonValue> by filtering out undefined
       const providerData: Record<
         string,
-        import("../../types/common.js").JsonValue
+        import("../../types/index.js").JsonValue
       > = {};
       for (const [key, value] of Object.entries(userData)) {
         if (value !== undefined) {
-          providerData[key] =
-            value as import("../../types/common.js").JsonValue;
+          providerData[key] = value as import("../../types/index.js").JsonValue;
         }
       }
 

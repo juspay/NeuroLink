@@ -22,8 +22,8 @@ import type {
   ServerAdapterConfig,
   ServerAdapterEvents,
   ServerContext,
-} from "../types.js";
-import type { HonoRateLimitEntry } from "../../types/index.js";
+  HonoRateLimitEntry,
+} from "../../types/index.js";
 import { isErrorResponse } from "../utils/validation.js";
 
 // Declare global for runtime detection

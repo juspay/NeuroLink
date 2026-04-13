@@ -5,13 +5,15 @@
  * @see https://datatracker.ietf.org/doc/html/rfc8594 - The 'Deprecation' HTTP Header Field
  */
 
-import type { MiddlewareDefinition, RouteDefinition } from "../types.js";
-import type { DeprecatedRouteInfo } from "../../types/index.js";
-
+import type {
+  MiddlewareDefinition,
+  RouteDefinition,
+  DeprecatedRouteInfo,
+} from "../../types/index.js";
 /**
  * Deprecation middleware configuration
  */
-export type DeprecationConfig = {
+type DeprecationConfig = {
   /**
    * Array of route definitions to check for deprecation
    * Routes with `deprecated.enabled: true` will have deprecation headers added

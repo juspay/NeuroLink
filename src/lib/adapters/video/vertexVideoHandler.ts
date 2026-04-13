@@ -17,7 +17,7 @@ import { VIDEO_ERROR_CODES } from "../../constants/videoErrors.js";
 import type {
   VideoGenerationResult,
   VideoOutputOptions,
-} from "../../types/multimodal.js";
+} from "../../types/index.js";
 import {
   isAbortError,
   NeuroLinkError,

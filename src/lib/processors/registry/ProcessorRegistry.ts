@@ -47,16 +47,14 @@
 import type { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
-  FileProcessingResult,
+  ProcessorFileProcessingResult,
   ProcessedFileBase,
   ProcessOptions,
   ProcessorMatch,
   RegistryOptions,
   RegistryProcessResult,
-} from "../base/types.js";
-
-import type { ProcessorRegistration } from "./types.js";
-
+  ProcessorRegistration,
+} from "../../types/index.js";
 // =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
@@ -453,7 +451,7 @@ export class ProcessorRegistry {
   async processFile(
     fileInfo: FileInfo,
     options?: ProcessOptions,
-  ): Promise<FileProcessingResult<ProcessedFileBase> | null> {
+  ): Promise<ProcessorFileProcessingResult<ProcessedFileBase> | null> {
     const match = this.findProcessor(fileInfo.mimetype, fileInfo.name);
     if (!match) {
       return null;
@@ -704,7 +702,7 @@ async function initializeDefaultProcessors(
       import("../document/index.js"),
       import("../media/AudioProcessor.js"),
       import("../archive/ArchiveProcessor.js"),
-      import("../base/types.js"),
+      import("../../types/processor.js"),
     ]);
 
   // Also import video separately (same pattern as audio)

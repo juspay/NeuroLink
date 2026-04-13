@@ -16,15 +16,15 @@
 
 import { nanoid } from "nanoid";
 import type { NeuroLink } from "../../neurolink.js";
-import type { Context } from "../../types/common.js";
 import type {
+  Context,
+  StreamOptions,
   AIProviderName,
   AnalyticsData,
   EnhancedGenerateResult,
   EvaluationData,
   TextGenerationOptions,
 } from "../../types/index.js";
-import type { StreamOptions } from "../../types/streamTypes.js";
 import { logger } from "../../utils/logger.js";
 import { recordProviderPerformanceFromMetrics } from "../evaluationProviders.js";
 import { modelConfig } from "../modelConfiguration.js";

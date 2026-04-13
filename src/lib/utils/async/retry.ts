@@ -11,7 +11,7 @@ import type { AsyncRetryOptions } from "../../types/index.js";
  * Local alias: the canonical type was renamed to AsyncRetryOptions to avoid
  * collision with other RetryOptions types in the codebase.
  */
-export type RetryOptions = AsyncRetryOptions;
+type RetryOptions = AsyncRetryOptions;
 
 /**
  * Default retry configuration.

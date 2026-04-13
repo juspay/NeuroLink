@@ -12,14 +12,15 @@
  */
 
 import type { CommandModule, Argv } from "yargs";
-import type { UnknownRecord } from "../../lib/types/index.js";
 import type {
+  UnknownRecord,
   MCPServerInfo,
   MCPStatus,
   MCPTransportType,
+  MCPCommandArgs,
+  MCPToolAnnotations,
 } from "../../lib/types/index.js";
 import { createExternalServerInfo } from "../../lib/utils/mcpDefaults.js";
-import type { MCPCommandArgs } from "../../lib/types/index.js";
 import { NeuroLink } from "../../lib/neurolink.js";
 import { logger } from "../../lib/utils/logger.js";
 import chalk from "chalk";
@@ -32,7 +33,6 @@ import {
   mergeAnnotations,
   inferAnnotations,
 } from "../../lib/mcp/toolAnnotations.js";
-import type { MCPToolAnnotations } from "../../lib/mcp/toolAnnotations.js";
 import { withTimeout, ErrorFactory } from "../../lib/utils/errorHandling.js";
 
 // Using MCPCommandArgs from types/cli.ts

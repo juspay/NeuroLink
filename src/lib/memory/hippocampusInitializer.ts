@@ -7,8 +7,6 @@ import { logger } from "../utils/logger.js";
 
 export type { HippocampusConfig, StorageConfig };
 
-export type Memory = HippocampusConfig & { enabled?: boolean };
-
 export function initializeHippocampus(
   config: HippocampusConfig,
 ): Hippocampus | null {

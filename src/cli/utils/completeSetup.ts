@@ -9,12 +9,13 @@ import {
   runInteractiveSetup,
   testProviderConnectivity,
   displaySetupSummary,
-  type SetupResult,
 } from "./interactiveSetup.js";
 import { updateEnvFile, displayEnvUpdateSummary } from "./envManager.js";
 import chalk from "chalk";
 
 import { logger } from "../../lib/utils/logger.js";
+import type { SetupResult } from "../../lib/types/index.js";
+
 /**
  * Run the complete interactive setup process
  */

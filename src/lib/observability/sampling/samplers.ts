@@ -3,10 +3,14 @@
  * Control which spans are exported for production optimization
  */
 
-import type { SamplerConfig, SamplingRule } from "../types/exporterTypes.js";
-import type { SpanData } from "../types/spanTypes.js";
-import { SpanStatus } from "../types/spanTypes.js";
-import type { Sampler } from "../../types/observability.js";
+import type {
+  SamplerConfig,
+  SamplingRule,
+  SpanData,
+  Sampler,
+} from "../../types/index.js";
+
+import { SpanStatus } from "../../types/index.js";
 
 export type { Sampler };
 

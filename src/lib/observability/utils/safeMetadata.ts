@@ -6,7 +6,7 @@
  * any other potentially sensitive data are excluded to prevent PII leaks.
  */
 
-import type { SpanAttributes } from "../types/spanTypes.js";
+import type { SpanAttributes } from "../../types/index.js";
 
 // Only ai.* keys are forwarded as metadata. Stream metrics (chunk_count,
 // content_length) should be accessed via span attributes directly, not via

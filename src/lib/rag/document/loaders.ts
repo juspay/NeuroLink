@@ -28,21 +28,15 @@ import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { basename, extname } from "path";
 import { logger } from "../../utils/logger.js";
-import type { DocumentType } from "../types.js";
-import { MDocument } from "./MDocument.js";
 import type {
+  DocumentType,
   LoaderOptions,
   WebLoaderOptions,
   PDFLoaderOptions,
   CSVLoaderOptions,
   DocumentLoader,
-} from "../../types/ragTypes.js";
-
-export type { LoaderOptions } from "../../types/ragTypes.js";
-export type { WebLoaderOptions } from "../../types/ragTypes.js";
-export type { PDFLoaderOptions } from "../../types/ragTypes.js";
-export type { CSVLoaderOptions } from "../../types/ragTypes.js";
-export type { DocumentLoader } from "../../types/ragTypes.js";
+} from "../../types/index.js";
+import { MDocument } from "./MDocument.js";
 
 /**
  * Text file loader

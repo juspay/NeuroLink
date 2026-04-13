@@ -14,11 +14,11 @@ import type {
   SageMakerAsLanguageModel,
   SageMakerConfig,
   SageMakerModelConfig,
-} from "../../types/providers.js";
-import type { ConnectivityResult } from "../../types/typeAliases.js";
+  ConnectivityResult,
+  UnknownRecord,
+} from "../../types/index.js";
 import { createAdaptiveSemaphore } from "./adaptive-semaphore.js";
 import { logger } from "../../utils/logger.js";
-import type { UnknownRecord } from "../../types/common.js";
 
 /**
  * Interface for SageMaker tool call results

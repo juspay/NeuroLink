@@ -25,7 +25,7 @@ import {
   OAuthTokenRefreshError,
   OAuthTokenRevocationError,
   OAuthCallbackServerError,
-} from "../types/errors.js";
+} from "../types/index.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -98,7 +98,7 @@ export const CLAUDE_CODE_VERSION = "2.1.87.6d6";
 export const CLAUDE_CODE_ENTRYPOINT = "sdk-cli";
 export const CLAUDE_CLI_USER_AGENT = "claude-cli/2.1.87 (external, sdk-cli)";
 
-export type ClaudeCodeIdentity = {
+type ClaudeCodeIdentity = {
   deviceId: string;
   accountUuid: string;
   sessionId: string;
@@ -326,7 +326,7 @@ export const DEFAULT_CALLBACK_PORT = 8787;
 import type {
   OAuthTokenResponse,
   OAuthFlowTokens,
-  TokenValidationResult,
+  ClaudeTokenValidationResult,
   AnthropicOAuthConfig,
   PKCEParams,
   CallbackResult,
@@ -866,7 +866,7 @@ export class AnthropicOAuth {
    */
   async validateTokenWithDetails(
     accessToken: string,
-  ): Promise<TokenValidationResult> {
+  ): Promise<ClaudeTokenValidationResult> {
     if (!accessToken) {
       return {
         isValid: false,

@@ -9,7 +9,7 @@ import { logger } from "../../utils/logger.js";
 import type {
   AdaptiveSemaphoreConfig,
   AdaptiveSemaphoreMetrics,
-} from "../../types/providers.js";
+} from "../../types/index.js";
 
 /**
  * Adaptive semaphore that automatically adjusts concurrency based on performance metrics

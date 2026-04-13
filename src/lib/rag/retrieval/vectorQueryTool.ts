@@ -16,10 +16,8 @@ import type {
   VectorQueryResponse,
   VectorQueryResult,
   VectorQueryToolConfig,
-} from "../types.js";
-import type { VectorStore } from "../../types/ragTypes.js";
-
-export type { VectorStore } from "../../types/ragTypes.js";
+  VectorStore,
+} from "../../types/index.js";
 
 /**
  * Creates a vector query tool for semantic search
@@ -124,8 +122,12 @@ export function createVectorQueryTool(
         // Apply reranking if configured
         if (rerankerConfig && results.length > 0) {
           const rerankerModel = await ProviderFactory.createProvider(
-            rerankerConfig.model.provider,
-            rerankerConfig.model.modelName,
+            typeof rerankerConfig.model === "object"
+              ? rerankerConfig.model.provider
+              : rerankerConfig.model,
+            typeof rerankerConfig.model === "object"
+              ? rerankerConfig.model.modelName
+              : rerankerConfig.model,
           );
 
           const rerankedResults = await rerank(

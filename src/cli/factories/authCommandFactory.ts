@@ -8,13 +8,12 @@
  */
 
 import type { CommandModule, Argv, ArgumentsCamelCase } from "yargs";
-import type { AuthCommandArgs } from "../../lib/types/index.js";
 import type {
+  AuthCommandArgs,
   AuthProvidersArgs,
   AuthValidateArgs,
   AuthHealthArgs,
-} from "../commands/authProviders.js";
-
+} from "../../lib/types/index.js";
 /**
  * Supported providers for authentication
  */

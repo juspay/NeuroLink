@@ -5,9 +5,14 @@ import { BaseProvider } from "../core/baseProvider.js";
 import { DEFAULT_MAX_STEPS } from "../core/constants.js";
 import type { NeuroLink } from "../neurolink.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
-import type { UnknownRecord } from "../types/common.js";
-import type { StepFinishEvent } from "../types/index.js";
-import type { StreamOptions, StreamResult } from "../types/streamTypes.js";
+import type {
+  UnknownRecord,
+  StepFinishEvent,
+  StreamOptions,
+  StreamResult,
+  NeurolinkCredentials,
+} from "../types/index.js";
+
 import { logger } from "../utils/logger.js";
 import {
   createAzureAPIKeyConfig,
@@ -20,7 +25,6 @@ import {
   TimeoutError,
 } from "../utils/timeout.js";
 import { resolveToolChoice } from "../utils/toolChoice.js";
-import type { NeurolinkCredentials } from "../types/providers.js";
 
 export class AzureOpenAIProvider extends BaseProvider {
   private apiKey: string;

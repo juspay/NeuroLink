@@ -3,7 +3,7 @@
  * Pre-built route definitions for common NeuroLink endpoints
  */
 
-import type { RouteDefinition, RouteGroup } from "../types.js";
+import type { RouteDefinition, RouteGroup } from "../../types/index.js";
 import { createAgentRoutes } from "./agentRoutes.js";
 import { createClaudeProxyRoutes } from "./claudeProxyRoutes.js";
 // ClaudeProxyDeps removed
@@ -26,7 +26,7 @@ export { createToolRoutes } from "./toolRoutes.js";
 /**
  * Options for creating routes
  */
-export type CreateRoutesOptions = {
+type CreateRoutesOptions = {
   /** Enable OpenAPI/Swagger documentation endpoints (default: false) */
   enableSwagger?: boolean;
   /**

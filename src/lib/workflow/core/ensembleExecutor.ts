@@ -5,7 +5,18 @@
 
 import pLimit from "p-limit";
 import { AIProviderFactory } from "../../core/factory.js";
-import type { AIProvider } from "../../types/providers.js";
+import type {
+  AIProvider,
+  EnsembleResponse,
+  ExecutionConfig,
+  WorkflowModelConfig,
+  ModelGroup,
+  EnsembleExecutionResult,
+  ExecuteEnsembleOptions,
+  ExecuteLayerOptions,
+  ExecuteModelOptions,
+  LayerExecutionResult,
+} from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import {
   SpanSerializer,
@@ -13,21 +24,7 @@ import {
   SpanStatus,
   getMetricsAggregator,
 } from "../../observability/index.js";
-import type {
-  EnsembleResponse,
-  ExecutionConfig,
-  ModelConfig,
-  ModelGroup,
-} from "../types.js";
-import { WorkflowError } from "../types.js";
-import type {
-  EnsembleExecutionResult,
-  ExecuteEnsembleOptions,
-  ExecuteLayerOptions,
-  ExecuteModelOptions,
-  LayerExecutionResult,
-} from "./types/index.js";
-
+import { WorkflowError } from "../../types/index.js";
 const functionTag = "EnsembleExecutor";
 
 // ============================================================================
@@ -237,7 +234,7 @@ async function executeModel(
  * @param model - Model configuration
  * @returns Provider instance
  */
-async function createProvider(model: ModelConfig): Promise<AIProvider> {
+async function createProvider(model: WorkflowModelConfig): Promise<AIProvider> {
   return await AIProviderFactory.createProvider(model.provider, model.model);
 }
 

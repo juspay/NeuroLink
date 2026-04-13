@@ -6,7 +6,7 @@ import type {
   EvaluationActionResult,
   PrecallEvaluationConfig,
   PrecallEvaluationResult,
-} from "../../types/guardrails.js";
+} from "../../types/index.js";
 export const DEFAULT_EVALUATION_PROMPT = `
 Evaluate the following user input for safety and appropriateness. Respond ONLY with valid JSON:
 
