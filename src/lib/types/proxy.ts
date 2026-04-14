@@ -681,6 +681,8 @@ export type PreparedAnthropicAccountAttempt = {
 export type AnthropicUpstreamFetchResult = {
   continueLoop: boolean;
   retrySameAccount?: boolean;
+  /** When set, the caller should wait this many ms before retrying (from upstream retry-after). */
+  retryAfterMs?: number;
   response?: Response;
   lastError: unknown;
   sawRateLimit: boolean;
@@ -701,8 +703,6 @@ export type AccountStats = {
   rateLimitCount: number;
   lastAttemptAt: number;
   lastErrorAt?: number;
-  currentBackoffLevel: number;
-  coolingUntil?: number;
 };
 
 export type ProxyStats = {
@@ -768,8 +768,6 @@ export type AccountQuota = {
 
 /** Runtime state for a proxy account. */
 export type RuntimeAccountState = {
-  coolingUntil?: number;
-  backoffLevel: number;
   consecutiveRefreshFailures: number;
   permanentlyDisabled: boolean;
   lastToken?: string;
@@ -860,12 +858,6 @@ export type ProxyTranslationPlan = {
   modelTier: ClaudeProxyModelTier;
   attempts: ProxyTranslationAttempt[];
   skipped: never[];
-};
-
-/** An account skipped during partitioning, with its cooldown info. */
-export type CooldownSkippedAccount<T> = {
-  account: T;
-  cooldown: { until: number; backoffLevel: number };
 };
 
 // =============================================================================

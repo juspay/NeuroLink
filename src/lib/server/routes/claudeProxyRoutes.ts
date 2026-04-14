@@ -47,18 +47,14 @@ import {
   refreshToken,
 } from "../../proxy/tokenRefresh.js";
 import {
-  applyRateLimitCooldown,
   buildProxyTranslationPlan,
-  clearAccountCooldown,
-  getAccountCooldownUntil,
-  partitionAccountsByCooldown,
+  parseRetryAfterMs,
   type ProxyTranslationPlan,
 } from "../../proxy/routingPolicy.js";
 import { writeJsonSnapshotAtomically } from "../../proxy/snapshotPersistence.js";
 import {
   recordAttempt,
   recordAttemptError,
-  recordCooldown,
   recordFinalError,
   recordFinalSuccess,
 } from "../../proxy/usageStats.js";
@@ -105,7 +101,7 @@ const BLOCKED_UPSTREAM_HEADERS = new Set([
 // ---------------------------------------------------------------------------
 
 /** Fill-first: index of the current primary account. Only advances when
- *  the current account hits a 429 or auth failure that puts it on cooldown. */
+ *  the current account exhausts 429 retries or auth retries fail. */
 let primaryAccountIndex = 0;
 /** Track account count so we can reset primaryAccountIndex when it changes. */
 let lastKnownAccountCount = 0;
@@ -115,9 +111,12 @@ const MAX_CONSECUTIVE_REFRESH_FAILURES = 15;
 const MAX_TRANSIENT_SAME_ACCOUNT_RETRIES = 2;
 const TRANSIENT_SAME_ACCOUNT_RETRY_DELAYS_MS = [250, 1_000] as const;
 
-/** Decision 8: Cooldowns only for 401 and 429. */
-const AUTH_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes for 401
-const RATE_LIMIT_BACKOFF_CAP_MS = 10 * 60 * 1000; // 10 minute cap for 429
+/** Maximum upstream 429 attempts per account before rotating to the next account.
+ *  Total attempts per account = this + 1 (the initial call plus this many retries). */
+const MAX_RATE_LIMIT_SAME_ACCOUNT_RETRIES = 5;
+/** Max time to sleep between 429 retries. Caps large upstream retry-after values
+ *  so we don't hold the client connection open for minutes. */
+const MAX_RATE_LIMIT_RETRY_DELAY_MS = 30_000;
 /** Timeout for upstream requests to Anthropic. Must be generous enough
  *  to cover the full lifecycle of streaming responses, including extended
  *  thinking from Opus models (which can exceed 5 minutes for large contexts). */
@@ -134,10 +133,10 @@ type ProxyTranslationAttempt = {
 /** Track whether we've run the one-time startup prune. */
 let startupPruneDone = false;
 
-/** Advance the primary account index when the current primary is put on cooldown.
- *  This is what makes fill-first work: we stick to one account until it's unusable.
- *  Only advances when the account being cooled IS the current primary; otherwise
- *  it's already a fallback and advancing would disrupt the fill-first ordering. */
+/** Advance the primary account index when the current primary is exhausted
+ *  (429 retries exhausted or auth failure). This is what makes fill-first work:
+ *  we stick to one account until it's unusable. Only advances when the exhausted
+ *  account IS the current primary; otherwise it's already a fallback. */
 function advancePrimaryIfCurrent(
   accountKey: string,
   enabledCount: number,
@@ -1527,8 +1526,6 @@ async function loadClaudeProxyAccounts(args: {
           `[proxy] account=${key.split(":")[1] ?? key} re-enabled (credentials changed)`,
         );
         existingState.permanentlyDisabled = false;
-        existingState.coolingUntil = undefined;
-        existingState.backoffLevel = 0;
         existingState.consecutiveRefreshFailures = 0;
       } else {
         logger.debug(
@@ -1661,8 +1658,6 @@ async function loadClaudeProxyAccounts(args: {
           `[proxy] account=${account.label} credentials changed, re-enabling`,
         );
       }
-      state.coolingUntil = undefined;
-      state.backoffLevel = 0;
       state.consecutiveRefreshFailures = 0;
       state.permanentlyDisabled = false;
     }
@@ -2202,16 +2197,10 @@ function buildClaudeAnthropicFailureResponse(args: {
     return buildLoggedClaudeError(502, msg);
   }
 
-  const earliestRecovery = orderedAccounts.reduce((min, account) => {
-    const until = getAccountCooldownUntil(getOrCreateRuntimeState(account.key));
-    return until !== null ? Math.min(min, until) : min;
-  }, Infinity);
-  // If no active cooldown remains (expired while retries ran), use 1s
-  // instead of fabricating a long retry-after.
-  const retryAfterSec = Number.isFinite(earliestRecovery)
-    ? Math.max(1, Math.ceil((earliestRecovery - Date.now()) / 1000))
-    : 1;
-  const errorMessage = `All accounts rate-limited. Earliest recovery in ${retryAfterSec}s.`;
+  // All accounts returned 429 after exhausting per-account retries.
+  // Return 1s retry-after — the proxy already waited for each upstream retry-after inline.
+  const retryAfterSec = 1;
+  const errorMessage = `All ${orderedAccounts.length} accounts rate-limited after ${MAX_RATE_LIMIT_SAME_ACCOUNT_RETRIES + 1} attempts each (1 initial + ${MAX_RATE_LIMIT_SAME_ACCOUNT_RETRIES} retries).`;
   logger.always(
     `[proxy] all accounts rate-limited, retry in ${retryAfterSec}s`,
   );
@@ -2284,7 +2273,6 @@ async function handleAnthropicSuccessfulResponse(args: {
     logProxyBody,
     logFinalRequest,
   } = args;
-  clearAccountCooldown(accountState);
   accountState.consecutiveRefreshFailures = 0;
   logger.always(`[proxy] ← ${response.status} account=${account.label}`);
 
@@ -2367,7 +2355,7 @@ async function handleAnthropicStreamingSuccessResponse(args: {
     ctx,
     body,
     account,
-    accountState,
+    accountState: _accountState,
     response,
     responseHeaders,
     tracer,
@@ -2412,13 +2400,6 @@ async function handleAnthropicStreamingSuccessResponse(args: {
   const firstChunk = await reader.read();
   if (firstChunk.done || !firstChunk.value || firstChunk.value.length === 0) {
     reader.cancel();
-    accountState.coolingUntil = Date.now() + 10_000;
-    recordCooldown(
-      account.label,
-      account.type,
-      accountState.coolingUntil,
-      accountState.backoffLevel,
-    );
     logger.always(
       `[proxy] ← empty stream from account=${account.label}, trying next`,
     );
@@ -3279,8 +3260,6 @@ async function handleAnthropicAuthRetry(args: {
       if (retryResp.ok) {
         authRetrySucceeded = true;
         accountState.consecutiveRefreshFailures = 0;
-        accountState.backoffLevel = 0;
-        accountState.coolingUntil = undefined;
         logger.always(
           `[proxy] ← 200 account=${account.label} (after ${authRetry + 1} refresh(es))`,
         );
@@ -3321,26 +3300,10 @@ async function handleAnthropicAuthRetry(args: {
 
       if (retryStatus === 429) {
         currentSawRateLimit = true;
-        const retryAfter = retryResp.headers.get("retry-after");
-        const parsedRetryAfter = parseInt(retryAfter ?? "", 10);
-        const cooldownMs = Number.isNaN(parsedRetryAfter)
-          ? 60_000
-          : Math.max(1, parsedRetryAfter) * 1000;
-        const cooldown = applyRateLimitCooldown({
-          state: accountState,
-          retryAfterMs: cooldownMs,
-          capMs: RATE_LIMIT_BACKOFF_CAP_MS,
-        });
         advancePrimaryIfCurrent(
           account.key,
           enabledAccounts.length,
           orderedAccounts[0]?.key,
-        );
-        recordCooldown(
-          account.label,
-          account.type,
-          Date.now() + cooldown.backoffMs,
-          accountState.backoffLevel,
         );
         break;
       }
@@ -3411,29 +3374,21 @@ async function handleAnthropicAuthRetry(args: {
   }
 
   if (!authRetrySucceeded) {
-    if (!accountState.permanentlyDisabled) {
-      if (
-        !accountState.coolingUntil ||
-        accountState.coolingUntil <= Date.now()
-      ) {
-        accountState.coolingUntil = Date.now() + AUTH_COOLDOWN_MS;
-      }
-      recordCooldown(
-        account.label,
-        account.type,
-        accountState.coolingUntil,
-        accountState.backoffLevel,
-      );
-    }
+    // No persistent cooldown — just move to next account for this request.
     currentLastError = authRetryError;
     logger.always(
-      `[proxy] ⚠ account=${account.label} auth retries exhausted, cooldown=5min`,
+      `[proxy] ⚠ account=${account.label} auth retries exhausted, rotating to next account`,
     );
     logAttempt(401, "authentication_error", authRetryError);
     tracer?.setError("authentication_error", authRetryError);
     tracer?.recordRetry(account.label, "auth_exhausted");
     currentUpstreamSpan?.end();
     currentUpstreamSpan = undefined;
+    advancePrimaryIfCurrent(
+      account.key,
+      enabledAccounts.length,
+      orderedAccounts[0]?.key,
+    );
   }
 
   return {
@@ -3535,6 +3490,8 @@ async function handleAnthropicNonOkResponse(args: {
   response: Response;
   account: ProxyPassthroughAccount;
   accountState: RuntimeAccountState;
+  enabledAccounts: ProxyPassthroughAccount[];
+  orderedAccounts: ProxyPassthroughAccount[];
   tracer?: ProxyTracer;
   requestStartTime: number;
   fetchStartMs: number;
@@ -3578,6 +3535,8 @@ async function handleAnthropicNonOkResponse(args: {
     response,
     account,
     accountState,
+    enabledAccounts,
+    orderedAccounts,
     tracer,
     requestStartTime,
     fetchStartMs,
@@ -3651,13 +3610,6 @@ async function handleAnthropicNonOkResponse(args: {
   ) {
     recordAttemptError(account.label, account.type, response.status);
     accountState.consecutiveRefreshFailures += 1;
-    accountState.coolingUntil = Date.now() + AUTH_COOLDOWN_MS;
-    recordCooldown(
-      account.label,
-      account.type,
-      accountState.coolingUntil,
-      accountState.backoffLevel,
-    );
     if (
       accountState.consecutiveRefreshFailures >= maxConsecutiveRefreshFailures
     ) {
@@ -3665,7 +3617,7 @@ async function handleAnthropicNonOkResponse(args: {
     }
     currentAuthFailureMessage = formatReauthMessage(account.label);
     logger.always(
-      `[proxy] ← ${response.status} account=${account.label} cooldown=5min`,
+      `[proxy] ← ${response.status} account=${account.label} (auth failure, no refresh token)`,
     );
     currentLastError = errBody;
     logAttempt(
@@ -3675,6 +3627,11 @@ async function handleAnthropicNonOkResponse(args: {
     );
     tracer?.setError("authentication_error", summarizeErrorMessage(errBody));
     tracer?.recordRetry(account.label, "auth_no_refresh");
+    advancePrimaryIfCurrent(
+      account.key,
+      enabledAccounts.length,
+      orderedAccounts[0]?.key,
+    );
     return {
       continueLoop: true,
       lastError: currentLastError,
@@ -3694,15 +3651,8 @@ async function handleAnthropicNonOkResponse(args: {
     recordAttemptError(account.label, account.type, response.status);
     currentAuthFailureMessage =
       "Authentication failed for Anthropic API key credentials. Update ANTHROPIC_API_KEY or re-login with OAuth.";
-    accountState.coolingUntil = Date.now() + AUTH_COOLDOWN_MS;
-    recordCooldown(
-      account.label,
-      account.type,
-      accountState.coolingUntil,
-      accountState.backoffLevel,
-    );
     logger.always(
-      `[proxy] ← ${response.status} account=${account.label} cooldown=5min`,
+      `[proxy] ← ${response.status} account=${account.label} (auth failure, api_key)`,
     );
     currentLastError = errBody;
     logAttempt(
@@ -3712,6 +3662,11 @@ async function handleAnthropicNonOkResponse(args: {
     );
     tracer?.setError("authentication_error", summarizeErrorMessage(errBody));
     tracer?.recordRetry(account.label, "auth_api_key");
+    advancePrimaryIfCurrent(
+      account.key,
+      enabledAccounts.length,
+      orderedAccounts[0]?.key,
+    );
     return {
       continueLoop: true,
       lastError: currentLastError,
@@ -4198,9 +4153,9 @@ async function fetchAnthropicAccountResponse(args: {
     headers,
     finalBodyStr,
     account,
-    accountState,
-    enabledAccounts,
-    orderedAccounts,
+    accountState: _accountState2,
+    enabledAccounts: _enabledAccounts,
+    orderedAccounts: _orderedAccounts,
     tracer,
     logAttempt,
     currentLastError,
@@ -4250,40 +4205,11 @@ async function fetchAnthropicAccountResponse(args: {
 
   if (response.status === 429) {
     sawRateLimit = true;
-    const retryAfter = response.headers.get("retry-after");
-    let cooldownMs = 0;
-    if (retryAfter) {
-      const seconds = parseInt(retryAfter, 10);
-      if (!Number.isNaN(seconds)) {
-        cooldownMs = seconds * 1000;
-      } else {
-        const date = new Date(retryAfter);
-        if (!Number.isNaN(date.getTime())) {
-          cooldownMs = Math.max(date.getTime() - Date.now(), 1000);
-        }
-      }
-    }
-
-    const cooldown = applyRateLimitCooldown({
-      state: accountState,
-      retryAfterMs: cooldownMs > 0 ? cooldownMs : undefined,
-      capMs: RATE_LIMIT_BACKOFF_CAP_MS,
-    });
-    advancePrimaryIfCurrent(
-      account.key,
-      enabledAccounts.length,
-      orderedAccounts[0]?.key,
-    );
+    const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"));
     recordAttemptError(account.label, account.type, 429);
-    recordCooldown(
-      account.label,
-      account.type,
-      Date.now() + cooldown.backoffMs,
-      accountState.backoffLevel,
-    );
     lastError = await response.text();
     logger.always(
-      `[proxy] ← 429 account=${account.label} backoff-level=${accountState.backoffLevel} cooldown=${Math.round(cooldown.backoffMs / 1000)}s`,
+      `[proxy] ← 429 account=${account.label} retry-after=${retryAfterMs}ms (upstream)`,
     );
     logAttempt(429, "rate_limit_error", String(lastError));
     tracer?.setError("rate_limit_error", String(lastError).slice(0, 500));
@@ -4291,6 +4217,8 @@ async function fetchAnthropicAccountResponse(args: {
     currentUpstreamSpan?.end();
     return {
       continueLoop: true,
+      retrySameAccount: true,
+      retryAfterMs,
       lastError,
       sawRateLimit,
       sawNetworkError,
@@ -4364,28 +4292,13 @@ async function handleAnthropicRoutedClaudeRequest(args: {
     attemptNumber: 0,
   };
   const acctSelectionSpan = tracer?.startAccountSelection();
-  const accountPartition = partitionAccountsByCooldown(
-    orderedAccounts,
-    (account) => getOrCreateRuntimeState(account.key),
-  );
-  for (const skippedAccount of accountPartition.skipped) {
-    logger.always(
-      `[proxy] skipping account=${skippedAccount.account.label} cooldown remaining=${Math.max(1, Math.ceil((skippedAccount.cooldown.until - Date.now()) / 1000))}s`,
-    );
-  }
-  // Only flag rate-limit when ALL accounts are cooling — if some are eligible,
-  // let the actual attempt results determine sawRateLimit via real 429 responses.
-  if (
-    accountPartition.skipped.length > 0 &&
-    accountPartition.eligible.length === 0
-  ) {
-    loopState.sawRateLimit = true;
-    loopState.lastError = `All ${accountPartition.skipped.length} accounts are cooling down`;
-  }
 
-  accountLoop: for (const account of accountPartition.eligible) {
+  // No partition / cooldown gating — every account is always eligible.
+  // Retries are handled inline per-account using upstream retry-after.
+  accountLoop: for (const account of orderedAccounts) {
     const accountState = getOrCreateRuntimeState(account.key);
     let transientSameAccountRetries = 0;
+    let rateLimitSameAccountRetries = 0;
 
     while (true) {
       loopState.attemptNumber += 1;
@@ -4454,6 +4367,39 @@ async function handleAnthropicRoutedClaudeRequest(args: {
       loopState.sawRateLimit = fetchResult.sawRateLimit;
       loopState.sawNetworkError = fetchResult.sawNetworkError;
       if (fetchResult.continueLoop || !fetchResult.response) {
+        // 429 with retry-after: wait and retry same account up to 5 times
+        if (
+          fetchResult.retrySameAccount &&
+          fetchResult.retryAfterMs !== undefined &&
+          rateLimitSameAccountRetries < MAX_RATE_LIMIT_SAME_ACCOUNT_RETRIES
+        ) {
+          rateLimitSameAccountRetries += 1;
+          const delayMs = Math.min(
+            fetchResult.retryAfterMs || 1_000,
+            MAX_RATE_LIMIT_RETRY_DELAY_MS,
+          );
+          logger.always(
+            `[proxy] retrying same account=${account.label} after upstream 429 (${rateLimitSameAccountRetries}/${MAX_RATE_LIMIT_SAME_ACCOUNT_RETRIES}) in ${delayMs}ms`,
+          );
+          await sleep(delayMs);
+          continue;
+        }
+        // Rate-limit retries exhausted for this account — rotate
+        if (
+          fetchResult.retrySameAccount &&
+          fetchResult.retryAfterMs !== undefined
+        ) {
+          advancePrimaryIfCurrent(
+            account.key,
+            enabledAccounts.length,
+            orderedAccounts[0]?.key,
+          );
+          logger.always(
+            `[proxy] exhausted ${MAX_RATE_LIMIT_SAME_ACCOUNT_RETRIES} rate-limit retries for account=${account.label}; rotating`,
+          );
+          continue accountLoop;
+        }
+        // Transient error retry (network errors, 529 overloaded)
         if (
           fetchResult.retrySameAccount &&
           transientSameAccountRetries < MAX_TRANSIENT_SAME_ACCOUNT_RETRIES
@@ -4527,6 +4473,8 @@ async function handleAnthropicRoutedClaudeRequest(args: {
           response,
           account,
           accountState,
+          enabledAccounts,
+          orderedAccounts,
           tracer,
           requestStartTime,
           fetchStartMs: preparedAttempt.fetchStartMs,
@@ -4922,8 +4870,6 @@ function getOrCreateRuntimeState(accountKey: string): RuntimeAccountState {
     return existing;
   }
   const initial: RuntimeAccountState = {
-    coolingUntil: undefined,
-    backoffLevel: 0,
     consecutiveRefreshFailures: 0,
     permanentlyDisabled: false,
   };
@@ -4936,8 +4882,6 @@ async function disableAccountUntilReauth(
   state: RuntimeAccountState,
 ): Promise<void> {
   state.permanentlyDisabled = true;
-  state.coolingUntil = undefined;
-  state.backoffLevel = 0;
 
   // Decision 7 (usage): Persist disabled state to disk so it survives restarts
   try {
