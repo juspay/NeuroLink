@@ -32,7 +32,6 @@ export function recordFinalSuccess(
   if (accountLabel && accountType) {
     const acct = ensureAccount(accountLabel, accountType);
     acct.successCount++;
-    acct.currentBackoffLevel = 0;
   }
 }
 
@@ -62,17 +61,6 @@ export function recordFinalError(
     acct.errorCount++;
     acct.lastErrorAt = Date.now();
   }
-}
-
-export function recordCooldown(
-  accountLabel: string,
-  accountType: string,
-  cooldownUntil: number,
-  backoffLevel: number,
-): void {
-  const acct = ensureAccount(accountLabel, accountType);
-  acct.coolingUntil = cooldownUntil;
-  acct.currentBackoffLevel = backoffLevel;
 }
 
 export function getStats(): ProxyStats {
@@ -108,7 +96,6 @@ function ensureAccount(label: string, type: string): AccountStats {
       errorCount: 0,
       rateLimitCount: 0,
       lastAttemptAt: 0,
-      currentBackoffLevel: 0,
     };
   }
   return stats.accounts[label];
