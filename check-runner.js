@@ -505,7 +505,7 @@ function truncate(str, limit = MAX_OUTPUT_BYTES) {
   return Buffer.from(str).subarray(0, limit).toString("utf8") + "\n…[truncated]";
 }
 
-/** Run commands sequentially. Stops on first failure. */
+/** Run all commands sequentially regardless of failures. */
 async function runCommands(workDir, commands, timeoutMs) {
   const results = [];
   for (const command of commands) {
@@ -536,7 +536,6 @@ async function runCommands(workDir, commands, timeoutMs) {
       );
     });
     results.push(result);
-    if (!result.success) break;
   }
   return results;
 }
@@ -612,12 +611,13 @@ async function executeJob(job) {
     const results = await runCommands(workDir, commands, commandTimeoutMs);
     stamp(job, { commandResults: results });
 
-    const failed = results.find((r) => !r.success);
-    if (failed) {
-      const code = failed.timedOut ? E.COMMAND_TIMEOUT : E.COMMAND_FAILED;
-      const message = failed.timedOut
-        ? `Timed out after ${commandTimeoutMs}ms: ${failed.command}`
-        : `Command failed: ${failed.command}`;
+    const failures = results.filter((r) => !r.success);
+    if (failures.length > 0) {
+      const first = failures[0];
+      const code = first.timedOut ? E.COMMAND_TIMEOUT : E.COMMAND_FAILED;
+      const message = failures.length === 1
+        ? (first.timedOut ? `Timed out after ${commandTimeoutMs}ms: ${first.command}` : `Command failed: ${first.command}`)
+        : `${failures.length} command(s) failed: ${failures.map((f) => f.command).join("; ")}`;
       stamp(job, { status: "failed", stage: "command", error: { code, message } });
       return;
     }
