@@ -20,10 +20,10 @@ const CLEANUP_INTERVAL_MS = Number(process.env.CHECK_RUNNER_JOB_CLEANUP_INTERVAL
 const MAX_JOBS = Number(process.env.CHECK_RUNNER_MAX_JOBS || 500);
 const DEFAULT_TIMEOUT_MS = Number(process.env.CHECK_RUNNER_COMMAND_TIMEOUT_MS || 600_000);
 const GIT_CLONE_TIMEOUT_MS = Number(process.env.CHECK_RUNNER_GIT_CLONE_TIMEOUT_MS || 300_000); // 5 min
-// e.g. https://bitbucket.juspay.net/scm/bz/lighthouse.git — used to derive the base URL for any repo
-const GIT_REPO_URL      = process.env.GIT_REPO_URL      || "";
-const GIT_READ_USERNAME = process.env.GIT_READ_USERNAME  || "";
-const GIT_READ_TOKEN    = process.env.GIT_READ_TOKEN     || "";
+// Bitbucket SCM root — every repo is cloned via {BITBUCKET_SCM_BASE}/{project}/{repo}.git
+const BITBUCKET_SCM_BASE = process.env.BITBUCKET_SCM_BASE || "https://bitbucket.juspay.net/scm";
+const GIT_READ_USERNAME  = process.env.GIT_READ_USERNAME  || "";
+const GIT_READ_TOKEN     = process.env.GIT_READ_TOKEN     || "";
 
 // Proxy config — the pod sets HTTP_PROXY_HOST + HTTP_PROXY_PORT for outbound traffic.
 // We turn that into a proper proxy URL that git/curl understand.
@@ -167,6 +167,7 @@ function parseJson(raw) {
 /**
  * @typedef {{
  *   repoName: string;
+ *   project: string;
  *   branchRef: string;
  *   commands: string[];
  *   commandTimeoutMs: number;
@@ -188,6 +189,7 @@ function validateAndNormalize(raw) {
   const str = (v) => typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
 
   const repoName = str(raw.repoName);
+  const project = str(raw.project);
   const branchRef = str(raw.branchRef);
 
   const commands = Array.isArray(raw.commands)
@@ -200,10 +202,11 @@ function validateAndNormalize(raw) {
       : DEFAULT_TIMEOUT_MS;
 
   if (!repoName) return { ok: false, reason: "repoName is required" };
+  if (!project) return { ok: false, reason: "project is required" };
   if (!branchRef) return { ok: false, reason: "branchRef is required" };
   if (commands.length === 0) return { ok: false, reason: "commands must be a non-empty array" };
 
-  return { ok: true, input: { repoName, branchRef, commands, commandTimeoutMs } };
+  return { ok: true, input: { repoName, project, branchRef, commands, commandTimeoutMs } };
 }
 
 // ---------------------------------------------------------------------------
@@ -212,21 +215,26 @@ function validateAndNormalize(raw) {
 
 /**
  * Build an authenticated HTTPS clone URL for a given repo.
- * Derives the base from GIT_REPO_URL, injects GIT_READ_USERNAME:GIT_READ_TOKEN.
+ * URL shape: {BITBUCKET_SCM_BASE}/{project}/{repoName}.git with creds injected.
+ *
  * @param {string} repoName
+ * @param {string} project  Bitbucket project key (e.g. "bz", "picaf")
  * @returns {string}
  */
-function buildRepoUrl(repoName) {
-  if (!GIT_REPO_URL || !GIT_READ_USERNAME || !GIT_READ_TOKEN) {
-    throw new Error("GIT_REPO_URL, GIT_READ_USERNAME, and GIT_READ_TOKEN must be configured");
+function buildRepoUrl(repoName, project) {
+  if (!GIT_READ_USERNAME || !GIT_READ_TOKEN) {
+    throw new Error("GIT_READ_USERNAME and GIT_READ_TOKEN must be configured");
+  }
+  if (!project) {
+    throw new Error("project is required to build the clone URL");
   }
   // Manually encode credentials — new URL() does not encode `+` in the password
   // component, which Bitbucket interprets as a space and rejects with 403.
-  const parsed = new URL(GIT_REPO_URL);
+  const parsed = new URL(BITBUCKET_SCM_BASE);
   const encodedUser = encodeURIComponent(GIT_READ_USERNAME);
   const encodedToken = encodeURIComponent(GIT_READ_TOKEN);
-  const basePath = parsed.pathname.replace(/\/[^/]+$/, "");
-  return `${parsed.protocol}//${encodedUser}:${encodedToken}@${parsed.host}${basePath}/${repoName}.git`;
+  const root = parsed.pathname.replace(/\/$/, "");
+  return `${parsed.protocol}//${encodedUser}:${encodedToken}@${parsed.host}${root}/${project}/${repoName}.git`;
 }
 
 // ---------------------------------------------------------------------------
@@ -402,8 +410,8 @@ async function collectDiffDiagnostics(repoUrl) {
   return lines.join("\n");
 }
 
-async function applyBranchDiff(repoName, branchRef, workDir) {
-  const repoUrl = buildRepoUrl(repoName);
+async function applyBranchDiff(repoName, project, branchRef, workDir) {
+  const repoUrl = buildRepoUrl(repoName, project);
   const branchDir = await fs.mkdtemp(path.join(os.tmpdir(), `cr-branch-${repoName}-`));
 
   // If a proxy is configured, pass it to git via HTTPS_PROXY/HTTP_PROXY.
@@ -562,7 +570,7 @@ function toResponse(job) {
 }
 
 async function executeJob(job) {
-  const { repoName, branchRef, commands, commandTimeoutMs } = /** @type {JobInput} */ (job.input);
+  const { repoName, project, branchRef, commands, commandTimeoutMs } = /** @type {JobInput} */ (job.input);
   let workDir = "";
   let branchDir = "";
 
@@ -586,7 +594,7 @@ async function executeJob(job) {
     console.log(`[JOB ${job.jobId}] fetching branch diff for: ${branchRef}`);
 
     try {
-      const result = await applyBranchDiff(repoName, branchRef, workDir);
+      const result = await applyBranchDiff(repoName, project, branchRef, workDir);
       branchDir = result.branchDir;
       console.log(`[JOB ${job.jobId}] diff applied (${result.changedCount} changed, ${result.deletedCount} deleted)`);
     } catch (err) {
