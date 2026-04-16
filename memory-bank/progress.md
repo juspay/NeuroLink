@@ -1,5 +1,48 @@
 # Project Progress
 
+## 🚀 **GEMINI 3 NATIVE PATH — MULTI-TURN TOOL CALLING FIXED** (2026-04-17)
+
+### **🏆 LATEST ACHIEVEMENT: NATIVE @google/genai SDK CONVERSATION REPLAY**
+
+**Objective**: Fix multi-step agentic tool calling for Gemini 3 models on Vertex AI
+
+**Root Problem**: The Vercel AI SDK strips the `thoughtSignature` token that
+Gemini 3 requires when echoing function calls back in conversation history. Without
+it, Gemini treats subsequent steps as a fresh context and stops calling tools.
+
+**Secondary Problem**: Multiple agentic loop executions on the same `sessionId`
+(e.g., via `continueOrchestratorWorkflow`) restart `stepIndex` at 1 each time.
+Without an per-execution identifier, `prependConversationHistory` merges tool calls
+from different executions into the same Gemini model turn, producing consecutive
+model turns. Gemini hallucinates responses and returns 0 function calls → tool
+`execute()` callbacks are never reached → no logs appear from inside tools.
+
+**Completed Fixes:**
+- ✅ `extractThoughtSignature` type narrowing — `in` operator instead of unsafe `as` cast
+- ✅ `thoughtSignature` sibling replay format — emitted as sibling on `functionCall` and `text` parts, not wrapper
+- ✅ `stepIndex` on all tool messages — stored in `ChatMessageMetadata` + `PendingToolExecution` + Redis
+- ✅ `prependConversationHistory` composite key — `turnCounter:stepIndex` groups parallel calls correctly
+- ✅ 5-minute default timeout on generate path — prevents premature 30s cutoff in long agentic loops
+- ✅ Silent timeout detection — surfaces `TimeoutError` instead of returning empty response silently
+- ✅ Removed all debug `console.log` statements — 8 locations across 3 files
+- ✅ Lint: `!= null` → `!== null && !== undefined` in 3 places
+
+**Pending Fix (executionId):**
+- ❌ Add `executionId = randomUUID()` per invocation; store on tool_call/tool_result Redis messages; update `prependConversationHistory` to key on `exec:<executionId>:<stepIndex>` (backward-compat fallback for old messages)
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| `src/lib/providers/googleVertex.ts` | `prependConversationHistory` composite key, stream loop stepIndex/thoughtSignature tagging, generate loop stepIndex/thoughtSignature tagging, 5-min timeout, silent timeout check |
+| `src/lib/providers/googleNativeGemini3.ts` | `extractThoughtSignature` `in` narrowing |
+| `src/lib/types/conversation.ts` | `stepIndex?: number` on `ChatMessageMetadata` |
+| `src/lib/types/tools.ts` | `stepIndex?: number` + `thoughtSignature?: string` on `PendingToolExecution.toolCalls[]`; `stepIndex?: number` on `.toolResults[]` |
+| `src/lib/core/redisConversationMemoryManager.ts` | Store `stepIndex` + `thoughtSignature` in tool_call metadata; `stepIndex` in tool_result metadata |
+| `src/lib/core/modules/TelemetryHandler.ts` | Removed console.log |
+| `src/lib/utils/conversationMemory.ts` | `thoughtSignature` passthrough |
+
+---
+
 ## 🚀 **ENTERPRISE IMAGE CACHING SYSTEM IMPLEMENTED** (2026-01-30)
 
 ### **🏆 LATEST ACHIEVEMENT: INTELLIGENT IMAGE CACHE WITH LRU & DEDUPLICATION**

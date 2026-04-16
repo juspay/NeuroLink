@@ -1,5 +1,94 @@
 # NeuroLink System Patterns
 
+## ✅ **GEMINI 3 NATIVE PATH — CONVERSATION HISTORY RECONSTRUCTION** (2026-04-17)
+
+### **`prependConversationHistory` — How It Works**
+
+Gemini's API requires strictly alternating `user → model → user → model` turns. Redis stores flat `tool_call`/`tool_result` messages. `prependConversationHistory` reconstructs the correct Gemini history from those flat messages before every new API call.
+
+**Algorithm:**
+1. Walk `conversationMessages` in order
+2. `tool_call` messages → grouped into a `ToolStep.callParts[]` (becomes a model turn)
+3. `tool_result` messages → grouped into the same `ToolStep.resultParts[]` (becomes a user turn)
+4. Regular `user`/`assistant` text messages → emitted inline as `RegularSegment`
+5. Emit all segments in order: regular segments as-is; ToolSteps as `model(callParts) + user(resultParts)`
+
+**Composite key for grouping:**
+```typescript
+// With executionId (new messages): key = "exec:<uuid>:<stepIndex>"
+// Without executionId (legacy messages): key = "turn:<turnCounter>:<stepIndex>"
+const makeKey = (stepIndex: number | undefined, executionId: string | undefined): string =>
+  executionId !== undefined
+    ? `exec:${executionId}:${stepIndex ?? "undefined"}`
+    : `turn:${turnCounter}:${stepIndex ?? "undefined"}`;
+```
+
+- `stepIndex` groups parallel function calls from the same agentic loop step into one model turn
+- `turnCounter` (incremented per regular text message) acts as boundary between sequential loop invocations — prevents step 1 of loop A from colliding with step 1 of loop B when both happen without a text message between them
+- `executionId` is the definitive fix for multi-execution session overlap (once implemented): each UUID is guaranteed unique per invocation, no possibility of collision
+
+**`thoughtSignature` Replay:**
+- On `tool_call` messages: `thoughtSignature` emitted as sibling field on the `functionCall` part
+- On `assistant` text messages: `thoughtSignature` emitted as sibling field on the `text` part
+- Never wrapped — Gemini requires the token to sit next to the content, not above it
+
+### **Canonical Code Pattern**
+```typescript
+// In googleVertex.ts → prependConversationHistory
+type ToolStep = {
+  type: "tool_step";
+  callParts: unknown[];
+  resultParts: unknown[];
+};
+
+const stepMap = new Map<string, ToolStep>();
+const makeKey = (stepIndex: number | undefined, executionId: string | undefined) =>
+  executionId !== undefined
+    ? `exec:${executionId}:${stepIndex ?? "undefined"}`
+    : `turn:${turnCounter}:${stepIndex ?? "undefined"}`;
+
+// tool_call handler
+if (msg.role === "tool_call") {
+  const step = getOrCreateStep(msg.metadata?.stepIndex, msg.metadata?.executionId);
+  const fcPart: Record<string, unknown> = {
+    functionCall: { name: msg.tool, args: msg.args || {} }
+  };
+  if (msg.metadata?.thoughtSignature) {
+    fcPart.thoughtSignature = msg.metadata.thoughtSignature; // sibling, not wrapper
+  }
+  step.callParts.push(fcPart);
+}
+```
+
+### **`stepIndex` Tagging in the Agentic Loop**
+```typescript
+// In executeNativeGemini3Stream / executeNativeGemini3Generate
+const executionId = randomUUID(); // once per invocation (pending implementation)
+let step = 0;
+
+while (step < maxSteps) {
+  step++;
+  // ... get Gemini response ...
+  const stepThoughtSig = extractThoughtSignature(chunkResult.rawResponseParts);
+
+  // Tag tool calls with this step's metadata before storing to Redis
+  const taggedToolCalls = stepToolCalls.map((tc, i) => ({
+    ...tc,
+    ...(i === 0 && stepThoughtSig ? { thoughtSignature: stepThoughtSig } : {}),
+    stepIndex: step,
+    executionId,          // (pending)
+  }));
+  const taggedToolResults = stepToolExecs.map((te) => ({
+    toolName: te.name,
+    result: te.output,
+    stepIndex: step,
+    executionId,          // (pending)
+  }));
+}
+```
+
+---
+
 ## ✅ **GENERATE FUNCTION MIGRATION COMPLETE** (2025-01-07)
 
 ### **Factory-Enhanced Generate Architecture**

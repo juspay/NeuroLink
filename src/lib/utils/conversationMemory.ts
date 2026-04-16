@@ -265,6 +265,7 @@ export async function storeConversationTurn(
                 cacheWriteTokens: result.usage.cacheCreationTokens,
               }
             : undefined,
+          thoughtSignature: result.thoughtSignature,
         });
 
         logger.debug(

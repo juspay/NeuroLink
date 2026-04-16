@@ -344,6 +344,85 @@ for await (const chunk of stream) {
 
 ---
 
+## Gemini 3 Multi-Turn Tool Calling (Agentic Loops)
+
+Gemini 3 models use a **native `@google/genai` SDK path** inside NeuroLink that bypasses the Vercel AI SDK. This is required because the Vercel layer strips the `thoughtSignature` token that Gemini 3 attaches to every tool-calling response — without it, conversation history replays break after the first agentic step.
+
+### How It Works
+
+When NeuroLink detects a Gemini 3 model + tools, it routes to the native path automatically. You use the same SDK API — nothing changes on your end:
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Run my agentic workflow..." },
+  provider: "vertex",
+  model: "gemini-3-flash-preview",
+  tools: { myTool: { ... } },
+  sessionId: "session-123", // enables Redis conversation history
+  maxSteps: 20,
+});
+```
+
+### `thoughtSignature` and History Replay
+
+Gemini 3 returns a `thoughtSignature` token with every response that includes function calls. This token must be echoed back as a **sibling field** on each `functionCall` part in conversation history:
+
+```typescript
+// How NeuroLink stores it in Redis → how it replays it to Gemini
+{
+  functionCall: { name: "getStatus", args: { id: "abc" } },
+  thoughtSignature: "<opaque-token-from-previous-response>"
+}
+```
+
+Without this, Gemini treats each step as a new conversation and stops calling tools after step 1.
+
+### Parallel Tool Calls and `stepIndex`
+
+Within one agentic step, Gemini can return multiple function calls simultaneously. NeuroLink tags every stored tool call/result with a `stepIndex` (integer, increments per step) so that `prependConversationHistory` can group them into the correct single model turn:
+
+```
+Step 1 → model turn: [functionCall(toolA), functionCall(toolB)]   // stepIndex: 1
+         user turn:  [functionResponse(toolA), functionResponse(toolB)]
+Step 2 → model turn: [functionCall(toolC)]                        // stepIndex: 2
+         user turn:  [functionResponse(toolC)]
+```
+
+Putting two steps into separate model turns would create consecutive model turns, which Gemini rejects with a validation error.
+
+### Multi-Execution Session Isolation (`executionId`)
+
+When the same `sessionId` is used by multiple agentic loop invocations (for example, an orchestrator spawning a child agent via `continueOrchestratorWorkflow`), each invocation restarts `stepIndex` at 1. Without isolation, step 1 from Execution A and step 1 from Execution B would be grouped into the same model turn, producing an invalid Gemini history.
+
+NeuroLink assigns a UUID `executionId` to each invocation and uses it as a prefix in the grouping key:
+
+```
+Execution A, step 1  →  key "exec:<uuid-A>:1"
+Execution B, step 1  →  key "exec:<uuid-B>:1"   ← never collide
+```
+
+Old messages without an `executionId` fall back to the `turn:<counter>:<stepIndex>` key for backward compatibility.
+
+### Timeout Defaults
+
+The native generate path defaults to **5 minutes** (300 s) to accommodate long multi-step agentic loops. Override with `options.timeout`:
+
+```typescript
+const result = await neurolink.generate({
+  ...
+  timeout: "10m", // "2m", "300s", or milliseconds
+});
+```
+
+If the timeout fires mid-stream, NeuroLink surfaces a `TimeoutError` rather than returning empty content silently.
+
+### Constraints
+
+- **No tools + JSON schema simultaneously** — Gemini 3 cannot use function calling and `structuredOutput` with a JSON schema at the same time. NeuroLink automatically disables tools when a JSON schema output is requested and logs a warning.
+- **Gemini 3 only** — This native path activates only for model names matching the Gemini 3 pattern. All other Vertex AI models continue to use the standard Vercel AI SDK path.
+
+---
+
 ## IAM & Permissions
 
 ### Required IAM Roles

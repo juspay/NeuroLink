@@ -505,13 +505,17 @@ export type PendingToolExecution = {
     toolName?: string;
     args?: Record<string, unknown>;
     timestamp?: Date;
+    thoughtSignature?: string;
+    stepIndex?: number;
     [key: string]: unknown;
   }>;
   toolResults: Array<{
     toolCallId?: string;
+    toolName?: string;
     result?: unknown;
     error?: string;
     timestamp?: Date;
+    stepIndex?: number;
     [key: string]: unknown;
   }>;
   timestamp: number;

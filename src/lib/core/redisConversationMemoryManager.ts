@@ -688,6 +688,9 @@ export class RedisConversationMemoryManager implements IConversationMemoryManage
             role: "assistant",
             content: options.aiResponse,
             events: options.events || undefined,
+            ...(options.thoughtSignature && {
+              metadata: { thoughtSignature: options.thoughtSignature },
+            }),
           };
           conversation.messages.push(assistantMsg);
 
@@ -1828,6 +1831,14 @@ User message: "${userMessage}"`;
             toolCall.arguments ||
             toolCall.parameters ||
             {}) as Record<string, unknown>,
+          metadata: {
+            ...(toolCall.thoughtSignature
+              ? { thoughtSignature: String(toolCall.thoughtSignature) }
+              : {}),
+            ...(toolCall.stepIndex !== null && toolCall.stepIndex !== undefined
+              ? { stepIndex: Number(toolCall.stepIndex) }
+              : {}),
+          },
         };
         conversation.messages.push(toolCallMessage);
       }
@@ -1837,7 +1848,9 @@ User message: "${userMessage}"`;
         const toolCallId = String(
           toolResult.toolCallId || toolResult.id || "unknown",
         );
-        const toolName = toolCallMap.get(toolCallId) || "unknown";
+        const toolName =
+          toolCallMap.get(toolCallId) ||
+          String(toolResult.toolName || "unknown");
 
         // Serialize the tool result to string for content field
         let serializedResult: string;
@@ -1891,6 +1904,10 @@ User message: "${userMessage}"`;
           ...(truncated && { toolOutputPreview: preview }),
           ...(truncated && { originalSize }),
           ...(artifactId && { artifactId }),
+          ...(toolResult.stepIndex !== null &&
+          toolResult.stepIndex !== undefined
+            ? { stepIndex: Number(toolResult.stepIndex) }
+            : {}),
         };
 
         // Build result — success/error metadata only, NOT the output data

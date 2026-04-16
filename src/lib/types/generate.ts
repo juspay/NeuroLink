@@ -1106,6 +1106,8 @@ export type TextGenerationResult = {
   ppt?: PPTGenerationResult;
   /** Image generation output */
   imageOutput?: { base64: string } | null;
+  /** Gemini 3 thought signature for reasoning continuity across turns */
+  thoughtSignature?: string;
   // NL-007: Retry metadata for observability
   retries?: {
     count: number;

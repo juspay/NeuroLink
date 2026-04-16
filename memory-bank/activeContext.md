@@ -1,4 +1,40 @@
-## 🚀 **CURRENT STATUS: IMAGE CACHE SYSTEM IMPLEMENTED** (2026-01-30)
+## 🚀 **CURRENT STATUS: GEMINI 3 NATIVE PATH — MULTI-TURN TOOL CALLING FIXES** (2026-04-17)
+
+### **🏆 LATEST WORK: NATIVE @google/genai SDK — CONVERSATION REPLAY & EXECUTION ISOLATION**
+
+**Primary Objective**: Fix multi-turn agentic tool calling on Gemini 3 models (gemini-3-pro-preview, gemini-3-flash-preview) via the native `@google/genai` SDK on Vertex AI.
+
+**Root Cause of Original Bug**: The Vercel AI SDK does not preserve `thoughtSignature` — the opaque token Gemini 3 requires to be echoed back with every function call part when replaying conversation history. Without it, Gemini rejects multistep tool calls silently.
+
+**Root Cause of Multi-Execution Bug**: When `continueOrchestratorWorkflow` fires a new invocation of the same `sessionId`, both the original and new execution start their `stepIndex` at 1. Since `prependConversationHistory` used `turnCounter:stepIndex` as a grouping key and `turnCounter` never increments when there are no regular text messages between executions, the two sets of tool calls collapse into the same Gemini model turn — producing invalid consecutive model turns that cause Gemini to hallucinate function responses. Result: tools are never executed, `stepFunctionCalls.length === 0`, the loop exits on step 1, and your tool `execute()` callbacks are never invoked (no logs appear).
+
+### **✅ Completed Fixes**
+1. **`extractThoughtSignature` type narrowing** — switched from unsafe `as` cast to `in` operator narrowing in `googleNativeGemini3.ts`
+2. **`thoughtSignature` sibling format on replay** — `prependConversationHistory` in `googleVertex.ts` now emits `thoughtSignature` as a sibling field on `functionCall` parts and `text` parts (not as a wrapper object)
+3. **`stepIndex` on all tool messages** — every `tool_call` and `tool_result` stored in Redis carries `stepIndex` from `ChatMessageMetadata` and `PendingToolExecution`
+4. **`prependConversationHistory` composite key** — groups tool calls by `turnCounter:stepIndex` so parallel function calls in the same step land in one model turn, while sequential steps stay separate
+5. **5-minute default timeout on generate path** — `timeout = options.timeout ? this.getTimeout(options) : 300000` instead of the previous 30s
+6. **Silent timeout detection** — after `collectStreamChunks`, checks `composedSignal?.aborted` and surfaces a `TimeoutError` instead of silently returning empty content
+7. **Removed all debug `console.log` statements** — 8 locations across `googleVertex.ts`, `googleNativeGemini3.ts`, `TelemetryHandler.ts`
+8. **`!= null` → `!== null && !== undefined`** — fixed 3 biome lint violations
+
+### **🔴 Pending: `executionId` Fix for Multi-Execution Session Overlap**
+- **Problem**: Two separate executions of the same `sessionId` both restart `stepIndex` at 1. With no regular text message between them, `prependConversationHistory` collides their `stepIndex=1` into the same Gemini model turn → consecutive model turns → Gemini hallucinates tool responses → tools never execute
+- **Fix**: Generate `executionId = randomUUID()` once per call to `executeNativeGemini3Generate`/`executeNativeGemini3Stream`. Store on every tool_call/tool_result message. Update `prependConversationHistory` composite key to `exec:<executionId>:<stepIndex>` (falling back to `turn:<turnCounter>:<stepIndex>` for legacy messages without an `executionId`)
+- **Files to change**: `types/conversation.ts`, `types/tools.ts`, `redisConversationMemoryManager.ts`, `googleVertex.ts` (3 locations)
+
+### **Files Modified**
+- `src/lib/providers/googleVertex.ts` — `prependConversationHistory`, stream loop, generate loop, silent timeout
+- `src/lib/providers/googleNativeGemini3.ts` — `extractThoughtSignature` type narrowing
+- `src/lib/types/conversation.ts` — `stepIndex` on `ChatMessageMetadata`
+- `src/lib/types/tools.ts` — `stepIndex` + `thoughtSignature` on `PendingToolExecution`
+- `src/lib/core/redisConversationMemoryManager.ts` — store `stepIndex` + `thoughtSignature` on messages
+- `src/lib/core/modules/TelemetryHandler.ts` — removed console.log
+- `src/lib/utils/conversationMemory.ts` — `thoughtSignature` passthrough
+
+---
+
+## 🚀 **PREVIOUS STATUS: IMAGE CACHE SYSTEM IMPLEMENTED** (2026-01-30)
 
 ### **🏆 LATEST FEATURE: ENTERPRISE-GRADE IMAGE CACHING**
 - **Primary Objective**: ✅ Implement intelligent image caching system to reduce bandwidth and improve performance

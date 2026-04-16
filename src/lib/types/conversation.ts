@@ -260,6 +260,8 @@ export type ChatMessageMetadata = {
   thoughtHash?: string;
   /** Whether extended thinking was used for this message */
   thinkingExpanded?: boolean;
+  /** Step index for reconstructing parallel vs sequential tool calls */
+  stepIndex?: number;
 
   // --- Tool output management (SDK-2) ---
 
@@ -440,6 +442,8 @@ export type StoreConversationTurnOptions = {
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
   };
+  /** Gemini 3 thought signature for reasoning continuity across turns */
+  thoughtSignature?: string;
 };
 
 /**

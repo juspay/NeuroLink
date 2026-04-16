@@ -51,6 +51,9 @@ import type {
   StreamToolCall,
   StreamToolResult,
   VertexNativePart,
+  VertexToolStep,
+  VertexSegment,
+  ChatMessage,
 } from "../types/index.js";
 
 import {
@@ -91,6 +94,7 @@ import {
   createTextChannel,
   executeNativeToolCalls,
   extractTextFromParts,
+  extractThoughtSignature,
   handleMaxStepsTermination,
   normalizeToolsForJsonSchemaProvider,
   pushModelResponseToHistory,
@@ -1852,17 +1856,77 @@ export class GoogleVertexProvider extends BaseProvider {
    */
   private prependConversationHistory(
     currentContents: Array<{ role: string; parts: unknown[] }>,
-    conversationMessages?: Array<{ role: string; content: string }>,
+    conversationMessages?: ChatMessage[],
   ): Array<{ role: string; parts: unknown[] }> {
     if (!conversationMessages || conversationMessages.length === 0) {
       return currentContents;
     }
 
     const history: Array<{ role: string; parts: unknown[] }> = [];
+
+    // Composite key: "<turnCounter>:<stepIndex>" ensures step 1 of
+    // conversational turn 1 never collides with step 1 of turn 2.
+    const stepMap = new Map<string, VertexToolStep>();
+    const segments: VertexSegment[] = [];
+
+    // Incremented each time a regular user/assistant message is encountered,
+    // acting as a logical turn boundary between agentic loop iterations.
+    let turnCounter = 0;
+
+    const makeKey = (stepIndex: number | undefined): string =>
+      `${turnCounter}:${stepIndex ?? "undefined"}`;
+
+    const getOrCreateStep = (stepIndex: number | undefined): VertexToolStep => {
+      const key = makeKey(stepIndex);
+      if (stepMap.has(key)) {
+        return stepMap.get(key)!;
+      }
+      const step: VertexToolStep = {
+        type: "tool_step",
+        callParts: [],
+        resultParts: [],
+      };
+      stepMap.set(key, step);
+      segments.push(step);
+      return step;
+    };
+
     for (const msg of conversationMessages) {
-      // @google/genai only accepts "user" and "model" roles in contents.
-      // Skip system messages (handled via config.systemInstruction).
-      // Map "assistant" → "model" (Gemini convention).
+      if (msg.role === "tool_call") {
+        const step = getOrCreateStep(msg.metadata?.stepIndex);
+        const fcPart: Record<string, unknown> = {
+          functionCall: {
+            name: msg.tool || "unknown",
+            args: msg.args || {},
+          },
+        };
+        if (msg.metadata?.thoughtSignature) {
+          fcPart.thoughtSignature = msg.metadata.thoughtSignature;
+        }
+        step.callParts.push(fcPart);
+        continue;
+      }
+
+      if (msg.role === "tool_result") {
+        const step = getOrCreateStep(msg.metadata?.stepIndex);
+        let responsePayload: unknown;
+        try {
+          responsePayload = msg.content
+            ? { result: JSON.parse(msg.content) }
+            : { result: "success" };
+        } catch {
+          responsePayload = { result: msg.content || "success" };
+        }
+        step.resultParts.push({
+          functionResponse: {
+            name: msg.tool || "unknown",
+            response: responsePayload,
+          },
+        });
+        continue;
+      }
+
+      // Regular (user / assistant) message — acts as a turn boundary.
       const role = msg.role === "assistant" ? "model" : msg.role;
       if (role !== "user" && role !== "model") {
         continue;
@@ -1870,10 +1934,32 @@ export class GoogleVertexProvider extends BaseProvider {
       if (!msg.content || msg.content.trim().length === 0) {
         continue;
       }
-      history.push({ role, parts: [{ text: msg.content }] });
+
+      // Increment turn counter BEFORE pushing the segment so that any
+      // tool_calls that follow this message get a fresh namespace.
+      turnCounter++;
+
+      const textPart: Record<string, unknown> = { text: msg.content };
+      if (msg.metadata?.thoughtSignature) {
+        textPart.thoughtSignature = msg.metadata.thoughtSignature;
+      }
+      segments.push({ type: "regular", role, parts: [textPart] });
     }
 
-    // Prepend history before current user message
+    // Emit in order: each ToolStep → model turn (calls) + user turn (results)
+    for (const seg of segments) {
+      if (seg.type === "regular") {
+        history.push({ role: seg.role, parts: seg.parts });
+      } else {
+        if (seg.callParts.length > 0) {
+          history.push({ role: "model", parts: seg.callParts });
+        }
+        if (seg.resultParts.length > 0) {
+          history.push({ role: "user", parts: seg.resultParts });
+        }
+      }
+    }
+
     return [...history, ...currentContents];
   }
 
@@ -2000,10 +2086,8 @@ export class GoogleVertexProvider extends BaseProvider {
     );
     const maxSteps = computeMaxStepsShared(options.maxSteps);
     const currentContents = this.prependConversationHistory(
-      [...contents] as Array<{ role: string; parts: unknown[] }>,
-      (options as TextGenerationOptions).conversationMessages as
-        | Array<{ role: string; content: string }>
-        | undefined,
+      [...contents],
+      options.conversationMessages,
     );
     const channel = createTextChannel();
     const allToolCalls: Array<{
@@ -2039,6 +2123,7 @@ export class GoogleVertexProvider extends BaseProvider {
       timeoutController,
       composedSignal,
       maxSteps,
+      options,
     });
     loopPromise.catch(() => undefined);
 
@@ -2073,13 +2158,20 @@ export class GoogleVertexProvider extends BaseProvider {
     timeoutController: ReturnType<typeof createTimeoutController>;
     composedSignal: AbortSignal | undefined;
     maxSteps: number;
+    options: StreamOptions;
   }): Promise<void> {
     let lastStepText = "";
+    let lastThoughtSignature: string | undefined;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     let step = 0;
     let completedWithFinalAnswer = false;
     const failedTools = new Map<string, { count: number; lastError: string }>();
+    const toolExecutions: Array<{
+      name: string;
+      input: Record<string, unknown>;
+      output: unknown;
+    }> = [];
 
     try {
       while (step < params.maxSteps) {
@@ -2110,6 +2202,14 @@ export class GoogleVertexProvider extends BaseProvider {
           totalOutputTokens += chunkResult.outputTokens;
 
           const stepText = extractTextFromParts(chunkResult.rawResponseParts);
+
+          const stepThoughtSig = extractThoughtSignature(
+            chunkResult.rawResponseParts,
+          );
+          if (stepThoughtSig) {
+            lastThoughtSignature = stepThoughtSig;
+          }
+
           if (chunkResult.stepFunctionCalls.length === 0) {
             completedWithFinalAnswer = true;
             break;
@@ -2132,14 +2232,54 @@ export class GoogleVertexProvider extends BaseProvider {
             chunkResult.stepFunctionCalls,
           );
 
+          // Track array lengths before execution to extract this step's additions
+          const toolCallsBefore = params.allToolCalls.length;
+          const toolExecsBefore = toolExecutions.length;
+
           const functionResponses = await executeNativeToolCalls(
             "[GoogleVertex]",
             chunkResult.stepFunctionCalls,
             params.executeMap,
             failedTools,
             params.allToolCalls,
-            { abortSignal: params.composedSignal },
+            { toolExecutions, abortSignal: params.composedSignal },
           );
+
+          // Store this step's tool calls/results in conversation memory
+          // (mirrors onStepFinish in the standard GenerationHandler path)
+          const stepToolCalls = params.allToolCalls.slice(toolCallsBefore);
+          const stepToolExecs = toolExecutions.slice(toolExecsBefore);
+          // Tag each tool call with the step's thoughtSignature and stepIndex
+          // so they can be stored on the tool_call ChatMessage metadata in Redis
+          // and reconstructed correctly in prependConversationHistory.
+          const taggedToolCalls = stepToolCalls.map((tc, i) => ({
+            ...tc,
+            ...(i === 0 && stepThoughtSig
+              ? { thoughtSignature: stepThoughtSig }
+              : {}),
+            stepIndex: step,
+          }));
+          const taggedToolResults = stepToolExecs.map((te) => ({
+            toolName: te.name,
+            result: te.output,
+            stepIndex: step,
+          }));
+          if (taggedToolCalls.length > 0 || taggedToolResults.length > 0) {
+            this.handleToolExecutionStorage(
+              taggedToolCalls,
+              taggedToolResults,
+              params.options as unknown as TextGenerationOptions,
+              new Date(),
+            ).catch((error: unknown) => {
+              logger.warn(
+                "[GoogleVertex] Failed to store native stream tool executions",
+                {
+                  error: error instanceof Error ? error.message : String(error),
+                },
+              );
+            });
+          }
+
           params.currentContents.push({
             role: "user",
             parts: functionResponses as unknown[],
@@ -2166,6 +2306,10 @@ export class GoogleVertexProvider extends BaseProvider {
       const responseTime = Date.now() - params.startTime;
       params.metadata.responseTime = responseTime;
       params.metadata.totalToolExecutions = params.allToolCalls.length;
+      if (lastThoughtSignature) {
+        (params.metadata as Record<string, unknown>).thoughtSignature =
+          lastThoughtSignature;
+      }
       params.span.setAttribute(ATTR.GEN_AI_INPUT_TOKENS, totalInputTokens);
       params.span.setAttribute(ATTR.GEN_AI_OUTPUT_TOKENS, totalOutputTokens);
       params.span.setAttribute(
@@ -2320,11 +2464,8 @@ export class GoogleVertexProvider extends BaseProvider {
         // See stream path comment for rationale.
         const config = buildNativeConfig(options, toolsConfig);
 
-        // Note: Schema/JSON output for Gemini 3 native SDK is complex due to $ref resolution issues
-        // For now, schemas are handled via the AI SDK fallback path, not native SDK
-        // TODO: Implement proper $ref resolution for complex nested schemas
-
         const startTime = Date.now();
+        // 5-min default: timeout covers ALL agentic steps, 30s is too short.
         const timeout = this.getTimeout(options);
         const timeoutController = createTimeoutController(
           timeout,
@@ -2338,13 +2479,12 @@ export class GoogleVertexProvider extends BaseProvider {
         const maxSteps = computeMaxStepsShared(options.maxSteps);
         // Inject conversation history so the native path has multi-turn context
         const currentContents = this.prependConversationHistory(
-          [...contents] as Array<{ role: string; parts: unknown[] }>,
-          options.conversationMessages as
-            | Array<{ role: string; content: string }>
-            | undefined,
+          [...contents],
+          options.conversationMessages,
         );
         let finalText = "";
         let lastStepText = "";
+        let lastThoughtSignature: string | undefined;
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
         const allToolCalls: Array<{
@@ -2387,18 +2527,35 @@ export class GoogleVertexProvider extends BaseProvider {
               });
 
               const chunkResult = await collectStreamChunks(stream);
+
+              // Silent timeout: abort signal may terminate the stream without
+              // throwing, yielding zero parts. Surface error explicitly.
+              if (
+                composedSignal?.aborted &&
+                chunkResult.rawResponseParts.length === 0
+              ) {
+                throw composedSignal.reason instanceof Error
+                  ? composedSignal.reason
+                  : new Error("Request timed out (no response parts received)");
+              }
+
               totalInputTokens += chunkResult.inputTokens;
               totalOutputTokens += chunkResult.outputTokens;
-
+              const stepThoughtSig = extractThoughtSignature(
+                chunkResult.rawResponseParts,
+              );
+              if (stepThoughtSig) {
+                lastThoughtSignature = stepThoughtSig;
+              }
               const stepText = extractTextFromParts(
                 chunkResult.rawResponseParts,
               );
 
               if (chunkResult.stepFunctionCalls.length === 0) {
-                finalText = stepText;
+                // Fall back to lastStepText when final step has no text parts
+                finalText = stepText || lastStepText;
                 break;
               }
-
               lastStepText = stepText;
 
               // Record tool call events on the span
@@ -2419,6 +2576,10 @@ export class GoogleVertexProvider extends BaseProvider {
                 chunkResult.stepFunctionCalls,
               );
 
+              // Track array lengths before execution to extract this step's additions
+              const toolCallsBefore = allToolCalls.length;
+              const toolExecsBefore = toolExecutions.length;
+
               const functionResponses = await executeNativeToolCalls(
                 "[GoogleVertex]",
                 chunkResult.stepFunctionCalls,
@@ -2427,6 +2588,42 @@ export class GoogleVertexProvider extends BaseProvider {
                 allToolCalls,
                 { toolExecutions, abortSignal: composedSignal },
               );
+
+              // Store this step's tool calls/results in conversation memory
+              // (mirrors onStepFinish in the standard GenerationHandler path)
+              const stepToolCalls = allToolCalls.slice(toolCallsBefore);
+              const stepToolExecs = toolExecutions.slice(toolExecsBefore);
+              // Tag each tool call with the step's thoughtSignature and stepIndex
+              // so they can be stored on the tool_call ChatMessage metadata in Redis
+              // and reconstructed correctly in prependConversationHistory.
+              const taggedToolCalls = stepToolCalls.map((tc, i) => ({
+                ...tc,
+                ...(i === 0 && stepThoughtSig
+                  ? { thoughtSignature: stepThoughtSig }
+                  : {}),
+                stepIndex: step,
+              }));
+              const taggedToolResults = stepToolExecs.map((te) => ({
+                toolName: te.name,
+                result: te.output,
+                stepIndex: step,
+              }));
+              if (taggedToolCalls.length > 0 || taggedToolResults.length > 0) {
+                this.handleToolExecutionStorage(
+                  taggedToolCalls,
+                  taggedToolResults,
+                  options,
+                  new Date(),
+                ).catch((error: unknown) => {
+                  logger.warn(
+                    "[GoogleVertex] Failed to store native tool executions",
+                    {
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    },
+                  );
+                });
+              }
 
               // Function/tool responses must use role: "user" — the
               // @google/genai SDK's validateHistory() only accepts "user"
@@ -2500,6 +2697,9 @@ export class GoogleVertexProvider extends BaseProvider {
           toolsUsed: allToolCalls.map((tc) => tc.toolName),
           toolExecutions: toolExecutions,
           enhancedWithTools: allToolCalls.length > 0,
+          ...(lastThoughtSignature && {
+            thoughtSignature: lastThoughtSignature,
+          }),
         };
       },
     );

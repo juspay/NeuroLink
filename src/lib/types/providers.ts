@@ -1920,3 +1920,21 @@ export type GoogleLiveAudioQueueItem =
 export type VertexNativePart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } };
+
+/**
+ * Internal helpers used by the conversation-history builder in
+ * providers/googleVertex.ts to merge interleaved tool call / result turns.
+ */
+export type VertexToolStep = {
+  type: "tool_step";
+  callParts: unknown[];
+  resultParts: unknown[];
+};
+
+export type VertexRegularSegment = {
+  type: "regular";
+  role: string;
+  parts: unknown[];
+};
+
+export type VertexSegment = VertexToolStep | VertexRegularSegment;

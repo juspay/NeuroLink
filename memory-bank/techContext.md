@@ -1,5 +1,95 @@
 # NeuroLink Technical Context
 
+## ✅ **GEMINI 3 NATIVE PATH — MULTI-TURN TOOL CALLING** (2026-04-17)
+
+### **Why the Native @google/genai Path Exists**
+
+Gemini 3 models (`gemini-3-pro-preview`, `gemini-3-flash-preview`) emit a `thoughtSignature` token on every response that contains tool calls. This opaque token **must** be echoed back verbatim on every subsequent function call part in conversation history. The Vercel AI SDK (`@ai-sdk/google-vertex`) silently strips this token during message construction, making multi-turn tool calling break after the first step.
+
+NeuroLink solves this by routing all Gemini 3 models to a **native `@google/genai` SDK path** that bypasses the Vercel layer entirely:
+- `executeNativeGemini3Stream` / `executeNativeGemini3StreamWithSpan` — stream path
+- `executeNativeGemini3Generate` — generate path
+- Shared helpers in `src/lib/providers/googleNativeGemini3.ts`
+
+### **`thoughtSignature` Replay Format**
+
+When replaying conversation history, `thoughtSignature` must be a **sibling field** on the part — not a wrapper around it:
+
+```typescript
+// CORRECT — thoughtSignature as sibling on functionCall part
+{
+  functionCall: { name: "myTool", args: { ... } },
+  thoughtSignature: "<opaque-token>"
+}
+
+// WRONG — thoughtSignature in a wrapper
+{
+  thoughtSignature: "<opaque-token>",
+  part: { functionCall: { ... } }
+}
+```
+
+Same rule applies to `text` parts (for assistant messages that came right before tool calls).
+
+### **`stepIndex` — Parallel Tool Call Grouping**
+
+Within a single agentic loop step, Gemini can return multiple function calls in one response (parallel calling). All of them must be in a **single model turn** in conversation history. Grouping them separately produces two consecutive model turns, which Gemini rejects.
+
+`stepIndex` is an integer counter that increments with each while-loop iteration in `executeNativeGemini3Stream`/`Generate`. It is stored on every `tool_call` and `tool_result` Redis message via `ChatMessageMetadata.stepIndex`.
+
+`prependConversationHistory` groups by composite key `turnCounter:stepIndex`:
+- `turnCounter` increments on each regular user/assistant text message — acts as a logical boundary between agentic loop invocations
+- `stepIndex` groups parallel calls within one invocation step
+
+### **Multi-Execution Session Overlap Bug**
+
+When `continueOrchestratorWorkflow` (or any orchestrator mechanism) triggers a **new invocation of the same `sessionId`**, both executions restart `stepIndex` at 1. With no regular text message between the two executions' tool messages, `turnCounter` stays at 0 for everything. The key `"0:1"` becomes shared between Exec A's step 1 and Exec B's step 1 — their tool calls are merged into the same Gemini model turn.
+
+**Visual Example:**
+
+```
+Redis session-123 (arrival order):
+  [Exec A] tool_call  { tool: "getChildAgentStatuses",  stepIndex: 1 }
+  [Exec A] tool_result { tool: "getChildAgentStatuses", stepIndex: 1 }
+  [Exec A] tool_call  { tool: "continueOrchestrator",   stepIndex: 2 }
+  [Exec A] tool_result { tool: "continueOrchestrator",  stepIndex: 2 }
+  [Exec B] tool_call  { tool: "getChildAgentStatuses",  stepIndex: 1 }  ← restarts!
+  [Exec B] tool_result { tool: "getChildAgentStatuses", stepIndex: 1 }
+
+prependConversationHistory groups by "turnCounter:stepIndex":
+  "0:1" → contains Exec A step 1 AND Exec B step 1  ← collision!
+  "0:2" → Exec A step 2 only (no overlap there)
+
+Resulting Gemini history (INVALID):
+  model turn: [ functionCall(getChildAgentStatuses), functionCall(getChildAgentStatuses) ]
+  user turn:  [ functionResponse(A), functionResponse(B) ]
+  model turn: [ functionCall(continueOrchestrator) ]
+  user turn:  [ functionResponse ]
+
+On new execution C's step 1 — Gemini sees "tools already ran" and returns text/stop:
+  stepFunctionCalls.length === 0 → loop exits immediately → execute() never called → no logs
+```
+
+**Fix (pending)**: Add `executionId = randomUUID()` once per `executeNativeGemini3*` call. Tag every `tool_call`/`tool_result`. Key becomes `exec:<executionId>:<stepIndex>`. Backward-compat fallback for old messages without `executionId`: `turn:<turnCounter>:<stepIndex>`.
+
+### **File Map for Native Gemini 3 Path**
+
+| File | Role |
+|------|------|
+| `src/lib/providers/googleVertex.ts` | Main provider: native stream/generate paths, `prependConversationHistory` |
+| `src/lib/providers/googleNativeGemini3.ts` | Shared helpers: `extractThoughtSignature`, `collectStreamChunksIncremental`, `buildNativeToolDeclarations`, `buildNativeConfig`, `executeNativeToolCalls`, `handleMaxStepsTermination` |
+| `src/lib/types/conversation.ts` | `ChatMessageMetadata.stepIndex`, `ChatMessageMetadata.thoughtSignature` |
+| `src/lib/types/tools.ts` | `PendingToolExecution.toolCalls[].stepIndex`, `PendingToolExecution.toolCalls[].thoughtSignature`, `PendingToolExecution.toolResults[].stepIndex` |
+| `src/lib/core/redisConversationMemoryManager.ts` | `flushPendingToolData` — stores `stepIndex` + `thoughtSignature` on Redis messages |
+| `src/lib/utils/conversationMemory.ts` | `thoughtSignature` passthrough in the `handleToolExecutionStorage` call chain |
+
+### **Timeout Behaviour on Native Generate Path**
+- Default 5 minutes (`300000` ms) — covers multi-step agentic loops with many tool calls
+- Configurable via `options.timeout` (human-readable: `"2m"`, `"300s"`, milliseconds)
+- After `collectStreamChunks`, checks `composedSignal?.aborted` and throws `TimeoutError` if the signal was set — prevents silent empty-response returns when the clock runs out mid-stream
+
+---
+
 ## ✅ **GEMINI 3 EXTENDED THINKING TECHNICAL IMPLEMENTATION** (2025-12-31)
 
 ### **Extended Thinking Configuration**

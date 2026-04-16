@@ -591,6 +591,29 @@ export async function collectStreamChunksIncremental(
 }
 
 /**
+ * Extract the thoughtSignature token from raw response parts.
+ * Returns the last thoughtSignature found (each step may produce one).
+ */
+export function extractThoughtSignature(
+  rawResponseParts: unknown[],
+): string | undefined {
+  for (let i = rawResponseParts.length - 1; i >= 0; i--) {
+    const part = rawResponseParts[i];
+    if (
+      part !== null &&
+      part !== undefined &&
+      typeof part === "object" &&
+      "thoughtSignature" in part &&
+      typeof (part as { thoughtSignature: unknown }).thoughtSignature ===
+        "string"
+    ) {
+      return (part as { thoughtSignature: string }).thoughtSignature;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Extract text from raw response parts, filtering out non-text parts
  * (thoughtSignature, functionCall) to avoid SDK warnings.
  */
