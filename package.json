@@ -248,8 +248,6 @@
     "open": "^11.0.0",
     "ora": "^9.3.0",
     "p-limit": "^7.3.0",
-    "pdf-parse": "^2.4.5",
-    "pdf-to-img": "^5.0.0",
     "pptxgenjs": "^4.0.1",
     "redis": "^5.11.0",
     "tar-stream": "^3.1.8",
@@ -275,6 +273,8 @@
   },
   "optionalDependencies": {
     "@langfuse/otel": "^5.0.1",
+    "pdf-parse": "^2.4.5",
+    "pdf-to-img": "^5.0.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/rate-limit": "^10.3.0",
     "@hono/node-server": "^1.19.9",
