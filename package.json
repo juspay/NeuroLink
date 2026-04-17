@@ -205,7 +205,6 @@
     "@ai-sdk/provider": "^3.0.8",
     "@aws-sdk/client-bedrock": "^3.1000.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1000.0",
-    "@aws-sdk/client-sagemaker": "^3.1000.0",
     "@aws-sdk/client-sagemaker-runtime": "^3.1000.0",
     "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/vertexai": "^1.10.0",
@@ -271,6 +270,7 @@
     }
   },
   "optionalDependencies": {
+    "@aws-sdk/client-sagemaker": "^3.1000.0",
     "@langfuse/otel": "^5.0.1",
     "bullmq": "^5.52.2",
     "pdf-parse": "^2.4.5",
