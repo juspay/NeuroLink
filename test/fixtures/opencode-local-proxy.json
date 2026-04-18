@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "neurolink": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NeuroLink Local Proxy",
+      "env": [],
+      "models": {
+        "claude-sonnet-4-6": {
+          "name": "Claude Sonnet 4.6",
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "reasoning": true,
+          "release_date": "2025-06-10",
+          "limit": { "context": 200000, "output": 16384 }
+        }
+      },
+      "options": {
+        "baseURL": "http://localhost:5555/v1",
+        "apiKey": "neurolink-local-test"
+      }
+    }
+  },
+  "model": "neurolink/claude-sonnet-4-6"
+}

@@ -1401,7 +1401,10 @@ export type OpenAPISpec = {
 export type CreateRoutesOptions = {
   enableSwagger?: boolean;
   getRoutes?: () => RouteDefinition[];
+  /** Enable both Claude and OpenAI proxy endpoints. */
+  proxy?: boolean;
   claudeProxy?: boolean;
+  openaiProxy?: boolean;
 };
 
 // =============================================================================

@@ -1320,3 +1320,181 @@ export type ProxyTelemetryAction =
   | "status"
   | "logs"
   | "import-dashboard";
+
+// =============================================================================
+// PROXY FORMAT (from proxy/proxyTranslationEngine.ts)
+// =============================================================================
+
+/** Wire format a proxy request is using. */
+export type ProxyFormat = "claude" | "openai";
+
+/**
+ * Common adapter interface that hides the differences between
+ * Claude and OpenAI stream serializers from the unified translation engine.
+ */
+export type StreamSerializerAdapter = {
+  start(): Iterable<string>;
+  pushDelta(text: string): Iterable<string>;
+  pushToolUse(id: string, name: string, input: unknown): Iterable<string>;
+  finish(
+    finishReason: string,
+    usage: { input: number; output: number; total: number },
+  ): Iterable<string>;
+  emitError(message: string): Iterable<string>;
+};
+
+// =============================================================================
+// OPENAI CHAT COMPLETIONS TYPES (for OpenCode proxy support)
+// =============================================================================
+
+/** OpenAI content part in a user message. */
+export type OpenAIContentPartText = { type: "text"; text: string };
+export type OpenAIContentPartImage = {
+  type: "image_url";
+  image_url: { url: string; detail?: "auto" | "low" | "high" };
+};
+export type OpenAIContentPart = OpenAIContentPartText | OpenAIContentPartImage;
+
+/** OpenAI message types. */
+export type OpenAISystemMessage = { role: "system"; content: string };
+export type OpenAIUserMessage = {
+  role: "user";
+  content: string | OpenAIContentPart[];
+};
+export type OpenAIAssistantMessage = {
+  role: "assistant";
+  content?: string | null;
+  tool_calls?: OpenAIToolCall[];
+};
+export type OpenAIToolMessage = {
+  role: "tool";
+  tool_call_id: string;
+  content: string;
+};
+export type OpenAIMessage =
+  | OpenAISystemMessage
+  | OpenAIUserMessage
+  | OpenAIAssistantMessage
+  | OpenAIToolMessage;
+
+/** OpenAI tool call (in assistant messages and responses). */
+export type OpenAIToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string }; // arguments is stringified JSON
+};
+
+/** OpenAI tool definition. */
+export type OpenAIToolDef = {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+/** OpenAI tool_choice options. */
+export type OpenAIToolChoice =
+  | "auto"
+  | "required"
+  | "none"
+  | { type: "function"; function: { name: string } };
+
+/** OpenAI Chat Completions request body. */
+export type OpenAICompletionRequest = {
+  model: string;
+  messages: OpenAIMessage[];
+  tools?: OpenAIToolDef[];
+  tool_choice?: OpenAIToolChoice;
+  stream?: boolean;
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  max_completion_tokens?: number;
+  stop?: string | string[];
+  n?: number;
+  response_format?: {
+    type: "text" | "json_object" | "json_schema";
+    json_schema?: unknown;
+  };
+  stream_options?: { include_usage?: boolean };
+};
+
+/** OpenAI usage counters. */
+export type OpenAIUsage = {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+};
+
+/** OpenAI non-streaming response. */
+export type OpenAICompletionResponse = {
+  id: string;
+  object: "chat.completion";
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: "assistant";
+      content: string | null;
+      tool_calls?: OpenAIToolCall[];
+    };
+    finish_reason: "stop" | "tool_calls" | "length" | "content_filter" | null;
+  }>;
+  usage: OpenAIUsage;
+};
+
+/** OpenAI streaming chunk. */
+export type OpenAIStreamChunk = {
+  id: string;
+  object: "chat.completion.chunk";
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    delta: {
+      role?: "assistant";
+      content?: string;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        type?: "function";
+        function?: { name?: string; arguments?: string };
+      }>;
+    };
+    finish_reason: string | null;
+  }>;
+  usage?: OpenAIUsage;
+};
+
+/** OpenAI error response. */
+export type OpenAIErrorResponse = {
+  error: { message: string; type: string; code: string | null };
+};
+
+/** Parsed OpenAI request — intermediate form for NeuroLink pipeline. */
+export type ParsedOpenAIRequest = {
+  model: string;
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  systemPrompt?: string;
+  stream: boolean;
+  prompt: string;
+  images: string[];
+  conversationMessages: Array<{ role: string; content: string }>;
+  tools: Record<
+    string,
+    {
+      description?: string;
+      inputSchema: unknown;
+      execute?: (...args: unknown[]) => unknown;
+    }
+  >;
+  toolChoice?: "auto" | "required" | "none";
+  toolChoiceName?: string;
+  stopSequences?: string[];
+  responseFormat?: { type: string; jsonSchema?: unknown };
+};

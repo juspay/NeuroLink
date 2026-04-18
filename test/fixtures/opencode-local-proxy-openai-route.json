@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "_comment": "OpenCode fixture that exercises the proxy's /v1/chat/completions endpoint. OpenCode 1.3.x routes any model name containing 'claude' through its bundled Anthropic SDK directly to /v1/messages, bypassing this branch's new code. Using a non-claude alias forces OpenCode through the @ai-sdk/openai-compatible adapter, which is what hits /v1/chat/completions. The proxy must have a routing entry mapping 'gpt-4o' (or whichever alias you pick) back to anthropic/claude-haiku-4-5 — see docs/features/opencode-proxy-support.md §11.",
+  "provider": {
+    "neurolink": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NeuroLink Local Proxy (OpenAI route)",
+      "env": [],
+      "models": {
+        "gpt-4o": {
+          "name": "GPT-4o (alias → claude-haiku-4-5 via proxy router)",
+          "tool_call": true,
+          "temperature": true,
+          "attachment": true,
+          "reasoning": true,
+          "release_date": "2025-06-10",
+          "limit": { "context": 200000, "output": 16384 }
+        }
+      },
+      "options": {
+        "baseURL": "http://localhost:5555/v1",
+        "apiKey": "neurolink-local-test"
+      }
+    }
+  },
+  "model": "neurolink/gpt-4o"
+}

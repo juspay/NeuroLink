@@ -40,4 +40,14 @@ export class ModelRouter {
   getFallbackChain(): FallbackEntry[] {
     return this.fallback;
   }
+
+  /** Return the raw model mapping entries (used by /v1/models). */
+  getModelMappings(): ModelMapping[] {
+    return Array.from(this.mappings.values());
+  }
+
+  /** Return models configured for passthrough (used by /v1/models). */
+  getPassthroughModels(): string[] {
+    return Array.from(this.passthrough);
+  }
 }

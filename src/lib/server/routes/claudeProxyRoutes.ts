@@ -31,6 +31,16 @@ import {
   parseClaudeRequest,
   serializeClaudeResponse,
 } from "../../proxy/claudeFormat.js";
+import {
+  buildAnthropicModelsListResponse,
+  buildTranslationOptions,
+  extractText,
+  extractToolArgs,
+  extractUsageFromStreamResult,
+  handleTranslatedJsonRequest,
+  handleTranslatedStreamRequest,
+  hasTranslatedOutput,
+} from "../../proxy/proxyTranslationEngine.js";
 import type { ModelRouter } from "../../proxy/modelRouter.js";
 import { tracers } from "../../telemetry/tracers.js";
 import { withSpan } from "../../telemetry/withSpan.js";
@@ -81,7 +91,6 @@ import type {
   PreparedAnthropicAccountAttempt,
   ProxyBodyCaptureLogger,
   ProxyPassthroughAccount,
-  ProxyTranslationAttempt,
   RouteGroup,
   RuntimeAccountState,
   ServerContext,
@@ -698,24 +707,25 @@ async function handleTranslatedClaudeRequest(args: {
   const attempts = plan.attempts;
 
   if (body.stream) {
-    return handleTranslatedClaudeStreamRequest({
+    return handleTranslatedStreamRequest({
       ctx,
-      body,
-      attempts,
+      format: "claude",
+      requestModel: body.model,
       parsed,
+      attempts,
       tracer,
       requestStartTime,
     });
   }
 
-  return handleTranslatedClaudeJsonRequest({
+  return handleTranslatedJsonRequest({
     ctx,
-    body,
-    attempts,
+    format: "claude",
+    requestModel: body.model,
     parsed,
+    attempts,
     tracer,
     requestStartTime,
-    logProxyBody,
   });
 }
 
@@ -732,289 +742,6 @@ function logProxyRoutingPlan(
       attempts: plan.attempts,
     },
   });
-}
-
-async function handleTranslatedClaudeStreamRequest(args: {
-  ctx: ServerContext;
-  body: ClaudeRequest;
-  attempts: ProxyTranslationAttempt[];
-  parsed: ParsedClaudeRequest;
-  tracer?: ProxyTracer;
-  requestStartTime: number;
-}): Promise<Response> {
-  const { ctx, body, attempts, parsed, tracer, requestStartTime } = args;
-  const serializer = new ClaudeStreamSerializer(body.model, 0);
-  const KEEPALIVE_INTERVAL_MS = 15_000;
-  const encoder = new TextEncoder();
-  let translationKeepAliveTimer: ReturnType<typeof setInterval> | undefined;
-  let translationCancelled = false;
-  let translationSucceeded = false;
-  let translatedModel: string | undefined;
-  let finalStreamError = "No translation providers succeeded";
-  let upstreamIterator: AsyncIterator<unknown> | undefined;
-
-  const translationStream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      for (const frame of serializer.start()) {
-        controller.enqueue(encoder.encode(frame));
-      }
-
-      translationKeepAliveTimer = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(": keep-alive\n\n"));
-        } catch {
-          // Controller already closed.
-        }
-      }, KEEPALIVE_INTERVAL_MS);
-
-      try {
-        for (
-          let attemptIndex = 0;
-          attemptIndex < attempts.length;
-          attemptIndex++
-        ) {
-          const attempt = attempts[attemptIndex];
-          if (attemptIndex > 0) {
-            logger.always(`[proxy] fallback → ${attempt.label}`);
-          }
-
-          let collectedText = "";
-          try {
-            const options = buildProxyFallbackOptions(
-              parsed,
-              attempt.provider
-                ? {
-                    provider: attempt.provider,
-                    model: attempt.model,
-                  }
-                : {},
-            );
-            const streamResult = await ctx.neurolink.stream(
-              options as Parameters<typeof ctx.neurolink.stream>[0],
-            );
-            const iterable = streamResult.stream as AsyncIterable<unknown>;
-            upstreamIterator = iterable[Symbol.asyncIterator]();
-
-            while (true) {
-              if (translationCancelled) {
-                break;
-              }
-              const { value: chunk, done } = await upstreamIterator.next();
-              if (done || translationCancelled) {
-                break;
-              }
-              const text = extractText(chunk);
-              if (text) {
-                collectedText += text;
-                for (const frame of serializer.pushDelta(text)) {
-                  controller.enqueue(encoder.encode(frame));
-                }
-              }
-            }
-
-            const toolCalls = streamResult.toolCalls ?? [];
-            if (!hasTranslatedOutput(collectedText, toolCalls)) {
-              finalStreamError = `Translated provider ${attempt.label} returned no content or tool calls`;
-              logger.debug(
-                `[proxy] translation attempt ${attempt.label} returned no content or tool calls`,
-              );
-              continue;
-            }
-
-            if (!translationCancelled && toolCalls.length) {
-              for (const toolCall of toolCalls) {
-                const toolName =
-                  (toolCall as { toolName?: string }).toolName ??
-                  (toolCall as { name?: string }).name ??
-                  "unknown";
-                for (const frame of serializer.pushToolUse(
-                  generateToolUseId(),
-                  toolName,
-                  extractToolArgs(toolCall),
-                )) {
-                  controller.enqueue(encoder.encode(frame));
-                }
-              }
-            }
-
-            if (!translationCancelled) {
-              const reason = streamResult.finishReason ?? "end_turn";
-              const resolvedUsage = extractUsageFromStreamResult(
-                streamResult.usage,
-              );
-              for (const frame of serializer.finish(
-                resolvedUsage.output,
-                reason,
-              )) {
-                controller.enqueue(encoder.encode(frame));
-              }
-            }
-
-            translatedModel = streamResult.model;
-            translationSucceeded = true;
-            return;
-          } catch (streamErr) {
-            if (translationCancelled) {
-              return;
-            }
-            finalStreamError =
-              streamErr instanceof Error
-                ? streamErr.message
-                : String(streamErr);
-            if (collectedText.trim().length > 0) {
-              logger.always(
-                `[proxy] mid-stream error (translation mode): ${finalStreamError}`,
-              );
-              const errorEvent = `event: error\ndata: ${JSON.stringify({ type: "error", error: { type: "api_error", message: `Upstream stream interrupted: ${finalStreamError}` } })}\n\n`;
-              controller.enqueue(encoder.encode(errorEvent));
-              return;
-            }
-            logger.debug(
-              `[proxy] translation attempt ${attempt.label} failed: ${finalStreamError}`,
-            );
-          }
-        }
-
-        if (!translationCancelled) {
-          logger.always(
-            `[proxy] mid-stream error (translation mode): ${finalStreamError}`,
-          );
-          const errorEvent = `event: error\ndata: ${JSON.stringify({ type: "error", error: { type: "api_error", message: `Upstream stream interrupted: ${finalStreamError}` } })}\n\n`;
-          controller.enqueue(encoder.encode(errorEvent));
-        }
-      } finally {
-        if (translationKeepAliveTimer) {
-          clearInterval(translationKeepAliveTimer);
-        }
-        if (!translationCancelled) {
-          controller.close();
-        }
-        if (tracer && translatedModel && translatedModel !== body.model) {
-          tracer.setModelSubstitution(body.model, translatedModel);
-        }
-        if (!translationSucceeded) {
-          tracer?.setError("generation_error", finalStreamError.slice(0, 500));
-        }
-        tracer?.end(200, Date.now() - requestStartTime);
-      }
-    },
-    cancel() {
-      translationCancelled = true;
-      if (translationKeepAliveTimer) {
-        clearInterval(translationKeepAliveTimer);
-        translationKeepAliveTimer = undefined;
-      }
-      if (upstreamIterator?.return) {
-        upstreamIterator.return(undefined).catch((cancelErr) => {
-          logger.debug(
-            `[proxy] upstream cancel error: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`,
-          );
-        });
-      }
-    },
-  });
-
-  return new Response(translationStream, {
-    headers: {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
-    },
-  });
-}
-
-async function handleTranslatedClaudeJsonRequest(args: {
-  ctx: ServerContext;
-  body: ClaudeRequest;
-  attempts: ProxyTranslationAttempt[];
-  parsed: ParsedClaudeRequest;
-  tracer?: ProxyTracer;
-  requestStartTime: number;
-  logProxyBody: ProxyBodyCaptureLogger;
-}): Promise<unknown> {
-  const {
-    ctx,
-    body,
-    attempts,
-    parsed,
-    tracer,
-    requestStartTime,
-    logProxyBody,
-  } = args;
-  let lastAttemptError = "No translation providers succeeded";
-
-  for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
-    const attempt = attempts[attemptIndex];
-    if (attemptIndex > 0) {
-      logger.always(`[proxy] fallback → ${attempt.label}`);
-    }
-
-    try {
-      const options = buildProxyFallbackOptions(
-        parsed,
-        attempt.provider
-          ? {
-              provider: attempt.provider,
-              model: attempt.model,
-            }
-          : {},
-      );
-      const streamResult = await ctx.neurolink.stream(
-        options as Parameters<typeof ctx.neurolink.stream>[0],
-      );
-      let collectedText = "";
-      for await (const chunk of streamResult.stream) {
-        const text = extractText(chunk);
-        if (text) {
-          collectedText += text;
-        }
-      }
-      if (!hasTranslatedOutput(collectedText, streamResult.toolCalls)) {
-        lastAttemptError = `Translated provider ${attempt.label} returned no content or tool calls`;
-        logger.debug(
-          `[proxy] translation attempt ${attempt.label} returned no content or tool calls`,
-        );
-        continue;
-      }
-
-      const internal: InternalResult = {
-        content: collectedText,
-        model: streamResult.model,
-        finishReason: streamResult.finishReason ?? "end_turn",
-        reasoning: undefined,
-        usage: streamResult.usage
-          ? extractUsageFromStreamResult(streamResult.usage)
-          : undefined,
-        toolCalls: streamResult.toolCalls as InternalResult["toolCalls"],
-      };
-      if (tracer && streamResult.model && streamResult.model !== body.model) {
-        tracer.setModelSubstitution(body.model, streamResult.model);
-      }
-      tracer?.end(200, Date.now() - requestStartTime);
-      const clientResponse = serializeClaudeResponse(internal, body.model);
-      const clientResponseText = JSON.stringify(clientResponse);
-      logProxyBody({
-        phase: "client_response",
-        headers: { "content-type": "application/json" },
-        body: clientResponseText,
-        bodySize: Buffer.byteLength(clientResponseText, "utf8"),
-        contentType: "application/json",
-        responseStatus: 200,
-        durationMs: Date.now() - requestStartTime,
-      });
-      return clientResponse;
-    } catch (attemptError) {
-      lastAttemptError =
-        attemptError instanceof Error
-          ? attemptError.message
-          : String(attemptError);
-      logger.debug(
-        `[proxy] translation attempt ${attempt.label} failed: ${lastAttemptError}`,
-      );
-    }
-  }
-
-  throw new Error(lastAttemptError);
 }
 
 async function handleClaudePassthroughRequest(args: {
@@ -4874,7 +4601,13 @@ export function createClaudeProxyRoutes(
       },
 
       // =====================================================================
-      // GET /v1/models -- List available models
+      // GET /v1/models -- List available models (Anthropic schema)
+      //
+      // Returns the Anthropic-shaped list response (`type`, `display_name`,
+      // `created_at`, `first_id`, `last_id`, `has_more`) so Anthropic SDK
+      // consumers calling this Claude-compatible surface get the schema they
+      // expect. The OpenAI route serves the same data in OpenAI list format
+      // via its own builder.
       // =====================================================================
       {
         method: "GET",
@@ -4886,26 +4619,9 @@ export function createClaudeProxyRoutes(
               tracer: tracers.http,
               attributes: { "http.route": `${basePath}/v1/models` },
             },
-            async () => {
-              const models = [
-                "claude-sonnet-4-20250514",
-                "claude-sonnet-4-5-20250929",
-                "claude-haiku-4-5-20241022",
-                "claude-opus-4-20250514",
-              ];
-
-              return {
-                object: "list",
-                data: models.map((id) => ({
-                  id,
-                  object: "model",
-                  created: 1700000000,
-                  owned_by: "anthropic",
-                })),
-              };
-            },
+            async () => buildAnthropicModelsListResponse(modelRouter),
           ),
-        description: "List available Claude models",
+        description: "List available models (Anthropic schema)",
         tags: ["claude-proxy", "models"],
       },
 
@@ -4964,63 +4680,6 @@ export function createClaudeProxyRoutes(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Extract token usage from a StreamResult.usage object, handling multiple
- * naming conventions across AI SDK versions and providers:
- * - AI SDK v6: inputTokens / outputTokens
- * - AI SDK v4: promptTokens / completionTokens
- * - NeuroLink internal: input / output
- */
-function extractUsageFromStreamResult(usage: unknown): {
-  input: number;
-  output: number;
-  total: number;
-} {
-  if (!usage || typeof usage !== "object") {
-    return { input: 0, output: 0, total: 0 };
-  }
-  const u = usage as Record<string, unknown>;
-  const input =
-    (typeof u.inputTokens === "number" ? u.inputTokens : 0) ||
-    (typeof u.promptTokens === "number" ? u.promptTokens : 0) ||
-    (typeof u.input === "number" ? u.input : 0);
-  const output =
-    (typeof u.outputTokens === "number" ? u.outputTokens : 0) ||
-    (typeof u.completionTokens === "number" ? u.completionTokens : 0) ||
-    (typeof u.output === "number" ? u.output : 0);
-  return { input, output, total: input + output };
-}
-
-/**
- * Extract text content from a stream chunk (handles various chunk formats).
- */
-function extractText(chunk: unknown): string | null {
-  if (typeof chunk === "string") {
-    return chunk;
-  }
-
-  if (chunk && typeof chunk === "object") {
-    const c = chunk as Record<string, unknown>;
-
-    // NeuroLink StreamResult chunk format: { content: string }
-    if (typeof c.content === "string") {
-      return c.content;
-    }
-
-    // Vercel AI SDK text delta format
-    if (c.type === "text-delta" && typeof c.textDelta === "string") {
-      return c.textDelta;
-    }
-
-    // Direct text field
-    if (typeof c.text === "string") {
-      return c.text;
-    }
-  }
-
-  return null;
-}
 
 function getOrCreateRuntimeState(accountKey: string): RuntimeAccountState {
   const existing = accountRuntimeState.get(accountKey);
@@ -5223,104 +4882,10 @@ function normalizeClaudeRequestForAnthropic(
   };
 }
 
-export function buildProxyFallbackOptions(
-  parsed: ParsedClaudeRequest,
-  overrides: {
-    provider?: string;
-    model?: string;
-  } = {},
-): Record<string, unknown> {
-  const historyMessages = parsed.conversationMessages.slice(0, -1);
-  const toolNames = Object.keys(parsed.tools);
-  const images = shouldOmitImagesForTarget(overrides.provider, overrides.model)
-    ? []
-    : parsed.images;
-  const thinkingConfig = shouldOmitThinkingConfigForTarget(
-    overrides.provider,
-    overrides.model,
-  )
-    ? undefined
-    : parsed.thinkingConfig;
-  const toolChoice = parsed.toolChoiceName
-    ? { type: "tool" as const, toolName: parsed.toolChoiceName }
-    : parsed.toolChoice;
-
-  return {
-    input: {
-      text: parsed.prompt,
-      ...(images.length > 0 ? { images } : {}),
-    },
-    ...(overrides.provider ? { provider: overrides.provider } : {}),
-    ...(overrides.model ? { model: overrides.model } : {}),
-    systemPrompt: parsed.systemPrompt,
-    maxTokens: parsed.maxTokens,
-    ...(parsed.temperature !== undefined
-      ? { temperature: parsed.temperature }
-      : {}),
-    ...(parsed.topP !== undefined ? { topP: parsed.topP } : {}),
-    ...(parsed.topK !== undefined ? { topK: parsed.topK } : {}),
-    ...(parsed.stopSequences?.length
-      ? { stopSequences: parsed.stopSequences }
-      : {}),
-    ...(thinkingConfig ? { thinkingConfig } : {}),
-    ...(toolNames.length === 0 ? { disableTools: true } : {}),
-    // Claude-compatible requests already declare the exact tool contract.
-    // Filter out NeuroLink's built-in agent tools so translated fallbacks only
-    // expose the tools the client actually knows how to handle.
-    ...(toolNames.length > 0
-      ? {
-          tools: parsed.tools,
-          toolFilter: toolNames,
-        }
-      : {}),
-    ...(toolChoice ? { toolChoice } : {}),
-    ...(historyMessages.length > 0
-      ? { conversationMessages: historyMessages }
-      : {}),
-    disableInternalFallback: true,
-    skipToolPromptInjection: true,
-    maxSteps: 1,
-  };
-}
-
-function hasTranslatedOutput(
-  collectedText: string,
-  toolCalls: unknown[] | undefined,
-): boolean {
-  return collectedText.trim().length > 0 || (toolCalls?.length ?? 0) > 0;
-}
-
-function shouldOmitImagesForTarget(provider?: string, model?: string): boolean {
-  // `open-large` in our LiteLLM setup handles text and tools, but returns an
-  // empty completion when binary images are forwarded. Claude Code already
-  // includes textual image markers in the prompt, so dropping only the binary
-  // image payload keeps the request usable instead of breaking fallback.
-  return provider === "litellm" && model === "open-large";
-}
-
-function shouldOmitThinkingConfigForTarget(
-  provider?: string,
-  model?: string,
-): boolean {
-  if (provider === "litellm") {
-    return true;
-  }
-  if (provider !== "vertex") {
-    return false;
-  }
-  // Only Gemini 2.5+ and 3.x support thinking_level on Vertex.
-  const m = model?.toLowerCase() ?? "";
-  return !/gemini-(2\.5|3)/.test(m);
-}
-
-function extractToolArgs(toolCall: unknown): unknown {
-  return (
-    (toolCall as { args?: unknown }).args ??
-    (toolCall as { parameters?: unknown }).parameters ??
-    (toolCall as { input?: unknown }).input ??
-    {}
-  );
-}
+/**
+ * Backward-compatible alias — delegates to the shared translation engine.
+ */
+export const buildProxyFallbackOptions = buildTranslationOptions;
 
 /**
  * Detect transient upstream failures that should trigger account/provider failover.

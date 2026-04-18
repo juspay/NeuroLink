@@ -323,6 +323,144 @@ async function clearClaudeProxySettings(
   return hadBaseUrl || hadToolSearch;
 }
 
+// =============================================================================
+// OPENCODE AUTO-CONFIGURATION
+// =============================================================================
+
+function getOpenCodeConfigDir(): string {
+  if (process.platform === "darwin") {
+    return join(homedir(), "Library", "Application Support", "opencode");
+  }
+  // Linux/other: XDG_CONFIG_HOME or ~/.config
+  return join(
+    process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
+    "opencode",
+  );
+}
+
+const OPENCODE_CONFIG_PATH = join(getOpenCodeConfigDir(), "opencode.json");
+
+/**
+ * Key under which we persist the snapshot of the user's pre-existing
+ * `provider.neurolink` config inside `opencode.json` itself. Persisting (rather
+ * than relying on in-process state) means restoration still works even if the
+ * proxy crashes or shutdown handlers run in a different process.
+ *
+ * Mirrors the Claude pattern (`__proxy_original_env` inside Claude's settings).
+ */
+const OPENCODE_ORIGINAL_KEY = "__proxy_original_neurolink";
+
+async function setOpenCodeProxySettings(
+  baseUrl: string,
+  proxyKey?: string,
+): Promise<void> {
+  const fs = await import("fs");
+
+  const configDir = getOpenCodeConfigDir();
+  try {
+    fs.accessSync(configDir);
+  } catch {
+    // OpenCode not installed — config directory does not exist, skip silently
+    return;
+  }
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(fs.readFileSync(OPENCODE_CONFIG_PATH, "utf8"));
+  } catch {
+    // file missing/invalid — create fresh config object
+    config = { provider: {} };
+  }
+
+  const provider = (config.provider ?? {}) as Record<string, unknown>;
+
+  // Persist a snapshot of the user's pre-existing provider.neurolink — but
+  // only the first time we touch the file. Subsequent set() calls must NOT
+  // overwrite the snapshot (otherwise after the proxy writes its own block,
+  // the next set() would store the proxy's block as the "original" and
+  // permanently lose the user's real config on the next clear()).
+  if (!(OPENCODE_ORIGINAL_KEY in config)) {
+    (config as Record<string, unknown>)[OPENCODE_ORIGINAL_KEY] =
+      "neurolink" in provider
+        ? JSON.parse(JSON.stringify(provider.neurolink))
+        : null;
+  }
+
+  provider.neurolink = {
+    id: "neurolink",
+    name: "NeuroLink Proxy",
+    npm: "@ai-sdk/openai-compatible",
+    env: [],
+    models: {},
+    options: {
+      baseURL: baseUrl,
+      apiKey: proxyKey || "neurolink-proxy",
+    },
+  };
+
+  config.provider = provider;
+  fs.writeFileSync(OPENCODE_CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+async function clearOpenCodeProxySettings(
+  expectedBaseUrl?: string,
+): Promise<boolean> {
+  const fs = await import("fs");
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(fs.readFileSync(OPENCODE_CONFIG_PATH, "utf8"));
+  } catch {
+    return false;
+  }
+
+  const provider = config.provider as Record<string, unknown> | undefined;
+  if (!provider || !("neurolink" in provider)) {
+    return false;
+  }
+
+  // Check if our proxy URL matches before removing
+  const existing = provider.neurolink as Record<string, unknown> | undefined;
+  if (expectedBaseUrl && existing) {
+    const options = existing.options as Record<string, unknown> | undefined;
+    if (options && typeof options.baseURL === "string") {
+      if (options.baseURL !== expectedBaseUrl) {
+        // User configured a different URL; do not clobber
+        return false;
+      }
+    }
+  }
+
+  const hadNeurolink = "neurolink" in provider;
+
+  // Restore from the snapshot persisted at first set(), regardless of process
+  // identity. Only delete provider.neurolink when the snapshot says the user
+  // explicitly had no entry before — never on an "undefined" snapshot, since
+  // that would mean the snapshot was lost and we cannot prove the entry is ours.
+  if (OPENCODE_ORIGINAL_KEY in config) {
+    const snapshot = (config as Record<string, unknown>)[OPENCODE_ORIGINAL_KEY];
+    if (snapshot === null) {
+      // User had no provider.neurolink before the proxy started — safe to remove.
+      delete provider.neurolink;
+    } else {
+      provider.neurolink = snapshot;
+    }
+    delete (config as Record<string, unknown>)[OPENCODE_ORIGINAL_KEY];
+  } else {
+    // No snapshot present — refuse to delete to avoid destroying a config
+    // the proxy may not own (e.g. a user wrote their own `neurolink` block
+    // before the snapshot key was introduced, or this is being cleared from
+    // a process that never ran set()).
+    logger.debug(
+      "[proxy] OpenCode clear: no original-provider snapshot found, leaving provider.neurolink intact",
+    );
+    return false;
+  }
+
+  config.provider = provider;
+  fs.writeFileSync(OPENCODE_CONFIG_PATH, JSON.stringify(config, null, 2));
+  return hadNeurolink;
+}
+
 async function isProxyHealthy(
   host: string,
   port: number,
@@ -684,9 +822,16 @@ function printProxyBanner(url: string, strategy: string): void {
   logger.always(`  ${chalk.bold("PID:")}        ${chalk.cyan(process.pid)}`);
   logger.always("");
   logger.always(chalk.bold("Endpoints:"));
-  logger.always(`  ${chalk.blue("POST")} /v1/messages  — Proxy to Anthropic`);
-  logger.always(`  ${chalk.green("GET")}  /health       — Health check`);
-  logger.always(`  ${chalk.green("GET")}  /status       — Detailed status`);
+  logger.always(
+    `  ${chalk.blue("POST")} /v1/messages         — Claude proxy (Anthropic format)`,
+  );
+  logger.always(
+    `  ${chalk.blue("POST")} /v1/chat/completions — OpenAI-compatible proxy`,
+  );
+  logger.always(`  ${chalk.green("GET")}  /health              — Health check`);
+  logger.always(
+    `  ${chalk.green("GET")}  /status              — Detailed status`,
+  );
   logger.always("");
   logger.always(chalk.bold("Set in Claude Code:"));
   logger.always(`  ${chalk.cyan(`ANTHROPIC_BASE_URL=${url}`)}`);
@@ -930,6 +1075,8 @@ async function createProxyStartApp(params: {
 }) {
   const { createClaudeProxyRoutes } =
     await import("../../lib/server/routes/claudeProxyRoutes.js");
+  const { createOpenAIProxyRoutes } =
+    await import("../../lib/server/routes/openaiProxyRoutes.js");
   const { Hono } = await import("hono");
 
   const app = new Hono();
@@ -960,7 +1107,14 @@ async function createProxyStartApp(params: {
     params.primaryAccountKey,
   );
 
-  for (const route of routeGroup.routes) {
+  const openaiRouteGroup = createOpenAIProxyRoutes(
+    params.modelRouter,
+    "",
+    params.port,
+  );
+  const allProxyRoutes = [...routeGroup.routes, ...openaiRouteGroup.routes];
+
+  for (const route of allProxyRoutes) {
     const method = route.method.toLowerCase() as "get" | "post";
     app[method](route.path, async (c) => {
       const emptyBody = {};
@@ -1332,6 +1486,15 @@ function registerProxyShutdownHandlers(params: {
       } catch {
         // non-fatal
       }
+      try {
+        const shutdownHost =
+          params.host === "0.0.0.0" ? "localhost" : params.host;
+        await clearOpenCodeProxySettings(
+          `http://${shutdownHost}:${params.port}/v1`,
+        );
+      } catch {
+        // non-fatal
+      }
     }
 
     try {
@@ -1455,6 +1618,17 @@ async function startProxyRuntime(params: {
     } catch (error) {
       logger.debug(
         "[proxy] Failed to auto-configure Claude Code: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+
+    try {
+      await setOpenCodeProxySettings(`${url}/v1`);
+      logger.always(chalk.green("  ✓ Auto-configured OpenCode settings"));
+      logger.always(chalk.dim("    Restart OpenCode to connect through proxy"));
+    } catch (error) {
+      logger.debug(
+        "[proxy] Failed to auto-configure OpenCode: " +
           (error instanceof Error ? error.message : String(error)),
       );
     }
@@ -2390,6 +2564,11 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
 
     // Restart failed or launchd not installed — clean up Claude settings
     const cleared = await clearClaudeProxySettings(expectedBaseUrl);
+    try {
+      await clearOpenCodeProxySettings(`${expectedBaseUrl}/v1`);
+    } catch {
+      // non-fatal
+    }
 
     const state = loadProxyState();
     if (
@@ -2531,10 +2710,20 @@ export const proxySetupCommand: CommandModule = {
       } catch (e) {
         console.info(
           chalk.yellow(
-            `  ⚠ Could not auto-configure: ${e instanceof Error ? e.message : String(e)}`,
+            `  ⚠ Could not auto-configure Claude Code: ${e instanceof Error ? e.message : String(e)}`,
           ),
         );
         console.info(chalk.yellow(`  Set manually: ANTHROPIC_BASE_URL=${url}`));
+      }
+      try {
+        await setOpenCodeProxySettings(`${url}/v1`);
+        console.info(chalk.green("  ✓ OpenCode configured"));
+      } catch (e) {
+        console.info(
+          chalk.yellow(
+            `  ⚠ Could not auto-configure OpenCode: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+        );
       }
 
       // Done!
