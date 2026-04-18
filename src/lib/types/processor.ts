@@ -655,6 +655,43 @@ export type ProcessedYaml = ProcessedFileBase & {
 };
 
 /**
+ * Structural types for exceljs objects.
+ * Defined here so the optional exceljs package is not required at typecheck time.
+ */
+export type ExcelJSCell = {
+  value: CellValue;
+};
+
+export type ExcelJSRow = {
+  values: (CellValue | undefined)[];
+  eachCell: (
+    opts: { includeEmpty: boolean },
+    callback: (cell: ExcelJSCell, colNumber: number) => void,
+  ) => void;
+};
+
+export type ExcelJSWorksheet = {
+  name: string;
+  rowCount: number;
+  eachRow: {
+    (callback: (row: ExcelJSRow, rowNumber: number) => void): void;
+    (
+      opts: { includeEmpty: boolean },
+      callback: (row: ExcelJSRow, rowNumber: number) => void,
+    ): void;
+  };
+  getRow: (rowNumber: number) => ExcelJSRow;
+};
+
+export type ExcelJSWorkbook = {
+  worksheets: ExcelJSWorksheet[];
+  getWorksheet: (name: string) => ExcelJSWorksheet | undefined;
+  xlsx: {
+    load: (buffer: ArrayBuffer) => Promise<void>;
+  };
+};
+
+/**
  * Single worksheet extracted from an Excel file.
  */
 export type ExcelWorksheet = {
