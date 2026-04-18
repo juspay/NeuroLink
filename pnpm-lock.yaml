@@ -161,9 +161,6 @@ importers:
       json-schema-to-zod:
         specifier: ^2.7.0
         version: 2.8.0
-      mammoth:
-        specifier: ^1.11.0
-        version: 1.12.0
       mediabunny:
         specifier: ^1.40.1
         version: 1.40.1
@@ -448,6 +445,9 @@ importers:
       koa-bodyparser:
         specifier: ^4.4.1
         version: 4.4.1
+      mammoth:
+        specifier: ^1.11.0
+        version: 1.12.0
       pdf-parse:
         specifier: ^2.4.5
         version: 2.4.5

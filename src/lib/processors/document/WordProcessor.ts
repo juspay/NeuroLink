@@ -32,8 +32,6 @@
  * ```
  */
 
-import * as mammoth from "mammoth";
-
 import { BaseFileProcessor } from "../base/BaseFileProcessor.js";
 import type {
   FileInfo,
@@ -43,6 +41,26 @@ import type {
 } from "../../types/index.js";
 import { SIZE_LIMITS } from "../config/index.js";
 import { FileErrorCode } from "../errors/index.js";
+
+let _mammoth: typeof import("mammoth") | null = null;
+async function loadMammoth() {
+  if (_mammoth) {
+    return _mammoth;
+  }
+  try {
+    _mammoth = await import(/* @vite-ignore */ "mammoth");
+    return _mammoth;
+  } catch (err) {
+    const e = err instanceof Error ? (err as NodeJS.ErrnoException) : null;
+    if (e?.code === "ERR_MODULE_NOT_FOUND" && e.message.includes("mammoth")) {
+      throw new Error(
+        'Word document processing requires the "mammoth" package. Install it with:\n  pnpm add mammoth',
+        { cause: err },
+      );
+    }
+    throw err;
+  }
+}
 
 // Re-export for consumers who import from this module
 
@@ -266,6 +284,7 @@ export class WordProcessor extends BaseFileProcessor<ProcessedWord> {
       const warnings: string[] = [];
 
       try {
+        const mammoth = await loadMammoth();
         // Extract plain text
         const textResult = await mammoth.extractRawText({ buffer });
         textContent = textResult.value;
