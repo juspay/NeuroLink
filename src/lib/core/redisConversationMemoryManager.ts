@@ -1338,12 +1338,17 @@ export class RedisConversationMemoryManager implements IConversationMemoryManage
         conversationMemory: { enabled: false },
       });
 
-      const titlePrompt = `Generate a clear, concise, and descriptive title (5–8 words maximum) for a conversation based on the following user message.
+      const defaultTitlePrompt = `Generate a clear, concise, and descriptive title (20-25 letters maximum) for a conversation based on the following user message.
 The title must meaningfully reflect the topic or intent of the message.
 Do not output anything unrelated, vague, or generic.
 Do not say you cannot create a title. Always return a valid title.
 
 User message: "${userMessage}"`;
+
+      const customPrompt = process.env.NEUROLINK_TITLE_PROMPT;
+      const titlePrompt = customPrompt
+        ? customPrompt.replace(/\$\{userMessage\}/g, userMessage)
+        : defaultTitlePrompt;
 
       const result = await titleGenerator.generate({
         input: { text: titlePrompt },

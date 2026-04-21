@@ -516,6 +516,9 @@ function toModelMessage(message: ChatMessage): ModelMessage | null {
     message.role === "assistant" ||
     message.role === "system"
   ) {
+    if (message.content.trim() === "") {
+      return null;
+    }
     return {
       role: message.role,
       content: message.content,
