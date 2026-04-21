@@ -1,3 +1,9 @@
+## [9.56.1](https://github.com/juspay/neurolink/compare/v9.56.0...v9.56.1) (2026-04-21)
+
+### Bug Fixes
+
+- **(context):** Add support to filter out empty content chunks ([5f13d91](https://github.com/juspay/neurolink/commit/5f13d919cb5342dce3c2796fa22436ad6aceb318))
+
 ## [9.56.0](https://github.com/juspay/neurolink/compare/v9.55.11...v9.56.0) (2026-04-20)
 
 ### Features
