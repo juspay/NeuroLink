@@ -17,6 +17,7 @@ import type { TokenUsage } from "./analytics.js";
 import type { JsonValue, UnknownRecord } from "./common.js";
 import type { Content, ImageWithAltText } from "./content.js";
 import type { ChatMessage } from "./conversation.js";
+import type { StreamNoOutputSentinel } from "./noOutputSentinel.js";
 import type { AdditionalMemoryUser } from "./generate.js";
 import type {
   AIModelProviderConfig,
@@ -577,11 +578,12 @@ export type StreamOptions = {
 export type StreamResult = {
   stream: AsyncIterable<
     | { content: string }
+    | StreamNoOutputSentinel
     | { type: "audio"; audio: AudioChunk }
     | { type: "image"; imageOutput: { base64: string } }
     | { content: string; type?: "preliminary" | "final" }
     | { type: "audio"; audio: AudioChunk }
-  >; // text chunks (with optional workflow stage) or audio events
+  >; // text chunks (with optional workflow stage), no-output sentinel, or audio/image events
 
   // Provider information
   provider?: string;

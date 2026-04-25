@@ -121,7 +121,16 @@ function buildBaseOptions(includeModel = true): Record<string, unknown> {
 }
 
 function getTestModel(): string {
-  return TEST_CONFIG.model || "gemini-2.5-flash";
+  // Reviewer follow-up: previously hardcoded `gemini-2.5-flash` as the
+  // fallback. Now matches the rest of the suite by reading TEST_MODEL,
+  // VERTEX_MODEL, and ANTHROPIC_MODEL in turn — same precedence as
+  // tool-reliability and tracing.
+  return (
+    TEST_CONFIG.model ||
+    process.env.VERTEX_MODEL ||
+    process.env.ANTHROPIC_MODEL ||
+    "gemini-2.5-flash"
+  );
 }
 
 function isExpectedProviderError(msg: string): boolean {

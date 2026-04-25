@@ -37,6 +37,11 @@ import {
 import { isAbortError } from "../utils/errorHandling.js";
 import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
 import { logger } from "../utils/logger.js";
+import {
+  buildNoOutputSentinel,
+  detectPostStreamNoOutput,
+  stampNoOutputSpan,
+} from "../utils/noOutputSentinel.js";
 import { calculateCost } from "../utils/pricing.js";
 import { getProviderModel } from "../utils/providerConfig.js";
 import {
@@ -233,6 +238,11 @@ export class LiteLLMProvider extends BaseProvider {
 
     const startTime = Date.now();
     let chunkCount = 0; // Track chunk count for debugging
+    // Reviewer follow-up: capture upstream provider errors via onError so
+    // the post-stream NoOutput detect can propagate the *real* cause
+    // (content_filter, provider crash, etc.) into the sentinel's
+    // providerError / modelResponseRaw instead of "No output generated".
+    let capturedProviderError: unknown;
     const timeout = this.getTimeout(options);
     const timeoutController = createTimeoutController(
       timeout,
@@ -299,6 +309,10 @@ export class LiteLLMProvider extends BaseProvider {
           const error = event.error;
           const errorMessage =
             error instanceof Error ? error.message : String(error);
+          // Reviewer follow-up: propagate the captured error to the
+          // post-stream NoOutput sentinel so telemetry sees the real
+          // provider cause instead of "No output generated".
+          capturedProviderError = error;
           logger.error(`LiteLLM: Stream error`, {
             provider: this.providerName,
             modelName: this.modelName,
@@ -476,7 +490,10 @@ export class LiteLLMProvider extends BaseProvider {
 
       timeoutController?.cleanup();
 
-      const transformedStream = this.createLiteLLMTransformedStream(result);
+      const transformedStream = this.createLiteLLMTransformedStream(
+        result,
+        () => capturedProviderError,
+      );
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(
@@ -514,7 +531,14 @@ export class LiteLLMProvider extends BaseProvider {
 
   private async *createLiteLLMTransformedStream(
     result: ReturnType<typeof streamText>,
+    getCapturedProviderError?: () => unknown,
   ): AsyncGenerator<{ content: string }> {
+    // Reviewer follow-up: gate the post-stream NoOutput detect on
+    // *content yielded*, not raw chunk count. AI SDK fullStream emits
+    // control events ({ type: "start" }, "step-start", etc.) before any
+    // text-delta — those incremented chunkCount and made the post-stream
+    // detect dead even when zero text was produced.
+    let contentYielded = 0;
     try {
       const streamToUse = result.fullStream || result.textStream;
 
@@ -539,6 +563,7 @@ export class LiteLLMProvider extends BaseProvider {
           if ("textDelta" in chunk) {
             const textDelta = (chunk as { textDelta: string }).textDelta;
             if (textDelta) {
+              contentYielded++;
               yield { content: textDelta };
             }
           } else if (
@@ -553,17 +578,49 @@ export class LiteLLMProvider extends BaseProvider {
             });
           }
         } else if (typeof chunk === "string") {
+          contentYielded++;
           yield { content: chunk };
         }
       }
     } catch (streamError) {
       if (NoOutputGeneratedError.isInstance(streamError)) {
         logger.warn(
-          "LiteLLM: Stream produced no output (NoOutputGeneratedError) — propagating to fallback chain",
+          "LiteLLM: Stream produced no output (NoOutputGeneratedError) — caught from textStream",
         );
-        throw streamError;
+        // Yield the enriched sentinel so downstream telemetry has
+        // finishReason / usage / providerError. Match the other
+        // providers' pattern: yield + return (no throw). NeuroLink's
+        // iteration fallback at neurolink.ts only fires for
+        // looksLikeModelAccessDenied errors, so a NoOutput throw here
+        // would NOT trigger any fallback — and it would mask the
+        // already-yielded sentinel from consumers expecting a clean
+        // stream. The sentinel itself signals the no-output condition.
+        const sentinel = await buildNoOutputSentinel(
+          streamError,
+          result,
+          getCapturedProviderError?.(),
+        );
+        stampNoOutputSpan(sentinel);
+        yield sentinel as { content: string };
+        return;
       }
       throw streamError;
+    }
+    // Curator P3-6 (round-2 fix): production trigger sets the error on
+    // result.finishReason rejection (NOT thrown from textStream).
+    // Surface that path here, matching the catch above (yield + return).
+    if (contentYielded === 0) {
+      const detected = await detectPostStreamNoOutput(
+        result,
+        getCapturedProviderError?.(),
+      );
+      if (detected) {
+        logger.warn(
+          "LiteLLM: Stream produced no output (NoOutputGeneratedError) — caught from finishReason rejection",
+        );
+        stampNoOutputSpan(detected.sentinel);
+        yield detected.sentinel as { content: string };
+      }
     }
   }
 

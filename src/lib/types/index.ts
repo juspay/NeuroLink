@@ -66,3 +66,6 @@ export * from "./dynamic.js";
 
 // Curator P2-4 dedup: per-stream AsyncLocalStorage context
 export * from "./streamDedup.js";
+
+// Curator P3-6: NoOutputGeneratedError sentinel chunk shape
+export * from "./noOutputSentinel.js";

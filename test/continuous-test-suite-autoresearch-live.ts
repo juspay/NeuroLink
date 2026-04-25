@@ -47,12 +47,16 @@ const HAS_VERTEX = !!(VERTEX_PROJECT && VERTEX_LOCATION);
 const HAS_PROVIDER = !!(HAS_VERTEX || ANTHROPIC_KEY || OPENAI_KEY);
 
 // Determine which provider/model to use (prefer Vertex > Anthropic > OpenAI)
+// Reviewer follow-up: every per-provider branch now reads its own model
+// env var (matches the rest of the suite). The previous hardcoded
+// `claude-sonnet-4-20250514` and `gpt-4o-mini` ignored ANTHROPIC_MODEL /
+// OPENAI_MODEL even when set.
 const PROVIDER = HAS_VERTEX ? "vertex" : ANTHROPIC_KEY ? "anthropic" : "openai";
 const MODEL = HAS_VERTEX
   ? process.env.VERTEX_MODEL || "gemini-2.5-flash"
   : ANTHROPIC_KEY
-    ? "claude-sonnet-4-20250514"
-    : "gpt-4o-mini";
+    ? process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514"
+    : process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 // ============================================================
 // LOGGING

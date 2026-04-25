@@ -159,6 +159,9 @@ export class AzureOpenAIProvider extends BaseProvider {
       const messages = await this.buildMessagesForStream(options);
 
       const model = await this.getAISDKModelWithMiddleware(options);
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput sentinel carries the real cause.
+      let capturedProviderError: unknown;
       const stream = await streamText({
         model,
         messages: messages,
@@ -178,6 +181,15 @@ export class AzureOpenAIProvider extends BaseProvider {
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
         experimental_repairToolCall: this.getToolCallRepairFn(options),
+        onError: (event: { error: unknown }) => {
+          capturedProviderError = event.error;
+          logger.error("AzureOpenAI: Stream error", {
+            error:
+              event.error instanceof Error
+                ? event.error.message
+                : String(event.error),
+          });
+        },
         onStepFinish: (event: StepFinishEvent) => {
           emitToolEndFromStepFinish(
             this.neurolink?.getEventEmitter(),
@@ -208,7 +220,10 @@ export class AzureOpenAIProvider extends BaseProvider {
       timeoutController?.cleanup();
 
       // Transform string stream to content object stream using BaseProvider method
-      const transformedStream = this.createTextStream(stream);
+      const transformedStream = this.createTextStream(
+        stream,
+        () => capturedProviderError,
+      );
 
       return {
         stream: transformedStream,

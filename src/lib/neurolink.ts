@@ -7147,9 +7147,39 @@ Current user's request: ${currentInput}`;
         // single `generation:end` event with cost data. Cost listeners
         // subscribe here; previously the stream path never fired it.
         let resolvedUsage: unknown;
+        // Reviewer follow-up: track *non-sentinel output chunks* (text,
+        // audio, image — anything the SDK considers real output) so the
+        // fallback gate fires only when the stream produced nothing
+        // useful. Counting only text content here would have spuriously
+        // triggered fallback for valid audio-only (Google Live) and
+        // image-only streams. The sentinel is the only thing we exclude
+        // — that path can mask real provider failures (DNS, auth,
+        // retry-exhaustion) that AI SDK rejects with
+        // NoOutputGeneratedError, and we want fallback to fire there.
+        let realOutputChunks = 0;
         try {
           for await (const chunk of mcpStream) {
             chunkCount++;
+            const isNoOutputSentinel =
+              chunk !== null &&
+              typeof chunk === "object" &&
+              "metadata" in chunk &&
+              (chunk as { metadata?: Record<string, unknown> }).metadata
+                ?.noOutput === true;
+            const hasTextContent =
+              chunk &&
+              "content" in chunk &&
+              typeof chunk.content === "string" &&
+              chunk.content.length > 0;
+            const hasMediaPayload =
+              chunk !== null &&
+              typeof chunk === "object" &&
+              "type" in chunk &&
+              ((chunk as { type?: unknown }).type === "audio" ||
+                (chunk as { type?: unknown }).type === "image");
+            if (!isNoOutputSentinel && (hasTextContent || hasMediaPayload)) {
+              realOutputChunks++;
+            }
             if (
               chunk &&
               "content" in chunk &&
@@ -7163,6 +7193,7 @@ Current user's request: ${currentInput}`;
                 metadata: {
                   chunkIndex: chunkCount,
                   totalLength: accumulatedContent.length,
+                  ...(isNoOutputSentinel && { noOutput: true }),
                 },
                 timestamp: Date.now(),
               });
@@ -7170,8 +7201,11 @@ Current user's request: ${currentInput}`;
             yield chunk;
           }
 
+          // Reviewer follow-up: fire fallback when no *non-sentinel*
+          // output was produced — sentinel-only and truly empty streams
+          // both qualify, but media-only streams (audio/image) do not.
           if (
-            chunkCount === 0 &&
+            realOutputChunks === 0 &&
             !metadata.fallbackAttempted &&
             !enhancedOptions.disableInternalFallback &&
             streamState.toolCalls.length === 0 &&
@@ -7859,9 +7893,37 @@ Current user's request: ${currentInput}`;
           fallbackResult.finishReason ?? streamState.finishReason;
       }
 
+      // Reviewer follow-up: count *real* output chunks for the fallback
+      // success gate, mirroring the primary stream wrapper. A fallback
+      // that yields only the NoOutputSentinel must not be treated as
+      // success — that's the same masked-failure scenario as the primary.
       let fallbackChunkCount = 0;
+      let fallbackRealOutputChunks = 0;
       for await (const fallbackChunk of fallbackResult.stream) {
         fallbackChunkCount++;
+        const isFallbackNoOutputSentinel =
+          fallbackChunk !== null &&
+          typeof fallbackChunk === "object" &&
+          "metadata" in fallbackChunk &&
+          (fallbackChunk as { metadata?: Record<string, unknown> }).metadata
+            ?.noOutput === true;
+        const fallbackHasTextContent =
+          fallbackChunk &&
+          "content" in fallbackChunk &&
+          typeof fallbackChunk.content === "string" &&
+          fallbackChunk.content.length > 0;
+        const fallbackHasMediaPayload =
+          fallbackChunk !== null &&
+          typeof fallbackChunk === "object" &&
+          "type" in fallbackChunk &&
+          ((fallbackChunk as { type?: unknown }).type === "audio" ||
+            (fallbackChunk as { type?: unknown }).type === "image");
+        if (
+          !isFallbackNoOutputSentinel &&
+          (fallbackHasTextContent || fallbackHasMediaPayload)
+        ) {
+          fallbackRealOutputChunks++;
+        }
         if (
           fallbackChunk &&
           "content" in fallbackChunk &&
@@ -7874,12 +7936,12 @@ Current user's request: ${currentInput}`;
       }
 
       if (
-        fallbackChunkCount === 0 &&
+        fallbackRealOutputChunks === 0 &&
         fallbackToolCalls.length === 0 &&
         fallbackToolResults.length === 0
       ) {
         throw new Error(
-          `Fallback provider ${fallbackRoute.provider} also returned 0 chunks`,
+          `Fallback provider ${fallbackRoute.provider} also returned 0 real output chunks (chunkCount=${fallbackChunkCount}, sentinel-only or empty)`,
         );
       }
 

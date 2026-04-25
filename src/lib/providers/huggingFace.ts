@@ -24,6 +24,11 @@ import type {
 import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
 import { logger } from "../utils/logger.js";
 import {
+  buildNoOutputSentinel,
+  detectPostStreamNoOutput,
+  stampNoOutputSpan,
+} from "../utils/noOutputSentinel.js";
+import {
   createHuggingFaceConfig,
   getProviderModel,
   validateApiKey,
@@ -195,6 +200,10 @@ export class HuggingFaceProvider extends BaseProvider {
         : options;
       const messages = await this.buildMessagesForStream(messagesOptions);
 
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput detect can propagate the real cause
+      // into the sentinel's providerError / modelResponseRaw.
+      let capturedProviderError: unknown;
       const result = await streamText({
         model: this.model,
         messages: messages,
@@ -219,6 +228,15 @@ export class HuggingFaceProvider extends BaseProvider {
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
         experimental_repairToolCall: this.getToolCallRepairFn(options),
+        onError: (event: { error: unknown }) => {
+          capturedProviderError = event.error;
+          logger.error("HuggingFace: Stream error", {
+            error:
+              event.error instanceof Error
+                ? event.error.message
+                : String(event.error),
+          });
+        },
         onStepFinish: ({ toolCalls, toolResults }) => {
           emitToolEndFromStepFinish(
             this.neurolink?.getEventEmitter(),
@@ -250,19 +268,42 @@ export class HuggingFaceProvider extends BaseProvider {
 
       // Transform stream to match StreamResult interface with enhanced tool call parsing
       const transformedStream = async function* () {
+        let chunkCount = 0;
         try {
           for await (const chunk of result.textStream) {
+            chunkCount++;
             yield { content: chunk };
           }
         } catch (streamError) {
-          // AI SDK v6 throws NoOutputGeneratedError when the stream produced no output.
           if (NoOutputGeneratedError.isInstance(streamError)) {
             logger.warn(
-              "HuggingFace: Stream produced no output (NoOutputGeneratedError)",
+              "HuggingFace: Stream produced no output (NoOutputGeneratedError) — caught from textStream",
             );
+            const sentinel = await buildNoOutputSentinel(
+              streamError,
+              result,
+              capturedProviderError,
+            );
+            stampNoOutputSpan(sentinel);
+            yield sentinel as { content: string };
             return;
           }
           throw streamError;
+        }
+        // Curator P3-6 (round-2 fix): production trigger comes through
+        // the result.finishReason rejection, not textStream throws.
+        if (chunkCount === 0) {
+          const detected = await detectPostStreamNoOutput(
+            result,
+            capturedProviderError,
+          );
+          if (detected) {
+            logger.warn(
+              "HuggingFace: Stream produced no output (NoOutputGeneratedError) — caught from finishReason rejection",
+            );
+            stampNoOutputSpan(detected.sentinel);
+            yield detected.sentinel as { content: string };
+          }
         }
       };
 

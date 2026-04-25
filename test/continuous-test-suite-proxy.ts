@@ -100,6 +100,16 @@ let proxyProcess: ChildProcess | null = null;
 const PROXY_PORT = 9876; // Non-standard port for testing
 const PROXY_URL = `http://127.0.0.1:${PROXY_PORT}`;
 
+/**
+ * Anthropic model used for the proxy round-trip tests.
+ * Reviewer follow-up: previously hardcoded `claude-sonnet-4-20250514` in
+ * every request; now matches the rest of the suite by reading
+ * `ANTHROPIC_MODEL` (config-parser fixtures at the bottom of the file
+ * stay literal because they assert on the YAML they emitted).
+ */
+const PROXY_TEST_MODEL =
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+
 // State file management: the proxy CLI uses a single global state file to
 // prevent multiple instances.  We back it up before our test run and restore
 // it afterwards so an already-running proxy on a different port is unaffected.
@@ -584,7 +594,7 @@ async function testProxyCountTokens(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         messages: [{ role: "user", content: "Hello, how are you today?" }],
       }),
     });
@@ -714,7 +724,7 @@ async function testProxyNonStreaming(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         max_tokens: 128,
         messages: [
           { role: "user", content: "Reply with exactly: PROXY_TEST_OK" },
@@ -800,7 +810,7 @@ async function testProxyStreaming(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         max_tokens: 128,
         stream: true,
         messages: [
@@ -889,7 +899,7 @@ async function testProxyToolUse(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         max_tokens: 256,
         messages: [
           {
@@ -989,7 +999,7 @@ async function testProxyMultiTurn(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         max_tokens: 128,
         messages: [
           { role: "user", content: "My name is Alice. Remember that." },
@@ -1065,7 +1075,7 @@ async function testProxyStreamingToolUse(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         max_tokens: 256,
         stream: true,
         messages: [
@@ -1222,7 +1232,7 @@ async function testUsageStats(): Promise<boolean | null> {
       method: "POST",
       headers: claudeHeaders,
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: PROXY_TEST_MODEL,
         max_tokens: 32,
         messages: [{ role: "user", content: "Say OK" }],
       }),

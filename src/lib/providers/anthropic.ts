@@ -1045,6 +1045,10 @@ export class AnthropicProvider extends BaseProvider {
         },
       );
 
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput sentinel carries the real cause in
+      // providerError / modelResponseRaw.
+      let capturedProviderError: unknown;
       let result: ReturnType<typeof streamText>;
       try {
         result = streamText({
@@ -1060,6 +1064,15 @@ export class AnthropicProvider extends BaseProvider {
             options.abortSignal,
             timeoutController?.controller.signal,
           ),
+          onError: (event: { error: unknown }) => {
+            capturedProviderError = event.error;
+            logger.error("Anthropic: Stream error", {
+              error:
+                event.error instanceof Error
+                  ? event.error.message
+                  : String(event.error),
+            });
+          },
           experimental_repairToolCall: this.getToolCallRepairFn(options),
           experimental_telemetry:
             this.telemetryHandler.getTelemetryConfig(options),
@@ -1156,7 +1169,10 @@ export class AnthropicProvider extends BaseProvider {
 
       timeoutController?.cleanup();
 
-      const transformedStream = this.createTextStream(result);
+      const transformedStream = this.createTextStream(
+        result,
+        () => capturedProviderError,
+      );
 
       // ✅ Note: Vercel AI SDK's streamText() method limitations with tools
       // The streamText() function doesn't provide the same tool result access as generateText()

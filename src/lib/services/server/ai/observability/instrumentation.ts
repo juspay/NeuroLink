@@ -238,8 +238,13 @@ function applyNonErrorLangfuseLevel(attrs: Record<string, unknown>): void {
   }
   if (attrs["neurolink.no_output"] === true) {
     attrs["langfuse.level"] = "WARNING";
-    attrs["langfuse.status_message"] =
-      "Stream produced no output (NoOutputGeneratedError)";
+    // Preserve any enriched status message StreamHandler already set
+    // (carries finishReason / token counts via buildNoOutputStatusMessage).
+    // Only fall back to the generic message when none was set upstream.
+    if (typeof attrs["langfuse.status_message"] !== "string") {
+      attrs["langfuse.status_message"] =
+        "Stream produced no output (NoOutputGeneratedError)";
+    }
     return;
   }
   if (reasonStr === "aborted") {

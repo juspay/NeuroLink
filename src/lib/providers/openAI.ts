@@ -31,6 +31,11 @@ import {
   RateLimitError,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
+import {
+  buildNoOutputSentinel,
+  detectPostStreamNoOutput,
+  stampNoOutputSpan,
+} from "../utils/noOutputSentinel.js";
 import { calculateCost } from "../utils/pricing.js";
 import {
   createOpenAIConfig,
@@ -490,6 +495,10 @@ export class OpenAIProvider extends BaseProvider {
         },
       );
 
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput detect can propagate the *real* cause
+      // into the sentinel's providerError / modelResponseRaw.
+      let capturedProviderError: unknown;
       let result: ReturnType<typeof streamText>;
       try {
         result = streamText({
@@ -508,6 +517,15 @@ export class OpenAIProvider extends BaseProvider {
           experimental_repairToolCall: this.getToolCallRepairFn(options),
           experimental_telemetry:
             this.telemetryHandler.getTelemetryConfig(options),
+          onError: (event: { error: unknown }) => {
+            capturedProviderError = event.error;
+            logger.error("OpenAI: Stream error", {
+              error:
+                event.error instanceof Error
+                  ? event.error.message
+                  : String(event.error),
+            });
+          },
           onStepFinish: ({ toolCalls, toolResults }) => {
             logger.info("Tool execution completed", {
               toolResults,
@@ -602,6 +620,7 @@ export class OpenAIProvider extends BaseProvider {
         result,
         shouldUseTools,
         tools,
+        () => capturedProviderError,
       );
 
       // Create analytics promise that resolves after stream completion
@@ -636,6 +655,7 @@ export class OpenAIProvider extends BaseProvider {
     result: ReturnType<typeof streamText>,
     shouldUseTools: boolean,
     tools: Record<string, Tool>,
+    getCapturedProviderError?: () => unknown,
   ): AsyncGenerator<{ content: string }> {
     try {
       logger.debug(`OpenAI: Starting stream transformation`, {
@@ -705,12 +725,39 @@ export class OpenAIProvider extends BaseProvider {
         logger.warn(
           `OpenAI: No content was yielded from stream despite processing ${chunkCount} chunks`,
         );
+        // Curator P3-6 (round-2 fix): when no content was yielded, the
+        // production trigger sets NoOutputGeneratedError on
+        // result.finishReason rejection (NOT on the textStream itself).
+        // Surface that rejection here so the enriched sentinel actually
+        // fires for real-world no-output streams.
+        const detected = await detectPostStreamNoOutput(
+          result,
+          getCapturedProviderError?.(),
+        );
+        if (detected) {
+          logger.warn(
+            "OpenAI: Stream produced no output (NoOutputGeneratedError) — caught from finishReason rejection",
+          );
+          stampNoOutputSpan(detected.sentinel);
+          yield detected.sentinel as { content: string };
+        }
       }
     } catch (streamError) {
       if (NoOutputGeneratedError.isInstance(streamError)) {
         logger.warn(
-          "OpenAI: Stream produced no output (NoOutputGeneratedError)",
+          "OpenAI: Stream produced no output (NoOutputGeneratedError) — caught from textStream",
         );
+        // Defensive: AI SDK *can* throw this from textStream in some
+        // failure modes (catastrophic transform errors). Keep this path
+        // for completeness; the production trigger goes through the
+        // post-loop detect above.
+        const sentinel = await buildNoOutputSentinel(
+          streamError,
+          result,
+          getCapturedProviderError?.(),
+        );
+        stampNoOutputSpan(sentinel);
+        yield sentinel as { content: string };
         return;
       }
       logger.error(`OpenAI: Stream transformation error:`, streamError);

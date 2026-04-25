@@ -106,6 +106,9 @@ export class MistralProvider extends BaseProvider {
       const messages = await this.buildMessagesForStream(options);
 
       const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput sentinel carries the real cause.
+      let capturedProviderError: unknown;
       const result = await streamText({
         model,
         messages: messages,
@@ -121,6 +124,15 @@ export class MistralProvider extends BaseProvider {
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
         experimental_repairToolCall: this.getToolCallRepairFn(options),
+        onError: (event: { error: unknown }) => {
+          capturedProviderError = event.error;
+          logger.error("Mistral: Stream error", {
+            error:
+              event.error instanceof Error
+                ? event.error.message
+                : String(event.error),
+          });
+        },
         onStepFinish: ({ toolCalls, toolResults }) => {
           emitToolEndFromStepFinish(
             this.neurolink?.getEventEmitter(),
@@ -148,7 +160,10 @@ export class MistralProvider extends BaseProvider {
       timeoutController?.cleanup();
 
       // Transform string stream to content object stream using BaseProvider method
-      const transformedStream = this.createTextStream(result);
+      const transformedStream = this.createTextStream(
+        result,
+        () => capturedProviderError,
+      );
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(

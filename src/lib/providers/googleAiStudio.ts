@@ -643,6 +643,9 @@ export class GoogleAIStudioProvider extends BaseProvider {
 
       const collectedToolCalls: StreamToolCall[] = [];
       const collectedToolResults: StreamToolResult[] = [];
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput sentinel carries the real cause.
+      let capturedProviderError: unknown;
 
       const result = await streamText({
         model,
@@ -659,6 +662,15 @@ export class GoogleAIStudioProvider extends BaseProvider {
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
         experimental_repairToolCall: this.getToolCallRepairFn(options),
+        onError: (event: { error: unknown }) => {
+          capturedProviderError = event.error;
+          logger.error("GoogleAiStudio: Stream error", {
+            error:
+              event.error instanceof Error
+                ? event.error.message
+                : String(event.error),
+          });
+        },
         // Gemini 3: use thinkingLevel via providerOptions
         // Gemini 2.5: use thinkingBudget via providerOptions
         ...(options.thinkingConfig?.enabled && {
@@ -753,7 +765,10 @@ export class GoogleAIStudioProvider extends BaseProvider {
         .finally(() => timeoutController?.cleanup());
 
       // Transform string stream to content object stream using BaseProvider method
-      const transformedStream = this.createTextStream(result);
+      const transformedStream = this.createTextStream(
+        result,
+        () => capturedProviderError,
+      );
 
       // Create analytics promise that resolves after stream completion
       const analyticsPromise = streamAnalyticsCollector.createAnalytics(

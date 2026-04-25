@@ -63,6 +63,26 @@ const TEST_CONFIG = {
   interTestDelay: 7000,
 };
 
+/**
+ * Vertex models used by the per-provider compaction / abort tests below.
+ * Reviewer follow-up: previously a single `VERTEX_TEST_MODEL` constant
+ * defaulted to `gemini-2.5-pro`, which meant Flash-named tests silently
+ * ran on Pro (and 2.0-Flash legacy tests ran on whatever override was
+ * set). Now split into Pro and Flash family overrides so the test names
+ * match what's actually exercised:
+ *   - VERTEX_PRO_TEST_MODEL  → "Pro"-named compaction / abort tests
+ *   - VERTEX_FLASH_TEST_MODEL → "Flash"-named compaction / abort tests
+ * Each falls back via dedicated env override → TEST_MODEL → family default.
+ */
+const VERTEX_PRO_TEST_MODEL =
+  process.env.VERTEX_PRO_TEST_MODEL ||
+  process.env.TEST_MODEL ||
+  "gemini-2.5-pro";
+const VERTEX_FLASH_TEST_MODEL =
+  process.env.VERTEX_FLASH_TEST_MODEL ||
+  process.env.TEST_MODEL ||
+  "gemini-2.5-flash";
+
 // ============================================================
 // LOGGING UTILITIES
 // ============================================================
@@ -692,7 +712,7 @@ async function testContextCompactionVertexPro(
           },
           maxTokens: 100,
           provider: "vertex",
-          model: "gemini-2.5-pro",
+          model: VERTEX_PRO_TEST_MODEL,
         });
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -717,7 +737,7 @@ async function testContextCompactionVertexPro(
         },
         maxTokens: 50,
         provider: "vertex",
-        model: "gemini-2.5-pro",
+        model: VERTEX_PRO_TEST_MODEL,
       });
 
       try {
@@ -793,7 +813,7 @@ async function testContextCompactionVertexFlash(
           },
           maxTokens: 100,
           provider: "vertex",
-          model: "gemini-2.5-flash",
+          model: VERTEX_FLASH_TEST_MODEL,
         });
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -822,7 +842,7 @@ async function testContextCompactionVertexFlash(
         },
         maxTokens: 50,
         provider: "vertex",
-        model: "gemini-2.5-flash",
+        model: VERTEX_FLASH_TEST_MODEL,
       });
 
       try {
@@ -1640,7 +1660,7 @@ async function testAbortSignalVertexPro(
         },
         maxTokens: 8000,
         provider: "vertex",
-        model: "gemini-2.5-pro",
+        model: VERTEX_PRO_TEST_MODEL,
         abortSignal: signal,
       });
 
@@ -1706,7 +1726,7 @@ async function testAbortSignalVertexFlash(
         },
         maxTokens: 8000,
         provider: "vertex",
-        model: "gemini-2.0-flash",
+        model: VERTEX_FLASH_TEST_MODEL,
         abortSignal: signal,
       });
 

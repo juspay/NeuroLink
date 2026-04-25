@@ -1494,12 +1494,24 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * Create text stream transformation - delegated to StreamHandler
+   * Create text stream transformation - delegated to StreamHandler.
+   * Reviewer follow-up: forwards the optional `getUnderlyingError`
+   * callback so providers can capture upstream errors via
+   * `streamText`'s `onError` and have them flow into the
+   * NoOutputGeneratedError sentinel's `providerError` /
+   * `modelResponseRaw`.
    */
-  protected createTextStream(result: {
-    textStream: AsyncIterable<string>;
-  }): AsyncGenerator<{ content: string }> {
-    return this.streamHandler.createTextStream(result);
+  protected createTextStream(
+    result: {
+      textStream: AsyncIterable<string>;
+      finishReason?: Promise<unknown> | unknown;
+      totalUsage?: Promise<unknown> | unknown;
+    },
+    getUnderlyingError?: () => unknown,
+  ): AsyncGenerator<
+    { content: string } | import("../types/index.js").StreamNoOutputSentinel
+  > {
+    return this.streamHandler.createTextStream(result, getUnderlyingError);
   }
 
   /**

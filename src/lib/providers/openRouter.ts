@@ -27,6 +27,11 @@ import type {
 import { isAbortError } from "../utils/errorHandling.js";
 import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
 import { logger } from "../utils/logger.js";
+import {
+  buildNoOutputSentinel,
+  detectPostStreamNoOutput,
+  stampNoOutputSpan,
+} from "../utils/noOutputSentinel.js";
 import { getProviderModel } from "../utils/providerConfig.js";
 import {
   composeAbortSignals,
@@ -317,6 +322,12 @@ export class OpenRouterProvider extends BaseProvider {
 
     const startTime = Date.now();
     let chunkCount = 0; // Track chunk count for debugging
+    // Reviewer follow-up: capture upstream provider errors via onError so
+    // the post-stream NoOutput detect can propagate the *real* cause
+    // (e.g. content_filter, provider crash) into the sentinel's
+    // providerError / modelResponseRaw instead of the AI SDK's generic
+    // "No output generated" message.
+    let capturedProviderError: unknown;
     const timeout = this.getTimeout(options);
     const timeoutController = createTimeoutController(
       timeout,
@@ -371,6 +382,10 @@ export class OpenRouterProvider extends BaseProvider {
           const error = event.error;
           const errorMessage =
             error instanceof Error ? error.message : String(error);
+          // Reviewer follow-up: propagate the captured error to the
+          // post-stream NoOutput sentinel so telemetry sees the real
+          // provider cause instead of "No output generated".
+          capturedProviderError = error;
           logger.error(`OpenRouter: Stream error`, {
             provider: this.providerName,
             modelName: this.modelName,
@@ -458,6 +473,12 @@ export class OpenRouterProvider extends BaseProvider {
 
       // Transform stream to content object stream using fullStream (handles both text and tool calls)
       const transformedStream = (async function* () {
+        // Reviewer follow-up: gate the post-stream NoOutput detect on
+        // *content yielded*, not raw chunk count. AI SDK fullStream emits
+        // control events ({ type: "start" }, "step-start", etc.) before
+        // any text-delta — those incremented `chunkCount` and made the
+        // post-stream check dead even when zero text was produced.
+        let contentYielded = 0;
         try {
           // Try fullStream first (handles both text and tool calls), fallback to textStream
           const streamToUse = result.fullStream || result.textStream;
@@ -487,6 +508,7 @@ export class OpenRouterProvider extends BaseProvider {
                 // Text delta from fullStream
                 const textDelta = (chunk as { textDelta: string }).textDelta;
                 if (textDelta) {
+                  contentYielded++;
                   yield { content: textDelta };
                 }
               } else if (
@@ -505,18 +527,40 @@ export class OpenRouterProvider extends BaseProvider {
               }
             } else if (typeof chunk === "string") {
               // Direct string chunk from textStream fallback
+              contentYielded++;
               yield { content: chunk };
             }
           }
         } catch (streamError) {
-          // AI SDK v6 throws NoOutputGeneratedError when the stream produced no output.
           if (NoOutputGeneratedError.isInstance(streamError)) {
             logger.warn(
-              "OpenRouter: Stream produced no output (NoOutputGeneratedError)",
+              "OpenRouter: Stream produced no output (NoOutputGeneratedError) — caught from textStream",
             );
+            const sentinel = await buildNoOutputSentinel(
+              streamError,
+              result,
+              capturedProviderError,
+            );
+            stampNoOutputSpan(sentinel);
+            yield sentinel as { content: string };
             return;
           }
           throw streamError;
+        }
+        // Curator P3-6 (round-2 fix): production trigger comes through
+        // result.finishReason rejection, not textStream throws.
+        if (contentYielded === 0) {
+          const detected = await detectPostStreamNoOutput(
+            result,
+            capturedProviderError,
+          );
+          if (detected) {
+            logger.warn(
+              "OpenRouter: Stream produced no output (NoOutputGeneratedError) — caught from finishReason rejection",
+            );
+            stampNoOutputSpan(detected.sentinel);
+            yield detected.sentinel as { content: string };
+          }
         }
       })();
 

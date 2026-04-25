@@ -23,6 +23,7 @@ import type {
   StreamResult,
   UnknownRecord,
   AIProviderName,
+  StreamNoOutputSentinel,
 } from "../../types/index.js";
 
 import { tracers, ATTR, withSpan } from "../../telemetry/index.js";
@@ -32,6 +33,11 @@ import {
   ValidationError,
   createValidationSummary,
 } from "../../utils/parameterValidation.js";
+import {
+  buildNoOutputSentinel,
+  detectPostStreamNoOutput,
+  stampNoOutputSpan,
+} from "../../utils/noOutputSentinel.js";
 import { STEP_LIMITS } from "../constants.js";
 import { createAnalytics } from "../analytics.js";
 import { nanoid } from "nanoid";
@@ -119,9 +125,30 @@ export class StreamHandler {
    * Create text stream transformation - consolidates identical logic from 7/10 providers
    * Tracks TTFC (Time To First Chunk), chunk count, and total bytes streamed.
    */
-  createTextStream(result: {
-    textStream: AsyncIterable<string>;
-  }): AsyncGenerator<{ content: string }> {
+  createTextStream(
+    result: {
+      textStream: AsyncIterable<string>;
+      /**
+       * Optional metadata getters from the AI SDK's StreamTextResult. These
+       * reject with NoOutputGeneratedError when no output is produced, which
+       * is exactly the path Curator's P3-6 fix needs to enrich. We attempt
+       * to await them in the catch block; whichever resolve get included in
+       * the sentinel chunk metadata.
+       */
+      finishReason?: Promise<unknown> | unknown;
+      totalUsage?: Promise<unknown> | unknown;
+    },
+    /**
+     * Reviewer follow-up: optional getter for the provider's captured
+     * upstream error (typically wired from `streamText`'s `onError`
+     * callback). When set, the sentinel's `providerError` /
+     * `modelResponseRaw` reflect the real upstream cause instead of the
+     * AI SDK's generic "No output generated" message. Callers that don't
+     * capture upstream errors can omit this — the sentinel still
+     * populates with the AI SDK error.
+     */
+    getUnderlyingError?: () => unknown,
+  ): AsyncGenerator<{ content: string } | StreamNoOutputSentinel> {
     const providerName = this.providerName;
 
     return (async function* () {
@@ -156,28 +183,50 @@ export class StreamHandler {
           logger.warn(
             `${providerName}: Stream produced no output (NoOutputGeneratedError), returning empty stream`,
           );
-          // Curator P2-5: stamp the active OTel span so ContextEnricher.onEnd()
-          // surfaces a WARNING-level Langfuse observation instead of defaulting
-          // to DEFAULT with no status message.
-          try {
-            const activeSpan = trace.getSpan(otelContext.active());
-            if (activeSpan) {
-              activeSpan.setAttribute("neurolink.no_output", true);
-            }
-          } catch {
-            // Tracing not initialized — ignore.
-          }
+          // Curator P3-6: build the enriched sentinel using the shared
+          // helper so every provider yields the same shape. Pass the
+          // captured upstream error (if any) so providerError /
+          // modelResponseRaw carry the real cause.
+          const sentinel = await buildNoOutputSentinel(
+            error,
+            result,
+            getUnderlyingError?.(),
+          );
+          // Curator P2-5 + P3-6: stamp the active OTel span so
+          // ContextEnricher.onEnd() surfaces a WARNING-level Langfuse
+          // observation with finishReason + token usage. Centralized in
+          // stampNoOutputSpan so every wired site stamps consistently.
+          stampNoOutputSpan(sentinel);
           // S4 fix: yield a sentinel chunk so Pipeline B can detect the empty stream
           // and set the span to WARNING status instead of OK
-          yield {
-            content: "",
-            metadata: {
-              noOutput: true,
-              errorType: "NoOutputGeneratedError",
-            },
-          };
+          yield sentinel;
+          // Reviewer follow-up: must return here. Falling through to the
+          // post-stream detection block below would yield a SECOND sentinel
+          // chunk (verified with synthetic NoOutputGeneratedError stream:
+          // count=2 sentinels). The catch block's yield is sufficient.
+          return;
         } else {
           throw error;
+        }
+      }
+
+      // Curator P3-6 (round-2 fix): the production trigger sets
+      // NoOutputGeneratedError on `result.finishReason` rejection — NOT
+      // thrown from textStream iteration. Surface that path here so the
+      // sentinel actually fires for real-world no-output streams. The
+      // catch above remains as a defensive path for failure modes that
+      // do throw from textStream.
+      if (chunkCount === 0) {
+        const detected = await detectPostStreamNoOutput(
+          result,
+          getUnderlyingError?.(),
+        );
+        if (detected) {
+          logger.warn(
+            `${providerName}: Stream produced no output (NoOutputGeneratedError) — caught from finishReason rejection`,
+          );
+          stampNoOutputSpan(detected.sentinel);
+          yield detected.sentinel;
         }
       }
 

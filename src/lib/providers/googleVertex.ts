@@ -1229,10 +1229,16 @@ export class GoogleVertexProvider extends BaseProvider {
     modelName: string,
   ): Promise<StreamResult> {
     const functionTag = "GoogleVertexProvider.executeStream";
+    // Reviewer follow-up: include `capturedProviderError` in the
+    // tracking object so the streamText `onError` callback (in
+    // buildAISDKStreamOptions) can write to it; the post-stream
+    // NoOutput sentinel reads it via the `getUnderlyingError` getter
+    // passed to createTextStream.
     const tracking = {
       chunkCount: 0,
       collectedToolCalls: [] as StreamToolCall[],
       collectedToolResults: [] as StreamToolResult[],
+      capturedProviderError: undefined as unknown,
     };
     const timeoutController = createTimeoutController(
       this.getTimeout(options),
@@ -1274,7 +1280,10 @@ export class GoogleVertexProvider extends BaseProvider {
       });
 
       return {
-        stream: this.createTextStream(result),
+        stream: this.createTextStream(
+          result,
+          () => tracking.capturedProviderError,
+        ),
         provider: this.providerName,
         model: this.modelName,
         ...(shouldUseTools && {
@@ -1366,6 +1375,7 @@ export class GoogleVertexProvider extends BaseProvider {
       chunkCount: number;
       collectedToolCalls: StreamToolCall[];
       collectedToolResults: StreamToolResult[];
+      capturedProviderError: unknown;
     };
   }): Parameters<typeof streamText>[0] {
     const {
@@ -1424,6 +1434,10 @@ export class GoogleVertexProvider extends BaseProvider {
           event.error instanceof Error
             ? event.error.message
             : String(event.error);
+        // Reviewer follow-up: capture the upstream error so the
+        // post-stream NoOutput sentinel can surface it via
+        // providerError / modelResponseRaw.
+        tracking.capturedProviderError = event.error;
         logger.error(`${functionTag}: Stream error`, {
           provider: this.providerName,
           modelName: this.modelName,

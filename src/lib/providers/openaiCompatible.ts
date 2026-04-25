@@ -25,6 +25,11 @@ import type {
 import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
 import { logger } from "../utils/logger.js";
 import {
+  buildNoOutputSentinel,
+  detectPostStreamNoOutput,
+  stampNoOutputSpan,
+} from "../utils/noOutputSentinel.js";
+import {
   composeAbortSignals,
   createTimeoutController,
   TimeoutError,
@@ -274,6 +279,10 @@ export class OpenAICompatibleProvider extends BaseProvider {
       const messages = await this.buildMessagesForStream(options);
 
       const model = await this.getAISDKModelWithMiddleware(options); // This is where network connection happens!
+      // Reviewer follow-up: capture upstream provider errors via onError
+      // so the post-stream NoOutput detect can propagate the real cause
+      // into the sentinel's providerError / modelResponseRaw.
+      let capturedProviderError: unknown;
       const result = streamText({
         model,
         messages: messages,
@@ -293,6 +302,15 @@ export class OpenAICompatibleProvider extends BaseProvider {
         experimental_telemetry:
           this.telemetryHandler.getTelemetryConfig(options),
         experimental_repairToolCall: this.getToolCallRepairFn(options),
+        onError: (event: { error: unknown }) => {
+          capturedProviderError = event.error;
+          logger.error("OpenAI-compatible: Stream error", {
+            error:
+              event.error instanceof Error
+                ? event.error.message
+                : String(event.error),
+          });
+        },
         onStepFinish: (event: StepFinishEvent) => {
           emitToolEndFromStepFinish(
             this.neurolink?.getEventEmitter(),
@@ -324,19 +342,47 @@ export class OpenAICompatibleProvider extends BaseProvider {
 
       // Transform stream to match StreamResult interface
       const transformedStream = async function* () {
+        let chunkCount = 0;
         try {
           for await (const chunk of result.textStream) {
+            chunkCount++;
             yield { content: chunk };
           }
         } catch (streamError) {
-          // AI SDK v6 throws NoOutputGeneratedError when the stream produced no output.
+          // AI SDK v6 *can* throw NoOutputGeneratedError from textStream
+          // iteration in some failure modes (e.g. catastrophic transform
+          // errors); keep this catch as a defensive path.
           if (NoOutputGeneratedError.isInstance(streamError)) {
             logger.warn(
-              "OpenAI-compatible: Stream produced no output (NoOutputGeneratedError)",
+              "OpenAI-compatible: Stream produced no output (NoOutputGeneratedError) — caught from textStream",
             );
+            const sentinel = await buildNoOutputSentinel(
+              streamError,
+              result,
+              capturedProviderError,
+            );
+            stampNoOutputSpan(sentinel);
+            yield sentinel as { content: string };
             return;
           }
           throw streamError;
+        }
+        // Curator P3-6 (round-2 fix): the production trigger doesn't
+        // throw from textStream — AI SDK rejects `result.finishReason`
+        // instead. Surface that rejection here so the enriched sentinel
+        // actually fires for real-world no-output streams.
+        if (chunkCount === 0) {
+          const detected = await detectPostStreamNoOutput(
+            result,
+            capturedProviderError,
+          );
+          if (detected) {
+            logger.warn(
+              "OpenAI-compatible: Stream produced no output (NoOutputGeneratedError) — caught from finishReason rejection",
+            );
+            stampNoOutputSpan(detected.sentinel);
+            yield detected.sentinel as { content: string };
+          }
         }
       };
 
