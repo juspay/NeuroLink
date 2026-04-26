@@ -1,3 +1,9 @@
+## [9.59.2](https://github.com/juspay/neurolink/compare/v9.59.1...v9.59.2) (2026-04-26)
+
+### Bug Fixes
+
+- **(context):** pre-dispatch compaction + hard cap for inline conversationMessages on both generate and stream paths + compaction.insufficient event ([d39739f](https://github.com/juspay/neurolink/commit/d39739fc6ac01aa64e309481e0a8fe53525e9c7f))
+
 ## [9.59.1](https://github.com/juspay/neurolink/compare/v9.59.0...v9.59.1) (2026-04-26)
 
 ### Bug Fixes
