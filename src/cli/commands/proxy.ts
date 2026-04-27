@@ -1900,13 +1900,15 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
           `[guard] update available: ${runningVersion} → ${result.latestVersion}`,
         );
 
-        // 2. Wait for quiet traffic
-        const maxQuietWaitMs = 60 * 60 * 1000; // 1 hour max wait
+        // 2. Best-effort quiet wait — try for a brief window, but proceed
+        //    regardless. The install (pnpm add -g) is non-disruptive; only the
+        //    restart causes a ~1-3s blip. Blocking updates for hours/days because
+        //    traffic never goes silent is worse than a brief interruption.
+        const maxQuietWaitMs = 5 * 60 * 1000; // 5 minutes max, then proceed
         const quietPollMs = 10_000; // check every 10s
         const quietStart = Date.now();
 
         while (Date.now() - quietStart < maxQuietWaitMs) {
-          // Bail out if parent proxy died during the wait
           if (getProcessStatus(parentPid) === "not_running") {
             logger.always(
               `[guard] parent process died during quiet-wait, aborting update`,
@@ -1915,6 +1917,7 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
           }
           const quietStatus = checkTrafficQuiet(QUIET_THRESHOLD_MS);
           if (quietStatus.isQuiet) {
+            logger.always(`[guard] traffic quiet, proceeding with update`);
             break;
           }
           logger.debug(
@@ -1923,12 +1926,14 @@ export const proxyGuardCommand: CommandModule<object, ProxyGuardArgs> = {
           await new Promise((r) => setTimeout(r, quietPollMs));
         }
 
+        // Proceed with install regardless — don't block updates indefinitely.
+        // The install itself (pnpm add -g) doesn't affect the running process.
+        // Only the restart afterwards causes a brief interruption.
         const finalQuiet = checkTrafficQuiet(QUIET_THRESHOLD_MS);
         if (!finalQuiet.isQuiet) {
           logger.always(
-            `[guard] traffic didn't quiet down within 1 hour, skipping update cycle`,
+            `[guard] traffic still active after ${Math.round(maxQuietWaitMs / 1000)}s wait, proceeding with update anyway (restart will briefly interrupt in-flight requests)`,
           );
-          return;
         }
 
         // 3. Install update (validate version string before passing to shell)
