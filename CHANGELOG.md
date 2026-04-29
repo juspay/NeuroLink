@@ -1,3 +1,9 @@
+## [9.59.5](https://github.com/juspay/neurolink/compare/v9.59.4...v9.59.5) (2026-04-29)
+
+### Bug Fixes
+
+- **(routing):** dual-mode image text fallback + skip video-frame hijack on structured output ([97b2373](https://github.com/juspay/neurolink/commit/97b2373a793e56414a2ca41009efc72d9a574999))
+
 ## [9.59.4](https://github.com/juspay/neurolink/compare/v9.59.3...v9.59.4) (2026-04-27)
 
 ### Bug Fixes
