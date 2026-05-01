@@ -271,6 +271,8 @@ export default [
       "debug-output.txt",
       "demo-results.json",
       "batch-results.json",
+      // Scratch artifacts produced by the voice fix campaign — not source.
+      "test-results/**",
       "package-lock.json",
       "pnpm-lock.yaml",
       "*.tgz",

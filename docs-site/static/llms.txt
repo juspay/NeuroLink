@@ -2,7 +2,7 @@
 
 > Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI
 
-Generated: 2026-03-23T19:22:39.655Z
+Generated: 2026-05-07T11:39:53.366Z
 Full documentation: https://docs.neurolink.ink/llms-full.txt
 
 ---
@@ -79,14 +79,22 @@ NeuroLink is an enterprise AI development platform that provides:
 - AWS Bedrock Provider Guide
 - Azure OpenAI Provider Guide
 - ⚙️ Provider Configuration Guide
+- Azure Speech Services
+- Deepgram Provider Guide
+- Redis Quick Start (5 Minutes)
+- DeepSeek Provider Guide
+- ElevenLabs Provider Guide
 - Google AI Studio Provider Guide
 - Google Vertex AI Provider Guide
-- Redis Quick Start (5 Minutes)
 - Hugging Face Provider Guide
 - LiteLLM Provider Guide
+- llama.cpp Provider Guide
+- LM Studio Provider Guide
 - Mistral AI Provider Guide
+- NVIDIA NIM Provider Guide
 - Ollama Provider Guide
 - OpenAI-Compatible Providers Guide
+- OpenAI TTS Provider Guide
 - OpenAI Provider Guide
 - OpenRouter Provider Guide
 - Amazon SageMaker Provider Guide
@@ -101,9 +109,16 @@ NeuroLink is an enterprise AI development platform that provides:
 ### Features
 - Feature Guides
 - Audio Input & Transcription Guide
+- Authentication Providers
 - Auto Evaluation Engine
-- Claude Subscription Testing Guide
 - Client SDK
+- AutoResearch - Autonomous AI Experiment Engine
+- Claude Proxy Architecture
+- Claude Proxy Configuration Reference
+- Claude Proxy Observability
+- Claude Proxy Troubleshooting
+- Claude Proxy
+- Claude Subscription Testing Guide
 - Claude Subscription Support
 - CLI Loop Sessions
 - Context Compaction
@@ -127,6 +142,7 @@ NeuroLink is an enterprise AI development platform that provides:
 - Observability Guide
 - Office Documents Support
 - PDF File Support
+- Per-Request Credentials
 - PPT Generation - AI-Powered Presentations
 - Provider Orchestration Brain
 - RAG Document Processing Guide
@@ -135,11 +151,13 @@ NeuroLink is an enterprise AI development platform that provides:
 - Speech-to-Speech Agents: Architecture and Gemini Live Integration Plan
 - Streaming Guide
 - Structured Output with Zod Schemas
+- TaskManager - Scheduled & Self-Running Tasks
 - Extended Thinking Configuration
 - Text-to-Speech (TTS) Integration Guide
 - Video Analysis
 - Video Director Mode – Multi-Clip Generation & Merging
 - Video Generation with Veo 3.1
+- Real-Time Voice Agent - Streaming Voice Loop Design
 - Workflow Engine Guide
 
 ### Examples
@@ -165,8 +183,7 @@ NeuroLink
 [[Image: npm version]](https://www.npmjs.com/package/@juspay/neurolink)
 [[Image: npm downloads]](https://www.npmjs.com/package/@juspay/neurolink)
 [[Image: Build Status]](https://github.com/juspay/neurolink/actions/workflows/ci.yml)
-[[Image: Coverage Status]](https://coveralls.io/github/juspay/neurolink?branch=main)
-[[Image: License: MIT]](https://opensource.
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -185,7 +202,6 @@ Welcome to NeuroLink! This section will help you get up and running quickly with
 ##  What You'll Learn
 
 - **[Quick Start](/docs/getting-started/quick-start)** — Get NeuroLink working in under 2 minutes with basic examples for both CLI and SDK usage.
-- **[Installation](/docs/getting-started/installation)** — Detailed installation instructions for different environments and package managers.
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -210,9 +226,6 @@ Access leading AI models directly from their creators:
 
 -  Claude 4.5 Opus/Sonnet/Haiku, Claude 4.0 Opus/Sonnet
 -  API key or OAuth (Pro/Max subscription)
--  Extended thinking for deep reasoning
--  200K context window, multimodal support
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -239,9 +252,6 @@ Get NeuroLink running in under 2 minutes with this quick start guide.
 
 ```bash
 # Set up your API key (Google AI Studio has free tier)
-export GOOGLE_AI_API_KEY="AIza-your-google-ai-api-key"
-
-# Generate text instantly
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -274,13 +284,6 @@ npm install @juspay/neurolink
 # pnpm
 pnpm add @juspay/neurolink
 
-# yarn
-yarn add @juspay/neurolink
-```
-
-```bash
-git clone https://github.com/juspay/neurolink
-
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -300,9 +303,6 @@ This guide provides comprehensive setup instructions for all AI providers suppor
 
 NeuroLink CLI automatically loads environment variables from `.env` files in your project directory:
 
-```bash
-# Create .env file (automatically loaded)
-echo 'OPENAI_API_KEY="sk-your-key"' > .env
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -327,9 +327,7 @@ echo 'OPENAI_API_KEY="sk-your-key"' > .env
 
 ### 1. Get Your API Key
 
-1. Visit [console.anthropic.com](https://console.anthropic.com)
-2. Sign in or create an account
-3.
+1. Visit [console.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -344,8 +342,7 @@ echo 'OPENAI_API_KEY="sk-your-key"' > .env
 **Enterprise AI with Claude, Nova, Llama, Mistral, DeepSeek, Qwen, and 110+ foundation models on AWS infrastructure**
 
 ----------- | ------------------------------------------------------------------------ | ---------------------------------------- |
-| **Anthropic**  | Claude 4.6 Opus/Sonnet, 4.5, 4.1, 4, 3.7, 3.5, 3 (12)                    | Complex reasoning, coding, 1M context    |
-
+| **Anthropic**  | Claude 4.6 Opus/Sonnet, 4.5, 4.1, 4, 3.7, 3.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -373,11 +370,7 @@ az cognitiveservices account create \
   --sku S0
 ```
 
-Or use [Azure Portal](https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI):
-
-1. Search for "Azure OpenAI"
-2. Click "Create"
-3.
+Or use [Azure Portal](https://portal.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -396,7 +389,125 @@ NeuroLink supports multiple AI providers with flexible authentication methods. T
 - **OpenAI** - GPT-4o, GPT-4o-mini, GPT-4-turbo
 - **Amazon Bedrock** - Claude 3.7 Sonnet, Claude 3.5 Sonnet, Claude 3 Haiku
 - **Amazon SageMaker** - Custom models deployed on SageMaker endpoints
-- **Google Vertex AI** - Gemini 3 Flash/Pro (preview), Gemini 2.5 Flash, Claude 4.0 Sonnet
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Azure Speech Services
+
+<!-- Source: getting-started/providers/azure-speech.md -->
+
+# Azure Speech Services
+
+Azure Cognitive Services Speech provides both TTS and STT capabilities.
+
+## Setup
+
+```bash
+# Required environment variables
+AZURE_SPEECH_KEY=your-speech-key
+AZURE_SPEECH_REGION=eastus
+```
+
+Get credentials from: **Azure Portal** > **Cognitive Services** > **Speech** > **Keys and Endpoint**
+
+## Usage
+
+### Text-to-Speech
+
+```typescript
+const result = await neurolink.
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Deepgram Provider Guide
+
+<!-- Source: getting-started/providers/deepgram.md -->
+
+# Deepgram Provider Guide
+
+**Fast, accurate speech-to-text with streaming, speaker diarization, and smart formatting**
+
+> **STT-only in NeuroLink** — Deepgram is registered as the STT provider id
+> `deepgram`. Deepgram's TTS product is not wired in NeuroLink today; for
+> TTS use `openai-tts`, `elevenlabs`, `azure-tts`, or `google-ai`.
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Redis Quick Start (5 Minutes)
+
+<!-- Source: getting-started/redis-quickstart.md -->
+
+# Redis Quick Start (5 Minutes)
+
+Get Redis storage up and running with NeuroLink in under 5 minutes.
+
+## Prerequisites
+
+- Docker installed **OR** Redis installed locally
+- NeuroLink SDK installed (`pnpm add @juspay/neurolink`)
+
+## Option 1: Docker (Recommended)
+
+The fastest way to get Redis running for development and testing.
+
+### Start Redis Container
+
+```bash
+# Start Redis with persistence
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## DeepSeek Provider Guide
+
+<!-- Source: getting-started/providers/deepseek.md -->
+
+# DeepSeek Provider Guide
+
+**Text generation with DeepSeek-V3 (chat) and DeepSeek-R1 (reasoning) through a single API**
+
+## Quick Start
+
+### 1. Get an API Key
+
+Sign up at [https://platform.deepseek.com](https://platform.deepseek.com) and create an API key under **API Keys**.
+
+### 2. Configure Environment
+
+Add to your `.env` file:
+
+```bash
+# Required
+DEEPSEEK_API_KEY=sk-...
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## ElevenLabs Provider Guide
+
+<!-- Source: getting-started/providers/elevenlabs.md -->
+
+# ElevenLabs Provider Guide
+
+**Studio-quality, multilingual text-to-speech with dynamic voice discovery and voice cloning**
+
+-------------- | --------------------------------------------------- |
+| **Provider ID**   | `elevenlabs`                                        |
+| **API endpoint**  | `https://api.elevenlabs.io/v1`                      |
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -419,14 +530,7 @@ NeuroLink supports multiple AI providers with flexible authentication methods. T
 2. Sign in with your Google account (no GCP project needed)
 3. Click **Get API Key** in the top navigation
 4. Click **Create API Key**
-5. Copy the generated key (starts with `AIza`)
-
-### 2. Configure NeuroLink
-
-Add to your `.env` file:
-
-```bash
-
+5.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -457,43 +561,6 @@ gcloud services enable aiplatform.googleapis.com
 
 ### 2. Setup Authentication
 
-**Option A: Service Account (Production)**
-
-```bash
-# Create service account
-
-
-[Content truncated - see llms-full.txt for complete documentation]
-
----
-
-## Redis Quick Start (5 Minutes)
-
-<!-- Source: getting-started/redis-quickstart.md -->
-
-# Redis Quick Start (5 Minutes)
-
-Get Redis storage up and running with NeuroLink in under 5 minutes.
-
-## Prerequisites
-
-- Docker installed **OR** Redis installed locally
-- NeuroLink SDK installed (`pnpm add @juspay/neurolink`)
-
-## Option 1: Docker (Recommended)
-
-The fastest way to get Redis running for development and testing.
-
-### Start Redis Container
-
-```bash
-# Start Redis with persistence
-docker run -d \
-  --name neurolink-redis \
-  -p 6379:6379 \
-  -v redis-data:/data \
-  redis:7-alpine
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -517,12 +584,7 @@ docker run -d \
 3. Go to [Settings → Access Tokens](https://huggingface.co/settings/tokens)
 4. Click "New token"
 5. Give it a name (e.g., "NeuroLink")
-6. Select "Read" permissions
-7. Copy the token (starts with `hf_...`)
-
-### 2. Configure NeuroLink
-
-
+6.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -540,14 +602,54 @@ docker run -d \
 
 ### 1. Set Up a LiteLLM Proxy Server
 
-Before using the NeuroLink `litellm` provider, you need a running LiteLLM proxy. See the [Setting Up LiteLLM Proxy](#setting-up-litellm-proxy) section below for full details, or get started quickly:
+Before using the NeuroLink `litellm` provider, you need a running LiteLLM proxy.
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## llama.cpp Provider Guide
+
+<!-- Source: getting-started/providers/llamacpp.md -->
+
+# llama.cpp Provider Guide
+
+**Fully offline GGUF inference — connect NeuroLink directly to a `llama-server` process**
+
+## Quick Start
+
+### 1. Install and Build llama.cpp
 
 ```bash
-pip install 'litellm[proxy]'
-litellm --model openai/gpt-4o-mini --port 4000
-```
+# Clone the repo
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
 
-### 2.
+# Build (CPU-only — works on any machine)
+cmake -B build
+cmake --build build --config Release -j $(nproc)
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## LM Studio Provider Guide
+
+<!-- Source: getting-started/providers/lm-studio.md -->
+
+# LM Studio Provider Guide
+
+**Run any GGUF model privately on your own hardware — no cloud, no API key required**
+
+## Quick Start
+
+### 1. Download and Start LM Studio
+
+1. Download LM Studio from [https://lmstudio.ai](https://lmstudio.ai) for your platform.
+2. Open the app and search for a model in the **Discover** tab (e.g., `Llama 3.2 3B Instruct`).
+3.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -576,13 +678,30 @@ litellm --model openai/gpt-4o-mini --port 4000
 Add to your `.env` file:
 
 ```bash
-MISTRAL_API_KEY=your_api_key_here
-```
 
-### 3. Test the Setup
 
-```bash
-# CLI - Test with default model
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## NVIDIA NIM Provider Guide
+
+<!-- Source: getting-started/providers/nvidia-nim.md -->
+
+# NVIDIA NIM Provider Guide
+
+**Hundreds of optimised AI models on NVIDIA's GPU-accelerated inference platform — or your own self-hosted NIM deployment**
+
+## Quick Start
+
+### 1. Get an API Key
+
+Sign up at [https://build.nvidia.com](https://build.nvidia.com) and create an API key under [API Keys](https://build.nvidia.com/settings/api-keys).
+
+### 2. Configure Environment
+
+Add to your `.env` file:
+
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -599,8 +718,6 @@ MISTRAL_API_KEY=your_api_key_here
 
 ------------------ | ---------------------- | ------------------------------------------------- |
 | **Native** (default)  | `/api/generate`        | Standard text generation and streaming            |
-| **OpenAI-compatible** | `/v1/chat/completions` | Tool calling, chat-format messages, compatibility |
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -618,7 +735,24 @@ MISTRAL_API_KEY=your_api_key_here
 ---------------------- | ------------------------------------ | ---------------------- |
 | **OpenRouter**            | AI provider aggregator (100+ models) | Multi-provider access  |
 | **vLLM**                  | High-performance inference server    | Self-hosted models     |
-| **LocalAI**               | Local OpenAI alternative             | Privacy, offline usage |
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## OpenAI TTS Provider Guide
+
+<!-- Source: getting-started/providers/openai-tts.md -->
+
+# OpenAI TTS Provider Guide
+
+**High-quality neural text-to-speech with six distinct voices and HD quality option**
+
+------------- | --------------------------------------------- |
+| **Provider ID**  | `openai-tts`                                  |
+| **API endpoint** | `https://api.openai.com/v1/audio/speech`      |
+| **Models**       | `tts-1` (standard), `tts-1-hd` (high quality) |
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -644,9 +778,7 @@ These aliases are registered in `src/lib/factories/providerRegistry.ts`.
 
 ## Quick Start
 
-### 1. Get Your API Key
 
-1. Visit [platform.openai.com/api-keys](https://platform.openai.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -674,8 +806,6 @@ Add your API key to `.env`:
 # Required
 OPENROUTER_API_KEY=sk-or-v1-...
 
-# Optional: Attribution (shows in OpenRouter dashboard)
-OPENROUTER_REFERER=https://yourapp.com
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -693,7 +823,6 @@ OPENROUTER_REFERER=https://yourapp.com
 > **Version:** 9.26.x | **Status:** General Availability | **Streaming:** Not Available (see warning below)
 
 ------------- | ------------- | --------------------------------------------------- | ---------------------------------- |
-| **Llama**        | `llama`       | Meta Llama models deployed via JumpStart or custom  | General-purpose, cost-effective    |
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -719,13 +848,6 @@ The SDK is designed for:
 - **Serverless functions** (Vercel, Netlify, AWS Lambda)
 - **Desktop applications** (Electron, Tauri)
 
-## Quick Start
-
-```typescript
-
-const neurolink = new NeuroLink();
-
-// Generate text
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -763,8 +885,6 @@ npm install -g @juspay/neurolink
 npm install @juspay/neurolink
 ```
 
-## Command Map
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -781,8 +901,7 @@ npm install @juspay/neurolink
 
 Comprehensive guides for all NeuroLink features organized by category. Each guide includes setup, usage patterns, configuration, and troubleshooting.
 
-------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-
+------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------...
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -802,9 +921,23 @@ NeuroLink provides comprehensive audio input capabilities, enabling real-time vo
 
 NeuroLink supports the following audio capabilities today:
 
-- **Real-time voice conversations** via Gemini Live (Google AI Studio)
-- **Text-to-Speech (TTS) output** via Google Cloud TTS integration
 
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Authentication Providers
+
+<!-- Source: features/authentication-providers.md -->
+
+# Authentication Providers
+
+> **Status**: Stable | **Availability**: SDK + CLI + Server
+
+## Overview
+
+NeuroLink ships with a pluggable authentication system that validates tokens, manages sessions, and enforces role-based access control (RBAC) across your AI endpoints.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -820,7 +953,130 @@ NeuroLink provides an automated quality gate that scores every response using an
 
 ## What It Does
 
-- Generates a structured evaluation payload (`result.evaluation`) for every call with `enableEvaluation: true`.
+- Generates a structured evaluation payload (`result.
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Client SDK
+
+<!-- Source: features/client-sdk.md -->
+
+# Client SDK
+
+> **Since**: v9.30.0 | **Status**: Stable | **Availability**: SDK
+
+## Overview
+
+The NeuroLink Client SDK provides type-safe libraries for accessing NeuroLink APIs from JavaScript and TypeScript applications. It is designed for frontend apps, backend services, and full-stack frameworks alike.
+
+**Key capabilities:**
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## AutoResearch - Autonomous AI Experiment Engine
+
+<!-- Source: features/autoresearch.md -->
+
+# AutoResearch - Autonomous AI Experiment Engine
+
+## Overview
+
+AutoResearch is an autonomous experiment loop that proposes code changes, executes experiments, evaluates results against a deterministic metric, and keeps or discards each change — running unattended for hours.
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Claude Proxy Architecture
+
+<!-- Source: features/claude-proxy-architecture.md -->
+
+# Claude Proxy Architecture
+
+## 1. System Overview
+
+The Claude proxy is a local HTTP server that sits between Claude Code and the Anthropic API. It provides multi-account rotation, automatic token refresh, rate-limit handling with exponential backoff, and optional model translation to non-Anthropic providers.
+
+### Two operational modes
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Claude Proxy Configuration Reference
+
+<!-- Source: features/claude-proxy-config-reference.md -->
+
+# Claude Proxy Configuration Reference
+
+This document is the authoritative reference for every configurable aspect of the NeuroLink Claude proxy. It covers CLI flags, the YAML config file schema, environment variables, auto-configured Claude Code settings, and all file locations.
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Claude Proxy Observability
+
+<!-- Source: features/claude-proxy-observability.md -->
+
+# Claude Proxy Observability
+
+This guide explains how to read the OpenObserve dashboard used to operate the NeuroLink Claude proxy.
+
+## Source Of Truth
+
+- Dashboard definition: `docs/assets/dashboards/neurolink-proxy-observability-dashboard.json`
+- Live dashboard title: `NeuroLink Proxy Observability`
+- Default time range: `Last 30 minutes`
+
+## First-Time Local Setup
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Claude Proxy Troubleshooting
+
+<!-- Source: features/claude-proxy-troubleshooting.md -->
+
+# Claude Proxy Troubleshooting
+
+This guide covers every issue encountered during development and real-world usage of the NeuroLink Claude proxy. For general proxy documentation, see [Claude Proxy](/docs/features/claude-proxy).
+
+## Common Issues
+
+### 1. "API Error: 400 invalid_request_error: Error"
+
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Claude Proxy
+
+<!-- Source: features/claude-proxy.md -->
+
+# Claude Proxy
+
+NeuroLink includes a Claude-API-compatible proxy server that sits between Claude Code and Anthropic. It pools multiple Claude accounts, handles rate-limit failover automatically, refreshes OAuth tokens on demand before they expire, and falls back to other providers when all Claude accounts are exhausted.
+
+## Overview
+
+### Why use the proxy?
+
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -841,34 +1097,6 @@ This document provides comprehensive testing commands and examples for the Claud
 
 Before testing, ensure you have the required environment configured:
 
-```bash
-# Navigate to project directory
-cd /path/to/neurolink
-
-# Install dependencies
-pnpm install
-
-
-
-[Content truncated - see llms-full.txt for complete documentation]
-
----
-
-## Client SDK
-
-<!-- Source: features/client-sdk.md -->
-
-# Client SDK
-
-> **Since**: v9.30.0 | **Status**: Stable | **Availability**: SDK
-
-## Overview
-
-The NeuroLink Client SDK provides type-safe libraries for accessing NeuroLink APIs from JavaScript and TypeScript applications. It is designed for frontend apps, backend services, and full-stack frameworks alike.
-
-**Key capabilities:**
-
-- **HTTP Client** -- Type-safe request/response with automatic retries, middleware, and request cancellation
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -887,7 +1115,6 @@ NeuroLink provides flexible access to Anthropic's Claude models through multiple
 
 Claude is available through different subscription tiers, each offering varying levels of access, rate limits, and model availability:
 
-| Tier     | Access Method     | Rate Limits      | Best For                                |
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -906,9 +1133,6 @@ Claude is available through different subscription tiers, each offering varying 
 
 ```bash
 # Enter interactive loop mode with Anthropic as the default provider
-npx @juspay/neurolink loop --provider anthropic
-
-# Inside the loop, just type prompts:
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -943,10 +1167,6 @@ NeuroLink's Context Compaction system automatically manages conversation context
 
 **What it does**: Export complete conversation session history from Redis storage as JSON for analytics, debugging, and compliance auditing.
 
-**Why use it**: Access structured conversation data for analysis, user behavior insights, quality assurance, and debugging failed sessions. Essential for production observability.
-
-**Common use cases**:
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -965,8 +1185,7 @@ NeuroLink provides seamless CSV file support as a **multimodal input type** - at
 
 CSV support in NeuroLink works just like image support - it's a multimodal input that gets automatically processed and injected into your prompts. The system:
 
-1. **Auto-detects** CSV files using FileDetector (magic bytes, MIME types, extensions, content heuristics)
-2.
+1.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -985,7 +1204,6 @@ CSV support in NeuroLink works just like image support - it's a multimodal input
 Embeddings convert text into dense numerical vectors that capture semantic meaning. Two texts with similar meanings produce vectors that are close together in the embedding space, enabling use cases like:
 
 - **Semantic search** -- find documents by meaning rather than exact keyword match
-- **RAG pipelines** -- retrieve relevant context before generating answers
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1004,8 +1222,7 @@ Embeddings convert text into dense numerical vectors that capture semantic meani
 This document describes enterprise HITL features. Some advanced features (marked as "Planned")
 are not yet implemented and represent the target API design for future releases.
 
-**Currently Available:** Basic HITL with `dangerousActions`, `timeout`, `autoApproveOnTimeout`,
-`allowArgumentModification`, and `auditLogging`.
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1024,8 +1241,6 @@ NeuroLink includes a comprehensive file processing system that supports 20+ file
 The file processor system is organized into a modular architecture:
 
 ```
-src/lib/processors/
-├── base/           # BaseFileProcessor abstract class and types
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1042,7 +1257,7 @@ This document outlines the modern, simplified approach to integrating Guardrails
 
 ## Overview
 
-Guardrails AI is an open-source library that provides a framework for creating and managing guardrails for large language models (LLMs).
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1060,8 +1275,6 @@ This document provides comprehensive documentation for the NeuroLink guardrails 
 
 The guardrails implementation provides advanced content filtering and safety mechanisms for AI interactions. It includes:
 
-- **Pre-call Evaluation**: AI-powered safety assessment before processing
-- **Content Filtering**: Bad words and regex pattern filtering
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1079,8 +1292,6 @@ The guardrails implementation provides advanced content filtering and safety mec
 ## Overview
 
 **What it does**: Guardrails middleware provides real-time content filtering and policy enforcement for AI model outputs, blocking profanity, PII, unsafe content, and custom-defined terms.
-
-**Why use it**: Protect your application from generating harmful, inappropriate, or non-compliant content. Ensures AI responses meet safety standards and regulatory requirements.
 
 
 
@@ -1100,8 +1311,6 @@ The guardrails implementation provides advanced content filtering and safety mec
 
 **What it does**: HITL pauses AI tool execution to request explicit user approval before performing risky operations like deleting files, modifying databases, or making expensive API calls.
 
-**Why use it**: Prevent costly mistakes and give users control over potentially dangerous AI actions. Think of it as an "Are you sure?" dialog for AI assistant operations.
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1120,9 +1329,7 @@ NeuroLink supports image generation through AI models like Google Vertex AI's `g
 
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Streaming Modes](#streaming-modes)
-3.
+1.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1156,10 +1363,6 @@ Visual guides for understanding the MCP enhancement architecture, data flows, an
 
 ## Overall Architecture
 
-The MCP enhancement system is organized into five layers, each serving a distinct role in tool management, routing, and execution across multiple MCP servers.
-
-```mermaid
-graph TD
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1178,7 +1381,6 @@ graph TD
 
 The MCP Enhancements suite extends NeuroLink's Model Context Protocol integration with production-grade capabilities for managing tool calls at scale. These modules address the operational challenges of running multiple MCP servers in enterprise environments:
 
-- **Tool Router** -- Intelligent routing of tool calls across multiple servers with 6 strategies
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1215,7 +1417,6 @@ NeuroLink includes a **memory engine** powered by the `@juspay/hippocampus` SDK.
 
 Key characteristics:
 
-- **Per-user**: Each user gets an independent memory store keyed by `userId`
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1232,11 +1433,7 @@ NeuroLink provides full multimodal pipelines so you can mix text, URLs, and loca
 
 ## Video Generation {#video-generation}
 
-NeuroLink supports **video generation** from images using Google's Veo 3.1 model via Vertex AI. Transform static images into 8-second videos with synchronized audio.
-
-```typescript
-
-const result = await neurolink.
+NeuroLink supports **video generation** from images using Google's Veo 3.1 model via Vertex AI.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1255,8 +1452,6 @@ NeuroLink provides comprehensive multimodal support, allowing you to combine tex
 **Supported Input Types:**
 
 - **Images** - JPEG, PNG, GIF, WebP, HEIC (vision-capable models)
-- **PDFs** - Document analysis and content extraction
-- **CSV/Spreadsheets** - Data analysis and tabular content processing
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1276,7 +1471,6 @@ Enterprise-grade observability for AI operations with Langfuse and OpenTelemetry
 NeuroLink provides comprehensive observability features for monitoring AI operations in production:
 
 - **Langfuse Integration**: LLM-specific observability with token tracking, cost analysis, and trace visualization
-- **OpenTelemetry Support**: Standard distributed tracing compatible with Jaeger, Zipkin, and other backends
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1293,9 +1487,7 @@ NeuroLink provides seamless Office document support as a **multimodal input type
 
 ## Overview
 
-Office document support in NeuroLink works as a native multimodal input - the system automatically processes Office files and passes them to the AI provider's document understanding capabilities. The system:
 
-1.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1311,9 +1503,26 @@ NeuroLink provides seamless PDF file support as a **multimodal input type** - at
 
 ## Overview
 
-PDF support in NeuroLink works as a native multimodal input - the system automatically processes PDF files and passes them directly to the AI provider's vision/document understanding capabilities. The system:
 
-1.
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Per-Request Credentials
+
+<!-- Source: features/per-request-credentials.md -->
+
+# Per-Request Credentials
+
+> **Status**: Stable | **Availability**: SDK only
+
+## Overview
+
+NeuroLink allows provider credentials to be supplied at two levels below the environment-variable default: on the `NeuroLink` constructor (instance level) and on individual `generate()` / `stream()` calls (per-call level). Credentials are resolved in the following order of precedence:
+
+```
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1331,8 +1540,7 @@ NeuroLink enables AI-powered PowerPoint presentation generation from text prompt
 
 PPT generation in NeuroLink uses a multi-stage pipeline powered by any supported AI provider:
 
-1. **Accepts** a text prompt describing the presentation topic via `input.text`
-2.
+1.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1348,8 +1556,7 @@ The orchestration engine introduced in 7.42.0 pairs a task classifier with a pro
 
 ## Highlights
 
-- **Binary task classifier** – categorises prompts (analysis vs. creative, etc.) before routing.
-
+- **Binary task classifier** – categorises prompts (analysis vs.
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1366,8 +1573,6 @@ The orchestration engine introduced in 7.42.0 pairs a task classifier with a pro
 > **Provider Defaults:** When `--provider` (CLI) or `provider` (SDK) is not specified, NeuroLink defaults to **Vertex AI** with **gemini-2.5-flash**. Set the `NEUROLINK_PROVIDER` or `AI_PROVIDER` environment variable to change the default provider.
 
 ## Overview
-
-NeuroLink provides enterprise-grade RAG (Retrieval-Augmented Generation) capabilities for building production AI applications:
 
 
 
@@ -1389,7 +1594,6 @@ NeuroLink provides enterprise-grade real-time services with WebSocket infrastruc
 
 ##  Key Features
 
-- ** WebSocket Infrastructure** - Professional-grade server with connection management
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1411,9 +1615,7 @@ Latency, compliance, and model availability often depend on which region you cal
 const neurolink = new NeuroLink();
 
 const result = await neurolink.stream({
-  input: { text: "Summarise EMEA incident reports" },
-  provider: "bedrock",
-  model: "anthropic.
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1433,7 +1635,6 @@ Last updated: 2025-09-01
 
 - Use `NeuroLink.stream` as the single, unified API for both text and voice streaming (no separate engine entrypoint).
 - Start with Google Gemini Live API (Studio) as the first realtime provider.
-- Server-level only: users attach their own WebSocket(s) and forward events; we do not host WS in the SDK.
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1452,7 +1653,7 @@ Last updated: 2025-09-01
 
 ## Overview
 
-Streaming lets you receive AI-generated text incrementally -- token by token -- instead of waiting for the entire response.
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1479,10 +1680,21 @@ const UserSchema = z.object({
 });
 
 const result = await neurolink.generate({
-  input: { text: "Create a profile for John Doe, 30, software engineer" },
-  schema: UserSchema,
-  output: { format: "json" },
-});
+
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## TaskManager - Scheduled & Self-Running Tasks
+
+<!-- Source: features/task-manager.md -->
+
+# TaskManager - Scheduled & Self-Running Tasks
+
+## Overview
+
+TaskManager adds scheduled and self-running task capabilities to NeuroLink. It enables AI agents to execute prompts on a schedule (cron, interval, or one-shot), with two execution modes: **Isolated** (fresh context per run) and **Continuation** (preserves conversation history across runs).
 
 
 
@@ -1518,8 +1730,6 @@ NeuroLink provides integrated Text-to-Speech (TTS) capabilities, allowing you to
 
 **Key Features:**
 
-- **High-quality voices** - Neural, Wavenet, and Standard voice types
-- **Multiple languages** - 50+ voices across 10+ languages
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1537,7 +1747,6 @@ Comprehensive video analysis for NeuroLink, powered by Gemini 2.0 Flash. This fe
 ## Key Capabilities
 
 - **Logical Analysis**: Dissect any video to extract the underlying intent, cause-and-effect, and logical progression.
-- **Action-Reaction Chain**: A step-by-step audit of user or system actions and their immediate visual results.
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1550,7 +1759,7 @@ Comprehensive video analysis for NeuroLink, powered by Gemini 2.0 Flash. This fe
 
 # Video Director Mode
 
-Director Mode extends NeuroLink's [video generation](/docs/features/video-generation) capability to produce **multi-segment videos with seamless AI-generated transitions**. Instead of a single clip, you define an array of **segments** — each with its own prompt and image — and NeuroLink orchestrates the full pipeline: generating each clip, extracting boundary frames, producing transition videos (with individually configurable durations) using Veo 3.
+Director Mode extends NeuroLink's [video generation](/docs/features/video-generation) capability to produce **multi-segment videos with seamless AI-generated transitions**. Instead of a single clip, you define an array of **segments** — each with its own prompt and image — and NeuroLink orchestrates the full pipeline: generating each clip, extracting boundary frames, produci...
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1566,9 +1775,30 @@ NeuroLink integrates Google's Veo 3.1 model to enable AI-powered video generatio
 
 ## Overview
 
-Video generation in NeuroLink leverages Google's state-of-the-art Veo 3.1 model through Vertex AI. The system uses the existing `generate()` function with video-specific options:
+Video generation in NeuroLink leverages Google's state-of-the-art Veo 3.1 model through Vertex AI.
 
-1. **Accepts** an input image via `input.
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Real-Time Voice Agent - Streaming Voice Loop Design
+
+<!-- Source: features/voice-agent.md -->
+
+# Real-Time Voice Agent - Streaming Voice Loop Design
+
+**Automatic low-latency voice conversations with STT, LLM, TTS, and barge-in support**
+
+## Problem Statement & Solution
+
+### The Challenge
+
+Real-time voice assistants are harder than ordinary request/response chat because they must coordinate:
+
+- continuous microphone audio input
+- speech detection
+- real-time transcription
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 
@@ -1606,7 +1836,6 @@ Learn NeuroLink through practical examples and step-by-step tutorials for real-w
 
 This section contains practical implementations, use cases, and tutorials to help you integrate NeuroLink into your projects effectively.
 
-- **[Basic Usage](/docs/examples/basic-usage)** — Fundamental examples for both CLI and SDK usage, covering core functionality and common patterns.
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1634,8 +1863,6 @@ class LoadBalancedNeuroLink {
 
   constructor() {
     this.instances = new Map([
-      ["openai", new NeuroLink({ defaultProvider: "openai" })],
-      ["google-ai", new NeuroLink({ defaultProvider: "google-ai" })],
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1658,10 +1885,6 @@ Simple examples to get started with NeuroLink in different scenarios and program
 
 ```typescript
 
-const neurolink = new NeuroLink();
-
-// Basic text generation
-const result = await neurolink.generate({
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1687,12 +1910,6 @@ Enterprise-focused examples demonstrating NeuroLink's value in business environm
 class StrategyAssistant {
   private neurolink: NeuroLink;
 
-  constructor() {
-    this.neurolink = new NeuroLink({
-      analytics: { enabled: true },
-    });
-  }
-
 
 
 [Content truncated - see llms-full.txt for complete documentation]
@@ -1717,8 +1934,6 @@ Create or update your `.mcp-config.json` file:
     "filesystem": {
       "name": "filesystem",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
-      "transport": "stdio",
 
 
 [Content truncated - see llms-full.txt for complete documentation]

@@ -20,6 +20,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { spawn } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
+import * as path from "path";
 
 // Read package.json dynamically for version and main script
 const packageJsonPath = "package.json";
@@ -4214,7 +4215,14 @@ async function testSchemaWithMultipleImagesSDK(): Promise<boolean | null> {
     return null;
   }
 
-  const tempDir = fs.mkdtempSync(os.tmpdir() + "/test-schema-multi-img-sdk-");
+  // Place temp dir INSIDE the project so the bare `import 'zod'` in the
+  // generated script can resolve via node_modules walk-up. /tmp/ has no
+  // node_modules so the script would crash with ERR_MODULE_NOT_FOUND before
+  // printing PASS/FAIL — the silent failure that made this test report as
+  // "❌" with empty detail. (.test-tmp-* is in .gitignore.)
+  const tempDir = fs.mkdtempSync(
+    path.join(process.cwd(), ".test-tmp-schema-multi-img-sdk-"),
+  );
   const tempScriptPath = tempDir + "/test.mjs";
 
   try {
@@ -4260,7 +4268,29 @@ async function run() {
 
     let parsed;
     try {
-      parsed = typeof result.content === 'string' ? JSON.parse(result.content.replace(/^\\\`\\\`\\\`json\\s*|\\s*\\\`\\\`\\\`$/g, '').trim()) : result.content;
+      // Iterative defensive parse — handles up to 3 layers of wrapping
+      // (some models double-encode: JSON string → markdown-fenced JSON).
+      const tryParse = (s) => { try { return JSON.parse(s); } catch { return undefined; } };
+      const stripFences = (s) => s
+        .replace(/^[\\s\\S]*?\`\`\`(?:json)?[\\s\\r\\n]*/i, '')
+        .replace(/[\\s\\r\\n]*\`\`\`[\\s\\S]*$/, '')
+        .trim();
+      const deepParse = (raw) => {
+        let v = raw;
+        for (let i = 0; i < 4 && typeof v === 'string'; i++) {
+          const direct = tryParse(v);
+          if (direct !== undefined) { v = direct; continue; }
+          const stripped = tryParse(stripFences(v));
+          if (stripped !== undefined) { v = stripped; continue; }
+          break;
+        }
+        return v;
+      };
+      const raw = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+      parsed = deepParse(raw);
+      if (typeof parsed === 'string' || parsed === undefined) {
+        throw new Error('Could not parse content as JSON object');
+      }
     } catch (e) {
       console.log('Schema 3+ Images: FAIL - non-JSON content. content=' + (result.content || '').slice(0, 200));
       process.exit(1);
@@ -4313,9 +4343,13 @@ run();
       );
       return true;
     }
+    // Improved failure detail: surface stderr / exit code when stdout has
+    // no FAIL line — silent script failures otherwise look like empty FAIL.
     const failLine =
       result.stdout.split("\n").find((l) => l.includes("FAIL")) ||
-      result.stdout.slice(0, 300);
+      result.stdout.slice(0, 300) ||
+      (result.stderr ? `stderr: ${result.stderr.slice(0, 300)}` : null) ||
+      `exit=${result.code}, no stdout/stderr`;
     logTest("Schema Output with 3+ Images (SDK)", "FAIL", failLine);
     return false;
   } catch (error) {
@@ -4378,7 +4412,31 @@ async function run() {
 
     let parsed;
     try {
-      parsed = typeof result.content === 'string' ? JSON.parse(result.content) : result.content;
+      // Iterative defensive parse — handles up to 4 layers of wrapping
+      // (some models double-encode: JSON string → markdown-fenced JSON).
+      // Backtick escaping: each \` in this template literal becomes a single
+      // backtick in the generated inner script.
+      const tryParse = (s) => { try { return JSON.parse(s); } catch { return undefined; } };
+      const stripFences = (s) => s
+        .replace(/^[\\s\\S]*?\`\`\`(?:json)?[\\s\\r\\n]*/i, '')
+        .replace(/[\\s\\r\\n]*\`\`\`[\\s\\S]*$/, '')
+        .trim();
+      const deepParse = (raw) => {
+        let v = raw;
+        for (let i = 0; i < 4 && typeof v === 'string'; i++) {
+          const direct = tryParse(v);
+          if (direct !== undefined) { v = direct; continue; }
+          const stripped = tryParse(stripFences(v));
+          if (stripped !== undefined) { v = stripped; continue; }
+          break;
+        }
+        return v;
+      };
+      const raw = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+      parsed = deepParse(raw);
+      if (typeof parsed === 'string' || parsed === undefined) {
+        throw new Error('Could not parse content as JSON object');
+      }
     } catch (e) {
       console.log('JSON 3+ Images: FAIL - non-JSON content. content=' + (result.content || '').slice(0, 200));
       process.exit(1);

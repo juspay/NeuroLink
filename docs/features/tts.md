@@ -12,12 +12,13 @@ NeuroLink provides integrated Text-to-Speech (TTS) capabilities, allowing you to
 
 **Key Features:**
 
-- **High-quality voices** - Neural, Wavenet, and Standard voice types
+- **Multiple providers** - Google Cloud TTS, OpenAI TTS, ElevenLabs, and Azure TTS
+- **High-quality voices** - Neural, Wavenet, Standard, and multilingual voice types
 - **Multiple languages** - 50+ voices across 10+ languages
 - **Flexible audio formats** - MP3, WAV, OGG/Opus
 - **Voice customization** - Adjust speed, pitch, and volume
 - **Two synthesis modes** - Direct text-to-speech OR AI response synthesis
-- **Production-ready** - Google Cloud TTS integration
+- **Production-ready** - Works with Google Cloud, OpenAI, ElevenLabs, and Azure
 
 ---
 
@@ -29,19 +30,31 @@ TTS support is built into NeuroLink. No additional installation required.
 
 ### Environment Setup
 
-TTS requires Google Cloud credentials:
+Set the appropriate environment variables for your chosen TTS provider:
 
 ```bash
-# Option 1: Service account (recommended for production)
+# Google AI Studio (google-ai TTS uses the Google Cloud TTS SDK; ADC / service
+# account is required — there is no API-key auth for the TTS handler itself)
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+# (GOOGLE_AI_API_KEY is used by the LLM/STT side of `google-ai`, not TTS.)
+
+# Google Vertex AI (vertex) — service account recommended for production
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 
-# Option 2: API key (simpler for development)
-export GOOGLE_AI_API_KEY="your-api-key"
+# OpenAI TTS (openai-tts)
+export OPENAI_API_KEY="your-openai-api-key"
+
+# ElevenLabs (elevenlabs)
+export ELEVENLABS_API_KEY="your-elevenlabs-api-key"
+
+# Azure TTS (azure-tts)
+export AZURE_SPEECH_KEY="your-azure-speech-key"
+export AZURE_SPEECH_REGION="eastus"  # or your Azure region
 ```
 
-**API Key Configuration:**
+**Google API Key Configuration:**
 
-If using API key authentication, enable both APIs in Google Cloud Console:
+If using API key authentication for Google, enable both APIs in Google Cloud Console:
 
 1. Navigate to "APIs & Services" > "Credentials"
 2. Create or select your API key
@@ -85,25 +98,26 @@ const result = await neurolink.generate({
 });
 
 // Access generated audio
-console.log("Audio size:", result.tts?.size, "bytes");
-console.log("Audio format:", result.tts?.format);
+console.log("Audio size:", result.audio?.size, "bytes");
+console.log("Audio format:", result.audio?.format);
 ```
 
 ---
 
 ## Supported Providers
 
-TTS is currently available through Google Cloud Text-to-Speech API:
+TTS is available through the following providers:
 
-| Provider      | Authentication                                     | Voices     | Notes                                |
-| ------------- | -------------------------------------------------- | ---------- | ------------------------------------ |
-| **google-ai** | API Key (`GOOGLE_AI_API_KEY`)                      | 50+ voices | Simplest setup, good for development |
-| **vertex**    | Service Account (`GOOGLE_APPLICATION_CREDENTIALS`) | 50+ voices | Recommended for production           |
+| Provider       | Authentication                                              | Voices / Models                                                            | Notes                                                               |
+| -------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **google-ai**  | Service Account (`GOOGLE_APPLICATION_CREDENTIALS`)          | 50+ voices (Neural2, Wavenet, Standard)                                    | Same auth as `vertex` (TTS uses Google Cloud Text-to-Speech client) |
+| **vertex**     | Service Account (`GOOGLE_APPLICATION_CREDENTIALS`)          | 50+ voices (Neural2, Wavenet, Standard)                                    | Recommended for production                                          |
+| **openai-tts** | API Key (`OPENAI_API_KEY`)                                  | 6 voices: alloy, echo, fable, onyx, nova, shimmer; models: tts-1, tts-1-hd | Good default quality                                                |
+| **elevenlabs** | API Key (`ELEVENLABS_API_KEY`)                              | Multilingual voices; model: eleven_multilingual_v2                         | High-quality multilingual synthesis                                 |
+| **azure-tts**  | API Key (`AZURE_SPEECH_KEY` + region `AZURE_SPEECH_REGION`) | Neural voices with SSML support                                            | Enterprise-grade Azure Speech                                       |
 
 **Planned for future releases:**
 
-- OpenAI TTS (GPT-4 voices: alloy, echo, fable, onyx, nova, shimmer)
-- Azure Speech Services
 - AWS Polly
 
 ---
@@ -229,6 +243,14 @@ const result = await neurolink.generate({
 // TTS synthesizes the joke audio
 // Both text and audio available in result
 ```
+
+> **Note:** when `useAiResponse: true`, NeuroLink synthesizes the chat
+> provider's text response. If your chat provider has no TTS counterpart
+> (e.g. `anthropic`, `bedrock`), set `tts.provider` explicitly — otherwise
+> stream Mode 2 will throw `No TTS provider resolved for stream Mode 2`
+> after text generation completes. Chat providers that double as TTS
+> handlers (e.g. `google-ai`, `vertex`) auto-resolve when `tts.provider`
+> is omitted.
 
 **Use cases:**
 
@@ -396,14 +418,14 @@ const result = await neurolink.generate({
 
 // Access results
 console.log("Text:", result.content);
-console.log("Audio size:", result.tts?.size, "bytes");
-console.log("Audio format:", result.tts?.format);
-console.log("Voice used:", result.tts?.voice);
+console.log("Audio size:", result.audio?.size, "bytes");
+console.log("Audio format:", result.audio?.format);
+console.log("Voice used:", result.audio?.voice);
 
 // Save audio to file
-if (result.tts?.buffer) {
+if (result.audio?.buffer) {
   import { writeFileSync } from "fs";
-  writeFileSync("output.mp3", result.tts.buffer);
+  writeFileSync("output.mp3", result.audio.buffer);
 }
 ```
 
@@ -412,12 +434,35 @@ if (result.tts?.buffer) {
 ```bash
 neurolink generate "Your text" \
   --provider google-ai \
-  --tts-voice <voice-id> \      # Required to enable TTS
-  --tts-format <format> \        # mp3|wav|ogg (default: mp3)
-  --tts-speed <rate> \           # 0.25-4.0 (default: 1.0)
-  --tts-pitch <pitch> \          # -20.0 to 20.0 (default: 0.0)
-  --tts-output <file> \          # Save to file
-  --tts-use-ai-response          # Synthesize AI response instead of input
+  --tts \
+  --tts-provider <provider> \
+  --tts-voice <voice-id> \
+  --tts-format <format> \
+  --tts-speed <rate> \
+  --tts-pitch <pitch> \
+  --tts-output <file> \
+  --tts-use-ai-response
+# --tts                  : enable TTS (boolean flag, required)
+# --tts-provider         : google-ai|vertex|openai-tts|elevenlabs|azure-tts
+# --tts-voice            : voice id (optional — provider default applies)
+# --tts-format           : mp3|wav|ogg (default: mp3)
+# --tts-speed            : 0.25-4.0 (default: 1.0)
+# --tts-pitch            : -20.0 to 20.0 (default: 0.0)
+# --tts-output           : save to file
+# --tts-use-ai-response  : synthesize AI response instead of input text
+```
+
+**Selecting a specific TTS provider:**
+
+```bash
+# Use OpenAI TTS
+neurolink generate "Hello" --tts --tts-provider openai-tts
+
+# Use ElevenLabs
+neurolink generate "Hello" --tts --tts-provider elevenlabs
+
+# Use Azure TTS
+neurolink generate "Hello" --tts --tts-provider azure-tts
 ```
 
 ---
@@ -530,7 +575,7 @@ for (const [lang, config] of Object.entries(translations)) {
       output: `welcome-${lang}.mp3`,
     },
   });
-  console.log(`Generated ${lang} audio (${result.tts?.size} bytes)`);
+  console.log(`Generated ${lang} audio (${result.audio?.size} bytes)`);
 }
 ```
 
@@ -558,8 +603,8 @@ async function generateBatchAudio(
 
     results.push({
       text,
-      audioBuffer: result.tts?.buffer,
-      audioSize: result.tts?.size,
+      audioBuffer: result.audio?.buffer,
+      audioSize: result.audio?.size,
     });
   }
 
@@ -615,7 +660,7 @@ async function streamAndSpeak(prompt: string, voice: string) {
 
   return {
     text: fullText,
-    audio: ttsResult.tts,
+    audio: ttsResult.audio,
   };
 }
 
@@ -653,13 +698,13 @@ async function generateTTSWithRetry(
       });
 
       // Validate audio buffer
-      if (!result.tts || result.tts.size === 0) {
+      if (!result.audio || result.audio.size === 0) {
         throw new Error("Empty audio buffer received");
       }
 
       return {
         success: true,
-        audio: result.tts,
+        audio: result.audio,
         attempt,
       };
     } catch (error) {
@@ -830,12 +875,12 @@ For detailed pricing, see [Google Cloud TTS Pricing](https://cloud.google.com/te
 
 NeuroLink's TTS integration provides:
 
-✅ **High-quality voices** - Neural2, Wavenet, and Standard options
-✅ **Multiple languages** - 50+ voices across 10+ languages
-✅ **Flexible synthesis modes** - Direct text or AI response
-✅ **Voice customization** - Speed, pitch, volume control
-✅ **Production-ready** - Google Cloud TTS integration
-✅ **Easy integration** - Works seamlessly with CLI and SDK
+- **Multiple TTS providers** - Google Cloud TTS, OpenAI TTS, ElevenLabs, Azure TTS
+- **High-quality voices** - Neural2, Wavenet, Standard, and multilingual options
+- **Multiple languages** - 50+ voices across 10+ languages
+- **Flexible synthesis modes** - Direct text or AI response
+- **Voice customization** - Speed, pitch, volume control
+- **Easy integration** - Works seamlessly with CLI and SDK via `--tts-provider` flag
 
 **Next Steps:**
 

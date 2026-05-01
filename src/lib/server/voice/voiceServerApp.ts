@@ -4,6 +4,7 @@ import http from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import { setupWebSocket } from "./voiceWebSocketHandler.js";
+import { timingSafeEqualString } from "./tokenCompare.js";
 import { NeuroLink } from "../../neurolink.js";
 import { logger } from "../../utils/logger.js";
 import { withTimeout } from "../../utils/async/withTimeout.js";
@@ -37,6 +38,55 @@ function resolvePublicPath(): string {
 export async function startVoiceServer(port = 3000): Promise<void> {
   const app = express();
 
+  // NEW11: refuse to bind to non-loopback interfaces unless the operator
+  // has explicitly opted in. The voice server has minimal hardening and
+  // exposing it publicly without a token leaks Soniox / Cartesia / LLM
+  // credit usage to anyone who can reach the listener.
+  const allowPublic = process.env.VOICE_SERVER_ALLOW_PUBLIC === "1";
+  const host = allowPublic
+    ? (process.env.VOICE_SERVER_HOST ?? "0.0.0.0")
+    : "127.0.0.1";
+
+  // NEW11: optional shared-secret bearer token for both HTTP and WebSocket
+  // upgrade. When VOICE_SERVER_AUTH_TOKEN is set, every HTTP request must
+  // carry `Authorization: Bearer <token>`. The WS upgrade additionally
+  // accepts `?token=<token>` because browser WebSocket constructors cannot
+  // set custom headers — see voiceWebSocketHandler.verifyClient. HTTP routes
+  // intentionally reject `?token=` (would leak via Referer + access logs).
+  const authToken = process.env.VOICE_SERVER_AUTH_TOKEN;
+
+  /* ---------- BODY LIMITS + AUTH ---------- */
+
+  // NEW11: cap JSON / urlencoded body to 100kb. Express's default is 100kb
+  // for json() but only when explicitly registered; without this any future
+  // body parser would default to whatever its own limit is.
+  app.use(express.json({ limit: "100kb" }));
+  app.use(express.urlencoded({ limit: "100kb", extended: false }));
+
+  // NEW11: minimal HTTP auth middleware. Skips when no token is configured
+  // (back-compat — local-only dev keeps working). Skips for /health so
+  // load-balancers can probe without credentials.
+  if (authToken) {
+    app.use((req, res, next) => {
+      if (req.path === "/health") {
+        return next();
+      }
+      const header = req.header("authorization");
+      // Bug 3 fix: HTTP routes only accept the bearer header. The `?token=`
+      // fallback exists only on the WS upgrade where the browser API cannot
+      // attach headers — using it on regular HTTP would leak credentials via
+      // Referer headers, browser history, server access logs, and proxies.
+      const provided = header?.startsWith("Bearer ")
+        ? header.slice(7)
+        : undefined;
+      if (!provided || !timingSafeEqualString(provided, authToken)) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      next();
+    });
+  }
+
   /* ---------- STATIC FILES ---------- */
 
   const publicPath = resolvePublicPath();
@@ -54,19 +104,46 @@ export async function startVoiceServer(port = 3000): Promise<void> {
     res.json({ status: "ok" });
   });
 
+  /* ---------- ERROR HANDLER ---------- */
+
+  // NEW11: global Express error handler so synchronous and async errors are
+  // caught instead of crashing the process or leaking stack traces.
+  app.use(
+    (
+      err: unknown,
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      logger.error(
+        `[SERVER] Unhandled error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    },
+  );
+
   const server = http.createServer(app);
 
   /* ---------- WS ---------- */
 
-  setupWebSocket(server);
+  // NEW11: pass the auth token + allow-public flag through to the WS handler
+  // so it can verify clients on upgrade and apply maxPayload caps.
+  setupWebSocket(server, { authToken, maxPayload: 1_048_576 });
 
   /* ---------- START ---------- */
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(port, () => {
+    server.listen(port, host, () => {
       server.removeListener("error", reject);
-      logger.info(`[SERVER] Voice server running at http://localhost:${port}`);
+      const exposure = allowPublic
+        ? `bound publicly on ${host}:${port} (VOICE_SERVER_ALLOW_PUBLIC=1)`
+        : `bound to loopback ${host}:${port} (set VOICE_SERVER_ALLOW_PUBLIC=1 to expose externally)`;
+      logger.info(
+        `[SERVER] Voice server running — ${exposure}${authToken ? " (auth required)" : " (no auth — token via VOICE_SERVER_AUTH_TOKEN recommended)"}`,
+      );
       resolve();
     });
   });

@@ -84,6 +84,8 @@
     "test:tool-reliability": "npx tsx test/continuous-test-suite-tool-reliability.ts",
     "test:tracing": "npx tsx test/continuous-test-suite-tracing.ts",
     "test:tts": "npx tsx test/continuous-test-suite-tts.ts",
+    "test:voice": "npx tsx test/continuous-test-suite-voice.ts",
+    "test:voice-server": "npx tsx test/continuous-test-suite-voice-server.ts",
     "test:credentials": "tsx test/continuous-test-suite-credentials.ts",
     "test:dynamic": "npx tsx test/continuous-test-suite-dynamic.ts",
     "test:proxy": "npx tsx test/continuous-test-suite-proxy.ts",

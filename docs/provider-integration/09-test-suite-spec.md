@@ -48,26 +48,18 @@ Set these to make a provider work in production AND in tests via the standard en
 | **`LLAMACPP_BASE_URL`** (defaults to `http://localhost:8080/v1`)  | **llama.cpp (NEW)**  |
 | **`LLAMACPP_MODEL`** (optional)                                   | **llama.cpp (NEW)**  |
 
-### 2b. Test-only env vars (consumed by test suites)
+### 2b. Test-suite env vars
 
-These are used by per-call/per-instance credential override tests. They are intentionally separate so a developer can run tests with different keys than production:
+The continuous test suites read the same runtime env vars the providers themselves use — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `NVIDIA_NIM_API_KEY`, `LM_STUDIO_BASE_URL`, `LLAMACPP_BASE_URL`, etc. There is no separate `TEST_*_API_KEY` layer.
 
-| Var                           | Used by                                                                            |
-| ----------------------------- | ---------------------------------------------------------------------------------- |
-| `TEST_PROVIDER`               | Most suites — overrides default test provider                                      |
-| `TEST_MODEL`                  | Most suites — overrides default test model                                         |
-| `TEST_OPENAI_API_KEY`         | `continuous-test-suite-credentials.ts`                                             |
-| `TEST_ANTHROPIC_API_KEY`      | `continuous-test-suite-credentials.ts`                                             |
-| **`TEST_DEEPSEEK_API_KEY`**   | **`continuous-test-suite-new-providers.ts`**                                       |
-| **`TEST_NVIDIA_NIM_API_KEY`** | **`continuous-test-suite-new-providers.ts`**                                       |
-| **`TEST_LM_STUDIO_BASE_URL`** | **`continuous-test-suite-new-providers.ts`**                                       |
-| **`TEST_LLAMACPP_BASE_URL`**  | **`continuous-test-suite-new-providers.ts`**                                       |
-| **`TEST_LM_STUDIO_API_KEY`**  | **`continuous-test-suite-new-providers.ts`** (probe auth for proxied LM Studio)    |
-| **`TEST_LLAMACPP_API_KEY`**   | **`continuous-test-suite-new-providers.ts`** (probe auth for proxied llama-server) |
-| `LM_STUDIO_API_KEY`           | runtime — `LMStudioProvider` (auth bearer for reverse-proxied deployments)         |
-| `LLAMACPP_API_KEY`            | runtime — `LlamaCppProvider` (auth bearer for reverse-proxied deployments)         |
+Two test-only overrides exist for choosing what to exercise:
 
-If a test-only var is unset, the test falls back to the runtime var. If both are unset, the test SKIPs.
+| Var             | Used by                                       |
+| --------------- | --------------------------------------------- |
+| `TEST_PROVIDER` | Most suites — overrides default test provider |
+| `TEST_MODEL`    | Most suites — overrides default test model    |
+
+If a provider's env var is unset, the affected tests SKIP cleanly so the suite runs green in CI without credentials.
 
 ### 2c. New `.env.example` additions
 
@@ -116,18 +108,10 @@ LLAMACPP_MODEL=
 # Optional: bearer token for reverse-proxied llama-server (forwarded as Authorization)
 LLAMACPP_API_KEY=
 
-# =============================================================================
-# TEST-ONLY CREDENTIALS (used by test/continuous-test-suite-credentials.ts and
-# test/continuous-test-suite-new-providers.ts to verify per-call overrides
-# without depending on the runtime env vars above)
-# =============================================================================
-# TEST_DEEPSEEK_API_KEY=
-# TEST_NVIDIA_NIM_API_KEY=
-# TEST_LM_STUDIO_BASE_URL=
-# TEST_LLAMACPP_BASE_URL=
-# TEST_LM_STUDIO_API_KEY=
-# TEST_LLAMACPP_API_KEY=
 ```
+
+The test suites read the runtime env vars above directly — no separate
+`TEST_*_API_KEY` indirection.
 
 ## 3. New test suite file — `test/continuous-test-suite-new-providers.ts`
 
@@ -155,46 +139,37 @@ import "dotenv/config";
 import { NeuroLink } from "../dist/index.js";
 // ... colors, logSection, logTest, isExpectedProviderError ... (copy from continuous-test-suite-providers.ts)
 
-// Per-provider availability gates
-const HAS_DEEPSEEK = Boolean(
-  process.env.DEEPSEEK_API_KEY || process.env.TEST_DEEPSEEK_API_KEY,
-);
-const HAS_NIM = Boolean(
-  process.env.NVIDIA_NIM_API_KEY || process.env.TEST_NVIDIA_NIM_API_KEY,
-);
-const HAS_LM_STUDIO = await probeLocalServer(
-  process.env.TEST_LM_STUDIO_BASE_URL ??
-    process.env.LM_STUDIO_BASE_URL ??
-    "http://localhost:1234/v1",
-);
-const HAS_LLAMACPP = await probeLocalServer(
-  process.env.TEST_LLAMACPP_BASE_URL ??
-    process.env.LLAMACPP_BASE_URL ??
-    "http://localhost:8080/v1",
-);
+// Per-provider availability gates — same env vars the providers use at runtime.
+const HAS_DEEPSEEK = Boolean(process.env.DEEPSEEK_API_KEY);
+const HAS_NIM = Boolean(process.env.NVIDIA_NIM_API_KEY);
 
-const LM_STUDIO_KEY =
-  process.env.TEST_LM_STUDIO_API_KEY ?? process.env.LM_STUDIO_API_KEY ?? "";
-const LLAMACPP_KEY =
-  process.env.TEST_LLAMACPP_API_KEY ?? process.env.LLAMACPP_API_KEY ?? "";
+const LM_STUDIO_URL =
+  process.env.LM_STUDIO_BASE_URL ?? "http://localhost:1234/v1";
+const LLAMACPP_URL =
+  process.env.LLAMACPP_BASE_URL ?? "http://localhost:8080/v1";
+const LM_STUDIO_KEY = process.env.LM_STUDIO_API_KEY ?? "";
+const LLAMACPP_KEY = process.env.LLAMACPP_API_KEY ?? "";
 
 // probeLocalServer returns { available, loadedModel? } — we forward the
 // loadedModel onto each provider entry so the C1 vision-skip predicate can
-// inspect the actual loaded model id instead of guessing.
+// inspect the actual loaded model id instead of guessing. One probe per
+// provider; derive the boolean availability from the probe result.
 const LM_STUDIO_PROBE = await probeLocalServer(LM_STUDIO_URL, LM_STUDIO_KEY);
 const LLAMACPP_PROBE = await probeLocalServer(LLAMACPP_URL, LLAMACPP_KEY);
+const HAS_LM_STUDIO = LM_STUDIO_PROBE.available;
+const HAS_LLAMACPP = LLAMACPP_PROBE.available;
 
 const PROVIDERS_UNDER_TEST = [
   { name: "deepseek", available: HAS_DEEPSEEK },
   { name: "nvidia-nim", available: HAS_NIM },
   {
     name: "lm-studio",
-    available: LM_STUDIO_PROBE.available,
+    available: HAS_LM_STUDIO,
     loadedModel: LM_STUDIO_PROBE.loadedModel,
   },
   {
     name: "llamacpp",
-    available: LLAMACPP_PROBE.available,
+    available: HAS_LLAMACPP,
     loadedModel: LLAMACPP_PROBE.loadedModel,
   },
 ] as const;
@@ -318,12 +293,12 @@ Add 4 new test blocks in Section 3 (provider-scoped credential slicing). Each fo
 ```ts
 // 3.X DeepSeek per-call credentials
 await test("3.X deepseek per-call apiKey override", async () => {
-  if (!HAS_DEEPSEEK_KEY) throw new Error("SKIP: TEST_DEEPSEEK_API_KEY not set");
+  if (!HAS_DEEPSEEK) throw new Error("SKIP: DEEPSEEK_API_KEY not set");
   const sdk = new NeuroLink();
   const result = await sdk.generate({
     input: { text: "Reply: PONG" },
     provider: "deepseek",
-    credentials: { deepseek: { apiKey: process.env.TEST_DEEPSEEK_API_KEY! } },
+    credentials: { deepseek: { apiKey: process.env.DEEPSEEK_API_KEY! } },
     maxTokens: 16,
   });
   assertNotNull(result?.content, "should return content");
@@ -368,7 +343,7 @@ After running the full suite:
 ## 7. CI considerations
 
 - Cloud-provider tests (DeepSeek, NIM) cost money. Default CI: env vars unset → suite skips clean.
-- Nightly: GitHub secrets provide TEST_DEEPSEEK_API_KEY, TEST_NVIDIA_NIM_API_KEY for full coverage.
+- Nightly: GitHub secrets provide DEEPSEEK_API_KEY, NVIDIA_NIM_API_KEY for full coverage.
 - Local provider tests (LM Studio, llama.cpp): only run if those servers are running — typical CI runners won't have them. Provide opt-in flag `RUN_LOCAL_PROVIDERS=1` if you want to enforce them on a self-hosted runner.
 
 ## 8. What this suite does NOT cover (out of scope for v1)

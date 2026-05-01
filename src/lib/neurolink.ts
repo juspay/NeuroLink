@@ -171,7 +171,13 @@ import { TaskManager } from "./tasks/taskManager.js";
 import { createTaskTools } from "./tasks/tools/taskTools.js";
 import { ATTR } from "./telemetry/attributes.js";
 import { tracers } from "./telemetry/tracers.js";
-// NEW: Generate function imports
+// Voice integration imports
+import type {
+  STTResult,
+  TTSResult,
+  TTSChunk,
+  TTSOptions,
+} from "./types/index.js";
 import {
   getConversationMessages,
   storeConversationTurn,
@@ -3893,10 +3899,18 @@ Current user's request: ${currentInput}`;
       !!(options.tools && Object.keys(options.tools).length > 0),
     );
 
-    this.assertInputText(
-      options.input?.text,
-      "Input text is required and must be a non-empty string",
-    );
+    // When STT audio is provided, ensure options.input exists (the transcription
+    // will supply the text inside runStandardGenerateRequest) and skip text validation.
+    const hasSttAudio = !!(options.stt?.enabled && options.stt?.audio);
+    if (hasSttAudio && !options.input) {
+      options.input = { text: "" };
+    }
+    if (!hasSttAudio) {
+      this.assertInputText(
+        options.input?.text,
+        "Input text is required and must be a non-empty string",
+      );
+    }
     this.enforceSessionBudget(options.maxBudgetUsd);
     this.applyGenerateLifecycleMiddleware(options);
     await this.applyAuthenticatedRequestContext(options);
@@ -3909,12 +3923,36 @@ Current user's request: ${currentInput}`;
     generateSpan: ReturnType<typeof tracers.sdk.startSpan>,
   ): Promise<GenerateResult | null> {
     if (options.workflow || options.workflowConfig) {
+      if (options.stt?.enabled && options.stt?.audio) {
+        // prepareGenerateRequest synthesizes input.text = "" for audio-only
+        // calls, so without this guard generateWithWorkflow runs with an
+        // empty prompt. Fail fast when there's no text fallback.
+        if (!options.input?.text?.trim()) {
+          throw new Error(
+            "STT audio is not supported with workflow mode without input.text",
+          );
+        }
+        logger.warn(
+          "[NeuroLink] STT audio preprocessing is not supported with workflow mode; audio will be ignored",
+        );
+      }
       return this.generateWithWorkflow(options);
     }
     if (options.output?.mode !== "ppt") {
       return null;
     }
 
+    if (options.stt?.enabled && options.stt?.audio) {
+      // Same fail-fast as the workflow branch — see comment above.
+      if (!options.input?.text?.trim()) {
+        throw new Error(
+          "STT audio is not supported with PPT mode without input.text",
+        );
+      }
+      logger.warn(
+        "[NeuroLink] STT audio preprocessing is not supported with PPT mode; audio will be ignored",
+      );
+    }
     const pptResult = await this.generateWithPPT(options);
     generateSpan.setAttribute(
       "neurolink.output_length",
@@ -3972,17 +4010,81 @@ Current user's request: ${currentInput}`;
       originalPrompt,
       factoryResult,
     );
+    // STT preprocessing: transcribe audio input before LLM generation
+    let sttTranscription: STTResult | undefined;
+    if (options.stt?.enabled && options.stt.audio) {
+      try {
+        // Always call — registerAllProviders() is idempotent via internal
+        // `registered` + `registrationPromise` deduplication. The previous
+        // isRegistered() guard short-circuited even when STT handler
+        // registration failed silently after AI providers were registered.
+        await ProviderRegistry.registerAllProviders();
+        const { STTProcessor } = await import("./utils/sttProcessor.js");
+        const sttProvider = options.stt.provider ?? "whisper";
+        sttTranscription = await STTProcessor.transcribe(
+          options.stt.audio,
+          sttProvider,
+          options.stt,
+        );
+        // Inject transcription into the LLM prompt
+        if (sttTranscription.text) {
+          const existingText =
+            textOptions.prompt || textOptions.input?.text || "";
+          if (!existingText) {
+            // No user text — use transcription directly as the prompt
+            textOptions.prompt = sttTranscription.text;
+            if (textOptions.input) {
+              textOptions.input.text = sttTranscription.text;
+            }
+          } else {
+            // User provided text — prepend transcription as context
+            const combined = `[Transcribed audio]: ${sttTranscription.text}\n\n${existingText}`;
+            if (textOptions.prompt) {
+              textOptions.prompt = combined;
+            }
+            if (textOptions.input?.text) {
+              textOptions.input.text = combined;
+            }
+          }
+        }
+      } catch (sttError) {
+        const existingText =
+          textOptions.prompt || textOptions.input?.text || "";
+        if (!existingText) {
+          // Audio-only request — no text to fall back to, fail fast
+          throw sttError;
+        }
+        logger.warn(
+          `[NeuroLink] STT transcription failed, falling back to text: ${sttError instanceof Error ? sttError.message : String(sttError)}`,
+        );
+      }
+    }
+
     const textResult = await this.generateTextInternal(textOptions);
 
-    return this.finalizeGenerateRequestResult({
+    // For STT-only calls, originalPrompt was captured before transcription.
+    // Use the transcribed text as the effective prompt for telemetry, memory,
+    // and trace attribution so traces don't show empty prompts.
+    const effectiveOriginalPrompt = sttTranscription?.text
+      ? originalPrompt
+        ? `[Transcribed audio]: ${sttTranscription.text}\n\n${originalPrompt}`
+        : sttTranscription.text
+      : originalPrompt;
+
+    // Attach STT transcription to result
+    const generateResult = this.finalizeGenerateRequestResult({
       generateSpan,
       options,
       textOptions,
       textResult,
       factoryResult,
-      originalPrompt,
+      originalPrompt: effectiveOriginalPrompt,
       startTime,
     });
+    if (sttTranscription) {
+      generateResult.transcription = sttTranscription;
+    }
+    return generateResult;
   }
 
   private async maybeApplyGenerateOrchestration(
@@ -4102,6 +4204,7 @@ Current user's request: ${currentInput}`;
       input: options.input,
       region: options.region,
       tts: options.tts,
+      stt: options.stt,
       fileRegistry: this.fileRegistry,
       timeout: options.timeout,
       abortSignal: options.abortSignal,
@@ -4174,8 +4277,14 @@ Current user's request: ${currentInput}`;
       toolsUsed: textResult.toolsUsed,
       timestamp: Date.now(),
       result: textResult,
+      // Use the effective prompt (which already incorporates STT-transcribed
+      // text for audio-only calls) so observers see the real prompt instead
+      // of an empty string. Falls back through the same chain as before for
+      // text-only calls.
       prompt:
-        options.input?.text || (options as Record<string, unknown>).prompt,
+        originalPrompt ||
+        options.input?.text ||
+        (options as Record<string, unknown>).prompt,
       temperature: textOptions.temperature,
       maxTokens: textOptions.maxTokens,
       // A2 fix: Signal that Pipeline A (AI SDK → @langfuse/otel) already
@@ -4225,6 +4334,7 @@ Current user's request: ${currentInput}`;
           }
         : undefined,
       audio: textResult.audio,
+      transcription: textResult.transcription,
       video: textResult.video,
       ppt: textResult.ppt,
       ...(textResult.retries && { retries: textResult.retries }),
@@ -6956,7 +7066,45 @@ Current user's request: ${currentInput}`;
       const startTime = Date.now();
       const hrTimeStart = process.hrtime.bigint();
       const streamId = `neurolink-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const originalPrompt = options.input.text;
+
+      // STT preprocessing for stream(): transcribe audio buffer (not realtime frames)
+      // and inject into the prompt before validation/execution. Mirrors generate().
+      const sttOptions = options.stt;
+      const sttAudio = sttOptions?.audio;
+      const hasStreamSttAudio = !!(sttOptions?.enabled && sttAudio);
+      let streamSttTranscription: STTResult | undefined;
+      if (hasStreamSttAudio && sttOptions && sttAudio) {
+        if (!options.input) {
+          options.input = { text: "" };
+        }
+        try {
+          // registerAllProviders() is idempotent; always call.
+          await ProviderRegistry.registerAllProviders();
+          const { STTProcessor } = await import("./utils/sttProcessor.js");
+          const sttProvider = sttOptions.provider ?? "whisper";
+          streamSttTranscription = await STTProcessor.transcribe(
+            sttAudio,
+            sttProvider,
+            sttOptions,
+          );
+          if (streamSttTranscription.text) {
+            const existingText = options.input.text || "";
+            options.input.text = existingText
+              ? `[Transcribed audio]: ${streamSttTranscription.text}\n\n${existingText}`
+              : streamSttTranscription.text;
+          }
+        } catch (sttError) {
+          const existingText = options.input.text || "";
+          if (!existingText) {
+            throw sttError;
+          }
+          logger.warn(
+            `[NeuroLink] Stream STT transcription failed, falling back to text: ${sttError instanceof Error ? sttError.message : String(sttError)}`,
+          );
+        }
+      }
+
+      const originalPrompt = options.input?.text ?? "";
 
       options.fileRegistry = this.fileRegistry;
       await this.validateStreamRequestOptions(options, startTime);
@@ -6971,17 +7119,46 @@ Current user's request: ${currentInput}`;
         return workflowResult;
       }
 
-      return this.setLangfuseContextFromOptions(options, () =>
-        this.runStandardStreamRequest({
-          options,
-          streamSpan,
-          spanStartTime,
-          startTime,
-          hrTimeStart,
-          streamId,
-          originalPrompt,
-        }),
+      // TTS Mode 2 deferred: stream() emits text first, then synthesizes the
+      // accumulated response into a single audio chunk at end-of-stream and
+      // resolves `streamResult.audio` with the same TTSResult. The resolver is
+      // plumbed explicitly through the params bag (M11: previously a
+      // `_streamTtsResolve` cast on the caller's options object — fragile if
+      // the same options object was reused across concurrent stream() calls).
+      const ttsOptions = options.tts;
+      const wantsStreamTtsMode2 = !!(
+        ttsOptions?.enabled && ttsOptions?.useAiResponse
       );
+      let resolveStreamTtsAudio:
+        | ((value: TTSResult | undefined) => void)
+        | undefined;
+      const streamTtsAudioPromise = wantsStreamTtsMode2
+        ? new Promise<TTSResult | undefined>((resolve) => {
+            resolveStreamTtsAudio = resolve;
+          })
+        : undefined;
+
+      const streamResult = await this.setLangfuseContextFromOptions(
+        options,
+        () =>
+          this.runStandardStreamRequest({
+            options,
+            streamSpan,
+            spanStartTime,
+            startTime,
+            hrTimeStart,
+            streamId,
+            originalPrompt,
+            ttsResolver: resolveStreamTtsAudio,
+          }),
+      );
+      if (streamSttTranscription) {
+        streamResult.transcription = streamSttTranscription;
+      }
+      if (streamTtsAudioPromise) {
+        streamResult.audio = streamTtsAudioPromise;
+      }
+      return streamResult;
     } catch (error) {
       streamSpan.setStatus({
         code: SpanStatusCode.ERROR,
@@ -7055,6 +7232,15 @@ Current user's request: ${currentInput}`;
     hrTimeStart: bigint;
     streamId: string;
     originalPrompt: string;
+    /**
+     * Resolver for `streamResult.audio` Promise (TTS Mode 2). Set when the
+     * caller requested `tts.enabled && tts.useAiResponse`. Always resolved
+     * exactly once: with the synthesised TTSResult on success, or `undefined`
+     * on synthesis failure / non-Mode-2 path / stream error. Plumbed
+     * explicitly via this params bag (M11) instead of via a side-channel
+     * cast on the caller's options object.
+     */
+    ttsResolver?: (value: TTSResult | undefined) => void;
   }): Promise<StreamResult> {
     const {
       options,
@@ -7064,6 +7250,7 @@ Current user's request: ${currentInput}`;
       hrTimeStart,
       streamId,
       originalPrompt,
+      ttsResolver,
     } = params;
 
     logger.debug("[NeuroLink] Running standard stream request", {
@@ -7177,6 +7364,7 @@ Current user's request: ${currentInput}`;
               typeof chunk === "object" &&
               "type" in chunk &&
               ((chunk as { type?: unknown }).type === "audio" ||
+                (chunk as { type?: unknown }).type === "tts_audio" ||
                 (chunk as { type?: unknown }).type === "image");
             if (!isNoOutputSentinel && (hasTextContent || hasMediaPayload)) {
               realOutputChunks++;
@@ -7222,6 +7410,23 @@ Current user's request: ${currentInput}`;
                 accumulatedContent += content;
               },
             );
+          }
+
+          // TTS Mode 2 for stream(): synthesize the accumulated response
+          // and yield ONE final audio chunk so callers iterating the stream
+          // get the audio inline; also resolve `streamResult.audio` so the
+          // ergonomic `await result.audio` pattern works post-iteration.
+          // m5: synthesis logic lives in a dedicated helper to keep this
+          // generator under the max-lines-per-function lint budget.
+          const ttsModeResult = await self.synthesizeStreamModeTwo({
+            ttsOptions: enhancedOptions.tts,
+            providerName,
+            fallbackProvider: enhancedOptions.provider,
+            accumulatedContent,
+            ttsResolver,
+          });
+          if (ttsModeResult.audioChunk) {
+            yield ttsModeResult.audioChunk;
           }
 
           resolvedUsage = streamUsage;
@@ -7289,6 +7494,15 @@ Current user's request: ${currentInput}`;
           });
           throw error;
         } finally {
+          // Belt-and-braces: if TTS Mode 2 was requested but synthesis never
+          // ran (stream errored before reaching the TTS block, or Mode 2 path
+          // was skipped), resolve the audio promise to undefined so callers
+          // awaiting `streamResult.audio` never hang. Uses the explicit
+          // `ttsResolver` param (M11), not a side-channel cast.
+          // m4: a duplicate resolution is a silent no-op — Promise resolvers
+          // never throw, so no try/catch needed here.
+          ttsResolver?.(undefined);
+
           logger.debug(
             "[NeuroLink.stream] Stream finished, performing cleanup",
             {
@@ -7476,6 +7690,94 @@ Current user's request: ${currentInput}`;
   }
 
   /**
+   * TTS Mode 2 synthesis helper for the stream() pipeline.
+   *
+   * m5 — extracted from runStandardStreamRequest so the surrounding generator
+   * stays under the max-lines-per-function lint budget. Behaviour preserved
+   * exactly:
+   * - When Mode 2 is enabled (`tts.enabled && tts.useAiResponse`) AND the
+   *   model produced non-empty content: synthesises one final audio buffer
+   *   and returns it as an `audioChunk` for the caller to `yield`. Resolves
+   *   `ttsResolver` with the `TTSResult`.
+   * - When Mode 2 is enabled but synthesis fails: logs a warning and resolves
+   *   `ttsResolver` with `undefined`.
+   * - When Mode 2 is requested but skipped (empty content / wrong mode):
+   *   resolves `ttsResolver` with `undefined` early so callers awaiting
+   *   `result.audio` unblock before the surrounding `finally` cleanup
+   *   completes (Issue 7 latency micro-opt — the finally block also resolves
+   *   defensively, so this is a redundant early signal, not a coverage fix).
+   */
+  private async synthesizeStreamModeTwo(params: {
+    ttsOptions: TTSOptions | undefined;
+    providerName: string;
+    fallbackProvider?: string;
+    accumulatedContent: string;
+    ttsResolver?: (value: TTSResult | undefined) => void;
+  }): Promise<{ audioChunk?: { type: "tts_audio"; audio: TTSChunk } }> {
+    const {
+      ttsOptions,
+      providerName,
+      fallbackProvider,
+      accumulatedContent,
+      ttsResolver,
+    } = params;
+
+    if (
+      !ttsOptions?.enabled ||
+      !ttsOptions.useAiResponse ||
+      accumulatedContent.trim().length === 0
+    ) {
+      ttsResolver?.(undefined);
+      return {};
+    }
+
+    try {
+      const { TTSProcessor } = await import("./utils/ttsProcessor.js");
+      // ttsOptions.provider takes precedence; otherwise fall back to the
+      // chat provider ID ONLY when it happens to be a registered TTS handler
+      // (e.g. "google-ai" works for both LLM and TTS). For LLM-only IDs like
+      // "anthropic", we'd otherwise complete generation and then fail synth —
+      // surface that mismatch up front instead.
+      const candidate = ttsOptions.provider ?? fallbackProvider ?? providerName;
+      const ttsProvider =
+        candidate && TTSProcessor.supports(candidate) ? candidate : undefined;
+      if (!ttsProvider) {
+        throw new Error(
+          `No TTS provider resolved for stream Mode 2 (set tts.provider explicitly — chat provider "${candidate ?? "<unset>"}" is not a registered TTS handler)`,
+        );
+      }
+      const ttsResult = await TTSProcessor.synthesize(
+        accumulatedContent,
+        ttsProvider,
+        ttsOptions,
+      );
+      ttsResolver?.(ttsResult);
+      return {
+        audioChunk: {
+          type: "tts_audio" as const,
+          audio: {
+            data: ttsResult.buffer,
+            format: ttsResult.format,
+            index: 0,
+            isFinal: true,
+            cumulativeSize: ttsResult.size,
+            voice: ttsResult.voice,
+            sampleRate: ttsResult.sampleRate,
+          },
+        },
+      };
+    } catch (ttsError) {
+      logger.warn(
+        `[NeuroLink.stream] Stream TTS Mode 2 synthesis failed: ${
+          ttsError instanceof Error ? ttsError.message : String(ttsError)
+        }`,
+      );
+      ttsResolver?.(undefined);
+      return {};
+    }
+  }
+
+  /**
    * Prepare stream options: initialize memory, MCP, retrieval, orchestration,
    * Ollama tool auto-disable, factory processing, and tool detection.
    */
@@ -7531,8 +7833,15 @@ Current user's request: ${currentInput}`;
           prompt: options.input.text?.substring(0, 100),
         });
 
-        // Use orchestrated options
-        Object.assign(options, orchestratedOptions);
+        // Use orchestrated options — rebind the local `options` to a fresh
+        // merged object instead of mutating the caller-supplied one
+        // (NEW2: avoids cross-call contamination when callers reuse options).
+        // Issue 6: extract to an explicit local so the rebind intent is
+        // obvious to future readers, and the lint suppression is scoped
+        // narrowly to the one statement that actually rebinds the param.
+        const mergedOptions = { ...options, ...orchestratedOptions };
+        // eslint-disable-next-line no-param-reassign -- see NEW2/Issue 6 above
+        options = mergedOptions;
 
         // Re-resolve model alias in case orchestration returned an alias
         if (orchestratedOptions.model) {
@@ -7781,6 +8090,7 @@ Current user's request: ${currentInput}`;
   ): AsyncGenerator<
     | { content: string }
     | { type: "audio"; audio: AudioChunk }
+    | { type: "tts_audio"; audio: TTSChunk }
     | { type: "image"; imageOutput: { base64: string } }
   > {
     metadata.fallbackAttempted = true;
@@ -7918,6 +8228,7 @@ Current user's request: ${currentInput}`;
           typeof fallbackChunk === "object" &&
           "type" in fallbackChunk &&
           ((fallbackChunk as { type?: unknown }).type === "audio" ||
+            (fallbackChunk as { type?: unknown }).type === "tts_audio" ||
             (fallbackChunk as { type?: unknown }).type === "image");
         if (
           !isFallbackNoOutputSentinel &&
@@ -8117,10 +8428,12 @@ Current user's request: ${currentInput}`;
         Symbol.asyncIterator
       ] === "function"
     );
+    // STT pre-recorded audio buffer counts as input — transcription will fill text.
+    const hasSttAudio = !!(options?.stt?.enabled && options?.stt?.audio);
 
-    if (!hasText && !hasAudio) {
+    if (!hasText && !hasAudio && !hasSttAudio) {
       throw new Error(
-        "Stream options must include either input.text or input.audio",
+        "Stream options must include either input.text, input.audio, or stt.audio",
       );
     }
   }
@@ -8150,6 +8463,7 @@ Current user's request: ${currentInput}`;
     stream: AsyncIterable<
       | { content: string }
       | { type: "audio"; audio: AudioChunk }
+      | { type: "tts_audio"; audio: TTSChunk }
       | { type: "image"; imageOutput: { base64: string } }
     >;
     provider: string;
@@ -8446,6 +8760,7 @@ Current user's request: ${currentInput}`;
     _stream: AsyncIterable<
       | { content: string }
       | { type: "audio"; audio: AudioChunk }
+      | { type: "tts_audio"; audio: TTSChunk }
       | { type: "image"; imageOutput: { base64: string } }
     >,
     _options: StreamOptions,
@@ -8498,6 +8813,7 @@ Current user's request: ${currentInput}`;
     stream: AsyncIterable<
       | { content: string }
       | { type: "audio"; audio: AudioChunk }
+      | { type: "tts_audio"; audio: TTSChunk }
       | { type: "image"; imageOutput: { base64: string } }
     >,
     config: {

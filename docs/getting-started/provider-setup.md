@@ -2020,4 +2020,434 @@ Authentication failed
 
 ---
 
+## OpenAI TTS Configuration {#openai-tts}
+
+OpenAI TTS provides text-to-speech synthesis using the same API key as the OpenAI LLM provider. No additional credentials are required.
+
+### Basic Setup
+
+```bash
+export OPENAI_API_KEY="sk-your-openai-api-key"
+```
+
+**Note:** `OPENAI_API_KEY` is shared with the OpenAI LLM provider. No separate key is needed.
+
+### Supported Models
+
+- `tts-1` (default) - Optimized for speed, lower latency
+- `tts-1-hd` - Optimized for quality, higher fidelity audio
+
+### Supported Voices
+
+`alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`
+
+### Supported Output Formats
+
+`mp3` (default), `opus`, `wav`, `ogg`
+
+### Usage Example
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+const result = await neurolink.generate({
+  input: { text: "Hello, world!" },
+  tts: {
+    enabled: true,
+    provider: "openai-tts",
+    voice: "alloy",
+    format: "mp3",
+  },
+});
+```
+
+### CLI Usage
+
+```bash
+npx @juspay/neurolink generate "Hello, world!" --tts --tts-provider openai-tts
+```
+
+### Environment Variables Reference
+
+| Variable         | Required | Default | Description                         |
+| ---------------- | -------- | ------- | ----------------------------------- |
+| `OPENAI_API_KEY` | ✅       | -       | Shared with the OpenAI LLM provider |
+
+### Provider ID and Aliases
+
+- **Provider ID**: `openai-tts`
+
+---
+
+## ElevenLabs Configuration {#elevenlabs}
+
+ElevenLabs provides high-quality, multilingual text-to-speech synthesis with a wide selection of voices and voice cloning support.
+
+### Basic Setup
+
+```bash
+export ELEVENLABS_API_KEY="your-elevenlabs-api-key"
+```
+
+### How to Get ElevenLabs API Key
+
+1. Visit [ElevenLabs](https://elevenlabs.io)
+2. Sign up or log in to your account
+3. Navigate to **Profile → API Key**
+4. Copy the key
+
+### Supported Models
+
+- `eleven_multilingual_v2` (default) - Best quality, 29 languages
+- `eleven_turbo_v2_5` - Low-latency streaming, 32 languages
+- `eleven_flash_v2_5` - Fastest, suitable for real-time applications
+
+### Usage Example
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+
+const neurolink = new NeuroLink();
+
+const result = await neurolink.generate({
+  input: { text: "Bonjour le monde!" },
+  tts: {
+    enabled: true,
+    provider: "elevenlabs",
+    voice: "Rachel",
+    model: "eleven_multilingual_v2",
+  },
+});
+```
+
+### CLI Usage
+
+```bash
+npx @juspay/neurolink generate "Hello, world!" --tts --tts-provider elevenlabs
+```
+
+### Notes
+
+- **Multilingual support**: ElevenLabs models support up to 32 languages with natural prosody
+- **Voice cloning**: ElevenLabs supports custom voice IDs from your ElevenLabs account
+
+### Environment Variables Reference
+
+| Variable             | Required | Default | Description        |
+| -------------------- | -------- | ------- | ------------------ |
+| `ELEVENLABS_API_KEY` | ✅       | -       | ElevenLabs API key |
+
+### Provider ID and Aliases
+
+- **Provider ID**: `elevenlabs`
+
+---
+
+## Deepgram STT Configuration {#deepgram}
+
+Deepgram provides fast, accurate speech-to-text transcription with support for real-time streaming and pre-recorded audio.
+
+### Basic Setup
+
+```bash
+export DEEPGRAM_API_KEY="your-deepgram-api-key"
+```
+
+### How to Get Deepgram API Key
+
+1. Visit [Deepgram Console](https://console.deepgram.com)
+2. Sign up or log in to your account
+3. Navigate to **API Keys**
+4. Click **Create a New API Key**
+5. Copy the key
+
+### Supported Models
+
+- `nova-3` (default) - Latest, highest accuracy
+- `nova-2` - High accuracy, broad language support
+- `base` - Balanced accuracy and speed
+
+### Usage Example
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+import { readFileSync } from "fs";
+
+const neurolink = new NeuroLink();
+const audioBuffer = readFileSync("audio.wav");
+
+const result = await neurolink.generate({
+  input: { text: "Respond to what was said" },
+  stt: {
+    enabled: true,
+    provider: "deepgram",
+    audio: audioBuffer,
+    model: "nova-3",
+    language: "en",
+  },
+});
+```
+
+### CLI Usage
+
+```bash
+npx @juspay/neurolink generate "Respond to this" --stt --stt-provider deepgram --input-audio file.wav
+```
+
+### Notes
+
+- **Streaming transcription**: Deepgram supports real-time audio streaming for live transcription
+- **Language support**: Deepgram nova models support 30+ languages
+
+### Environment Variables Reference
+
+| Variable           | Required | Default | Description      |
+| ------------------ | -------- | ------- | ---------------- |
+| `DEEPGRAM_API_KEY` | ✅       | -       | Deepgram API key |
+
+### Provider ID and Aliases
+
+- **Provider ID**: `deepgram` (STT only — Deepgram's TTS product is not wired today)
+
+---
+
+## Whisper Configuration {#whisper}
+
+Whisper is OpenAI's speech-to-text model — registered as the provider id `whisper`.
+It accepts MP3, WAV, M4A, and FLAC inputs up to 25 MB.
+
+```bash
+# Required environment variable
+OPENAI_API_KEY=sk-...
+```
+
+Get your API key from: **OpenAI Platform** > **API Keys**.
+
+### Usage
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Repeat what was said" },
+  provider: "openai",
+  stt: {
+    enabled: true,
+    provider: "whisper",
+    audio: audioBuffer,
+    format: "mp3",
+  },
+});
+console.log(result.transcription?.text);
+```
+
+### CLI
+
+```bash
+neurolink generate "Repeat what was said" \
+  --provider openai \
+  --stt --stt-provider whisper --input-audio ./audio.mp3
+```
+
+### Provider ID
+
+- **Provider ID**: `whisper`
+
+---
+
+## Azure Speech Configuration {#azure-speech}
+
+Azure Cognitive Services Speech provides both TTS (`azure-tts`) and STT (`azure-stt`).
+
+```bash
+# Required environment variables
+AZURE_SPEECH_KEY=your-speech-key
+AZURE_SPEECH_REGION=eastus
+```
+
+Get credentials from: **Azure Portal** > **Cognitive Services** > **Speech** > **Keys and Endpoint**.
+
+### TTS Usage
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Hello world" },
+  tts: {
+    enabled: true,
+    provider: "azure-tts",
+    voice: "en-US-JennyNeural",
+    format: "mp3",
+  },
+});
+```
+
+### STT Usage
+
+> **MP3 not supported** — Azure's short-audio REST endpoint only decodes WAV
+> PCM and Ogg/Opus. Passing `format: "mp3"` to `azure-stt` throws
+> `STT_INVALID_AUDIO_FORMAT` early. Convert with
+> `ffmpeg -i in.mp3 -ar 16000 -ac 1 out.wav` first.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  provider: "openai",
+  stt: {
+    enabled: true,
+    provider: "azure-stt",
+    audio: wavBuffer,
+    format: "wav",
+    language: "en-US",
+  },
+});
+```
+
+### Provider IDs
+
+- **TTS**: `azure-tts`
+- **STT**: `azure-stt`
+
+---
+
+## Google Speech Configuration {#google-speech}
+
+Covers both Google Cloud TTS (`google-tts` / via `google-ai`) and Google Cloud
+Speech-to-Text (`google-stt`). Both share the same service-account credentials.
+
+```bash
+# Required environment variable
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+
+# OR (for TTS only) an API key
+GOOGLE_API_KEY=AIza...
+```
+
+> **Speech-to-Text API must be enabled** in your Google Cloud project for
+> `google-stt` to work. Enable it at
+> [console.cloud.google.com/apis/library/speech.googleapis.com](https://console.cloud.google.com/apis/library/speech.googleapis.com).
+
+### TTS Usage
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Hello world" },
+  tts: {
+    enabled: true,
+    provider: "google-ai",
+    voice: "en-US-Neural2-A",
+    format: "mp3",
+  },
+});
+```
+
+### STT Usage
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  provider: "openai",
+  stt: {
+    enabled: true,
+    provider: "google-stt",
+    audio: audioBuffer,
+    format: "mp3",
+  },
+});
+```
+
+### Provider IDs
+
+- **TTS**: `google-ai` (or `google-tts` alias)
+- **STT**: `google-stt`
+
+---
+
+## OpenAI Realtime Configuration {#openai-realtime}
+
+Real-time voice via the OpenAI Realtime WebSocket API. Provider id
+`openai-realtime` is registered for future use; the typical pattern is to
+launch the integrated voice server (`neurolink serve voice`) which wires
+this through Soniox/Cartesia.
+
+```bash
+OPENAI_API_KEY=sk-...
+```
+
+### Provider ID
+
+- **Provider ID**: `openai-realtime`
+- **Audio chunk format**: `pcm16` — raw 16-bit PCM at 24 kHz, **NOT**
+  WAV-headered. Do not pass these chunks to a WAV duration parser.
+
+---
+
+## Gemini Live Configuration {#gemini-live}
+
+Real-time voice via Google's Gemini Live WebSocket API. Provider id
+`gemini-live` is registered for future use.
+
+```bash
+GOOGLE_API_KEY=AIza...
+# OR
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+```
+
+### Provider ID
+
+- **Provider ID**: `gemini-live`
+
+---
+
+## Streaming + Voice Patterns {#streaming-voice}
+
+### `stream()` + STT (transcribe before stream)
+
+```typescript
+const audio = readFileSync("./recording.mp3");
+const r = await neurolink.stream({
+  input: { text: "" },
+  provider: "openai",
+  stt: { enabled: true, provider: "whisper", audio, format: "mp3" },
+});
+
+console.log("transcription:", r.transcription?.text); // available before iterating
+for await (const chunk of r.stream) {
+  if ("content" in chunk) process.stdout.write(chunk.content);
+}
+```
+
+### `stream()` + TTS Mode 2 (synthesise the streamed reply)
+
+Two ergonomic options — both deliver byte-identical audio:
+
+```typescript
+const r = await neurolink.stream({
+  input: { text: "Tell me a fact." },
+  provider: "openai",
+  tts: {
+    enabled: true,
+    useAiResponse: true,
+    provider: "openai-tts",
+    format: "mp3",
+  },
+});
+
+// --- Option A: collect inline while iterating ---
+const audioBufs: Buffer[] = [];
+for await (const c of r.stream) {
+  if ("content" in c) process.stdout.write(c.content);
+  else if (c.type === "audio") audioBufs.push(c.audio.data);
+}
+writeFileSync("./out.mp3", Buffer.concat(audioBufs));
+
+// --- Option B: ergonomic Promise — read after the stream completes ---
+const tts = await r.audio; // resolves to TTSResult or undefined
+if (tts) writeFileSync("./out.mp3", tts.buffer);
+```
+
+When `tts.useAiResponse` is `false` (Mode 1) or TTS is not enabled,
+`r.audio` resolves to `undefined` rather than hanging.
+
+---
+
 [← Back to Main README](../index.md) | [Next: API Reference →](./api-reference.md)

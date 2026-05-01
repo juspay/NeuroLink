@@ -8,6 +8,8 @@ import type { MCPToolRegistry } from "../mcp/toolRegistry.js";
 import type { NeuroLink } from "../neurolink.js";
 import type { JsonObject, JsonValue } from "./common.js";
 import type { ExternalMCPServerStatus } from "./externalMcp.js";
+// ConversationMessage is locally defined further down in this file (line ~1350)
+// — used by ServerVoiceSessionState and other server-side types.
 
 // ============================================
 // Configuration Types
@@ -1475,4 +1477,73 @@ export type CobraInstance = {
   frameLength: number;
   process: (pcm: Int16Array) => number;
   release: () => void;
+};
+
+/**
+ * Per-WebSocket-connection context object passed to the voice connection
+ * handler. Holds shared singletons that all per-connection state derives from.
+ *
+ * (Server-prefixed per CLAUDE.md Rule 9 — server-tier type.)
+ */
+export type ServerVoiceConnectionCtx = {
+  neurolink: NeuroLink;
+  accessKey: string;
+};
+
+/**
+ * Per-session mutable state for one voice WebSocket connection.
+ *
+ * Threaded through the voice connection helper functions so each connection
+ * has fully isolated turn / TTS / VAD / barge-in state. The class types
+ * (`FrameBus`, `TurnManager`, `CartesiaStream`) are imported as types here so
+ * that this file remains the single source of truth — consumers import this
+ * type via the barrel and do not redefine it locally.
+ *
+ * (Server-prefixed per CLAUDE.md Rule 9 — server-tier type.)
+ */
+export type ServerVoiceSessionState = {
+  cobra: CobraInstance | null;
+  FRAME_LENGTH: number;
+  FRAME_BYTES: number;
+  bus: import("../server/voice/frameBus.js").FrameBus;
+  turnManager: import("../server/voice/turnManager.js").TurnManager;
+  sonioxWs: import("ws").WebSocket | null;
+  keepAliveTimer: NodeJS.Timeout | null;
+  sonioxReconnectTimer: ReturnType<typeof setTimeout> | null;
+  sessionClosed: boolean;
+  transcriptBuffer: string;
+  activeTTS: import("../adapters/tts/cartesiaHandler.js").CartesiaStream | null;
+  conversation: ConversationMessage[];
+  currentTurnId: number;
+  activePipelineTurnId: number | null;
+  turnAborters: Set<{ aborted: boolean }>;
+  playbackResetTimer: NodeJS.Timeout | null;
+  bargeInLockedUntil: number;
+  isSpeaking: boolean;
+  silenceFrameCount: number;
+  voiceFrameCount: number;
+  frameRemainder: Buffer;
+};
+
+/**
+ * Options accepted by `setupWebSocket()` in `server/voice/voiceWebSocketHandler.ts`.
+ *
+ * (Server-prefixed per CLAUDE.md Rule 9 — server-tier type. Lives in
+ * `server.ts` rather than `cli.ts` because it configures a server-side
+ * WebSocket upgrade handler, not CLI argument parsing.)
+ */
+export type ServerVoiceWebSocketOptions = {
+  /**
+   * Optional shared-secret bearer token. When set, the WebSocket upgrade
+   * handshake must include `Authorization: Bearer <token>` or
+   * `?token=<token>` in the URL. Without this, anyone reachable on the
+   * network can open a session and consume Soniox / Cartesia / LLM credits.
+   */
+  authToken?: string;
+  /**
+   * Maximum WebSocket message size in bytes. Defaults to 1 MiB. Caps both
+   * inbound audio frames and any client control messages — guards against
+   * OOM via oversized uploads.
+   */
+  maxPayload?: number;
 };

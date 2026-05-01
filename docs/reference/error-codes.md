@@ -642,6 +642,47 @@ Some providers have additional error codes:
 | `ENDPOINT_NOT_FOUND`  | SageMaker endpoint not found    | 404         | No        |
 | `UNKNOWN_ERROR`       | Unclassified error              | 500         | No        |
 
+### Voice Errors (STT / TTS / Realtime)
+
+STT and Realtime error codes are surfaced via the `STTError` and
+`RealtimeError` classes, which extend the shared `VoiceError` base. TTS
+error codes are exposed via the `TTS_ERROR_CODES` enum and surfaced via
+the `TTSError` class, which extends `NeuroLinkError` directly rather than
+`VoiceError` (see [TTS / Realtime Errors](#tts--realtime-errors) below).
+
+#### STT Error Codes
+
+| Code                          | Description                                                                              | Retriable |
+| ----------------------------- | ---------------------------------------------------------------------------------------- | --------- |
+| `STT_AUDIO_EMPTY`             | Empty audio buffer submitted for transcription                                           | No        |
+| `STT_AUDIO_TOO_LONG`          | Audio buffer exceeds `maxAudioBytes` (default 25MB)                                      | No        |
+| `STT_INVALID_AUDIO_FORMAT`    | Provider doesn't decode the requested audio format. Common trigger: `azure-stt` + `mp3`. | No        |
+| `STT_LANGUAGE_NOT_SUPPORTED`  | Requested language not supported by the provider                                         | No        |
+| `STT_TRANSCRIPTION_FAILED`    | Transcription failed at the provider                                                     | Sometimes |
+| `STT_PROVIDER_NOT_CONFIGURED` | Required env vars / credentials not set                                                  | No        |
+| `STT_PROVIDER_NOT_SUPPORTED`  | No handler registered for the requested provider id                                      | No        |
+| `STT_STREAM_ERROR`            | Streaming transcription failed mid-stream                                                | Yes       |
+| `STT_STREAMING_NOT_SUPPORTED` | Provider doesn't support streaming transcription                                         | No        |
+
+#### TTS / Realtime Errors
+
+`TTSError` and `RealtimeError` carry provider-specific messages (e.g.
+synthesis failure, WebSocket disconnect, function-call failure). Inspect
+`error.cause` for the underlying provider error.
+
+#### Common Triggers
+
+- **`STT_INVALID_AUDIO_FORMAT`** is thrown by `STTProcessor.transcribe()`
+  when `options.format` doesn't appear in the provider's
+  `getSupportedFormats()` list. The CLI infers the format from the
+  `--input-audio` file extension; the SDK requires you to pass it explicitly.
+  Fix: either convert the audio to a supported format, or use a different
+  STT provider. See `docs/getting-started/providers/azure-speech.md` for the
+  Azure-MP3 case.
+- **`STT_AUDIO_TOO_LONG`** is thrown when the buffer exceeds the per-call
+  `maxAudioBytes` limit. Default is 25 MB (matches Whisper's documented
+  ceiling). Override via `stt.maxAudioBytes`.
+
 ## Related Documentation
 
 - [Troubleshooting Guide](./troubleshooting.md) - Common issues and solutions

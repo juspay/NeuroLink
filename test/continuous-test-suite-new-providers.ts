@@ -12,11 +12,13 @@ import "dotenv/config";
  * Each provider's tests SKIP cleanly when its env var (or local server) is
  * missing so this suite runs green in CI without credentials.
  *
- * Env vars consulted:
- *   DEEPSEEK_API_KEY        / TEST_DEEPSEEK_API_KEY
- *   NVIDIA_NIM_API_KEY      / TEST_NVIDIA_NIM_API_KEY
- *   LM_STUDIO_BASE_URL      / TEST_LM_STUDIO_BASE_URL  (default http://localhost:1234/v1)
- *   LLAMACPP_BASE_URL       / TEST_LLAMACPP_BASE_URL   (default http://localhost:8080/v1)
+ * Env vars consulted (same as the providers themselves use at runtime):
+ *   DEEPSEEK_API_KEY
+ *   NVIDIA_NIM_API_KEY
+ *   LM_STUDIO_BASE_URL  (default http://localhost:1234/v1)
+ *   LLAMACPP_BASE_URL   (default http://localhost:8080/v1)
+ *   LM_STUDIO_API_KEY   (optional — for proxied LM Studio with auth)
+ *   LLAMACPP_API_KEY    (optional — for proxied llama-server with auth)
  *
  * Run with: npx tsx test/continuous-test-suite-new-providers.ts
  *
@@ -146,22 +148,15 @@ function isExpectedProviderError(
 // PROVIDER AVAILABILITY GATES
 // ============================================================
 
-const DEEPSEEK_KEY =
-  process.env.TEST_DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY || "";
-const NIM_KEY =
-  process.env.TEST_NVIDIA_NIM_API_KEY || process.env.NVIDIA_NIM_API_KEY || "";
+// Use the same runtime env vars the providers themselves use.
+const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || "";
+const NIM_KEY = process.env.NVIDIA_NIM_API_KEY || "";
 const LM_STUDIO_URL =
-  process.env.TEST_LM_STUDIO_BASE_URL ||
-  process.env.LM_STUDIO_BASE_URL ||
-  "http://localhost:1234/v1";
+  process.env.LM_STUDIO_BASE_URL || "http://localhost:1234/v1";
 const LLAMACPP_URL =
-  process.env.TEST_LLAMACPP_BASE_URL ||
-  process.env.LLAMACPP_BASE_URL ||
-  "http://localhost:8080/v1";
-const LM_STUDIO_KEY =
-  process.env.TEST_LM_STUDIO_API_KEY || process.env.LM_STUDIO_API_KEY || "";
-const LLAMACPP_KEY =
-  process.env.TEST_LLAMACPP_API_KEY || process.env.LLAMACPP_API_KEY || "";
+  process.env.LLAMACPP_BASE_URL || "http://localhost:8080/v1";
+const LM_STUDIO_KEY = process.env.LM_STUDIO_API_KEY || "";
+const LLAMACPP_KEY = process.env.LLAMACPP_API_KEY || "";
 
 type LocalServerProbe = { available: boolean; loadedModel?: string };
 

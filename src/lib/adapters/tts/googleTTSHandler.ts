@@ -9,12 +9,12 @@
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 import { TTSError, TTS_ERROR_CODES } from "../../utils/ttsProcessor.js";
 import type {
-  Gender,
+  TTSGender,
   GoogleAudioEncoding,
   TTSOptions,
   TTSResult,
   TTSVoice,
-  VoiceType,
+  TTSVoiceType,
   TTSHandler,
 } from "../../types/index.js";
 import { ErrorCategory, ErrorSeverity } from "../../constants/enums.js";
@@ -150,8 +150,8 @@ export class GoogleTTSHandler implements TTSHandler {
 
         const voiceType = this.detectVoiceType(voiceName);
 
-        // Map Google's ssmlGender → internal Gender
-        const gender: Gender =
+        // Map Google's ssmlGender → internal TTSGender
+        const gender: TTSGender =
           voice.ssmlGender === "MALE"
             ? "male"
             : voice.ssmlGender === "FEMALE"
@@ -403,7 +403,7 @@ export class GoogleTTSHandler implements TTSHandler {
    * detectVoiceType("en-US-Chirp-A") // returns "chirp"
    * detectVoiceType("en-US-Journey-D") // returns "unknown" (unrecognized type)
    */
-  private detectVoiceType(name: string): VoiceType {
+  private detectVoiceType(name: string): TTSVoiceType {
     const tokens = name.toLowerCase().split("-");
 
     if (tokens.some((t) => t.startsWith("chirp"))) {

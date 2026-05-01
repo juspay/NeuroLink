@@ -12,7 +12,7 @@ import path from "path";
 import type {
   TTSResult,
   AudioSaveResult,
-  AudioFormat,
+  TTSAudioFormat,
 } from "../../lib/types/index.js";
 
 /**
@@ -67,7 +67,7 @@ export async function ensureDirectoryExists(filePath: string): Promise<void> {
  * @param format - Audio format
  * @returns File extension (including dot)
  */
-export function getAudioExtension(format: AudioFormat): string {
+export function getAudioExtension(format: TTSAudioFormat): string {
   switch (format) {
     case "mp3":
       return ".mp3";
@@ -77,6 +77,10 @@ export function getAudioExtension(format: AudioFormat): string {
       return ".ogg";
     case "opus":
       return ".opus";
+    case "pcm16":
+      // Raw PCM16 (no RIFF/WAV header) — write to .pcm so consumers don't
+      // mistake it for a parseable WAV file.
+      return ".pcm";
     default:
       return ".mp3";
   }
@@ -91,13 +95,13 @@ export function getAudioExtension(format: AudioFormat): string {
  */
 export function normalizeOutputPath(
   outputPath: string,
-  format: AudioFormat = "mp3",
+  format: TTSAudioFormat = "mp3",
 ): string {
   const resolvedPath = resolveOutputPath(outputPath);
   const ext = path.extname(resolvedPath).toLowerCase();
 
   // If no extension or wrong extension, add the correct one
-  const validExtensions = [".mp3", ".wav", ".ogg", ".opus"];
+  const validExtensions = [".mp3", ".wav", ".ogg", ".opus", ".pcm"];
   if (!ext || !validExtensions.includes(ext)) {
     return resolvedPath + getAudioExtension(format);
   }

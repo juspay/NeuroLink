@@ -16,26 +16,31 @@ This guide helps you choose the optimal AI provider for your specific use case, 
 
 Use this matrix to quickly identify the best provider for your primary requirement:
 
-| Primary Need              | Best Choice          | Alternative          | Budget Option           |
-| ------------------------- | -------------------- | -------------------- | ----------------------- |
-| **Highest Quality**       | OpenAI GPT-4o/GPT-5  | Anthropic Claude 4.5 | Google Gemini 2.5 Pro   |
-| **Extended Thinking**     | Anthropic Claude 4.5 | Google Gemini 2.5+   | Google AI Studio (Free) |
-| **PDF Processing**        | Anthropic            | Google AI Studio     | Google Vertex           |
-| **Complete Privacy**      | Ollama (Local)       | Self-hosted LiteLLM  | -                       |
-| **Enterprise Security**   | Azure OpenAI         | Amazon Bedrock       | Google Vertex           |
-| **GDPR Compliance**       | Mistral              | Ollama (Local)       | -                       |
-| **Free Tier**             | Google AI Studio     | OpenRouter           | HuggingFace             |
-| **Multi-Provider Access** | OpenRouter           | LiteLLM              | -                       |
-| **AWS Integration**       | Amazon Bedrock       | Amazon SageMaker     | -                       |
-| **Azure Integration**     | Azure OpenAI         | -                    | -                       |
-| **GCP Integration**       | Google Vertex        | Google AI Studio     | -                       |
-| **Vision/Multimodal**     | OpenAI GPT-4o        | Anthropic Claude 4.5 | Google Gemini           |
-| **Tool Calling**          | OpenAI               | Anthropic            | Google AI Studio        |
-| **Custom Models**         | Amazon SageMaker     | OpenAI Compatible    | Ollama                  |
-| **Budget Reasoning**      | DeepSeek (R1)        | NVIDIA NIM           | llama.cpp (local)       |
-| **Local GUI Inference**   | LM Studio            | Ollama               | llama.cpp               |
-| **Local CLI Inference**   | llama.cpp            | Ollama               | LM Studio               |
-| **NVIDIA GPU Cloud**      | NVIDIA NIM           | -                    | -                       |
+| Primary Need              | Best Choice           | Alternative          | Budget Option           |
+| ------------------------- | --------------------- | -------------------- | ----------------------- |
+| **Highest Quality**       | OpenAI GPT-4o/GPT-5   | Anthropic Claude 4.5 | Google Gemini 2.5 Pro   |
+| **Extended Thinking**     | Anthropic Claude 4.5  | Google Gemini 2.5+   | Google AI Studio (Free) |
+| **PDF Processing**        | Anthropic             | Google AI Studio     | Google Vertex           |
+| **Complete Privacy**      | Ollama (Local)        | Self-hosted LiteLLM  | -                       |
+| **Enterprise Security**   | Azure OpenAI          | Amazon Bedrock       | Google Vertex           |
+| **GDPR Compliance**       | Mistral               | Ollama (Local)       | -                       |
+| **Free Tier**             | Google AI Studio      | OpenRouter           | HuggingFace             |
+| **Multi-Provider Access** | OpenRouter            | LiteLLM              | -                       |
+| **AWS Integration**       | Amazon Bedrock        | Amazon SageMaker     | -                       |
+| **Azure Integration**     | Azure OpenAI          | -                    | -                       |
+| **GCP Integration**       | Google Vertex         | Google AI Studio     | -                       |
+| **Vision/Multimodal**     | OpenAI GPT-4o         | Anthropic Claude 4.5 | Google Gemini           |
+| **Tool Calling**          | OpenAI                | Anthropic            | Google AI Studio        |
+| **Custom Models**         | Amazon SageMaker      | OpenAI Compatible    | Ollama                  |
+| **Budget Reasoning**      | DeepSeek (R1)         | NVIDIA NIM           | llama.cpp (local)       |
+| **Local GUI Inference**   | LM Studio             | Ollama               | llama.cpp               |
+| **Local CLI Inference**   | llama.cpp             | Ollama               | LM Studio               |
+| **NVIDIA GPU Cloud**      | NVIDIA NIM            | -                    | -                       |
+| **TTS Quality**           | openai-tts (tts-1-hd) | elevenlabs           | google-ai (free tier)   |
+| **TTS Multilingual**      | elevenlabs            | openai-tts           | azure-tts               |
+| **STT Accuracy**          | whisper               | deepgram             | google-stt              |
+| **STT Streaming**         | deepgram              | -                    | -                       |
+| **Realtime Voice**        | openai-realtime       | gemini-live          | -                       |
 
 ---
 
@@ -846,10 +851,20 @@ START: What's your primary constraint?
 │   ├─ GCP → Google Vertex AI
 │   └─ Multi-cloud → LiteLLM or OpenRouter
 │
-└─ PERFORMANCE → What matters most?
-    ├─ Latency → Ollama (local) or Google AI Studio
-    ├─ Throughput → OpenAI or Google
-    └─ Quality → OpenAI GPT-4o or Anthropic Claude
+├─ PERFORMANCE → What matters most?
+│   ├─ Latency → Ollama (local) or Google AI Studio
+│   ├─ Throughput → OpenAI or Google
+│   └─ Quality → OpenAI GPT-4o or Anthropic Claude
+│
+└─ VOICE → What kind of audio I/O do you need?
+    ├─ Text-to-Speech (quality) → openai-tts (tts-1-hd) or elevenlabs (multilingual)
+    ├─ Text-to-Speech (cost) → google-ai (1M chars/month free)
+    ├─ Text-to-Speech (enterprise) → azure-tts (full SSML)
+    ├─ Speech-to-Text (accuracy) → whisper
+    ├─ Speech-to-Text (real-time streaming) → deepgram (WebSocket)
+    ├─ Speech-to-Text (GCP users) → google-stt
+    ├─ Speech-to-Text (enterprise) → azure-stt
+    └─ Realtime bidirectional voice → openai-realtime or gemini-live
 ```
 
 ---
@@ -880,6 +895,90 @@ START: What's your primary constraint?
 
 **Use NVIDIA NIM** - Curated Llama, Nemotron, and DeepSeek-R1 models served at scale via NVIDIA's cloud.
 
+### Text-to-Speech (TTS)
+
+**Best quality: `openai-tts` with model tts-1-hd**
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+const result = await neurolink.generate({
+  input: { text: "Hello, world!" },
+  tts: {
+    enabled: true,
+    provider: "openai-tts",
+    voice: "nova",
+    model: "tts-1-hd",
+  },
+});
+```
+
+**Best multilingual: `elevenlabs`**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Hola, ¿cómo estás?" },
+  tts: { enabled: true, provider: "elevenlabs", voice: "your-voice-id" },
+});
+```
+
+**Most cost-effective: `google-ai` (1M chars free tier)**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Cost-effective synthesis at scale." },
+  tts: { enabled: true, provider: "google-ai", voice: "en-US-Standard-A" },
+});
+```
+
+**Enterprise: `azure-tts` (SSML support)**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Welcome to Neurolink." },
+  tts: { enabled: true, provider: "azure-tts", voice: "en-US-AriaNeural" },
+});
+```
+
+### Speech-to-Text (STT)
+
+**Best accuracy: `whisper` (OpenAI)**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "whisper", audio: audioBuffer },
+});
+```
+
+**Best streaming: `deepgram` (WebSocket real-time)**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "deepgram", audio: audioBuffer },
+});
+```
+
+**Best for Google Cloud users: `google-stt`**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "google-stt", audio: audioBuffer },
+});
+```
+
+**Enterprise: `azure-stt`**
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "azure-stt", audio: audioBuffer },
+});
+```
+
 ### For Cost Optimization
 
 **Implement multi-provider routing** - Use free/cheap providers for simple tasks, premium for complex ones.
@@ -894,3 +993,5 @@ START: What's your primary constraint?
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 - **[Multi-Provider Fallback Cookbook](../cookbook/multi-provider-fallback.md)** - Implementation patterns
 - **[Cost Optimization Cookbook](../cookbook/cost-optimization.md)** - Strategies to reduce costs
+- **[Voice Providers Comparison](provider-comparison.md#voice-providers)** - TTS, STT, and Realtime provider matrix
+- **[Voice Providers Index](../getting-started/providers/index.md#voice-providers)** - Voice provider setup cards

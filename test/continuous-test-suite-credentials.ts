@@ -92,8 +92,12 @@ function assertNotNull<T>(
 // CONFIG
 // =============================================================================
 
-const HAS_OPENAI_KEY = Boolean(process.env.TEST_OPENAI_API_KEY);
-const HAS_ANTHROPIC_KEY = Boolean(process.env.TEST_ANTHROPIC_API_KEY);
+// Use the same runtime env vars every other continuous-test-suite-*.ts file
+// uses. No special TEST_* prefix — the previous indirection gated nothing.
+const RESOLVED_OPENAI_KEY = process.env.OPENAI_API_KEY ?? "";
+const RESOLVED_ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+const HAS_OPENAI_KEY = Boolean(RESOLVED_OPENAI_KEY);
+const HAS_ANTHROPIC_KEY = Boolean(RESOLVED_ANTHROPIC_KEY);
 const HAS_ANY_KEY = HAS_OPENAI_KEY || HAS_ANTHROPIC_KEY;
 
 // =============================================================================
@@ -380,24 +384,24 @@ async function testInstanceAndCallBehavior(): Promise<void> {
   // Test 2.2: Per-call generate() with credentials field — SKIP if no real key
   await test("2.2 Per-call credentials override in generate() — accepted by type system (SKIP if no API key)", async () => {
     if (!HAS_ANY_KEY) {
-      throw new Error(
-        "SKIP: No TEST_OPENAI_API_KEY or TEST_ANTHROPIC_API_KEY set",
-      );
+      throw new Error("SKIP: No OPENAI_API_KEY or ANTHROPIC_API_KEY set");
     }
 
     const neurolink = new NeuroLink();
 
     const provider = HAS_OPENAI_KEY ? "openai" : "anthropic";
     const creds: NeurolinkCredentials = HAS_OPENAI_KEY
-      ? { openai: { apiKey: process.env.TEST_OPENAI_API_KEY! } }
-      : { anthropic: { apiKey: process.env.TEST_ANTHROPIC_API_KEY! } };
+      ? { openai: { apiKey: RESOLVED_OPENAI_KEY } }
+      : { anthropic: { apiKey: RESOLVED_ANTHROPIC_KEY } };
 
     try {
       const result = await neurolink.generate({
         input: { text: "Reply with a single word: hello" },
         provider,
         credentials: creds,
-        maxTokens: 10,
+        // OpenAI's Responses API requires max_output_tokens >= 16. Use 32 so
+        // the gate is comfortably above the minimum across providers.
+        maxTokens: 32,
       });
 
       assertNotNull(result, "generate() should return a result");
@@ -564,7 +568,7 @@ async function testProviderScopedCredentials(): Promise<void> {
     assert(
       matchCount >= 5,
       `Expected at least 5 credential keys to match registered providers. ` +
-        `Got ${matchCount} matches. Available providers: ${availableLower.join(", ")}`,
+        `Got ${matchCount} matches. Available providers: ${availableNormalized.join(", ")}`,
     );
   });
 }
@@ -579,7 +583,7 @@ async function testConcurrentCallsWithDifferentCredentials(): Promise<void> {
   await test("4.1 Concurrent generate() calls with different credentials do not cross-contaminate (SKIP if no API keys)", async () => {
     if (!HAS_OPENAI_KEY && !HAS_ANTHROPIC_KEY) {
       throw new Error(
-        "SKIP: No TEST_OPENAI_API_KEY or TEST_ANTHROPIC_API_KEY set — cannot verify live credential isolation",
+        "SKIP: No OPENAI_API_KEY or ANTHROPIC_API_KEY set — cannot verify live credential isolation",
       );
     }
 
@@ -591,8 +595,8 @@ async function testConcurrentCallsWithDifferentCredentials(): Promise<void> {
     // concurrent call (or from any shared state).
     const provider = HAS_OPENAI_KEY ? "openai" : "anthropic";
     const validKey = HAS_OPENAI_KEY
-      ? process.env.TEST_OPENAI_API_KEY!
-      : process.env.TEST_ANTHROPIC_API_KEY!;
+      ? RESOLVED_OPENAI_KEY
+      : RESOLVED_ANTHROPIC_KEY;
     const fakeKey = "fake-key-for-isolation-test";
 
     // Call using the real API key — expected to succeed (returns a result).
@@ -603,7 +607,8 @@ async function testConcurrentCallsWithDifferentCredentials(): Promise<void> {
         credentials: HAS_OPENAI_KEY
           ? { openai: { apiKey: validKey } }
           : { anthropic: { apiKey: validKey } },
-        maxTokens: 5,
+        // OpenAI's Responses API requires max_output_tokens >= 16.
+        maxTokens: 32,
       })
       .catch((err: Error) => {
         if (isExpectedProviderError(err.message)) {
@@ -620,7 +625,8 @@ async function testConcurrentCallsWithDifferentCredentials(): Promise<void> {
         credentials: HAS_OPENAI_KEY
           ? { openai: { apiKey: fakeKey } }
           : { anthropic: { apiKey: fakeKey } },
-        maxTokens: 5,
+        // OpenAI's Responses API requires max_output_tokens >= 16.
+        maxTokens: 32,
       })
       .then(() => null as null) // should not reach here
       .catch((err: Error) => err); // capture the error object
@@ -664,15 +670,12 @@ async function main(): Promise<void> {
   console.log("=".repeat(70));
 
   if (HAS_OPENAI_KEY) {
-    log("  TEST_OPENAI_API_KEY detected — live API tests will run.", "green");
+    log("  OPENAI_API_KEY detected — live API tests will run.", "green");
   } else if (HAS_ANTHROPIC_KEY) {
-    log(
-      "  TEST_ANTHROPIC_API_KEY detected — live API tests will run.",
-      "green",
-    );
+    log("  ANTHROPIC_API_KEY detected — live API tests will run.", "green");
   } else {
     log(
-      "  No TEST_OPENAI_API_KEY or TEST_ANTHROPIC_API_KEY — live tests will be skipped.",
+      "  No OPENAI_API_KEY or ANTHROPIC_API_KEY — live tests will be skipped.",
       "yellow",
     );
   }
@@ -724,7 +727,7 @@ async function main(): Promise<void> {
       "yellow",
     );
     log(
-      "  Set TEST_OPENAI_API_KEY or TEST_ANTHROPIC_API_KEY to run live tests.",
+      "  Set OPENAI_API_KEY or ANTHROPIC_API_KEY to run live tests.",
       "yellow",
     );
     console.log();

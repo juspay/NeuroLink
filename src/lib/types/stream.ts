@@ -23,7 +23,8 @@ import type {
   AIModelProviderConfig,
   NeurolinkCredentials,
 } from "./providers.js";
-import type { TTSChunk, TTSOptions } from "./tts.js";
+import type { TTSChunk, TTSOptions, TTSResult } from "./tts.js";
+import type { STTOptions, STTResult } from "./stt.js";
 import type { StandardRecord, ValidationSchema } from "./aliases.js";
 import type { FileWithMetadata } from "./file.js";
 import type { WorkflowConfig } from "./workflow.js";
@@ -168,9 +169,9 @@ export type AudioChunk = {
  * ```typescript
  * const audioBuffer: Buffer[] = [];
  * for await (const chunk of result.stream) {
- *   if (chunk.type === "audio") {
- *     audioBuffer.push(chunk.audioChunk.data); // TypeScript knows 'audioChunk' exists
- *     if (chunk.audioChunk.isFinal) {
+ *   if (chunk.type === "tts_audio") {
+ *     audioBuffer.push(chunk.audio.data); // TypeScript knows 'audio' exists
+ *     if (chunk.audio.isFinal) {
  *       const fullAudio = Buffer.concat(audioBuffer);
  *       fs.writeFileSync('output.mp3', fullAudio);
  *     }
@@ -185,8 +186,8 @@ export type AudioChunk = {
  *     case "text":
  *       process.stdout.write(chunk.content);
  *       break;
- *     case "audio":
- *       playAudioChunk(chunk.audioChunk.data);
+ *     case "tts_audio":
+ *       playAudioChunk(chunk.audio.data);
  *       break;
  *   }
  * }
@@ -200,10 +201,12 @@ export type StreamChunk =
       content: string;
     }
   | {
-      /** Discriminator for audio chunks */
-      type: "audio";
+      /** Discriminator for synthesized TTS audio chunks. Uses `tts_audio`
+       *  (not `audio`) to avoid colliding with realtime AudioChunk and to
+       *  match the runtime shape emitted by `BaseProvider.stream()`. */
+      type: "tts_audio";
       /** TTS audio chunk data */
-      audioChunk: TTSChunk;
+      audio: TTSChunk;
     };
 
 export type StreamOptions = {
@@ -275,9 +278,9 @@ export type StreamOptions = {
    * for await (const chunk of result.stream) {
    *   if (chunk.type === "text") {
    *     process.stdout.write(chunk.content);
-   *   } else if (chunk.type === "audio") {
+   *   } else if (chunk.type === "tts_audio") {
    *     // Handle audio chunk
-   *     playAudioChunk(chunk.audioChunk.data);
+   *     playAudioChunk(chunk.audio.data);
    *   }
    * }
    * ```
@@ -298,6 +301,13 @@ export type StreamOptions = {
    * ```
    */
   tts?: TTSOptions;
+
+  /**
+   * Speech-to-Text (STT) configuration for streaming
+   *
+   * When enabled, audio from `stt.audio` is transcribed before streaming begins.
+   */
+  stt?: STTOptions & { provider?: string; audio?: Buffer | ArrayBuffer };
 
   /**
    * Thinking/reasoning configuration for extended thinking models
@@ -580,10 +590,12 @@ export type StreamResult = {
     | { content: string }
     | StreamNoOutputSentinel
     | { type: "audio"; audio: AudioChunk }
+    | { type: "tts_audio"; audio: TTSChunk }
     | { type: "image"; imageOutput: { base64: string } }
     | { content: string; type?: "preliminary" | "final" }
-    | { type: "audio"; audio: AudioChunk }
-  >; // text chunks (with optional workflow stage), no-output sentinel, or audio/image events
+  >; // text chunks (with optional workflow stage), no-output sentinel, or audio/image events.
+  // NOTE: `type: "audio"` is realtime/Gemini PCM (`AudioChunk` shape).
+  // `type: "tts_audio"` is synthesized TTS output (`TTSChunk` shape, with format/index/voice).
 
   // Provider information
   provider?: string;
@@ -663,6 +675,18 @@ export type StreamResult = {
     workflowId: string;
     workflowName: string;
   };
+
+  /** STT transcription result (when stt option is used) */
+  transcription?: STTResult;
+
+  /**
+   * TTS Mode 2 result (when `tts.enabled && tts.useAiResponse`).
+   * Resolves with the synthesized audio after the stream completes;
+   * resolves to undefined if TTS was not enabled or synthesis failed.
+   * The same audio is also yielded as a final chunk on `stream` for callers
+   * that prefer to consume it inline.
+   */
+  audio?: Promise<TTSResult | undefined>;
 };
 
 /**

@@ -7,9 +7,24 @@
  */
 
 /**
- * Supported audio formats for TTS output
+ * Supported audio formats for TTS output, STT input, and Realtime PCM streams.
+ *
+ * `pcm16` is included for the OpenAI Realtime PCM16 output stream — the chunk
+ * is raw PCM, not a RIFF/WAV-headered file. Consumers must not pass `pcm16`
+ * bytes to a WAV duration parser.
  */
-export type AudioFormat = "mp3" | "wav" | "ogg" | "opus";
+export type TTSAudioFormat =
+  | "mp3"
+  | "wav"
+  | "ogg"
+  | "opus"
+  | "m4a"
+  | "flac"
+  | "webm"
+  | "mp4"
+  | "mpeg"
+  | "mpga"
+  | "pcm16";
 
 /**
  * TTS quality settings
@@ -54,7 +69,7 @@ export type TTSOptions = {
   /** Voice identifier (e.g., "en-US-Neural2-C") */
   voice?: string;
   /** Audio format (default: mp3) */
-  format?: AudioFormat;
+  format?: TTSAudioFormat;
   /** Speaking rate 0.25-4.0 (default: 1.0) */
   speed?: number;
   /** Voice pitch adjustment -20.0 to 20.0 semitones (default: 0.0) */
@@ -67,6 +82,8 @@ export type TTSOptions = {
   output?: string;
   /** Auto-play audio after generation (default: false) */
   play?: boolean;
+  /** Override TTS provider (e.g., "elevenlabs", "openai-tts", "azure-tts") */
+  provider?: string;
 };
 
 /**
@@ -76,7 +93,7 @@ export type TTSResult = {
   /** Audio data as Buffer */
   buffer: Buffer;
   /** Audio format */
-  format: AudioFormat;
+  format: TTSAudioFormat;
   /** Audio file size in bytes */
   size: number;
   /** Duration in seconds (if available) */
@@ -111,10 +128,33 @@ export type AudioSaveResult = {
 };
 
 /** Allowed TTS voice types */
-export type VoiceType = "standard" | "wavenet" | "neural" | "chirp" | "unknown";
+export type TTSVoiceType =
+  | "standard"
+  | "wavenet"
+  | "neural"
+  | "chirp"
+  | "unknown";
 
 /** Allowed genders for TTS voices */
-export type Gender = "male" | "female" | "neutral";
+export type TTSGender = "male" | "female" | "neutral";
+
+// =============================================================================
+// BACKWARD-COMPAT ALIASES (for SDK consumers from earlier releases)
+// =============================================================================
+//
+// `release` shipped these types as `AudioFormat` / `VoiceType` / `Gender` —
+// the voice PR added the `TTS` prefix per the domain-prefix rule. Re-export
+// the old names so existing `import { AudioFormat } from "@juspay/neurolink"`
+// keeps compiling. Marked @deprecated — drop in the next major version.
+
+/** @deprecated Use `TTSAudioFormat` instead. */
+export type AudioFormat = TTSAudioFormat;
+
+/** @deprecated Use `TTSVoiceType` instead. */
+export type VoiceType = TTSVoiceType;
+
+/** @deprecated Use `TTSGender` instead. */
+export type Gender = TTSGender;
 
 /**
  * TTS voice information
@@ -128,10 +168,10 @@ export type TTSVoice = {
   languageCode: string;
   /** All supported language codes */
   languageCodes: string[];
-  /** Gender */
-  gender: Gender;
+  /** TTSGender */
+  gender: TTSGender;
   /** Voice type */
-  type?: VoiceType;
+  type?: TTSVoiceType;
   /** Voice description (optional) */
   description?: string;
   /** Natural sample rate in Hz (optional) */
@@ -139,11 +179,18 @@ export type TTSVoice = {
 };
 
 /** Valid audio formats as an array for runtime validation */
-export const VALID_AUDIO_FORMATS: readonly AudioFormat[] = [
+export const VALID_AUDIO_FORMATS: readonly TTSAudioFormat[] = [
   "mp3",
   "wav",
   "ogg",
   "opus",
+  "m4a",
+  "flac",
+  "webm",
+  "mp4",
+  "mpeg",
+  "mpga",
+  "pcm16",
 ];
 
 /** Valid TTS quality levels as an array for runtime validation */
@@ -163,7 +210,7 @@ export function isTTSResult(value: unknown): value is TTSResult {
   return (
     Buffer.isBuffer(obj.buffer) &&
     typeof obj.format === "string" &&
-    VALID_AUDIO_FORMATS.includes(obj.format as AudioFormat) &&
+    VALID_AUDIO_FORMATS.includes(obj.format as TTSAudioFormat) &&
     typeof obj.size === "number" &&
     obj.size >= 0
   );
@@ -209,7 +256,7 @@ export type TTSChunk = {
   /** Audio data chunk as Buffer */
   data: Buffer;
   /** Audio format of this chunk */
-  format: AudioFormat;
+  format: TTSAudioFormat;
   /** Chunk sequence number (0-indexed) */
   index: number;
   /** Whether this is the final audio chunk */

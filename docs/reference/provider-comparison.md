@@ -972,6 +972,40 @@ _Subscription Pricing (via OAuth):_
 
 ---
 
+---
+
+## Voice Providers
+
+Voice providers handle audio I/O and are distinct from LLM text-generation providers. They are categorised by function: Text-to-Speech (TTS), Speech-to-Text (STT), and Realtime (bidirectional audio over WebSocket).
+
+| Provider            | Type     | Protocol         | Streaming | Formats                                               | Auth                                               |
+| ------------------- | -------- | ---------------- | --------- | ----------------------------------------------------- | -------------------------------------------------- |
+| **google-ai** (TTS) | TTS      | REST (gRPC SDK)  | No        | MP3, WAV, OGG                                         | Service Account (`GOOGLE_APPLICATION_CREDENTIALS`) |
+| **openai-tts**      | TTS      | REST             | No        | MP3, WAV, OGG, Opus                                   | API Key                                            |
+| **elevenlabs**      | TTS      | REST             | No        | MP3, WAV (PCM), Opus                                  | API Key                                            |
+| **azure-tts**       | TTS      | REST             | No        | MP3, WAV (PCM), Opus                                  | API Key + Region                                   |
+| **whisper**         | STT      | REST             | No        | WAV, MP3, M4A, FLAC, OGG, Opus, WebM, MP4, MPEG, MPGA | API Key                                            |
+| **google-stt**      | STT      | REST             | No        | WAV, FLAC, MP3, OGG                                   | API Key or Service Account                         |
+| **deepgram**        | STT      | REST + WebSocket | Yes       | WAV, MP3, OGG, FLAC                                   | API Key                                            |
+| **azure-stt**       | STT      | REST             | No        | WAV¹, OGG, Opus                                       | API Key + Region                                   |
+| **openai-realtime** | Realtime | WebSocket        | Yes       | PCM16, WAV, Opus                                      | API Key                                            |
+| **gemini-live**     | Realtime | WebSocket        | Yes       | WAV, Opus                                             | API Key (or Service Account)                       |
+
+¹ Azure STT's short-audio REST endpoint does not decode MP3 — passing
+`format: "mp3"` to `azure-stt` throws `STT_INVALID_AUDIO_FORMAT` early.
+Convert to WAV first (`ffmpeg -i in.mp3 -ar 16000 -ac 1 out.wav`) or use a
+different STT provider for MP3 input. See `docs/getting-started/providers/azure-speech.md`.
+
+**Legend:**
+
+- **TTS** — Text-to-Speech: converts text to audio
+- **STT** — Speech-to-Text: transcribes audio to text
+- **Realtime** — Bidirectional voice session with the model over a persistent WebSocket
+
+See also: [Voice Provider Selection](#voice-provider-selection) | [Voice Providers Index](../getting-started/providers/index.md#voice-providers)
+
+---
+
 ## Use Case Recommendations
 
 ### For Startups (Limited Budget)
@@ -1304,6 +1338,112 @@ const result = await neurolink.generate({
 
 ---
 
+## Voice Provider Selection
+
+### Text-to-Speech (TTS)
+
+**Best quality: `openai-tts` with model tts-1-hd**
+
+```typescript
+import { NeuroLink } from "@juspay/neurolink";
+const neurolink = new NeuroLink();
+
+const result = await neurolink.generate({
+  input: { text: "Hello, world!" },
+  tts: {
+    enabled: true,
+    provider: "openai-tts",
+    voice: "nova",
+    model: "tts-1-hd",
+  },
+});
+// result.audio contains the synthesized speech
+```
+
+**Best multilingual: `elevenlabs`**
+
+ElevenLabs supports the widest range of languages and voice cloning, making it the default choice for multilingual or branded voice experiences.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Hola, ¿cómo estás?" },
+  tts: { enabled: true, provider: "elevenlabs", voice: "your-voice-id" },
+});
+```
+
+**Most cost-effective: `google-ai` (1M chars free tier)**
+
+Google Cloud Text-to-Speech provides a generous free tier (1M characters/month for standard voices) and is ideal for high-volume applications on GCP.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Cost-effective synthesis at scale." },
+  tts: { enabled: true, provider: "google-ai", voice: "en-US-Standard-A" },
+});
+```
+
+**Enterprise: `azure-tts` (SSML support)**
+
+Azure Cognitive Services TTS has the most comprehensive SSML support, including fine-grained prosody control, making it the standard choice for enterprise IVR and accessibility pipelines.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "Welcome to Neurolink." },
+  tts: { enabled: true, provider: "azure-tts", voice: "en-US-AriaNeural" },
+});
+```
+
+---
+
+### Speech-to-Text (STT)
+
+**Best accuracy: `whisper` (OpenAI)**
+
+OpenAI Whisper consistently ranks highest on transcription benchmarks across languages and noisy environments.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "whisper", audio: audioBuffer },
+});
+// result.transcription.text contains the transcribed text
+```
+
+**Best streaming: `deepgram` (WebSocket real-time)**
+
+Deepgram is the only STT provider with native WebSocket streaming support, enabling sub-300 ms word-level transcription for live audio.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "deepgram", audio: audioBuffer },
+});
+```
+
+**Best for Google Cloud users: `google-stt`**
+
+Tight integration with GCP infrastructure, support for 125+ languages, and speaker diarization make `google-stt` the natural choice when already on Google Cloud.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "google-stt", audio: audioBuffer },
+});
+```
+
+**Enterprise: `azure-stt`**
+
+Azure Cognitive Services STT offers custom model training, batch transcription, and fine-grained compliance controls for regulated industries.
+
+```typescript
+const result = await neurolink.generate({
+  input: { text: "" },
+  stt: { enabled: true, provider: "azure-stt", audio: audioBuffer },
+});
+```
+
+---
+
 ## Conclusion
 
 **Choose based on priorities:**
@@ -1317,6 +1457,11 @@ const result = await neurolink.generate({
 7. **Flexibility Priority** → OpenRouter (300+ models) or NVIDIA NIM (curated NVIDIA-hosted models)
 8. **Flat-Rate Pricing** → Anthropic subscription (Pro $20/mo, Max $100+/mo)
 9. **Zero Cloud Cost** → LM Studio or llama.cpp (local execution)
+10. **TTS Quality** → `openai-tts` (tts-1-hd) or `elevenlabs` (multilingual)
+11. **TTS Cost** → `google-ai` TTS (1M chars/month free tier)
+12. **STT Accuracy** → `whisper` (OpenAI)
+13. **STT Streaming** → `deepgram` (WebSocket, sub-300 ms)
+14. **Realtime Voice** → `openai-realtime` or `gemini-live`
 
 **NeuroLink Advantage:**
 
@@ -1330,3 +1475,5 @@ See also:
 - [Provider Capabilities Audit](./provider-capabilities-audit.md) - Detailed technical capabilities
 - [Provider Selection Wizard](../guides/provider-selection.md) - Interactive decision guide
 - [Claude Subscription Support](../features/claude-subscription.md) - OAuth authentication and subscription tiers for Anthropic
+- [Voice Provider Selection](./provider-comparison.md#voice-provider-selection) - TTS, STT, and Realtime provider recommendations
+- [Voice Providers Index](../getting-started/providers/index.md#voice-providers) - Voice provider setup cards

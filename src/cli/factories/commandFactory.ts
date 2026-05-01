@@ -320,9 +320,25 @@ export class CLICommandFactory {
       type: "string" as const,
       description: "TTS voice to use (e.g., 'en-US-Neural2-C')",
     },
+    ttsProvider: {
+      type: "string" as const,
+      choices: ["google-ai", "vertex", "openai-tts", "elevenlabs", "azure-tts"],
+      description: "TTS provider (overrides --provider for speech synthesis)",
+    },
     ttsFormat: {
       type: "string" as const,
-      choices: ["mp3", "wav", "ogg", "opus"],
+      choices: [
+        "mp3",
+        "wav",
+        "ogg",
+        "opus",
+        "m4a",
+        "flac",
+        "webm",
+        "mp4",
+        "mpeg",
+        "mpga",
+      ],
       default: "mp3",
       description: "Audio output format",
     },
@@ -346,6 +362,26 @@ export class CLICommandFactory {
       type: "boolean" as const,
       default: false,
       description: "Auto-play generated audio",
+    },
+
+    // STT (Speech-to-Text) options
+    stt: {
+      type: "boolean" as const,
+      default: false,
+      description: "Enable speech-to-text transcription of input audio",
+    },
+    sttProvider: {
+      type: "string" as const,
+      choices: ["whisper", "deepgram", "google-stt", "azure-stt"],
+      description: "STT provider to use",
+    },
+    sttLanguage: {
+      type: "string" as const,
+      description: "Audio language code for STT (e.g., en-US)",
+    },
+    inputAudio: {
+      type: "string" as const,
+      description: "Path to audio file for STT transcription",
     },
 
     // Video Generation options (Veo 3.1)
@@ -498,10 +534,18 @@ export class CLICommandFactory {
 
   // Helper method to build options for commands
   private static buildOptions(yargs: Argv, additionalOptions = {}) {
-    return yargs.options({
-      ...CLICommandFactory.commonOptions,
-      ...additionalOptions,
-    });
+    return (
+      yargs
+        .options({
+          ...CLICommandFactory.commonOptions,
+          ...additionalOptions,
+        })
+        // NEW9: implies relationships so users who pass --stt-provider or
+        // --input-audio without --stt get an actionable error from yargs
+        // instead of silently skipping STT.
+        .implies("sttProvider", "stt")
+        .implies("inputAudio", "stt")
+    );
   }
 
   // Helper method to process CLI images with smart auto-detection
@@ -708,11 +752,19 @@ export class CLICommandFactory {
       // TTS options
       tts: argv.tts as boolean | undefined,
       ttsVoice: argv.ttsVoice as string | undefined,
-      ttsFormat: argv.ttsFormat as "mp3" | "wav" | "ogg" | "opus" | undefined,
+      ttsProvider: argv.ttsProvider as string | undefined,
+      ttsFormat: argv.ttsFormat as
+        | import("../../lib/types/index.js").TTSAudioFormat
+        | undefined,
       ttsSpeed: argv.ttsSpeed as number | undefined,
       ttsQuality: argv.ttsQuality as "standard" | "hd" | undefined,
       ttsOutput: argv.ttsOutput as string | undefined,
       ttsPlay: argv.ttsPlay as boolean | undefined,
+      // STT options
+      stt: argv.stt as boolean | undefined,
+      sttProvider: argv.sttProvider as string | undefined,
+      sttLanguage: argv.sttLanguage as string | undefined,
+      inputAudio: argv.inputAudio as string | undefined,
       // Video generation options (Veo 3.1)
       outputMode: argv.outputMode as "text" | "video" | "ppt" | undefined,
       videoOutput: argv.videoOutput as string | undefined,
@@ -1377,7 +1429,7 @@ export class CLICommandFactory {
    */
   static createGenerateCommand(): CommandModule {
     return {
-      command: ["generate <input>", "gen <input>"],
+      command: ["generate [input]", "gen [input]"],
       describe: "Generate content using AI providers",
       builder: (yargs) => {
         return CLICommandFactory.buildOptions(
@@ -1459,7 +1511,7 @@ export class CLICommandFactory {
    */
   static createStreamCommand(): CommandModule {
     return {
-      command: "stream <input>",
+      command: "stream [input]",
       describe: "Stream generation in real-time",
       builder: (yargs) => {
         return CLICommandFactory.buildOptions(
@@ -2230,6 +2282,14 @@ export class CLICommandFactory {
   private static async handleGenerateStdinInput(
     argv: GenerateCommandArgs,
   ): Promise<string> {
+    // M10: STT-only runs (--stt + --input-audio with no positional prompt)
+    // are valid — the transcription becomes the prompt downstream. Skip the
+    // stdin/empty-input check in that case so users don't get
+    // "Input required..." for an STT-only command.
+    const isSttOnly = !!(
+      (argv as { stt?: boolean }).stt &&
+      (argv as { inputAudio?: string }).inputAudio
+    );
     if (!argv.input && !process.stdin.isTTY) {
       let stdinData = "";
       process.stdin.setEncoding("utf8");
@@ -2238,10 +2298,16 @@ export class CLICommandFactory {
       }
       const trimmedData = stdinData.trim();
       if (!trimmedData) {
+        if (isSttOnly) {
+          return "";
+        }
         throw new Error("No input received from stdin");
       }
       return trimmedData;
     } else if (!argv.input) {
+      if (isSttOnly) {
+        return "";
+      }
       throw new Error(
         'Input required. Use: neurolink generate "your prompt" or echo "prompt" | neurolink generate',
       );
@@ -2614,6 +2680,22 @@ export class CLICommandFactory {
         enhancedOptions,
       );
 
+      // Read audio file for STT if --input-audio is provided.
+      // NEW10: existsSync guard mirrors the stream handler so a missing file
+      // produces a friendly error here too instead of a raw ENOENT crash.
+      const inputAudioPath = enhancedOptions.inputAudio as string | undefined;
+      if (inputAudioPath && !fs.existsSync(inputAudioPath)) {
+        throw new Error(`--input-audio file not found: ${inputAudioPath}`);
+      }
+      const inputAudioBuffer = inputAudioPath
+        ? fs.readFileSync(inputAudioPath)
+        : undefined;
+      // m2: shared format helper (was duplicated in generate + stream
+      // handlers; now lives in src/lib/utils/audioFormatDetector.ts).
+      const { inferAudioFormatFromPath } =
+        await import("../../lib/utils/audioFormatDetector.js");
+      const inputAudioFormat = inferAudioFormatFromPath(inputAudioPath);
+
       const runGenerate = () =>
         sdk.generate({
           input: generateInput,
@@ -2682,12 +2764,11 @@ export class CLICommandFactory {
                 enabled: true,
                 useAiResponse: true,
                 voice: enhancedOptions.ttsVoice as string | undefined,
+                provider: enhancedOptions.ttsProvider as string | undefined,
                 format:
                   (enhancedOptions.ttsFormat as
-                    | "mp3"
-                    | "wav"
-                    | "ogg"
-                    | "opus") || undefined,
+                    | import("../../lib/types/index.js").TTSAudioFormat
+                    | undefined) || undefined,
                 speed: enhancedOptions.ttsSpeed as number | undefined,
                 quality: enhancedOptions.ttsQuality as
                   | "standard"
@@ -2695,6 +2776,16 @@ export class CLICommandFactory {
                   | undefined,
                 output: enhancedOptions.ttsOutput as string | undefined,
                 play: enhancedOptions.ttsPlay as boolean | undefined,
+              }
+            : undefined,
+          // STT configuration
+          stt: enhancedOptions.stt
+            ? {
+                enabled: true,
+                provider: enhancedOptions.sttProvider as string | undefined,
+                language: enhancedOptions.sttLanguage as string | undefined,
+                ...(inputAudioBuffer && { audio: inputAudioBuffer }),
+                ...(inputAudioFormat && { format: inputAudioFormat }),
               }
             : undefined,
         });
@@ -2886,7 +2977,7 @@ export class CLICommandFactory {
       argv.file as string | string[] | undefined,
     );
 
-    const runStream = () =>
+    const runStream = async () =>
       sdk.stream({
         input: {
           text: inputText,
@@ -2962,9 +3053,11 @@ export class CLICommandFactory {
               enabled: true,
               useAiResponse: true,
               voice: enhancedOptions.ttsVoice as string | undefined,
+              provider: enhancedOptions.ttsProvider as string | undefined,
               format:
-                (enhancedOptions.ttsFormat as "mp3" | "wav" | "ogg" | "opus") ||
-                undefined,
+                (enhancedOptions.ttsFormat as
+                  | import("../../lib/types/index.js").TTSAudioFormat
+                  | undefined) || undefined,
               speed: enhancedOptions.ttsSpeed as number | undefined,
               quality: enhancedOptions.ttsQuality as
                 | "standard"
@@ -2973,6 +3066,36 @@ export class CLICommandFactory {
               output: enhancedOptions.ttsOutput as string | undefined,
               play: enhancedOptions.ttsPlay as boolean | undefined,
             }
+          : undefined,
+        // STT configuration. m2: shared format helper (was duplicated with
+        // the generate handler; now lives in audioFormatDetector.ts).
+        stt: enhancedOptions.stt
+          ? await (async () => {
+              const streamSttAudioPath = enhancedOptions.inputAudio as
+                | string
+                | undefined;
+              // Fail fast on a missing --input-audio so a CLI typo doesn't
+              // turn into a confusing provider/validation error later
+              // (matches the generate path).
+              if (streamSttAudioPath && !fs.existsSync(streamSttAudioPath)) {
+                throw new Error(
+                  `--input-audio file not found: ${streamSttAudioPath}`,
+                );
+              }
+              const streamSttAudio = streamSttAudioPath
+                ? fs.readFileSync(streamSttAudioPath)
+                : undefined;
+              const { inferAudioFormatFromPath: inferFmt } =
+                await import("../../lib/utils/audioFormatDetector.js");
+              const streamSttFormat = inferFmt(streamSttAudioPath);
+              return {
+                enabled: true as const,
+                provider: enhancedOptions.sttProvider as string | undefined,
+                language: enhancedOptions.sttLanguage as string | undefined,
+                ...(streamSttAudio && { audio: streamSttAudio }),
+                ...(streamSttFormat && { format: streamSttFormat }),
+              };
+            })()
           : undefined,
       });
     const stream = await runStream();
@@ -3028,6 +3151,7 @@ export class CLICommandFactory {
       stream: AsyncIterable<
         | { content: string }
         | { type: "audio" }
+        | { type: "tts_audio" }
         | { type: "image"; imageOutput: { base64: string } }
       >;
     },
@@ -3134,10 +3258,13 @@ export class CLICommandFactory {
           !!o &&
           typeof o === "object" &&
           typeof (o as Record<string, unknown>).content === "string";
-        const isAudio = (o: unknown): o is { type: "audio" } =>
-          !!o &&
-          typeof o === "object" &&
-          (o as Record<string, unknown>).type === "audio";
+        const isAudio = (o: unknown): o is { type: "audio" | "tts_audio" } => {
+          if (!o || typeof o !== "object") {
+            return false;
+          }
+          const t = (o as Record<string, unknown>).type;
+          return t === "audio" || t === "tts_audio";
+        };
         const isImage = (
           o: unknown,
         ): o is { type: "image"; imageOutput: { base64: string } } => {
@@ -3333,6 +3460,10 @@ export class CLICommandFactory {
   private static async handleStdinInput(
     argv: StreamCommandArgs,
   ): Promise<void> {
+    // STT-only flow: --stt --input-audio <file> with no text prompt is now
+    // valid (the stream pipeline transcribes the audio and uses the result
+    // as the prompt). Skip the stdin/empty-input rejection in that case.
+    const isSttOnly = !!argv.stt && !!argv.inputAudio;
     if (!argv.input && !process.stdin.isTTY) {
       let stdinData = "";
       process.stdin.setEncoding("utf8");
@@ -3341,9 +3472,17 @@ export class CLICommandFactory {
       }
       argv.input = stdinData.trim();
       if (!argv.input) {
+        if (isSttOnly) {
+          argv.input = "";
+          return;
+        }
         throw new Error("No input received from stdin");
       }
     } else if (!argv.input) {
+      if (isSttOnly) {
+        argv.input = "";
+        return;
+      }
       throw new Error(
         'Input required. Use: neurolink stream "your prompt" or echo "prompt" | neurolink stream',
       );

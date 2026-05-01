@@ -197,6 +197,22 @@ export class ServeCommandFactory {
             (argv) =>
               ServeCommandFactory.executeStatus(argv as ServeCommandArgs),
           )
+          .command(
+            "voice",
+            "Start the real-time voice assistant server (OpenAI Realtime / Gemini Live)",
+            (yargs) =>
+              yargs.option("port", {
+                alias: "p",
+                type: "number",
+                default: 3000,
+                describe: "Port to listen on",
+              }),
+            async (argv) => {
+              const { startVoiceServer } =
+                await import("../../lib/server/voice/voiceServerApp.js");
+              await startVoiceServer(argv.port as number);
+            },
+          )
           .option("port", {
             type: "number",
             alias: "p",

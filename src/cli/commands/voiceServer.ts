@@ -3,10 +3,17 @@ import type { VoiceServerArgs } from "../../lib/types/index.js";
 import { startVoiceServer } from "../../lib/server/voice/voiceServerApp.js";
 import { configureVoiceServerEnvironment } from "../../lib/server/voice/voiceWebSocketHandler.js";
 
+/**
+ * @deprecated Use `neurolink serve voice` instead. This top-level alias is
+ * kept for one release for backwards compatibility and will be removed in a
+ * future version. The voice server is now subsumed under the existing
+ * `serve` infra command per CLAUDE.md's "everything via generate/stream/serve
+ * only" contract.
+ */
 export const voiceServerCommand: CommandModule<object, VoiceServerArgs> = {
   command: "voice-server",
   describe:
-    "Start the real-time voice assistant server (Soniox STT + Cartesia TTS + Cobra VAD)",
+    "[DEPRECATED — use 'neurolink serve voice'] Start the real-time voice assistant server",
   builder: (yargs) =>
     yargs.option("port", {
       alias: "p",
@@ -15,6 +22,9 @@ export const voiceServerCommand: CommandModule<object, VoiceServerArgs> = {
       describe: "Port to listen on",
     }),
   handler: async (argv) => {
+    console.warn(
+      "[deprecation] 'neurolink voice-server' is deprecated. Use 'neurolink serve voice' instead. This alias will be removed in a future release.",
+    );
     configureVoiceServerEnvironment();
     await startVoiceServer(argv.port);
   },

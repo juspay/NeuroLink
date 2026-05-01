@@ -34,6 +34,21 @@ export class ProviderRegistry {
   private static options: ProviderRegistryOptions = {
     enableManualMCP: false, // Default to disabled for safety
   };
+  /**
+   * NEW4: per-handler registration outcomes for the realtime voice
+   * providers. `"ok"` = registered; any other string = the error message.
+   * Empty until the first `registerAllProviders()` call.
+   */
+  public static realtimeRegistration: Record<string, "ok" | string> = {};
+
+  /**
+   * Returns a snapshot of voice provider registration outcomes so callers
+   * can detect at runtime which voice handlers are usable. Useful in
+   * health-check endpoints and CI startup probes.
+   */
+  static getRegistrationReport(): { realtime: Record<string, "ok" | string> } {
+    return { realtime: { ...this.realtimeRegistration } };
+  }
 
   /**
    * Register all providers with the factory
@@ -471,8 +486,7 @@ export class ProviderRegistry {
         ["llamacpp", "llama.cpp", "llama-cpp"],
       );
 
-      logger.debug("All providers registered successfully");
-      this.registered = true;
+      logger.debug("All AI providers registered successfully");
 
       // ===== TTS HANDLER REGISTRATION =====
       try {
@@ -498,6 +512,172 @@ export class ProviderRegistry {
         );
         // Don't throw - TTS is optional functionality
       }
+
+      // New TTS providers
+      try {
+        const { TTSProcessor } = await import("../utils/ttsProcessor.js");
+        const { OpenAITTS } = await import("../voice/providers/OpenAITTS.js");
+        TTSProcessor.registerHandler("openai-tts", new OpenAITTS());
+      } catch (err) {
+        logger.debug(
+          `[ProviderRegistry] openai-tts registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      try {
+        const { TTSProcessor } = await import("../utils/ttsProcessor.js");
+        const { ElevenLabsTTS } =
+          await import("../voice/providers/ElevenLabsTTS.js");
+        const elevenLabsHandler = new ElevenLabsTTS();
+        TTSProcessor.registerHandler("elevenlabs", elevenLabsHandler);
+        TTSProcessor.registerHandler("elevenlabs-tts", elevenLabsHandler);
+      } catch (err) {
+        logger.debug(
+          `[ProviderRegistry] elevenlabs registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      try {
+        const { TTSProcessor } = await import("../utils/ttsProcessor.js");
+        const { AzureTTS } = await import("../voice/providers/AzureTTS.js");
+        TTSProcessor.registerHandler("azure-tts", new AzureTTS());
+      } catch (err) {
+        logger.debug(
+          `[ProviderRegistry] azure-tts registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+
+      // ===== STT HANDLER REGISTRATION =====
+      try {
+        const { STTProcessor } = await import("../utils/sttProcessor.js");
+
+        try {
+          const { OpenAISTT } = await import("../voice/providers/OpenAISTT.js");
+          const openAISTT = new OpenAISTT();
+          STTProcessor.registerHandler("whisper", openAISTT);
+          STTProcessor.registerHandler("openai-stt", openAISTT);
+        } catch (err) {
+          logger.debug(
+            `[ProviderRegistry] whisper/openai-stt registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        try {
+          const { DeepgramSTT } =
+            await import("../voice/providers/DeepgramSTT.js");
+          STTProcessor.registerHandler("deepgram", new DeepgramSTT());
+        } catch (err) {
+          logger.debug(
+            `[ProviderRegistry] deepgram registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        try {
+          const { GoogleSTT } = await import("../voice/providers/GoogleSTT.js");
+          STTProcessor.registerHandler("google-stt", new GoogleSTT());
+        } catch (err) {
+          logger.debug(
+            `[ProviderRegistry] google-stt registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        try {
+          const { AzureSTT } = await import("../voice/providers/AzureSTT.js");
+          STTProcessor.registerHandler("azure-stt", new AzureSTT());
+        } catch (err) {
+          logger.debug(
+            `[ProviderRegistry] azure-stt registration skipped: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
+        logger.debug("STT handlers registered successfully", {
+          providers: ["whisper", "deepgram", "google-stt", "azure-stt"],
+        });
+      } catch (sttError) {
+        logger.warn(
+          "Failed to register STT handlers - STT functionality will be unavailable",
+          {
+            error:
+              sttError instanceof Error ? sttError.message : String(sttError),
+          },
+        );
+      }
+
+      // ===== REALTIME HANDLER REGISTRATION =====
+      try {
+        const { RealtimeProcessor } =
+          await import("../voice/RealtimeVoiceAPI.js");
+
+        // M9 + NEW4: track per-handler registration outcomes so the final
+        // log accurately reflects which voice providers succeeded vs which
+        // were skipped — instead of unconditionally claiming "registered
+        // successfully" or hiding failures at debug level.
+        const realtimeOutcomes: Record<string, "ok" | string> = {};
+
+        try {
+          const { OpenAIRealtime } =
+            await import("../voice/providers/OpenAIRealtime.js");
+          RealtimeProcessor.registerHandler(
+            "openai-realtime",
+            new OpenAIRealtime(),
+          );
+          realtimeOutcomes["openai-realtime"] = "ok";
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          realtimeOutcomes["openai-realtime"] = msg;
+          // M9: promote per-handler failures to error level so users can
+          // see which shipped voice provider failed to register at startup.
+          logger.error(
+            `[ProviderRegistry] openai-realtime registration failed: ${msg}`,
+          );
+        }
+
+        try {
+          const { GeminiLive } =
+            await import("../voice/providers/GeminiLive.js");
+          RealtimeProcessor.registerHandler("gemini-live", new GeminiLive());
+          realtimeOutcomes["gemini-live"] = "ok";
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          realtimeOutcomes["gemini-live"] = msg;
+          logger.error(
+            `[ProviderRegistry] gemini-live registration failed: ${msg}`,
+          );
+        }
+
+        // NEW4: report the actual per-handler outcomes instead of an
+        // unconditional success log. Stored on the registry so callers can
+        // introspect via getRegistrationReport().
+        ProviderRegistry.realtimeRegistration = realtimeOutcomes;
+        const skipped = Object.entries(realtimeOutcomes).filter(
+          ([, v]) => v !== "ok",
+        );
+        if (skipped.length === 0) {
+          logger.info(
+            "[ProviderRegistry] Realtime handlers registered: openai-realtime, gemini-live",
+          );
+        } else {
+          logger.warn(
+            `[ProviderRegistry] Realtime handlers partial: ${skipped.length} skipped`,
+            { outcomes: realtimeOutcomes },
+          );
+        }
+      } catch (realtimeError) {
+        logger.warn(
+          "Failed to register Realtime handlers - Realtime functionality will be unavailable",
+          {
+            error:
+              realtimeError instanceof Error
+                ? realtimeError.message
+                : String(realtimeError),
+          },
+        );
+      }
+
+      // Mark registered ONLY after all blocks (AI + voice) attempted, so a
+      // subsequent registerAllProviders() call does not short-circuit when an
+      // optional handler block silently failed.
+      this.registered = true;
     } catch (error) {
       logger.error("Failed to register providers:", error);
       throw error;
@@ -518,6 +698,10 @@ export class ProviderRegistry {
     ProviderFactory.clearRegistrations();
     this.registered = false;
     this.registrationPromise = null;
+    // Reset realtime registration too — otherwise getRegistrationReport()
+    // can surface stale data from a previous run if the realtime block
+    // failed before reaching `realtimeRegistration = realtimeOutcomes`.
+    ProviderRegistry.realtimeRegistration = {};
   }
 
   /**

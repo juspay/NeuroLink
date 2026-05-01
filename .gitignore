@@ -28,6 +28,8 @@ coverage/
 verification-results-*.txt
 feature-test-*.txt
 performance-test-*.txt
+# Per-test scratch dirs (must live INSIDE project so node_modules walk-up works)
+.test-tmp-*/
 test-results.json
 
 # OS

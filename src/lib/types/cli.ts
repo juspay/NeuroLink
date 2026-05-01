@@ -1593,6 +1593,12 @@ export type VoiceServerArgs = {
   port: number;
 };
 
+// `VoiceWebSocketOptions` was previously declared here; it was a server-tier
+// type (consumed by `setupWebSocket()` in `server/voice/voiceWebSocketHandler.ts`)
+// so it has been renamed to `ServerVoiceWebSocketOptions` and moved to
+// `server.ts` per CLAUDE.md Rule 9 (domain prefix) and Rule 2 (canonical
+// location). Import via the barrel.
+
 // =============================================================================
 // INTERACTIVE SETUP (from cli/utils/interactiveSetup.ts)
 // =============================================================================
