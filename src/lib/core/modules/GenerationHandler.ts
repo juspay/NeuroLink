@@ -670,7 +670,8 @@ export class GenerationHandler {
             toolExecutions.push({
               name: toolName,
               input: toolArgs,
-              output: (trRecord.result as unknown) ?? "success",
+              output:
+                ((trRecord.output ?? trRecord.result) as unknown) ?? "success",
             });
           }
         }

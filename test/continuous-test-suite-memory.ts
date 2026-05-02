@@ -2083,6 +2083,162 @@ async function testMemoryWithTools(sdk: NeuroLink): Promise<boolean | null> {
 }
 
 // ============================================================
+// TEST 16 — Tool result content stored correctly in Redis
+// ============================================================
+
+/**
+ * Regression test for the "null" tool result bug.
+ *
+ * The AI SDK populates `output` on tool result objects, not `result`.
+ * Before the fix, flushPendingToolData read `toolResult.result` (always
+ * undefined for AI-SDK-driven tool calls) and serialized it as the string
+ * "null". After the fix it prefers `output`, so the real object is stored.
+ *
+ * Assertion: after a generate() call that invokes a registered tool, the
+ * stored ChatMessage with role "tool_result" must have non-null content
+ * that contains the actual tool return value — not the string "null".
+ */
+async function testToolResultStoredInRedis(): Promise<boolean | null> {
+  logTest("16. Tool result content stored correctly in Redis", "TESTING");
+
+  if (!isRedisConfigured()) {
+    logTest(
+      "16. Tool result content stored correctly in Redis",
+      "SKIP",
+      "REDIS_URL or REDIS_HOST not configured",
+    );
+    return null;
+  }
+
+  const redisConfig = REDIS_URL
+    ? { url: REDIS_URL }
+    : { host: REDIS_HOST, port: REDIS_PORT };
+
+  const sessionId = generateTestSessionId("tool-output-storage");
+  const userId = `test-user-tool-output-${Date.now()}`;
+
+  let sdk: InstanceType<typeof NeuroLink> | null = null;
+
+  try {
+    sdk = new NeuroLink({
+      conversationMemory: {
+        enabled: true,
+        enableSummarization: false,
+        redisConfig,
+      },
+    });
+
+    // Register a tool with a rich, deterministic return value.
+    // Using known numeric fields (price, stock) makes assertions precise.
+    sdk.registerTool("get_product_info", {
+      name: "get_product_info",
+      description: "Get product details by product ID",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          productId: { type: "string", description: "Product identifier" },
+        },
+        required: ["productId"],
+      },
+      execute: async (_params: unknown) => ({
+        id: "P42",
+        name: "Widget",
+        price: 9.99,
+        inStock: true,
+      }),
+    });
+
+    // Very directive prompt — leaves no room for the LLM to answer from its
+    // own knowledge instead of calling the tool.
+    await sdk.generate({
+      input: {
+        text: 'Call the get_product_info tool with productId "P42" and report the result.',
+      },
+      maxTokens: TEST_CONFIG.maxTokens,
+      ...buildBaseSDKOptions(),
+      context: { sessionId, userId },
+    });
+
+    // Read back the raw stored ChatMessage[] from Redis.
+    const messages = await sdk.getSessionMessages(sessionId, userId);
+
+    // Find the tool_result message written by flushPendingToolData.
+    const stored = messages.find((m) => m.role === "tool_result");
+
+    if (!stored) {
+      logTest(
+        "16. Tool result content stored correctly in Redis",
+        "FAIL",
+        `No tool_result message in stored history — LLM may not have called the tool. Messages: [${messages.map((m) => m.role).join(", ")}]`,
+      );
+      return false;
+    }
+
+    // Core regression check: content must not be the string "null".
+    if (stored.content === "null" || stored.content === "") {
+      logTest(
+        "16. Tool result content stored correctly in Redis",
+        "FAIL",
+        `tool_result content is "${stored.content}" — output field was not read correctly (regression)`,
+      );
+      return false;
+    }
+
+    // Content must be valid JSON containing the actual tool output.
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(stored.content) as Record<string, unknown>;
+    } catch {
+      logTest(
+        "16. Tool result content stored correctly in Redis",
+        "FAIL",
+        `tool_result content is not valid JSON: ${stored.content.substring(0, 200)}`,
+      );
+      return false;
+    }
+
+    // Assert real data is present — not a placeholder or empty object.
+    if (parsed.price !== 9.99 && parsed.name !== "Widget") {
+      logTest(
+        "16. Tool result content stored correctly in Redis",
+        "FAIL",
+        `tool_result content does not contain expected product data. Got: ${stored.content.substring(0, 200)}`,
+      );
+      return false;
+    }
+
+    logTest(
+      "16. Tool result content stored correctly in Redis",
+      "PASS",
+      `tool_result.content contains real tool output (price: ${parsed.price}, name: ${parsed.name})`,
+    );
+    return true;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (
+      isExpectedProviderError(msg) ||
+      msg.includes("ECONNREFUSED") ||
+      msg.includes("Redis")
+    ) {
+      logTest(
+        "16. Tool result content stored correctly in Redis",
+        "SKIP",
+        `Redis or provider not available: ${msg}`,
+      );
+      return null;
+    }
+    logTest("16. Tool result content stored correctly in Redis", "FAIL", msg);
+    return false;
+  } finally {
+    try {
+      await sdk?.shutdown?.();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// ============================================================
 // MAIN RUNNER
 // ============================================================
 
@@ -2154,6 +2310,10 @@ async function runAllTests(): Promise<void> {
       fn: () => testMemoryAcrossSessions(sharedSdk),
     },
     { name: "14. Memory with Tools", fn: () => testMemoryWithTools(sharedSdk) },
+    {
+      name: "16. Tool result content stored correctly in Redis",
+      fn: testToolResultStoredInRedis,
+    },
     {
       name: "15. Observability Spans",
       fn: async () => {

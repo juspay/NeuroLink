@@ -290,6 +290,7 @@ export class TelemetryHandler {
         toolResults as Array<{
           toolCallId?: string;
           toolName?: string;
+          output?: unknown;
           result?: unknown;
           [key: string]: unknown;
         }>,

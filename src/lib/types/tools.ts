@@ -512,6 +512,7 @@ export type PendingToolExecution = {
   toolResults: Array<{
     toolCallId?: string;
     toolName?: string;
+    output?: unknown;
     result?: unknown;
     error?: string;
     timestamp?: Date;

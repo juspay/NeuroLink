@@ -473,7 +473,8 @@ export abstract class BaseProvider implements AIProvider {
               status: (((tr as UnknownRecord).status as string) === "error"
                 ? "failure"
                 : "success") as "success" | "failure",
-              result: (tr as UnknownRecord).result,
+              result:
+                (tr as UnknownRecord).output ?? (tr as UnknownRecord).result,
               error: (tr as UnknownRecord).error as string | undefined,
             }))
           : undefined,

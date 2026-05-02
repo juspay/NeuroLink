@@ -454,6 +454,7 @@ export class RedisConversationMemoryManager implements IConversationMemoryManage
     }>,
     toolResults: Array<{
       toolCallId?: string;
+      output?: unknown;
       result?: unknown;
       error?: string;
       [key: string]: unknown;
@@ -1893,19 +1894,23 @@ User message: "${userMessage}"`;
         const toolName =
           toolCallMap.get(toolCallId) ||
           String(toolResult.toolName || "unknown");
+        const toolResultRecord = toolResult as Record<string, unknown>;
+        const selectedResultField =
+          "output" in toolResultRecord ? "output" : "result";
+        const toolResultValue =
+          selectedResultField === "output"
+            ? toolResultRecord.output
+            : toolResult.result;
 
         // Serialize the tool result to string for content field
         let serializedResult: string;
-        if (typeof toolResult.result === "string") {
-          serializedResult = toolResult.result;
-        } else if (
-          toolResult.result === undefined ||
-          toolResult.result === null
-        ) {
-          serializedResult = String(toolResult.result ?? "null");
+        if (typeof toolResultValue === "string") {
+          serializedResult = toolResultValue;
+        } else if (toolResultValue === undefined || toolResultValue === null) {
+          serializedResult = String(toolResultValue ?? "null");
         } else {
           try {
-            serializedResult = JSON.stringify(toolResult.result, null, 2);
+            serializedResult = JSON.stringify(toolResultValue, null, 2);
           } catch (serializeError) {
             serializedResult = `[Serialization failed: ${serializeError instanceof Error ? serializeError.message : String(serializeError)}]`;
           }
@@ -1924,7 +1929,7 @@ User message: "${userMessage}"`;
         // The surrogate carries `_meta.neurolinkArtifactId` on the raw result object.
         let artifactId: string | undefined;
         try {
-          const rawResult = toolResult.result;
+          const rawResult = toolResultValue;
           if (rawResult && typeof rawResult === "object") {
             const meta = (rawResult as Record<string, unknown>)._meta;
             if (meta && typeof meta === "object") {
