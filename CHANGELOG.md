@@ -1,3 +1,9 @@
+## [9.61.1](https://github.com/juspay/neurolink/compare/v9.61.0...v9.61.1) (2026-05-04)
+
+### Bug Fixes
+
+- **(memory):** fix null tool result storage by reading AI SDK output field ([1e6dbf8](https://github.com/juspay/neurolink/commit/1e6dbf86a59aa3a882480f8f545326213ec2f424))
+
 ## [9.61.0](https://github.com/juspay/neurolink/compare/v9.60.1...v9.61.0) (2026-05-01)
 
 ### Features
