@@ -98,6 +98,7 @@ import type {
   RoutingDecision,
   MetricsTraceContext,
   StreamGenerationEndContext,
+  HITLExecutionState,
 } from "./types/index.js";
 import { emergencyContentTruncation } from "./context/emergencyTruncation.js";
 import {
@@ -9806,6 +9807,7 @@ Current user's request: ${currentInput}`;
     inputSize: number;
     truncatedInput: string;
     options: typeof options;
+    hitlState: HITLExecutionState;
   } {
     const externalTool = this.externalServerManager
       .getAllTools()
@@ -9831,6 +9833,7 @@ Current user's request: ${currentInput}`;
       truncatedInput:
         inputStr.length > 2048 ? inputStr.substring(0, 2048) : inputStr,
       options,
+      hitlState: { triggered: false },
     };
   }
 
@@ -10058,6 +10061,7 @@ Current user's request: ${currentInput}`;
                 toolName,
                 params,
                 prepared.finalOptions,
+                executionContext.hitlState,
               ),
               prepared.finalOptions.timeout,
               ErrorFactory.toolTimeout(toolName, prepared.finalOptions.timeout),
@@ -10415,6 +10419,7 @@ Current user's request: ${currentInput}`;
         [key: string]: unknown;
       };
     },
+    HITLState?: HITLExecutionState,
   ): Promise<T> {
     const functionTag = "NeuroLink.executeToolInternal";
 
@@ -10573,6 +10578,7 @@ Current user's request: ${currentInput}`;
         const context = {
           ...storedContext,
           ...passedAuthContext,
+          hitlState: HITLState,
         };
 
         logger.debug(`[Using merged context for unified registry tool:`, {

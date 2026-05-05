@@ -314,3 +314,7 @@ export type HITLManager = {
   on(event: string, listener: (...args: unknown[]) => void): HITLManager;
   emit(event: string, ...args: unknown[]): boolean;
 };
+
+export type HITLExecutionState = {
+  triggered: boolean;
+};
