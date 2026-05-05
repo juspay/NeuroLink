@@ -6,6 +6,7 @@ import { ErrorCategory, ErrorSeverity } from "../constants/enums.js";
 import type { StructuredError } from "../types/index.js";
 import { logger } from "./logger.js";
 import { CircuitBreakerOpenError } from "../types/index.js";
+import { HITLTimeoutError } from "../hitl/hitlErrors.js";
 
 // Error codes for different scenarios
 export const ERROR_CODES = {
@@ -1115,6 +1116,10 @@ export function isAbortError(error: unknown): boolean {
 export function isRetriableError(error: Error): boolean {
   if (error instanceof NeuroLinkError) {
     return error.retriable;
+  }
+
+  if (error instanceof HITLTimeoutError) {
+    return false;
   }
 
   // Check for common retriable error patterns

@@ -20,6 +20,7 @@ import type {
 import type { ValidationError } from "../utils/parameterValidation.js";
 import type { MCPToolAnnotations } from "./mcp.js";
 import type { Logger } from "./utilities.js";
+import type { HITLExecutionState } from "./hitl.js";
 
 /**
  * Commonly used Zod schema type aliases for cleaner type declarations
@@ -70,6 +71,7 @@ export type ExecutionContext<T = StandardRecord> = {
   timeoutMs?: number;
   maxRetries?: number;
   startTime?: number;
+  hitlState?: HITLExecutionState;
 };
 
 /**

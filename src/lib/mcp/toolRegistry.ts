@@ -396,7 +396,12 @@ export class MCPToolRegistry extends MCPRegistry {
 
           // HITL Safety Check: Request confirmation if required
           let finalArgs = args;
-          if (this.hitlManager && this.hitlManager.isEnabled()) {
+          const HITLState = context?.hitlState;
+          if (
+            !HITLState?.triggered &&
+            this.hitlManager &&
+            this.hitlManager.isEnabled()
+          ) {
             const requiresConfirmation = this.hitlManager.requiresConfirmation(
               toolName,
               args,
@@ -409,6 +414,9 @@ export class MCPToolRegistry extends MCPRegistry {
               span.addEvent("tool.hitl_requested");
 
               try {
+                if (HITLState) {
+                  HITLState.triggered = true;
+                }
                 const confirmationResult =
                   await this.hitlManager.requestConfirmation(toolName, args, {
                     serverId: tool.serverId,
