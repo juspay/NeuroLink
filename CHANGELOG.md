@@ -1,3 +1,9 @@
+## [9.63.0](https://github.com/juspay/neurolink/compare/v9.62.0...v9.63.0) (2026-05-09)
+
+### Features
+
+- **(proxy):** configurable primary (home) account via routing.primaryAccount ([c0bde2f](https://github.com/juspay/neurolink/commit/c0bde2f65b1cb8b686d3f528652122a12acb07d0))
+
 ## [9.62.0](https://github.com/juspay/neurolink/compare/v9.61.2...v9.62.0) (2026-05-07)
 
 ### Features
