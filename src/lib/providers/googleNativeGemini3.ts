@@ -50,6 +50,71 @@ import { createNativeThinkingConfig } from "../utils/thinkingConfig.js";
 // ── Functions ──
 
 /**
+ * Google's `function_declarations[].name` validator regex.
+ *
+ * Empirically (and per the Vertex/AI Studio API error message), the server
+ * enforces `[A-Za-z_][A-Za-z0-9_.:-]{0,127}`. Tool names that don't match
+ * fail with HTTP 400 "Invalid function name", which surfaces as a misleading
+ * tool-calling failure for the whole request.
+ *
+ * MCP-imported or user-registered tools may legally contain characters
+ * outside this set (e.g. `/`, spaces, unicode), so we sanitize defensively
+ * before sending to Google. The sanitized name is also used as the
+ * `executeMap` key so the round-trip from Google's function-call response
+ * back to our executor still works.
+ */
+const GOOGLE_FN_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_.:-]{0,127}$/;
+
+const GOOGLE_FN_NAME_MAX_LENGTH = 128;
+
+export function sanitizeForGoogleFunctionName(name: string): string {
+  if (GOOGLE_FN_NAME_REGEX.test(name)) {
+    return name;
+  }
+  let sanitized = name.replace(/[^A-Za-z0-9_.:-]/g, "_");
+  if (!/^[A-Za-z_]/.test(sanitized)) {
+    sanitized = `_${sanitized}`;
+  }
+  if (sanitized.length > GOOGLE_FN_NAME_MAX_LENGTH) {
+    sanitized = sanitized.slice(0, GOOGLE_FN_NAME_MAX_LENGTH);
+  }
+  return sanitized;
+}
+
+/**
+ * Resolve a sanitized Gemini tool name to one that is both unique within
+ * the current request and at most 128 characters. When the candidate
+ * collides with an already-used name we append `_2`, `_3`, … — but
+ * reserve room for the suffix by truncating the base first so the
+ * resolved name never exceeds Google's `function_declarations[].name`
+ * limit.
+ *
+ * @param base       The already-sanitized candidate name.
+ * @param isTaken    Predicate that returns true if `name` is already used.
+ */
+export function resolveUniqueGoogleFunctionName(
+  base: string,
+  isTaken: (name: string) => boolean,
+): string {
+  if (!isTaken(base)) {
+    return base;
+  }
+  let suffix = 2;
+  while (true) {
+    const suffixStr = `_${suffix}`;
+    const trimmedBase = base.slice(
+      0,
+      GOOGLE_FN_NAME_MAX_LENGTH - suffixStr.length,
+    );
+    const candidate = `${trimmedBase}${suffixStr}`;
+    if (!isTaken(candidate)) {
+      return candidate;
+    }
+    suffix++;
+  }
+}
+
+/**
  * Sanitize a JSON Schema for Gemini's proto-based API.
  *
  * Gemini cannot handle `anyOf`/`oneOf` union types in function declarations
@@ -170,12 +235,41 @@ export function sanitizeSchemaForGemini(
 export function sanitizeToolsForGemini(tools: Record<string, Tool>): {
   tools: Record<string, Tool>;
   dropped: string[];
+  /**
+   * Reverse map: Google-safe sanitized name → original consumer-supplied
+   * name. Lets the calling layer translate tool-call results back so the
+   * sanitization stays transport-only (see CodeRabbit thread, PR #1006).
+   */
+  originalNameMap: Map<string, string>;
 } {
   const sanitized: Record<string, Tool> = {};
   const dropped: string[] = [];
+  const renamed: Array<{ from: string; to: string }> = [];
+  const originalNameMap = new Map<string, string>();
 
   for (const [name, tool] of Object.entries(tools)) {
     try {
+      // Sanitize the tool name to fit Google's function_declarations regex.
+      // Without this, MCP-imported or user-registered tools whose names contain
+      // characters outside [A-Za-z_][A-Za-z0-9_.:-]{0,127} cause the entire
+      // request to 400 with "Invalid function name", surfacing as a misleading
+      // tool-calling failure. Distinct originals that collapse onto the same
+      // sanitized name (e.g. "my/tool" and "my-tool" → "my_tool") are
+      // disambiguated with a numeric suffix that preserves Google's 128-char
+      // ceiling.
+      const candidate = sanitizeForGoogleFunctionName(name);
+      const safeName = resolveUniqueGoogleFunctionName(
+        candidate,
+        (n) => n in sanitized,
+      );
+      // Always record the mapping so downstream code can translate every
+      // safeName back to the original — including the no-rename identity
+      // mapping, which simplifies the lookup path.
+      originalNameMap.set(safeName, name);
+      if (safeName !== name) {
+        renamed.push({ from: name, to: safeName });
+      }
+
       // Access the legacy `parameters` field that may exist on older AI SDK tools.
       // AI SDK v6 uses `inputSchema`, but v3/v4 tools and third-party wrappers use `parameters`.
       const legacyTool = tool as ToolWithLegacyParams;
@@ -197,8 +291,8 @@ export function sanitizeToolsForGemini(tools: Record<string, Tool>): {
         // but loses some type constraints from the original Zod schema.
         const sanitizedSchema = sanitizeSchemaForGemini(inlined);
 
-        sanitized[name] = createAISDKTool({
-          description: tool.description || `Tool: ${name}`,
+        sanitized[safeName] = createAISDKTool({
+          description: tool.description || `Tool: ${safeName}`,
           inputSchema: aiJsonSchema(sanitizedSchema),
           execute: tool.execute as ToolExecuteFunction<unknown, unknown>,
         });
@@ -214,13 +308,13 @@ export function sanitizeToolsForGemini(tools: Record<string, Tool>): {
           inlineJsonSchema(rawSchema),
         );
 
-        sanitized[name] = createAISDKTool({
-          description: tool.description || `Tool: ${name}`,
+        sanitized[safeName] = createAISDKTool({
+          description: tool.description || `Tool: ${safeName}`,
           inputSchema: aiJsonSchema(sanitizedSchema),
           execute: tool.execute as ToolExecuteFunction<unknown, unknown>,
         });
       } else {
-        sanitized[name] = tool;
+        sanitized[safeName] = tool;
       }
     } catch (error) {
       logger.warn(
@@ -231,7 +325,15 @@ export function sanitizeToolsForGemini(tools: Record<string, Tool>): {
     }
   }
 
-  return { tools: sanitized, dropped };
+  if (renamed.length > 0) {
+    logger.warn(
+      `[Gemini] ${renamed.length} tool name(s) sanitized for Google's function-name regex: ${renamed
+        .map((r) => `"${r.from}" -> "${r.to}"`)
+        .join(", ")}`,
+    );
+  }
+
+  return { tools: sanitized, dropped, originalNameMap };
 }
 
 export function normalizeToolsForJsonSchemaProvider(
@@ -299,12 +401,33 @@ export function buildNativeToolDeclarations(
   const executeMap = new Map<string, Tool["execute"]>();
 
   const skippedTools: string[] = [];
+  const renamedTools: Array<{ from: string; to: string }> = [];
+
+  // Disambiguate distinct originals that collapse onto the same sanitized
+  // name (e.g. "my/tool" and "my-tool" both → "my_tool") via
+  // resolveUniqueGoogleFunctionName, which appends `_N` while keeping the
+  // final string within Google's 128-char limit. Track all assigned names
+  // regardless of whether the tool has an `execute` function (tools without
+  // execute are still pushed to functionDeclarations). The originalNameMap
+  // lets the calling stream loop translate Google-returned function-call
+  // names back to the consumer-facing identifier so the sanitization is
+  // transport-only.
+  const usedNames = new Set<string>();
+  const originalNameMap = new Map<string, string>();
 
   for (const [name, tool] of Object.entries(tools)) {
     try {
+      const candidate = sanitizeForGoogleFunctionName(name);
+      const safeName = resolveUniqueGoogleFunctionName(candidate, (n) =>
+        usedNames.has(n),
+      );
+      originalNameMap.set(safeName, name);
+      if (safeName !== name) {
+        renamedTools.push({ from: name, to: safeName });
+      }
       const decl: NativeFunctionDeclaration = {
-        name,
-        description: tool.description || `Tool: ${name}`,
+        name: safeName,
+        description: tool.description || `Tool: ${safeName}`,
       };
 
       // Access legacy `parameters` (AI SDK v3/v4) or current `inputSchema` (v6)
@@ -339,9 +462,10 @@ export function buildNativeToolDeclarations(
       }
 
       functionDeclarations.push(decl);
+      usedNames.add(safeName);
 
       if (tool.execute) {
-        executeMap.set(name, tool.execute);
+        executeMap.set(decl.name, tool.execute);
       }
     } catch (err) {
       skippedTools.push(name);
@@ -358,7 +482,19 @@ export function buildNativeToolDeclarations(
     );
   }
 
-  return { toolsConfig: [{ functionDeclarations }], executeMap };
+  if (renamedTools.length > 0) {
+    logger.warn(
+      `[buildNativeToolDeclarations] ${renamedTools.length} tool name(s) sanitized for Google's function-name regex: ${renamedTools
+        .map((r) => `"${r.from}" -> "${r.to}"`)
+        .join(", ")}`,
+    );
+  }
+
+  return {
+    toolsConfig: [{ functionDeclarations }],
+    executeMap,
+    originalNameMap,
+  };
 }
 
 /**
@@ -672,7 +808,10 @@ export function extractTextFromParts(rawResponseParts: unknown[]): string {
  * @param executeMap - Map of tool name to execute function
  * @param failedTools - Mutable map tracking per-tool failure counts
  * @param allToolCalls - Mutable array accumulating all tool call records
- * @param options - Optional settings for execution tracking and cancellation
+ * @param options - Optional settings for execution tracking and cancellation,
+ *                  plus an `originalNameMap` (Google-safe → consumer-supplied
+ *                  identifier) so the sanitization stays transport-only and
+ *                  consumers see the names they registered.
  * @returns Array of function responses for conversation history
  */
 export async function executeNativeToolCalls(
@@ -688,31 +827,42 @@ export async function executeNativeToolCalls(
       output: unknown;
     }>;
     abortSignal?: AbortSignal;
+    originalNameMap?: Map<string, string>;
   },
 ): Promise<NativeFunctionResponse[]> {
   const functionResponses: NativeFunctionResponse[] = [];
 
+  // Translate a Google-safe sanitized name back to the consumer-facing
+  // original name. Falls back to the safe name if the map is missing or
+  // doesn't contain the call (e.g. tool added mid-conversation).
+  const externalName = (safeName: string): string =>
+    options?.originalNameMap?.get(safeName) ?? safeName;
+
   for (const call of stepFunctionCalls) {
-    allToolCalls.push({ toolName: call.name, args: call.args });
+    const exposedName = externalName(call.name);
+    allToolCalls.push({ toolName: exposedName, args: call.args });
 
     // Check if this tool has already exceeded retry limit
     const failedInfo = failedTools.get(call.name);
     if (failedInfo && failedInfo.count >= DEFAULT_TOOL_MAX_RETRIES) {
       logger.warn(
-        `${logLabel} Tool "${call.name}" has exceeded retry limit (${DEFAULT_TOOL_MAX_RETRIES}), skipping execution`,
+        `${logLabel} Tool "${exposedName}" has exceeded retry limit (${DEFAULT_TOOL_MAX_RETRIES}), skipping execution`,
       );
 
       const errorOutput = {
-        error: `TOOL_PERMANENTLY_FAILED: The tool "${call.name}" has failed ${failedInfo.count} times and will not be retried. Last error: ${failedInfo.lastError}. Please proceed without using this tool or inform the user that this functionality is unavailable.`,
+        error: `TOOL_PERMANENTLY_FAILED: The tool "${exposedName}" has failed ${failedInfo.count} times and will not be retried. Last error: ${failedInfo.lastError}. Please proceed without using this tool or inform the user that this functionality is unavailable.`,
         status: "permanently_failed",
         do_not_retry: true,
       };
 
+      // Wire transport-side `name: call.name` (Google needs the sanitized
+      // form to match the function declaration) while exposing the
+      // consumer-facing name in toolExecutions metadata.
       functionResponses.push({
         functionResponse: { name: call.name, response: errorOutput },
       });
       options?.toolExecutions?.push({
-        name: call.name,
+        name: exposedName,
         input: call.args,
         output: errorOutput,
       });
@@ -734,7 +884,7 @@ export async function executeNativeToolCalls(
           functionResponse: { name: call.name, response: { result } },
         });
         options?.toolExecutions?.push({
-          name: call.name,
+          name: exposedName,
           input: call.args,
           output: result,
         });
@@ -752,7 +902,7 @@ export async function executeNativeToolCalls(
         failedTools.set(call.name, currentFailInfo);
 
         logger.warn(
-          `${logLabel} Tool "${call.name}" failed (attempt ${currentFailInfo.count}/${DEFAULT_TOOL_MAX_RETRIES}): ${errorMessage}`,
+          `${logLabel} Tool "${exposedName}" failed (attempt ${currentFailInfo.count}/${DEFAULT_TOOL_MAX_RETRIES}): ${errorMessage}`,
         );
 
         // Determine if this is a permanent failure
@@ -761,7 +911,7 @@ export async function executeNativeToolCalls(
 
         const errorOutput = {
           error: isPermanentFailure
-            ? `TOOL_PERMANENTLY_FAILED: The tool "${call.name}" has failed ${currentFailInfo.count} times with error: ${errorMessage}. This tool will not be retried. Please proceed without using this tool or inform the user that this functionality is unavailable.`
+            ? `TOOL_PERMANENTLY_FAILED: The tool "${exposedName}" has failed ${currentFailInfo.count} times with error: ${errorMessage}. This tool will not be retried. Please proceed without using this tool or inform the user that this functionality is unavailable.`
             : `TOOL_EXECUTION_ERROR: ${errorMessage}. Retry attempt ${currentFailInfo.count}/${DEFAULT_TOOL_MAX_RETRIES}.`,
           status: isPermanentFailure ? "permanently_failed" : "failed",
           do_not_retry: isPermanentFailure,
@@ -773,7 +923,7 @@ export async function executeNativeToolCalls(
           functionResponse: { name: call.name, response: errorOutput },
         });
         options?.toolExecutions?.push({
-          name: call.name,
+          name: exposedName,
           input: call.args,
           output: errorOutput,
         });
@@ -781,7 +931,7 @@ export async function executeNativeToolCalls(
     } else {
       // Tool not found is a permanent error
       const errorOutput = {
-        error: `TOOL_NOT_FOUND: The tool "${call.name}" does not exist. Do not attempt to call this tool again.`,
+        error: `TOOL_NOT_FOUND: The tool "${exposedName}" does not exist. Do not attempt to call this tool again.`,
         status: "permanently_failed",
         do_not_retry: true,
       };
@@ -790,7 +940,7 @@ export async function executeNativeToolCalls(
         functionResponse: { name: call.name, response: errorOutput },
       });
       options?.toolExecutions?.push({
-        name: call.name,
+        name: exposedName,
         input: call.args,
         output: errorOutput,
       });

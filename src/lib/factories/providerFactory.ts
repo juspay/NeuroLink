@@ -94,11 +94,17 @@ export class ProviderFactory {
 
     // Map registered provider names to NeurolinkCredentials keys.
     // Most names match (openai, anthropic, vertex, bedrock, etc.)
-    // but some differ (google-ai → googleAiStudio, openai-compatible → openaiCompatible).
+    // but every kebab-case provider whose canonical credentials key is
+    // camelCase MUST be mapped here — otherwise per-call credential
+    // overrides silently get dropped (the factory looks up
+    // credentials["lm-studio"] which is undefined while the user wrote
+    // credentials.lmStudio).
     const credentialKeyMap: Record<string, string> = {
       "google-ai": "googleAiStudio",
       "openai-compatible": "openaiCompatible",
       huggingface: "huggingFace",
+      "lm-studio": "lmStudio",
+      "nvidia-nim": "nvidiaNim",
     };
     const credKey = credentialKeyMap[normalizedName] ?? normalizedName;
 

@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { type LanguageModel, stepCountIs, streamText, type Tool } from "ai";
 import type { AIProviderName } from "../constants/enums.js";
 import { NvidiaNimModels } from "../constants/enums.js";
@@ -29,6 +29,92 @@ import {
 } from "../utils/timeout.js";
 import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
 
+/**
+ * Decide whether a NIM 400 response body is a rejection of the named
+ * field (as opposed to an unrelated 400 that happens to mention the
+ * field name — e.g. when the user's prompt is echoed back inside the
+ * error envelope).
+ *
+ * A rejection requires both:
+ *   - the field name appears in the body, and
+ *   - a rejection keyword (`unsupported`, `not supported`, `unknown`,
+ *     `invalid`, `unrecognized`, `does not support`) appears within
+ *     80 characters of any occurrence.
+ *
+ * The 80-character window is loose enough to absorb NIM's "Unsupported
+ * argument: `chat_template`" framing and tight enough that a 1KB error
+ * body mentioning the field once in a code sample plus an unrelated
+ * "invalid" elsewhere won't trigger a strip.
+ */
+const NIM_REJECTION_KEYWORDS = [
+  "unsupported",
+  "not supported",
+  "does not support",
+  "unrecognized",
+  "unknown field",
+  "unknown parameter",
+  "unknown argument",
+  "invalid field",
+  "invalid parameter",
+  "invalid argument",
+];
+
+const isNimFieldRejection = (body: string, field: string): boolean => {
+  if (!body) {
+    return false;
+  }
+  const lower = body.toLowerCase();
+  const fieldLower = field.toLowerCase();
+  let idx = lower.indexOf(fieldLower);
+  while (idx !== -1) {
+    const windowStart = Math.max(0, idx - 80);
+    const windowEnd = Math.min(lower.length, idx + fieldLower.length + 80);
+    const slice = lower.slice(windowStart, windowEnd);
+    if (NIM_REJECTION_KEYWORDS.some((kw) => slice.includes(kw))) {
+      return true;
+    }
+    idx = lower.indexOf(fieldLower, idx + fieldLower.length);
+  }
+  return false;
+};
+
+/**
+ * Strip an offending field from a JSON request body and return the rebuilt
+ * stringified body. Returns `null` if the body isn't JSON-parseable or the
+ * field isn't present (signal: nothing to retry).
+ */
+const stripFieldFromJsonBody = (
+  body: string,
+  field: "reasoning_budget" | "chat_template",
+): string | null => {
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    let mutated = false;
+    if (field === "chat_template" && "chat_template" in parsed) {
+      delete parsed.chat_template;
+      mutated = true;
+    }
+    if (field === "reasoning_budget") {
+      const kw = parsed.chat_template_kwargs as
+        | Record<string, unknown>
+        | undefined;
+      if (kw && "reasoning_budget" in kw) {
+        delete kw.reasoning_budget;
+        mutated = true;
+        if (Object.keys(kw).length === 0) {
+          delete parsed.chat_template_kwargs;
+        }
+      }
+    }
+    if (!mutated) {
+      return null;
+    }
+    return JSON.stringify(parsed);
+  } catch {
+    return null;
+  }
+};
+
 const makeLoggingFetch = (provider: string): typeof fetch => {
   const base = createProxyFetch();
   return (async (input, init) => {
@@ -40,7 +126,46 @@ const makeLoggingFetch = (provider: string): typeof fetch => {
           : input.url;
     const reqSize =
       init?.body && typeof init.body === "string" ? init.body.length : 0;
-    const response = await base(input, init);
+    let response = await base(input, init);
+
+    // Generic NIM 400 retry-strip: works for BOTH generate and stream paths.
+    // NIM sometimes returns HTTP 400 when a model rejects `reasoning_budget`
+    // or `chat_template`. The stream path already retries by reconstructing
+    // its provider options; this fetch-level retry is the symmetric fix for
+    // generate (and any other transport that lands here).
+    //
+    // We require BOTH (a) the offending field name AND (b) a rejection
+    // keyword (unsupported / not supported / unknown / invalid /
+    // unrecognized / does not support) within 80 chars of it. Without the
+    // rejection-keyword guard, an unrelated 400 whose error body happened
+    // to mention `chat_template` (e.g. the user prompt got echoed back)
+    // would cause us to silently strip a field the user actually wanted
+    // sent, and either succeed for the wrong reason or fail with a
+    // misleading error.
+    if (
+      response.status === 400 &&
+      typeof init?.body === "string" &&
+      init.body.length > 0
+    ) {
+      const cloned = response.clone();
+      const body = await cloned.text().catch(() => "");
+      let retryBody: string | null = null;
+      let stripped: "reasoning_budget" | "chat_template" | null = null;
+      if (isNimFieldRejection(body, "reasoning_budget")) {
+        retryBody = stripFieldFromJsonBody(init.body, "reasoning_budget");
+        stripped = "reasoning_budget";
+      } else if (isNimFieldRejection(body, "chat_template")) {
+        retryBody = stripFieldFromJsonBody(init.body, "chat_template");
+        stripped = "chat_template";
+      }
+      if (retryBody !== null && stripped !== null) {
+        logger.warn(
+          `[${provider}] NIM rejected ${stripped}; retrying with field stripped`,
+        );
+        response = await base(input, { ...init, body: retryBody });
+      }
+    }
+
     if (!response.ok) {
       // If maskProxyUrl can't safely sanitize the URL (returns null), don't
       // log the raw URL — that defeats the redaction. Use a placeholder so
@@ -198,13 +323,31 @@ export class NvidiaNimProvider extends BaseProvider {
       process.env.NVIDIA_NIM_BASE_URL ??
       NVIDIA_NIM_DEFAULT_BASE_URL;
 
-    const nim = createOpenAI({
+    // We deliberately use `@ai-sdk/openai-compatible` rather than
+    // `@ai-sdk/openai`. Two upstream behaviors of `@ai-sdk/openai` break us:
+    //   1. It always sends `response_format: { type: "json_schema" }` when a
+    //      schema is provided. Most NIM-served chat models don't enforce
+    //      json_schema strictly — the schema goes through but `result.object`
+    //      stays empty because the SDK never gets the typed response back.
+    //   2. It does not parse the `reasoning_content` field that NIM-hosted
+    //      reasoning models (deepseek-r1, qwq, llama-nemotron-ultra) emit,
+    //      so chain-of-thought is silently dropped.
+    // `@ai-sdk/openai-compatible` honors `supportsStructuredOutputs: false`
+    // (falls back to `{ type: "json_object" }` and injects the schema into
+    // the prompt — works across the entire NIM model fleet) and parses both
+    // `choice.message.reasoning_content` and `delta.reasoning_content` into
+    // the SDK-standard `reasoning` part. NIM-specific extras (`min_tokens`,
+    // `chat_template_kwargs.reasoning_budget`, `chat_template`) are still
+    // injected via `providerOptions.openai.body` in `executeStreamInner`.
+    const nim = createOpenAICompatible({
+      name: "nvidia-nim",
       apiKey: this.apiKey,
       baseURL: this.baseURL,
       fetch: makeLoggingFetch("nvidia-nim"),
+      supportsStructuredOutputs: false,
+      includeUsage: true,
     });
-    // .chat() — NIM exposes /v1/chat/completions, not /v1/responses
-    this.model = nim.chat(this.modelName);
+    this.model = nim.chatModel(this.modelName);
 
     logger.debug("NVIDIA NIM Provider initialized", {
       modelName: this.modelName,
@@ -445,6 +588,16 @@ export class NvidiaNimProvider extends BaseProvider {
         ? errorRecord.message
         : "Unknown error";
 
+    // NIM canonically returns HTTP 401/Unauthorized for invalid API keys,
+    // but its OpenAI-compatible gateway sometimes surfaces a bare 400 +
+    // "Bad Request" with no body details for both malformed-credentials
+    // and bad-parameter cases. Because the two are indistinguishable from
+    // the message alone, we DON'T promote bare 400/Bad Request to "invalid
+    // key" here — that would mis-classify legitimate parameter errors
+    // (e.g. unsupported `reasoning_budget`, unsupported `chat_template`)
+    // as auth failures. Tests that probe the auth path (K1) detect
+    // "bad request" / "400" themselves; tests that probe parameter retry
+    // (K5) need the original "Bad Request" message to surface.
     if (
       message.includes("Invalid API key") ||
       message.includes("401") ||

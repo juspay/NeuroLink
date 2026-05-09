@@ -231,7 +231,7 @@ const TOP_MODELS_CONFIG: Record<
   ],
   [AIProviderName.OPENROUTER]: [
     {
-      model: OpenRouterModels.CLAUDE_3_5_SONNET,
+      model: OpenRouterModels.CLAUDE_SONNET_4_5,
       description: "Anthropic via OpenRouter",
     },
     { model: OpenRouterModels.GPT_4O, description: "OpenAI via OpenRouter" },
@@ -311,7 +311,7 @@ export const DEFAULT_MODELS: Record<string, string> = {
   [AIProviderName.LITELLM]: LiteLLMModels.OPENAI_GPT_4O,
   [AIProviderName.HUGGINGFACE]: HuggingFaceModels.LLAMA_3_3_70B_INSTRUCT,
   [AIProviderName.SAGEMAKER]: SageMakerModels.LLAMA_4_MAVERICK_17B_128E,
-  [AIProviderName.OPENROUTER]: OpenRouterModels.CLAUDE_3_5_SONNET,
+  [AIProviderName.OPENROUTER]: OpenRouterModels.CLAUDE_SONNET_4_5,
   [AIProviderName.OPENAI_COMPATIBLE]: "gpt-4o",
   [AIProviderName.DEEPSEEK]: DeepSeekModels.DEEPSEEK_CHAT,
   [AIProviderName.NVIDIA_NIM]: NvidiaNimModels.LLAMA_3_3_70B_INSTRUCT,

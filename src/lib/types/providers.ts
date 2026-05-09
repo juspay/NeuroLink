@@ -1779,10 +1779,18 @@ export type NativeToolsConfig = Array<{
   functionDeclarations: NativeFunctionDeclaration[];
 }>;
 
-/** Return value of buildNativeToolDeclarations. */
+/**
+ * Return value of buildNativeToolDeclarations.
+ *
+ * `originalNameMap` lets callers translate a Google-safe (sanitized,
+ * suffix-disambiguated) tool name back to the original identifier the
+ * SDK consumer registered. Sanitized names are transport-only — they
+ * MUST be hidden from tool-call metadata exposed to consumers.
+ */
 export type NativeToolDeclarationsResult = {
   toolsConfig: NativeToolsConfig;
   executeMap: Map<string, Tool["execute"]>;
+  originalNameMap: Map<string, string>;
 };
 
 /** A single function call returned by the Gemini model. */

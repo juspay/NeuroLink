@@ -36,7 +36,11 @@ export enum OpenRouterModels {
   CLAUDE_SONNET_4_6 = "anthropic/claude-sonnet-4.6",
   CLAUDE_SONNET_4_5 = "anthropic/claude-sonnet-4.5",
   CLAUDE_HAIKU_4_5 = "anthropic/claude-haiku-4.5",
-  CLAUDE_3_5_SONNET = "anthropic/claude-3-5-sonnet",
+  CLAUDE_3_7_SONNET = "anthropic/claude-3.7-sonnet",
+  // anthropic/claude-3-5-sonnet was retired by OpenRouter in late 2025 and
+  // is no longer reachable through any of their endpoints, so the entry is
+  // dropped here. Callers should switch to CLAUDE_3_7_SONNET (or a newer
+  // 4.x entry above).
   CLAUDE_3_5_HAIKU = "anthropic/claude-3-5-haiku",
   CLAUDE_3_OPUS = "anthropic/claude-3-opus",
   // OpenAI models

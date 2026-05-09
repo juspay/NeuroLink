@@ -194,6 +194,12 @@ import {
   withRetry,
   withTimeout,
 } from "./utils/errorHandling.js";
+import {
+  hasLifecycleErrorFired,
+  markLifecycleErrorFired,
+} from "./utils/lifecycleCallbacks.js";
+import { resolveLifecycleTimeoutMs } from "./utils/lifecycleTimeout.js";
+import { cloneOptionsForCallIsolation } from "./utils/cloneOptions.js";
 // Factory processing imports
 import {
   createCleanStreamOptions,
@@ -202,7 +208,6 @@ import {
   processStreamingFactoryOptions,
   validateFactoryConfig,
 } from "./utils/factoryProcessing.js";
-import { fireOnErrorOnce } from "./utils/lifecycleCallbacks.js";
 import { logger, mcpLogger } from "./utils/logger.js";
 import { extractMcpErrorText } from "./utils/mcpErrorText.js";
 import {
@@ -3625,7 +3630,18 @@ Current user's request: ${currentInput}`;
   async generate(
     optionsOrPrompt: GenerateOptions | DynamicOptions | string,
   ): Promise<GenerateResult> {
-    const startTime = Date.now();
+    // Defensive call-isolation clone — mirrors stream(): downstream
+    // generate-prep (memory retrieval, orchestration, RAG/MCP tool
+    // injection) mutates nested branches on the caller-supplied options
+    // object. Without cloning here, callers reusing a single options
+    // bag across generate() calls accumulate state across them.
+    // String prompts are immutable, so they pass through.
+    if (typeof optionsOrPrompt !== "string") {
+      optionsOrPrompt = cloneOptionsForCallIsolation(
+        optionsOrPrompt as unknown as StreamOptions | DynamicOptions,
+      ) as unknown as GenerateOptions | DynamicOptions;
+    }
+    const startedAt = Date.now();
     try {
       return await this.runWithFallbackOrchestration(
         optionsOrPrompt,
@@ -3639,28 +3655,76 @@ Current user's request: ${currentInput}`;
           ),
       );
     } catch (error) {
-      // Fire `onError` lifecycle callback for ANY thrown error — including
-      // ones raised before the provider is even instantiated (invalid
-      // provider name, missing credentials, etc.). The downstream
-      // LifecycleMiddleware only fires `onError` once it has wrapped the
-      // AI SDK doGenerate, which is too late for early-resolution failures.
-      // `fireOnErrorOnce` dedupes against the middleware path so the
-      // consumer callback fires at most once per logical failure.
-      const onError =
-        typeof optionsOrPrompt === "object" && optionsOrPrompt !== null
-          ? (
-              optionsOrPrompt as {
-                onError?: Parameters<typeof fireOnErrorOnce>[0];
-              }
-            ).onError
-          : undefined;
-      const err = error instanceof Error ? error : new Error(String(error));
-      fireOnErrorOnce(onError, error, {
-        error: err,
-        duration: Date.now() - startTime,
-        recoverable: false,
-      });
+      // Lifecycle middleware (wrapGenerate.catch in builtin/lifecycle.ts)
+      // stamps errors it already surfaced with the shared Symbol marker
+      // (see utils/lifecycleCallbacks.ts). For errors thrown BEFORE the
+      // language model was wrapped (e.g. unknown provider name,
+      // validation failures, factory exceptions), the mark is absent —
+      // fire the consumer's onError here so it sees every failure path.
+      // Awaited so async handlers fully settle before generate()
+      // rethrows, matching the middleware-managed path.
+      await this.fireConsumerOnErrorIfNotFired(
+        optionsOrPrompt,
+        error,
+        startedAt,
+      );
       throw error;
+    }
+  }
+
+  private async fireConsumerOnErrorIfNotFired(
+    optionsOrPrompt: unknown,
+    error: unknown,
+    startedAt: number,
+  ): Promise<void> {
+    if (hasLifecycleErrorFired(error)) {
+      return;
+    }
+    if (typeof optionsOrPrompt !== "object" || optionsOrPrompt === null) {
+      return;
+    }
+    const opts = optionsOrPrompt as {
+      onError?: (payload: {
+        error: Error;
+        duration: number;
+        recoverable: boolean;
+      }) => unknown;
+      middleware?: {
+        middlewareConfig?: {
+          lifecycle?: { config?: { timeoutMs?: number } };
+        };
+      };
+    };
+    const userOnError = opts.onError;
+    if (!userOnError) {
+      return;
+    }
+    const err = error instanceof Error ? error : new Error(String(error));
+    // Bound the consumer callback so a never-settling handler can't hang
+    // generate()/stream(). The deadline honors per-call
+    // `lifecycle.timeoutMs` and the `NEUROLINK_LIFECYCLE_TIMEOUT_MS` env
+    // var (CLI surface), falling back to 5_000. Errors raised here are
+    // logged and swallowed; the original failure still propagates to the
+    // caller because the outer catch re-throws.
+    const lifecycle = opts.middleware?.middlewareConfig?.lifecycle?.config;
+    const timeoutMs = resolveLifecycleTimeoutMs(lifecycle);
+    // Mark the error first so the AI-SDK lifecycle middleware can't
+    // re-fire the same callback if the throw races a parallel catch.
+    markLifecycleErrorFired(err);
+    try {
+      await withTimeout(
+        Promise.resolve(
+          userOnError({
+            error: err,
+            duration: Date.now() - startedAt,
+            recoverable: false,
+          }),
+        ),
+        timeoutMs,
+        new Error(`consumer onError callback timed out after ${timeoutMs}ms`),
+      );
+    } catch (e) {
+      logger.warn("[NeuroLink] consumer onError callback error:", e);
     }
   }
 
@@ -3771,16 +3835,24 @@ Current user's request: ${currentInput}`;
         /* listener errors are non-fatal */
       }
 
+      // Defensive call-isolation clone for the retry attempt. The shallow
+      // spread below would keep nested branches (`input`, `tools`, `memory`,
+      // `rag`, …) pointing at the same objects the previous attempt's
+      // prepare stages mutated — so the retry inherits e.g. memory-retrieved
+      // history appended to `input.messages`, RAG-injected tools, etc.
+      // Re-cloning at the retry boundary mirrors the entry-level isolation
+      // applied in generate()/stream() so each fallback attempt sees a
+      // fresh options bag.
       const retriedOptions =
         typeof optionsOrPrompt === "object"
-          ? {
+          ? cloneOptionsForCallIsolation({
               ...(optionsOrPrompt as Record<string, unknown>),
               ...(next.provider && { provider: next.provider }),
               ...(next.model && { model: next.model }),
               // Strip the fallback hooks so the retry doesn't re-orchestrate.
               providerFallback: undefined,
               modelChain: undefined,
-            }
+            } as unknown as StreamOptions | DynamicOptions)
           : optionsOrPrompt;
 
       const retryAttempt = await this.attemptInner(
@@ -4370,6 +4442,15 @@ Current user's request: ${currentInput}`;
       transcription: textResult.transcription,
       video: textResult.video,
       ppt: textResult.ppt,
+      // Forward reasoning/reasoningTokens from the provider layer.
+      // BaseProvider's GenerationHandler extracts these from AI-SDK reasoning
+      // parts (DeepSeek's `reasoning_content`, Anthropic thinking blocks,
+      // Gemini thought parts, OpenAI o1) and they're declared on
+      // `GenerateResult`, but the builder previously dropped them on the
+      // floor — so callers asking for `result.reasoning` got `undefined`
+      // even when the model emitted a chain-of-thought.
+      reasoning: textResult.reasoning,
+      reasoningTokens: textResult.reasoningTokens,
       ...(textResult.retries && { retries: textResult.retries }),
     };
 
@@ -6276,6 +6357,11 @@ Current user's request: ${currentInput}`;
       imageOutput: result.imageOutput,
       analytics: result.analytics,
       evaluation: result.evaluation,
+      // Forward reasoning from provider so callers asking for `result.reasoning`
+      // (DeepSeek `reasoning_content`, Anthropic thinking, Gemini thought parts,
+      // OpenAI o1) actually receive it.
+      reasoning: result.reasoning,
+      reasoningTokens: result.reasoningTokens,
     };
   }
 
@@ -6636,6 +6722,11 @@ Current user's request: ${currentInput}`;
           ppt: result.ppt,
           // CRITICAL FIX: Include imageOutput for image generation models
           imageOutput: result.imageOutput,
+          // Forward reasoning so callers asking for `result.reasoning`
+          // (DeepSeek `reasoning_content`, Anthropic thinking, Gemini
+          // thought parts, OpenAI o1) actually receive it.
+          reasoning: result.reasoning,
+          reasoningTokens: result.reasoningTokens,
         };
       } catch (error) {
         // Immediately propagate AbortError — never fall back to next provider on abort
@@ -6923,26 +7014,27 @@ Current user's request: ${currentInput}`;
         : [],
       optionKeys: Object.keys(options),
     });
-    const startTime = Date.now();
+    // Defensive shallow clone of top-level options + the nested mutable
+    // branches that downstream stages (prepareStreamOptions's memory
+    // retrieval at `options.input.text`, applyStreamOrchestration's merge,
+    // RAG/MCP tool injection, etc.) mutate. Cloning at the entry point
+    // means callers can reuse a single options object across stream()
+    // calls without accumulating mutations across them — the earlier
+    // shallow rebind at the orchestration site only covered the
+    // top-level keys and left `options.input` shared with the caller.
+    options = cloneOptionsForCallIsolation(options);
+    const startedAt = Date.now();
     try {
       return await this.streamWithIterationFallback(options as StreamOptions);
     } catch (error) {
-      // Fire `onError` for early-resolution failures (invalid provider,
-      // missing credentials, etc.) that surface before the per-chunk
-      // wrapper installed by GoogleVertex / LifecycleMiddleware can run.
-      // `fireOnErrorOnce` dedupes against the middleware path so the
-      // consumer callback fires at most once per logical failure.
-      const onError = (
-        options as {
-          onError?: Parameters<typeof fireOnErrorOnce>[0];
-        }
-      ).onError;
-      const err = error instanceof Error ? error : new Error(String(error));
-      fireOnErrorOnce(onError, error, {
-        error: err,
-        duration: Date.now() - startTime,
-        recoverable: false,
-      });
+      // Mirror generate(): fire consumer onError for failures that
+      // happened before the wrapped language-model middleware could
+      // observe them (e.g. unknown provider, validation, factory
+      // exceptions). The shared Symbol marker (lifecycleCallbacks.ts)
+      // prevents double-fire when the AI-SDK lifecycle middleware
+      // already handled the error. Awaited so async handlers fully
+      // settle before stream() rethrows.
+      await this.fireConsumerOnErrorIfNotFired(options, error, startedAt);
       throw error;
     }
   }
@@ -7894,7 +7986,7 @@ Current user's request: ${currentInput}`;
         // obvious to future readers, and the lint suppression is scoped
         // narrowly to the one statement that actually rebinds the param.
         const mergedOptions = { ...options, ...orchestratedOptions };
-        // eslint-disable-next-line no-param-reassign -- see NEW2/Issue 6 above
+
         options = mergedOptions;
 
         // Re-resolve model alias in case orchestration returned an alias

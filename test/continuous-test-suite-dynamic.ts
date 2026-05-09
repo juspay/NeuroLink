@@ -28,34 +28,26 @@ import { NeuroLink } from "../dist/index.js";
 import type { DynamicResolutionContext } from "../dist/index.js";
 
 // =============================================================================
-// TEST RUNNER INFRASTRUCTURE
+// TEST RUNNER (delegates to shared harness)
 // =============================================================================
 
-let passed = 0;
-let failed = 0;
-let skipped = 0;
-const failures: Array<{ name: string; error: string }> = [];
+import {
+  defineSuite,
+  log,
+  logSection as section,
+  isExpectedProviderError as harnessIsExpectedError,
+} from "./helpers/harness.js";
 
-const C = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-  blue: "\x1b[34m",
-} as const;
+const {
+  recordTest,
+  runSuite,
+  opts: suiteOpts,
+} = defineSuite("Dynamic Arguments");
 
-function log(msg: string, color: keyof typeof C = "reset"): void {
-  console.log(`${C[color]}${msg}${C.reset}`);
-}
-
-function section(title: string): void {
-  console.log("\n" + "=".repeat(70));
-  log(`  ${title}`, "cyan");
-  console.log("=".repeat(70) + "\n");
-}
-
+/**
+ * Local adapter — preserves the existing `boolean | null` return shape of
+ * tests in this file while plumbing into the harness's counters.
+ */
 async function test(
   name: string,
   fn: () => Promise<boolean | null>,
@@ -63,24 +55,13 @@ async function test(
   try {
     const result = await fn();
     if (result === null) {
-      skipped++;
-      console.log(
-        `  ${C.yellow}⊘${C.reset} ${name} ${C.yellow}(skipped)${C.reset}`,
-      );
-    } else if (result) {
-      passed++;
-      console.log(`  ${C.green}✓${C.reset} ${name}`);
+      recordTest(name, false, true, "skipped");
     } else {
-      failed++;
-      failures.push({ name, error: "assertion failed" });
-      console.log(`  ${C.red}✗${C.reset} ${name}`);
+      recordTest(name, result, false, result ? undefined : "assertion failed");
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    failed++;
-    failures.push({ name, error: msg });
-    console.log(`  ${C.red}✗${C.reset} ${name}`);
-    console.log(`    ${C.yellow}→ ${msg.slice(0, 150)}${C.reset}`);
+    recordTest(name, false, false, msg);
   }
 }
 
@@ -94,19 +75,10 @@ function ctx(c: DynamicResolutionContext): Record<string, unknown> {
 }
 
 const TEST_CONFIG = {
-  provider: process.env.TEST_PROVIDER || "vertex",
-  model: process.env.TEST_MODEL || (undefined as string | undefined),
+  provider: suiteOpts.provider ?? "vertex",
+  model: suiteOpts.model,
   maxTokens: 100,
 };
-
-for (const arg of process.argv.slice(2)) {
-  if (arg.startsWith("--provider=")) {
-    TEST_CONFIG.provider = arg.split("=")[1]!;
-  }
-  if (arg.startsWith("--model=")) {
-    TEST_CONFIG.model = arg.split("=")[1]!;
-  }
-}
 
 function buildBaseOptions(includeModel = true): Record<string, unknown> {
   const opts: Record<string, unknown> = {
@@ -133,41 +105,7 @@ function getTestModel(): string {
   );
 }
 
-function isExpectedProviderError(msg: string): boolean {
-  const lower = msg.toLowerCase();
-  return [
-    "api key",
-    "api_key",
-    "authentication",
-    "rate limit",
-    "quota",
-    "credentials",
-    "cannot connect",
-    "not configured",
-    "permission denied",
-    "billing",
-    "econnrefused",
-    "enotfound",
-    "unauthorized",
-    "unauthenticated",
-    "403",
-    "429",
-    "could not resolve",
-    "network",
-    "timeout",
-    "no providers",
-    "failed to",
-    "invalid api",
-    "missing api",
-    "google_application_credentials",
-    "application default credentials",
-    "service account",
-    "project_id",
-    "not found",
-    "default credentials",
-    "does not exist",
-  ].some((p) => lower.includes(p));
-}
+const isExpectedProviderError = harnessIsExpectedError;
 
 // =============================================================================
 // SECTION 1: generate() with dynamic arguments (real API calls)
@@ -401,60 +339,10 @@ async function testResolution(): Promise<void> {
 // =============================================================================
 
 async function main(): Promise<void> {
-  const start = Date.now();
-
-  console.log("\n" + "=".repeat(70));
-  log("  NeuroLink Dynamic Arguments — Continuous Test Suite", "bright");
-  console.log("=".repeat(70));
-  log(`\n  Provider: ${TEST_CONFIG.provider}`, "blue");
-  if (TEST_CONFIG.model) {
-    log(`  Model: ${TEST_CONFIG.model}`, "blue");
-  }
   log(`  Max Tokens: ${TEST_CONFIG.maxTokens}`, "blue");
-
   await testGenerate();
   await testStream();
   await testResolution();
-
-  const duration = ((Date.now() - start) / 1000).toFixed(2);
-  const total = passed + failed + skipped;
-
-  section("Summary");
-  log(`  Passed:  ${passed}`, "green");
-  log(`  Failed:  ${failed}`, failed > 0 ? "red" : "green");
-  log(`  Skipped: ${skipped}`, skipped > 0 ? "yellow" : "green");
-  log(`  Total:   ${total}`, "bright");
-  log(`  Time:    ${duration}s`, "cyan");
-
-  if (failures.length > 0) {
-    log("\n  FAILURES:", "red");
-    for (const f of failures) {
-      console.log(`    ${C.red}✗${C.reset} ${f.name}`);
-      console.log(`      ${C.yellow}${f.error}${C.reset}`);
-    }
-  }
-
-  if (skipped > 0) {
-    log(
-      `\n  Note: ${skipped} test(s) skipped — provider not available.`,
-      "yellow",
-    );
-    log(
-      "  Set GOOGLE_APPLICATION_CREDENTIALS or TEST_PROVIDER to run API tests.",
-      "yellow",
-    );
-  }
-
-  console.log();
-  log(
-    failed > 0 ? "  RESULT: FAIL" : "  RESULT: PASS",
-    failed > 0 ? "red" : "green",
-  );
-  console.log("=".repeat(70) + "\n");
-  process.exit(failed > 0 ? 1 : 0);
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(2);
-});
+await runSuite(main);

@@ -44,42 +44,21 @@ const FRAMEWORK_PORTS = {
 // Color Codes for Output
 // ============================================
 
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  magenta: "\x1b[35m",
-  cyan: "\x1b[36m",
-} as const;
+import {
+  defineSuite,
+  log,
+  logSection,
+  type ColorName,
+} from "./helpers/harness.js";
 
-type ColorName = keyof typeof colors;
+const { recordTest, runSuite } = defineSuite("Servers");
 
-function log(message: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
-function logSection(title: string): void {
-  log(`\n${"=".repeat(60)}`, "cyan");
-  log(`${title}`, "cyan");
-  log(`${"=".repeat(60)}`, "cyan");
-}
-
+/** Print-only logTest shim. Counters are driven by recordTest in the runner. */
 function logTest(
   testName: string,
   status: "PASS" | "FAIL" | "SKIP" | "TESTING",
-  details = "",
+  details?: string,
 ): void {
-  const icon =
-    status === "PASS"
-      ? "\u2705"
-      : status === "FAIL"
-        ? "\u274C"
-        : status === "SKIP"
-          ? "\u23ED"
-          : "\u26A0\uFE0F";
   const color: ColorName =
     status === "PASS"
       ? "green"
@@ -87,13 +66,9 @@ function logTest(
         ? "red"
         : status === "SKIP"
           ? "yellow"
-          : "yellow";
-  log(`${icon} ${testName}`, color);
-  if (details) {
-    log(`   ${details}`, "reset");
-  }
+          : "blue";
+  log(`[${status}] ${testName}${details ? ` — ${details}` : ""}`, color);
 }
-
 function skipTest(testName: string, reason: string): null {
   logTest(testName, "SKIP", reason);
   return null;
@@ -102,13 +77,6 @@ function skipTest(testName: string, reason: string): null {
 // ============================================
 // Test Result Tracking
 // ============================================
-
-const testResults: Array<{
-  name: string;
-  result: boolean | null;
-  error: string | null;
-  duration?: number;
-}> = [];
 
 // ============================================
 // HTTP Request Helpers
@@ -2627,87 +2595,19 @@ async function runAllTests(): Promise<void> {
 
   // Run all tests
   for (const test of tests) {
-    const testStartTime = Date.now();
     try {
       const result = await test.fn();
-      const duration = Date.now() - testStartTime;
-      testResults.push({
-        name: test.name,
-        result,
-        error: null,
-        duration,
-      });
+      recordTest(
+        test.name,
+        result === true,
+        result === null,
+        result === null ? "skipped" : result === true ? undefined : "failed",
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      const duration = Date.now() - testStartTime;
-      testResults.push({
-        name: test.name,
-        result: false,
-        error: errorMessage,
-        duration,
-      });
+      recordTest(test.name, false, false, errorMessage);
     }
-  }
-
-  // Summary
-  logSection("Test Results Summary");
-
-  const passed = testResults.filter((r) => r.result === true).length;
-  const failed = testResults.filter((r) => r.result === false).length;
-  const skipped = testResults.filter((r) => r.result === null).length;
-  const total = testResults.length;
-
-  testResults.forEach((test) => {
-    const status =
-      test.result === null ? "SKIP" : test.result === true ? "PASS" : "FAIL";
-    const details = test.error ? test.error : `${test.duration}ms`;
-    logTest(test.name, status, details);
-  });
-
-  const duration = Math.round((Date.now() - startTime) / 1000);
-
-  log(
-    `
-Final Results: ${passed} passed, ${failed} failed, ${skipped} skipped (${total} total) in ${duration}s`,
-    "bright",
-  );
-
-  // Feature Summary
-  log("\n\uD83D\uDCCB Feature Summary:", "cyan");
-  log("   Adapters: 4 (Hono, Express, Fastify, Koa)", "reset");
-  log("   Route Groups: 5 (Agent, Tool, MCP, Memory, Health)", "reset");
-  log("   Middleware: 5 (Auth, RateLimit, Cache, Validation, Common)", "reset");
-
-  // CLI Coverage Report
-  const cliTestResult = testResults.find((r) => r.name === "CLI Coverage");
-  if (cliTestResult && cliTestResult.result === false) {
-    log("\n\u26A0\uFE0F CLI Coverage: NONE - GAP DETECTED", "yellow");
-    log(
-      "   Server Adapters has NO CLI commands. This is a known gap.",
-      "yellow",
-    );
-  } else if (cliTestResult && cliTestResult.result === null) {
-    log(
-      "\n\u26A0\uFE0F CLI Coverage: SKIPPED (CLI binary not available)",
-      "yellow",
-    );
-  } else {
-    log("\n\u2705 CLI Coverage: Present", "green");
-  }
-
-  if (failed === 0) {
-    log(
-      "\n\uD83C\uDF89 All tests passed! Server Adapters feature is fully implemented.",
-      "green",
-    );
-    process.exit(0);
-  } else {
-    log(
-      `\n\u274C ${failed} test(s) failed. Please review the issues above.`,
-      "red",
-    );
-    process.exit(1);
   }
 }
 
@@ -2739,8 +2639,4 @@ Run with: npx tsx test/continuous-test-suite-servers.ts
 }
 
 // Run tests
-runAllTests().catch((error) => {
-  log(`\n\uD83D\uDCA5 Test suite crashed: ${error.message}`, "red");
-  console.error(error);
-  process.exit(1);
-});
+await runSuite(runAllTests);

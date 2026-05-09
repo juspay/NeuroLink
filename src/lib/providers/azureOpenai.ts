@@ -44,12 +44,56 @@ export class AzureOpenAIProvider extends BaseProvider {
 
     this.apiKey = credentials?.apiKey || process.env.AZURE_OPENAI_API_KEY || "";
     const endpoint = process.env.AZURE_OPENAI_ENDPOINT || "";
-    const envResourceName = endpoint
-      .replace("https://", "")
-      .replace(/\/+$/, "") // Remove trailing slashes
-      .replace(".openai.azure.com", "")
-      .replace(".cognitiveservices.azure.com", "");
+    // Use URL parsing instead of string-replace so endpoints that already
+    // carry a path segment (e.g. "https://<host>/openai" — a valid Azure AI
+    // Foundry shape) don't end up duplicating it as "<host>/openai/openai".
+    // Tolerate missing scheme by prefixing https:// before parsing.
+    let endpointUrl: URL | undefined;
+    if (endpoint) {
+      try {
+        endpointUrl = new URL(
+          endpoint.includes("://") ? endpoint : `https://${endpoint}`,
+        );
+      } catch {
+        endpointUrl = undefined;
+      }
+    }
+    const endpointHost = endpointUrl?.hostname ?? "";
+    const endpointPath =
+      endpointUrl?.pathname && endpointUrl.pathname !== "/"
+        ? endpointUrl.pathname.replace(/\/+$/, "")
+        : "";
+
+    // Classic Azure OpenAI ("*.openai.azure.com") and Cognitive Services
+    // ("*.cognitiveservices.azure.com") endpoints encode the resource name as
+    // a subdomain that @ai-sdk/azure expects to receive verbatim. The newer
+    // Azure AI Foundry endpoint format ("*.services.ai.azure.com") does not
+    // round-trip through that subdomain rewrite, so passing the resource name
+    // would yield e.g. "<host>.services.ai.azure.com.openai.azure.com". For
+    // those hosts we hand the full URL back via baseURL instead.
+    const isClassicAzureHost = /\.(openai|cognitiveservices)\.azure\.com$/.test(
+      endpointHost,
+    );
+    const envResourceName = isClassicAzureHost
+      ? endpointHost
+          .replace(".openai.azure.com", "")
+          .replace(".cognitiveservices.azure.com", "")
+      : "";
     this.resourceName = credentials?.resourceName || envResourceName;
+    // For Azure AI Foundry the SDK still routes to the OpenAI-compatible API
+    // (deployments/{deployment}/chat/completions); the `/openai` path suffix
+    // mirrors what the SDK derives in classic mode
+    // (`https://${resource}.openai.azure.com/openai`). Reuse the path the
+    // operator already supplied if it already terminates in `/openai` *or*
+    // a versioned form like `/openai/v1`; otherwise append `/openai`. Never
+    // duplicate.
+    const hasOpenAIPathSuffix = /\/openai(?:\/v\d+)?$/.test(endpointPath);
+    const baseURLForFoundry =
+      !this.resourceName && endpointUrl
+        ? `${endpointUrl.origin}${
+            hasOpenAIPathSuffix ? endpointPath : `${endpointPath}/openai`
+          }`
+        : undefined;
     this.deployment =
       credentials?.deploymentName ||
       modelName ||
@@ -66,21 +110,33 @@ export class AzureOpenAIProvider extends BaseProvider {
     if (!this.apiKey) {
       validateApiKey(createAzureAPIKeyConfig());
     }
-    if (!this.resourceName) {
+    if (!this.resourceName && !baseURLForFoundry) {
       validateApiKey(createAzureEndpointConfig());
     }
 
-    // Create the Azure provider instance with proxy support
+    // Create the Azure provider instance with proxy support.
+    // For classic *.openai.azure.com / *.cognitiveservices.azure.com hosts we
+    // pass `resourceName`, which @ai-sdk/azure rewrites into the canonical
+    // subdomain. For Azure AI Foundry hosts ("*.services.ai.azure.com") we
+    // pass the full URL via `baseURL` so no rewrite happens.
     // useDeploymentBasedUrls is required because @ai-sdk/azure v3+ defaults to
     // the /v1/ URL format, but most Azure deployments still require the legacy
     // /deployments/{deployment}/ URL pattern.
-    this.azureProvider = createAzure({
-      resourceName: this.resourceName,
-      apiKey: this.apiKey,
-      apiVersion: this.apiVersion,
-      useDeploymentBasedUrls: true,
-      fetch: createProxyFetch(),
-    });
+    this.azureProvider = baseURLForFoundry
+      ? createAzure({
+          baseURL: baseURLForFoundry,
+          apiKey: this.apiKey,
+          apiVersion: this.apiVersion,
+          useDeploymentBasedUrls: true,
+          fetch: createProxyFetch(),
+        })
+      : createAzure({
+          resourceName: this.resourceName,
+          apiKey: this.apiKey,
+          apiVersion: this.apiVersion,
+          useDeploymentBasedUrls: true,
+          fetch: createProxyFetch(),
+        });
 
     logger.debug("Azure Vercel Provider initialized", {
       deployment: this.deployment,

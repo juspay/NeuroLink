@@ -35,49 +35,13 @@ type TestFunction = {
   category?: string;
 };
 
-type TestResult = {
-  name: string;
-  result: boolean | null;
-  error: string | null;
-};
-
-type ColorName = "reset" | "bright" | "red" | "green" | "yellow" | "cyan";
-
 // ============================================================================
-// Helpers
+// Helpers (delegated to shared harness where possible)
 // ============================================================================
 
-const colors: Record<ColorName, string> = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-};
+import { defineSuite, log, logSection } from "./helpers/harness.js";
 
-function log(message: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
-function logSection(title: string): void {
-  log(`\n${"=".repeat(60)}`, "cyan");
-  log(title, "cyan");
-  log("=".repeat(60), "cyan");
-}
-
-function logTest(
-  testName: string,
-  status: "PASS" | "FAIL" | "SKIP",
-  details = "",
-): void {
-  const color: ColorName =
-    status === "PASS" ? "green" : status === "FAIL" ? "red" : "yellow";
-  log(`[${status}] ${testName}`, color);
-  if (details) {
-    log(`   ${details}`, "reset");
-  }
-}
+const { recordTest, runSuite } = defineSuite("Production Bugfix Verification");
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -1096,63 +1060,25 @@ exit 127
 // Runner
 // ============================================================================
 
-async function runTests(): Promise<void> {
-  logSection("Production Bugfix Verification Tests");
+async function runAllBugfixTests(): Promise<void> {
   log(`Running ${tests.length} tests...\n`);
-
-  const results: TestResult[] = [];
-  let passed = 0;
-  let failed = 0;
-  let skipped = 0;
-
   for (const test of tests) {
     try {
       const result = await test.fn();
       if (result === null) {
-        logTest(test.name, "SKIP");
-        results.push({ name: test.name, result: null, error: null });
-        skipped++;
-      } else if (result) {
-        logTest(test.name, "PASS");
-        results.push({ name: test.name, result: true, error: null });
-        passed++;
+        recordTest(test.name, false, true, "skipped");
       } else {
-        logTest(test.name, "FAIL");
-        results.push({
-          name: test.name,
-          result: false,
-          error: "assertion failed",
-        });
-        failed++;
+        recordTest(
+          test.name,
+          result,
+          false,
+          result ? undefined : "assertion failed",
+        );
       }
     } catch (error) {
-      const msg = getErrorMessage(error);
-      logTest(test.name, "FAIL", msg);
-      results.push({ name: test.name, result: false, error: msg });
-      failed++;
+      recordTest(test.name, false, false, getErrorMessage(error));
     }
-  }
-
-  logSection("Results");
-  log(
-    `Total: ${tests.length}  Passed: ${passed}  Failed: ${failed}  Skipped: ${skipped}`,
-  );
-
-  if (failed > 0) {
-    log("\nFailed tests:", "red");
-    for (const r of results) {
-      if (r.result === false) {
-        log(`  - ${r.name}: ${r.error}`, "red");
-      }
-    }
-    process.exit(1);
-  } else {
-    log("\nAll tests passed!", "green");
-    process.exit(0);
   }
 }
 
-runTests().catch((error) => {
-  log(`\nFatal error: ${getErrorMessage(error)}`, "red");
-  process.exit(1);
-});
+await runSuite(runAllBugfixTests);

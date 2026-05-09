@@ -5,35 +5,51 @@ import "dotenv/config";
  * Continuous Test Suite: Evaluation
  *
  * Tests the RAGAS-style evaluation system including RAGASEvaluator,
- * ContextBuilder, RetryManager, PromptBuilder, scoring functions,
- * and evaluation provider integration.
+ * ContextBuilder, PromptBuilder, scoring functions, and evaluation
+ * provider integration, plus the merged scoring subsuite that covers
+ * the rule/LLM scorer registry, preset & PipelineBuilder fluent APIs,
+ * stream+evaluate, ground-truth scoring, BatchStrategy execution,
+ * and the CLI `evaluate presets` smoke run.
  *
- * 13 tests covering:
- * - RAGAS evaluator initialization
- * - Scoring dimensions (faithfulness/relevance, answer relevancy, context precision, context recall)
+ * ~18 tests covering:
+ * - RAGAS-style scoring dimensions (faithfulness, answer relevancy,
+ *   context precision, context recall)
  * - Direct scoring API
  * - Context builder utility
- * - Retry manager (basic + exhaustion)
  * - Different providers for evaluation
  * - Batch evaluation
  * - Custom prompt evaluation
- * - Observability span instrumentation
+ * - Scoring subsuite (#13–#22): rule scorers, LLM scorers via
+ *   ScorerRegistry, inline enableEvaluation, stream+evaluate,
+ *   preset pipelines, PipelineBuilder fluent API, good-vs-bad
+ *   discriminative scoring, ground-truth scoring, batch via
+ *   BatchStrategy, CLI `evaluate presets` smoke
+ *
+ * Note: RAGASEvaluator init (#1), RetryManager (#8/#9), and
+ * Observability Spans (#13) were intentionally moved/removed during
+ * the consolidation pass; observability coverage now lives in
+ * continuous-test-suite-observability.ts.
  *
  * Source: src/lib/evaluation/ (6 files), src/lib/core/evaluation.ts,
- *         src/lib/core/evaluationProviders.ts, src/lib/types/evaluation*.ts (3 files)
- *         — 11 files, 1,822 lines, currently zero tests
+ *         src/lib/core/evaluationProviders.ts, src/lib/types/evaluation*.ts
+ *         (3 files).
  *
  * Run: npx tsx test/continuous-test-suite-evaluation.ts --provider=vertex
  */
 
+import { spawn } from "node:child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import type { SpanData } from "../dist/index.js";
 import {
+  BatchStrategy,
+  EvaluationPipeline,
   getMetricsAggregator,
+  getPreset,
   NeuroLink,
+  PipelineBuilder,
   resetMetricsAggregator,
+  ScorerRegistry,
   SpanSerializer,
   SpanStatus,
   SpanType,
@@ -70,63 +86,39 @@ const TEST_CONFIG = {
 };
 
 // ============================================================
-// LOGGING UTILITIES
+// LOGGING UTILITIES — provided by shared harness
 // ============================================================
 
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-};
-type ColorName = keyof typeof colors;
+import {
+  defineSuite,
+  log,
+  logSection,
+  type ColorName,
+} from "./helpers/harness.js";
 
-function log(message: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
+const { recordTest, runSuite } = defineSuite("Evaluation");
 
-function logSection(title: string): void {
-  log(`\n${"=".repeat(60)}`, "cyan");
-  log(`  ${title}`, "cyan");
-  log(`${"=".repeat(60)}`, "cyan");
-}
-
+/** Print-only logTest shim. Counters come from recordTest in the runner loop. */
 function logTest(
   testName: string,
   status: "PASS" | "FAIL" | "SKIP" | "TESTING",
   details?: string,
 ): void {
-  const icons = {
-    PASS: "\u2705",
-    FAIL: "\u274C",
-    SKIP: "\u23ED\uFE0F",
-    TESTING: "\u26A0\uFE0F",
-  };
-  const statusColors: Record<string, ColorName> = {
-    PASS: "green",
-    FAIL: "red",
-    SKIP: "yellow",
-    TESTING: "blue",
-  };
-  log(`${icons[status]} ${testName}`, statusColors[status]);
-  if (details) {
-    log(`   ${details}`, "reset");
-  }
+  const color: ColorName =
+    status === "PASS"
+      ? "green"
+      : status === "FAIL"
+        ? "red"
+        : status === "SKIP"
+          ? "yellow"
+          : "blue";
+  log(`[${status}] ${testName}${details ? ` — ${details}` : ""}`, color);
 }
-
 // ============================================================
 // SHARED UTILITIES
 // ============================================================
 
 // Use boolean | null: true=pass, false=fail, null=skip
-const testResults: Array<{
-  name: string;
-  result: boolean | null;
-  error: string | null;
-}> = [];
 const skippedTests: Set<string> = new Set();
 
 function buildBaseSDKOptions(): { provider: string; model?: string } {
@@ -233,6 +225,7 @@ async function scoreAnswerOnDimension(
   dimensionDescription: string,
   answer: string,
   extras: { context?: string; groundTruth?: string } = {},
+  signal?: AbortSignal,
 ): Promise<number> {
   const contextBlock = extras.context ? `\nContext: ${extras.context}` : "";
   const groundTruthBlock = extras.groundTruth
@@ -273,6 +266,7 @@ Respond ONLY with a JSON object: {"score": <number between 0 and 1>, "reasoning"
 
   const result = await sdk.generate({
     input: { text: prompt },
+    abortSignal: signal,
     maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
     ...buildBaseSDKOptions(),
   });
@@ -282,67 +276,13 @@ Respond ONLY with a JSON object: {"score": <number between 0 and 1>, "reasoning"
 }
 
 // ============================================================
-// TEST #1: RAGAS Evaluator Init
-// ============================================================
-
-async function testRAGASEvaluatorInit(
-  _sdk: NeuroLink,
-): Promise<boolean | null> {
-  logTest("1. RAGAS Evaluator Init", "TESTING");
-  try {
-    // Try to import RAGASEvaluator from dist
-    const distIndexPath = path.join(__dirname, "../dist/index.js");
-    if (!fs.existsSync(distIndexPath)) {
-      logTest("1. RAGAS Evaluator Init", "FAIL", "dist/index.js not found");
-      return false;
-    }
-
-    const distModule = await import(distIndexPath);
-
-    // Check if RAGASEvaluator is exported
-    if (typeof distModule.RAGASEvaluator === "function") {
-      // It IS exported - try to instantiate it
-      try {
-        const evaluator = new distModule.RAGASEvaluator();
-        if (evaluator) {
-          logTest(
-            "1. RAGAS Evaluator Init",
-            "PASS",
-            "RAGASEvaluator instantiated from dist exports",
-          );
-          return true;
-        }
-      } catch (initError) {
-        const initMsg =
-          initError instanceof Error ? initError.message : String(initError);
-        logTest(
-          "1. RAGAS Evaluator Init",
-          "FAIL",
-          `RAGASEvaluator exported but failed to instantiate: ${initMsg}`,
-        );
-        return false;
-      }
-    }
-
-    // RAGASEvaluator is NOT exported from dist
-    logTest(
-      "1. RAGAS Evaluator Init",
-      "SKIP",
-      "RAGASEvaluator not exported from dist",
-    );
-    return null;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logTest("1. RAGAS Evaluator Init", "FAIL", msg);
-    return false;
-  }
-}
-
-// ============================================================
 // TEST #2: RAGAS Faithfulness Scoring
 // ============================================================
 
-async function testRAGASFaithfulness(sdk: NeuroLink): Promise<boolean | null> {
+async function testRAGASFaithfulness(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
   logTest("2. RAGAS Faithfulness Scoring", "TESTING");
   try {
     // Faithfulness: whether every claim in the answer can be verified from the context.
@@ -358,6 +298,7 @@ async function testRAGASFaithfulness(sdk: NeuroLink): Promise<boolean | null> {
       {
         context: EVAL_TEST_DATA.context,
       },
+      signal,
     );
 
     // Brief delay to avoid rate limiting
@@ -371,6 +312,7 @@ async function testRAGASFaithfulness(sdk: NeuroLink): Promise<boolean | null> {
       {
         context: EVAL_TEST_DATA.context,
       },
+      signal,
     );
 
     if (isNaN(goodScore) && isNaN(poorScore)) {
@@ -429,6 +371,7 @@ async function testRAGASFaithfulness(sdk: NeuroLink): Promise<boolean | null> {
 
 async function testRAGASAnswerRelevancy(
   sdk: NeuroLink,
+  signal?: AbortSignal,
 ): Promise<boolean | null> {
   logTest("3. RAGAS Answer Relevancy", "TESTING");
   try {
@@ -442,6 +385,8 @@ async function testRAGASAnswerRelevancy(
       "answer relevancy",
       dimensionDesc,
       EVAL_TEST_DATA.goodAnswer,
+      {},
+      signal,
     );
 
     await new Promise((r) => setTimeout(r, 2000));
@@ -451,6 +396,8 @@ async function testRAGASAnswerRelevancy(
       "answer relevancy",
       dimensionDesc,
       EVAL_TEST_DATA.poorAnswer,
+      {},
+      signal,
     );
 
     if (isNaN(goodScore) && isNaN(poorScore)) {
@@ -507,6 +454,7 @@ async function testRAGASAnswerRelevancy(
 
 async function testRAGASContextPrecision(
   sdk: NeuroLink,
+  signal?: AbortSignal,
 ): Promise<boolean | null> {
   logTest("4. RAGAS Context Precision", "TESTING");
   try {
@@ -534,6 +482,7 @@ async function testRAGASContextPrecision(
         context: EVAL_TEST_DATA.context,
         groundTruth: EVAL_TEST_DATA.groundTruth,
       },
+      signal,
     );
 
     await new Promise((r) => setTimeout(r, 2000));
@@ -547,6 +496,7 @@ async function testRAGASContextPrecision(
         context: bloatedContext,
         groundTruth: EVAL_TEST_DATA.groundTruth,
       },
+      signal,
     );
 
     if (isNaN(focusedScore) && isNaN(bloatedScore)) {
@@ -601,7 +551,10 @@ async function testRAGASContextPrecision(
 // TEST #5: RAGAS Context Recall Scoring
 // ============================================================
 
-async function testRAGASContextRecall(sdk: NeuroLink): Promise<boolean | null> {
+async function testRAGASContextRecall(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
   logTest("5. RAGAS Context Recall", "TESTING");
   try {
     // Context recall: whether the context contains all information needed for the ground truth.
@@ -623,6 +576,7 @@ async function testRAGASContextRecall(sdk: NeuroLink): Promise<boolean | null> {
         context: EVAL_TEST_DATA.context,
         groundTruth: EVAL_TEST_DATA.groundTruth,
       },
+      signal,
     );
 
     await new Promise((r) => setTimeout(r, 2000));
@@ -636,6 +590,7 @@ async function testRAGASContextRecall(sdk: NeuroLink): Promise<boolean | null> {
         context: partialContext,
         groundTruth: EVAL_TEST_DATA.groundTruth,
       },
+      signal,
     );
 
     if (isNaN(fullScore) && isNaN(partialScore)) {
@@ -690,7 +645,10 @@ async function testRAGASContextRecall(sdk: NeuroLink): Promise<boolean | null> {
 // TEST #6: Direct Scoring API via sdk.evaluate()
 // ============================================================
 
-async function testScoringFunction(sdk: NeuroLink): Promise<boolean | null> {
+async function testScoringFunction(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
   logTest("6. Direct Scoring API", "TESTING");
   try {
     // Import RAGASEvaluator directly from dist exports
@@ -778,7 +736,10 @@ async function testScoringFunction(sdk: NeuroLink): Promise<boolean | null> {
 // TEST #7: Context Builder Utility
 // ============================================================
 
-async function testContextBuilder(_sdk: NeuroLink): Promise<boolean | null> {
+async function testContextBuilder(
+  _sdk: NeuroLink,
+  _signal?: AbortSignal,
+): Promise<boolean | null> {
   logTest("7. Context Builder Utility", "TESTING");
   try {
     // Try importing ContextBuilder from dist
@@ -841,177 +802,19 @@ async function testContextBuilder(_sdk: NeuroLink): Promise<boolean | null> {
 }
 
 // ============================================================
-// TEST #8: Retry Manager Basic
-// ============================================================
-
-async function testRetryManagerBasic(_sdk: NeuroLink): Promise<boolean | null> {
-  logTest("8. Retry Manager Basic", "TESTING");
-  try {
-    // Try importing RetryManager from dist
-    const distIndexPath = path.join(__dirname, "../dist/index.js");
-    const distModule = await import(distIndexPath);
-
-    if (typeof distModule.RetryManager === "function") {
-      try {
-        const retryMgr = new distModule.RetryManager();
-
-        // Test shouldRetry: attempt 1 should allow retry (within default maxRetries)
-        const hasShouldRetry = typeof retryMgr.shouldRetry === "function";
-
-        if (hasShouldRetry) {
-          const canRetry = retryMgr.shouldRetry(1);
-          if (typeof canRetry === "boolean") {
-            logTest(
-              "8. Retry Manager Basic",
-              "PASS",
-              `RetryManager.shouldRetry(1) = ${canRetry}`,
-            );
-            return true;
-          }
-        }
-
-        // Fallback: check for any callable methods
-        const methods = Object.getOwnPropertyNames(
-          Object.getPrototypeOf(retryMgr),
-        ).filter(
-          (m) => m !== "constructor" && typeof retryMgr[m] === "function",
-        );
-
-        if (methods.length > 0) {
-          logTest(
-            "8. Retry Manager Basic",
-            "PASS",
-            `RetryManager instantiated; methods: ${methods.join(", ")}`,
-          );
-          return true;
-        }
-
-        logTest(
-          "8. Retry Manager Basic",
-          "FAIL",
-          "RetryManager instantiated but no usable methods found",
-        );
-        return false;
-      } catch (initError) {
-        const initMsg =
-          initError instanceof Error ? initError.message : String(initError);
-        logTest(
-          "8. Retry Manager Basic",
-          "FAIL",
-          `RetryManager exported but failed: ${initMsg}`,
-        );
-        return false;
-      }
-    }
-
-    // RetryManager not exported from dist
-    logTest(
-      "8. Retry Manager Basic",
-      "SKIP",
-      "RetryManager not exported from dist",
-    );
-    return null;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logTest("8. Retry Manager Basic", "FAIL", msg);
-    return false;
-  }
-}
-
-// ============================================================
-// TEST #9: Retry Manager Exhaustion
-// ============================================================
-
-async function testRetryManagerExhaustion(
-  _sdk: NeuroLink,
-): Promise<boolean | null> {
-  logTest("9. Retry Manager Exhaustion", "TESTING");
-  try {
-    // Try importing RetryManager from dist
-    const distIndexPath = path.join(__dirname, "../dist/index.js");
-    const distModule = await import(distIndexPath);
-
-    if (typeof distModule.RetryManager === "function") {
-      try {
-        const retryMgr = new distModule.RetryManager();
-
-        if (typeof retryMgr.shouldRetry === "function") {
-          // Test exhaustion: high attempt number should return false
-          const canRetryAttempt10 = retryMgr.shouldRetry(10);
-          if (canRetryAttempt10 === false) {
-            logTest(
-              "9. Retry Manager Exhaustion",
-              "PASS",
-              "RetryManager.shouldRetry(10) = false (exhaustion correctly detected)",
-            );
-            return true;
-          } else if (canRetryAttempt10 === true) {
-            logTest(
-              "9. Retry Manager Exhaustion",
-              "FAIL",
-              "RetryManager.shouldRetry(10) returned true; expected exhaustion",
-            );
-            return false;
-          }
-        }
-
-        // Check for getDelay method
-        if (typeof retryMgr.getDelay === "function") {
-          const delay = retryMgr.getDelay(1);
-          if (typeof delay === "number" && delay >= 0) {
-            logTest(
-              "9. Retry Manager Exhaustion",
-              "PASS",
-              `RetryManager.getDelay(1) = ${delay}ms`,
-            );
-            return true;
-          }
-        }
-
-        logTest(
-          "9. Retry Manager Exhaustion",
-          "FAIL",
-          "RetryManager lacks shouldRetry or getDelay methods for exhaustion test",
-        );
-        return false;
-      } catch (initError) {
-        const initMsg =
-          initError instanceof Error ? initError.message : String(initError);
-        logTest(
-          "9. Retry Manager Exhaustion",
-          "FAIL",
-          `RetryManager instantiation failed: ${initMsg}`,
-        );
-        return false;
-      }
-    }
-
-    // RetryManager not exported from dist
-    logTest(
-      "9. Retry Manager Exhaustion",
-      "SKIP",
-      "RetryManager not exported from dist",
-    );
-    return null;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logTest("9. Retry Manager Exhaustion", "FAIL", msg);
-    return false;
-  }
-}
-
-// ============================================================
 // TEST #10: Evaluation with Different Provider
 // ============================================================
 
 async function testEvaluationProviders(
   sdk: NeuroLink,
+  signal?: AbortSignal,
 ): Promise<boolean | null> {
   logTest("10. Evaluation Providers", "TESTING");
   try {
     // Generate with the test provider and verify the generate() call succeeds.
     // This validates that the provider can be used as an evaluation judge.
     const result = await sdk.generate({
+      abortSignal: signal,
       input: {
         text: `You are an evaluation judge. Rate this answer on a 1-10 scale.
 Question: What is the capital of France?
@@ -1075,7 +878,10 @@ Respond with ONLY a JSON object: {"score": <1-10>, "reasoning": "<brief>"}`,
 // TEST #11: Batch Evaluation
 // ============================================================
 
-async function testBatchEvaluation(sdk: NeuroLink): Promise<boolean | null> {
+async function testBatchEvaluation(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
   logTest("11. Batch Evaluation", "TESTING");
   try {
     // Generate 3 evaluation calls and assert all 3 return valid results.
@@ -1106,6 +912,7 @@ async function testBatchEvaluation(sdk: NeuroLink): Promise<boolean | null> {
 
       try {
         const result = await sdk.generate({
+          abortSignal: signal,
           input: {
             text: `You are an evaluation judge. Rate the following answer for accuracy and completeness.
 Question: ${pair.question}
@@ -1186,12 +993,14 @@ Respond ONLY with a JSON object: {"score": <1-10>, "reasoning": "<brief>"}`,
 
 async function testEvaluationWithCustomPrompt(
   sdk: NeuroLink,
+  signal?: AbortSignal,
 ): Promise<boolean | null> {
   logTest("12. Custom Prompt Evaluation", "TESTING");
   try {
     // Generate with a custom system prompt for domain-specific evaluation.
     // Assert the response is meaningful and addresses the custom criteria.
     const result = await sdk.generate({
+      abortSignal: signal,
       input: {
         text: `Evaluate the following AI response using these CUSTOM domain-specific criteria:
 
@@ -1282,136 +1091,940 @@ Respond with JSON:
 }
 
 // ============================================================
-// TEST #13: Observability Spans
+// SCORING SUBSUITE: from continuous-test-suite-evaluation-scoring.ts
+// ============================================================
+//
+// Tests 13-22 cover SDK-level evaluate() integration (rule scorers, LLM
+// scorers, inline enableEvaluation, stream+evaluate, preset pipelines,
+// PipelineBuilder, discriminative good-vs-bad, ground truth, batch, CLI).
+// EVAL_TEST_DATA above already has the question/context/groundTruth fields
+// these tests rely on; the duplicate definition was removed during merge.
+
+// TEST #13: Generate and Evaluate with Rule Scorers
 // ============================================================
 
-async function test_observability_spans(
+async function testGenerateAndEvaluateWithRuleScorers(
   sdk: NeuroLink,
+  signal?: AbortSignal,
 ): Promise<boolean | null> {
-  logTest("13. Observability Spans", "TESTING");
+  logTest("13. Generate + Evaluate with Rule Scorers", "TESTING");
   try {
-    // Reset global metrics aggregator to get a clean slate
-    resetMetricsAggregator();
-    const globalAggregator = getMetricsAggregator();
+    // Step 1: Generate a response with SDK
+    const result = await sdk.generate({
+      abortSignal: signal,
+      input: { text: EVAL_TEST_DATA.question },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
 
-    // Run generate() with enableEvaluation to exercise the evaluation pipeline.
-    //
-    // NOTE: enableEvaluation triggers generateEvaluation() in core/evaluation.ts,
-    // which makes a nested provider.generate() call. This records MODEL_GENERATION
-    // spans (not EVALUATION spans). EVALUATION-type spans are only recorded by
-    // ragasEvaluator.ts (tested in tests #1-#6 above).
-    //
-    // This test verifies that:
-    //   1. generate() with enableEvaluation succeeds end-to-end
-    //   2. Spans are recorded to the MetricsAggregator during the pipeline
-    //
-    // Detailed OTEL span verification is covered in the dedicated observability suite.
-    let generateSucceeded = false;
-    try {
-      const evalResult = await sdk.generate({
-        input: {
-          text: `You are an evaluation judge. Score the faithfulness of an AI answer.
-
-Context: ${EVAL_TEST_DATA.context}
-Question: ${EVAL_TEST_DATA.question}
-Answer to evaluate: ${EVAL_TEST_DATA.goodAnswer}
-
-Respond with a JSON object: {"relevanceScore": 8, "accuracyScore": 9, "completenessScore": 7, "finalScore": 8, "reasoning": "Good answer", "suggestedImprovements": "None"}`,
-        },
-        maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
-        enableEvaluation: true,
-        ...buildBaseSDKOptions(),
-      });
-
-      generateSucceeded = !!evalResult;
-      // Suppress unused variable warning
-      void evalResult;
-    } catch (evalError) {
-      const evalMsg =
-        evalError instanceof Error ? evalError.message : String(evalError);
-      if (isExpectedProviderError(evalMsg)) {
-        markSkipped("13. Observability Spans");
-        logTest("13. Observability Spans", "SKIP", evalMsg);
-        return null;
-      }
-      // Non-provider error during generate - log but continue to check spans
-      log(
-        `  [info] generate() with enableEvaluation errored: ${evalMsg.substring(0, 150)}`,
-        "yellow",
+    if (!result?.content) {
+      logTest(
+        "13. Generate + Evaluate with Rule Scorers",
+        "FAIL",
+        "generate() returned no content",
       );
+      return false;
     }
 
-    // Check what spans were recorded in the global aggregator
-    const allSpans = globalAggregator.getSpans();
-    const evaluationSpans = allSpans.filter(
-      (s: SpanData) => s.type === SpanType.EVALUATION,
-    );
+    // Step 2: Build a rule-scorer pipeline and evaluate the response
+    const pipeline = await PipelineBuilder.create("rule-scorer-test")
+      .addScorer("length", { threshold: 0.3 })
+      .addScorer("format", { threshold: 0.3 })
+      .addScorer("keyword-coverage", { threshold: 0.3 })
+      .aggregateWith("average")
+      .passThreshold(0.3)
+      .buildAndInitialize();
 
-    // Best case: dedicated EVALUATION spans were recorded (from ragasEvaluator/scoring)
-    if (evaluationSpans.length >= 1) {
-      const spanNames = evaluationSpans.map((s: SpanData) => s.name);
-      const hasRagasSpan = spanNames.some((n: string) =>
-        n.includes("evaluation.ragas"),
-      );
-      const hasScoreSpan = spanNames.some((n: string) =>
-        n.includes("evaluation.score"),
-      );
+    const evalResult = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: result.content,
+    });
 
+    // Step 3: Verify scores came back
+    if (
+      evalResult &&
+      Array.isArray(evalResult.scores) &&
+      evalResult.scores.length > 0 &&
+      typeof evalResult.overallScore === "number"
+    ) {
+      const scorerNames = evalResult.scores
+        .map((s) => `${s.scorerId}=${s.score.toFixed(1)}`)
+        .join(", ");
       logTest(
-        "13. Observability Spans",
+        "13. Generate + Evaluate with Rule Scorers",
         "PASS",
-        `Evaluation produced ${evaluationSpans.length} evaluation span(s) ` +
-          `(ragas=${hasRagasSpan}, score=${hasScoreSpan}); ` +
-          `names: [${spanNames.join(", ")}]`,
-      );
-      return true;
-    }
-
-    // Good case: spans were recorded (MODEL_GENERATION from the evaluation pipeline)
-    // The enableEvaluation path goes through generateEvaluation() which makes a nested
-    // provider.generate() call, producing MODEL_GENERATION spans — not EVALUATION spans.
-    if (allSpans.length > 0) {
-      const spanTypes = Array.from(
-        new Set(allSpans.map((s: SpanData) => s.type)),
-      );
-      logTest(
-        "13. Observability Spans",
-        "PASS",
-        `Evaluation pipeline recorded ${allSpans.length} span(s) of types [${spanTypes.join(", ")}]. ` +
-          `No dedicated EVALUATION spans (expected: enableEvaluation uses generateEvaluation() ` +
-          `which records MODEL_GENERATION spans). Dedicated span verification in observability suite.`,
-      );
-      return true;
-    }
-
-    // generate() succeeded but no spans at all — still pass since the evaluation
-    // feature works; span recording depends on OTEL bootstrap timing which the
-    // dedicated observability suite verifies with InMemorySpanExporter.
-    if (generateSucceeded) {
-      logTest(
-        "13. Observability Spans",
-        "PASS",
-        `generate() with enableEvaluation=true succeeded. No spans in MetricsAggregator ` +
-          `(spans may be routed to OTEL exporters instead). ` +
-          `Detailed span verification is in the dedicated observability suite.`,
+        `Generated ${result.content.length} chars, ${evalResult.scores.length} scorers: [${scorerNames}], overall: ${evalResult.overallScore.toFixed(2)}`,
       );
       return true;
     }
 
     logTest(
-      "13. Observability Spans",
+      "13. Generate + Evaluate with Rule Scorers",
       "FAIL",
-      "generate() with enableEvaluation=true did not succeed and no spans were recorded",
+      "No scores returned from pipeline",
     );
     return false;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (isExpectedProviderError(msg)) {
-      markSkipped("13. Observability Spans");
-      logTest("13. Observability Spans", "SKIP", msg);
+      markSkipped("13. Generate + Evaluate with Rule Scorers");
+      logTest("13. Generate + Evaluate with Rule Scorers", "SKIP", msg);
       return null;
     }
-    logTest("13. Observability Spans", "FAIL", msg);
+    logTest("13. Generate + Evaluate with Rule Scorers", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #14: Generate and Evaluate with LLM Scorers
+// ============================================================
+
+async function testGenerateAndEvaluateWithLLMScorers(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("14. Generate + Evaluate with LLM Scorers", "TESTING");
+  try {
+    // Step 1: Generate a factual response with context
+    const result = await sdk.generate({
+      abortSignal: signal,
+      input: {
+        text: `Based on the following context, answer the question.
+
+Context: ${EVAL_TEST_DATA.context}
+
+Question: ${EVAL_TEST_DATA.question}`,
+      },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    if (!result?.content) {
+      logTest(
+        "14. Generate + Evaluate with LLM Scorers",
+        "FAIL",
+        "generate() returned no content",
+      );
+      return false;
+    }
+
+    // Step 2: Evaluate with LLM scorers
+    // Initialize registry first so LLM scorers are available
+    await ScorerRegistry.registerBuiltInScorers();
+
+    const hallucinationScorer = await ScorerRegistry.getScorer("hallucination");
+    const faithfulnessScorer = await ScorerRegistry.getScorer("faithfulness");
+    const relevancyScorer = await ScorerRegistry.getScorer("answer-relevancy");
+
+    if (!hallucinationScorer && !faithfulnessScorer && !relevancyScorer) {
+      // The scorer registry is set up in this process via
+      // ScorerRegistry.registerBuiltInScorers() above — an empty result
+      // means registration itself is broken, not an environmental SKIP.
+      logTest(
+        "14. Generate + Evaluate with LLM Scorers",
+        "FAIL",
+        "No LLM scorers available in registry after registerBuiltInScorers()",
+      );
+      return false;
+    }
+
+    const scorerInput = {
+      query: EVAL_TEST_DATA.question,
+      response: result.content,
+      context: [EVAL_TEST_DATA.context],
+    };
+
+    // Score with whichever LLM scorers are available
+    const scores: Array<{ name: string; score: number }> = [];
+
+    if (hallucinationScorer) {
+      const hScore = await hallucinationScorer.score(scorerInput);
+      if (hScore && typeof hScore.score === "number") {
+        scores.push({ name: "hallucination", score: hScore.score });
+      }
+    }
+
+    if (faithfulnessScorer) {
+      const fScore = await faithfulnessScorer.score(scorerInput);
+      if (fScore && typeof fScore.score === "number") {
+        scores.push({ name: "faithfulness", score: fScore.score });
+      }
+    }
+
+    if (relevancyScorer) {
+      const rScore = await relevancyScorer.score(scorerInput);
+      if (rScore && typeof rScore.score === "number") {
+        scores.push({ name: "answer-relevancy", score: rScore.score });
+      }
+    }
+
+    if (scores.length > 0) {
+      const summary = scores
+        .map((s) => `${s.name}=${s.score.toFixed(2)}`)
+        .join(", ");
+      logTest(
+        "14. Generate + Evaluate with LLM Scorers",
+        "PASS",
+        `Generated ${result.content.length} chars, ${scores.length} LLM scorers: [${summary}]`,
+      );
+      return true;
+    }
+
+    logTest(
+      "14. Generate + Evaluate with LLM Scorers",
+      "FAIL",
+      "No LLM scorer returned a valid score",
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("14. Generate + Evaluate with LLM Scorers");
+      logTest("14. Generate + Evaluate with LLM Scorers", "SKIP", msg);
+      return null;
+    }
+    logTest("14. Generate + Evaluate with LLM Scorers", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #15: Generate with enableEvaluation (inline)
+// ============================================================
+
+async function testGenerateWithEnableEvaluation(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("15. Generate with enableEvaluation", "TESTING");
+  try {
+    const result = await sdk.generate({
+      abortSignal: signal,
+      input: {
+        text: `You are an evaluation judge. Score this answer for quality.
+Question: What is the capital of France?
+Answer: Paris is the capital of France.
+Respond with JSON: {"relevanceScore": 9, "accuracyScore": 10, "completenessScore": 8, "finalScore": 9, "reasoning": "Correct and concise", "suggestedImprovements": "Could add more detail"}`,
+      },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+      enableEvaluation: true,
+    });
+
+    if (!result?.content) {
+      logTest(
+        "15. Generate with enableEvaluation",
+        "FAIL",
+        "generate() returned no content",
+      );
+      return false;
+    }
+
+    // Check if evaluation was populated (it depends on the provider response being parseable)
+    if (result.evaluation) {
+      const evalKeys = Object.keys(result.evaluation);
+      logTest(
+        "15. Generate with enableEvaluation",
+        "PASS",
+        `result.evaluation populated with keys: [${evalKeys.join(", ")}]`,
+      );
+      return true;
+    }
+
+    // Even without result.evaluation, the generate succeeded with enableEvaluation=true
+    // This validates the code path does not crash
+    logTest(
+      "15. Generate with enableEvaluation",
+      "PASS",
+      `enableEvaluation=true generated ${result.content.length} chars (evaluation field may be absent if LLM response was not parseable as eval JSON)`,
+    );
+    return true;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("15. Generate with enableEvaluation");
+      logTest("15. Generate with enableEvaluation", "SKIP", msg);
+      return null;
+    }
+    logTest("15. Generate with enableEvaluation", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #16: Stream and Evaluate
+// ============================================================
+
+async function testStreamAndEvaluate(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("16. Stream + Evaluate", "TESTING");
+  try {
+    // Step 1: Stream a response and collect the full text
+    const streamResult = await sdk.stream({
+      abortSignal: signal,
+      input: { text: EVAL_TEST_DATA.question },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    let fullText = "";
+    for await (const chunk of streamResult.stream) {
+      if ("content" in chunk && typeof chunk.content === "string") {
+        fullText += chunk.content;
+      }
+    }
+
+    if (!fullText.trim()) {
+      // stream() returning empty content here is a real regression — every
+      // other empty-content branch in this suite is treated as FAIL/false
+      // for consistency. The provider-error branch in the surrounding
+      // try/catch still SKIPs transient upstream issues.
+      logTest(
+        "16. Stream + Evaluate",
+        "FAIL",
+        "stream() returned no text content",
+      );
+      return false;
+    }
+
+    // Step 2: Evaluate the streamed response with a pipeline
+    const pipeline = await PipelineBuilder.create("stream-eval-test")
+      .addScorer("length", { threshold: 0.3 })
+      .addScorer("format", { threshold: 0.3 })
+      .aggregateWith("average")
+      .passThreshold(0.3)
+      .buildAndInitialize();
+
+    const evalResult = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: fullText,
+    });
+
+    if (
+      evalResult &&
+      Array.isArray(evalResult.scores) &&
+      evalResult.scores.length > 0 &&
+      typeof evalResult.overallScore === "number"
+    ) {
+      logTest(
+        "16. Stream + Evaluate",
+        "PASS",
+        `Streamed ${fullText.length} chars, evaluated with ${evalResult.scores.length} scorers, overall: ${evalResult.overallScore.toFixed(2)}`,
+      );
+      return true;
+    }
+
+    logTest(
+      "16. Stream + Evaluate",
+      "FAIL",
+      "Pipeline returned no scores for streamed response",
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("16. Stream + Evaluate");
+      logTest("16. Stream + Evaluate", "SKIP", msg);
+      return null;
+    }
+    logTest("16. Stream + Evaluate", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #17: Evaluate with Preset Pipeline
+// ============================================================
+
+async function testEvaluateWithPreset(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("17. Evaluate with Preset Pipeline", "TESTING");
+  try {
+    // Step 1: Generate a response
+    const result = await sdk.generate({
+      abortSignal: signal,
+      input: { text: EVAL_TEST_DATA.question },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    if (!result?.content) {
+      logTest(
+        "17. Evaluate with Preset Pipeline",
+        "FAIL",
+        "generate() returned no content",
+      );
+      return false;
+    }
+
+    // Step 2: Use the "quality" preset pipeline
+    const qualityConfig = getPreset("quality");
+    const pipeline = new EvaluationPipeline(qualityConfig);
+    await pipeline.initialize();
+
+    const evalResult = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: result.content,
+    });
+
+    if (
+      evalResult &&
+      typeof evalResult.overallScore === "number" &&
+      Array.isArray(evalResult.scores)
+    ) {
+      const scorerNames = evalResult.scores
+        .map((s) => `${s.scorerId}=${s.score.toFixed(1)}`)
+        .join(", ");
+      logTest(
+        "17. Evaluate with Preset Pipeline",
+        "PASS",
+        `Preset 'quality' ran ${evalResult.scores.length} scorers: [${scorerNames}], overall: ${evalResult.overallScore.toFixed(2)}, passed: ${evalResult.passed}`,
+      );
+      return true;
+    }
+
+    logTest(
+      "17. Evaluate with Preset Pipeline",
+      "FAIL",
+      "Preset pipeline returned invalid result",
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("17. Evaluate with Preset Pipeline");
+      logTest("17. Evaluate with Preset Pipeline", "SKIP", msg);
+      return null;
+    }
+    logTest("17. Evaluate with Preset Pipeline", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #18: Evaluate with PipelineBuilder Fluent API
+// ============================================================
+
+async function testEvaluateWithPipelineBuilder(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("18. Evaluate with PipelineBuilder", "TESTING");
+  try {
+    // Step 1: Generate a response
+    const result = await sdk.generate({
+      abortSignal: signal,
+      input: { text: EVAL_TEST_DATA.question },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    if (!result?.content) {
+      logTest(
+        "18. Evaluate with PipelineBuilder",
+        "FAIL",
+        "generate() returned no content",
+      );
+      return false;
+    }
+
+    // Step 2: Build a custom pipeline with PipelineBuilder
+    const pipeline = await PipelineBuilder.create("builder-integration-test")
+      .description("Custom pipeline built with fluent API for integration test")
+      .addScorer("length", { threshold: 0.3 })
+      .addScorer("format", { threshold: 0.3 })
+      .addScorer("keyword-coverage", { threshold: 0.3 })
+      .aggregateWith("average")
+      .passThreshold(0.3)
+      .parallel()
+      .buildAndInitialize();
+
+    const evalResult = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: result.content,
+      groundTruth: EVAL_TEST_DATA.groundTruth,
+    });
+
+    if (
+      evalResult &&
+      typeof evalResult.overallScore === "number" &&
+      evalResult.pipelineConfig.name === "builder-integration-test" &&
+      Array.isArray(evalResult.scores) &&
+      evalResult.scores.length > 0
+    ) {
+      logTest(
+        "18. Evaluate with PipelineBuilder",
+        "PASS",
+        `Pipeline '${evalResult.pipelineConfig.name}': ${evalResult.scores.length} scorers, overall: ${evalResult.overallScore.toFixed(2)}, passed: ${evalResult.passed}`,
+      );
+      return true;
+    }
+
+    logTest(
+      "18. Evaluate with PipelineBuilder",
+      "FAIL",
+      "PipelineBuilder result missing expected fields",
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("18. Evaluate with PipelineBuilder");
+      logTest("18. Evaluate with PipelineBuilder", "SKIP", msg);
+      return null;
+    }
+    logTest("18. Evaluate with PipelineBuilder", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #19: Evaluate Good vs Bad Response (Discriminative)
+// ============================================================
+
+async function testEvaluateGoodVsBadResponse(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("19. Good vs Bad Response (Discriminative)", "TESTING");
+  try {
+    // Step 1: Generate a GOOD response (with context for grounding)
+    const goodResult = await sdk.generate({
+      abortSignal: signal,
+      input: {
+        text: `Based on the following context, answer the question accurately.
+
+Context: ${EVAL_TEST_DATA.context}
+
+Question: ${EVAL_TEST_DATA.question}`,
+      },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    if (!goodResult?.content) {
+      logTest(
+        "19. Good vs Bad Response (Discriminative)",
+        "FAIL",
+        "generate() for good response returned no content",
+      );
+      return false;
+    }
+
+    // Brief delay to avoid rate limiting
+    await new Promise((r) => setTimeout(r, 3000));
+
+    // Step 2: Generate a BAD response (completely unrelated question)
+    const badResult = await sdk.generate({
+      abortSignal: signal,
+      input: {
+        text: "Write a haiku about clouds.",
+      },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    if (!badResult?.content) {
+      logTest(
+        "19. Good vs Bad Response (Discriminative)",
+        "FAIL",
+        "generate() for bad response returned no content",
+      );
+      return false;
+    }
+
+    // Step 3: Evaluate both with the same pipeline
+    const pipeline = await PipelineBuilder.create("discriminative-test")
+      .addScorer("keyword-coverage", { threshold: 0.3 })
+      .addScorer("content-similarity", { threshold: 0.3 })
+      .aggregateWith("average")
+      .passThreshold(0.3)
+      .buildAndInitialize();
+
+    const goodEval = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: goodResult.content,
+      groundTruth: EVAL_TEST_DATA.groundTruth,
+      context: [EVAL_TEST_DATA.context],
+    });
+
+    const badEval = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: badResult.content,
+      groundTruth: EVAL_TEST_DATA.groundTruth,
+      context: [EVAL_TEST_DATA.context],
+    });
+
+    if (
+      goodEval &&
+      badEval &&
+      typeof goodEval.overallScore === "number" &&
+      typeof badEval.overallScore === "number"
+    ) {
+      if (goodEval.overallScore > badEval.overallScore) {
+        logTest(
+          "19. Good vs Bad Response (Discriminative)",
+          "PASS",
+          `Good response scored higher: good=${goodEval.overallScore.toFixed(2)} > bad=${badEval.overallScore.toFixed(2)}`,
+        );
+        return true;
+      }
+
+      // Even if scores are close, the pipeline ran — report the numbers
+      logTest(
+        "19. Good vs Bad Response (Discriminative)",
+        "FAIL",
+        `Good response (${goodEval.overallScore.toFixed(2)}) did NOT score higher than bad response (${badEval.overallScore.toFixed(2)})`,
+      );
+      return false;
+    }
+
+    logTest(
+      "19. Good vs Bad Response (Discriminative)",
+      "FAIL",
+      "Pipeline returned invalid scores",
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("19. Good vs Bad Response (Discriminative)");
+      logTest("19. Good vs Bad Response (Discriminative)", "SKIP", msg);
+      return null;
+    }
+    logTest("19. Good vs Bad Response (Discriminative)", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #20: Evaluate with Ground Truth
+// ============================================================
+
+async function testEvaluateWithGroundTruth(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("20. Evaluate with Ground Truth", "TESTING");
+  try {
+    // Step 1: Generate a factual response
+    const result = await sdk.generate({
+      abortSignal: signal,
+      input: {
+        text: `Answer this question factually: ${EVAL_TEST_DATA.question}
+
+Mention these key points: static type checking, IDE support with autocompletion, and code maintainability through interfaces.`,
+      },
+      ...buildBaseSDKOptions(),
+      maxTokens: Math.min(TEST_CONFIG.maxTokens || 500, 500),
+    });
+
+    if (!result?.content) {
+      logTest(
+        "20. Evaluate with Ground Truth",
+        "FAIL",
+        "generate() returned no content",
+      );
+      return false;
+    }
+
+    // Step 2: Evaluate with keyword-coverage and content-similarity against ground truth
+    const pipeline = await PipelineBuilder.create("ground-truth-test")
+      .addScorer("keyword-coverage", { threshold: 0.3 })
+      .addScorer("content-similarity", { threshold: 0.3 })
+      .aggregateWith("average")
+      .passThreshold(0.3)
+      .buildAndInitialize();
+
+    const evalResult = await pipeline.execute({
+      query: EVAL_TEST_DATA.question,
+      response: result.content,
+      groundTruth: EVAL_TEST_DATA.groundTruth,
+    });
+
+    if (
+      evalResult &&
+      typeof evalResult.overallScore === "number" &&
+      Array.isArray(evalResult.scores) &&
+      evalResult.scores.length > 0
+    ) {
+      const scorerSummary = evalResult.scores
+        .map((s) => `${s.scorerId}=${s.score.toFixed(2)}`)
+        .join(", ");
+      logTest(
+        "20. Evaluate with Ground Truth",
+        "PASS",
+        `Generated ${result.content.length} chars, ground truth eval: [${scorerSummary}], overall: ${evalResult.overallScore.toFixed(2)}`,
+      );
+      return true;
+    }
+
+    logTest(
+      "20. Evaluate with Ground Truth",
+      "FAIL",
+      "Pipeline returned no scores for ground truth evaluation",
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("20. Evaluate with Ground Truth");
+      logTest("20. Evaluate with Ground Truth", "SKIP", msg);
+      return null;
+    }
+    logTest("20. Evaluate with Ground Truth", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #21: Batch Evaluate Multiple Generations
+// ============================================================
+
+async function testBatchEvaluateMultipleGenerations(
+  sdk: NeuroLink,
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("21. Batch Evaluate Multiple Generations", "TESTING");
+  try {
+    // Step 1: Generate 3 different responses
+    const questions = [
+      "What is TypeScript?",
+      "What are the benefits of static typing?",
+      "How does TypeScript improve developer productivity?",
+    ];
+
+    const responses: Array<{ query: string; response: string }> = [];
+    // Track WHY each question failed so we can distinguish "every call hit
+    // a transient provider error" (→ SKIP) from "every call ran but returned
+    // empty content / threw a real error" (→ FAIL).
+    let providerSkipCount = 0;
+
+    for (let i = 0; i < questions.length; i++) {
+      try {
+        const result = await sdk.generate({
+          abortSignal: signal,
+          input: { text: questions[i] },
+          ...buildBaseSDKOptions(),
+          maxTokens: Math.min(TEST_CONFIG.maxTokens || 300, 300),
+        });
+
+        if (result?.content) {
+          responses.push({ query: questions[i], response: result.content });
+        }
+      } catch (genError) {
+        const genMsg =
+          genError instanceof Error ? genError.message : String(genError);
+        if (isExpectedProviderError(genMsg)) {
+          providerSkipCount++;
+          log(`   Question ${i + 1} skipped: provider error`, "yellow");
+          continue;
+        }
+        // Non-provider error — still continue with remaining questions
+        log(
+          `   Question ${i + 1} failed: ${genMsg.substring(0, 100)}`,
+          "yellow",
+        );
+      }
+
+      // Brief delay between generations
+      if (i < questions.length - 1) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+
+    if (responses.length === 0) {
+      // If EVERY question was a transient provider/auth skip, the
+      // environment can't run this test — SKIP rather than FAIL. Otherwise
+      // (every call returned empty content or a real exception) this is a
+      // genuine regression and must FAIL.
+      if (providerSkipCount === questions.length) {
+        markSkipped("21. Batch Evaluate Multiple Generations");
+        logTest(
+          "21. Batch Evaluate Multiple Generations",
+          "SKIP",
+          `All ${questions.length} questions hit provider errors`,
+        );
+        return null;
+      }
+      logTest(
+        "21. Batch Evaluate Multiple Generations",
+        "FAIL",
+        "No responses were generated (all generations returned empty content)",
+      );
+      return false;
+    }
+
+    // Step 2: Batch-evaluate all responses using BatchStrategy
+    const pipeline = await PipelineBuilder.create("batch-test")
+      .addScorer("length", { threshold: 0.3 })
+      .addScorer("format", { threshold: 0.3 })
+      .aggregateWith("average")
+      .passThreshold(0.3)
+      .buildAndInitialize();
+
+    const batcher = new BatchStrategy(pipeline, { concurrency: 2 });
+    const batchResult = await batcher.evaluate(responses);
+
+    // PASS only when:
+    //   - all questions produced a response (no silent partial failure)
+    //   - batcher returned results for every response
+    //   - the summary's total matches what we fed in
+    // Previously `total === responses.length` always held trivially even
+    // when only 1/3 questions had succeeded, masking real regressions.
+    const allGenerationsSucceeded = responses.length === questions.length;
+    // `averageScore` is required (its `.toFixed` call below would crash on
+    // undefined). `passRate` is optional — BatchStrategy emits it only when
+    // at least one scorer reports a binary passed/failed verdict; rule-only
+    // pipelines don't. Treat it as optional in the display.
+    const batcherSawAll =
+      batchResult?.summary?.total === responses.length &&
+      Array.isArray(batchResult?.results) &&
+      batchResult.results.length === responses.length &&
+      typeof batchResult.summary.averageScore === "number";
+
+    if (allGenerationsSucceeded && batcherSawAll) {
+      const passRate = batchResult.summary.passRate;
+      const passRateDisplay =
+        typeof passRate === "number"
+          ? `${(passRate * 100).toFixed(0)}%`
+          : "n/a";
+      logTest(
+        "21. Batch Evaluate Multiple Generations",
+        "PASS",
+        `Generated ${responses.length}/${questions.length} responses, batch evaluated: total=${batchResult.summary.total}, ` +
+          `successful=${batchResult.summary.successful}, avg score=${batchResult.summary.averageScore.toFixed(2)}, ` +
+          `pass rate=${passRateDisplay}`,
+      );
+      return true;
+    }
+
+    if (!allGenerationsSucceeded) {
+      logTest(
+        "21. Batch Evaluate Multiple Generations",
+        "FAIL",
+        `Only ${responses.length}/${questions.length} generations succeeded — batch test requires all questions to complete (partial failures hide model/provider regressions)`,
+      );
+      return false;
+    }
+
+    // batcherSawAll was false. Surface every component (total, results.length,
+    // averageScore type) so the FAIL diagnostic isolates the cause —
+    // previously the message only printed total/results.length, which
+    // collided with the numeric-guard mode (added in the toFixed-safety
+    // pass): the test would say "expected 3, got 3" while really failing
+    // on `averageScore` being undefined.
+    const avgType = typeof batchResult?.summary?.averageScore;
+    logTest(
+      "21. Batch Evaluate Multiple Generations",
+      "FAIL",
+      `Batch result mismatch: summary.total=${batchResult?.summary?.total}, results.length=${(batchResult?.results || []).length}, expected ${responses.length}, averageScore=${avgType}(${String(batchResult?.summary?.averageScore)})`,
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (isExpectedProviderError(msg)) {
+      markSkipped("21. Batch Evaluate Multiple Generations");
+      logTest("21. Batch Evaluate Multiple Generations", "SKIP", msg);
+      return null;
+    }
+    logTest("21. Batch Evaluate Multiple Generations", "FAIL", msg);
+    return false;
+  }
+}
+
+// ============================================================
+// TEST #22: CLI Evaluate Command
+// ============================================================
+
+async function testCLIEvaluateCommand(
+  signal?: AbortSignal,
+): Promise<boolean | null> {
+  logTest("22. CLI evaluate command", "TESTING");
+  try {
+    const cliPath = path.resolve(__dirname, "../dist/cli/index.js");
+    if (!fs.existsSync(cliPath)) {
+      // Missing CLI artifact is exactly what this smoke catches — flipping
+      // to FAIL ensures a broken build doesn't silently pass the suite.
+      logTest(
+        "22. CLI evaluate command",
+        "FAIL",
+        "CLI not built: dist/cli/index.js not found — run pnpm run build first",
+      );
+      return false;
+    }
+
+    const result = await new Promise<{ stdout: string; exitCode: number }>(
+      (resolve) => {
+        const child = spawn("node", [cliPath, "evaluate", "presets"], {
+          cwd: path.resolve(__dirname, ".."),
+          timeout: 30000,
+        });
+        // Forward the per-test deadline AbortSignal to the child process.
+        // Without this, when the suite-level deadline fires `controller.abort()`
+        // (the for-loop in runAllTests), the child keeps running until its own
+        // `timeout: 30000` triggers — orphaning a process and burning the next
+        // test's pacing budget. With it, SIGTERM lands within a few ms of the
+        // signal firing.
+        const onAbort = (): void => {
+          try {
+            child.kill();
+          } catch {
+            /* child already exited */
+          }
+        };
+        if (signal) {
+          if (signal.aborted) {
+            onAbort();
+          } else {
+            signal.addEventListener("abort", onAbort, { once: true });
+          }
+        }
+        let stdout = "";
+        child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
+        child.stderr.on("data", (d: Buffer) => (stdout += d.toString()));
+        const cleanup = (): void => {
+          if (signal) {
+            signal.removeEventListener("abort", onAbort);
+          }
+        };
+        child.on("close", (code: number | null) => {
+          cleanup();
+          resolve({ stdout, exitCode: code ?? 1 });
+        });
+        child.on("error", () => {
+          cleanup();
+          resolve({ stdout, exitCode: 1 });
+        });
+      },
+    );
+
+    if (result.exitCode === 0 && result.stdout.length > 0) {
+      logTest(
+        "22. CLI evaluate command",
+        "PASS",
+        `Exit 0, output: ${result.stdout.substring(0, 150).replace(/\n/g, " ")}...`,
+      );
+      return true;
+    }
+
+    // Non-zero exit is a real failure even when stdout is present — the
+    // previous "PASS on any output" path masked CLI errors that happened
+    // to print partial results before crashing.
+    logTest(
+      "22. CLI evaluate command",
+      "FAIL",
+      `Exit ${result.exitCode}, output: ${result.stdout.substring(0, 100).replace(/\n/g, " ")}`,
+    );
+    return false;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logTest("22. CLI evaluate command", "FAIL", msg);
     return false;
   }
 }
@@ -1421,131 +2034,182 @@ Respond with a JSON object: {"relevanceScore": 8, "accuracyScore": 9, "completen
 // ============================================================
 
 async function runAllTests(): Promise<void> {
-  const startTime = Date.now();
   log("\n\uD83D\uDE80 NeuroLink Continuous Test Suite: Evaluation", "bright");
   log(
     `   Provider: ${TEST_CONFIG.provider}, Model: ${TEST_CONFIG.model || "default"}`,
     "cyan",
   );
 
-  // Prerequisite checks
+  // Prerequisite checks — throw so the harness owns the exit path
+  // (prints summary, cleanup). process.exit here short-circuits both.
   if (
     !fs.existsSync(path.resolve(__dirname, "../dist")) ||
     !fs.existsSync(path.resolve(__dirname, "../dist/index.js"))
   ) {
-    log("Build not found. Run: pnpm run build", "red");
-    process.exit(1);
+    throw new Error("Build not found. Run: pnpm run build");
   }
 
   const sharedSdk = new NeuroLink();
 
-  const tests: Array<{ name: string; fn: () => Promise<boolean | null> }> = [
-    {
-      name: "1. RAGAS Evaluator Init",
-      fn: () => testRAGASEvaluatorInit(sharedSdk),
-    },
+  // Test fns accept an optional AbortSignal that fires when the per-test
+  // deadline elapses. Tests that perform long-running provider work can
+  // forward this signal to `sdk.generate({ abortSignal })` so cancelled
+  // calls actually stop.
+  const tests: Array<{
+    name: string;
+    fn: (signal?: AbortSignal) => Promise<boolean | null>;
+  }> = [
+    // Tests 1, 8, 9 (RAGASEvaluator Init / RetryManager Basic / RetryManager
+    // Exhaustion) were removed: these classes are intentionally internal — not
+    // part of the public dist surface — so the dist-import gating they used
+    // amounted to "always SKIP". Internal coverage of those classes belongs in
+    // a unit-style suite that imports from src/ directly.
     {
       name: "2. RAGAS Faithfulness Scoring",
-      fn: () => testRAGASFaithfulness(sharedSdk),
+      fn: (signal) => testRAGASFaithfulness(sharedSdk, signal),
     },
     {
       name: "3. RAGAS Answer Relevancy",
-      fn: () => testRAGASAnswerRelevancy(sharedSdk),
+      fn: (signal) => testRAGASAnswerRelevancy(sharedSdk, signal),
     },
     {
       name: "4. RAGAS Context Precision",
-      fn: () => testRAGASContextPrecision(sharedSdk),
+      fn: (signal) => testRAGASContextPrecision(sharedSdk, signal),
     },
     {
       name: "5. RAGAS Context Recall",
-      fn: () => testRAGASContextRecall(sharedSdk),
+      fn: (signal) => testRAGASContextRecall(sharedSdk, signal),
     },
     // COMMENTED OUT: sdk.evaluate() not implemented yet — re-enable when evaluate() is added to NeuroLink class
     // { name: "6. Direct Scoring API", fn: () => testScoringFunction(sharedSdk) },
     {
       name: "7. Context Builder Utility",
-      fn: () => testContextBuilder(sharedSdk),
-    },
-    {
-      name: "8. Retry Manager Basic",
-      fn: () => testRetryManagerBasic(sharedSdk),
-    },
-    {
-      name: "9. Retry Manager Exhaustion",
-      fn: () => testRetryManagerExhaustion(sharedSdk),
+      fn: (signal) => testContextBuilder(sharedSdk, signal),
     },
     {
       name: "10. Evaluation Providers",
-      fn: () => testEvaluationProviders(sharedSdk),
+      fn: (signal) => testEvaluationProviders(sharedSdk, signal),
     },
-    { name: "11. Batch Evaluation", fn: () => testBatchEvaluation(sharedSdk) },
+    {
+      name: "11. Batch Evaluation",
+      fn: (signal) => testBatchEvaluation(sharedSdk, signal),
+    },
     {
       name: "12. Custom Prompt Evaluation",
-      fn: () => testEvaluationWithCustomPrompt(sharedSdk),
+      fn: (signal) => testEvaluationWithCustomPrompt(sharedSdk, signal),
+    },
+    // 13. Observability Spans — DELETED. Coverage now lives in
+    // continuous-test-suite-observability.ts; this duplicate was ~130 lines.
+    {
+      name: "13. Generate + Evaluate with Rule Scorers",
+      fn: (signal) => testGenerateAndEvaluateWithRuleScorers(sharedSdk, signal),
     },
     {
-      name: "13. Observability Spans",
-      fn: () => test_observability_spans(sharedSdk),
+      name: "14. Generate + Evaluate with LLM Scorers",
+      fn: (signal) => testGenerateAndEvaluateWithLLMScorers(sharedSdk, signal),
+    },
+    {
+      name: "15. Generate with enableEvaluation",
+      fn: (signal) => testGenerateWithEnableEvaluation(sharedSdk, signal),
+    },
+    {
+      name: "16. Stream + Evaluate",
+      fn: (signal) => testStreamAndEvaluate(sharedSdk, signal),
+    },
+    {
+      name: "17. Evaluate with Preset Pipeline",
+      fn: (signal) => testEvaluateWithPreset(sharedSdk, signal),
+    },
+    {
+      name: "18. Evaluate with PipelineBuilder",
+      fn: (signal) => testEvaluateWithPipelineBuilder(sharedSdk, signal),
+    },
+    {
+      name: "19. Good vs Bad Response (Discriminative)",
+      fn: (signal) => testEvaluateGoodVsBadResponse(sharedSdk, signal),
+    },
+    {
+      name: "20. Evaluate with Ground Truth",
+      fn: (signal) => testEvaluateWithGroundTruth(sharedSdk, signal),
+    },
+    {
+      name: "21. Batch Evaluate Multiple Generations",
+      fn: (signal) => testBatchEvaluateMultipleGenerations(sharedSdk, signal),
+    },
+    {
+      name: "22. CLI evaluate command",
+      fn: (signal) => testCLIEvaluateCommand(signal),
     },
   ];
 
   for (const test of tests) {
     try {
-      const result = await test.fn();
-      const isSkipped = skippedTests.has(test.name);
-      testResults.push({
-        name: test.name,
-        result: isSkipped ? null : result,
-        error: isSkipped
-          ? `${test.name} skipped due to missing credentials`
-          : null,
+      // Enforce per-test deadline so a hung provider call / scorer init can't
+      // block the entire live sweep. TEST_CONFIG.timeout is consulted here
+      // instead of being orphaned at the config-only level. Timeout failures
+      // surface as ordinary FAIL records via the catch below.
+      //
+      // The previous version used `Promise.race(test.fn(), deadline)`, which
+      // rejects on timeout but leaves the losing `test.fn()` running against
+      // the shared sdk — its pending fetches keep consuming quotas, and its
+      // late callbacks can scribble on suite state after the runner has
+      // moved on. We now spawn an AbortController, pass its signal to
+      // test.fn (so cooperatively cancellable tests can drop their work),
+      // and `controller.abort()` on timeout.
+      const controller = new AbortController();
+      let timer: NodeJS.Timeout | undefined;
+      // Track whether `test.fn` settled before the deadline so the finally
+      // doesn't pointlessly abort the signal on a clean pass. Without this,
+      // any listener `test.fn` registered on `signal` (or any helper that
+      // outlives the test fn) sees `signal.aborted === true` post-resolve.
+      let testFinished = false;
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(
+            new Error(
+              `Test "${test.name}" timed out after ${TEST_CONFIG.timeout}ms`,
+            ),
+          );
+        }, TEST_CONFIG.timeout);
       });
+      const result = await Promise.race([
+        test.fn(controller.signal).finally(() => {
+          testFinished = true;
+        }),
+        deadline,
+      ]).finally(() => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        // Only cancel in-flight work if test.fn didn't already settle.
+        // On a clean pass we leave the signal untouched.
+        if (!testFinished) {
+          controller.abort();
+        }
+      });
+      // Treat result === null as a skip too — many tests return null
+      // after logging SKIP without going through markSkipped().
+      const isSkipped = skippedTests.has(test.name) || result === null;
+      recordTest(
+        test.name,
+        !isSkipped && result === true,
+        isSkipped,
+        isSkipped
+          ? skippedTests.has(test.name)
+            ? "skipped due to provider/auth issue"
+            : "skipped"
+          : result === true
+            ? undefined
+            : "failed",
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      testResults.push({ name: test.name, result: false, error: msg });
+      recordTest(test.name, false, false, msg);
     }
     await globalCleanup();
     await new Promise((r) => setTimeout(r, TEST_CONFIG.interTestDelay));
   }
-
-  // Summary — three buckets: pass / fail / skip
-  logSection("Test Results Summary");
-  const passed = testResults.filter((r) => r.result === true).length;
-  const failed = testResults.filter((r) => r.result === false).length;
-  const skipped = testResults.filter((r) => r.result === null).length;
-  const total = testResults.length;
-  testResults.forEach((t) => {
-    const status =
-      t.result === null ? "SKIP" : t.result === true ? "PASS" : "FAIL";
-    logTest(t.name, status, t.error || "");
-  });
-  const duration = Math.round((Date.now() - startTime) / 1000);
-  log(
-    `\nFinal Results: ${passed} passed, ${skipped} skipped, ${failed} failed out of ${total} in ${duration}s`,
-    failed === 0 ? "green" : "red",
-  );
-  if (skipped > 0 && passed === 0 && failed === 0) {
-    log(
-      `WARNING: All tests were skipped — no real passes or failures`,
-      "yellow",
-    );
-  }
-
-  log("\n\uD83D\uDCCB Feature Summary:", "cyan");
-  log("   Evaluator: RAGASEvaluator (LLM-as-judge)", "reset");
-  log(
-    "   Scoring: Faithfulness, Answer Relevancy, Context Precision, Context Recall",
-    "reset",
-  );
-  log("   Components: ContextBuilder, RetryManager, PromptBuilder", "reset");
-  log("   Source: 11 files, 1,822 lines (previously zero tests)", "reset");
-
-  try {
-    await sharedSdk.shutdown?.();
-  } catch {
-    /* ignore */
-  }
-  process.exit(failed === 0 ? 0 : 1);
 }
 
 // ============================================================
@@ -1568,14 +2232,15 @@ function parseArguments(): { provider?: string; model?: string } {
 NeuroLink Evaluation Test Suite
 
 Tests the RAGAS-style evaluation system including:
-  - RAGASEvaluator initialization and scoring
   - Faithfulness, Answer Relevancy, Context Precision, Context Recall
   - Direct scoring API via generate()
   - ContextBuilder utility
-  - RetryManager (basic + exhaustion)
   - Evaluation provider configuration
   - Batch evaluation
   - Custom prompt evaluation
+  - Scoring subsuite (#13–#22): rule/LLM scorers, enableEvaluation,
+    stream+evaluate, preset & PipelineBuilder pipelines, ground
+    truth, BatchStrategy, and CLI 'evaluate presets' smoke
 
 Options:
   --provider=X    AI provider for evaluation (default: vertex)
@@ -1620,13 +2285,4 @@ if (!TEST_CONFIG.maxTokens) {
     1024;
 }
 
-if (typeof describe === "undefined") {
-  runAllTests().catch((e) => {
-    log(`Suite crashed: ${e instanceof Error ? e.message : String(e)}`, "red");
-    process.exit(1);
-  });
-} else {
-  describe.skip("Continuous Test Suite: Evaluation", () => {
-    it("runs standalone", () => runAllTests(), 600000);
-  });
-}
+await runSuite(runAllTests);

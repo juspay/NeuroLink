@@ -188,20 +188,29 @@ pnpm test                 # Main suite (test/continuous-test-suite.ts)
 pnpm run test:ci          # test + test:client
 pnpm run test:client      # SDK client suite
 pnpm run test:context     # Context compaction + file handling
-pnpm run test:mcp         # MCP HTTP suite
+pnpm run test:mcp         # MCP infrastructure (no-API; mcp-infra.ts)
+pnpm run test:mcp:http    # HTTP-transport suite (mcp-http.ts) — live
+pnpm run test:mcp:sdk     # Live SDK MCP enhancements (mcp-sdk.ts)
+pnpm run test:mcp:cli     # Live CLI MCP suite (mcp-cli.ts)
+pnpm run test:mcp:bash    # Bash subprocess (mcp-bash.ts) — no API
+pnpm run test:mcp:limits  # Output limits + artifacts (mcp-output-limits.ts) — no API
+pnpm run test:mcp:spans   # Issue#5 span attributes (mcp-spans.ts) — no API
+pnpm run test:mcp:full    # All seven mcp-* suites in dependency order
 pnpm run test:rag         # RAG suite
-pnpm run test:providers   # Providers suite
+pnpm run test:providers   # Provider-specific feature tests
+pnpm run test:matrix      # Capability sweep across all 17 providers
 pnpm run test:media       # Media generation suite
-pnpm run test:memory      # Memory suite
-pnpm run test:observability
+pnpm run test:memory      # Memory suite (incl. session-memory-bug regressions)
+pnpm run test:observability  # Includes tracing + telemetry-gaps + issue-04
 pnpm run test:ppt
 pnpm run test:servers
-pnpm run test:tracing
 pnpm run test:tts
 pnpm run test:workflow
-pnpm run test:credentials
-pnpm run test:evaluation
+pnpm run test:credentials # Includes issue-01 model-access regression
+pnpm run test:evaluation  # Includes evaluation-scoring sub-suite
 pnpm run test:middleware
+pnpm run test:autoresearch       # E2E + live (live half skips without keys)
+pnpm run test:autoresearch:redis # Redis storage tests
 
 # Run a single suite directly
 npx tsx test/continuous-test-suite-<name>.ts

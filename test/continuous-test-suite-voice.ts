@@ -2088,10 +2088,9 @@ async function runAllTests(): Promise<void> {
   );
   log(`   Temp dir: ${tempDir}`, "cyan");
 
-  // Prerequisite checks
+  // Prerequisite checks — throw so the harness owns the exit path.
   if (!fs.existsSync("dist") || !fs.existsSync("dist/index.js")) {
-    log("Build not found. Run: pnpm run build", "red");
-    process.exit(1);
+    throw new Error("Build not found. Run: pnpm run build");
   }
 
   const sharedSdk = new NeuroLink();

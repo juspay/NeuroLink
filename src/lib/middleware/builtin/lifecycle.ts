@@ -22,6 +22,32 @@ import { logger } from "../../utils/logger.js";
 import { isRecoverableError } from "../../utils/errorHandling.js";
 import { fireOnErrorOnce } from "../../utils/lifecycleCallbacks.js";
 
+/**
+ * Normalize a thrown value to an `Error` while preserving structured
+ * fields (`code`, `status`, `statusCode`, `retryAfter`, `details`,
+ * `cause`, etc.) that downstream retry logic and SDK callers depend on.
+ *
+ * Previously the lifecycle middleware did
+ * `error instanceof Error ? error : new Error(String(error))`, which
+ * silently dropped every custom property on non-Error throws — so a
+ * provider's `{ code: "RATE_LIMITED", retryAfter: 30 }` rejection
+ * surfaced to consumers as a bare `Error("[object Object]")`.
+ */
+function normalizeToError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  if (typeof error === "object" && error !== null) {
+    const obj = error as Record<string, unknown>;
+    const msg = typeof obj.message === "string" ? obj.message : String(error);
+    // Object.assign keeps Error's prototype chain (including the
+    // captured stack from this synthetic Error's construction) while
+    // copying enumerable fields from the original throw.
+    return Object.assign(new Error(msg), obj);
+  }
+  return new Error(String(error));
+}
+
 export function createLifecycleMiddleware(
   config: LifecycleMiddlewareConfig = {},
 ): NeuroLinkMiddleware {
@@ -75,13 +101,18 @@ export function createLifecycleMiddleware(
 
         return result;
       } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        fireOnErrorOnce(config.onError, error, {
+        const err = normalizeToError(error);
+        // fireOnErrorOnce stamps a Symbol on `err` so the SDK-level catch
+        // in neurolink.ts (and baseProvider.handleProviderError) skips
+        // its own onError fire for the same logical failure.
+        fireOnErrorOnce(config.onError, err, {
           error: err,
           duration: Date.now() - startTime,
           recoverable: isRecoverableError(err),
         });
-        throw error;
+        // Rethrow the normalized err (not the raw `error`) so the
+        // fired-mark and any preserved structured fields propagate.
+        throw err;
       }
     },
 
@@ -133,14 +164,13 @@ export function createLifecycleMiddleware(
 
               controller.enqueue(chunk);
             } catch (error) {
-              const err =
-                error instanceof Error ? error : new Error(String(error));
-              fireOnErrorOnce(config.onError, error, {
+              const err = normalizeToError(error);
+              fireOnErrorOnce(config.onError, err, {
                 error: err,
                 duration: Date.now() - startTime,
                 recoverable: isRecoverableError(err),
               });
-              throw error;
+              throw err;
             }
           },
           flush() {
@@ -171,13 +201,13 @@ export function createLifecycleMiddleware(
           stream: result.stream.pipeThrough(transformStream),
         };
       } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        fireOnErrorOnce(config.onError, error, {
+        const err = normalizeToError(error);
+        fireOnErrorOnce(config.onError, err, {
           error: err,
           duration: Date.now() - startTime,
           recoverable: isRecoverableError(err),
         });
-        throw error;
+        throw err;
       }
     },
   };

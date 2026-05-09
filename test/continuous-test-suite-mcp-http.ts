@@ -76,58 +76,37 @@ const REAL_HTTP_MCP_SERVERS = {
 };
 
 // ============================================================
-// LOGGING UTILITIES
+// LOGGING UTILITIES — provided by shared harness
 // ============================================================
 
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-};
-type ColorName = keyof typeof colors;
+import {
+  defineSuite,
+  log,
+  logSection,
+  type ColorName,
+} from "./helpers/harness.js";
 
-function log(message: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
+const { recordTest, runSuite } = defineSuite("Mcp Http");
 
-function logSection(title: string): void {
-  log(`\n${"=".repeat(60)}`, "cyan");
-  log(`  ${title}`, "cyan");
-  log(`${"=".repeat(60)}`, "cyan");
-}
-
+/** Print-only logTest shim. Counters come from recordTest in the runner loop. */
 function logTest(
   testName: string,
   status: "PASS" | "FAIL" | "SKIP" | "TESTING",
   details?: string,
 ): void {
-  const icons = { PASS: "PASS", FAIL: "FAIL", SKIP: "SKIP", TESTING: "TEST" };
-  const statusColors: Record<string, ColorName> = {
-    PASS: "green",
-    FAIL: "red",
-    SKIP: "yellow",
-    TESTING: "blue",
-  };
-  log(`[${icons[status]}] ${testName}`, statusColors[status]);
-  if (details) {
-    log(`   ${details}`, "reset");
-  }
+  const color: ColorName =
+    status === "PASS"
+      ? "green"
+      : status === "FAIL"
+        ? "red"
+        : status === "SKIP"
+          ? "yellow"
+          : "blue";
+  log(`[${status}] ${testName}${details ? ` — ${details}` : ""}`, color);
 }
-
 // ============================================================
 // SHARED UTILITIES
 // ============================================================
-
-const testResults: Array<{
-  name: string;
-  result: boolean | null;
-  error: string | null;
-  duration?: number;
-}> = [];
 
 function buildBaseSDKOptions(): { provider: string; model?: string } {
   const opts: { provider: string; model?: string } = {
@@ -1806,7 +1785,6 @@ async function testObservabilitySpans(
 // ============================================================
 
 async function runAllTests(): Promise<void> {
-  const startTime = Date.now();
   log("\nNeuroLink Continuous Test Suite: MCP HTTP Transport", "bright");
   log(
     `   Provider: ${TEST_CONFIG.provider}, Model: ${TEST_CONFIG.model || "default"}`,
@@ -1815,8 +1793,8 @@ async function runAllTests(): Promise<void> {
 
   // Prerequisite checks
   if (!fs.existsSync("dist") || !fs.existsSync("dist/index.js")) {
-    log("Build not found. Run: pnpm run build", "red");
-    process.exit(1);
+    // Throw so the harness owns the exit path (prints summary, cleanup).
+    throw new Error("Build not found. Run: pnpm run build");
   }
 
   const sharedSdk = new NeuroLink();
@@ -1893,52 +1871,19 @@ async function runAllTests(): Promise<void> {
       const testStartTime = Date.now();
       const result = await test.fn();
       const duration = Date.now() - testStartTime;
-      testResults.push({ name: test.name, result, error: null, duration });
+      recordTest(
+        test.name,
+        result === true,
+        result === null,
+        result === null ? "skipped" : result === true ? undefined : "failed",
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      testResults.push({ name: test.name, result: false, error: msg });
+      recordTest(test.name, false, false, msg);
     }
     await globalCleanup();
     await new Promise((r) => setTimeout(r, TEST_CONFIG.interTestDelay));
   }
-
-  // Summary
-  logSection("Test Results Summary");
-  const passed = testResults.filter((r) => r.result === true).length;
-  const failed = testResults.filter((r) => r.result === false).length;
-  const skipped = testResults.filter((r) => r.result === null).length;
-  testResults.forEach((t) => {
-    logTest(
-      t.name,
-      t.result === true ? "PASS" : t.result === false ? "FAIL" : "SKIP",
-      t.error || "",
-    );
-  });
-  const duration = Math.round((Date.now() - startTime) / 1000);
-  log(
-    `
-Final Results: ${passed} passed, ${failed} failed, ${skipped} skipped (${testResults.length} total) in ${duration}s`,
-    failed === 0 ? "green" : "red",
-  );
-
-  log("\nMCP HTTP Transport Feature Summary:", "cyan");
-  log("   Transports: HTTP (Streamable), SSE", "reset");
-  log("   Auth: Bearer token, API key", "reset");
-  log(
-    "   Resilience: Retry with exponential backoff, rate limiting, timeouts",
-    "reset",
-  );
-  log("   Real servers: DeepWiki, Remote Fetch, Sequential Thinking", "reset");
-  log("   Mock servers: Semgrep (Streamable HTTP), SSE", "reset");
-  log("   Session: Mcp-Session-Id via multiple generate() calls", "reset");
-  log("   Observability: Span recording after MCP operations", "reset");
-
-  try {
-    await safeShutdown(sharedSdk);
-  } catch {
-    /* ignore */
-  }
-  process.exit(failed === 0 ? 0 : 1);
 }
 
 // ============================================================
@@ -1992,13 +1937,4 @@ if (!TEST_CONFIG.maxTokens) {
   TEST_CONFIG.maxTokens = PROVIDER_MAX_TOKENS[TEST_CONFIG.provider] || 1024;
 }
 
-if (typeof describe === "undefined") {
-  runAllTests().catch((e) => {
-    log(`Suite crashed: ${e instanceof Error ? e.message : String(e)}`, "red");
-    process.exit(1);
-  });
-} else {
-  describe.skip("Continuous Test Suite: MCP HTTP Transport", () => {
-    it("runs standalone", () => runAllTests(), 600000);
-  });
-}
+await runSuite(runAllTests);

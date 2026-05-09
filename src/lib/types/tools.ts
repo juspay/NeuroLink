@@ -615,3 +615,17 @@ export function isToolDefinition(value: unknown): value is ToolDefinition {
     typeof (value as ToolDefinition).execute === "function"
   );
 }
+
+/**
+ * Result shape returned by the built-in `bashTool` execute function in
+ * `src/lib/agent/directTools.ts`. Centralised here per CLAUDE.md rule 2
+ * so callers (incl. the mcp-bash test suite) don't need to declare a
+ * local re-shaping of the runtime contract.
+ */
+export type BashToolResult = {
+  success: boolean;
+  code: number;
+  stdout: string;
+  stderr: string;
+  error?: string;
+};

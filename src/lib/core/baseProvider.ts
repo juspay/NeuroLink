@@ -18,6 +18,7 @@ import type {
   JsonValue,
   UnknownRecord,
   MiddlewareFactoryOptions,
+  OptionsWithLifecycleMiddleware,
   StreamOptions,
   StreamResult,
   AIProvider,
@@ -30,7 +31,13 @@ import type {
   ZodUnknownSchema,
 } from "../types/index.js";
 import { isAbortError } from "../utils/errorHandling.js";
+import {
+  hasLifecycleErrorFired,
+  markLifecycleErrorFired,
+} from "../utils/lifecycleCallbacks.js";
+import { resolveLifecycleTimeoutMs } from "../utils/lifecycleTimeout.js";
 import { logger } from "../utils/logger.js";
+import { withTimeoutFn } from "../utils/async/withTimeout.js";
 import {
   composeAbortSignals,
   createTimeoutController,
@@ -253,7 +260,17 @@ export abstract class BaseProvider implements AIProvider {
             model: this.modelName,
           },
         );
-        return await this.executeFakeStreaming(options, analysisSchema);
+        // Note: executeFakeStreaming() owns its own catch that fires the
+        // consumer-supplied onError before re-throwing through
+        // handleProviderError(), so we do not need to wrap again here —
+        // doing so would route the error through handleProviderError()
+        // twice (and risk a double-fire onError without the shared
+        // lifecycle-fired WeakSet mark).
+        const fakeResult = await this.executeFakeStreaming(
+          options,
+          analysisSchema,
+        );
+        return this.wrapStreamWithLifecycleCallbacks(fakeResult, options);
       }
     }
 
@@ -278,8 +295,14 @@ export abstract class BaseProvider implements AIProvider {
           "Image generation requires fake streaming to yield image output",
       });
 
-      // Skip real streaming, go directly to fake streaming
-      return await this.executeFakeStreaming(options, analysisSchema);
+      // Skip real streaming, go directly to fake streaming.
+      // executeFakeStreaming() owns its own catch + lifecycle fire, so
+      // wrapping again here would double-route through handleProviderError().
+      const fakeResult = await this.executeFakeStreaming(
+        options,
+        analysisSchema,
+      );
+      return this.wrapStreamWithLifecycleCallbacks(fakeResult, options);
     }
 
     // Central tool merge: Pre-merge base tools (MCP/built-in) with user-provided
@@ -311,8 +334,14 @@ export abstract class BaseProvider implements AIProvider {
         timestamp: Date.now(),
       });
 
-      // If real streaming succeeds, return it (with tools support via Vercel AI SDK)
-      return realStreamResult;
+      // Wire lifecycle callbacks (onChunk/onFinish/onError) on the user-
+      // facing StreamResult.stream. The AI-SDK lifecycle middleware only
+      // sees AI-SDK-internal chunks via streamText/wrapLanguageModel, so
+      // providers with custom HTTP streaming (Ollama, llama.cpp's /api,
+      // anything that doesn't go through streamText) bypass it. Wrapping
+      // here makes the callbacks fire for every provider, regardless of
+      // streaming implementation.
+      return this.wrapStreamWithLifecycleCallbacks(realStreamResult, options);
     } catch (realStreamError) {
       // Don't retry on terminal/abort errors — only fall back for
       // "real streaming with tools is unsupported" style failures.
@@ -332,6 +361,7 @@ export abstract class BaseProvider implements AIProvider {
         errMsg.includes("rate limit") ||
         errMsg.includes("authentication")
       ) {
+        await this.fireLifecycleErrorCallback(options, realStreamError);
         throw this.handleProviderError(realStreamError);
       }
 
@@ -343,10 +373,21 @@ export abstract class BaseProvider implements AIProvider {
         },
       );
 
-      // Fallback to fake streaming only if real streaming fails AND tools are enabled
+      // Fallback to fake streaming only if real streaming fails AND tools
+      // are enabled. executeFakeStreaming() owns its own catch + lifecycle
+      // fire, so a fake-streaming failure here surfaces through that path
+      // without needing an outer wrap (which would double-route through
+      // handleProviderError()).
       if (!options.disableTools && this.supportsTools()) {
-        return await this.executeFakeStreaming(options, analysisSchema);
+        const fakeResult = await this.executeFakeStreaming(
+          options,
+          analysisSchema,
+        );
+        return this.wrapStreamWithLifecycleCallbacks(fakeResult, options);
       } else {
+        // If real streaming failed and no tools are enabled, fire onError
+        // before re-throwing so consumer-supplied callbacks see the failure.
+        await this.fireLifecycleErrorCallback(options, realStreamError);
         // If real streaming failed and no tools are enabled, re-throw the original error
         logger.error(
           `Real streaming failed for ${this.providerName}:`,
@@ -354,6 +395,185 @@ export abstract class BaseProvider implements AIProvider {
         );
         throw this.handleProviderError(realStreamError);
       }
+    }
+  }
+
+  /**
+   * Wrap a StreamResult with consumer-facing lifecycle callbacks.
+   *
+   * `options.onChunk`, `options.onFinish`, `options.onError` are translated
+   * by NeuroLink.applyStreamLifecycleMiddleware() into
+   * `options.middleware.middlewareConfig.lifecycle.config`. The AI SDK's
+   * lifecycle middleware only sees these via the wrapped LanguageModel —
+   * which is bypassed by providers that stream via raw HTTP fetch (Ollama
+   * over /api/chat, custom OpenAI-compatible servers, etc). Wrapping the
+   * user-facing stream here ensures the callbacks fire regardless of the
+   * underlying transport.
+   */
+  private wrapStreamWithLifecycleCallbacks(
+    result: StreamResult,
+    options: StreamOptions,
+  ): StreamResult {
+    const lifecycle = (options as unknown as OptionsWithLifecycleMiddleware)
+      ?.middleware?.middlewareConfig?.lifecycle?.config;
+
+    if (!lifecycle?.onChunk && !lifecycle?.onFinish && !lifecycle?.onError) {
+      return result;
+    }
+
+    const { onChunk, onFinish, onError } = lifecycle;
+    const startTime = Date.now();
+    const originalStream = result.stream;
+    // Lifecycle callbacks are awaited with a bounded deadline so callers
+    // observe ordering guarantees (onChunk/onFinish/onError have all
+    // settled by the time `for await` returns / throws). The previous
+    // fire-and-forget pattern left async work running past stream close,
+    // creating races during cleanup. The deadline is configurable via
+    // `lifecycle.timeoutMs` (per-call) or `NEUROLINK_LIFECYCLE_TIMEOUT_MS`
+    // (env / CLI surface) — see `resolveLifecycleTimeoutMs`.
+    const timeoutMs = resolveLifecycleTimeoutMs(lifecycle);
+    const safeFire = async (
+      fn: () => unknown,
+      label: string,
+    ): Promise<void> => {
+      try {
+        await withTimeoutFn(
+          async () => {
+            const ret = fn();
+            if (ret && typeof (ret as Promise<unknown>).then === "function") {
+              await ret;
+            }
+          },
+          timeoutMs,
+          `[lifecycle] ${label} callback exceeded ${timeoutMs}ms`,
+        );
+      } catch (e) {
+        logger.warn(`[lifecycle] ${label} callback error:`, e);
+      }
+    };
+
+    const wrappedStream = (async function* () {
+      let accumulated = "";
+      let seq = 0;
+      try {
+        for await (const chunk of originalStream) {
+          const textPart =
+            chunk &&
+            typeof chunk === "object" &&
+            "content" in chunk &&
+            typeof (chunk as { content: unknown }).content === "string"
+              ? ((chunk as { content: string }).content as string)
+              : "";
+          // Only fire onChunk for actual text deltas. Non-text chunks
+          // (image, tts_audio) would otherwise produce empty text-delta
+          // events that consumers must filter out themselves.
+          if (onChunk && textPart) {
+            const currentSeq = seq++;
+            await safeFire(
+              () =>
+                onChunk({
+                  type: "text-delta",
+                  textDelta: textPart,
+                  sequenceNumber: currentSeq,
+                }),
+              "onChunk",
+            );
+          }
+          if (textPart) {
+            accumulated += textPart;
+          }
+          yield chunk;
+        }
+        if (onFinish) {
+          await safeFire(
+            () =>
+              onFinish({
+                text: accumulated,
+                duration: Date.now() - startTime,
+              }),
+            "onFinish",
+          );
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (onError && !hasLifecycleErrorFired(err)) {
+          // Mark before firing so a higher layer that also routes through
+          // fireLifecycleErrorCallback (or its own lifecycle wrapper) with
+          // the same error instance won't double-fire onError. Mirrors the
+          // pattern in fireLifecycleErrorCallback below.
+          markLifecycleErrorFired(err);
+          await safeFire(
+            () =>
+              onError({
+                error: err,
+                duration: Date.now() - startTime,
+                recoverable: false,
+              }),
+            "onError",
+          );
+        }
+        throw err;
+      }
+    })();
+
+    return { ...result, stream: wrappedStream };
+  }
+
+  /**
+   * Fire the consumer-supplied onError callback before throwing. Used in
+   * error branches inside stream() that re-throw without emitting any
+   * stream chunks (which would otherwise hide the failure from a caller
+   * that supplied `onError`).
+   */
+  private async fireLifecycleErrorCallback(
+    options: StreamOptions | TextGenerationOptions,
+    error: unknown,
+  ): Promise<void> {
+    const err = error instanceof Error ? error : new Error(String(error));
+    // The AI-SDK lifecycle middleware stamps errors it has already
+    // surfaced (Symbol.for("neurolink.onErrorFired"); see
+    // utils/lifecycleCallbacks.ts). Skip here so consumers don't receive
+    // duplicate onError events for the same failure.
+    if (hasLifecycleErrorFired(err)) {
+      return;
+    }
+    const lifecycle = (options as unknown as OptionsWithLifecycleMiddleware)
+      ?.middleware?.middlewareConfig?.lifecycle?.config;
+    const onError = lifecycle?.onError;
+    if (!onError) {
+      return;
+    }
+    // Set the marker before invoking so a sync re-entry (or a concurrent
+    // dispatch path) can't double-fire onError for the same error object.
+    markLifecycleErrorFired(err);
+    // Fire the consumer's onError with a bounded deadline AND await its
+    // completion — callers can now `await fireLifecycleErrorCallback(...)`
+    // to guarantee the consumer's async onError settles before the
+    // surrounding stream() / executeFakeStreaming() rethrows. Deadline is
+    // configurable via `lifecycle.timeoutMs` or the
+    // `NEUROLINK_LIFECYCLE_TIMEOUT_MS` env var.
+    const timeoutMs = resolveLifecycleTimeoutMs(lifecycle);
+    try {
+      await withTimeoutFn(
+        async () => {
+          // Capturing `onError` into a const above means TypeScript sees the
+          // narrowing past the early-return, so no non-null assertion needed
+          // here — and the callback identity is stable across the timeout
+          // boundary even if the caller mutates `lifecycle.onError` mid-call.
+          const ret = onError({
+            error: err,
+            duration: 0,
+            recoverable: false,
+          });
+          if (ret && typeof (ret as Promise<unknown>).then === "function") {
+            await ret;
+          }
+        },
+        timeoutMs,
+        `[lifecycle] onError callback exceeded ${timeoutMs}ms`,
+      );
+    } catch (e) {
+      logger.warn("[lifecycle] onError callback error:", e);
     }
   }
 
@@ -510,6 +730,14 @@ export abstract class BaseProvider implements AIProvider {
         `Fake streaming fallback failed for ${this.providerName}:`,
         error,
       );
+      // Fire the consumer-supplied onError BEFORE re-throwing through
+      // handleProviderError() so callers using onChunk/onFinish/onError
+      // get notified even when fake-streaming setup (message build, image
+      // adapter, etc.) fails synchronously. Awaited so the consumer's
+      // async onError fully settles before we rethrow. The shared
+      // lifecycle-fired WeakSet mark prevents double-fire if a wrapper
+      // layer also handles this.
+      await this.fireLifecycleErrorCallback(options, error);
       throw this.handleProviderError(error);
     }
   }
@@ -1192,6 +1420,11 @@ export abstract class BaseProvider implements AIProvider {
       analytics: result.analytics,
       evaluation: result.evaluation,
       audio: result.audio,
+      // Forward reasoning fields populated by GenerationHandler from AI-SDK
+      // reasoning parts (DeepSeek `reasoning_content`, Anthropic thinking,
+      // Gemini thought parts, OpenAI o1).
+      reasoning: result.reasoning,
+      reasoningTokens: result.reasoningTokens,
     };
   }
 
@@ -1490,6 +1723,16 @@ export abstract class BaseProvider implements AIProvider {
         : new DOMException("The operation was aborted", "AbortError");
     }
     const formatted = this.formatProviderError(error);
+
+    // Preserve the lifecycle-fired mark across formatting:
+    // fireLifecycleErrorCallback() marks the ORIGINAL error in the shared
+    // WeakSet, but formatProviderError() typically returns a new Error
+    // instance. Re-mark the formatted error so a higher layer (e.g.
+    // NeuroLink.stream()'s top-level catch + applyStreamLifecycleMiddleware)
+    // doesn't fire onError a second time for the same failure.
+    if (hasLifecycleErrorFired(error)) {
+      markLifecycleErrorFired(formatted);
+    }
 
     // P3 fix: Classify error and set error.type on the active OTel span
     try {

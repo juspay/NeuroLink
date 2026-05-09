@@ -23,6 +23,37 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Path to the rag fixtures directory used by the *Files API* sub-suites.
+// Without this constant the suites crashed with `ReferenceError: FIXTURES_DIR
+// is not defined`, marking all three (ragGenerateFilesAPI, ragStreamFilesAPI,
+// cliRagFiles) as FAIL even when their preflight skip conditions matched.
+const FIXTURES_DIR = path.join(__dirname, "fixtures", "rag");
+
+// Fixture-driven test bodies live in JSON files alongside the document
+// fixtures. Loading them lazily lets the tests survive a missing fixture file
+// without crashing the whole sub-suite — they just fall back to an empty
+// array, which makes the for-loop a no-op.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FixtureTest = Record<string, any>;
+
+function loadJsonFixture<T>(filename: string, fallback: T): T {
+  try {
+    const filePath = path.join(FIXTURES_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return fallback;
+    }
+    return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+const generateStreamTests: FixtureTest[] = loadJsonFixture(
+  "generate-stream-tests.json",
+  [],
+);
+const cliTests: FixtureTest[] = loadJsonFixture("cli-tests.json", []);
+
 import type { Tool } from "ai";
 import type { z } from "zod";
 import { NeuroLink } from "../src/lib/neurolink.js";
@@ -117,284 +148,66 @@ const TEST_CONFIG = {
 };
 
 // Color codes for output
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  magenta: "\x1b[35m",
-  cyan: "\x1b[36m",
-} as const;
+import {
+  defineSuite,
+  log,
+  logSection,
+  type ColorName,
+} from "./helpers/harness.js";
 
-type ColorName = keyof typeof colors;
+const { recordTest, runSuite } = defineSuite("Rag");
 
-// ============================================================================
-// Test Fixtures
-// ============================================================================
-
-// Load fixtures from JSON files
-const FIXTURES_DIR = path.join(__dirname, "fixtures", "rag");
-
-type ChunkerConfigFixture = {
-  strategy: ChunkingStrategy;
-  config: Record<string, unknown>;
-  description: string;
-};
-
-type SearchQueryFixture = {
-  query: string;
-  expectedKeywords: string[];
-  minResults: number;
-};
-
-type RerankerConfigFixture = {
-  type: string;
-  config: Record<string, unknown>;
-  description: string;
-};
-
-type GenerateStreamTestFixture = {
-  id: string;
-  description: string;
-  prompt: string;
-  expectedToolCall: string;
-  expectedKeywords: string[];
-  expectNoResults?: boolean;
-  ragConfig: {
-    topK?: number;
-    minScore?: number;
-    stream?: boolean;
-    rerank?: boolean;
-  };
-};
-
-type CLITestFixture = {
-  id: string;
-  command: string;
-  expectedMinChunks?: number;
-  expectedMaxChunks?: number;
-  expectedOutput?: string;
-  description: string;
-};
-
-let chunkerConfigs: ChunkerConfigFixture[] = [];
-let searchQueries: SearchQueryFixture[] = [];
-let rerankerConfigs: RerankerConfigFixture[] = [];
-let sampleDocuments: string = "";
-let generateStreamTests: GenerateStreamTestFixture[] = [];
-let cliTests: CLITestFixture[] = [];
-
-function loadFixtures(): void {
-  try {
-    chunkerConfigs = JSON.parse(
-      fs.readFileSync(path.join(FIXTURES_DIR, "chunker-config.json"), "utf-8"),
-    );
-    searchQueries = JSON.parse(
-      fs.readFileSync(path.join(FIXTURES_DIR, "search-queries.json"), "utf-8"),
-    );
-    rerankerConfigs = JSON.parse(
-      fs.readFileSync(path.join(FIXTURES_DIR, "reranker-config.json"), "utf-8"),
-    );
-    sampleDocuments = fs.readFileSync(
-      path.join(FIXTURES_DIR, "sample-documents.txt"),
-      "utf-8",
-    );
-    // Load generate/stream and CLI test fixtures
-    try {
-      generateStreamTests = JSON.parse(
-        fs.readFileSync(
-          path.join(FIXTURES_DIR, "generate-stream-tests.json"),
-          "utf-8",
-        ),
-      );
-    } catch {
-      log(
-        "Warning: generate-stream-tests.json not found, using defaults",
-        "yellow",
-      );
-      generateStreamTests = [];
-    }
-    try {
-      cliTests = JSON.parse(
-        fs.readFileSync(path.join(FIXTURES_DIR, "cli-tests.json"), "utf-8"),
-      );
-    } catch {
-      log("Warning: cli-tests.json not found, using defaults", "yellow");
-      cliTests = [];
-    }
-    log("Fixtures loaded successfully", "green");
-  } catch (error) {
-    log(`Warning: Could not load some fixtures: ${error}`, "yellow");
-    // Use inline defaults if fixtures not found
-    chunkerConfigs = getDefaultChunkerConfigs();
-    searchQueries = getDefaultSearchQueries();
-    rerankerConfigs = getDefaultRerankerConfigs();
-    sampleDocuments = getDefaultSampleDocument();
-  }
-}
-
-function getDefaultChunkerConfigs(): ChunkerConfigFixture[] {
-  return [
-    {
-      strategy: "character",
-      config: { maxSize: 500, overlap: 50 },
-      description: "Character-based chunking",
-    },
-    {
-      strategy: "recursive",
-      config: { maxSize: 500, overlap: 50 },
-      description: "Recursive chunking",
-    },
-    {
-      strategy: "sentence",
-      config: { maxSize: 500 },
-      description: "Sentence-based chunking",
-    },
-    {
-      strategy: "token",
-      config: { maxSize: 256, overlap: 25 },
-      description: "Token-based chunking",
-    },
-    {
-      strategy: "markdown",
-      config: { maxSize: 500 },
-      description: "Markdown-aware chunking",
-    },
-    {
-      strategy: "html",
-      config: { maxSize: 500 },
-      description: "HTML-aware chunking",
-    },
-    {
-      strategy: "json",
-      config: { maxSize: 500 },
-      description: "JSON structure-aware chunking",
-    },
-    {
-      strategy: "latex",
-      config: { maxSize: 500 },
-      description: "LaTeX-aware chunking",
-    },
-    {
-      strategy: "semantic-markdown",
-      config: { maxSize: 500, overlap: 100 },
-      description: "Semantic markdown chunking",
-    },
-  ];
-}
-
-function getDefaultSearchQueries(): SearchQueryFixture[] {
-  return [
-    {
-      query: "machine learning algorithms",
-      expectedKeywords: ["machine", "learning"],
-      minResults: 1,
-    },
-    {
-      query: "neural network architecture",
-      expectedKeywords: ["neural", "network"],
-      minResults: 1,
-    },
-    {
-      query: "data processing pipeline",
-      expectedKeywords: ["data", "processing"],
-      minResults: 1,
-    },
-  ];
-}
-
-function getDefaultRerankerConfigs(): RerankerConfigFixture[] {
-  return [
-    {
-      type: "simple",
-      config: { topK: 3 },
-      description: "Simple position-based reranking",
-    },
-    {
-      type: "cross-encoder",
-      config: { topK: 3 },
-      description: "Cross-encoder reranking",
-    },
-    {
-      type: "cohere",
-      config: { topK: 3 },
-      description: "Cohere API reranking",
-    },
-  ];
-}
-
-function getDefaultSampleDocument(): string {
-  return `# Introduction to Machine Learning
-
-Machine learning is a subset of artificial intelligence that enables systems to learn from data.
-
-## Types of Machine Learning
-
-### Supervised Learning
-Supervised learning uses labeled datasets to train algorithms.
-
-### Unsupervised Learning
-Unsupervised learning finds patterns in unlabeled data.
-
-## Neural Networks
-
-Neural networks are computing systems inspired by biological neural networks.
-
-### Architecture
-A neural network consists of layers of interconnected nodes.
-
-## Data Processing
-
-Data preprocessing is essential for machine learning pipelines.
-
-### Feature Engineering
-Feature engineering involves creating new features from raw data.
-`;
-}
-
-// ============================================================================
-// Logging Utilities
-// ============================================================================
-
-function log(message: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
-function logSection(title: string): void {
-  log(`\n${"=".repeat(70)}`, "cyan");
-  log(`${title}`, "cyan");
-  log(`${"=".repeat(70)}`, "cyan");
-}
-
-function logSubsection(title: string): void {
-  log(`\n--- ${title} ---`, "blue");
-}
-
+/** Print-only logTest shim. Counters are driven by recordTest in the runner. */
 function logTest(
   testName: string,
   status: "PASS" | "FAIL" | "SKIP" | "TESTING",
-  details = "",
+  details?: string,
 ): void {
-  const icons = {
-    PASS: "\u2705",
-    FAIL: "\u274C",
-    SKIP: "\u23ED\uFE0F",
-    TESTING: "\u26A0\uFE0F",
-  };
-  const colorMap: Record<string, ColorName> = {
-    PASS: "green",
-    FAIL: "red",
-    SKIP: "yellow",
-    TESTING: "yellow",
-  };
-  log(`${icons[status]} ${testName}`, colorMap[status]);
-  if (details) {
-    log(`   ${details}`, "reset");
-  }
+  const color: ColorName =
+    status === "PASS"
+      ? "green"
+      : status === "FAIL"
+        ? "red"
+        : status === "SKIP"
+          ? "yellow"
+          : "blue";
+  log(`[${status}] ${testName}${details ? ` — ${details}` : ""}`, color);
 }
 
+/** Section nested under a logSection() banner — visually narrower. */
+function logSubsection(title: string): void {
+  log(`\n  ${title}`, "cyan");
+  log(`  ${"-".repeat(Math.min(title.length, 60))}`, "cyan");
+}
+
+/**
+ * Default sample document used by chunker / reranker tests when the
+ * fixtures/rag/sample-document.md isn't loaded yet. Contains enough
+ * sentences to make chunkSize/overlap behaviour observable.
+ */
+function getDefaultSampleDocument(): string {
+  return `# Sample Document
+
+This is a sample document used for RAG testing. It contains multiple
+paragraphs to exercise chunkers, rerankers, and hybrid search.
+
+## Section 1
+The first section discusses semantic search. Semantic search uses
+vector embeddings to find relevant content. Relevance is scored by
+cosine similarity.
+
+## Section 2
+The second section discusses keyword search. Keyword search uses BM25
+to score document relevance. BM25 considers term frequency and inverse
+document frequency.
+
+## Section 3
+The third section discusses hybrid search, which combines semantic and
+keyword scoring with reciprocal-rank fusion.`;
+}
+
+/** Optional override populated by per-test fixture loaders; null = use default. */
+const sampleDocuments: string | null = null;
 // ============================================================================
 // Test Results Tracking
 // ============================================================================
@@ -406,10 +219,15 @@ type TestResult = {
   duration?: number;
 };
 
-const testResults: TestResult[] = [];
-
-function recordTest(result: TestResult): void {
-  testResults.push(result);
+// Local recordResult shadow — translates rag.ts's `{name, status}` shape
+// into the shared harness's `recordTest(name, passed, skipped, error?)`.
+function recordResult(result: TestResult): void {
+  recordTest(
+    result.name,
+    result.status === "PASS",
+    result.status === "SKIP",
+    result.status === "FAIL" ? "failed" : undefined,
+  );
 }
 
 // ============================================================================
@@ -427,19 +245,19 @@ async function testChunkerFactory(): Promise<boolean | null> {
     const instance2 = ChunkerFactory.getInstance();
     if (instance1 === instance2) {
       logTest("ChunkerFactory singleton", "PASS", "Same instance returned");
-      recordTest({ name: "ChunkerFactory singleton", status: "PASS" });
+      recordResult({ name: "ChunkerFactory singleton", status: "PASS" });
     } else {
       logTest(
         "ChunkerFactory singleton",
         "FAIL",
         "Different instances returned",
       );
-      recordTest({ name: "ChunkerFactory singleton", status: "FAIL" });
+      recordResult({ name: "ChunkerFactory singleton", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("ChunkerFactory singleton", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "ChunkerFactory singleton",
       status: "FAIL",
       details: String(error),
@@ -473,19 +291,19 @@ async function testChunkerFactory(): Promise<boolean | null> {
         "PASS",
         `Found ${strategies.length} strategies: ${strategies.join(", ")}`,
       );
-      recordTest({ name: "Available strategies", status: "PASS" });
+      recordResult({ name: "Available strategies", status: "PASS" });
     } else {
       logTest(
         "Available strategies",
         "FAIL",
         `Expected at least 10 strategies, found ${foundCount}`,
       );
-      recordTest({ name: "Available strategies", status: "FAIL" });
+      recordResult({ name: "Available strategies", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Available strategies", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Available strategies",
       status: "FAIL",
       details: String(error),
@@ -512,19 +330,19 @@ async function testChunkerFactory(): Promise<boolean | null> {
       const chunker = await createChunker(strategy);
       if (chunker && chunker.strategy === strategy) {
         logTest(`Create ${strategy} chunker`, "PASS");
-        recordTest({ name: `Create ${strategy} chunker`, status: "PASS" });
+        recordResult({ name: `Create ${strategy} chunker`, status: "PASS" });
       } else {
         logTest(
           `Create ${strategy} chunker`,
           "FAIL",
           "Invalid chunker returned",
         );
-        recordTest({ name: `Create ${strategy} chunker`, status: "FAIL" });
+        recordResult({ name: `Create ${strategy} chunker`, status: "FAIL" });
         allPassed = false;
       }
     } catch (error) {
       logTest(`Create ${strategy} chunker`, "FAIL", String(error));
-      recordTest({
+      recordResult({
         name: `Create ${strategy} chunker`,
         status: "FAIL",
         details: String(error),
@@ -548,19 +366,19 @@ async function testChunkerFactory(): Promise<boolean | null> {
       const chunker = await createChunker(alias);
       if (chunker && chunker.strategy === expected) {
         logTest(`Alias '${alias}' -> '${expected}'`, "PASS");
-        recordTest({ name: `Alias ${alias}`, status: "PASS" });
+        recordResult({ name: `Alias ${alias}`, status: "PASS" });
       } else {
         logTest(
           `Alias '${alias}' -> '${expected}'`,
           "FAIL",
           `Got ${chunker?.strategy}`,
         );
-        recordTest({ name: `Alias ${alias}`, status: "FAIL" });
+        recordResult({ name: `Alias ${alias}`, status: "FAIL" });
         allPassed = false;
       }
     } catch (error) {
       logTest(`Alias '${alias}' -> '${expected}'`, "FAIL", String(error));
-      recordTest({
+      recordResult({
         name: `Alias ${alias}`,
         status: "FAIL",
         details: String(error),
@@ -584,15 +402,15 @@ async function testChunkerFactory(): Promise<boolean | null> {
         "PASS",
         `Description: ${metadata.description.slice(0, 50)}...`,
       );
-      recordTest({ name: "Get chunker metadata", status: "PASS" });
+      recordResult({ name: "Get chunker metadata", status: "PASS" });
     } else {
       logTest("Get chunker metadata", "FAIL", "Incomplete metadata");
-      recordTest({ name: "Get chunker metadata", status: "FAIL" });
+      recordResult({ name: "Get chunker metadata", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get chunker metadata", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get chunker metadata",
       status: "FAIL",
       details: String(error),
@@ -606,15 +424,15 @@ async function testChunkerFactory(): Promise<boolean | null> {
     const config = getDefaultConfig("recursive");
     if (config && typeof config.maxSize === "number") {
       logTest("Get default config", "PASS", `maxSize: ${config.maxSize}`);
-      recordTest({ name: "Get default config", status: "PASS" });
+      recordResult({ name: "Get default config", status: "PASS" });
     } else {
       logTest("Get default config", "FAIL", "Invalid config returned");
-      recordTest({ name: "Get default config", status: "FAIL" });
+      recordResult({ name: "Get default config", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get default config", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get default config",
       status: "FAIL",
       details: String(error),
@@ -636,15 +454,15 @@ async function testChunkerRegistry(): Promise<boolean | null> {
     const instance2 = ChunkerRegistry.getInstance();
     if (instance1 === instance2) {
       logTest("ChunkerRegistry singleton", "PASS");
-      recordTest({ name: "ChunkerRegistry singleton", status: "PASS" });
+      recordResult({ name: "ChunkerRegistry singleton", status: "PASS" });
     } else {
       logTest("ChunkerRegistry singleton", "FAIL");
-      recordTest({ name: "ChunkerRegistry singleton", status: "FAIL" });
+      recordResult({ name: "ChunkerRegistry singleton", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("ChunkerRegistry singleton", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "ChunkerRegistry singleton",
       status: "FAIL",
       details: String(error),
@@ -658,15 +476,15 @@ async function testChunkerRegistry(): Promise<boolean | null> {
     const chunker = await getChunker("recursive");
     if (chunker && typeof chunker.chunk === "function") {
       logTest("Get chunker from registry", "PASS");
-      recordTest({ name: "Get chunker from registry", status: "PASS" });
+      recordResult({ name: "Get chunker from registry", status: "PASS" });
     } else {
       logTest("Get chunker from registry", "FAIL", "Invalid chunker");
-      recordTest({ name: "Get chunker from registry", status: "FAIL" });
+      recordResult({ name: "Get chunker from registry", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get chunker from registry", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get chunker from registry",
       status: "FAIL",
       details: String(error),
@@ -684,19 +502,19 @@ async function testChunkerRegistry(): Promise<boolean | null> {
         "PASS",
         `Found ${available.length} chunkers`,
       );
-      recordTest({ name: "Available chunkers", status: "PASS" });
+      recordResult({ name: "Available chunkers", status: "PASS" });
     } else {
       logTest(
         "Available chunkers",
         "FAIL",
         `Expected >= 9, got ${available.length}`,
       );
-      recordTest({ name: "Available chunkers", status: "FAIL" });
+      recordResult({ name: "Available chunkers", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Available chunkers", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Available chunkers",
       status: "FAIL",
       details: String(error),
@@ -711,19 +529,19 @@ async function testChunkerRegistry(): Promise<boolean | null> {
     const hasInvalid = chunkerRegistry.hasChunker("non-existent-chunker");
     if (hasRecursive && !hasInvalid) {
       logTest("Has chunker check", "PASS");
-      recordTest({ name: "Has chunker check", status: "PASS" });
+      recordResult({ name: "Has chunker check", status: "PASS" });
     } else {
       logTest(
         "Has chunker check",
         "FAIL",
         `recursive=${hasRecursive}, invalid=${hasInvalid}`,
       );
-      recordTest({ name: "Has chunker check", status: "FAIL" });
+      recordResult({ name: "Has chunker check", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Has chunker check", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Has chunker check",
       status: "FAIL",
       details: String(error),
@@ -741,19 +559,19 @@ async function testChunkerRegistry(): Promise<boolean | null> {
         "PASS",
         `Found: ${docChunkers.join(", ")}`,
       );
-      recordTest({ name: "Get chunkers by use case", status: "PASS" });
+      recordResult({ name: "Get chunkers by use case", status: "PASS" });
     } else {
       logTest(
         "Get chunkers by use case",
         "FAIL",
         "Markdown not found for documentation",
       );
-      recordTest({ name: "Get chunkers by use case", status: "FAIL" });
+      recordResult({ name: "Get chunkers by use case", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get chunkers by use case", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get chunkers by use case",
       status: "FAIL",
       details: String(error),
@@ -834,20 +652,20 @@ This is the methods section.
                 chunks.length,
             )} chars`,
           );
-          recordTest({ name: `${strategy} chunker`, status: "PASS" });
+          recordResult({ name: `${strategy} chunker`, status: "PASS" });
         } else {
           logTest(`${strategy} chunker`, "FAIL", "Invalid chunk structure");
-          recordTest({ name: `${strategy} chunker`, status: "FAIL" });
+          recordResult({ name: `${strategy} chunker`, status: "FAIL" });
           allPassed = false;
         }
       } else {
         logTest(`${strategy} chunker`, "FAIL", "No chunks generated");
-        recordTest({ name: `${strategy} chunker`, status: "FAIL" });
+        recordResult({ name: `${strategy} chunker`, status: "FAIL" });
         allPassed = false;
       }
     } catch (error) {
       logTest(`${strategy} chunker`, "FAIL", String(error));
-      recordTest({
+      recordResult({
         name: `${strategy} chunker`,
         status: "FAIL",
         details: String(error),
@@ -874,15 +692,15 @@ async function testRerankerFactory(): Promise<boolean | null> {
     const instance2 = RerankerFactory.getInstance();
     if (instance1 === instance2) {
       logTest("RerankerFactory singleton", "PASS");
-      recordTest({ name: "RerankerFactory singleton", status: "PASS" });
+      recordResult({ name: "RerankerFactory singleton", status: "PASS" });
     } else {
       logTest("RerankerFactory singleton", "FAIL");
-      recordTest({ name: "RerankerFactory singleton", status: "FAIL" });
+      recordResult({ name: "RerankerFactory singleton", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("RerankerFactory singleton", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "RerankerFactory singleton",
       status: "FAIL",
       details: String(error),
@@ -901,19 +719,19 @@ async function testRerankerFactory(): Promise<boolean | null> {
 
     if (foundCount >= 4) {
       logTest("Available reranker types", "PASS", `Found: ${types.join(", ")}`);
-      recordTest({ name: "Available reranker types", status: "PASS" });
+      recordResult({ name: "Available reranker types", status: "PASS" });
     } else {
       logTest(
         "Available reranker types",
         "FAIL",
         `Expected >= 4, found ${foundCount}`,
       );
-      recordTest({ name: "Available reranker types", status: "FAIL" });
+      recordResult({ name: "Available reranker types", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Available reranker types", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Available reranker types",
       status: "FAIL",
       details: String(error),
@@ -930,15 +748,15 @@ async function testRerankerFactory(): Promise<boolean | null> {
     });
     if (reranker && reranker.type === "simple") {
       logTest("Create simple reranker", "PASS");
-      recordTest({ name: "Create simple reranker", status: "PASS" });
+      recordResult({ name: "Create simple reranker", status: "PASS" });
     } else {
       logTest("Create simple reranker", "FAIL", "Invalid reranker");
-      recordTest({ name: "Create simple reranker", status: "FAIL" });
+      recordResult({ name: "Create simple reranker", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Create simple reranker", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Create simple reranker",
       status: "FAIL",
       details: String(error),
@@ -961,15 +779,15 @@ async function testRerankerFactory(): Promise<boolean | null> {
         "PASS",
         `Description: ${metadata.description.slice(0, 50)}...`,
       );
-      recordTest({ name: "Get reranker metadata", status: "PASS" });
+      recordResult({ name: "Get reranker metadata", status: "PASS" });
     } else {
       logTest("Get reranker metadata", "FAIL", "Incomplete metadata");
-      recordTest({ name: "Get reranker metadata", status: "FAIL" });
+      recordResult({ name: "Get reranker metadata", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get reranker metadata", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get reranker metadata",
       status: "FAIL",
       details: String(error),
@@ -990,14 +808,14 @@ async function testRerankerFactory(): Promise<boolean | null> {
       const reranker = await createReranker(alias);
       if (reranker && reranker.type === expected) {
         logTest(`Alias '${alias}' -> '${expected}'`, "PASS");
-        recordTest({ name: `Reranker alias ${alias}`, status: "PASS" });
+        recordResult({ name: `Reranker alias ${alias}`, status: "PASS" });
       } else {
         logTest(
           `Alias '${alias}' -> '${expected}'`,
           "FAIL",
           `Got ${reranker?.type}`,
         );
-        recordTest({ name: `Reranker alias ${alias}`, status: "FAIL" });
+        recordResult({ name: `Reranker alias ${alias}`, status: "FAIL" });
         allPassed = false;
       }
     } catch (error) {
@@ -1008,10 +826,10 @@ async function testRerankerFactory(): Promise<boolean | null> {
           "PASS",
           "Correctly requires model provider",
         );
-        recordTest({ name: `Reranker alias ${alias}`, status: "PASS" });
+        recordResult({ name: `Reranker alias ${alias}`, status: "PASS" });
       } else {
         logTest(`Alias '${alias}' -> '${expected}'`, "FAIL", String(error));
-        recordTest({
+        recordResult({
           name: `Reranker alias ${alias}`,
           status: "FAIL",
           details: String(error),
@@ -1031,19 +849,19 @@ async function testRerankerFactory(): Promise<boolean | null> {
         "PASS",
         `Found: ${modelFree.join(", ")}`,
       );
-      recordTest({ name: "Get model-free rerankers", status: "PASS" });
+      recordResult({ name: "Get model-free rerankers", status: "PASS" });
     } else {
       logTest(
         "Get model-free rerankers",
         "FAIL",
         "Simple not found in model-free list",
       );
-      recordTest({ name: "Get model-free rerankers", status: "FAIL" });
+      recordResult({ name: "Get model-free rerankers", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get model-free rerankers", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get model-free rerankers",
       status: "FAIL",
       details: String(error),
@@ -1065,15 +883,15 @@ async function testRerankerRegistry(): Promise<boolean | null> {
     const instance2 = RerankerRegistry.getInstance();
     if (instance1 === instance2) {
       logTest("RerankerRegistry singleton", "PASS");
-      recordTest({ name: "RerankerRegistry singleton", status: "PASS" });
+      recordResult({ name: "RerankerRegistry singleton", status: "PASS" });
     } else {
       logTest("RerankerRegistry singleton", "FAIL");
-      recordTest({ name: "RerankerRegistry singleton", status: "FAIL" });
+      recordResult({ name: "RerankerRegistry singleton", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("RerankerRegistry singleton", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "RerankerRegistry singleton",
       status: "FAIL",
       details: String(error),
@@ -1091,19 +909,19 @@ async function testRerankerRegistry(): Promise<boolean | null> {
         "PASS",
         `Found ${available.length} rerankers`,
       );
-      recordTest({ name: "Registry available rerankers", status: "PASS" });
+      recordResult({ name: "Registry available rerankers", status: "PASS" });
     } else {
       logTest(
         "Available rerankers",
         "FAIL",
         `Expected >= 4, got ${available.length}`,
       );
-      recordTest({ name: "Registry available rerankers", status: "FAIL" });
+      recordResult({ name: "Registry available rerankers", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Available rerankers", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Registry available rerankers",
       status: "FAIL",
       details: String(error),
@@ -1118,19 +936,19 @@ async function testRerankerRegistry(): Promise<boolean | null> {
     const hasInvalid = rerankerRegistry.hasReranker("non-existent-reranker");
     if (hasSimple && !hasInvalid) {
       logTest("Has reranker check", "PASS");
-      recordTest({ name: "Has reranker check", status: "PASS" });
+      recordResult({ name: "Has reranker check", status: "PASS" });
     } else {
       logTest(
         "Has reranker check",
         "FAIL",
         `simple=${hasSimple}, invalid=${hasInvalid}`,
       );
-      recordTest({ name: "Has reranker check", status: "FAIL" });
+      recordResult({ name: "Has reranker check", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Has reranker check", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Has reranker check",
       status: "FAIL",
       details: String(error),
@@ -1148,19 +966,19 @@ async function testRerankerRegistry(): Promise<boolean | null> {
         "PASS",
         `Found: ${fastRerankers.join(", ")}`,
       );
-      recordTest({ name: "Get rerankers by use case", status: "PASS" });
+      recordResult({ name: "Get rerankers by use case", status: "PASS" });
     } else {
       logTest(
         "Get rerankers by use case",
         "FAIL",
         "Simple not found for 'fast' use case",
       );
-      recordTest({ name: "Get rerankers by use case", status: "FAIL" });
+      recordResult({ name: "Get rerankers by use case", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Get rerankers by use case", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Get rerankers by use case",
       status: "FAIL",
       details: String(error),
@@ -1206,10 +1024,10 @@ async function testSimpleReranking(): Promise<boolean | null> {
           "PASS",
           `Reranked to ${reranked.length} results, top score: ${reranked[0].score.toFixed(3)}`,
         );
-        recordTest({ name: "Simple reranking", status: "PASS" });
+        recordResult({ name: "Simple reranking", status: "PASS" });
       } else {
         logTest("Simple reranking", "FAIL", "Results not sorted by score");
-        recordTest({ name: "Simple reranking", status: "FAIL" });
+        recordResult({ name: "Simple reranking", status: "FAIL" });
         allPassed = false;
       }
     } else {
@@ -1218,12 +1036,12 @@ async function testSimpleReranking(): Promise<boolean | null> {
         "FAIL",
         `Expected 3 results, got ${reranked?.length}`,
       );
-      recordTest({ name: "Simple reranking", status: "FAIL" });
+      recordResult({ name: "Simple reranking", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Simple reranking", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Simple reranking",
       status: "FAIL",
       details: String(error),
@@ -1290,10 +1108,10 @@ async function testHybridSearch(): Promise<boolean | null> {
           "PASS",
           `Found ${results.length} results, top score: ${results[0].score.toFixed(3)}`,
         );
-        recordTest({ name: "BM25 search", status: "PASS" });
+        recordResult({ name: "BM25 search", status: "PASS" });
       } else {
         logTest("BM25 search", "FAIL", "Results don't match query");
-        recordTest({ name: "BM25 search", status: "FAIL" });
+        recordResult({ name: "BM25 search", status: "FAIL" });
         allPassed = false;
       }
     } else {
@@ -1302,12 +1120,16 @@ async function testHybridSearch(): Promise<boolean | null> {
         "FAIL",
         `Expected 3 results, got ${results?.length}`,
       );
-      recordTest({ name: "BM25 search", status: "FAIL" });
+      recordResult({ name: "BM25 search", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("BM25 search", "FAIL", String(error));
-    recordTest({ name: "BM25 search", status: "FAIL", details: String(error) });
+    recordResult({
+      name: "BM25 search",
+      status: "FAIL",
+      details: String(error),
+    });
     allPassed = false;
   }
 
@@ -1339,24 +1161,28 @@ async function testHybridSearch(): Promise<boolean | null> {
           "PASS",
           `doc1: ${doc1Score.toFixed(4)}, doc2: ${doc2Score.toFixed(4)}`,
         );
-        recordTest({ name: "RRF fusion", status: "PASS" });
+        recordResult({ name: "RRF fusion", status: "PASS" });
       } else {
         logTest(
           "RRF fusion",
           "FAIL",
           "Fusion scores not reflecting document overlap",
         );
-        recordTest({ name: "RRF fusion", status: "FAIL" });
+        recordResult({ name: "RRF fusion", status: "FAIL" });
         allPassed = false;
       }
     } else {
       logTest("RRF fusion", "FAIL", "Insufficient fused results");
-      recordTest({ name: "RRF fusion", status: "FAIL" });
+      recordResult({ name: "RRF fusion", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("RRF fusion", "FAIL", String(error));
-    recordTest({ name: "RRF fusion", status: "FAIL", details: String(error) });
+    recordResult({
+      name: "RRF fusion",
+      status: "FAIL",
+      details: String(error),
+    });
     allPassed = false;
   }
 
@@ -1387,24 +1213,24 @@ async function testHybridSearch(): Promise<boolean | null> {
           "PASS",
           `doc1: ${doc1Combined.toFixed(3)}, doc2: ${doc2Combined.toFixed(3)}`,
         );
-        recordTest({ name: "Linear combination", status: "PASS" });
+        recordResult({ name: "Linear combination", status: "PASS" });
       } else {
         logTest(
           "Linear combination",
           "FAIL",
           "Combined scores not calculated correctly",
         );
-        recordTest({ name: "Linear combination", status: "FAIL" });
+        recordResult({ name: "Linear combination", status: "FAIL" });
         allPassed = false;
       }
     } else {
       logTest("Linear combination", "FAIL", "Insufficient combined results");
-      recordTest({ name: "Linear combination", status: "FAIL" });
+      recordResult({ name: "Linear combination", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Linear combination", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Linear combination",
       status: "FAIL",
       details: String(error),
@@ -1462,15 +1288,15 @@ async function testChunkerIntegration(): Promise<boolean | null> {
         "PASS",
         `${chunks.length} chunks, avg: ${Math.round(avgSize)} chars, max: ${maxChunkSize} chars`,
       );
-      recordTest({ name: "Chunking pipeline", status: "PASS" });
+      recordResult({ name: "Chunking pipeline", status: "PASS" });
     } else {
       logTest("Chunking pipeline", "FAIL", "Invalid chunk structure");
-      recordTest({ name: "Chunking pipeline", status: "FAIL" });
+      recordResult({ name: "Chunking pipeline", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Chunking pipeline", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Chunking pipeline",
       status: "FAIL",
       details: String(error),
@@ -1506,15 +1332,15 @@ async function testChunkerIntegration(): Promise<boolean | null> {
         .map(([s, c]) => `${s}: ${c}`)
         .join(", ");
       logTest("Multiple chunkers", "PASS", summary);
-      recordTest({ name: "Multiple chunkers comparison", status: "PASS" });
+      recordResult({ name: "Multiple chunkers comparison", status: "PASS" });
     } else {
       logTest("Multiple chunkers", "FAIL", "Some chunkers produced no chunks");
-      recordTest({ name: "Multiple chunkers comparison", status: "FAIL" });
+      recordResult({ name: "Multiple chunkers comparison", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Multiple chunkers", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Multiple chunkers comparison",
       status: "FAIL",
       details: String(error),
@@ -1538,15 +1364,15 @@ async function testErrorHandling(): Promise<boolean | null> {
   try {
     await createChunker("invalid-strategy-xyz" as ChunkingStrategy);
     logTest("Invalid chunker error", "FAIL", "Should have thrown an error");
-    recordTest({ name: "Invalid chunker error", status: "FAIL" });
+    recordResult({ name: "Invalid chunker error", status: "FAIL" });
     allPassed = false;
   } catch (error) {
     if (String(error).includes("Unknown chunking strategy")) {
       logTest("Invalid chunker error", "PASS", "Proper error thrown");
-      recordTest({ name: "Invalid chunker error", status: "PASS" });
+      recordResult({ name: "Invalid chunker error", status: "PASS" });
     } else {
       logTest("Invalid chunker error", "FAIL", `Wrong error: ${error}`);
-      recordTest({
+      recordResult({
         name: "Invalid chunker error",
         status: "FAIL",
         details: String(error),
@@ -1560,15 +1386,15 @@ async function testErrorHandling(): Promise<boolean | null> {
   try {
     await createReranker("invalid-reranker-xyz");
     logTest("Invalid reranker error", "FAIL", "Should have thrown an error");
-    recordTest({ name: "Invalid reranker error", status: "FAIL" });
+    recordResult({ name: "Invalid reranker error", status: "FAIL" });
     allPassed = false;
   } catch (error) {
     if (String(error).includes("Unknown reranker type")) {
       logTest("Invalid reranker error", "PASS", "Proper error thrown");
-      recordTest({ name: "Invalid reranker error", status: "PASS" });
+      recordResult({ name: "Invalid reranker error", status: "PASS" });
     } else {
       logTest("Invalid reranker error", "FAIL", `Wrong error: ${error}`);
-      recordTest({
+      recordResult({
         name: "Invalid reranker error",
         status: "FAIL",
         details: String(error),
@@ -1589,14 +1415,14 @@ async function testErrorHandling(): Promise<boolean | null> {
         "PASS",
         "Returns empty array for empty input",
       );
-      recordTest({ name: "Empty input handling", status: "PASS" });
+      recordResult({ name: "Empty input handling", status: "PASS" });
     } else {
       logTest(
         "Empty input handling",
         "PASS",
         `Returned ${chunks.length} chunks for empty input`,
       );
-      recordTest({ name: "Empty input handling", status: "PASS" });
+      recordResult({ name: "Empty input handling", status: "PASS" });
     }
   } catch (error) {
     // Some chunkers may throw on empty input - this is acceptable
@@ -1605,7 +1431,7 @@ async function testErrorHandling(): Promise<boolean | null> {
       "PASS",
       "Throws error for empty input (acceptable)",
     );
-    recordTest({ name: "Empty input handling", status: "PASS" });
+    recordResult({ name: "Empty input handling", status: "PASS" });
   }
 
   return allPassed;
@@ -1780,13 +1606,13 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
       "PASS",
       "Populated with 5 programming topic chunks",
     );
-    recordTest({
+    recordResult({
       name: "InMemoryVectorStore setup for generate",
       status: "PASS",
     });
   } catch (error) {
     logTest("InMemoryVectorStore setup for generate", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "InMemoryVectorStore setup for generate",
       status: "FAIL",
       details: String(error),
@@ -1813,19 +1639,19 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "PASS",
         `Retrieved ${results.length} results, top score: ${results[0]?.score?.toFixed(4) || "N/A"}`,
       );
-      recordTest({ name: "Vector store direct query", status: "PASS" });
+      recordResult({ name: "Vector store direct query", status: "PASS" });
     } else {
       logTest(
         "Vector store direct query",
         "FAIL",
         "No results returned from query",
       );
-      recordTest({ name: "Vector store direct query", status: "FAIL" });
+      recordResult({ name: "Vector store direct query", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Vector store direct query", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Vector store direct query",
       status: "FAIL",
       details: String(error),
@@ -1858,7 +1684,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "PASS",
         `Retrieved ${results.length} filtered results (category: api)`,
       );
-      recordTest({ name: "Vector store filter query", status: "PASS" });
+      recordResult({ name: "Vector store filter query", status: "PASS" });
     } else if (results.length === 0) {
       // Filter might not be supported or no matches
       logTest(
@@ -1866,14 +1692,14 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "PASS",
         "No matches for filter (filter may not be implemented)",
       );
-      recordTest({ name: "Vector store filter query", status: "PASS" });
+      recordResult({ name: "Vector store filter query", status: "PASS" });
     } else {
       logTest(
         "Vector store filter query",
         "FAIL",
         "Filter did not work correctly",
       );
-      recordTest({ name: "Vector store filter query", status: "FAIL" });
+      recordResult({ name: "Vector store filter query", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
@@ -1883,7 +1709,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
       "PASS",
       `Filter query not supported: ${String(error).slice(0, 50)}`,
     );
-    recordTest({ name: "Vector store filter query", status: "PASS" });
+    recordResult({ name: "Vector store filter query", status: "PASS" });
   }
 
   // Test 4: Create vector query tool
@@ -1919,7 +1745,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "PASS",
         `Tool: ${vectorQueryTool.name}, description length: ${vectorQueryTool.description.length}`,
       );
-      recordTest({
+      recordResult({
         name: "Vector query tool creation for generate",
         status: "PASS",
       });
@@ -1929,7 +1755,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "FAIL",
         "Tool missing required properties",
       );
-      recordTest({
+      recordResult({
         name: "Vector query tool creation for generate",
         status: "FAIL",
       });
@@ -1937,7 +1763,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
     }
   } catch (error) {
     logTest("Vector query tool creation for generate", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Vector query tool creation for generate",
       status: "FAIL",
       details: String(error),
@@ -1967,19 +1793,19 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "PASS",
         "Has required 'query' parameter in schema",
       );
-      recordTest({ name: "Tool parameters schema", status: "PASS" });
+      recordResult({ name: "Tool parameters schema", status: "PASS" });
     } else {
       logTest(
         "Tool parameters schema",
         "FAIL",
         "Missing 'query' parameter in schema",
       );
-      recordTest({ name: "Tool parameters schema", status: "FAIL" });
+      recordResult({ name: "Tool parameters schema", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Tool parameters schema", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Tool parameters schema",
       status: "FAIL",
       details: String(error),
@@ -1997,10 +1823,10 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
       "PASS",
       "Instance created successfully",
     );
-    recordTest({ name: "NeuroLink instance for generate", status: "PASS" });
+    recordResult({ name: "NeuroLink instance for generate", status: "PASS" });
   } catch (error) {
     logTest("NeuroLink instance for generate", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "NeuroLink instance for generate",
       status: "FAIL",
       details: String(error),
@@ -2016,7 +1842,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
       "SKIP",
       "No API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, or VERTEX_AI) available",
     );
-    recordTest({
+    recordResult({
       name: "Generate with RAG context",
       status: "SKIP",
       details: "No API keys available for generate tests",
@@ -2053,19 +1879,19 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
             "PASS",
             `Response received, type: ${typeof generateResult}, keys: ${Object.keys(generateResult).slice(0, 5).join(", ")}`,
           );
-          recordTest({ name: "Generate result structure", status: "PASS" });
+          recordResult({ name: "Generate result structure", status: "PASS" });
         } else {
           logTest(
             "Generate result structure",
             "FAIL",
             "Response missing expected content",
           );
-          recordTest({ name: "Generate result structure", status: "FAIL" });
+          recordResult({ name: "Generate result structure", status: "FAIL" });
           allPassed = false;
         }
       } else {
         logTest("Generate result structure", "FAIL", "Invalid response type");
-        recordTest({ name: "Generate result structure", status: "FAIL" });
+        recordResult({ name: "Generate result structure", status: "FAIL" });
         allPassed = false;
       }
     } catch (error) {
@@ -2092,14 +1918,14 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
           "SKIP",
           `API/Provider unavailable: ${errorMessage.slice(0, 100)}`,
         );
-        recordTest({
+        recordResult({
           name: "Generate with RAG context",
           status: "SKIP",
           details: "API key or service unavailable",
         });
       } else {
         logTest("Generate with RAG context", "FAIL", errorMessage);
-        recordTest({
+        recordResult({
           name: "Generate with RAG context",
           status: "FAIL",
           details: errorMessage,
@@ -2133,7 +1959,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "PASS",
         `Serializable tool config, size: ${serialized.length}`,
       );
-      recordTest({
+      recordResult({
         name: "RAG tool serialization for generate",
         status: "PASS",
       });
@@ -2143,7 +1969,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
         "FAIL",
         "Tool config not properly serializable",
       );
-      recordTest({
+      recordResult({
         name: "RAG tool serialization for generate",
         status: "FAIL",
       });
@@ -2151,7 +1977,7 @@ async function testRAGWithGenerate(): Promise<boolean | null> {
     }
   } catch (error) {
     logTest("RAG tool serialization for generate", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "RAG tool serialization for generate",
       status: "FAIL",
       details: String(error),
@@ -2193,7 +2019,7 @@ async function testRAGWithStream(): Promise<boolean | null> {
       "SKIP",
       "No API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, or VERTEX_AI) available",
     );
-    recordTest({
+    recordResult({
       name: "RAG with stream() API",
       status: "SKIP",
       details: "No API keys available for streaming tests",
@@ -2270,10 +2096,10 @@ async function testRAGWithStream(): Promise<boolean | null> {
       "PASS",
       "Populated with 5 test chunks",
     );
-    recordTest({ name: "InMemoryVectorStore setup", status: "PASS" });
+    recordResult({ name: "InMemoryVectorStore setup", status: "PASS" });
   } catch (error) {
     logTest("InMemoryVectorStore setup", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "InMemoryVectorStore setup",
       status: "FAIL",
       details: String(error),
@@ -2314,19 +2140,19 @@ async function testRAGWithStream(): Promise<boolean | null> {
         "PASS",
         `Tool created with name: ${vectorQueryTool.name}`,
       );
-      recordTest({ name: "Vector query tool creation", status: "PASS" });
+      recordResult({ name: "Vector query tool creation", status: "PASS" });
     } else {
       logTest(
         "Vector query tool creation",
         "FAIL",
         "Tool missing required properties",
       );
-      recordTest({ name: "Vector query tool creation", status: "FAIL" });
+      recordResult({ name: "Vector query tool creation", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("Vector query tool creation", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "Vector query tool creation",
       status: "FAIL",
       details: String(error),
@@ -2344,10 +2170,10 @@ async function testRAGWithStream(): Promise<boolean | null> {
       "PASS",
       "Instance created successfully",
     );
-    recordTest({ name: "NeuroLink instance creation", status: "PASS" });
+    recordResult({ name: "NeuroLink instance creation", status: "PASS" });
   } catch (error) {
     logTest("NeuroLink instance creation", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "NeuroLink instance creation",
       status: "FAIL",
       details: String(error),
@@ -2378,7 +2204,7 @@ async function testRAGWithStream(): Promise<boolean | null> {
     // Verify stream result structure
     if (!streamResult || !streamResult.stream) {
       logTest("Stream result structure", "FAIL", "Missing stream in result");
-      recordTest({ name: "Stream result structure", status: "FAIL" });
+      recordResult({ name: "Stream result structure", status: "FAIL" });
       allPassed = false;
     } else {
       logTest(
@@ -2386,7 +2212,7 @@ async function testRAGWithStream(): Promise<boolean | null> {
         "PASS",
         `Provider: ${streamResult.provider || "auto"}`,
       );
-      recordTest({ name: "Stream result structure", status: "PASS" });
+      recordResult({ name: "Stream result structure", status: "PASS" });
 
       // Test 5: Consume the stream and verify chunks are received
       let chunkCount = 0;
@@ -2413,19 +2239,19 @@ async function testRAGWithStream(): Promise<boolean | null> {
             "PASS",
             `Received ${chunkCount} chunks, total content length: ${totalContent.length}`,
           );
-          recordTest({ name: "Stream consumption", status: "PASS" });
+          recordResult({ name: "Stream consumption", status: "PASS" });
         } else {
           logTest(
             "Stream consumption",
             "FAIL",
             "No chunks received from stream",
           );
-          recordTest({ name: "Stream consumption", status: "FAIL" });
+          recordResult({ name: "Stream consumption", status: "FAIL" });
           allPassed = false;
         }
       } catch (streamError) {
         logTest("Stream consumption", "FAIL", String(streamError));
-        recordTest({
+        recordResult({
           name: "Stream consumption",
           status: "FAIL",
           details: String(streamError),
@@ -2454,14 +2280,14 @@ async function testRAGWithStream(): Promise<boolean | null> {
         "SKIP",
         `Provider unavailable: ${errorMessage.slice(0, 80)}...`,
       );
-      recordTest({
+      recordResult({
         name: "Stream with RAG tool",
         status: "SKIP",
         details: "Provider or API key unavailable",
       });
     } else {
       logTest("Stream with RAG tool", "FAIL", errorMessage);
-      recordTest({
+      recordResult({
         name: "Stream with RAG tool",
         status: "FAIL",
         details: errorMessage,
@@ -2494,19 +2320,19 @@ async function testRAGWithStream(): Promise<boolean | null> {
         "PASS",
         `name: ${vectorQueryTool.name}, has description: ${hasDescription}, has parameters: ${hasParameters}, has execute: ${hasExecute}`,
       );
-      recordTest({ name: "RAG tool structure", status: "PASS" });
+      recordResult({ name: "RAG tool structure", status: "PASS" });
     } else {
       logTest(
         "RAG tool structure",
         "FAIL",
         `Missing properties: name=${hasName}, description=${hasDescription}, parameters=${hasParameters}, execute=${hasExecute}`,
       );
-      recordTest({ name: "RAG tool structure", status: "FAIL" });
+      recordResult({ name: "RAG tool structure", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     logTest("RAG tool structure", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "RAG tool structure",
       status: "FAIL",
       details: String(error),
@@ -2562,7 +2388,7 @@ Computer vision processes visual information.
     log(`Created temp test directory: ${tempDir}`, "cyan");
   } catch (error) {
     log(`Failed to create temp directory: ${error}`, "red");
-    recordTest({ name: "CLI Setup", status: "FAIL", details: String(error) });
+    recordResult({ name: "CLI Setup", status: "FAIL", details: String(error) });
     return false;
   }
 
@@ -2660,14 +2486,20 @@ Computer vision processes visual information.
               "PASS",
               `Generated ${chunks.length} chunks`,
             );
-            recordTest({ name: "CLI chunk command (default)", status: "PASS" });
+            recordResult({
+              name: "CLI chunk command (default)",
+              status: "PASS",
+            });
           } else {
             logTest(
               "CLI chunk command (default)",
               "FAIL",
               "No chunks in output",
             );
-            recordTest({ name: "CLI chunk command (default)", status: "FAIL" });
+            recordResult({
+              name: "CLI chunk command (default)",
+              status: "FAIL",
+            });
             allPassed = false;
           }
         } else {
@@ -2681,14 +2513,20 @@ Computer vision processes visual information.
               "PASS",
               "Chunks generated (text format)",
             );
-            recordTest({ name: "CLI chunk command (default)", status: "PASS" });
+            recordResult({
+              name: "CLI chunk command (default)",
+              status: "PASS",
+            });
           } else {
             logTest(
               "CLI chunk command (default)",
               "FAIL",
               "Could not parse output",
             );
-            recordTest({ name: "CLI chunk command (default)", status: "FAIL" });
+            recordResult({
+              name: "CLI chunk command (default)",
+              status: "FAIL",
+            });
             allPassed = false;
           }
         }
@@ -2703,14 +2541,14 @@ Computer vision processes visual information.
             "PASS",
             "Command executed successfully",
           );
-          recordTest({ name: "CLI chunk command (default)", status: "PASS" });
+          recordResult({ name: "CLI chunk command (default)", status: "PASS" });
         } else {
           logTest(
             "CLI chunk command (default)",
             "FAIL",
             `Parse error: ${parseError}`,
           );
-          recordTest({ name: "CLI chunk command (default)", status: "FAIL" });
+          recordResult({ name: "CLI chunk command (default)", status: "FAIL" });
           allPassed = false;
         }
       }
@@ -2728,7 +2566,7 @@ Computer vision processes visual information.
             ? "CLI subprocess timed out"
             : "CLI not available (not built)",
         );
-        recordTest({
+        recordResult({
           name: "CLI chunk command (default)",
           status: "SKIP",
           details: result.error.includes("timed out")
@@ -2741,7 +2579,7 @@ Computer vision processes visual information.
           "FAIL",
           result.error.slice(0, 200),
         );
-        recordTest({
+        recordResult({
           name: "CLI chunk command (default)",
           status: "FAIL",
           details: result.error,
@@ -2751,7 +2589,7 @@ Computer vision processes visual information.
     }
   } catch (error) {
     logTest("CLI chunk command (default)", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI chunk command (default)",
       status: "FAIL",
       details: String(error),
@@ -2784,7 +2622,7 @@ Computer vision processes visual information.
               "PASS",
               `Generated ${chunks.length} chunks${hasHeaders ? " (markdown-aware)" : ""}`,
             );
-            recordTest({
+            recordResult({
               name: "CLI chunk --strategy markdown",
               status: "PASS",
             });
@@ -2794,7 +2632,7 @@ Computer vision processes visual information.
               "FAIL",
               "No chunks generated",
             );
-            recordTest({
+            recordResult({
               name: "CLI chunk --strategy markdown",
               status: "FAIL",
             });
@@ -2809,14 +2647,20 @@ Computer vision processes visual information.
             "PASS",
             "Command executed successfully",
           );
-          recordTest({ name: "CLI chunk --strategy markdown", status: "PASS" });
+          recordResult({
+            name: "CLI chunk --strategy markdown",
+            status: "PASS",
+          });
         } else {
           logTest(
             "CLI chunk --strategy markdown",
             "FAIL",
             "Could not parse output",
           );
-          recordTest({ name: "CLI chunk --strategy markdown", status: "FAIL" });
+          recordResult({
+            name: "CLI chunk --strategy markdown",
+            status: "FAIL",
+          });
           allPassed = false;
         }
       } catch (parseError) {
@@ -2825,14 +2669,20 @@ Computer vision processes visual information.
           result.output.includes("chunks")
         ) {
           logTest("CLI chunk --strategy markdown", "PASS", "Command executed");
-          recordTest({ name: "CLI chunk --strategy markdown", status: "PASS" });
+          recordResult({
+            name: "CLI chunk --strategy markdown",
+            status: "PASS",
+          });
         } else {
           logTest(
             "CLI chunk --strategy markdown",
             "FAIL",
             `Parse error: ${parseError}`,
           );
-          recordTest({ name: "CLI chunk --strategy markdown", status: "FAIL" });
+          recordResult({
+            name: "CLI chunk --strategy markdown",
+            status: "FAIL",
+          });
           allPassed = false;
         }
       }
@@ -2849,14 +2699,14 @@ Computer vision processes visual information.
             ? "CLI subprocess timed out"
             : "CLI not available",
         );
-        recordTest({ name: "CLI chunk --strategy markdown", status: "SKIP" });
+        recordResult({ name: "CLI chunk --strategy markdown", status: "SKIP" });
       } else {
         logTest(
           "CLI chunk --strategy markdown",
           "FAIL",
           result.error.slice(0, 200),
         );
-        recordTest({
+        recordResult({
           name: "CLI chunk --strategy markdown",
           status: "FAIL",
           details: result.error,
@@ -2866,7 +2716,7 @@ Computer vision processes visual information.
     }
   } catch (error) {
     logTest("CLI chunk --strategy markdown", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI chunk --strategy markdown",
       status: "FAIL",
       details: String(error),
@@ -2901,7 +2751,7 @@ Computer vision processes visual information.
               "PASS",
               `Generated ${chunks.length} chunks, avg size: ${Math.round(avgSize)} chars`,
             );
-            recordTest({
+            recordResult({
               name: "CLI chunk --strategy recursive",
               status: "PASS",
             });
@@ -2911,7 +2761,7 @@ Computer vision processes visual information.
               "FAIL",
               "No chunks generated",
             );
-            recordTest({
+            recordResult({
               name: "CLI chunk --strategy recursive",
               status: "FAIL",
             });
@@ -2926,7 +2776,7 @@ Computer vision processes visual information.
             "PASS",
             "Command executed successfully",
           );
-          recordTest({
+          recordResult({
             name: "CLI chunk --strategy recursive",
             status: "PASS",
           });
@@ -2936,7 +2786,7 @@ Computer vision processes visual information.
             "FAIL",
             "Could not parse output",
           );
-          recordTest({
+          recordResult({
             name: "CLI chunk --strategy recursive",
             status: "FAIL",
           });
@@ -2948,7 +2798,7 @@ Computer vision processes visual information.
           result.output.includes("chunks")
         ) {
           logTest("CLI chunk --strategy recursive", "PASS", "Command executed");
-          recordTest({
+          recordResult({
             name: "CLI chunk --strategy recursive",
             status: "PASS",
           });
@@ -2958,7 +2808,7 @@ Computer vision processes visual information.
             "FAIL",
             `Parse error: ${parseError}`,
           );
-          recordTest({
+          recordResult({
             name: "CLI chunk --strategy recursive",
             status: "FAIL",
           });
@@ -2978,14 +2828,17 @@ Computer vision processes visual information.
             ? "CLI subprocess timed out"
             : "CLI not available",
         );
-        recordTest({ name: "CLI chunk --strategy recursive", status: "SKIP" });
+        recordResult({
+          name: "CLI chunk --strategy recursive",
+          status: "SKIP",
+        });
       } else {
         logTest(
           "CLI chunk --strategy recursive",
           "FAIL",
           result.error.slice(0, 200),
         );
-        recordTest({
+        recordResult({
           name: "CLI chunk --strategy recursive",
           status: "FAIL",
           details: result.error,
@@ -2995,7 +2848,7 @@ Computer vision processes visual information.
     }
   } catch (error) {
     logTest("CLI chunk --strategy recursive", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI chunk --strategy recursive",
       status: "FAIL",
       details: String(error),
@@ -3025,14 +2878,14 @@ Computer vision processes visual information.
               "PASS",
               `Output written to file (${chunks.length} chunks)`,
             );
-            recordTest({ name: "CLI chunk --output", status: "PASS" });
+            recordResult({ name: "CLI chunk --output", status: "PASS" });
           } else {
             logTest(
               "CLI chunk --output",
               "FAIL",
               "Output file empty or invalid",
             );
-            recordTest({ name: "CLI chunk --output", status: "FAIL" });
+            recordResult({ name: "CLI chunk --output", status: "FAIL" });
             allPassed = false;
           }
         } catch {
@@ -3043,20 +2896,20 @@ Computer vision processes visual information.
               "PASS",
               "Output written to file (text format)",
             );
-            recordTest({ name: "CLI chunk --output", status: "PASS" });
+            recordResult({ name: "CLI chunk --output", status: "PASS" });
           } else {
             logTest(
               "CLI chunk --output",
               "FAIL",
               "Could not parse output file",
             );
-            recordTest({ name: "CLI chunk --output", status: "FAIL" });
+            recordResult({ name: "CLI chunk --output", status: "FAIL" });
             allPassed = false;
           }
         }
       } else {
         logTest("CLI chunk --output", "FAIL", "Output file not created");
-        recordTest({ name: "CLI chunk --output", status: "FAIL" });
+        recordResult({ name: "CLI chunk --output", status: "FAIL" });
         allPassed = false;
       }
     } else {
@@ -3072,10 +2925,10 @@ Computer vision processes visual information.
             ? "CLI subprocess timed out"
             : "CLI not available",
         );
-        recordTest({ name: "CLI chunk --output", status: "SKIP" });
+        recordResult({ name: "CLI chunk --output", status: "SKIP" });
       } else {
         logTest("CLI chunk --output", "FAIL", result.error.slice(0, 200));
-        recordTest({
+        recordResult({
           name: "CLI chunk --output",
           status: "FAIL",
           details: result.error,
@@ -3085,7 +2938,7 @@ Computer vision processes visual information.
     }
   } catch (error) {
     logTest("CLI chunk --output", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI chunk --output",
       status: "FAIL",
       details: String(error),
@@ -3110,11 +2963,11 @@ Computer vision processes visual information.
         result.output.includes("index")
       ) {
         logTest("CLI index command", "PASS", "Index created successfully");
-        recordTest({ name: "CLI index command", status: "PASS" });
+        recordResult({ name: "CLI index command", status: "PASS" });
         indexSucceeded = true;
       } else {
         logTest("CLI index command", "PASS", "Command executed");
-        recordTest({ name: "CLI index command", status: "PASS" });
+        recordResult({ name: "CLI index command", status: "PASS" });
         indexSucceeded = true;
       }
     } else {
@@ -3134,14 +2987,14 @@ Computer vision processes visual information.
           "SKIP",
           `Provider/CLI unavailable: ${result.error.slice(0, 100)}`,
         );
-        recordTest({ name: "CLI index command", status: "SKIP" });
+        recordResult({ name: "CLI index command", status: "SKIP" });
       } else {
         logTest(
           "CLI index command",
           "FAIL",
           `Index failed: ${result.error.slice(0, 200)}`,
         );
-        recordTest({
+        recordResult({
           name: "CLI index command",
           status: "FAIL",
           details: result.error,
@@ -3152,7 +3005,7 @@ Computer vision processes visual information.
   } catch (error) {
     const errorStr = String(error);
     logTest("CLI index command", "FAIL", errorStr);
-    recordTest({
+    recordResult({
       name: "CLI index command",
       status: "FAIL",
       details: errorStr,
@@ -3173,17 +3026,17 @@ Computer vision processes visual information.
     if (result.success) {
       if (result.output.includes("Result") || result.output.includes("Found")) {
         logTest("CLI query command", "PASS", "Query returned results");
-        recordTest({ name: "CLI query command", status: "PASS" });
+        recordResult({ name: "CLI query command", status: "PASS" });
       } else {
         logTest("CLI query command", "PASS", "Command executed");
-        recordTest({ name: "CLI query command", status: "PASS" });
+        recordResult({ name: "CLI query command", status: "PASS" });
       }
     } else {
       // Query may fail if no indexed documents exist (in-memory store is process-scoped)
       // This is expected since index and query run in separate processes
       if (result.error.includes("timed out")) {
         logTest("CLI query command", "SKIP", "CLI subprocess timed out");
-        recordTest({
+        recordResult({
           name: "CLI query command",
           status: "SKIP",
           details: "Timeout",
@@ -3201,7 +3054,7 @@ Computer vision processes visual information.
           "PASS",
           "Correctly reports no indexed documents (in-memory store is process-scoped)",
         );
-        recordTest({
+        recordResult({
           name: "CLI query command",
           status: "PASS",
           details: "In-memory store is process-scoped, no persistence expected",
@@ -3212,7 +3065,7 @@ Computer vision processes visual information.
           "FAIL",
           `Query failed: ${result.error.slice(0, 200)}`,
         );
-        recordTest({
+        recordResult({
           name: "CLI query command",
           status: "FAIL",
           details: result.error,
@@ -3223,7 +3076,7 @@ Computer vision processes visual information.
   } catch (error) {
     const errorStr = String(error);
     logTest("CLI query command", "FAIL", errorStr);
-    recordTest({
+    recordResult({
       name: "CLI query command",
       status: "FAIL",
       details: errorStr,
@@ -3249,10 +3102,10 @@ Computer vision processes visual information.
 
       if (hasChunk && hasIndex && hasQuery) {
         logTest("CLI rag --help", "PASS", "Shows all subcommands");
-        recordTest({ name: "CLI rag --help", status: "PASS" });
+        recordResult({ name: "CLI rag --help", status: "PASS" });
       } else {
         logTest("CLI rag --help", "PASS", "Help displayed");
-        recordTest({ name: "CLI rag --help", status: "PASS" });
+        recordResult({ name: "CLI rag --help", status: "PASS" });
       }
     } else {
       if (
@@ -3267,10 +3120,10 @@ Computer vision processes visual information.
             ? "CLI subprocess timed out"
             : "CLI not available",
         );
-        recordTest({ name: "CLI rag --help", status: "SKIP" });
+        recordResult({ name: "CLI rag --help", status: "SKIP" });
       } else {
         logTest("CLI rag --help", "FAIL", result.error.slice(0, 200));
-        recordTest({
+        recordResult({
           name: "CLI rag --help",
           status: "FAIL",
           details: result.error,
@@ -3280,7 +3133,7 @@ Computer vision processes visual information.
     }
   } catch (error) {
     logTest("CLI rag --help", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI rag --help",
       status: "FAIL",
       details: String(error),
@@ -3306,7 +3159,7 @@ Computer vision processes visual information.
           "PASS",
           "Properly reports file not found",
         );
-        recordTest({ name: "CLI chunk (invalid file)", status: "PASS" });
+        recordResult({ name: "CLI chunk (invalid file)", status: "PASS" });
       } else if (
         result.error.includes("Cannot find module") ||
         result.error.includes("timed out")
@@ -3318,14 +3171,14 @@ Computer vision processes visual information.
             ? "CLI subprocess timed out"
             : "CLI not available",
         );
-        recordTest({ name: "CLI chunk (invalid file)", status: "SKIP" });
+        recordResult({ name: "CLI chunk (invalid file)", status: "SKIP" });
       } else {
         logTest(
           "CLI chunk (invalid file)",
           "PASS",
           "Command failed as expected",
         );
-        recordTest({ name: "CLI chunk (invalid file)", status: "PASS" });
+        recordResult({ name: "CLI chunk (invalid file)", status: "PASS" });
       }
     } else {
       logTest(
@@ -3333,13 +3186,13 @@ Computer vision processes visual information.
         "FAIL",
         "Should have failed for invalid file",
       );
-      recordTest({ name: "CLI chunk (invalid file)", status: "FAIL" });
+      recordResult({ name: "CLI chunk (invalid file)", status: "FAIL" });
       allPassed = false;
     }
   } catch (error) {
     // Throwing an error is also acceptable for invalid input
     logTest("CLI chunk (invalid file)", "PASS", "Command failed as expected");
-    recordTest({ name: "CLI chunk (invalid file)", status: "PASS" });
+    recordResult({ name: "CLI chunk (invalid file)", status: "PASS" });
   }
 
   // ============================================================================
@@ -3378,7 +3231,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
       "Skipping generate() with rag files API - no API keys available",
     );
     logTest("RAG generate with files API", "SKIP", "No API keys available");
-    recordTest({
+    recordResult({
       name: "RAG generate with files API",
       status: "SKIP",
       details: "No API keys available",
@@ -3394,7 +3247,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
       "FAIL",
       `Fixture not found: ${sampleDocPath}`,
     );
-    recordTest({
+    recordResult({
       name: "RAG generate fixture check",
       status: "FAIL",
       details: "sample-document.md not found",
@@ -3430,14 +3283,14 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "PASS",
         `Content length: ${(result.content as string).length}`,
       );
-      recordTest({ name: "Generate with rag files (basic)", status: "PASS" });
+      recordResult({ name: "Generate with rag files (basic)", status: "PASS" });
     } else {
       logTest(
         "Generate with rag files (basic)",
         "FAIL",
         "No content in response",
       );
-      recordTest({ name: "Generate with rag files (basic)", status: "FAIL" });
+      recordResult({ name: "Generate with rag files (basic)", status: "FAIL" });
       allPassed = false;
     }
 
@@ -3458,10 +3311,10 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "SKIP",
         `Provider unavailable: ${errorMessage.slice(0, 100)}`,
       );
-      recordTest({ name: "Generate with rag files (basic)", status: "SKIP" });
+      recordResult({ name: "Generate with rag files (basic)", status: "SKIP" });
     } else {
       logTest("Generate with rag files (basic)", "FAIL", errorMessage);
-      recordTest({
+      recordResult({
         name: "Generate with rag files (basic)",
         status: "FAIL",
         details: errorMessage,
@@ -3502,7 +3355,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "PASS",
         `Strategy: markdown, content length: ${(result.content as string).length}`,
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (custom strategy)",
         status: "PASS",
       });
@@ -3512,7 +3365,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "FAIL",
         "No content in response",
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (custom strategy)",
         status: "FAIL",
       });
@@ -3536,7 +3389,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "SKIP",
         `Provider unavailable: ${errorMessage.slice(0, 100)}`,
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (custom strategy)",
         status: "SKIP",
       });
@@ -3546,7 +3399,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "FAIL",
         errorMessage,
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (custom strategy)",
         status: "FAIL",
         details: errorMessage,
@@ -3594,7 +3447,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "PASS",
         `Files: ${filesToLoad.length}, content length: ${(result.content as string).length}`,
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (multi-file)",
         status: "PASS",
       });
@@ -3604,7 +3457,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "FAIL",
         "No content in response",
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (multi-file)",
         status: "FAIL",
       });
@@ -3628,13 +3481,13 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "SKIP",
         `Provider unavailable: ${errorMessage.slice(0, 100)}`,
       );
-      recordTest({
+      recordResult({
         name: "Generate with rag files (multi-file)",
         status: "SKIP",
       });
     } else {
       logTest("Generate with rag files (multi-file)", "FAIL", errorMessage);
-      recordTest({
+      recordResult({
         name: "Generate with rag files (multi-file)",
         status: "FAIL",
         details: errorMessage,
@@ -3683,26 +3536,26 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
               "PASS",
               `No-match scenario handled`,
             );
-            recordTest({ name: `Fixture: ${fixture.id}`, status: "PASS" });
+            recordResult({ name: `Fixture: ${fixture.id}`, status: "PASS" });
           } else if (keywordRatio >= 0.3 || content.length > 0) {
             logTest(
               `Fixture: ${fixture.id}`,
               "PASS",
               `Keywords matched: ${matchedKeywords.length}/${fixture.expectedKeywords.length}`,
             );
-            recordTest({ name: `Fixture: ${fixture.id}`, status: "PASS" });
+            recordResult({ name: `Fixture: ${fixture.id}`, status: "PASS" });
           } else {
             logTest(
               `Fixture: ${fixture.id}`,
               "FAIL",
               `Low keyword match: ${matchedKeywords.length}/${fixture.expectedKeywords.length}`,
             );
-            recordTest({ name: `Fixture: ${fixture.id}`, status: "FAIL" });
+            recordResult({ name: `Fixture: ${fixture.id}`, status: "FAIL" });
             allPassed = false;
           }
         } else {
           logTest(`Fixture: ${fixture.id}`, "FAIL", "No content in response");
-          recordTest({ name: `Fixture: ${fixture.id}`, status: "FAIL" });
+          recordResult({ name: `Fixture: ${fixture.id}`, status: "FAIL" });
           allPassed = false;
         }
 
@@ -3720,10 +3573,10 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
 
         if (isProviderError) {
           logTest(`Fixture: ${fixture.id}`, "SKIP", `Provider unavailable`);
-          recordTest({ name: `Fixture: ${fixture.id}`, status: "SKIP" });
+          recordResult({ name: `Fixture: ${fixture.id}`, status: "SKIP" });
         } else {
           logTest(`Fixture: ${fixture.id}`, "FAIL", errorMessage);
-          recordTest({
+          recordResult({
             name: `Fixture: ${fixture.id}`,
             status: "FAIL",
             details: errorMessage,
@@ -3756,7 +3609,7 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
       "PASS",
       "Handled gracefully (no crash)",
     );
-    recordTest({ name: "Generate with non-existent file", status: "PASS" });
+    recordResult({ name: "Generate with non-existent file", status: "PASS" });
     await neurolink.shutdown().catch(() => {});
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -3769,14 +3622,14 @@ async function testRAGGenerateWithFilesAPI(): Promise<boolean | null> {
         "PASS",
         "Properly reports file error",
       );
-      recordTest({ name: "Generate with non-existent file", status: "PASS" });
+      recordResult({ name: "Generate with non-existent file", status: "PASS" });
     } else {
       logTest(
         "Generate with non-existent file",
         "PASS",
         `Error handled: ${errorMessage.slice(0, 100)}`,
       );
-      recordTest({ name: "Generate with non-existent file", status: "PASS" });
+      recordResult({ name: "Generate with non-existent file", status: "PASS" });
     }
   }
 
@@ -3805,7 +3658,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
       "Skipping stream() with rag files API - no API keys available",
     );
     logTest("RAG stream with files API", "SKIP", "No API keys available");
-    recordTest({
+    recordResult({
       name: "RAG stream with files API",
       status: "SKIP",
       details: "No API keys available",
@@ -3820,7 +3673,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
       "FAIL",
       `Fixture not found: ${sampleDocPath}`,
     );
-    recordTest({
+    recordResult({
       name: "RAG stream fixture check",
       status: "FAIL",
       details: "sample-document.md not found",
@@ -3868,10 +3721,10 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
           "PASS",
           `Chunks: ${chunkCount}, content length: ${totalContent.length}`,
         );
-        recordTest({ name: "Stream with rag files (basic)", status: "PASS" });
+        recordResult({ name: "Stream with rag files (basic)", status: "PASS" });
       } else {
         logTest("Stream with rag files (basic)", "FAIL", "No chunks received");
-        recordTest({ name: "Stream with rag files (basic)", status: "FAIL" });
+        recordResult({ name: "Stream with rag files (basic)", status: "FAIL" });
         allPassed = false;
       }
     } else {
@@ -3880,7 +3733,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
         "FAIL",
         "Missing stream in result",
       );
-      recordTest({ name: "Stream with rag files (basic)", status: "FAIL" });
+      recordResult({ name: "Stream with rag files (basic)", status: "FAIL" });
       allPassed = false;
     }
 
@@ -3903,10 +3756,10 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
         "SKIP",
         `Provider unavailable: ${errorMessage.slice(0, 100)}`,
       );
-      recordTest({ name: "Stream with rag files (basic)", status: "SKIP" });
+      recordResult({ name: "Stream with rag files (basic)", status: "SKIP" });
     } else {
       logTest("Stream with rag files (basic)", "FAIL", errorMessage);
-      recordTest({
+      recordResult({
         name: "Stream with rag files (basic)",
         status: "FAIL",
         details: errorMessage,
@@ -3949,7 +3802,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
         "PASS",
         `Received ${chunkCount} chunks`,
       );
-      recordTest({
+      recordResult({
         name: "Stream with rag files (custom strategy)",
         status: "PASS",
       });
@@ -3959,7 +3812,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
         "FAIL",
         "Missing stream in result",
       );
-      recordTest({
+      recordResult({
         name: "Stream with rag files (custom strategy)",
         status: "FAIL",
       });
@@ -3985,13 +3838,13 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
         "SKIP",
         `Provider unavailable: ${errorMessage.slice(0, 100)}`,
       );
-      recordTest({
+      recordResult({
         name: "Stream with rag files (custom strategy)",
         status: "SKIP",
       });
     } else {
       logTest("Stream with rag files (custom strategy)", "FAIL", errorMessage);
-      recordTest({
+      recordResult({
         name: "Stream with rag files (custom strategy)",
         status: "FAIL",
         details: errorMessage,
@@ -4045,7 +3898,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
               "PASS",
               `Chunks: ${chunkCount}, content: ${totalContent.length}`,
             );
-            recordTest({
+            recordResult({
               name: `Fixture stream: ${fixture.id}`,
               status: "PASS",
             });
@@ -4055,7 +3908,7 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
               "FAIL",
               "No chunks received",
             );
-            recordTest({
+            recordResult({
               name: `Fixture stream: ${fixture.id}`,
               status: "FAIL",
             });
@@ -4063,7 +3916,10 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
           }
         } else {
           logTest(`Fixture stream: ${fixture.id}`, "FAIL", "Missing stream");
-          recordTest({ name: `Fixture stream: ${fixture.id}`, status: "FAIL" });
+          recordResult({
+            name: `Fixture stream: ${fixture.id}`,
+            status: "FAIL",
+          });
           allPassed = false;
         }
 
@@ -4087,10 +3943,13 @@ async function testRAGStreamWithFilesAPI(): Promise<boolean | null> {
             "SKIP",
             `Provider unavailable`,
           );
-          recordTest({ name: `Fixture stream: ${fixture.id}`, status: "SKIP" });
+          recordResult({
+            name: `Fixture stream: ${fixture.id}`,
+            status: "SKIP",
+          });
         } else {
           logTest(`Fixture stream: ${fixture.id}`, "FAIL", errorMessage);
-          recordTest({
+          recordResult({
             name: `Fixture stream: ${fixture.id}`,
             status: "FAIL",
             details: errorMessage,
@@ -4118,7 +3977,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
 
   if (!fs.existsSync(cliPath)) {
     logTest("CLI --rag-files (build check)", "SKIP", "CLI not built");
-    recordTest({
+    recordResult({
       name: "CLI --rag-files (build check)",
       status: "SKIP",
       details: "dist/cli/index.js not found",
@@ -4132,7 +3991,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
       "FAIL",
       "sample-document.md not found",
     );
-    recordTest({ name: "CLI --rag-files (fixture check)", status: "FAIL" });
+    recordResult({ name: "CLI --rag-files (fixture check)", status: "FAIL" });
     return false;
   }
 
@@ -4189,7 +4048,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
         "PASS",
         `Output length: ${result.output.length}`,
       );
-      recordTest({ name: "CLI generate --rag-files", status: "PASS" });
+      recordResult({ name: "CLI generate --rag-files", status: "PASS" });
     } else if (!result.success) {
       const combinedOutput = result.output + result.error;
       const isProviderError =
@@ -4208,10 +4067,10 @@ async function testCLIRagFiles(): Promise<boolean | null> {
             ? "CLI subprocess timed out"
             : "Provider unavailable",
         );
-        recordTest({ name: "CLI generate --rag-files", status: "SKIP" });
+        recordResult({ name: "CLI generate --rag-files", status: "SKIP" });
       } else {
         logTest("CLI generate --rag-files", "FAIL", result.error.slice(0, 200));
-        recordTest({
+        recordResult({
           name: "CLI generate --rag-files",
           status: "FAIL",
           details: result.error,
@@ -4221,7 +4080,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
     }
   } catch (error) {
     logTest("CLI generate --rag-files", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI generate --rag-files",
       status: "FAIL",
       details: String(error),
@@ -4243,7 +4102,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
         "PASS",
         `Strategy: markdown, output length: ${result.output.length}`,
       );
-      recordTest({
+      recordResult({
         name: "CLI generate --rag-files --rag-strategy",
         status: "PASS",
       });
@@ -4265,7 +4124,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
             ? "CLI subprocess timed out"
             : "Provider unavailable",
         );
-        recordTest({
+        recordResult({
           name: "CLI generate --rag-files --rag-strategy",
           status: "SKIP",
         });
@@ -4275,7 +4134,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
           "FAIL",
           result.error.slice(0, 200),
         );
-        recordTest({
+        recordResult({
           name: "CLI generate --rag-files --rag-strategy",
           status: "FAIL",
           details: result.error,
@@ -4285,7 +4144,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
     }
   } catch (error) {
     logTest("CLI generate --rag-files --rag-strategy", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI generate --rag-files --rag-strategy",
       status: "FAIL",
       details: String(error),
@@ -4307,7 +4166,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
         "PASS",
         `Output length: ${result.output.length}`,
       );
-      recordTest({ name: "CLI stream --rag-files", status: "PASS" });
+      recordResult({ name: "CLI stream --rag-files", status: "PASS" });
     } else if (!result.success) {
       const combinedOutput = result.output + result.error;
       const isProviderError =
@@ -4327,10 +4186,10 @@ async function testCLIRagFiles(): Promise<boolean | null> {
             ? "CLI subprocess timed out"
             : "Provider unavailable",
         );
-        recordTest({ name: "CLI stream --rag-files", status: "SKIP" });
+        recordResult({ name: "CLI stream --rag-files", status: "SKIP" });
       } else {
         logTest("CLI stream --rag-files", "FAIL", result.error.slice(0, 200));
-        recordTest({
+        recordResult({
           name: "CLI stream --rag-files",
           status: "FAIL",
           details: result.error,
@@ -4340,7 +4199,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
     }
   } catch (error) {
     logTest("CLI stream --rag-files", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI stream --rag-files",
       status: "FAIL",
       details: String(error),
@@ -4363,14 +4222,14 @@ async function testCLIRagFiles(): Promise<boolean | null> {
         "PASS",
         "Command failed as expected for missing file",
       );
-      recordTest({ name: "CLI --rag-files (non-existent)", status: "PASS" });
+      recordResult({ name: "CLI --rag-files (non-existent)", status: "PASS" });
     } else {
       logTest(
         "CLI --rag-files (non-existent)",
         "PASS",
         "Handled gracefully (continued without RAG)",
       );
-      recordTest({ name: "CLI --rag-files (non-existent)", status: "PASS" });
+      recordResult({ name: "CLI --rag-files (non-existent)", status: "PASS" });
     }
   } catch (error) {
     logTest(
@@ -4378,7 +4237,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
       "PASS",
       "Error thrown as expected",
     );
-    recordTest({ name: "CLI --rag-files (non-existent)", status: "PASS" });
+    recordResult({ name: "CLI --rag-files (non-existent)", status: "PASS" });
   }
 
   // Test 5: CLI with multiple --rag-files
@@ -4402,7 +4261,10 @@ async function testCLIRagFiles(): Promise<boolean | null> {
         "PASS",
         `Output: ${result.output.length} chars`,
       );
-      recordTest({ name: "CLI --rag-files (multiple files)", status: "PASS" });
+      recordResult({
+        name: "CLI --rag-files (multiple files)",
+        status: "PASS",
+      });
     } else if (!result.success) {
       const combinedOutput = result.output + result.error;
       const isProviderError =
@@ -4421,7 +4283,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
             ? "CLI subprocess timed out"
             : "Provider unavailable",
         );
-        recordTest({
+        recordResult({
           name: "CLI --rag-files (multiple files)",
           status: "SKIP",
         });
@@ -4431,7 +4293,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
           "FAIL",
           result.error.slice(0, 200),
         );
-        recordTest({
+        recordResult({
           name: "CLI --rag-files (multiple files)",
           status: "FAIL",
           details: result.error,
@@ -4441,7 +4303,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
     }
   } catch (error) {
     logTest("CLI --rag-files (multiple files)", "FAIL", String(error));
-    recordTest({
+    recordResult({
       name: "CLI --rag-files (multiple files)",
       status: "FAIL",
       details: String(error),
@@ -4491,7 +4353,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
                     "FAIL",
                     `Only ${chunkCount} chunks, expected >= ${fixture.expectedMinChunks}`,
                   );
-                  recordTest({
+                  recordResult({
                     name: `CLI fixture: ${fixture.id}`,
                     status: "FAIL",
                   });
@@ -4504,7 +4366,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
             }
           }
           logTest(`CLI fixture: ${fixture.id}`, "PASS", passMessage);
-          recordTest({ name: `CLI fixture: ${fixture.id}`, status: "PASS" });
+          recordResult({ name: `CLI fixture: ${fixture.id}`, status: "PASS" });
         } else {
           if (
             result.error.includes("Cannot find module") ||
@@ -4518,14 +4380,17 @@ async function testCLIRagFiles(): Promise<boolean | null> {
                 ? "CLI subprocess timed out"
                 : "CLI/file not available",
             );
-            recordTest({ name: `CLI fixture: ${fixture.id}`, status: "SKIP" });
+            recordResult({
+              name: `CLI fixture: ${fixture.id}`,
+              status: "SKIP",
+            });
           } else {
             logTest(
               `CLI fixture: ${fixture.id}`,
               "FAIL",
               result.error.slice(0, 200),
             );
-            recordTest({
+            recordResult({
               name: `CLI fixture: ${fixture.id}`,
               status: "FAIL",
               details: result.error,
@@ -4535,7 +4400,7 @@ async function testCLIRagFiles(): Promise<boolean | null> {
         }
       } catch (error) {
         logTest(`CLI fixture: ${fixture.id}`, "FAIL", String(error));
-        recordTest({
+        recordResult({
           name: `CLI fixture: ${fixture.id}`,
           status: "FAIL",
           details: String(error),
@@ -4565,8 +4430,8 @@ async function runAllTests(): Promise<void> {
   log(`  Verbose mode: ${TEST_CONFIG.verbose}`, "reset");
   log("=".repeat(70), "magenta");
 
-  // Load fixtures
-  loadFixtures();
+  // Fixtures (sample-document.md etc.) are read on-demand inside each test
+  // function — no global loadFixtures() call needed.
 
   // Run all test suites
   const results: Record<string, boolean | null> = {};
@@ -4684,20 +4549,17 @@ async function runAllTests(): Promise<void> {
   const skippedSuites = suiteValues.filter((v) => v === null).length;
   const totalSuites = suiteValues.length;
 
-  const passedTests = testResults.filter((r) => r.status === "PASS").length;
-  const failedTests = testResults.filter((r) => r.status === "FAIL").length;
-  const skippedTests = testResults.filter((r) => r.status === "SKIP").length;
-  const totalTests = testResults.length;
-
-  logSection("Test Summary");
+  // Per-test totals are managed by the harness's recordTest. Below we only
+  // print the per-suite breakdown (which is suite-local state, not harness
+  // state). The harness's runSuite() prints the test summary + sets exit.
+  logSection("RAG Suite Summary");
 
   log("\nSuite Results:", "cyan");
   for (const [suite, passed] of Object.entries(results)) {
-    const icon =
-      passed === true ? "\u2705" : passed === null ? "\u23ED\uFE0F" : "\u274C";
+    const icon = passed === true ? "PASS" : passed === null ? "SKIP" : "FAIL";
     const color: ColorName =
       passed === true ? "green" : passed === null ? "yellow" : "red";
-    log(`  ${icon} ${suite}`, color);
+    log(`  [${icon}] ${suite}`, color);
   }
 
   log("\n" + "=".repeat(70), "magenta");
@@ -4705,45 +4567,14 @@ async function runAllTests(): Promise<void> {
     `  Total Suites: ${passedSuites}/${totalSuites} passed`,
     passedSuites === totalSuites ? "green" : "yellow",
   );
-  log(
-    `  Total Tests:  ${passedTests}/${totalTests} passed`,
-    passedTests === totalTests ? "green" : "yellow",
-  );
-  if (failedTests > 0) {
-    log(`  Failed:       ${failedTests} tests`, "red");
+  if (failedSuites > 0) {
+    log(`  Failed Suites: ${failedSuites}`, "red");
   }
-  if (skippedTests > 0) {
-    log(`  Skipped:      ${skippedTests} tests`, "yellow");
+  if (skippedSuites > 0) {
+    log(`  Skipped Suites: ${skippedSuites}`, "yellow");
   }
-  log(`  Duration:     ${(totalTime / 1000).toFixed(2)}s`, "reset");
+  log(`  Duration: ${(totalTime / 1000).toFixed(2)}s`, "reset");
   log("=".repeat(70), "magenta");
-
-  // Exit with appropriate code
-  const allPassed = failedSuites === 0 && failedTests === 0;
-  if (allPassed) {
-    log("\n\u2705 All RAG Processing tests passed!", "green");
-    process.exit(0);
-  } else {
-    log("\n\u274C Some RAG Processing tests failed!", "red");
-
-    // List failed tests
-    const failed = testResults.filter((r) => r.status === "FAIL");
-    if (failed.length > 0) {
-      log("\nFailed tests:", "red");
-      for (const test of failed) {
-        log(
-          `  - ${test.name}${test.details ? `: ${test.details}` : ""}`,
-          "red",
-        );
-      }
-    }
-
-    process.exit(1);
-  }
 }
 
-// Run tests
-runAllTests().catch((error) => {
-  log(`\nFatal error: ${error}`, "red");
-  process.exit(1);
-});
+await runSuite(runAllTests);

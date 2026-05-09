@@ -71,11 +71,15 @@ const getOpenRouterConfig = (): OpenRouterConfig => {
  *   - 'google/gemini-2.5-flash'
  *   - 'meta-llama/llama-3-70b-instruct'
  *
- * You can override the default by setting the OPENROUTER_MODEL environment variable.
+ * The previous default `anthropic/claude-3-5-sonnet` was retired by OpenRouter
+ * in late 2025 and now returns "No endpoints found for model" for every
+ * caller. Default bumped to the current Anthropic mainline (Claude Sonnet
+ * 4.5) so callers without an `OPENROUTER_MODEL` env var don't hit a dead
+ * model. Must stay aligned with the registry default in
+ * `src/lib/factories/providerRegistry.ts` and `PROVIDER_DEFAULTS` in
+ * `src/lib/utils/modelChoices.ts`.
  *
- * Default updated from `anthropic/claude-3-5-sonnet` to `anthropic/claude-sonnet-4.5`
- * because OpenRouter sunset the Claude 3.5 Sonnet endpoint upstream — every
- * call against the old default returned `No endpoints found` 404s.
+ * You can override the default by setting the OPENROUTER_MODEL environment variable.
  */
 const getDefaultOpenRouterModel = (): string => {
   return getProviderModel("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5");
@@ -245,7 +249,7 @@ export class OpenRouterProvider extends BaseProvider {
             "Use a tool-capable model like:\n" +
             "  • google/gemini-2.0-flash-exp:free (free)\n" +
             "  • meta-llama/llama-3.3-70b-instruct:free (free)\n" +
-            "  • anthropic/claude-3-5-sonnet (paid)\n" +
+            "  • anthropic/claude-3.7-sonnet (paid)\n" +
             "  • openai/gpt-4o (paid)\n" +
             "Or use --disableTools flag. " +
             "See all tool-capable models at https://openrouter.ai/models?supported_parameters=tools",
@@ -309,7 +313,7 @@ export class OpenRouterProvider extends BaseProvider {
     logger.warn("OpenRouter: Unknown model tool capability, disabling tools", {
       model: modelName,
       suggestion:
-        "Use a known tool-capable model like anthropic/claude-3-5-sonnet, openai/gpt-4o, or google/gemini-2.0-flash-exp:free",
+        "Use a known tool-capable model like anthropic/claude-3.7-sonnet, openai/gpt-4o, or google/gemini-2.0-flash-exp:free",
     });
     return false;
   }
@@ -639,10 +643,12 @@ export class OpenRouterProvider extends BaseProvider {
       );
     }
 
-    // Fallback to hardcoded list if API fetch fails
+    // Fallback to hardcoded list if API fetch fails. Aligned with
+    // `getDefaultOpenRouterModel()` — `anthropic/claude-3-5-sonnet` was
+    // retired by OpenRouter late 2025 and would return a dead model here.
     const fallbackModels = [
       // Anthropic Claude models
-      "anthropic/claude-3-5-sonnet",
+      "anthropic/claude-3.7-sonnet",
       "anthropic/claude-3-5-haiku",
       "anthropic/claude-3-opus",
       // OpenAI models

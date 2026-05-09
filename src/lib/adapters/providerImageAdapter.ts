@@ -288,7 +288,7 @@ const VISION_CAPABILITIES = {
   openrouter: [
     // OpenRouter provides access to vision-capable models from multiple providers
     // Anthropic Claude models (via OpenRouter)
-    "anthropic/claude-3-5-sonnet",
+    "anthropic/claude-3.7-sonnet",
     "anthropic/claude-3-5-haiku",
     "anthropic/claude-3-opus",
     "anthropic/claude-3-sonnet",

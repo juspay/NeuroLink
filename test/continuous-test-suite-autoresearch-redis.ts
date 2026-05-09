@@ -35,53 +35,34 @@ import type { Task, TaskRunResult } from "../src/lib/types/taskTypes.js";
 // LOGGING
 // ============================================================
 
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-};
-type ColorName = keyof typeof colors;
+import {
+  defineSuite,
+  log,
+  logSection,
+  type ColorName,
+} from "./helpers/harness.js";
 
-function log(msg: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${msg}${colors.reset}`);
-}
+const { recordTest, runSuite } = defineSuite("Autoresearch Redis");
 
-function logSection(title: string): void {
-  log(`\n${"=".repeat(60)}`, "cyan");
-  log(`  ${title}`, "cyan");
-  log(`${"=".repeat(60)}`, "cyan");
-}
-
+/** Print-only logTest shim. Counters are driven by recordTest in the runner. */
 function logTest(
-  name: string,
+  testName: string,
   status: "PASS" | "FAIL" | "SKIP" | "TESTING",
   details?: string,
 ): void {
-  const icons = { PASS: "PASS", FAIL: "FAIL", SKIP: "SKIP", TESTING: "TEST" };
-  const clr: Record<string, ColorName> = {
-    PASS: "green",
-    FAIL: "red",
-    SKIP: "yellow",
-    TESTING: "blue",
-  };
-  const det = details ? ` -- ${details}` : "";
-  log(`[${icons[status]}] ${name}${det}`, clr[status] || "reset");
+  const color: ColorName =
+    status === "PASS"
+      ? "green"
+      : status === "FAIL"
+        ? "red"
+        : status === "SKIP"
+          ? "yellow"
+          : "blue";
+  log(`[${status}] ${testName}${details ? ` — ${details}` : ""}`, color);
 }
-
 // ============================================================
 // RESULTS
 // ============================================================
-
-const testResults: Array<{
-  group: string;
-  name: string;
-  status: "pass" | "fail" | "skip";
-  error?: string;
-}> = [];
 
 function recordResult(
   group: string,
@@ -89,13 +70,13 @@ function recordResult(
   result: boolean | null,
   error?: string,
 ): void {
-  if (result === null) {
-    testResults.push({ group, name, status: "skip", error });
-  } else if (result) {
-    testResults.push({ group, name, status: "pass" });
-  } else {
-    testResults.push({ group, name, status: "fail", error });
-  }
+  recordTest(
+    `${group} — ${name}`,
+    result === true,
+    result === null,
+    error ??
+      (result === null ? "skipped" : result === true ? undefined : "failed"),
+  );
 }
 
 // ============================================================
@@ -1152,38 +1133,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // ── Summary ──────────────────────────────────────────────
-  const passed = testResults.filter((r) => r.status === "pass").length;
-  const failed = testResults.filter((r) => r.status === "fail").length;
-  const skipped = testResults.filter((r) => r.status === "skip").length;
-
-  log("\n" + "=".repeat(60), "cyan");
-  log("  SUMMARY", "cyan");
-  log("=".repeat(60), "cyan");
-  log(`  Total:   ${testResults.length}`, "bright");
-  log(`  Passed:  ${passed}`, "green");
-  log(`  Failed:  ${failed}`, failed > 0 ? "red" : "green");
-  log(`  Skipped: ${skipped}`, "yellow");
-  log("=".repeat(60), "cyan");
-
-  if (failed > 0) {
-    log("\n  FAILED TESTS:", "red");
-    for (const r of testResults.filter((r) => r.status === "fail")) {
-      log(`    - [${r.group}] ${r.name}: ${r.error || ""}`, "red");
-    }
-  }
-
-  if (skipped > 0) {
-    log("\n  SKIPPED TESTS:", "yellow");
-    for (const r of testResults.filter((r) => r.status === "skip")) {
-      log(`    - [${r.group}] ${r.name}: ${r.error || ""}`, "yellow");
-    }
-  }
-
-  process.exit(failed === 0 ? 0 : 1);
+  // Summary printed by harness's runSuite — fall through.
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+await runSuite(main);

@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { type LanguageModel, stepCountIs, streamText, type Tool } from "ai";
 import type { AIProviderName } from "../constants/enums.js";
 import { DeepSeekModels } from "../constants/enums.js";
@@ -114,14 +114,73 @@ export class DeepSeekProvider extends BaseProvider {
       process.env.DEEPSEEK_BASE_URL ??
       DEEPSEEK_DEFAULT_BASE_URL;
 
-    const deepseek = createOpenAI({
+    // We deliberately use `@ai-sdk/openai-compatible` rather than
+    // `@ai-sdk/openai`. Two upstream behaviors of `@ai-sdk/openai` break us:
+    //   1. It always sends `response_format: { type: "json_schema" }` when a
+    //      schema is provided. DeepSeek's API rejects that with the literal
+    //      message "This response_format type is unavailable now".
+    //   2. It does not parse the `reasoning_content` field that
+    //      `deepseek-reasoner` emits, so chain-of-thought is silently dropped.
+    // `@ai-sdk/openai-compatible` honors `supportsStructuredOutputs: false`
+    // (falls back to `{ type: "json_object" }` and injects the schema into
+    // the prompt) and parses both `choice.message.reasoning_content` and
+    // `delta.reasoning_content` into the SDK-standard `reasoning` part.
+    const deepseek = createOpenAICompatible({
+      name: "deepseek",
       apiKey: this.apiKey,
       baseURL: this.baseURL,
       fetch: makeLoggingFetch("deepseek"),
+      supportsStructuredOutputs: false,
+      includeUsage: true,
+      // DeepSeek's `response_format: { type: "json_object" }` requires the
+      // prompt to literally contain the word "json" — otherwise the API
+      // rejects with: "Prompt must contain the word 'json' in some form to
+      // use 'response_format' of type 'json_object'." The OpenAI-compatible
+      // SDK fallback path (used because supportsStructuredOutputs is false)
+      // does not inject this guidance itself, so we prepend a system
+      // message when it's missing. No-op for non-JSON requests.
+      transformRequestBody: (body) => {
+        const rf = (body as { response_format?: { type?: string } })
+          .response_format;
+        if (rf?.type !== "json_object") {
+          return body;
+        }
+        const messages = (body as { messages?: Array<{ content?: unknown }> })
+          .messages;
+        if (!Array.isArray(messages)) {
+          return body;
+        }
+        const containsJsonWord = messages.some((m) => {
+          const c = m?.content;
+          if (typeof c === "string") {
+            return /\bjson\b/i.test(c);
+          }
+          if (Array.isArray(c)) {
+            return c.some(
+              (part) =>
+                typeof (part as { text?: unknown })?.text === "string" &&
+                /\bjson\b/i.test((part as { text: string }).text),
+            );
+          }
+          return false;
+        });
+        if (containsJsonWord) {
+          return body;
+        }
+        return {
+          ...body,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Respond with valid JSON that satisfies the requested schema. Output JSON only — no prose, no markdown fencing.",
+            },
+            ...messages,
+          ],
+        };
+      },
     });
-    // .chat() returns a Chat Completions model. The default factory call
-    // returns a Responses API model which OpenAI-compat providers don't implement.
-    this.model = deepseek.chat(this.modelName);
+    this.model = deepseek.chatModel(this.modelName);
 
     logger.debug("DeepSeek Provider initialized", {
       modelName: this.modelName,

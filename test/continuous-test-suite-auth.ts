@@ -19,75 +19,49 @@
 // TEST RUNNER INFRASTRUCTURE
 // =============================================================================
 
-let passed = 0;
-let failed = 0;
-let skipped = 0;
-const failures: Array<{ name: string; error: string }> = [];
+import {
+  defineSuite,
+  log,
+  logSection,
+  type ColorName,
+} from "./helpers/harness.js";
 
-const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-} as const;
+const { recordTest, runSuite } = defineSuite("Auth");
 
-function log(message: string, color: keyof typeof colors = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
+/** Print-only logTest shim. Counters are driven by recordTest in the runner. */
+function logTest(
+  testName: string,
+  status: "PASS" | "FAIL" | "SKIP" | "TESTING",
+  details?: string,
+): void {
+  const color: ColorName =
+    status === "PASS"
+      ? "green"
+      : status === "FAIL"
+        ? "red"
+        : status === "SKIP"
+          ? "yellow"
+          : "blue";
+  log(`[${status}] ${testName}${details ? ` — ${details}` : ""}`, color);
 }
-
-function logSection(title: string): void {
-  console.log("\n" + "=".repeat(70));
-  log(`  ${title}`, "cyan");
-  console.log("=".repeat(70) + "\n");
-}
-
 async function test(
   name: string,
   fn: () => Promise<void> | void,
 ): Promise<void> {
   try {
     await fn();
-    passed++;
-    console.log(`  ${colors.green}✓${colors.reset} ${name}`);
+    recordTest(name, true);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     if (errorMsg.startsWith("SKIP:")) {
-      skipped++;
-      console.log(
-        `  ${colors.yellow}⊘${colors.reset} ${name} ${colors.yellow}(skipped: ${errorMsg.slice(5).trim()})${colors.reset}`,
-      );
+      recordTest(name, false, true, errorMsg.slice(5).trim());
     } else {
-      failed++;
-      failures.push({ name, error: errorMsg });
-      console.log(`  ${colors.red}✗${colors.reset} ${name}`);
-      console.log(`    ${colors.yellow}→ ${errorMsg}${colors.reset}`);
+      recordTest(name, false, false, errorMsg);
     }
   }
 }
 
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-function assertEqual<T>(actual: T, expected: T, message?: string): void {
-  if (actual !== expected) {
-    throw new Error(message || `Expected ${expected}, got ${actual}`);
-  }
-}
-
-function assertNotNull<T>(
-  value: T | null | undefined,
-  message?: string,
-): asserts value is T {
-  if (value === null || value === undefined) {
-    throw new Error(message || "Expected non-null value");
-  }
-}
+import { assert, assertEqual, assertNotNull } from "./helpers/harness.js";
 
 // =============================================================================
 // CONFIG
@@ -946,74 +920,10 @@ async function testPerCallTokenAuth(): Promise<void> {
 // =============================================================================
 
 async function main(): Promise<void> {
-  console.log("\n" + "=".repeat(70));
-  log("  NeuroLink Authentication Providers - Continuous Test Suite", "bright");
-  log("  STANDALONE RUNNER (NO VITEST)", "yellow");
-  console.log("=".repeat(70));
-
-  const startTime = Date.now();
-
-  try {
-    await testServerAuth(); // Section 1: Server protected endpoints
-    await testServerRBAC(); // Section 2: Server RBAC
-    await testPerCallPrevalidated(); // Section 3: Per-call pre-validated context
-    await testPerCallTokenAuth(); // Section 4: Per-call token validation
-  } catch (error) {
-    console.error("\nUnexpected error:", error);
-    failed++;
-  }
-
-  const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-  const total = passed + failed + skipped;
-
-  console.log("\n" + "=".repeat(70));
-  log("  TEST SUMMARY", "bright");
-  console.log("=".repeat(70));
-  console.log();
-  log(`  Passed:  ${passed}`, "green");
-  if (failed > 0) {
-    log(`  Failed:  ${failed}`, "red");
-  }
-  if (skipped > 0) {
-    log(`  Skipped: ${skipped}`, "yellow");
-  }
-  log(`  Total:   ${total}`, "bright");
-  log(`  Time:    ${duration}s`, "blue");
-  console.log();
-
-  if (failures.length > 0) {
-    log("  FAILURES:", "red");
-    console.log();
-    for (const f of failures) {
-      console.log(`    ${colors.red}✗${colors.reset} ${f.name}`);
-      console.log(`      ${colors.yellow}${f.error}${colors.reset}`);
-    }
-    console.log();
-  }
-
-  if (skipped > 0) {
-    log(
-      `  Note: ${skipped} test(s) skipped due to missing provider API keys.`,
-      "yellow",
-    );
-    log(
-      "  This is expected in CI without configured AI provider credentials.",
-      "yellow",
-    );
-    console.log();
-  }
-
-  if (failed > 0) {
-    log("  RESULT: FAIL", "red");
-  } else {
-    log("  RESULT: PASS", "green");
-  }
-
-  console.log("=".repeat(70) + "\n");
-  process.exit(failed > 0 ? 1 : 0);
+  await testServerAuth();
+  await testServerRBAC();
+  await testPerCallPrevalidated();
+  await testPerCallTokenAuth();
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(2);
-});
+await runSuite(main);

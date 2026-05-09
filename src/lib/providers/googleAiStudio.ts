@@ -724,6 +724,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
           // Convert tools
           let toolsConfig: NativeToolsConfig | undefined;
           let executeMap = new Map<string, Tool["execute"]>();
+          let originalNameMap = new Map<string, string>();
 
           if (
             options.tools &&
@@ -733,6 +734,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
             const result = buildNativeToolDeclarations(options.tools);
             toolsConfig = result.toolsConfig;
             executeMap = result.executeMap;
+            originalNameMap = result.originalNameMap;
 
             logger.debug("[GoogleAIStudio] Converted tools for native SDK", {
               toolCount: toolsConfig[0].functionDeclarations.length,
@@ -883,7 +885,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
                     executeMap,
                     failedTools,
                     allToolCalls,
-                    { abortSignal: composedSignal },
+                    { abortSignal: composedSignal, originalNameMap },
                   );
 
                   // Add function responses to history — the @google/genai SDK
@@ -1045,6 +1047,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
           // Convert tools (a0269210: trust options.tools — already merged + filtered upstream)
           let toolsConfig: NativeToolsConfig | undefined;
           let executeMap = new Map<string, Tool["execute"]>();
+          let originalNameMap = new Map<string, string>();
 
           const shouldUseTools = !options.disableTools;
           if (shouldUseTools) {
@@ -1054,6 +1057,7 @@ export class GoogleAIStudioProvider extends BaseProvider {
               const result = buildNativeToolDeclarations(tools);
               toolsConfig = result.toolsConfig;
               executeMap = result.executeMap;
+              originalNameMap = result.originalNameMap;
 
               logger.debug(
                 "[GoogleAIStudio] Converted tools for native SDK generate",
@@ -1176,7 +1180,11 @@ export class GoogleAIStudioProvider extends BaseProvider {
                 executeMap,
                 failedTools,
                 allToolCalls,
-                { toolExecutions, abortSignal: composedSignal },
+                {
+                  toolExecutions,
+                  abortSignal: composedSignal,
+                  originalNameMap,
+                },
               );
 
               // Add function responses to history — the @google/genai SDK

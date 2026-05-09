@@ -3052,7 +3052,46 @@ ${tools.length > 0 ? tools.map((t) => `- **${t}**: TODO: Add description`).join(
         process.exit(1);
       }
 
+      // `--infer` standalone path: when the user passes `--tool <name> --infer`
+      // and no server scope, emit the heuristic annotations inferred purely
+      // from the tool name/description. This makes `--infer` useful in any
+      // environment (no MCP servers required) and matches user intent —
+      // "show me what NeuroLink would infer for a tool with this name".
       const serverId = argv.server as string | undefined;
+      if (
+        argv.infer &&
+        !serverId &&
+        servers.filter((s) => s.status === "connected").length === 0
+      ) {
+        const inferred = inferAnnotations({
+          name: toolName,
+          description: "",
+        });
+        const errors = validateAnnotations(inferred);
+        if (errors.length > 0) {
+          logger.error(chalk.red("Inferred annotations validation errors:"));
+          for (const error of errors) {
+            logger.error(chalk.red(`  - ${error}`));
+          }
+          process.exit(1);
+        }
+        if (argv.format === "json") {
+          logger.always(
+            JSON.stringify(
+              { tool: toolName, inferred: true, annotations: inferred },
+              null,
+              2,
+            ),
+          );
+        } else {
+          logger.always(
+            chalk.bold(`\nInferred annotations for ${chalk.cyan(toolName)}:`),
+          );
+          logger.always(JSON.stringify(inferred, null, 2));
+        }
+        return;
+      }
+
       const foundTool = this.findToolForAnnotation(servers, toolName, serverId);
       if (foundTool === "ambiguous") {
         logger.error(

@@ -22,6 +22,7 @@ import {
   HuggingFaceModels,
   DeepSeekModels,
   NvidiaNimModels,
+  OpenRouterModels,
 } from "../constants/enums.js";
 
 /**
@@ -363,10 +364,12 @@ export class ProviderRegistry {
             openrouterCreds,
           );
         },
-        // Default updated from claude-3-5-sonnet (sunset by OpenRouter)
-        // to claude-sonnet-4.5. Must match getDefaultOpenRouterModel()
-        // in src/lib/providers/openRouter.ts.
-        process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.5",
+        // OpenRouter retired `anthropic/claude-3-5-sonnet` in late 2025 — see
+        // src/lib/providers/openRouter.ts and src/lib/utils/modelChoices.ts
+        // for the rationale. Keep the three defaults aligned at the new
+        // model (claude-sonnet-4.5) so the registry doesn't override the
+        // provider's getDefault.
+        process.env.OPENROUTER_MODEL || OpenRouterModels.CLAUDE_SONNET_4_5,
         ["openrouter", "or"],
       );
 

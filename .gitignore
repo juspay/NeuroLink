@@ -32,6 +32,18 @@ performance-test-*.txt
 .test-tmp-*/
 test-results.json
 
+# Test fixture repos created at runtime by autoresearch suite
+test/.tmp-autoresearch-*
+
+# Temp scripts written inside the project tree by suites that spawn node
+# (e.g. testSchemaWithMultipleImagesSDK) so bare-import resolution finds
+# project node_modules. See test/continuous-test-suite.ts.
+test/.tmp/
+
+# Verification-sweep / triage logs written by continuous-test-suite-* runs.
+# Gigabyte-scale, environment-specific, never useful upstream.
+test/logs/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -129,9 +141,28 @@ site/
 _site/
 quality-metrics.json
 
-# Claude Code
-.claude/
+# Test-output artifacts written by continuous-test-suite-* runs at the
+# repo root (these are model outputs, not source). Pre-commit hooks
+# auto-stage them otherwise.
+/alphabet.txt
+/city.json
+/city_data.json
+/city_population.json
+/city_population.txt
+/essay.txt
+/output.txt
+/hello.txt
+/joke.txt
+/story.txt
+/poem-output.txt
+/timestamp.txt
+
+# Claude Code — local state is ignored, but .claude/skills/ is shared
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.claude/commands/
+.claude/plans/
 
 # Security Files
 *.key
@@ -139,7 +170,6 @@ quality-metrics.json
 test-output/
 # Generated docs search index
 docs-site/static/search-index.json
-.claude/worktrees/
 .type-consolidation/
 .tmp-tests/
 .proof-of-work/

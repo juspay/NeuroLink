@@ -40,60 +40,26 @@ type TestResult = {
   error: string | null;
 };
 
-type ColorName =
-  | "reset"
-  | "bright"
-  | "red"
-  | "green"
-  | "yellow"
-  | "blue"
-  | "magenta"
-  | "cyan";
-
 // ============================================================================
-// Color helpers
+// Color helpers — provided by shared harness
 // ============================================================================
 
-const colors: Record<ColorName, string> = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  magenta: "\x1b[35m",
-  cyan: "\x1b[36m",
-};
+import { defineSuite, log, logSection } from "./helpers/harness.js";
 
-function log(message: string, color: ColorName = "reset"): void {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
+const { recordTest, runSuite } = defineSuite("Claude Proxy");
 
-function logSection(title: string): void {
-  log(`\n${"=".repeat(60)}`, "cyan");
-  log(`${title}`, "cyan");
-  log(`${"=".repeat(60)}`, "cyan");
-}
-
+/** Print-only logTest shim. Counters come from recordTest in the runner. */
 function logTest(
   testName: string,
   status: "PASS" | "FAIL" | "TESTING" | "SKIP",
   details = "",
 ): void {
-  const icon =
-    status === "PASS"
-      ? "PASS"
-      : status === "FAIL"
-        ? "FAIL"
-        : status === "SKIP"
-          ? "SKIP"
-          : "TEST";
-  const color: ColorName =
+  const color =
     status === "PASS" ? "green" : status === "FAIL" ? "red" : "yellow";
-  log(`[${icon}] ${testName}`, color);
-  if (details) {
-    log(`   ${details}`, "reset");
-  }
+  log(
+    `[${status}] ${testName}${details ? ` — ${details}` : ""}`,
+    color as never,
+  );
 }
 
 // ============================================================================
@@ -103,6 +69,25 @@ function logTest(
 let proxyProcess: ChildProcess | null = null;
 const PROXY_PORT = 9876; // Non-standard port for testing
 const PROXY_URL = `http://127.0.0.1:${PROXY_PORT}`;
+
+/**
+ * Set to true when the local CLI refuses to start because a launchd-managed
+ * `com.neurolink.proxy` daemon is already running. Once true, every
+ * downstream test (`Health`, `Status`, `Models`, `Count Tokens`,
+ * `Non-Streaming Request`, ...) returns `null` (SKIP) instead of `false`
+ * (FAIL) — the failure is environmental, not a regression in the suite or
+ * the proxy code.
+ *
+ * Detected by parsing the CLI's stdout for the canonical guard message
+ * emitted from `src/cli/commands/proxy.ts` when `isLaunchdManaging()` returns
+ * true.
+ */
+let proxyLaunchdManaged = false;
+const LAUNCHD_GUARD_MARKERS = [
+  "Use 'neurolink proxy uninstall'",
+  "managed by launchd",
+  "launchctl kickstart",
+];
 
 /**
  * Anthropic model used for the proxy round-trip tests.
@@ -248,6 +233,17 @@ async function startProxy(): Promise<boolean> {
 
     proxyProcess.on("exit", (code) => {
       if (!started) {
+        const combined = `${stdout}\n${stderr}`;
+        if (LAUNCHD_GUARD_MARKERS.some((m) => combined.includes(m))) {
+          proxyLaunchdManaged = true;
+          log(
+            "Local launchd-managed neurolink proxy detected — proxy suite will SKIP",
+            "yellow",
+          );
+          started = true;
+          resolve(false);
+          return;
+        }
         log(`Proxy exited prematurely with code ${code}`, "red");
         if (stdout) {
           log(`  stdout: ${stdout.substring(0, 300)}`, "red");
@@ -433,6 +429,9 @@ async function testProxyStartup(): Promise<boolean | null> {
   log("Starting proxy on port " + PROXY_PORT + "...", "cyan");
   const ok = await startProxy();
   if (!ok) {
+    if (proxyLaunchdManaged) {
+      return null;
+    }
     log("Proxy failed to start", "red");
     return false;
   }
@@ -1931,95 +1930,49 @@ const tests: TestFunction[] = [
 // ============================================================================
 
 async function runAllTests(): Promise<void> {
-  logSection("Claude Proxy End-to-End Test Suite");
-  log(
-    "Testing proxy server lifecycle, endpoints, and real API requests\n",
-    "bright",
-  );
-
-  const startTime = Date.now();
-
-  // Prerequisite: check build
-  log("Checking build prerequisites...", "cyan");
   if (!fs.existsSync("dist") || !fs.existsSync("dist/cli/index.js")) {
     log("Build artifacts not found. Run: pnpm run build:cli", "red");
     process.exit(1);
   }
-  log("Build artifacts found", "green");
-
   const credStatus = hasValidCredentials()
     ? "credentials found"
     : "no credentials (API tests will skip)";
   log(`Credential check: ${credStatus}\n`, "cyan");
 
-  const results: TestResult[] = [];
-
   try {
     for (const test of tests) {
+      // If startup detected a launchd-managed local proxy, every downstream
+      // test would FAIL with "fetch failed" — skip them all so the result is
+      // SKIP instead of cascading FAILs.
+      if (
+        proxyLaunchdManaged &&
+        test.name !== "Proxy Startup" &&
+        test.category !== "proxy-config"
+      ) {
+        recordTest(test.name, false, true, "launchd-managed proxy detected");
+        continue;
+      }
       try {
         const result = await test.fn();
-        results.push({ name: test.name, result, error: null });
-        if (result === true) {
-          logTest(test.name, "PASS", "");
-        } else if (result === false) {
-          logTest(test.name, "FAIL", "");
-        } else {
-          logTest(test.name, "SKIP", "");
-        }
+        recordTest(
+          test.name,
+          result === true,
+          result === null,
+          result === null ? "skipped" : result === true ? undefined : "failed",
+        );
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        results.push({ name: test.name, result: false, error: msg });
-        logTest(test.name, "FAIL", msg);
+        recordTest(test.name, false, false, msg);
       }
-
-      // Small delay between API tests to avoid rate-limiting
       if (test.category === "proxy-api") {
         await new Promise((r) => setTimeout(r, 2000));
       }
     }
   } finally {
-    // Safety: ensure proxy is stopped even if shutdown test failed
     await stopProxy();
-
-    // Restore original proxy state file so any pre-existing proxy is unaffected
     restoreProxyState();
-
-    // Restore Claude Code settings
     restoreClaudeSettings();
-  }
-
-  // Summary
-  logSection("Test Results Summary");
-
-  const passed = results.filter((r) => r.result === true).length;
-  const failed = results.filter((r) => r.result === false).length;
-  const skipped = results.filter((r) => r.result === null).length;
-  const total = results.length;
-  const duration = Math.round((Date.now() - startTime) / 1000);
-
-  results.forEach((test) => {
-    const status: "PASS" | "FAIL" | "SKIP" =
-      test.result === true ? "PASS" : test.result === false ? "FAIL" : "SKIP";
-    const details = test.error
-      ? test.error
-      : test.result === null
-        ? "SKIPPED"
-        : "";
-    logTest(test.name, status, details);
-  });
-
-  log(
-    `\nResults: ${passed} passed, ${failed} failed, ${skipped} skipped out of ${total} tests in ${duration}s`,
-    "bright",
-  );
-
-  if (failed === 0) {
-    log("All non-skipped tests passed!", "green");
-    process.exit(0);
-  } else {
-    log(`${failed} test(s) failed. See details above.`, "red");
-    process.exit(1);
   }
 }
 
-runAllTests();
+await runSuite(runAllTests);

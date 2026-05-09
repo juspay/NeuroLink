@@ -1216,6 +1216,10 @@ export type TextGenerationResult = {
   imageOutput?: { base64: string } | null;
   /** Gemini 3 thought signature for reasoning continuity across turns */
   thoughtSignature?: string;
+  /** Thinking/reasoning text from provider (Anthropic thinking blocks, Gemini thought parts, DeepSeek/NIM reasoning_content) */
+  reasoning?: string;
+  /** Token count for reasoning content */
+  reasoningTokens?: number;
   // NL-007: Retry metadata for observability
   retries?: {
     count: number;
