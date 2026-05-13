@@ -146,6 +146,15 @@ import {
   getMetricsAggregator,
   MetricsAggregator,
 } from "./observability/metricsAggregator.js";
+import { AnalyticsService } from "./analytics/index.js";
+import type {
+  CostAnalysisOptions,
+  CostAnalysisResult,
+  ProviderMetricsOptions,
+  ProviderMetricsResult,
+  TeamAnalyticsOptions,
+  TeamAnalyticsResult,
+} from "./types/analytics.js";
 
 import {
   SpanStatus,
@@ -1110,6 +1119,7 @@ export class NeuroLink {
    */
   private observabilityConfig?: ObservabilityConfig;
   private metricsAggregator: MetricsAggregator = new MetricsAggregator();
+  private analyticsService: AnalyticsService;
   /**
    * Per-request metrics trace context backed by AsyncLocalStorage.
    * Safe for concurrent requests on the same SDK instance.
@@ -1123,6 +1133,7 @@ export class NeuroLink {
     this.toolRegistry = config?.toolRegistry || new MCPToolRegistry();
     this.fileRegistry = new FileReferenceRegistry();
     this.observabilityConfig = config?.observability;
+    this.analyticsService = new AnalyticsService();
 
     // Initialize orchestration setting
     this.enableOrchestration = config?.enableOrchestration ?? false;
@@ -3060,6 +3071,77 @@ Current user's request: ${currentInput}`;
   }
 
   /**
+   * Get provider metrics analysis
+   * Retrieves aggregated performance, token usage, latency, and success rates per provider.
+   *
+   * @param options - Filtering options
+   * @returns Comprehensive provider metrics result
+   */
+  async getProviderMetrics(options?: ProviderMetricsOptions): Promise<ProviderMetricsResult> {
+    try {
+      return await this.analyticsService.getProviderMetrics(options);
+    } catch {
+      return {
+        averageLatency: 0,
+        averageResponseTime: 0,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        errorRate: 0,
+        successRate: 1,
+        costPerToken: 0,
+        totalCost: 0,
+        requestCount: 0,
+        providers: [],
+      };
+    }
+  }
+
+  /**
+   * Get cost analysis breakdown
+   * Analyzes AI generation costs across requested groups and provides future projections.
+   *
+   * @param options - Cost configuration options
+   * @returns Detailed cost analysis breakdown
+   */
+  async getCostAnalysis(options?: CostAnalysisOptions): Promise<CostAnalysisResult> {
+    try {
+      return await this.analyticsService.getCostAnalysis(options);
+    } catch {
+      return {
+        totalCost: 0,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        requestCount: 0,
+        groups: {},
+        providers: [],
+      };
+    }
+  }
+
+  /**
+   * Get team-wide usage analytics
+   * Retrieves request counts, unique active users, provider breakdown, and quality scoring.
+   *
+   * @param options - Team query options
+   * @returns Comprehensive team analytics report
+   */
+  async getTeamAnalytics(options?: TeamAnalyticsOptions): Promise<TeamAnalyticsResult> {
+    try {
+      return await this.analyticsService.getTeamAnalytics(options);
+    } catch {
+      return {
+        totalRequests: 0,
+        uniqueUsers: 0,
+        providersUsed: [],
+        costBreakdownByProvider: {},
+        costBreakdownByUser: {},
+      };
+    }
+  }
+
+  /**
    * Record a memory operation span to both instance and global metrics aggregators.
    * This ensures memory spans are visible via sdk.getSpans() and getMetricsAggregator().getSpans().
    */
@@ -3310,6 +3392,23 @@ Current user's request: ${currentInput}`;
 
         this.metricsAggregator.recordSpan(span);
         getMetricsAggregator().recordSpan(span);
+
+        void this.analyticsService.trackRequest({
+          provider,
+          model,
+          userId: (data.userId as string) || (data.user as string) || undefined,
+          teamId: (data.teamId as string) || undefined,
+          department: (data.department as string) || undefined,
+          timestamp: Date.now(),
+          latency: responseTime,
+          inputTokens: usage?.input || 0,
+          outputTokens: usage?.output || 0,
+          totalTokens: usage?.total || (usage?.input || 0) + (usage?.output || 0),
+          cost: (span.attributes["ai.cost.total"] as number) || analytics?.cost,
+          isError: span.status === 2,
+          errorMessage: statusMessage,
+          qualityScore: data.qualityScore as any,
+        });
       } catch {
         // Non-blocking
       }
@@ -3417,6 +3516,23 @@ Current user's request: ${currentInput}`;
 
         this.metricsAggregator.recordSpan(span);
         getMetricsAggregator().recordSpan(span);
+
+        void this.analyticsService.trackRequest({
+          provider,
+          model,
+          userId: (data.userId as string) || (data.user as string) || undefined,
+          teamId: (data.teamId as string) || undefined,
+          department: (data.department as string) || undefined,
+          timestamp: Date.now(),
+          latency: durationMs,
+          inputTokens: usage?.input || 0,
+          outputTokens: usage?.output || 0,
+          totalTokens: usage?.total || (usage?.input || 0) + (usage?.output || 0),
+          cost: (span.attributes["ai.cost.total"] as number) || 0,
+          isError: span.status === 2,
+          errorMessage: span.statusMessage,
+          qualityScore: data.qualityScore as any,
+        });
       } catch {
         // Non-blocking
       }
@@ -3515,6 +3631,23 @@ Current user's request: ${currentInput}`;
 
         this.metricsAggregator.recordSpan(span);
         getMetricsAggregator().recordSpan(span);
+
+        void this.analyticsService.trackRequest({
+          provider,
+          model,
+          userId: (data.userId as string) || (data.user as string) || undefined,
+          teamId: (data.teamId as string) || undefined,
+          department: (data.department as string) || undefined,
+          timestamp: Date.now(),
+          latency: durationMs,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          cost: 0,
+          isError: true,
+          errorMessage: span.statusMessage,
+          qualityScore: data.qualityScore as any,
+        });
       } catch {
         // Non-blocking
       }

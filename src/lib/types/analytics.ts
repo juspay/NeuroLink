@@ -74,3 +74,97 @@ export type PerformanceMetrics = {
     external: number;
   };
 };
+
+export type TimeRangeOption = {
+  start: Date;
+  end: Date;
+};
+
+export interface ProviderMetricsOptions {
+  providers?: string[];
+  timeRange?: TimeRangeOption | string;
+  metrics?: string[];
+}
+
+export interface ProviderMetricItem {
+  name: string;
+  averageLatency: number;
+  averageResponseTime: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  errorRate: number;
+  successRate: number;
+  costPerToken: number;
+  totalCost: number;
+  requestCount: number;
+}
+
+export interface ProviderMetricsResult {
+  averageLatency: number;
+  averageResponseTime: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  errorRate: number;
+  successRate: number;
+  costPerToken: number;
+  totalCost: number;
+  requestCount: number;
+  providers: ProviderMetricItem[];
+}
+
+export interface CostAnalysisOptions {
+  timeRange?: TimeRangeOption | string;
+  groupBy?: string | string[];
+  includeProjections?: boolean;
+}
+
+export interface CostGroupItem {
+  groupKey: string;
+  provider?: string;
+  model?: string;
+  userId?: string;
+  totalCost: number;
+  costPerToken: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  requestCount: number;
+}
+
+export interface CostAnalysisResult {
+  totalCost: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  requestCount: number;
+  groups: Record<string, CostGroupItem>;
+  providers: CostGroupItem[];
+  projections?: {
+    nextMonth: number;
+    nextQuarter: number;
+  };
+}
+
+export interface TeamAnalyticsOptions {
+  teamId?: string;
+  departments?: string[];
+  metrics?: string[];
+  timeRange?: TimeRangeOption | string;
+}
+
+export interface TeamAnalyticsResult {
+  totalRequests: number;
+  uniqueUsers: number;
+  providersUsed: string[];
+  costBreakdownByProvider: Record<string, number>;
+  costBreakdownByUser: Record<string, number>;
+  qualityScores?: {
+    overall: number;
+    relevance: number;
+    accuracy: number;
+    completeness: number;
+    reasoning?: string;
+  };
+}
