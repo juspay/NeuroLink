@@ -92,6 +92,7 @@
     "test:bugfixes": "npx tsx test/continuous-test-suite-bugfixes.ts",
     "test:workflow": "npx tsx test/continuous-test-suite-workflow.ts",
     "test:hitl": "npx tsx test/continuous-test-suite-hitl.ts",
+    "test:analytics": "npx tsx test/continuous-test-suite-analytics.ts",
     "test:ci": "pnpm run test && pnpm run test:client && pnpm run test:hitl",
     "test:performance": "tsx tools/testing/performanceMonitor.ts",
     "// Content Generation (Cross-platform JS)": "",
