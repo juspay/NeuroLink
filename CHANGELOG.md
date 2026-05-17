@@ -1,3 +1,9 @@
+## [9.65.0](https://github.com/juspay/neurolink/compare/v9.64.0...v9.65.0) (2026-05-17)
+
+### Features
+
+- **(providers):** add 12 new providers + new modalities (avatar/music/video) + image-gen ([00f88f6](https://github.com/juspay/neurolink/commit/00f88f67161ab170cf2b3b8be3ec683d3cae1c24))
+
 ## [9.64.0](https://github.com/juspay/neurolink/compare/v9.63.1...v9.64.0) (2026-05-16)
 
 ### Features
