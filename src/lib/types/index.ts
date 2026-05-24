@@ -37,6 +37,7 @@ export * from "./middleware.js";
 export * from "./model.js";
 export * from "./multimodal.js";
 export * from "./observability.js";
+export * from "./openaiCompatible.js";
 export * from "./ppt.js";
 export * from "./processor.js";
 export * from "./providers.js";

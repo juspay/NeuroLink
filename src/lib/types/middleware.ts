@@ -19,6 +19,7 @@ export type {
   LanguageModelV3,
   LanguageModelV3CallOptions,
   LanguageModelV3Message,
+  LanguageModelV3Prompt,
   LanguageModelV3StreamPart,
   LanguageModelV3ToolCall,
   LanguageModelV3ToolChoice,

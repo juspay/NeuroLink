@@ -387,7 +387,10 @@ export const PROVIDERS: Record<string, ProviderEntry> = {
   },
   "openai-compatible": {
     name: "openai-compatible",
-    defaultModel: "gpt-4o-mini",
+    // Read the configured default first so LiteLLM-style endpoints with a
+    // restricted model allowlist (where gpt-4o-mini is not provisioned) can
+    // point the matrix at their actual model via OPENAI_COMPATIBLE_MODEL.
+    defaultModel: process.env.OPENAI_COMPATIBLE_MODEL || "gpt-4o-mini",
     envVars: ["OPENAI_COMPATIBLE_BASE_URL", "OPENAI_COMPATIBLE_API_KEY"],
     text: true,
     streaming: true,
