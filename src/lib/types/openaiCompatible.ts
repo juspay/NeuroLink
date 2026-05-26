@@ -309,3 +309,24 @@ export type OpenAICompatBuildBodyArgs = {
   streaming: boolean;
   responseFormat?: OpenAICompatResponseFormat;
 };
+
+/**
+ * Per-stream lifecycle listeners returned from an OpenAIChatCompletionsProvider
+ * subclass's `onStreamStart` hook. Every property is optional — provide only
+ * what the subclass cares about. Used by LiteLLM to wire an OTel span around
+ * the deferred analytics promises.
+ */
+export type OpenAICompatStreamLifecycleListeners = {
+  /** Fired once the deferred usage promise resolves with the final aggregated token counts. */
+  onUsage?: (usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }) => void;
+  /**
+   * Fired once the deferred finish promise resolves. `reason` is "stop",
+   * "length", "tool-calls", "content-filter", or "error". When the loop
+   * errored, the upstream cause is passed as `capturedError`.
+   */
+  onFinish?: (reason: string, capturedError?: unknown) => void;
+};
