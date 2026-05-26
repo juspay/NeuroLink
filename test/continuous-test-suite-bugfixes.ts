@@ -18,9 +18,14 @@ import {
 
 import { convertToModelMessages } from "../src/lib/utils/messageBuilder.js";
 
-import { resolveVertexLocation } from "../src/lib/providers/googleVertex.js";
+import {
+  GoogleVertexProvider,
+  resolveVertexLocation,
+} from "../src/lib/providers/googleVertex.js";
 
 import { OpenAICompatibleProvider } from "../src/lib/providers/openaiCompatible.js";
+import { LiteLLMProvider } from "../src/lib/providers/litellm.js";
+import { ModelAccessDeniedError } from "../src/lib/types/index.js";
 
 import type {
   ParsedClaudeRequest,
@@ -78,6 +83,34 @@ function makeRuntimeState(
   };
 }
 
+async function withTemporaryEnv<T>(
+  updates: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = new Map<string, string | undefined>();
+  for (const key of Object.keys(updates)) {
+    previous.set(key, process.env[key]);
+    const next = updates[key];
+    if (next === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = next;
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -122,6 +155,35 @@ const tests: TestFunction[] = [
     fn: async () => {
       return resolveVertexLocation("gemini-2.5-flash", "global") === "global";
     },
+  },
+  {
+    name: "GoogleVertexProvider: Anthropic Vertex client pins SDK timeout",
+    category: "vertex-anthropic",
+    fn: async () =>
+      withTemporaryEnv(
+        {
+          GOOGLE_APPLICATION_CREDENTIALS: "/tmp/neurolink-test-creds.json",
+          GOOGLE_CLOUD_PROJECT_ID: "test-project",
+          GOOGLE_CLOUD_LOCATION: "us-east5",
+        },
+        async () => {
+          const provider = new GoogleVertexProvider(
+            "claude-sonnet-4@20250514",
+            undefined,
+            undefined,
+            "us-east5",
+          );
+          const client = await (
+            provider as unknown as {
+              createAnthropicVertexClient(
+                timeoutMs?: number,
+              ): Promise<{ _options?: { timeout?: number } }>;
+            }
+          ).createAnthropicVertexClient(900_000);
+
+          return client._options?.timeout === 900_000;
+        },
+      ),
   },
 
   // ---------- Proxy routing: simplified ----------
@@ -2685,6 +2747,350 @@ exit 127
         }
       } finally {
         globalThis.fetch = originalFetch;
+      }
+    },
+  },
+  // ---------- LiteLLM provider (native HTTP, post-AI-SDK migration) ----------
+  {
+    name: "litellm.doGenerate forwards seed/stopSequences/presencePenalty/frequencyPenalty/topP",
+    category: "litellm",
+    fn: async () => {
+      const originalFetch = globalThis.fetch;
+      let captured: Record<string, unknown> | undefined;
+      try {
+        globalThis.fetch = (async (
+          _input: RequestInfo | URL,
+          init?: RequestInit,
+        ) => {
+          captured = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return new Response(
+            JSON.stringify({
+              id: "x",
+              choices: [
+                {
+                  index: 0,
+                  message: { role: "assistant", content: "ok" },
+                  finish_reason: "stop",
+                },
+              ],
+              usage: { prompt_tokens: 1, completion_tokens: 1 },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }) as typeof fetch;
+        const provider = new LiteLLMProvider(
+          "openai/gpt-4o-mini",
+          undefined,
+          undefined,
+          { apiKey: "k", baseURL: "http://fake.local" },
+        );
+        const model = (await provider.getAISDKModel()) as unknown as {
+          doGenerate: (opts: Record<string, unknown>) => Promise<unknown>;
+        };
+        await model.doGenerate({
+          prompt: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
+          seed: 42,
+          stopSequences: ["\nUser:"],
+          presencePenalty: 0.3,
+          frequencyPenalty: 0.4,
+          topP: 0.9,
+        });
+        return (
+          captured?.seed === 42 &&
+          Array.isArray(captured?.stop) &&
+          (captured?.stop as string[])[0] === "\nUser:" &&
+          captured?.presence_penalty === 0.3 &&
+          captured?.frequency_penalty === 0.4 &&
+          captured?.top_p === 0.9
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  },
+  {
+    name: "litellm.doGenerate skips maxTokens for Gemini 2.5 model",
+    category: "litellm",
+    fn: async () => {
+      const originalFetch = globalThis.fetch;
+      let captured: Record<string, unknown> | undefined;
+      try {
+        globalThis.fetch = (async (
+          _input: RequestInfo | URL,
+          init?: RequestInit,
+        ) => {
+          captured = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return new Response(
+            JSON.stringify({
+              id: "x",
+              choices: [
+                {
+                  index: 0,
+                  message: { role: "assistant", content: "ok" },
+                  finish_reason: "stop",
+                },
+              ],
+              usage: { prompt_tokens: 1, completion_tokens: 1 },
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }) as typeof fetch;
+        const provider = new LiteLLMProvider(
+          "google/gemini-2.5-flash",
+          undefined,
+          undefined,
+          { apiKey: "k", baseURL: "http://fake.local" },
+        );
+        const model = (await provider.getAISDKModel()) as unknown as {
+          doGenerate: (opts: Record<string, unknown>) => Promise<unknown>;
+        };
+        await model.doGenerate({
+          prompt: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
+          maxOutputTokens: 100,
+        });
+        return captured?.max_tokens === undefined;
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  },
+  {
+    name: "litellm.formatProviderError surfaces ModelAccessDeniedError on team allowlist 403",
+    category: "litellm",
+    fn: async () => {
+      const provider = new LiteLLMProvider(
+        "anthropic/claude-3-5-sonnet",
+        undefined,
+        undefined,
+        { apiKey: "k", baseURL: "http://fake.local" },
+      );
+      const msg =
+        "Team not allowed to access model. team can only access models=['openai/gpt-4o','google/gemini-2.5-flash']";
+      const err = (
+        provider as unknown as {
+          formatProviderError: (e: unknown) => Error;
+        }
+      ).formatProviderError(new Error(msg));
+      if (!(err instanceof ModelAccessDeniedError)) {
+        return false;
+      }
+      const allowed = (err as ModelAccessDeniedError).allowedModels;
+      return (
+        Array.isArray(allowed) &&
+        allowed.includes("openai/gpt-4o") &&
+        allowed.includes("google/gemini-2.5-flash")
+      );
+    },
+  },
+  {
+    name: "litellm.executeStream streams text deltas via SSE",
+    category: "litellm",
+    fn: async () => {
+      const originalFetch = globalThis.fetch;
+      try {
+        globalThis.fetch = (async () => {
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              const enc = new TextEncoder();
+              controller.enqueue(
+                enc.encode(
+                  `data: ${JSON.stringify({
+                    choices: [
+                      {
+                        index: 0,
+                        delta: { content: "hello " },
+                        finish_reason: null,
+                      },
+                    ],
+                  })}\n\n`,
+                ),
+              );
+              controller.enqueue(
+                enc.encode(
+                  `data: ${JSON.stringify({
+                    choices: [
+                      {
+                        index: 0,
+                        delta: { content: "world" },
+                        finish_reason: "stop",
+                      },
+                    ],
+                  })}\n\n`,
+                ),
+              );
+              controller.enqueue(enc.encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          });
+          return new Response(stream, {
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+          });
+        }) as typeof fetch;
+        const { NeuroLink } = await import("../src/lib/neurolink.js");
+        const nl = new NeuroLink();
+        const provider = new LiteLLMProvider(
+          "openai/gpt-4o-mini",
+          nl as unknown,
+          undefined,
+          { apiKey: "k", baseURL: "http://fake.local" },
+        );
+        const result = await (
+          provider as unknown as {
+            executeStream: (opts: Record<string, unknown>) => Promise<{
+              stream: AsyncIterable<unknown>;
+            }>;
+          }
+        ).executeStream({
+          input: { text: "hi" },
+          disableTools: true,
+        });
+        let collected = "";
+        for await (const chunk of result.stream) {
+          const c = chunk as { content?: string };
+          if (typeof c.content === "string") {
+            collected += c.content;
+          }
+        }
+        return collected === "hello world";
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  },
+  {
+    name: "litellm.embed POSTs to /embeddings and returns embedding vector",
+    category: "litellm",
+    fn: async () => {
+      const originalFetch = globalThis.fetch;
+      let capturedURL: string | undefined;
+      let capturedBody: Record<string, unknown> | undefined;
+      try {
+        globalThis.fetch = (async (
+          input: RequestInfo | URL,
+          init?: RequestInit,
+        ) => {
+          capturedURL =
+            typeof input === "string" ? input : (input as URL).toString();
+          capturedBody = JSON.parse(String(init?.body)) as Record<
+            string,
+            unknown
+          >;
+          return new Response(
+            JSON.stringify({
+              data: [{ embedding: [0.1, 0.2, 0.3] }],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }) as typeof fetch;
+        const provider = new LiteLLMProvider(
+          "openai/gpt-4o-mini",
+          undefined,
+          undefined,
+          { apiKey: "k", baseURL: "http://fake.local" },
+        );
+        const v = await provider.embed("hello");
+        return (
+          capturedURL === "http://fake.local/embeddings" &&
+          capturedBody?.input === "hello" &&
+          typeof capturedBody?.model === "string" &&
+          Array.isArray(v) &&
+          v.length === 3 &&
+          v[0] === 0.1
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  },
+  {
+    name: "litellm.embedMany POSTs batch and returns embedding matrix",
+    category: "litellm",
+    fn: async () => {
+      const originalFetch = globalThis.fetch;
+      let capturedBody: Record<string, unknown> | undefined;
+      try {
+        globalThis.fetch = (async (
+          _input: RequestInfo | URL,
+          init?: RequestInit,
+        ) => {
+          capturedBody = JSON.parse(String(init?.body)) as Record<
+            string,
+            unknown
+          >;
+          return new Response(
+            JSON.stringify({
+              data: [{ embedding: [0.1, 0.2] }, { embedding: [0.3, 0.4] }],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }) as typeof fetch;
+        const provider = new LiteLLMProvider(
+          "openai/gpt-4o-mini",
+          undefined,
+          undefined,
+          { apiKey: "k", baseURL: "http://fake.local" },
+        );
+        const vs = await provider.embedMany(["a", "b"]);
+        const inputBatch = capturedBody?.input as unknown[];
+        return (
+          Array.isArray(inputBatch) &&
+          inputBatch.length === 2 &&
+          inputBatch[0] === "a" &&
+          inputBatch[1] === "b" &&
+          vs.length === 2 &&
+          vs[0][0] === 0.1 &&
+          vs[1][1] === 0.4
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  },
+  {
+    name: "litellm.getAvailableModels falls back to LITELLM_FALLBACK_MODELS env when API fails",
+    category: "litellm",
+    fn: async () => {
+      const originalFetch = globalThis.fetch;
+      const originalFallback = process.env.LITELLM_FALLBACK_MODELS;
+      try {
+        globalThis.fetch = (async () => {
+          return new Response("server boom", { status: 500 });
+        }) as typeof fetch;
+        process.env.LITELLM_FALLBACK_MODELS =
+          "alpha/one, beta/two , gamma/three";
+        // bust the static cache via reflection so the fallback path runs
+        (LiteLLMProvider as unknown as { modelsCache: string[] }).modelsCache =
+          [];
+        (
+          LiteLLMProvider as unknown as { modelsCacheTime: number }
+        ).modelsCacheTime = 0;
+        const provider = new LiteLLMProvider(
+          "openai/gpt-4o-mini",
+          undefined,
+          undefined,
+          { apiKey: "k", baseURL: "http://fake.local" },
+        );
+        const models = await provider.getAvailableModels();
+        return (
+          models.length === 3 &&
+          models[0] === "alpha/one" &&
+          models[1] === "beta/two" &&
+          models[2] === "gamma/three"
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+        if (originalFallback === undefined) {
+          delete process.env.LITELLM_FALLBACK_MODELS;
+        } else {
+          process.env.LITELLM_FALLBACK_MODELS = originalFallback;
+        }
+        // restore cache to clean state for subsequent tests
+        (LiteLLMProvider as unknown as { modelsCache: string[] }).modelsCache =
+          [];
+        (
+          LiteLLMProvider as unknown as { modelsCacheTime: number }
+        ).modelsCacheTime = 0;
       }
     },
   },

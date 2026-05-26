@@ -1076,6 +1076,8 @@ export type AnthropicVertexSettings = {
   projectId: string;
   /** Google Cloud region for Anthropic models (e.g., 'us-east5') */
   region: string;
+  /** SDK request timeout in milliseconds */
+  timeout?: number;
 };
 
 // ============================================================================

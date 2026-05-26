@@ -485,6 +485,7 @@ const createVertexSettings = async (
 // Create Anthropic-specific Vertex settings for native @anthropic-ai/vertex-sdk
 const createVertexAnthropicSettings = async (
   region?: string,
+  timeoutMs?: number,
 ): Promise<AnthropicVertexSettings> => {
   const location = region || getVertexLocation();
   const project = getVertexProjectId();
@@ -492,6 +493,7 @@ const createVertexAnthropicSettings = async (
   return {
     projectId: project,
     region: location,
+    ...(timeoutMs !== undefined && { timeout: timeoutMs }),
   };
 };
 
@@ -2724,9 +2726,14 @@ export class GoogleVertexProvider extends BaseProvider {
   /**
    * Create native AnthropicVertex client for Claude models
    */
-  private async createAnthropicVertexClient(): Promise<AnthropicVertexType> {
+  private async createAnthropicVertexClient(
+    timeoutMs?: number,
+  ): Promise<AnthropicVertexType> {
     const mod = await getAnthropicVertexModule();
-    const settings = await createVertexAnthropicSettings(this.location);
+    const settings = await createVertexAnthropicSettings(
+      this.location,
+      timeoutMs,
+    );
     return new mod.AnthropicVertex(settings);
   }
 
@@ -2737,10 +2744,11 @@ export class GoogleVertexProvider extends BaseProvider {
   private async executeNativeAnthropicStream(
     options: StreamOptions,
   ): Promise<StreamResult> {
-    const client = await this.createAnthropicVertexClient();
     const modelName =
       options.model || this.modelName || "claude-sonnet-4-5@20250929";
     const startTime = Date.now();
+    const streamTimeoutMs = parseTimeout(options.timeout) ?? 300_000;
+    const client = await this.createAnthropicVertexClient(streamTimeoutMs);
 
     logger.debug(
       "[GoogleVertex] Using native @anthropic-ai/vertex-sdk for Claude stream",
@@ -3117,7 +3125,6 @@ export class GoogleVertexProvider extends BaseProvider {
     // abort the stream after the configured timeout so a stalled
     // Vertex/Anthropic endpoint can't hang forever. options.timeout wins
     // if set; otherwise 5 min — generous for tool-heavy turns.
-    const streamTimeoutMs = parseTimeout(options.timeout) ?? 300_000;
     const streamTimeoutHandle = setTimeout(() => {
       logger.warn(
         `[GoogleVertex] Anthropic stream exceeded ${streamTimeoutMs}ms — aborting`,
@@ -3410,10 +3417,11 @@ export class GoogleVertexProvider extends BaseProvider {
   private async executeNativeAnthropicGenerate(
     options: TextGenerationOptions,
   ): Promise<EnhancedGenerateResult> {
-    const client = await this.createAnthropicVertexClient();
     const modelName =
       options.model || this.modelName || "claude-sonnet-4-5@20250929";
     const startTime = Date.now();
+    const generateTimeoutMs = parseTimeout(options.timeout) ?? 300_000;
+    const client = await this.createAnthropicVertexClient(generateTimeoutMs);
 
     logger.debug(
       "[GoogleVertex] Using native @anthropic-ai/vertex-sdk for Claude generate",
@@ -3755,7 +3763,6 @@ export class GoogleVertexProvider extends BaseProvider {
         // Bound the SDK wait so a stalled Vertex/Anthropic call can't hang
         // generate forever. options.timeout wins if set, otherwise default
         // to 5 min — generous for tool-heavy turns.
-        const generateTimeoutMs = parseTimeout(options.timeout) ?? 300_000;
         const response = await withTimeout(
           client.messages.create({
             ...requestParams,
