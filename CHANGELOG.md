@@ -1,3 +1,9 @@
+## [9.68.0](https://github.com/juspay/neurolink/compare/v9.67.3...v9.68.0) (2026-06-01)
+
+### Features
+
+- **(providers):** native-base request/response hooks for OpenAIChatCompletionsProvider ([249563a](https://github.com/juspay/neurolink/commit/249563a32639edd246041bd4aa5cd641b9fab3aa))
+
 ## [9.67.3](https://github.com/juspay/neurolink/compare/v9.67.2...v9.67.3) (2026-05-29)
 
 ## [9.67.2](https://github.com/juspay/neurolink/compare/v9.67.1...v9.67.2) (2026-05-26)
