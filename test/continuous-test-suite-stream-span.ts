@@ -300,13 +300,35 @@ try {
 for (const name of expectedMigrated) {
   const file = auditFiles.find((f) => f === `${name}.ts`);
   if (!file) {
-    recordTest(`${name}: file present`, false, "not found");
+    recordTest(`${name}: file present`, false, false, "not found");
     continue;
   }
   try {
     const content = readFileSync(join(providersDir, file), "utf8");
     const usesStreamSpan = content.includes("withClientStreamSpan");
     const usesOldSpan = /withClientSpan\(/.test(content);
+    if (/extends\s+OpenAIChatCompletionsProvider/.test(content)) {
+      // Migrated to the native base: streaming spans are emitted centrally by
+      // OpenAIChatCompletionsProvider (onStreamStart + OTel). The provider must
+      // NOT carry its own span wrappers, so assert both are absent — a
+      // regression (re-adding per-provider span code) then fails here.
+      recordTest(
+        `${name}: no per-provider withClientStreamSpan (centralized in base)`,
+        !usesStreamSpan,
+        false,
+        usesStreamSpan
+          ? "migrated provider still wraps streaming with withClientStreamSpan"
+          : undefined,
+      );
+      recordTest(
+        `${name}: no leftover withClientSpan( call`,
+        !usesOldSpan,
+        false,
+        usesOldSpan ? "still has withClientSpan( reference" : undefined,
+      );
+      continue;
+    }
+    // Not yet migrated: still expected to wrap streaming itself.
     recordTest(
       `${name}: uses withClientStreamSpan for streaming`,
       usesStreamSpan,
@@ -314,11 +336,13 @@ for (const name of expectedMigrated) {
     recordTest(
       `${name}: no leftover withClientSpan( call for streaming`,
       !usesOldSpan,
+      false,
       usesOldSpan ? "still has withClientSpan( reference" : undefined,
     );
   } catch (err) {
     recordTest(
       `${name}: read`,
+      false,
       false,
       err instanceof Error ? err.message : String(err),
     );
@@ -404,14 +428,42 @@ for (const name of expectedBrandUsers) {
     const content = readFileSync(join(providersDir, `${name}.ts`), "utf8");
     const usesBrand = content.includes("isNeuroLink(");
     const hasDuckType = content.includes('"getInMemoryServers" in sdk');
+    if (/extends\s+OpenAIChatCompletionsProvider/.test(content)) {
+      // Migrated to the native base, which receives the SDK handle directly;
+      // the per-provider isNeuroLink() brand guard is centralized away. Assert
+      // it (and the legacy duck-type) is absent so a regression fails here.
+      recordTest(
+        `${name}: no per-provider isNeuroLink( brand check (centralized in base)`,
+        !usesBrand,
+        false,
+        usesBrand
+          ? "migrated provider still has a per-provider isNeuroLink( guard"
+          : undefined,
+      );
+      recordTest(
+        `${name}: no leftover duck-type "getInMemoryServers" in sdk`,
+        !hasDuckType,
+        false,
+        hasDuckType
+          ? 'still has "getInMemoryServers" in sdk duck-type'
+          : undefined,
+      );
+      continue;
+    }
+    // Not yet migrated: still expected to perform the brand check itself.
     recordTest(`${name}: uses isNeuroLink brand check`, usesBrand);
     recordTest(
       `${name}: no leftover duck-type "getInMemoryServers" in sdk`,
       !hasDuckType,
+      false,
+      hasDuckType
+        ? 'still has "getInMemoryServers" in sdk duck-type'
+        : undefined,
     );
   } catch (err) {
     recordTest(
       `${name}: brand audit`,
+      false,
       false,
       err instanceof Error ? err.message : String(err),
     );
