@@ -253,7 +253,19 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
       } catch (err) {
         logger.warn("Model auto-discovery failed, using fallback:", err);
       }
+      // Auto-discovery was attempted but yielded no model (local server/model
+      // not up yet, transient probe failure, …). Use the fallback for THIS
+      // call but persist NOTHING — not `resolvedModel`, and not `this.modelName`
+      // either. `refreshHandlersForModel()` sets `this.modelName = model`, which
+      // the explicit branch above would then memoize on the next call, pinning
+      // the instance to the fallback and defeating the retry. Returning the
+      // bare fallback (it is still used as the wire `modelId`) lets a later
+      // call re-probe once the server/model becomes available — matching the
+      // pre-migration local providers.
+      return this.getFallbackModelName();
     }
+    // No auto-discovery for this provider — the fallback is stable, so memoize
+    // it (and refresh handlers so telemetry/pricing reflect the resolved name).
     const fallback = this.getFallbackModelName();
     this.resolvedModel = fallback;
     this.refreshHandlersForModel(fallback);
@@ -604,10 +616,10 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
     const result: StreamResult = {
       stream: transformedStream(),
       provider: this.providerName,
-      model: this.modelName,
+      model: modelId,
       analytics: streamAnalyticsCollector.createAnalytics(
         this.providerName,
-        this.modelName,
+        modelId,
         {
           textStream: (async function* () {})(),
           usage: usagePromise,
