@@ -1,19 +1,5 @@
-import { createOpenAI } from "@ai-sdk/openai";
 import type { AIProviderName } from "../constants/enums.js";
 import { CohereModels } from "../constants/enums.js";
-import { BaseProvider } from "../core/baseProvider.js";
-import { DEFAULT_MAX_STEPS } from "../core/constants.js";
-import { streamAnalyticsCollector } from "../core/streamAnalytics.js";
-import { isNeuroLink } from "../neurolink.js";
-import { createLoggingFetch } from "../utils/loggingFetch.js";
-import { tracers, ATTR, withClientStreamSpan } from "../telemetry/index.js";
-import type {
-  UnknownRecord,
-  NeurolinkCredentials,
-  StreamOptions,
-  StreamResult,
-  ValidationSchema,
-} from "../types/index.js";
 import {
   AuthenticationError,
   InvalidModelError,
@@ -21,30 +7,18 @@ import {
   ProviderError,
   RateLimitError,
 } from "../types/index.js";
+import type { NeurolinkCredentials, UnknownRecord } from "../types/index.js";
 import { logger } from "../utils/logger.js";
+import { createProxyFetch } from "../proxy/proxyFetch.js";
 import {
   createCohereConfig,
   getProviderModel,
   validateApiKey,
 } from "../utils/providerConfig.js";
-import {
-  composeAbortSignals,
-  createTimeoutController,
-  TimeoutError,
-} from "../utils/timeout.js";
-import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
-import { resolveToolChoice } from "../utils/toolChoice.js";
-import { toAnalyticsStreamResult } from "./providerTypeUtils.js";
-import type { LanguageModel, Tool } from "../types/index.js";
-import { stepCountIs } from "../utils/tool.js";
-import { streamText } from "../utils/generation.js";
+import { createTimeoutController, TimeoutError } from "../utils/timeout.js";
+import { stripTrailingSlash } from "./openaiChatCompletionsClient.js";
+import { OpenAIChatCompletionsProvider } from "./openaiChatCompletionsBase.js";
 
-/**
- * Cohere uses an OpenAI-compatible endpoint at /compatibility/v1 that
- * accepts the same chat-completions shape. Embeddings + Rerank live on
- * the native API and are not exposed through this LLM provider class
- * (use the Cohere SDK directly or the embed/rerank routes when added).
- */
 const COHERE_DEFAULT_BASE_URL = "https://api.cohere.com/compatibility/v1";
 
 const getCohereApiKey = (): string => validateApiKey(createCohereConfig());
@@ -53,190 +27,65 @@ const getDefaultCohereModel = (): string =>
   getProviderModel("COHERE_MODEL", CohereModels.COMMAND_R_PLUS);
 
 /**
- * Cohere Provider
+ * Cohere Provider — direct HTTP, no AI SDK.
  *
- * Routes Command R / Command R+ chat completions through Cohere's OpenAI-
- * compatible endpoint. Embed v3 and Rerank v3 are top-tier for RAG but are
- * accessed via the Cohere native SDK / dedicated embedding routes (out of
- * scope for the LLM provider).
+ * Routes Command R / Command R+ chat completions through Cohere's
+ * OpenAI-compatible endpoint at /compatibility/v1. All request/stream/
+ * tool-loop orchestration lives in `OpenAIChatCompletionsProvider`; this
+ * class only declares configuration and provider-specific error mapping.
+ *
+ * Embed v3 is exposed via `embed()` / `embedMany()` backed by a native
+ * POST to /v2/embed (the compatibility path is chat-only).
  *
  * @see https://docs.cohere.com/docs/compatibility-api
+ * @see https://docs.cohere.com/reference/embed
  */
-export class CohereProvider extends BaseProvider {
-  private model: LanguageModel;
-  private apiKey: string;
-  private baseURL: string;
-
+export class CohereProvider extends OpenAIChatCompletionsProvider {
   constructor(
     modelName?: string,
     sdk?: unknown,
     _region?: string,
     credentials?: NeurolinkCredentials["cohere"],
   ) {
-    const validatedNeurolink = isNeuroLink(sdk) ? sdk : undefined;
-
-    super(modelName, "cohere" as AIProviderName, validatedNeurolink);
-
     const overrideApiKey = credentials?.apiKey?.trim();
-    this.apiKey =
+    const apiKey =
       overrideApiKey && overrideApiKey.length > 0
         ? overrideApiKey
         : getCohereApiKey();
-    this.baseURL =
-      credentials?.baseURL ??
-      process.env.COHERE_BASE_URL ??
+    const baseURL =
+      credentials?.baseURL?.trim() ||
+      process.env.COHERE_BASE_URL?.trim() ||
       COHERE_DEFAULT_BASE_URL;
 
-    const cohere = createOpenAI({
-      apiKey: this.apiKey,
-      baseURL: this.baseURL,
-      fetch: createLoggingFetch("cohere"),
-    });
-    this.model = cohere.chat(this.modelName);
+    super("cohere" as AIProviderName, modelName, sdk, { baseURL, apiKey });
 
     logger.debug("Cohere Provider initialized", {
       modelName: this.modelName,
       providerName: this.providerName,
-      baseURL: this.baseURL,
+      baseURL: this.config.baseURL,
     });
   }
 
-  protected async executeStream(
-    options: StreamOptions,
-    _analysisSchema?: ValidationSchema,
-  ): Promise<StreamResult> {
-    // withClientStreamSpan: keeps the span open until the consumer reaches
-    // end-of-stream / error, so the recorded duration reflects the actual
-    // stream lifetime instead of just setup.
-    return withClientStreamSpan(
-      {
-        name: "neurolink.provider.stream",
-        tracer: tracers.provider,
-        attributes: {
-          [ATTR.GEN_AI_SYSTEM]: "cohere",
-          [ATTR.GEN_AI_MODEL]: this.modelName,
-          [ATTR.GEN_AI_OPERATION]: "stream",
-          [ATTR.NL_STREAM_MODE]: true,
-        },
-      },
-      async () => this.executeStreamInner(options),
-      (r) => r.stream,
-      (r, wrapped) => ({ ...r, stream: wrapped }),
-    );
-  }
-
-  private async executeStreamInner(
-    options: StreamOptions,
-  ): Promise<StreamResult> {
-    this.validateStreamOptions(options);
-
-    // Resolve per-call credentials first, then fall back to instance-level.
-    const perCallCreds = options.credentials?.cohere;
-    const effectiveApiKey = perCallCreds?.apiKey?.trim() || this.apiKey;
-    const effectiveBaseURL = perCallCreds?.baseURL || this.baseURL;
-
-    const startTime = Date.now();
-    const timeout = this.getTimeout(options);
-    const timeoutController = createTimeoutController(
-      timeout,
-      this.providerName,
-      "stream",
-    );
-
-    try {
-      const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools
-        ? (options.tools as Record<string, Tool>) || (await this.getAllTools())
-        : {};
-
-      const messages = await this.buildMessagesForStream(options);
-
-      // When per-call credentials differ from instance, build a fresh client.
-      const hasDifferentCreds =
-        effectiveApiKey !== this.apiKey || effectiveBaseURL !== this.baseURL;
-      const model = hasDifferentCreds
-        ? createOpenAI({
-            apiKey: effectiveApiKey,
-            baseURL: effectiveBaseURL,
-            fetch: createLoggingFetch("cohere"),
-          }).chat(this.modelName)
-        : await this.getAISDKModelWithMiddleware(options);
-
-      const result = await streamText({
-        model,
-        messages,
-        temperature: options.temperature,
-        maxOutputTokens: options.maxTokens,
-        tools,
-        stopWhen: stepCountIs(options.maxSteps || DEFAULT_MAX_STEPS),
-        toolChoice: resolveToolChoice(options, tools, shouldUseTools),
-        abortSignal: composeAbortSignals(
-          options.abortSignal,
-          timeoutController?.controller.signal,
-        ),
-        experimental_telemetry:
-          this.telemetryHandler.getTelemetryConfig(options),
-        experimental_repairToolCall: this.getToolCallRepairFn(options),
-        onStepFinish: ({ toolCalls, toolResults }) => {
-          emitToolEndFromStepFinish(
-            this.neurolink?.getEventEmitter(),
-            toolResults as Array<{
-              toolName: string;
-              output?: unknown;
-              result?: unknown;
-              error?: string;
-            }>,
-          );
-          this.handleToolExecutionStorage(
-            toolCalls,
-            toolResults,
-            options,
-            new Date(),
-          ).catch((error: unknown) => {
-            logger.warn("[CohereProvider] Failed to store tool executions", {
-              provider: this.providerName,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        },
-      });
-
-      timeoutController?.cleanup();
-      const transformedStream = this.createTextStream(result);
-      const analyticsPromise = streamAnalyticsCollector.createAnalytics(
-        this.providerName,
-        this.modelName,
-        toAnalyticsStreamResult(result),
-        Date.now() - startTime,
-        {
-          requestId: `cohere-stream-${Date.now()}`,
-          streamingMode: true,
-        },
-      );
-
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        analytics: analyticsPromise,
-        metadata: { startTime, streamId: `cohere-${Date.now()}` },
-      };
-    } catch (error) {
-      timeoutController?.cleanup();
-      throw this.handleProviderError(error);
-    }
-  }
-
   protected getProviderName(): AIProviderName {
-    return this.providerName;
+    return "cohere" as AIProviderName;
   }
 
   protected getDefaultModel(): string {
     return getDefaultCohereModel();
   }
 
-  protected getAISDKModel(): LanguageModel {
-    return this.model;
+  protected getFallbackModelName(): string {
+    return CohereModels.COMMAND_R;
+  }
+
+  protected getFallbackModels(): string[] {
+    return [
+      CohereModels.COMMAND_A,
+      CohereModels.COMMAND_A_REASONING,
+      CohereModels.COMMAND_R_PLUS,
+      CohereModels.COMMAND_R,
+      CohereModels.COMMAND_R7B,
+    ];
   }
 
   protected formatProviderError(error: unknown): Error {
@@ -282,7 +131,10 @@ export class CohereProvider extends BaseProvider {
   }
 
   async validateConfiguration(): Promise<boolean> {
-    return typeof this.apiKey === "string" && this.apiKey.trim().length > 0;
+    return (
+      typeof this.config.apiKey === "string" &&
+      this.config.apiKey.trim().length > 0
+    );
   }
 
   getConfiguration() {
@@ -290,7 +142,7 @@ export class CohereProvider extends BaseProvider {
       provider: this.providerName,
       model: this.modelName,
       defaultModel: getDefaultCohereModel(),
-      baseURL: this.baseURL,
+      baseURL: this.config.baseURL,
     };
   }
 
@@ -323,56 +175,75 @@ export class CohereProvider extends BaseProvider {
   /**
    * Batch embedding via Cohere's native /v2/embed endpoint. Cohere caps at
    * 96 inputs per request; larger batches are chunked.
+   *
+   * Partial failures are not surfaced: if any chunk request fails the whole
+   * call rejects and already-embedded chunks are discarded — callers should
+   * retry the full input.
    */
   async embedMany(texts: string[], modelName?: string): Promise<number[][]> {
     if (texts.length === 0) {
       return [];
     }
     const model = modelName ?? this.getDefaultEmbeddingModel();
-    const baseUrl = this.baseURL.replace(/\/compatibility\/v\d+\/?$/, "");
+    // Strip the compatibility suffix to reach the native API root.
+    const baseUrl = stripTrailingSlash(
+      this.config.baseURL.replace(/\/compatibility\/v\d+\/?$/, ""),
+    );
     const url = `${baseUrl}/v2/embed`;
 
     const BATCH_SIZE = 96;
     const results: number[][] = [];
+    const fetchImpl = createProxyFetch();
+
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batch = texts.slice(i, i + BATCH_SIZE);
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          texts: batch,
-          input_type: "search_document",
-          embedding_types: ["float"],
-        }),
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        throw this.formatProviderError(
-          new Error(
-            `Cohere /v2/embed failed: ${response.status} — ${body.slice(0, 500)}`,
-          ),
-        );
+      const timeoutController = createTimeoutController(
+        30_000,
+        this.providerName,
+        "generate",
+      );
+      try {
+        const response = await fetchImpl(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.config.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            texts: batch,
+            input_type: "search_document",
+            embedding_types: ["float"],
+          }),
+          ...(timeoutController?.controller.signal
+            ? { signal: timeoutController.controller.signal }
+            : {}),
+        });
+        if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          throw this.formatProviderError(
+            new Error(
+              `Cohere /v2/embed failed: ${response.status} — ${body.slice(0, 500)}`,
+            ),
+          );
+        }
+        const json = (await response.json()) as {
+          embeddings?: { float?: number[][] } | number[][];
+        };
+        const floatVecs =
+          (json.embeddings as { float?: number[][] })?.float ??
+          (Array.isArray(json.embeddings) ? json.embeddings : undefined);
+        if (!floatVecs || floatVecs.length !== batch.length) {
+          throw new ProviderError(
+            `Cohere /v2/embed returned ${floatVecs?.length ?? 0} embeddings for ${batch.length} inputs.`,
+            "cohere",
+          );
+        }
+        results.push(...floatVecs);
+      } finally {
+        timeoutController?.cleanup();
       }
-      const json = (await response.json()) as {
-        embeddings?: { float?: number[][] } | number[][];
-      };
-      const floatVecs =
-        (json.embeddings as { float?: number[][] })?.float ??
-        (Array.isArray(json.embeddings) ? json.embeddings : undefined);
-      if (!floatVecs || floatVecs.length !== batch.length) {
-        throw new ProviderError(
-          `Cohere /v2/embed returned ${floatVecs?.length ?? 0} embeddings for ${batch.length} inputs.`,
-          "cohere",
-        );
-      }
-      results.push(...floatVecs);
     }
     return results;
   }
 }
-
-export default CohereProvider;
