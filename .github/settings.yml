@@ -178,6 +178,9 @@ branches:
         contexts:
           - "test"
           - "build"
+          # AI code review — fails only on a Yama BLOCKED verdict (see
+          # .github/workflows/yama-review.yml + yama.config.yaml).
+          - "Yama PR Review"
       enforce_admins: false
       required_pull_request_reviews:
         required_approving_review_count: 1
@@ -194,6 +197,9 @@ branches:
         contexts:
           - "test"
           - "build"
+          # AI code review — fails only on a Yama BLOCKED verdict (see
+          # .github/workflows/yama-review.yml + yama.config.yaml).
+          - "Yama PR Review"
       enforce_admins: false
       required_pull_request_reviews:
         required_approving_review_count: 1

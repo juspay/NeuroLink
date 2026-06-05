@@ -1,0 +1,141 @@
+# Yama PR Review — AI code review on every PR targeting the `release` branch.
+#
+# Powered by the published @juspay/yama action (https://github.com/juspay/yama),
+# run "the same way" as Yama's own self-review: LiteLLM provider, review-only,
+# fork-safe. The review RULES come from THIS repo — Yama auto-loads CLAUDE.md and
+# CONTRIBUTING.md, and the focus areas / blocking criteria live in
+# ./yama.config.yaml.
+#
+# This is a REQUIRED status check (context "Yama PR Review", wired in
+# .github/settings.yml). It FAILS — and blocks merge — only when Yama returns a
+# BLOCKED verdict (per yama.config.yaml `blockingCriteria`) or the review cannot
+# complete. Ordinary review comments / CHANGES_REQUESTED do not fail the check.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   YAMA_GITHUB_TOKEN : a REAL GitHub PAT — fine-grained with
+#                       "Pull requests: Read and write" + "Contents: Read"
+#                       scoped to this repo, OR a classic PAT with `repo`.
+#                       The hosted GitHub MCP endpoint rejects the ephemeral
+#                       Actions GITHUB_TOKEN, so this is mandatory.
+#   LITELLM_BASE_URL  : LiteLLM proxy base URL (must be reachable from
+#                       GitHub-hosted runners).
+#   LITELLM_API_KEY   : LiteLLM proxy API key.
+#
+# Fork PRs (which cannot read secrets) and runs with missing secrets are skipped
+# cleanly — the check passes so it never deadlocks merges.
+
+name: Yama PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [release]
+
+concurrency:
+  group: yama-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  yama-review:
+    # This job name IS the required status-check context referenced by branch
+    # protection in .github/settings.yml — keep the two in sync.
+    name: Yama PR Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Decide whether we can run. A required check must always report a
+      # conclusion, so when it can't run (fork / missing secrets) we PASS
+      # instead of skipping, to avoid blocking merges forever.
+      - name: Preflight (fork + secrets)
+        id: gate
+        env:
+          PAT: ${{ secrets.YAMA_GITHUB_TOKEN }}
+          LITELLM_BASE_URL: ${{ secrets.LITELLM_BASE_URL }}
+          LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
+          IS_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [ "$IS_SAME_REPO" != "true" ]; then
+            echo "::notice::Fork PR — repository secrets are unavailable; skipping Yama review (check passes)."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$PAT" ] || [ -z "$LITELLM_BASE_URL" ] || [ -z "$LITELLM_API_KEY" ]; then
+            echo "::notice::Missing YAMA_GITHUB_TOKEN / LITELLM_BASE_URL / LITELLM_API_KEY; skipping Yama review (check passes)."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Yama authenticates with its own PAT; don't leave the ephemeral
+          # Actions token in .git/config.
+          persist-credentials: false
+
+      # The Yama action pins pnpm 10.14.0 via pnpm/action-setup, but this repo's
+      # package.json declares "packageManager": "pnpm@10.15.1". pnpm/action-setup@v4
+      # aborts when both are present and differ. Temporarily drop the field so the
+      # action uses its own pinned pnpm; it builds in its own directory and reviews
+      # the PR via the GitHub API (not the local tree), so this is invisible to the
+      # review. Restored right after. (Durable fix belongs in juspay/yama's
+      # action.yml — e.g. set package_json_file to the action's own package.json.)
+      - name: Work around pnpm/action-setup version clash
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));delete p.packageManager;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+
+      - name: Yama Review
+        if: steps.gate.outputs.run == 'true'
+        id: yama
+        # Don't auto-fail the job on the action's exit code — the next step maps
+        # the verdict to the check result explicitly.
+        continue-on-error: true
+        # External consumer → published action. Owned by juspay, so a tag pin is
+        # acceptable; for strict supply-chain immutability replace with the full
+        # commit SHA behind this tag, e.g.
+        #   uses: juspay/yama@fb05b9f62837ea0cba729c1c48dbe7f547f65d0c  # v2.6.0
+        uses: juspay/yama@v2.6.0
+        with:
+          github-token: ${{ secrets.YAMA_GITHUB_TOKEN }}
+          ai-provider: litellm
+          ai-model: private-large
+          litellm-base-url: ${{ secrets.LITELLM_BASE_URL }}
+          litellm-api-key: ${{ secrets.LITELLM_API_KEY }}
+          config-path: yama.config.yaml
+          # Review only — post inline comments + a verdict; never rewrite the PR
+          # description.
+          skip-description-enhance: "true"
+
+      - name: Enforce verdict
+        if: steps.gate.outputs.run == 'true'
+        env:
+          DECISION: ${{ steps.yama.outputs.decision }}
+          OUTCOME: ${{ steps.yama.outcome }}
+        run: |
+          echo "Yama decision: ${DECISION:-<none>} (action outcome: ${OUTCOME})"
+          # No verdict + failed action = the review couldn't complete (build /
+          # MCP / LiteLLM error), not a code judgement. Fail so it's visible;
+          # re-run the job to retry transient failures.
+          if [ "$OUTCOME" != "success" ] && [ -z "$DECISION" ]; then
+            echo "::error::Yama could not complete the review (infrastructure error, not a code verdict). Re-run this job to retry."
+            exit 1
+          fi
+          if [ "$DECISION" = "BLOCKED" ]; then
+            echo "::error::Yama BLOCKED this PR. Resolve the blocking issues flagged in the review, then push an update."
+            exit 1
+          fi
+          echo "✅ Yama review passed (decision=${DECISION:-APPROVED})."
+
+      # Undo the temporary packageManager edit (no-op if it was never applied).
+      - name: Restore package.json
+        if: ${{ always() && steps.gate.outputs.run == 'true' }}
+        run: git checkout -- package.json || true
