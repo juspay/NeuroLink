@@ -1,3 +1,5 @@
+## [9.68.8](https://github.com/juspay/neurolink/compare/v9.68.7...v9.68.8) (2026-06-06)
+
 ## [9.68.7](https://github.com/juspay/neurolink/compare/v9.68.6...v9.68.7) (2026-06-06)
 
 ## [9.68.6](https://github.com/juspay/neurolink/compare/v9.68.5...v9.68.6) (2026-06-06)
