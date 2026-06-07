@@ -496,9 +496,11 @@ export const buildBody = (
 export const parseSSEStream = async (
   body: ReadableStream<Uint8Array>,
   onTextDelta: (delta: string) => void,
+  onReasoningDelta?: (delta: string) => void,
 ): Promise<OpenAICompatSSEResult> => {
   const result: OpenAICompatSSEResult = {
     text: "",
+    reasoning: "",
     toolCalls: new Map(),
     finishReason: null,
     usage: undefined,
@@ -529,6 +531,14 @@ export const parseSSEStream = async (
     if (delta?.content) {
       result.text += delta.content;
       onTextDelta(delta.content);
+    }
+    // Reasoner-model deltas: DeepSeek/NIM emit `reasoning_content`, some
+    // gateways emit `reasoning`. The AI SDK's openai-compatible wrapper
+    // surfaced these automatically; the native client must do the same.
+    const reasoningDelta = delta?.reasoning_content ?? delta?.reasoning;
+    if (reasoningDelta) {
+      result.reasoning += reasoningDelta;
+      onReasoningDelta?.(reasoningDelta);
     }
     if (delta?.tool_calls) {
       for (const tc of delta.tool_calls) {

@@ -187,7 +187,9 @@ const getDefaultNimModel = (): string => {
  * Wraps NVIDIA's hosted (or self-hosted) inference endpoints.
  * Passes NIM-specific extras (top_k, min_p, repetition_penalty,
  * chat_template_kwargs.reasoning_budget) via adjustBuildBodyOptions.
- * reasoning_content surfacing is a pending base-client follow-up (not emitted natively yet); all other behavior is preserved.
+ * reasoning_content is surfaced automatically by the native base client
+ * (streamed as `{ content: "", reasoning }` chunks; `result.reasoning` on
+ * the non-streaming path); all other behavior is preserved.
  *
  * @see https://docs.api.nvidia.com/nim/reference/
  */

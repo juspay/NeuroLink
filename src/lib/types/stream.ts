@@ -595,13 +595,16 @@ export type StreamOptions = {
  */
 export type StreamResult = {
   stream: AsyncIterable<
-    | { content: string }
+    | { content: string; reasoning?: string }
     | StreamNoOutputSentinel
     | { type: "audio"; audio: AudioChunk }
     | { type: "tts_audio"; audio: TTSChunk }
     | { type: "image"; imageOutput: { base64: string } }
     | { content: string; type?: "preliminary" | "final" }
   >; // text chunks (with optional workflow stage), no-output sentinel, or audio/image events.
+  // Reasoner models (deepseek-reasoner/R1, NVIDIA NIM reasoning, o-series via
+  // gateways) interleave `{ content: "", reasoning: <delta> }` chunks; the
+  // `content` field is always present so plain-text consumers are unaffected.
   // NOTE: `type: "audio"` is realtime/Gemini PCM (`AudioChunk` shape).
   // `type: "tts_audio"` is synthesized TTS output (`TTSChunk` shape, with format/index/voice).
 

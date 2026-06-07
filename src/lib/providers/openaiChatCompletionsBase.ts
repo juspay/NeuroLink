@@ -407,6 +407,14 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
             ? choice.message.content
             : "") ?? "";
         const content: Array<{ type: string } & Record<string, unknown>> = [];
+        // Reasoner-model output (DeepSeek `reasoning_content`, gateway
+        // `reasoning`) becomes a V3 reasoning part ahead of the text part —
+        // GenerationHandler joins reasoning parts into `result.reasoning`.
+        const reasoningText =
+          choice?.message?.reasoning_content ?? choice?.message?.reasoning;
+        if (typeof reasoningText === "string" && reasoningText.length > 0) {
+          content.push({ type: "reasoning", text: reasoningText });
+        }
         if (text.length > 0) {
           content.push({ type: "text", text });
         }
@@ -439,8 +447,15 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
             },
             outputTokens: {
               total: json.usage?.completion_tokens,
-              text: json.usage?.completion_tokens,
-              reasoning: undefined,
+              text:
+                json.usage?.completion_tokens !== undefined &&
+                json.usage?.completion_tokens_details?.reasoning_tokens !==
+                  undefined
+                  ? json.usage.completion_tokens -
+                    json.usage.completion_tokens_details.reasoning_tokens
+                  : json.usage?.completion_tokens,
+              reasoning:
+                json.usage?.completion_tokens_details?.reasoning_tokens,
             },
           },
           warnings: [],
@@ -815,9 +830,17 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
     if (!res.body) {
       throw new Error(`${this.providerName}: stream response had no body`);
     }
-    return parseSSEStream(res.body, (delta) => {
-      args.pushChunk({ content: delta });
-    });
+    return parseSSEStream(
+      res.body,
+      (delta) => {
+        args.pushChunk({ content: delta });
+      },
+      (reasoningDelta) => {
+        // Reasoning rides alongside an empty `content` so plain-text
+        // consumers (which only read chunk.content) are unaffected.
+        args.pushChunk({ content: "", reasoning: reasoningDelta });
+      },
+    );
   }
 
   private async executeToolBatch(args: {

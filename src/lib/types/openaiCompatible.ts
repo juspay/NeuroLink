@@ -112,6 +112,12 @@ export type OpenAICompatChatChoiceMessage = {
   content?: string | null;
   tool_calls?: OpenAICompatToolCallWire[];
   refusal?: string | null;
+  // Reasoner-model output. DeepSeek (deepseek-reasoner/R1) and NVIDIA NIM
+  // emit `reasoning_content`; some gateways (xAI, OpenRouter-normalized)
+  // emit `reasoning` instead. Both are optional extensions to the OpenAI
+  // shape — absent on non-reasoning models.
+  reasoning_content?: string | null;
+  reasoning?: string | null;
 };
 
 export type OpenAICompatChatChoice = {
@@ -149,6 +155,9 @@ export type OpenAICompatStreamDelta = {
     };
   }>;
   refusal?: string | null;
+  // Streaming reasoner-model deltas (see OpenAICompatChatChoiceMessage).
+  reasoning_content?: string | null;
+  reasoning?: string | null;
 };
 
 export type OpenAICompatStreamChunkChoice = {
@@ -241,6 +250,8 @@ export type OpenAICompatMessage = {
 
 export type OpenAICompatSSEResult = {
   text: string;
+  /** Accumulated reasoner-model output (`reasoning_content` / `reasoning` deltas). */
+  reasoning: string;
   toolCalls: Map<number, { id: string; name: string; argsBuffered: string }>;
   finishReason:
     | "stop"
@@ -252,7 +263,12 @@ export type OpenAICompatSSEResult = {
   usage?: OpenAICompatUsage;
 };
 
-export type OpenAICompatStreamChunk = { content: string } | { done: true };
+// Reasoning deltas ride alongside an always-present (empty) `content` string
+// so every existing `chunk.content` consumer stays type- and crash-safe;
+// reasoning-aware consumers read `chunk.reasoning`.
+export type OpenAICompatStreamChunk =
+  | { content: string; reasoning?: string }
+  | { done: true };
 
 // Per-execution tool record kept internally during the streaming multi-step
 // loop. Public shape lives in `ToolExecutionSummary` (src/lib/types/tools.ts).

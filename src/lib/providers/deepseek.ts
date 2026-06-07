@@ -47,12 +47,12 @@ const getDefaultDeepSeekModel = (): string => {
  *      `@ai-sdk/openai-compatible` path this migration replaced. The base
  *      client injects the literal "json" word the API requires for that mode.
  *
- *   2. Reasoning support — the opt-in `thinking` request param (non-reasoner
- *      chat models) and `reasoning_content` surfacing (deepseek-reasoner / R1)
- *      both require plumbing the thinking signal and the reasoning delta
- *      through the native base client. That plumbing isn't in place yet, so
- *      neither is wired here; it is tracked as a base-client follow-up. All
- *      other behavior is preserved.
+ *   2. Reasoning support — `reasoning_content` (deepseek-reasoner / R1) is
+ *      surfaced automatically by the native base client: streamed deltas
+ *      arrive as `{ content: "", reasoning }` chunks and the non-streaming
+ *      result carries `result.reasoning`. The opt-in `thinking` request
+ *      param (non-reasoner chat models) still needs thinking-signal plumbing
+ *      and is tracked as a follow-up. All other behavior is preserved.
  *
  * @see https://api-docs.deepseek.com
  */
