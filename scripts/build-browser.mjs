@@ -25,6 +25,9 @@ const npmStubs = [
   'which','pdf-to-img','express-rate-limit','@hono/node-server','powershell-utils',
   'wsl-utils','default-browser','default-browser-id','run-applescript','open',
   '@langfuse/langfuse','undici','bullmq','croner','ioredis',
+  // Optional peer of @anthropic-ai/sdk's beta webhooks module (server-only
+  // webhook signature verification) — irrelevant in the browser bundle.
+  'standardwebhooks',
 ];
 
 // OTel packages
@@ -228,6 +231,7 @@ export default mod;
 export const {BedrockClient,ListFoundationModelsCommand,BedrockRuntimeClient,ConverseCommand,ConverseStreamCommand,ImageFormat}=mod;
 export const {SageMakerRuntimeClient,InvokeEndpointCommand,InvokeEndpointWithResponseStreamCommand}=mod;
 export const {GoogleAuth,VertexAI,TextToSpeechClient}=mod;
+export const {Webhook}=mod;
 export const {Hippocampus,HippocampusConfig}=mod;
 export const {createClient}=mod;
 export const {Queue,Worker,Job,QueueScheduler,FlowProducer}=mod;

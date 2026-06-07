@@ -301,6 +301,7 @@
     "@ai-sdk/mistral": "^3.0.21",
     "@ai-sdk/openai": "^3.0.37",
     "@ai-sdk/provider": "^3.0.8",
+    "@anthropic-ai/sdk": "^0.102.0",
     "@anthropic-ai/vertex-sdk": "^0.16.0",
     "@aws-sdk/client-bedrock": "^3.1000.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1000.0",

@@ -1,5 +1,5 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import Anthropic from "@anthropic-ai/sdk";
+import { SpanKind, trace } from "@opentelemetry/api";
 import {
   existsSync,
   mkdirSync,
@@ -31,7 +31,6 @@ import type { NeuroLink } from "../neurolink.js";
 import { createOAuthFetch } from "../proxy/oauthFetch.js";
 import { createProxyFetch } from "../proxy/proxyFetch.js";
 import type {
-  JsonValue,
   UnknownRecord,
   AnthropicProviderConfig,
   StreamOptions,
@@ -53,6 +52,7 @@ import {
   RateLimitError,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
+import { redactUrlCredentials } from "../utils/logSanitize.js";
 import { calculateCost } from "../utils/pricing.js";
 import {
   createAnthropicConfig,
@@ -62,14 +62,23 @@ import {
 import {
   composeAbortSignals,
   createTimeoutController,
+  mergeAbortSignals,
   TimeoutError,
 } from "../utils/timeout.js";
 import { resolveToolChoice } from "../utils/toolChoice.js";
 import { emitToolEndFromStepFinish } from "../utils/toolEndEmitter.js";
-import { getModelId } from "./providerTypeUtils.js";
 import type { LanguageModel, Tool } from "../types/index.js";
-import { stepCountIs } from "../utils/tool.js";
-import { streamText } from "../utils/generation.js";
+import { NoOutputGeneratedError } from "../utils/generationErrors.js";
+import {
+  buildNoOutputSentinel,
+  stampNoOutputSpan,
+} from "../utils/noOutputSentinel.js";
+import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
+import {
+  createChunkQueue,
+  createDeferredAnalytics,
+  stringifyToolInput,
+} from "./openaiChatCompletionsClient.js";
 
 /**
  * Beta headers for Claude Code integration.
@@ -299,12 +308,366 @@ const parseRateLimitHeaders = (
   };
 };
 
+// ───────────────────────────────────────────────────────────────────────────
+// Native Messages-API conversion helpers (NeuroLink/V3 shapes → Anthropic)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Convert an image part (data URL, bare base64, https URL, or byte array)
+ * into an Anthropic image block. Returns undefined for unusable inputs.
+ */
+const toAnthropicImageBlock = (
+  data: unknown,
+): Anthropic.Messages.ImageBlockParam | undefined => {
+  if (data instanceof Uint8Array) {
+    return {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: "image/png",
+        data: Buffer.from(data).toString("base64"),
+      },
+    };
+  }
+  if (typeof data !== "string" && !(data instanceof URL)) {
+    return undefined;
+  }
+  const str = data instanceof URL ? data.toString() : data;
+  const dataUrlMatch = str.match(/^data:(image\/[a-z+.-]+);base64,(.+)$/i);
+  if (dataUrlMatch) {
+    return {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type:
+          dataUrlMatch[1] as Anthropic.Messages.Base64ImageSource["media_type"],
+        data: dataUrlMatch[2],
+      },
+    };
+  }
+  if (/^https?:\/\//i.test(str)) {
+    return { type: "image", source: { type: "url", url: str } };
+  }
+  // Bare base64 payload — assume PNG (matches the OpenAI-compat client).
+  return {
+    type: "image",
+    source: { type: "base64", media_type: "image/png", data: str },
+  };
+};
+
+/**
+ * Read an Anthropic cache breakpoint from a message/part/tool carrier.
+ * MessageBuilder marks system messages (and GenerationHandler marks the last
+ * tool definition) with `providerOptions.anthropic.cacheControl` — the
+ * AI-SDK-era prompt-caching contract this native path must keep honoring.
+ */
+const cacheControlOf = (
+  carrier: unknown,
+): Anthropic.Messages.CacheControlEphemeral | undefined => {
+  const cc = (
+    carrier as {
+      providerOptions?: { anthropic?: { cacheControl?: { type?: string } } };
+    }
+  )?.providerOptions?.anthropic?.cacheControl;
+  return cc?.type === "ephemeral" ? { type: "ephemeral" } : undefined;
+};
+
+/** Serialize a tool-result `output` into text for a tool_result block. */
+const stringifyAnthropicToolOutput = (output: unknown): string => {
+  if (output === null || output === undefined) {
+    return "";
+  }
+  if (typeof output === "string") {
+    return output;
+  }
+  const o = output as { type?: string; value?: unknown };
+  if (o.type === "text" && typeof o.value === "string") {
+    return o.value;
+  }
+  if (o.type === "json" || o.type === "error-json") {
+    try {
+      return JSON.stringify(o.value);
+    } catch {
+      return String(o.value);
+    }
+  }
+  try {
+    return JSON.stringify(output);
+  } catch {
+    return String(output);
+  }
+};
+
+/**
+ * Convert NeuroLink/V3-shaped messages (the shape produced by
+ * buildMessagesForStream and by the AI-SDK prompt on the V3 doGenerate path)
+ * into the Anthropic Messages payload: a top-level `system` string plus
+ * alternating user/assistant messages with typed content blocks.
+ */
+const messagesToAnthropic = (
+  msgs: ReadonlyArray<{
+    role: string;
+    content: unknown;
+    toolCallId?: string;
+  }>,
+): {
+  system?: string | Anthropic.Messages.TextBlockParam[];
+  messages: Anthropic.Messages.MessageParam[];
+} => {
+  const systemBlocks: Anthropic.Messages.TextBlockParam[] = [];
+  const messages: Anthropic.Messages.MessageParam[] = [];
+
+  const partsOf = (content: unknown): unknown[] =>
+    Array.isArray(content) ? content : [content];
+
+  // Message-level cache breakpoints apply to the message's LAST content
+  // block (the AI-SDK convention MessageBuilder relies on).
+  const applyMessageCacheControl = (
+    blocks: Anthropic.Messages.ContentBlockParam[],
+    msg: unknown,
+  ): void => {
+    const cc = cacheControlOf(msg);
+    if (cc && blocks.length > 0) {
+      const last = blocks[blocks.length - 1] as { cache_control?: unknown };
+      last.cache_control = cc;
+    }
+  };
+
+  for (const msg of msgs) {
+    switch (msg.role) {
+      case "system": {
+        const text =
+          typeof msg.content === "string"
+            ? msg.content
+            : partsOf(msg.content)
+                .map((p) =>
+                  typeof p === "string"
+                    ? p
+                    : String((p as { text?: string })?.text ?? ""),
+                )
+                .join("\n");
+        const cc = cacheControlOf(msg);
+        systemBlocks.push({
+          type: "text",
+          text,
+          ...(cc ? { cache_control: cc } : {}),
+        });
+        break;
+      }
+      case "user": {
+        const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+        for (const part of partsOf(msg.content)) {
+          if (typeof part === "string") {
+            if (part.length > 0) {
+              blocks.push({ type: "text", text: part });
+            }
+            continue;
+          }
+          const p = part as {
+            type?: string;
+            text?: string;
+            image?: unknown;
+            data?: unknown;
+            url?: unknown;
+          };
+          if (p?.type === "text" && typeof p.text === "string") {
+            const cc = cacheControlOf(p);
+            blocks.push({
+              type: "text",
+              text: p.text,
+              ...(cc ? { cache_control: cc } : {}),
+            });
+          } else if (p?.type === "image" || p?.type === "image_url") {
+            const img = toAnthropicImageBlock(p.image ?? p.data ?? p.url);
+            if (img) {
+              const cc = cacheControlOf(p);
+              blocks.push(cc ? { ...img, cache_control: cc } : img);
+            }
+          }
+        }
+        if (blocks.length > 0) {
+          applyMessageCacheControl(blocks, msg);
+          messages.push({ role: "user", content: blocks });
+        }
+        break;
+      }
+      case "assistant": {
+        const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+        for (const part of partsOf(msg.content)) {
+          if (typeof part === "string") {
+            if (part.length > 0) {
+              blocks.push({ type: "text", text: part });
+            }
+            continue;
+          }
+          const p = part as {
+            type?: string;
+            text?: string;
+            toolCallId?: string;
+            toolName?: string;
+            input?: unknown;
+          };
+          if (p?.type === "text" && typeof p.text === "string") {
+            if (p.text.length > 0) {
+              const cc = cacheControlOf(p);
+              blocks.push({
+                type: "text",
+                text: p.text,
+                ...(cc ? { cache_control: cc } : {}),
+              });
+            }
+          } else if (p?.type === "tool-call") {
+            let input: unknown = p.input;
+            if (typeof input === "string") {
+              try {
+                input = JSON.parse(input);
+              } catch {
+                input = {};
+              }
+            }
+            blocks.push({
+              type: "tool_use",
+              id: p.toolCallId ?? "",
+              name: p.toolName ?? "",
+              input: input ?? {},
+            });
+          }
+        }
+        if (blocks.length > 0) {
+          applyMessageCacheControl(blocks, msg);
+          messages.push({ role: "assistant", content: blocks });
+        }
+        break;
+      }
+      case "tool": {
+        // Tool results are user-role messages with tool_result blocks.
+        const blocks: Anthropic.Messages.ContentBlockParam[] = [];
+        if (Array.isArray(msg.content)) {
+          for (const part of msg.content) {
+            const p = part as {
+              type?: string;
+              toolCallId?: string;
+              output?: unknown;
+            };
+            if (p?.type === "tool-result") {
+              blocks.push({
+                type: "tool_result",
+                tool_use_id: p.toolCallId ?? "",
+                content: stringifyAnthropicToolOutput(p.output),
+              });
+            }
+          }
+        } else if (typeof msg.content === "string") {
+          blocks.push({
+            type: "tool_result",
+            tool_use_id: msg.toolCallId ?? "",
+            content: msg.content,
+          });
+        }
+        if (blocks.length > 0) {
+          messages.push({ role: "user", content: blocks });
+        }
+        break;
+      }
+    }
+  }
+
+  // Plain-string system when no cache breakpoints are present (matches the
+  // previous wire shape); block form only when cache_control must ride along.
+  const system =
+    systemBlocks.length === 0
+      ? undefined
+      : systemBlocks.some((b) => b.cache_control)
+        ? systemBlocks
+        : systemBlocks.map((b) => b.text).join("\n\n");
+
+  return {
+    ...(system !== undefined ? { system } : {}),
+    messages,
+  };
+};
+
+/** Convert a NeuroLink tool record into Anthropic tool definitions. */
+const toolsToAnthropic = (
+  tools: Record<string, Tool>,
+): Anthropic.Messages.Tool[] | undefined => {
+  const entries = Object.entries(tools);
+  if (entries.length === 0) {
+    return undefined;
+  }
+  return entries.map(([name, tool]) => {
+    const t = tool as {
+      description?: string;
+      inputSchema?: unknown;
+      parameters?: unknown;
+    };
+    const rawSchema = t.inputSchema ?? t.parameters;
+    const input_schema = (
+      rawSchema
+        ? convertZodToJsonSchema(rawSchema as never)
+        : { type: "object", properties: {} }
+    ) as Anthropic.Messages.Tool.InputSchema;
+    // GenerationHandler marks the last tool definition with a cache
+    // breakpoint when prompt caching is active — keep honoring it.
+    const cc = cacheControlOf(tool);
+    return {
+      name,
+      ...(t.description ? { description: t.description } : {}),
+      input_schema,
+      ...(cc ? { cache_control: cc } : {}),
+    };
+  });
+};
+
+/** Map a NeuroLink tool choice onto Anthropic's tool_choice shape. */
+const toolChoiceToAnthropic = (
+  choice: unknown,
+): Anthropic.Messages.MessageCreateParams["tool_choice"] => {
+  if (!choice || choice === "auto") {
+    return undefined; // Anthropic defaults to auto when tools are present
+  }
+  if (choice === "none") {
+    return { type: "none" };
+  }
+  if (choice === "required") {
+    return { type: "any" };
+  }
+  if (typeof choice === "object") {
+    const c = choice as { type?: string; toolName?: string };
+    if (c.type === "tool" && c.toolName) {
+      return { type: "tool", name: c.toolName };
+    }
+  }
+  return undefined;
+};
+
+/** Map Anthropic stop_reason onto the V3 unified finish reason. */
+const mapAnthropicStopReason = (
+  raw: string | null | undefined,
+): "stop" | "length" | "tool-calls" | "content-filter" => {
+  switch (raw) {
+    case "max_tokens":
+      return "length";
+    case "tool_use":
+      return "tool-calls";
+    case "refusal":
+      return "content-filter";
+    default:
+      return "stop";
+  }
+};
+
+// Anthropic's Messages API requires max_tokens on every request. The previous
+// @ai-sdk/anthropic implementation defaulted it to 4096 when the caller did
+// not specify maxTokens — preserve that wire behavior.
+const ANTHROPIC_DEFAULT_MAX_TOKENS = 4096;
+
 /**
  * Anthropic Provider v2 - BaseProvider Implementation
  * Enhanced with OAuth support, subscription tiers, and beta headers for Claude Code integration.
  */
 export class AnthropicProvider extends BaseProvider {
-  private model: LanguageModel;
+  private client: Anthropic;
   private readonly authMethod: AnthropicAuthMethod;
   private readonly subscriptionTier: ClaudeSubscriptionTier;
   private readonly enableBetaFeatures: boolean;
@@ -392,8 +755,8 @@ export class AnthropicProvider extends BaseProvider {
     // Build headers based on auth method and subscription tier
     const headers: Record<string, string> = this.getAuthHeaders();
 
-    // Create Anthropic instance based on auth method
-    let anthropic: ReturnType<typeof createAnthropic>;
+    // Create the official Anthropic SDK client based on auth method
+    let client: Anthropic;
 
     logger.debug("[AnthropicProvider] Constructor - checking OAuth:", {
       authMethod: this.authMethod,
@@ -413,12 +776,13 @@ export class AnthropicProvider extends BaseProvider {
       // even after an automatic token refresh.
       // oauthToken is guaranteed non-null here (checked by the enclosing if-guard).
       const tokenRef = this.oauthToken;
-      // skipBodyTransform=true: For the SDK provider path, body transforms ARE
-      // intentionally skipped because the Vercel AI SDK builds its own request
-      // format (system prompts, metadata, tool definitions). The billing header,
-      // agent block, user_id injection, and mcp_ tool-name prefixing are only
-      // needed for proxy passthrough of raw Claude API requests where we must
-      // make the request look like it came from Claude Code / CLIProxyAPI.
+      // skipBodyTransform=true: For the SDK client path, body transforms ARE
+      // intentionally skipped because the official Anthropic SDK builds its
+      // own request format (system prompts, metadata, tool definitions). The
+      // billing header, agent block, user_id injection, and mcp_ tool-name
+      // prefixing are only needed for proxy passthrough of raw Claude API
+      // requests where we must make the request look like it came from
+      // Claude Code / CLIProxyAPI.
       const oauthFetch = createOAuthFetch(
         () => tokenRef.accessToken,
         this.enableBetaFeatures,
@@ -429,13 +793,13 @@ export class AnthropicProvider extends BaseProvider {
       // For OAuth, we use a dummy API key since our fetch wrapper handles auth
       // IMPORTANT: Do NOT pass beta headers here - our fetch wrapper handles them
       // The claude-code-20250219 beta header triggers "credential only for Claude Code" error
-      anthropic = createAnthropic({
+      client = new Anthropic({
         apiKey: "oauth-authenticated", // Placeholder, actual auth is in fetch wrapper
         // Note: No headers passed - fetch wrapper sets oauth-2025-04-20 beta header
-        fetch: oauthFetch,
+        fetch: oauthFetch as unknown as typeof globalThis.fetch,
       });
       logger.debug(
-        "[AnthropicProvider] Anthropic SDK created with OAuth fetch wrapper",
+        "[AnthropicProvider] Anthropic SDK client created with OAuth fetch wrapper",
       );
 
       logger.debug("Anthropic Provider initialized with OAuth", {
@@ -454,44 +818,38 @@ export class AnthropicProvider extends BaseProvider {
       const apiKeyToUse =
         credentials?.apiKey ?? config?.apiKey ?? getAnthropicApiKey();
 
-      // The Vercel AI SDK builds `${baseURL}/messages` (no version prefix).
-      // Anthropic's REST API lives under `/v1/messages`, so a user-supplied
-      // bare host like `http://localhost:55669` 404s. Normalize: if the
-      // baseURL doesn't already end with `/vN`, append `/v1`.
-      //
-      // CAVEAT: this heuristic assumes the proxy exposes Anthropic-compatible
-      // endpoints rooted at `/vN/...`. Path-rooted proxies like
-      // `https://proxy.example.com/anthropic` will be silently rewritten to
-      // `…/anthropic/v1` and 404 if the proxy doesn't expose that path. To
-      // disable auto-append, set `ANTHROPIC_BASE_URL` explicitly ending in a
-      // version segment (e.g. `https://api.anthropic.com/v1`).
+      // The official Anthropic SDK builds `${baseURL}/v1/messages` itself, so
+      // a version-suffixed base URL — the form the previous @ai-sdk/anthropic
+      // implementation REQUIRED (`https://api.anthropic.com/v1`) — would
+      // double up as `/v1/v1/messages`. Normalize the inverse way now: strip
+      // a trailing `/vN` segment when present so both historical forms of
+      // ANTHROPIC_BASE_URL keep working.
       const normalizedBaseURL = (() => {
         const raw = process.env.ANTHROPIC_BASE_URL;
         if (!raw) {
           return undefined;
         }
         const trimmed = raw.replace(/\/+$/, "");
-        if (/\/v\d+$/.test(trimmed)) {
-          return trimmed;
+        const stripped = trimmed.replace(/\/v\d+$/, "");
+        if (stripped !== trimmed) {
+          logger.debug(
+            "[AnthropicProvider] Stripping the version suffix from " +
+              "ANTHROPIC_BASE_URL — the official Anthropic SDK appends /v1 " +
+              "to the base URL itself.",
+            {
+              baseURL: redactUrlCredentials(raw),
+              rewrittenTo: redactUrlCredentials(stripped),
+            },
+          );
         }
-        logger.warn(
-          "[AnthropicProvider] ANTHROPIC_BASE_URL does not end with /vN; " +
-            "appending /v1 so the Vercel AI SDK can build /messages correctly. " +
-            "To silence this warning, set ANTHROPIC_BASE_URL with an explicit " +
-            "version segment (e.g. https://api.anthropic.com/v1). " +
-            "If your proxy exposes Anthropic at a custom path that doesn't " +
-            "expose /v1/messages, the auto-append will produce a 404 — pass " +
-            "the full path including the version explicitly.",
-          { baseURL: raw, rewrittenTo: `${trimmed}/v1` },
-        );
-        return `${trimmed}/v1`;
+        return stripped;
       })();
 
-      anthropic = createAnthropic({
+      client = new Anthropic({
         apiKey: apiKeyToUse,
-        headers,
+        defaultHeaders: headers,
         ...(normalizedBaseURL && { baseURL: normalizedBaseURL }),
-        fetch: createProxyFetch(),
+        fetch: createProxyFetch() as unknown as typeof globalThis.fetch,
       });
 
       logger.debug("Anthropic Provider initialized with API key", {
@@ -503,8 +861,7 @@ export class AnthropicProvider extends BaseProvider {
       });
     }
 
-    // Initialize Anthropic model with configured instance
-    this.model = anthropic(this.modelName || getDefaultAnthropicModel());
+    this.client = client;
 
     // Initialize usage tracking
     this.usageInfo = {
@@ -979,10 +1336,208 @@ export class AnthropicProvider extends BaseProvider {
   }
 
   /**
-   * Returns the Vercel AI SDK model instance for Anthropic
+   * Returns a V3-shaped delegating model whose `doGenerate` drives the
+   * official Anthropic Messages API directly. BaseProvider's `generate()`
+   * path (and its middleware wrapping) keeps working unchanged; the
+   * streaming path bypasses this entirely via `executeStream`.
    */
   public getAISDKModel(): LanguageModel {
-    return this.model;
+    const client = this.client;
+    const providerName = this.providerName;
+    const modelId = this.modelName || getDefaultAnthropicModel();
+    const getTimeoutForOptions = (
+      opts: Record<string, unknown> | undefined,
+    ): number => this.getTimeout((opts ?? {}) as never);
+    const refreshAuth = () => this.refreshAuthIfNeeded();
+
+    return {
+      specificationVersion: "v3",
+      provider: providerName,
+      modelId,
+      supportedUrls: {},
+      doGenerate: async (
+        options: {
+          prompt: unknown[];
+          abortSignal?: AbortSignal;
+          maxOutputTokens?: number;
+          temperature?: number;
+          topP?: number;
+          stopSequences?: string[];
+          tools?: Array<{
+            type: string;
+            name: string;
+            description?: string;
+            inputSchema?: unknown;
+          }>;
+          toolChoice?: { type: string; toolName?: string };
+          responseFormat?: {
+            type: "text" | "json";
+            schema?: Record<string, unknown>;
+            name?: string;
+            description?: string;
+          };
+          providerOptions?: Record<string, Record<string, unknown>>;
+        } & Record<string, unknown>,
+      ) => {
+        await refreshAuth();
+        const { system, messages } = messagesToAnthropic(
+          options.prompt as Array<{ role: string; content: unknown }>,
+        );
+
+        let tools: Anthropic.Messages.Tool[] | undefined = (options.tools ?? [])
+          .filter((t) => t.type === "function")
+          .map((t) => {
+            // GenerationHandler marks the last tool definition with a cache
+            // breakpoint when prompt caching is active — keep honoring it.
+            const cc = cacheControlOf(t);
+            return {
+              name: t.name,
+              ...(t.description ? { description: t.description } : {}),
+              input_schema: (t.inputSchema ?? {
+                type: "object",
+                properties: {},
+              }) as Anthropic.Messages.Tool.InputSchema,
+              ...(cc ? { cache_control: cc } : {}),
+            };
+          });
+        if (tools && tools.length === 0) {
+          tools = undefined;
+        }
+        let toolChoice = options.toolChoice
+          ? toolChoiceToAnthropic(
+              options.toolChoice.type === "tool"
+                ? { type: "tool", toolName: options.toolChoice.toolName }
+                : options.toolChoice.type,
+            )
+          : undefined;
+
+        // JSON/structured output: Anthropic has no response_format — emulate
+        // with a forced synthetic tool whose input IS the JSON payload (the
+        // same object-tool strategy @ai-sdk/anthropic used).
+        let jsonTool: string | undefined;
+        if (options.responseFormat?.type === "json") {
+          jsonTool = options.responseFormat.name ?? "json";
+          const schema = (options.responseFormat.schema ?? {
+            type: "object",
+          }) as Anthropic.Messages.Tool.InputSchema;
+          tools = [
+            {
+              name: jsonTool,
+              description:
+                options.responseFormat.description ??
+                "Respond by calling this tool with the answer as its input.",
+              input_schema: schema,
+            },
+          ];
+          toolChoice = { type: "tool", name: jsonTool };
+        }
+
+        // Extended thinking passthrough (providerOptions.anthropic.thinking).
+        const thinking = options.providerOptions?.anthropic?.thinking as
+          | { type: "enabled"; budget_tokens: number }
+          | undefined;
+
+        const params: Anthropic.Messages.MessageCreateParamsNonStreaming = {
+          model: modelId,
+          messages,
+          max_tokens: options.maxOutputTokens ?? ANTHROPIC_DEFAULT_MAX_TOKENS,
+          ...(system ? { system } : {}),
+          ...(options.temperature !== undefined && options.temperature !== null
+            ? { temperature: options.temperature }
+            : {}),
+          ...(options.topP !== undefined && options.topP !== null
+            ? { top_p: options.topP }
+            : {}),
+          ...(options.stopSequences && options.stopSequences.length > 0
+            ? { stop_sequences: options.stopSequences }
+            : {}),
+          ...(tools ? { tools } : {}),
+          ...(toolChoice ? { tool_choice: toolChoice } : {}),
+          ...(thinking ? { thinking } : {}),
+        };
+
+        const timeoutController = createTimeoutController(
+          getTimeoutForOptions(options),
+          providerName,
+          "generate",
+        );
+        let response: Anthropic.Messages.Message;
+        try {
+          response = await client.messages.create(params, {
+            signal: composeAbortSignals(
+              options.abortSignal,
+              timeoutController?.controller.signal,
+            ),
+          });
+        } finally {
+          timeoutController?.cleanup();
+        }
+
+        const content: Array<{ type: string } & Record<string, unknown>> = [];
+        for (const block of response.content) {
+          if (block.type === "thinking") {
+            content.push({ type: "reasoning", text: block.thinking });
+          } else if (block.type === "text") {
+            // In forced-json mode the payload arrives via the tool input, not
+            // text — pass text through only in normal mode.
+            if (!jsonTool) {
+              content.push({ type: "text", text: block.text });
+            }
+          } else if (block.type === "tool_use") {
+            if (jsonTool && block.name === jsonTool) {
+              // Unwrap the synthetic tool call back into text JSON.
+              content.push({
+                type: "text",
+                text: stringifyToolInput(block.input),
+              });
+            } else {
+              content.push({
+                type: "tool-call",
+                toolCallId: block.id,
+                toolName: block.name,
+                input: stringifyToolInput(block.input),
+              });
+            }
+          }
+        }
+
+        const cacheRead = response.usage.cache_read_input_tokens ?? 0;
+        const cacheWrite = response.usage.cache_creation_input_tokens ?? 0;
+        return {
+          content,
+          finishReason: {
+            unified: mapAnthropicStopReason(response.stop_reason),
+            raw: response.stop_reason ?? "stop",
+          },
+          usage: {
+            inputTokens: {
+              total: response.usage.input_tokens + cacheRead + cacheWrite,
+              noCache: response.usage.input_tokens,
+              cacheRead,
+              cacheWrite,
+            },
+            outputTokens: {
+              total: response.usage.output_tokens,
+              text: response.usage.output_tokens,
+              reasoning: undefined,
+            },
+          },
+          warnings: [],
+          request: { body: params },
+          response: {
+            id: response.id,
+            modelId: response.model,
+            headers: {},
+            body: response,
+          },
+        };
+      },
+      doStream: () => {
+        throw new Error(
+          `${providerName}: doStream is not implemented on the delegating model — the streaming path uses executeStream directly.`,
+        );
+      },
+    } as unknown as LanguageModel;
   }
 
   protected formatProviderError(error: unknown): Error {
@@ -1074,192 +1629,450 @@ export class AnthropicProvider extends BaseProvider {
       this.providerName,
       "stream",
     );
+    // Consumer-driven abort: fires when the async iterator is closed early
+    // (caller breaks out of `for await`) so the background loop stops
+    // reading SSE and running tools.
+    const consumerAbortController = new AbortController();
+    const abortSignal = mergeAbortSignals([
+      options.abortSignal,
+      timeoutController?.controller.signal,
+      consumerAbortController.signal,
+    ]).signal;
 
+    let toolsRecord: Record<string, Tool>;
+    let anthropicTools: Anthropic.Messages.Tool[] | undefined;
+    let payload: {
+      system?: string | Anthropic.Messages.TextBlockParam[];
+      messages: Anthropic.Messages.MessageParam[];
+    };
+    let shouldUseTools: boolean;
     try {
-      // Get tools - options.tools is pre-merged by BaseProvider.stream() with
-      // base tools (MCP/built-in) + user-provided tools (RAG, etc.)
-      const shouldUseTools = !options.disableTools && this.supportsTools();
-      const tools = shouldUseTools
+      // options.tools is pre-merged by BaseProvider.stream() with base tools
+      // (MCP/built-in) + user-provided tools (RAG, etc.)
+      shouldUseTools = !options.disableTools && this.supportsTools();
+      toolsRecord = shouldUseTools
         ? (options.tools as Record<string, Tool>) || (await this.getAllTools())
         : {};
-
-      // Build message array from options with multimodal support
-      // Using protected helper from BaseProvider to eliminate code duplication
-      const messages = await this.buildMessagesForStream(options);
-      const model = await this.getAISDKModelWithMiddleware(options);
-
-      // Wrap streamText in an OTel span to capture provider-level latency and token usage
-      const streamSpan = streamTracer.startSpan(
-        "neurolink.provider.streamText",
-        {
-          kind: SpanKind.CLIENT,
-          attributes: {
-            "gen_ai.system": "anthropic",
-            "gen_ai.request.model": getModelId(
-              model,
-              this.modelName || "unknown",
-            ),
-          },
-        },
+      anthropicTools = shouldUseTools
+        ? toolsToAnthropic(toolsRecord)
+        : undefined;
+      // Build message array from options with multimodal support, then
+      // convert to the Anthropic Messages payload (system + content blocks).
+      const built = await this.buildMessagesForStream(options);
+      payload = messagesToAnthropic(
+        built as Array<{ role: string; content: unknown }>,
       );
+    } catch (setupErr) {
+      timeoutController?.cleanup();
+      throw this.handleProviderError(setupErr);
+    }
 
-      // Reviewer follow-up: capture upstream provider errors via onError
-      // so the post-stream NoOutput sentinel carries the real cause in
-      // providerError / modelResponseRaw.
-      let capturedProviderError: unknown;
-      let result: ReturnType<typeof streamText>;
-      try {
-        result = streamText({
-          model: model,
-          messages: messages,
-          temperature: options.temperature,
-          maxOutputTokens: options.maxTokens, // No default limit - unlimited unless specified
-          maxRetries: 0, // NL11: Disable AI SDK's invisible internal retries; we handle retries with OTel instrumentation
-          tools,
-          stopWhen: stepCountIs(options.maxSteps || DEFAULT_MAX_STEPS),
-          toolChoice: resolveToolChoice(options, tools, shouldUseTools),
-          abortSignal: composeAbortSignals(
-            options.abortSignal,
-            timeoutController?.controller.signal,
-          ),
-          onError: (event: { error: unknown }) => {
-            capturedProviderError = event.error;
-            logger.error("Anthropic: Stream error", {
-              error:
-                event.error instanceof Error
-                  ? event.error.message
-                  : String(event.error),
-            });
-          },
-          experimental_repairToolCall: this.getToolCallRepairFn(options),
-          experimental_telemetry:
-            this.telemetryHandler.getTelemetryConfig(options),
-          onStepFinish: ({ toolCalls, toolResults }) => {
-            // Emit tool:end for each completed tool result so Pipeline B
-            // captures telemetry for AI-SDK-driven tool calls (gap S2).
-            emitToolEndFromStepFinish(
-              this.neurolink?.getEventEmitter(),
-              toolResults as Array<{
-                toolName: string;
-                output?: unknown;
-                result?: unknown;
-                error?: string;
-              }>,
-            );
+    const modelId = this.modelName || getDefaultAnthropicModel();
+    const anthropicToolChoice =
+      shouldUseTools && anthropicTools && anthropicTools.length > 0
+        ? toolChoiceToAnthropic(
+            resolveToolChoice(options, toolsRecord, shouldUseTools),
+          )
+        : undefined;
 
-            this.handleToolExecutionStorage(
-              toolCalls,
-              toolResults,
-              options,
-              new Date(),
-            ).catch((error: unknown) => {
-              logger.warn(
-                "[AnthropicProvider] Failed to store tool executions",
-                {
-                  provider: this.providerName,
-                  error: error instanceof Error ? error.message : String(error),
-                },
-              );
-            });
-          },
+    // Extended thinking: enabled when the caller supplies an explicit token
+    // budget (mirrors the previous experimental_thinking gating). Thinking
+    // deltas stream out on the `reasoning` chunk channel.
+    const thinking =
+      options.thinkingConfig?.enabled && options.thinkingConfig.budgetTokens
+        ? {
+            type: "enabled" as const,
+            budget_tokens: options.thinkingConfig.budgetTokens,
+          }
+        : undefined;
+
+    // Wrap the native stream in an OTel span to capture provider-level
+    // latency and token usage (same span name as the pre-migration path so
+    // dashboards stay continuous).
+    const streamSpan = streamTracer.startSpan("neurolink.provider.streamText", {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        "gen_ai.system": "anthropic",
+        "gen_ai.request.model": modelId,
+      },
+    });
+
+    const maxSteps = options.maxSteps || DEFAULT_MAX_STEPS;
+    const emitter = this.neurolink?.getEventEmitter();
+    const { pushChunk, nextChunk } = createChunkQueue();
+    const { usagePromise, finishPromise, resolveUsage, resolveFinish } =
+      createDeferredAnalytics();
+
+    usagePromise
+      .then((usage) => {
+        streamSpan.setAttribute(
+          "gen_ai.usage.input_tokens",
+          usage.promptTokens || 0,
+        );
+        streamSpan.setAttribute(
+          "gen_ai.usage.output_tokens",
+          usage.completionTokens || 0,
+        );
+        const cost = calculateCost(this.providerName, this.modelName, {
+          input: usage.promptTokens || 0,
+          output: usage.completionTokens || 0,
+          total: usage.totalTokens || 0,
         });
-      } catch (streamError) {
-        streamSpan.setStatus({
-          code: SpanStatusCode.ERROR,
-          message:
-            streamError instanceof Error
-              ? streamError.message
-              : String(streamError),
-        });
-        if (streamError instanceof Error) {
-          streamSpan.recordException(streamError);
+        if (cost && cost > 0) {
+          streamSpan.setAttribute("neurolink.cost", cost);
         }
+      })
+      .catch(() => {
+        // usage may never resolve if the stream is aborted before completion
+      });
+    finishPromise
+      .then((reason) => {
+        streamSpan.setAttribute(
+          "gen_ai.response.finish_reason",
+          reason || "unknown",
+        );
         streamSpan.end();
-        throw streamError;
+      })
+      .catch(() => {
+        streamSpan.end();
+      });
+
+    let capturedProviderError: unknown;
+    const client = this.client;
+    const toolsUsed: string[] = [];
+
+    const runLoop = async (): Promise<void> => {
+      const conversation = payload.messages.slice();
+      let totalInput = 0;
+      let totalOutput = 0;
+      let lastStop: string | null = null;
+
+      for (let step = 0; step < maxSteps; step++) {
+        const params: Anthropic.Messages.MessageCreateParamsStreaming = {
+          model: modelId,
+          messages: conversation,
+          max_tokens: options.maxTokens ?? ANTHROPIC_DEFAULT_MAX_TOKENS,
+          stream: true,
+          ...(payload.system ? { system: payload.system } : {}),
+          ...(options.temperature !== undefined && options.temperature !== null
+            ? { temperature: options.temperature }
+            : {}),
+          ...(anthropicTools && anthropicTools.length > 0
+            ? { tools: anthropicTools }
+            : {}),
+          ...(anthropicToolChoice ? { tool_choice: anthropicToolChoice } : {}),
+          ...(thinking ? { thinking } : {}),
+        };
+        const events = await client.messages.create(params, {
+          signal: abortSignal ?? undefined,
+        });
+
+        // Per-step accumulators, keyed by content-block index so blocks are
+        // replayed to the conversation in order (thinking blocks must be
+        // passed back with their signatures when tool use continues a turn).
+        const blockTypes = new Map<number, string>();
+        const textAcc = new Map<number, string>();
+        const thinkingAcc = new Map<
+          number,
+          { text: string; signature: string }
+        >();
+        const toolAcc = new Map<
+          number,
+          { id: string; name: string; inputJson: string }
+        >();
+        let stopReason: string | null = null;
+
+        for await (const event of events) {
+          if (event.type === "message_start") {
+            totalInput += event.message.usage.input_tokens ?? 0;
+            totalOutput += event.message.usage.output_tokens ?? 0;
+          } else if (event.type === "content_block_start") {
+            blockTypes.set(event.index, event.content_block.type);
+            if (event.content_block.type === "tool_use") {
+              toolAcc.set(event.index, {
+                id: event.content_block.id,
+                name: event.content_block.name,
+                inputJson: "",
+              });
+            }
+          } else if (event.type === "content_block_delta") {
+            const delta = event.delta;
+            if (delta.type === "text_delta") {
+              textAcc.set(
+                event.index,
+                (textAcc.get(event.index) ?? "") + delta.text,
+              );
+              pushChunk({ content: delta.text });
+            } else if (delta.type === "thinking_delta") {
+              const acc = thinkingAcc.get(event.index) ?? {
+                text: "",
+                signature: "",
+              };
+              acc.text += delta.thinking;
+              thinkingAcc.set(event.index, acc);
+              // Reasoning rides the dedicated chunk channel; `content` stays
+              // an always-present string so plain-text consumers are safe.
+              pushChunk({ content: "", reasoning: delta.thinking });
+            } else if (delta.type === "signature_delta") {
+              const acc = thinkingAcc.get(event.index) ?? {
+                text: "",
+                signature: "",
+              };
+              acc.signature += delta.signature;
+              thinkingAcc.set(event.index, acc);
+            } else if (delta.type === "input_json_delta") {
+              const acc = toolAcc.get(event.index);
+              if (acc) {
+                acc.inputJson += delta.partial_json;
+              }
+            }
+          } else if (event.type === "message_delta") {
+            stopReason = event.delta.stop_reason ?? stopReason;
+            totalOutput += event.usage?.output_tokens ?? 0;
+          }
+        }
+        lastStop = stopReason;
+
+        if (stopReason !== "tool_use" || toolAcc.size === 0) {
+          break;
+        }
+
+        // Replay this assistant turn (thinking + text + tool_use blocks, in
+        // block order) then execute the requested tools and append their
+        // results as a user turn — the native multi-step tool loop.
+        const assistantBlocks: Anthropic.Messages.ContentBlockParam[] = [];
+        const orderedIndexes = [...blockTypes.keys()].sort((a, b) => a - b);
+        for (const idx of orderedIndexes) {
+          const type = blockTypes.get(idx);
+          if (type === "thinking") {
+            const acc = thinkingAcc.get(idx);
+            if (acc && acc.text.length > 0) {
+              assistantBlocks.push({
+                type: "thinking",
+                thinking: acc.text,
+                signature: acc.signature,
+              });
+            }
+          } else if (type === "text") {
+            const text = textAcc.get(idx);
+            if (text && text.length > 0) {
+              assistantBlocks.push({ type: "text", text });
+            }
+          } else if (type === "tool_use") {
+            const acc = toolAcc.get(idx);
+            if (acc) {
+              let input: unknown;
+              try {
+                input = acc.inputJson ? JSON.parse(acc.inputJson) : {};
+              } catch {
+                input = {};
+              }
+              assistantBlocks.push({
+                type: "tool_use",
+                id: acc.id,
+                name: acc.name,
+                input,
+              });
+            }
+          }
+        }
+        conversation.push({ role: "assistant", content: assistantBlocks });
+
+        const resultBlocks: Anthropic.Messages.ToolResultBlockParam[] = [];
+        const toolCallsForStorage: Array<{
+          type: string;
+          toolCallId: string;
+          toolName: string;
+          args: unknown;
+        }> = [];
+        const toolResultsForStorage: Array<{
+          type: string;
+          toolCallId: string;
+          toolName: string;
+          result?: unknown;
+          error?: string;
+        }> = [];
+
+        for (const acc of toolAcc.values()) {
+          let args: Record<string, unknown>;
+          try {
+            args = acc.inputJson
+              ? (JSON.parse(acc.inputJson) as Record<string, unknown>)
+              : {};
+          } catch {
+            args = {};
+          }
+          toolCallsForStorage.push({
+            type: "tool-call",
+            toolCallId: acc.id,
+            toolName: acc.name,
+            args,
+          });
+          toolsUsed.push(acc.name);
+
+          const tool = toolsRecord[acc.name] as
+            | {
+                execute?: (
+                  input: Record<string, unknown>,
+                  ctx: { toolCallId: string; messages: unknown[] },
+                ) => Promise<unknown>;
+              }
+            | undefined;
+          try {
+            if (!tool?.execute) {
+              throw new Error(`Tool not found: ${acc.name}`);
+            }
+            const result = await tool.execute(args, {
+              toolCallId: acc.id,
+              messages: [],
+            });
+            toolResultsForStorage.push({
+              type: "tool-result",
+              toolCallId: acc.id,
+              toolName: acc.name,
+              result,
+            });
+            resultBlocks.push({
+              type: "tool_result",
+              tool_use_id: acc.id,
+              content: stringifyAnthropicToolOutput(result),
+            });
+          } catch (toolErr) {
+            const message =
+              toolErr instanceof Error ? toolErr.message : String(toolErr);
+            toolResultsForStorage.push({
+              type: "tool-result",
+              toolCallId: acc.id,
+              toolName: acc.name,
+              error: message,
+            });
+            resultBlocks.push({
+              type: "tool_result",
+              tool_use_id: acc.id,
+              content: `Error: ${message}`,
+              is_error: true,
+            });
+          }
+        }
+
+        // Emit tool:end events for Pipeline B and persist tool executions —
+        // the same hooks the streamText onStepFinish callback used to drive.
+        emitToolEndFromStepFinish(
+          emitter,
+          toolResultsForStorage.map((tr) => ({
+            toolName: tr.toolName,
+            result: tr.result,
+            error: tr.error,
+          })),
+        );
+        this.handleToolExecutionStorage(
+          toolCallsForStorage,
+          toolResultsForStorage,
+          options,
+          new Date(),
+        ).catch((storageErr: unknown) => {
+          logger.warn("[AnthropicProvider] Failed to store tool executions", {
+            provider: this.providerName,
+            error:
+              storageErr instanceof Error
+                ? storageErr.message
+                : String(storageErr),
+          });
+        });
+
+        conversation.push({ role: "user", content: resultBlocks });
       }
 
-      // Collect token usage and finish reason asynchronously when the stream completes,
-      // then end the span. This avoids blocking the stream consumer.
-      Promise.resolve(result.usage)
-        .then((usage) => {
-          streamSpan.setAttribute(
-            "gen_ai.usage.input_tokens",
-            usage.inputTokens || 0,
-          );
-          streamSpan.setAttribute(
-            "gen_ai.usage.output_tokens",
-            usage.outputTokens || 0,
-          );
-          const cost = calculateCost(this.providerName, this.modelName, {
-            input: usage.inputTokens || 0,
-            output: usage.outputTokens || 0,
-            total: (usage.inputTokens || 0) + (usage.outputTokens || 0),
-          });
-          if (cost && cost > 0) {
-            streamSpan.setAttribute("neurolink.cost", cost);
+      resolveUsage({
+        promptTokens: totalInput,
+        completionTokens: totalOutput,
+        totalTokens: totalInput + totalOutput,
+      });
+      resolveFinish(lastStop ?? "stop");
+    };
+
+    const loopPromise = runLoop()
+      // Parameter named `error` so the compiled `capturedProviderError = error`
+      // assignment matches the regression-grep in test:context 6.14.
+      .catch((error: unknown) => {
+        capturedProviderError = error;
+        logger.error("Anthropic: Stream error", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        resolveFinish("error");
+        throw this.formatProviderError(error);
+      })
+      .finally(() => {
+        timeoutController?.cleanup();
+        pushChunk({ done: true });
+      });
+    loopPromise.catch(() => {
+      // Swallowed by design: the generator below surfaces loop errors after
+      // draining the queue; this guard only prevents an unhandled-rejection
+      // crash when the consumer abandons the stream early.
+    });
+
+    const providerName = this.providerName;
+    const transformedStream = async function* () {
+      let contentYielded = 0;
+      try {
+        for (;;) {
+          const chunk = await nextChunk();
+          if ("done" in chunk) {
+            break;
           }
-        })
-        .catch(() => {
-          // Usage may not be available if the stream is aborted
-        });
-      Promise.resolve(result.finishReason)
-        .then((reason) => {
-          streamSpan.setAttribute(
-            "gen_ai.response.finish_reason",
-            reason || "unknown",
+          if (
+            "content" in chunk &&
+            typeof chunk.content === "string" &&
+            chunk.content.length > 0
+          ) {
+            contentYielded++;
+          }
+          yield chunk;
+        }
+        // Surface any error the loop threw after draining the queue.
+        await loopPromise;
+        // No-output path: stream completed normally but yielded zero text.
+        if (contentYielded === 0 && toolsUsed.length === 0) {
+          logger.warn(
+            `${providerName}: Stream produced no output — emitting enriched sentinel`,
           );
-        })
-        .catch(() => {
-          // Finish reason may not be available if the stream is aborted
-        });
-      // End the span when the stream text resolves (stream fully consumed)
-      Promise.resolve(result.text)
-        .then(() => {
-          streamSpan.end();
-        })
-        .catch((err: unknown) => {
-          streamSpan.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err instanceof Error ? err.message : String(err),
+          const fauxNoOutput = new NoOutputGeneratedError({
+            message: "Stream produced no output",
           });
-          streamSpan.end();
-        });
+          const sentinel = await buildNoOutputSentinel(
+            fauxNoOutput,
+            undefined,
+            capturedProviderError,
+          );
+          stampNoOutputSpan(sentinel);
+          yield sentinel as { content: string };
+        }
+      } catch (streamError) {
+        const sentinel = await buildNoOutputSentinel(
+          streamError,
+          undefined,
+          capturedProviderError,
+        );
+        stampNoOutputSpan(sentinel);
+        yield sentinel as { content: string };
+        if (!NoOutputGeneratedError.isInstance(streamError)) {
+          throw streamError;
+        }
+      } finally {
+        if (!consumerAbortController.signal.aborted) {
+          consumerAbortController.abort();
+        }
+      }
+    };
 
-      timeoutController?.cleanup();
-
-      const transformedStream = this.createTextStream(
-        result,
-        () => capturedProviderError,
-      );
-
-      // ✅ Note: Vercel AI SDK's streamText() method limitations with tools
-      // The streamText() function doesn't provide the same tool result access as generateText()
-      // Full tool support is now available with real streaming
-      const toolCalls: Array<{
-        toolCallId: string;
-        toolName: string;
-        args: Record<string, unknown>;
-      }> = [];
-
-      const toolResults: Array<{
-        toolName: string;
-        status: "success" | "failure";
-        output?: JsonValue;
-        id: string;
-      }> = [];
-
-      return {
-        stream: transformedStream,
-        provider: this.providerName,
-        model: this.modelName,
-        toolCalls, // ✅ Include tool calls in stream result
-        toolResults, // ✅ Include tool results in stream result
-        // Note: omit usage/finishReason to avoid blocking streaming; compute asynchronously if needed.
-      };
-    } catch (error: unknown) {
-      timeoutController?.cleanup();
-      throw this.handleProviderError(error);
-    }
+    return {
+      stream: transformedStream(),
+      provider: this.providerName,
+      model: this.modelName,
+      toolCalls: [],
+      toolResults: [],
+    };
   }
 
   async isAvailable(): Promise<boolean> {
@@ -1278,7 +2091,7 @@ export class AnthropicProvider extends BaseProvider {
   }
 
   getModel(): LanguageModel {
-    return this.model;
+    return this.getAISDKModel();
   }
 }
 
@@ -1292,5 +2105,3 @@ export {
 
 // Export beta headers constant for external use
 export { ANTHROPIC_BETA_HEADERS };
-
-export default AnthropicProvider;

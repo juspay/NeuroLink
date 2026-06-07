@@ -2807,7 +2807,7 @@ async function test_6_1_all_providers_wired(): Promise<void> {
     "litellm",
     "huggingFace",
     "openRouter",
-    "anthropicBaseProvider",
+    "anthropic",
   ];
   // StreamHandler is also a wired site (when transformations don't go
   // through a provider-specific generator).
@@ -3325,7 +3325,7 @@ async function test_6_9_all_wired_sites_stamp_otel_span(): Promise<void> {
     "providers/litellm",
     "providers/huggingFace",
     "providers/openRouter",
-    "providers/anthropicBaseProvider",
+    "providers/anthropic",
     "core/modules/StreamHandler",
   ];
   for (const t of targets) {
@@ -3540,7 +3540,7 @@ async function test_6_14_providers_capture_and_pass_error(): Promise<void> {
     "providers/litellm",
     "providers/huggingFace",
     "providers/openRouter",
-    "providers/anthropicBaseProvider",
+    "providers/anthropic",
   ];
   // Native-base providers (those that `extends OpenAIChatCompletionsProvider`)
   // capture the provider error centrally in the shared base rather than in

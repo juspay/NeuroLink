@@ -148,7 +148,7 @@ export async function detectPostStreamNoOutput(
  * observation with the enriched status message. Without this, only
  * `StreamHandler`-based providers produced the rich telemetry; the
  * provider-specific paths (openAI, openaiCompatible, litellm,
- * huggingFace, openRouter, anthropicBaseProvider) yielded the sentinel
+ * huggingFace, openRouter, anthropic) yielded the sentinel
  * to direct stream consumers but Pipeline B saw nothing.
  *
  * Stamps three attributes:

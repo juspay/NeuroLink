@@ -359,10 +359,7 @@ console.log("\n=== Section F: provider error convention audit (M08) ===\n");
 // (AuthenticationError / RateLimitError / NetworkError / InvalidModelError /
 //  ProviderError / NeuroLinkError) — not plain new Error(...).
 const allProviders = auditFiles.filter(
-  (f) =>
-    f !== "index.ts" &&
-    f !== "providerTypeUtils.ts" &&
-    f !== "anthropicBaseProvider.ts",
+  (f) => f !== "index.ts" && f !== "providerTypeUtils.ts",
 );
 
 for (const file of allProviders) {
