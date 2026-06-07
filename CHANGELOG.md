@@ -1,3 +1,9 @@
+## [9.68.17](https://github.com/juspay/neurolink/compare/v9.68.16...v9.68.17) (2026-06-07)
+
+### Bug Fixes
+
+- **(providers):** redact embedded credentials from baseURL in debug logs ([d15f276](https://github.com/juspay/neurolink/commit/d15f27677dfff8a9e629eb6c4c4177232b5fa852))
+
 ## [9.68.16](https://github.com/juspay/neurolink/compare/v9.68.15...v9.68.16) (2026-06-06)
 
 ## [9.68.15](https://github.com/juspay/neurolink/compare/v9.68.14...v9.68.15) (2026-06-06)
