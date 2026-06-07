@@ -1,3 +1,9 @@
+## [9.69.0](https://github.com/juspay/neurolink/compare/v9.68.21...v9.69.0) (2026-06-07)
+
+### Features
+
+- **(providers):** surface reasoning_content natively in the SSE client + base ([879e90a](https://github.com/juspay/neurolink/commit/879e90a788a53d3c664be235ad1e43b446ad6091)), closes [#1057](https://github.com/juspay/neurolink/issues/1057) [#1058](https://github.com/juspay/neurolink/issues/1058) [#1059](https://github.com/juspay/neurolink/issues/1059)
+
 ## [9.68.21](https://github.com/juspay/neurolink/compare/v9.68.20...v9.68.21) (2026-06-07)
 
 ## [9.68.20](https://github.com/juspay/neurolink/compare/v9.68.19...v9.68.20) (2026-06-07)
