@@ -3330,52 +3330,36 @@ async function testAIToolDiscovery(): Promise<boolean | null> {
   try {
     const sdk = createSDK();
 
-    // Access tasks getter to wire up the tool references
-    const _manager = sdk.tasks;
+    // createSDK() passes a `tasks` config, so NeuroLink registers the task
+    // tools eagerly in its constructor; we keep the manager handle only to shut
+    // it down at the end.
+    const manager = sdk.tasks;
 
-    // Ask AI to use the listTasks tool
-    const result = await sdk.generate({
-      input: {
-        text: "Use the listTasks tool to list all scheduled tasks. Call the tool, do not make up a response.",
-      },
-      maxTokens: 300,
-    });
+    // "Available to the AI" means present in the tool set every generate()
+    // call draws from (NeuroLink.getAllAvailableTools()). Assert this
+    // DETERMINISTICALLY. The previous version round-tripped a live model and
+    // inspected result.toolsUsed / result.availableTools — that depends on a
+    // tool-calling provider being configured AND the model choosing to call the
+    // tool, so it only passed with live keys (and failed in no-key/local runs).
+    const available = await sdk.getAllAvailableTools();
+    const hasListTasks = available.some((t) => t.name === "listTasks");
+    const hasCreateTask = available.some((t) => t.name === "createTask");
 
-    const usedListTasks =
-      result.toolExecutions?.some(
-        (t: Record<string, unknown>) => t.name === "listTasks",
-      ) || result.toolsUsed?.includes("listTasks");
+    await manager.shutdown();
 
-    let toolsAvailable = false;
-    if (!usedListTasks) {
-      // Fallback: verify tools are in the available tools list
-      toolsAvailable =
-        result.availableTools?.some(
-          (t: Record<string, unknown>) =>
-            t.name === "listTasks" || t.name === "createTask",
-        ) ?? false;
-    }
-
-    await _manager.shutdown();
-
-    const checks: string[] = [];
-    if (!usedListTasks && !toolsAvailable) {
-      checks.push(
-        `AI did not use listTasks and tools not in available list. Available: ${result.availableTools?.map((t: Record<string, unknown>) => t.name).join(", ") || "none"}`,
+    if (!hasListTasks || !hasCreateTask) {
+      logTest(
+        "Task tools are available to AI",
+        "FAIL",
+        `task tools missing from registry. Available: ${available.map((t) => t.name).join(", ") || "none"}`,
       );
-    }
-
-    if (checks.length > 0) {
-      logTest("Task tools are available to AI", "FAIL", checks.join("; "));
       return false;
     }
 
     logTest(
       "Task tools are available to AI",
       "PASS",
-      usedListTasks
-        ? "AI called listTasks"
-        : "Task tools in available tools list",
+      `listTasks + createTask exposed to generate() (${available.length} tools total)`,
     );
     return true;
   } catch (error) {
