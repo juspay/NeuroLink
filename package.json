@@ -370,7 +370,7 @@
     "@aws-sdk/client-sagemaker": "^3.1000.0",
     "@fastify/cors": "^11.2.0",
     "@fastify/rate-limit": "^10.3.0",
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^1.19.13",
     "@koa/cors": "^5.0.0",
     "@koa/router": "^15.3.1",
     "@langfuse/otel": "^5.0.1",
