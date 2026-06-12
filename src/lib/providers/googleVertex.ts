@@ -77,13 +77,23 @@ import {
 } from "./googleNativeGemini3.js";
 import {
   ATTR,
+  LANGFUSE_ATTR,
+  spanJsonAttribute,
   tracers,
   withClientSpan,
   withClientStreamSpan,
   withSpan,
 } from "../telemetry/index.js";
+import {
+  SpanKind,
+  SpanStatusCode,
+  context as otelContext,
+  trace as otelTrace,
+} from "@opentelemetry/api";
 import { calculateCost } from "../utils/pricing.js";
 import { transformToolExecutions } from "../utils/transformationUtils.js";
+import { sanitizeAnthropicMessagesForTrace } from "../utils/anthropicTraceSanitizer.js";
+import { extractMcpToolErrorMessage } from "../utils/mcpErrorText.js";
 import type { Schema, LanguageModel, Tool } from "../types/index.js";
 
 // Import proper types for multimodal message handling
@@ -3177,6 +3187,52 @@ export class GoogleVertexProvider extends BaseProvider {
     const toolsUsedRef: string[] = [];
     const structuredOutputRef: { value?: Record<string, unknown> } = {};
 
+    // Langfuse/OTel: the native SDK bypasses the Vercel AI SDK's
+    // experimental_telemetry, so emit spans manually — one turn span, one
+    // generation span per API call, one tool span per execution — all carrying
+    // langfuse.* attributes the LangfuseSpanProcessor maps to observations.
+    // Usage lives ONLY on the generation spans (Langfuse sums usage across
+    // observations for trace totals, so repeating it on the turn double-counts).
+    const offeredToolNames = (tools ?? []).map(
+      (anthropicTool) => anthropicTool.name,
+    );
+    const turnInputAttribute = spanJsonAttribute({
+      system: systemPromptWithSchema,
+      messages: sanitizeAnthropicMessagesForTrace(messages),
+    });
+    const turnSpan = tracers.provider.startSpan("anthropic.vertex.stream", {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        // Mark as span, not generation — without it Langfuse infers "generation"
+        // from the gen_ai.* attributes; the model calls live in child spans.
+        [LANGFUSE_ATTR.OBSERVATION_TYPE]: "span",
+        [ATTR.GEN_AI_SYSTEM]: "anthropic",
+        [ATTR.GEN_AI_MODEL]: modelName,
+        [ATTR.GEN_AI_OPERATION]: "stream",
+        [ATTR.NL_PROVIDER]: this.providerName,
+        [ATTR.NL_TOOL_COUNT]: offeredToolNames.length,
+        [LANGFUSE_ATTR.OBSERVATION_INPUT]: turnInputAttribute,
+        // Also lift IO to the trace — Langfuse reads trace input/output from
+        // langfuse.trace.* and the trace list is unreadable without it.
+        [LANGFUSE_ATTR.TRACE_INPUT]: turnInputAttribute,
+        [LANGFUSE_ATTR.OBSERVATION_METADATA]: spanJsonAttribute({
+          toolsOffered: offeredToolNames,
+          toolCount: offeredToolNames.length,
+          maxSteps,
+          structuredOutput: useFinalResultTool,
+        }),
+      },
+    });
+    const turnContext = otelTrace.setSpan(otelContext.active(), turnSpan);
+    let aggregatedTurnText = "";
+    // Anthropic prompt-cache token accounting, aggregated across loop steps.
+    const turnCacheUsage = {
+      read: 0,
+      creation: 0,
+      creation5m: 0,
+      creation1h: 0,
+    };
+
     // Track the active Anthropic stream so options.abortSignal can cancel it
     // mid-flight (pre-rewrite code had no abort handling — fixed for free).
     let activeStream:
@@ -3213,34 +3269,156 @@ export class GoogleVertexProvider extends BaseProvider {
           }
           step++;
 
-          const stream = await client.messages.stream({
-            ...requestParams,
-            messages: currentMessages as Parameters<
-              typeof client.messages.stream
-            >[0]["messages"],
-          });
-          activeStream = stream;
+          // One generation observation per API call: request in, content + usage out.
+          const generationSpan = tracers.generation.startSpan(
+            "anthropic.messages.stream",
+            {
+              kind: SpanKind.CLIENT,
+              attributes: {
+                [LANGFUSE_ATTR.OBSERVATION_TYPE]: "generation",
+                [LANGFUSE_ATTR.OBSERVATION_MODEL_NAME]: modelName,
+                [LANGFUSE_ATTR.OBSERVATION_MODEL_PARAMETERS]: spanJsonAttribute(
+                  {
+                    max_tokens: requestParams.max_tokens,
+                    temperature: requestParams.temperature,
+                    top_p: requestParams.top_p,
+                  },
+                ),
+                [LANGFUSE_ATTR.OBSERVATION_INPUT]: spanJsonAttribute({
+                  system: systemPromptWithSchema,
+                  messages: sanitizeAnthropicMessagesForTrace(currentMessages),
+                }),
+                [LANGFUSE_ATTR.OBSERVATION_METADATA]: spanJsonAttribute({
+                  step,
+                  toolsOffered: offeredToolNames.length,
+                }),
+                [ATTR.GEN_AI_SYSTEM]: "anthropic",
+                [ATTR.GEN_AI_MODEL]: modelName,
+                [ATTR.GEN_AI_OPERATION]: "chat",
+              },
+            },
+            turnContext,
+          );
 
-          // Forward each text delta to the consumer as it arrives. The
-          // Anthropic SDK fires this listener synchronously for every
-          // content_block_delta SSE event, so the channel sees bytes at
-          // the same cadence the wire delivers them.
-          stream.on("text", (delta: string) => {
-            if (delta.length > 0) {
-              channel.push(delta);
+          let response: Awaited<
+            ReturnType<
+              Awaited<ReturnType<typeof client.messages.stream>>["finalMessage"]
+            >
+          >;
+          try {
+            const stream = await client.messages.stream({
+              ...requestParams,
+              messages: currentMessages as Parameters<
+                typeof client.messages.stream
+              >[0]["messages"],
+            });
+            activeStream = stream;
+
+            // Forward each text delta as it arrives — the Anthropic SDK fires
+            // this synchronously per content_block_delta, so the channel streams
+            // at wire cadence. The first delta stamps completion_start_time,
+            // giving Langfuse the generation's time-to-first-token.
+            let firstDeltaSeen = false;
+            stream.on("text", (delta: string) => {
+              if (delta.length > 0) {
+                if (!firstDeltaSeen) {
+                  firstDeltaSeen = true;
+                  generationSpan.setAttribute(
+                    LANGFUSE_ATTR.OBSERVATION_COMPLETION_START_TIME,
+                    new Date().toISOString(),
+                  );
+                }
+                channel.push(delta);
+              }
+            });
+
+            // finalMessage() resolves AFTER message_stop. By then the listener
+            // has already fired for every delta — awaiting here doesn't block
+            // visible streaming, it just gives us the structured response
+            // shape needed for tool_use block extraction.
+            response = await stream.finalMessage();
+          } catch (modelCallError) {
+            generationSpan.setStatus({
+              code: SpanStatusCode.ERROR,
+              message:
+                modelCallError instanceof Error
+                  ? modelCallError.message
+                  : String(modelCallError),
+            });
+            if (modelCallError instanceof Error) {
+              generationSpan.recordException(modelCallError);
             }
-          });
-
-          // finalMessage() resolves AFTER message_stop. By then the listener
-          // has already fired for every delta — awaiting here doesn't block
-          // visible streaming, it just gives us the structured response
-          // shape needed for tool_use block extraction.
-          const response = await stream.finalMessage();
+            generationSpan.end();
+            throw modelCallError;
+          }
           activeStream = undefined;
 
-          usage.input += response.usage?.input_tokens || 0;
-          usage.output += response.usage?.output_tokens || 0;
-          usage.total = usage.input + usage.output;
+          // End the generation span even if the bookkeeping below throws (else
+          // it leaks). The model-call error path already ended it — no double-end.
+          try {
+            const stepCacheRead = response.usage?.cache_read_input_tokens ?? 0;
+            const stepCacheCreation =
+              response.usage?.cache_creation_input_tokens ?? 0;
+            const stepCacheCreation5m =
+              response.usage?.cache_creation?.ephemeral_5m_input_tokens ?? 0;
+            const stepCacheCreation1h =
+              response.usage?.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+            turnCacheUsage.read += stepCacheRead;
+            turnCacheUsage.creation += stepCacheCreation;
+            turnCacheUsage.creation5m += stepCacheCreation5m;
+            turnCacheUsage.creation1h += stepCacheCreation1h;
+
+            usage.input += response.usage?.input_tokens || 0;
+            usage.output += response.usage?.output_tokens || 0;
+            usage.total = usage.input + usage.output;
+
+            for (const block of response.content) {
+              if (block.type === "text" && typeof block.text === "string") {
+                aggregatedTurnText += block.text;
+              }
+            }
+
+            generationSpan.setAttribute(
+              LANGFUSE_ATTR.OBSERVATION_OUTPUT,
+              spanJsonAttribute(response.content),
+            );
+            // 5m and 1h cache-creation are priced differently, so keep both;
+            // drop the aggregate input_cache_creation (= 5m + 1h) that would
+            // double-count. total sums the per-TTL keys shown here to match them.
+            generationSpan.setAttribute(
+              LANGFUSE_ATTR.OBSERVATION_USAGE_DETAILS,
+              spanJsonAttribute({
+                input: response.usage?.input_tokens ?? 0,
+                output: response.usage?.output_tokens ?? 0,
+                input_cached_tokens: stepCacheRead,
+                input_cache_creation_5m: stepCacheCreation5m,
+                input_cache_creation_1h: stepCacheCreation1h,
+                total:
+                  (response.usage?.input_tokens ?? 0) +
+                  (response.usage?.output_tokens ?? 0) +
+                  stepCacheRead +
+                  stepCacheCreation5m +
+                  stepCacheCreation1h,
+              }),
+            );
+            generationSpan.setAttribute(
+              ATTR.GEN_AI_INPUT_TOKENS,
+              response.usage?.input_tokens ?? 0,
+            );
+            generationSpan.setAttribute(
+              ATTR.GEN_AI_OUTPUT_TOKENS,
+              response.usage?.output_tokens ?? 0,
+            );
+            if (response.stop_reason) {
+              generationSpan.setAttribute(
+                ATTR.GEN_AI_FINISH_REASON,
+                response.stop_reason,
+              );
+            }
+            generationSpan.setStatus({ code: SpanStatusCode.OK });
+          } finally {
+            generationSpan.end();
+          }
 
           const toolUseBlocks = (
             response.content as VertexAnthropicContentBlock[]
@@ -3313,6 +3491,54 @@ export class GoogleVertexProvider extends BaseProvider {
               args: toolUse.input,
             });
 
+            // One tool observation per execution. ai.toolCall.* names follow the
+            // Vercel AI SDK convention so existing tooling keeps working.
+            const toolSpan = tracers.mcp.startSpan(
+              "ai.toolCall",
+              {
+                kind: SpanKind.INTERNAL,
+                attributes: {
+                  [LANGFUSE_ATTR.OBSERVATION_TYPE]: "tool",
+                  [ATTR.GEN_AI_TOOL_NAME]: toolUse.name,
+                  "ai.toolCall.name": toolUse.name,
+                  "ai.toolCall.id": toolUse.id,
+                  "ai.toolCall.args": spanJsonAttribute(toolUse.input, 20_000),
+                  [LANGFUSE_ATTR.OBSERVATION_INPUT]: spanJsonAttribute(
+                    toolUse.input,
+                    20_000,
+                  ),
+                  [LANGFUSE_ATTR.OBSERVATION_METADATA]: spanJsonAttribute({
+                    step,
+                  }),
+                },
+              },
+              turnContext,
+            );
+            const endToolSpan = (output: unknown, errorMessage?: string) => {
+              toolSpan.setAttribute(
+                "ai.toolCall.result",
+                spanJsonAttribute(output),
+              );
+              toolSpan.setAttribute(
+                LANGFUSE_ATTR.OBSERVATION_OUTPUT,
+                spanJsonAttribute(output),
+              );
+              if (errorMessage) {
+                toolSpan.setAttribute(LANGFUSE_ATTR.OBSERVATION_LEVEL, "ERROR");
+                toolSpan.setAttribute(
+                  LANGFUSE_ATTR.OBSERVATION_STATUS_MESSAGE,
+                  errorMessage,
+                );
+                toolSpan.setStatus({
+                  code: SpanStatusCode.ERROR,
+                  message: errorMessage,
+                });
+              } else {
+                toolSpan.setStatus({ code: SpanStatusCode.OK });
+              }
+              toolSpan.end();
+            };
+
             const execute = executeMap.get(toolUse.name);
             if (execute) {
               try {
@@ -3321,7 +3547,16 @@ export class GoogleVertexProvider extends BaseProvider {
                   messages: [],
                   abortSignal: options.abortSignal,
                 };
-                const result = await execute(toolUse.input, toolOptions);
+                // Run with toolSpan active so spans inside execute
+                // (neurolink.tool.execute) nest under this observation instead
+                // of becoming disconnected siblings.
+                const result = await otelContext.with(
+                  otelTrace.setSpan(turnContext, toolSpan),
+                  () => execute(toolUse.input, toolOptions),
+                );
+                // MCP failures are returned, not thrown — surface them on
+                // the span so failed calls show as ERROR in Langfuse.
+                endToolSpan(result, extractMcpToolErrorMessage(result));
                 toolExecutions.push({
                   name: toolUse.name,
                   input: toolUse.input,
@@ -3347,6 +3582,7 @@ export class GoogleVertexProvider extends BaseProvider {
               } catch (err) {
                 const errMsg = `Error executing tool "${toolUse.name}": ${err instanceof Error ? err.message : String(err)}`;
                 const errorPayload = { error: errMsg };
+                endToolSpan(errorPayload, errMsg);
                 toolExecutions.push({
                   name: toolUse.name,
                   input: toolUse.input,
@@ -3366,6 +3602,7 @@ export class GoogleVertexProvider extends BaseProvider {
             } else {
               const errMsg = `TOOL_NOT_FOUND: The tool "${toolUse.name}" does not exist.`;
               const errorPayload = { error: errMsg };
+              endToolSpan(errorPayload, errMsg);
               toolExecutions.push({
                 name: toolUse.name,
                 input: toolUse.input,
@@ -3427,11 +3664,54 @@ export class GoogleVertexProvider extends BaseProvider {
         metadata.totalToolExecutions = allToolCalls.filter(
           (tc) => tc.toolName !== "final_result",
         ).length;
+
+        const turnOutputAttribute = spanJsonAttribute({
+          text: aggregatedTurnText,
+          ...(structuredOutputRef.value
+            ? { structuredOutput: structuredOutputRef.value }
+            : {}),
+        });
+        turnSpan.setAttribute(
+          LANGFUSE_ATTR.OBSERVATION_OUTPUT,
+          turnOutputAttribute,
+        );
+        turnSpan.setAttribute(LANGFUSE_ATTR.TRACE_OUTPUT, turnOutputAttribute);
+        // Turn usage is metadata-only (not usage_details) — see the note at the
+        // top of this method on why it must not contribute to the cost rollup.
+        turnSpan.setAttribute(
+          LANGFUSE_ATTR.OBSERVATION_METADATA,
+          spanJsonAttribute({
+            toolsOffered: offeredToolNames,
+            toolCount: offeredToolNames.length,
+            maxSteps,
+            steps: step,
+            toolCallCount: metadata.totalToolExecutions,
+            toolsCalled: toolsUsedRef.filter((name) => name !== "final_result"),
+            structuredOutput: useFinalResultTool,
+            usage: {
+              input: usage.input,
+              output: usage.output,
+              input_cached_tokens: turnCacheUsage.read,
+              input_cache_creation: turnCacheUsage.creation,
+              input_cache_creation_5m: turnCacheUsage.creation5m,
+              input_cache_creation_1h: turnCacheUsage.creation1h,
+            },
+          }),
+        );
+        turnSpan.setStatus({ code: SpanStatusCode.OK });
         channel.close();
       } catch (err) {
+        turnSpan.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        if (err instanceof Error) {
+          turnSpan.recordException(err);
+        }
         logger.error("[GoogleVertex] Native Anthropic SDK stream error", err);
         channel.error(this.handleProviderError(err));
       } finally {
+        turnSpan.end();
         options.abortSignal?.removeEventListener("abort", abortHandler);
         clearTimeout(streamTimeoutHandle);
       }
@@ -4425,6 +4705,19 @@ export class GoogleVertexProvider extends BaseProvider {
           (mergedOptions as { prompt?: string }).prompt ||
           "";
 
+        // Set generation input before the call so error paths still carry the
+        // request; output is set after the native call resolves.
+        const generationInputAttribute = spanJsonAttribute({
+          ...(mergedOptions.systemPrompt
+            ? { system: mergedOptions.systemPrompt }
+            : {}),
+          prompt: inputPrompt,
+        });
+        generateSpan.setAttribute(
+          LANGFUSE_ATTR.OBSERVATION_INPUT,
+          generationInputAttribute,
+        );
+
         try {
           let result: EnhancedGenerateResult;
           // Wrap the actual native generate call in `neurolink.executeGeneration`
@@ -4442,9 +4735,11 @@ export class GoogleVertexProvider extends BaseProvider {
                 "neurolink.path": isAnthropicModel(modelName)
                   ? "native.anthropic"
                   : "native.google-genai",
+                [LANGFUSE_ATTR.OBSERVATION_INPUT]: generationInputAttribute,
               },
             },
-            async () => {
+            async (executionSpan) => {
+              let nativeResult: EnhancedGenerateResult;
               if (isAnthropicModel(modelName)) {
                 logger.info(
                   "[GoogleVertex] Routing Claude generate to native @anthropic-ai/vertex-sdk",
@@ -4453,16 +4748,24 @@ export class GoogleVertexProvider extends BaseProvider {
                     totalToolCount: Object.keys(mergedOptions.tools).length,
                   },
                 );
-                return this.executeNativeAnthropicGenerate(mergedOptions);
+                nativeResult =
+                  await this.executeNativeAnthropicGenerate(mergedOptions);
+              } else {
+                logger.info(
+                  "[GoogleVertex] Routing Gemini generate to native @google/genai",
+                  {
+                    model: modelName,
+                    totalToolCount: Object.keys(mergedOptions.tools).length,
+                  },
+                );
+                nativeResult =
+                  await this.executeNativeGemini3Generate(mergedOptions);
               }
-              logger.info(
-                "[GoogleVertex] Routing Gemini generate to native @google/genai",
-                {
-                  model: modelName,
-                  totalToolCount: Object.keys(mergedOptions.tools).length,
-                },
+              executionSpan.setAttribute(
+                LANGFUSE_ATTR.OBSERVATION_OUTPUT,
+                spanJsonAttribute(nativeResult?.content ?? ""),
               );
-              return this.executeNativeGemini3Generate(mergedOptions);
+              return nativeResult;
             },
           );
           this.attachUsageAndCostAttributes(
@@ -4475,6 +4778,10 @@ export class GoogleVertexProvider extends BaseProvider {
           // enabled / useAiResponse is false, so the cost is zero on
           // non-TTS paths.
           result = await this.synthesizeAIResponseIfNeeded(result, options);
+          generateSpan.setAttribute(
+            LANGFUSE_ATTR.OBSERVATION_OUTPUT,
+            spanJsonAttribute(result?.content ?? ""),
+          );
           // Fire onFinish lifecycle callback for the native generate path.
           // Pipeline A providers get this for free via the AI SDK middleware
           // wrapper (LifecycleMiddleware); native @google/genai bypasses

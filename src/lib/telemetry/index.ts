@@ -9,7 +9,12 @@ export {
   withStreamSpan,
   withClientStreamSpan,
 } from "./withSpan.js";
-export { ATTR } from "./attributes.js";
+export {
+  ATTR,
+  LANGFUSE_ATTR,
+  SPAN_ATTRIBUTE_MAX_CHARS,
+  spanJsonAttribute,
+} from "./attributes.js";
 import { logger } from "../utils/logger.js";
 
 /**

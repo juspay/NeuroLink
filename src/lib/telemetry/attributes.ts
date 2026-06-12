@@ -114,3 +114,55 @@ export const ATTR = {
   AR_DESCRIPTION: "autoresearch.description",
   AR_ERROR_CODE: "autoresearch.error_code",
 } as const;
+
+/**
+ * Langfuse observation/trace attribute names recognised by `@langfuse/otel`'s
+ * LangfuseSpanProcessor (already registered on the global TracerProvider). They
+ * let native (non-AI-SDK) provider paths emit spans that render as proper
+ * generation / tool observations — the same data the Vercel AI SDK's
+ * `experimental_telemetry` produced before providers moved to native SDKs.
+ */
+export const LANGFUSE_ATTR = {
+  TRACE_NAME: "langfuse.trace.name",
+  TRACE_INPUT: "langfuse.trace.input",
+  TRACE_OUTPUT: "langfuse.trace.output",
+  OBSERVATION_TYPE: "langfuse.observation.type",
+  OBSERVATION_INPUT: "langfuse.observation.input",
+  OBSERVATION_OUTPUT: "langfuse.observation.output",
+  OBSERVATION_METADATA: "langfuse.observation.metadata",
+  OBSERVATION_MODEL_NAME: "langfuse.observation.model.name",
+  OBSERVATION_MODEL_PARAMETERS: "langfuse.observation.model.parameters",
+  OBSERVATION_USAGE_DETAILS: "langfuse.observation.usage_details",
+  OBSERVATION_LEVEL: "langfuse.observation.level",
+  OBSERVATION_STATUS_MESSAGE: "langfuse.observation.status_message",
+  OBSERVATION_COMPLETION_START_TIME:
+    "langfuse.observation.completion_start_time",
+} as const;
+
+/** Default ceiling for serialized span attribute values. */
+export const SPAN_ATTRIBUTE_MAX_CHARS = 40_000;
+
+/**
+ * Serialize an arbitrary value for a span attribute, hard-capped at
+ * `maxChars` so a pathological prompt or tool result can't put megabytes
+ * on a single span. Strings pass through unserialized; everything else is
+ * JSON-stringified with a String() fallback for circular structures.
+ */
+export function spanJsonAttribute(
+  value: unknown,
+  maxChars: number = SPAN_ATTRIBUTE_MAX_CHARS,
+): string {
+  let serialized: string;
+  try {
+    serialized =
+      typeof value === "string"
+        ? value
+        : (JSON.stringify(value) ?? String(value));
+  } catch {
+    serialized = String(value);
+  }
+  if (serialized.length > maxChars) {
+    return `${serialized.slice(0, maxChars)}...[truncated ${serialized.length - maxChars} chars]`;
+  }
+  return serialized;
+}

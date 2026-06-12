@@ -35,3 +35,41 @@ export function extractMcpErrorText(raw: unknown): string {
     .map((c) => c.text);
   return texts.join(" ").substring(0, 500);
 }
+
+/**
+ * MCP tools signal failure by RETURNING `{ isError: true, ... }`, not throwing,
+ * so execute()'s try/catch never sees it. Returns a capped status message for
+ * failures (undefined for success) for the caller to set the span error level.
+ *
+ * Generic over input shape: accepts either a result object or a JSON-stringified
+ * envelope (different providers hand back different shapes), mirroring
+ * `extractMcpErrorText`. A non-JSON string has no `isError` field, so it is
+ * correctly treated as "not an error" (→ undefined).
+ *
+ * Layered on `extractMcpErrorText`: this adds the `isError === true` gate and
+ * the human-readable "MCP tool returned isError: …" prefix, while the shared
+ * helper owns the content parsing and the 500-char cap. When `isError` is set
+ * but no readable text is present, falls back to a generic message.
+ */
+export function extractMcpToolErrorMessage(
+  result: unknown,
+): string | undefined {
+  let resultObj: unknown = result;
+  if (typeof resultObj === "string") {
+    try {
+      resultObj = JSON.parse(resultObj);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!resultObj || typeof resultObj !== "object") {
+    return undefined;
+  }
+  if ((resultObj as { isError?: unknown }).isError !== true) {
+    return undefined;
+  }
+  const text = extractMcpErrorText(resultObj);
+  return text
+    ? `MCP tool returned isError: ${text}`
+    : "MCP tool returned isError: true";
+}

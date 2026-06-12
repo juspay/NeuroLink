@@ -9,7 +9,12 @@
 
 import type { LangfuseSpanProcessor as LangfuseSpanProcessorType } from "@langfuse/otel";
 import type { Context } from "@opentelemetry/api";
-import { metrics, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  metrics,
+  SpanStatusCode,
+  trace,
+  type Span as ApiSpan,
+} from "@opentelemetry/api";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
@@ -41,6 +46,7 @@ import type {
 } from "../../../../types/index.js";
 import { extractMcpErrorText } from "../../../../utils/mcpErrorText.js";
 import { logger } from "../../../../utils/logger.js";
+import { LANGFUSE_ATTR } from "../../../../telemetry/attributes.js";
 
 const LOG_PREFIX = "[OpenTelemetry]";
 
@@ -1444,6 +1450,50 @@ export async function setLangfuseContext<T = void>(
  */
 export function getLangfuseContext(): LangfuseContext | undefined {
   return contextStorage.getStore();
+}
+
+/**
+ * Fill a span's Langfuse identity when the caller's context would otherwise
+ * fall back to "guest". Identity (user.id / session.id) is set additively —
+ * only fields ambient context didn't already provide, so a host's own context
+ * is never overridden. trace.name (the title) is rescued only when no ambient
+ * name source exists AND this span is the trace root, mirroring
+ * ContextEnricher.onStart so a host wrapper span isn't relabelled.
+ */
+export function stampGuestRescueIdentity(
+  span: ApiSpan,
+  callContext: unknown,
+  isRootSpan: boolean,
+): void {
+  const ambient = getLangfuseContext();
+  const ctx = callContext as Record<string, unknown> | undefined;
+  const userId =
+    typeof ctx?.userId === "string" && ctx.userId ? ctx.userId : undefined;
+  const sessionId =
+    typeof ctx?.sessionId === "string" && ctx.sessionId
+      ? ctx.sessionId
+      : undefined;
+
+  // Title: the trace name comes from traceName ?? userId, so only rescue it
+  // from "guest" when ambient has neither, and only on the trace root.
+  if (isRootSpan && !ambient?.traceName && !ambient?.userId) {
+    const traceName =
+      typeof ctx?.traceName === "string" && ctx.traceName
+        ? ctx.traceName
+        : userId;
+    if (traceName) {
+      span.setAttribute(LANGFUSE_ATTR.TRACE_NAME, traceName);
+      span.setAttribute("trace.name", traceName);
+    }
+  }
+
+  // Identity: additive — set each field only where ambient didn't.
+  if (userId && !ambient?.userId) {
+    span.setAttribute("user.id", userId);
+  }
+  if (sessionId && !ambient?.sessionId) {
+    span.setAttribute("session.id", sessionId);
+  }
 }
 
 /**

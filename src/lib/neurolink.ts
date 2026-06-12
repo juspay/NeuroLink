@@ -164,12 +164,14 @@ import {
 import { SpanSerializer } from "./observability/utils/spanSerializer.js";
 import {
   flushOpenTelemetry,
+  getLangfuseContext,
   getLangfuseHealthStatus,
   initializeOpenTelemetry,
   isOpenTelemetryInitialized,
   runWithCurrentLangfuseContext,
   setLangfuseContext,
   shutdownOpenTelemetry,
+  stampGuestRescueIdentity,
 } from "./services/server/ai/observability/instrumentation.js";
 import { TaskManager } from "./tasks/taskManager.js";
 import { createTaskTools } from "./tasks/tools/taskTools.js";
@@ -1941,11 +1943,9 @@ Current user's request: ${currentInput}`;
     responseContent: string,
     userId: string,
     additionalUsers?: AdditionalMemoryUser[],
+    langfuseIdentity?: { traceName?: string | null; sessionId?: string | null },
   ): void {
-    // Preserve AsyncLocalStorage context across setImmediate boundary so that
-    // memory writes appear under the originating Langfuse trace instead of
-    // becoming orphan spans.
-    const wrappedMemoryWrite = runWithCurrentLangfuseContext(async () => {
+    const memoryWrite = async () => {
       try {
         const client = this.ensureMemoryReady();
         if (!client) {
@@ -1981,7 +1981,27 @@ Current user's request: ${currentInput}`;
       } catch (error) {
         logger.warn("Memory storage failed:", error);
       }
-    });
+    };
+
+    // Carry the turn's identity across the setImmediate boundary so the
+    // condensation generate + redis spans don't orphan to "guest". Keep the
+    // ambient store when it survived (generate path — carries conversationId,
+    // metadata, …); re-establish from the caller only when it was lost (stream
+    // path, which fires after the caller consumed the stream).
+    const ambient = getLangfuseContext();
+    const wrappedMemoryWrite =
+      !(ambient?.traceName || ambient?.userId) &&
+      (langfuseIdentity?.traceName || langfuseIdentity?.sessionId)
+        ? () =>
+            setLangfuseContext(
+              {
+                userId,
+                sessionId: langfuseIdentity.sessionId ?? null,
+                traceName: langfuseIdentity.traceName ?? null,
+              },
+              memoryWrite,
+            )
+        : runWithCurrentLangfuseContext(memoryWrite);
     setImmediate(wrappedMemoryWrite);
   }
 
@@ -3693,13 +3713,24 @@ Current user's request: ${currentInput}`;
       return await this.runWithFallbackOrchestration(
         optionsOrPrompt,
         "generate",
-        (opts) =>
-          tracers.sdk.startActiveSpan(
+        (opts) => {
+          // Capture root-ness before startActiveSpan makes generateSpan active.
+          // The actual guest-rescue stamp is deferred to executeGenerateRequest,
+          // AFTER prepareGenerateRequest merges auth/requestContext-derived
+          // identity into options.context — otherwise an auth:{token} caller
+          // with no pre-set context.userId would stamp the root span as guest.
+          const generateIsRoot = !trace.getSpan(context.active());
+          return tracers.sdk.startActiveSpan(
             "neurolink.generate",
             { kind: SpanKind.INTERNAL },
             (generateSpan) =>
-              this.executeGenerateWithMetricsContext(opts, generateSpan),
-          ),
+              this.executeGenerateWithMetricsContext(
+                opts,
+                generateSpan,
+                generateIsRoot,
+              ),
+          );
+        },
       );
     } catch (error) {
       // Lifecycle middleware (wrapGenerate.catch in builtin/lifecycle.ts)
@@ -3933,16 +3964,19 @@ Current user's request: ${currentInput}`;
   private async executeGenerateWithMetricsContext(
     optionsOrPrompt: GenerateOptions | DynamicOptions | string,
     generateSpan: ReturnType<typeof tracers.sdk.startSpan>,
+    isRootSpan: boolean,
   ): Promise<GenerateResult> {
     return metricsTraceContextStorage.run(
       this.createMetricsTraceContext(),
-      () => this.executeGenerateRequest(optionsOrPrompt, generateSpan),
+      () =>
+        this.executeGenerateRequest(optionsOrPrompt, generateSpan, isRootSpan),
     );
   }
 
   private async executeGenerateRequest(
     optionsOrPrompt: GenerateOptions | DynamicOptions | string,
     generateSpan: ReturnType<typeof tracers.sdk.startSpan>,
+    isRootSpan: boolean,
   ): Promise<GenerateResult> {
     let resolvedOptions: GenerateOptions | undefined;
     try {
@@ -3951,6 +3985,9 @@ Current user's request: ${currentInput}`;
         generateSpan,
       );
       resolvedOptions = options;
+      // Stamp now that prepareGenerateRequest has merged any auth/requestContext
+      // identity into options.context (see capture of isRootSpan in generate()).
+      stampGuestRescueIdentity(generateSpan, options.context, isRootSpan);
       const earlyResult = await this.maybeHandleEarlyGenerateResult(
         options,
         generateSpan,
@@ -4742,6 +4779,7 @@ Current user's request: ${currentInput}`;
         generateResult.content.trim(),
         options.context.userId as string,
         options.memory?.additionalUsers,
+        options.context as { traceName?: string; sessionId?: string },
       );
     }
   }
@@ -7511,12 +7549,22 @@ Current user's request: ${currentInput}`;
         [ATTR.NL_PROVIDER]: (options.provider as string) || "default",
         [ATTR.GEN_AI_MODEL]: options.model || "default",
         [ATTR.NL_INPUT_LENGTH]: options.input?.text?.length || 0,
-        [ATTR.NL_HAS_TOOLS]: !!(
-          options.tools && Object.keys(options.tools).length > 0
-        ),
+        // Count registered custom tools too — chat hosts put their MCP tools
+        // in the registry, so options.tools alone under-reports.
+        [ATTR.NL_HAS_TOOLS]:
+          !options.disableTools &&
+          (!!(options.tools && Object.keys(options.tools).length > 0) ||
+            this.getCustomTools().size > 0),
         [ATTR.NL_STREAM_MODE]: true,
       },
     });
+
+    // streamSpan isn't active yet, so context.active() is its parent — empty =
+    // root. Capture root-ness here, but defer the actual guest-rescue stamp to
+    // after validateStreamRequestOptions merges auth/requestContext identity
+    // into options.context (below) — otherwise an auth:{token} caller with no
+    // pre-set context.userId would stamp the root span as guest.
+    const streamIsRoot = !trace.getSpan(context.active());
     const spanStartTime = Date.now();
     this._disableToolCacheForCurrentRequest = !!options.disableToolCache;
 
@@ -7569,6 +7617,9 @@ Current user's request: ${currentInput}`;
       options.fileRegistry = this.fileRegistry;
       await this.validateStreamRequestOptions(options, startTime);
 
+      // options.context now carries any auth/requestContext-derived identity.
+      stampGuestRescueIdentity(streamSpan, options.context, streamIsRoot);
+
       const workflowResult = await this.maybeHandleWorkflowStreamRequest({
         options,
         startTime,
@@ -7578,6 +7629,10 @@ Current user's request: ${currentInput}`;
       if (workflowResult) {
         return workflowResult;
       }
+
+      // Make neurolink.stream the active span so every provider span (generations,
+      // tool calls) parents under it — one Langfuse trace per turn, not a forest.
+      const streamSpanContext = trace.setSpan(context.active(), streamSpan);
 
       // TTS Mode 2 deferred: stream() emits text first, then synthesizes the
       // accumulated response into a single audio chunk at end-of-stream and
@@ -7598,9 +7653,8 @@ Current user's request: ${currentInput}`;
           })
         : undefined;
 
-      const streamResult = await this.setLangfuseContextFromOptions(
-        options,
-        () =>
+      const streamResult = await context.with(streamSpanContext, () =>
+        this.setLangfuseContextFromOptions(options, () =>
           this.runStandardStreamRequest({
             options,
             streamSpan,
@@ -7611,6 +7665,7 @@ Current user's request: ${currentInput}`;
             originalPrompt,
             ttsResolver: resolveStreamTtsAudio,
           }),
+        ),
       );
       if (streamSttTranscription) {
         streamResult.transcription = streamSttTranscription;
@@ -8884,6 +8939,7 @@ Current user's request: ${currentInput}`;
         accumulatedContent.trim(),
         enhancedOptions.context?.userId as string,
         enhancedOptions.memory?.additionalUsers,
+        enhancedOptions.context as { traceName?: string; sessionId?: string },
       );
     }
   }

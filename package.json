@@ -104,6 +104,7 @@
     "test:log-sanitize": "npx tsx test/continuous-test-suite-log-sanitize.ts",
     "test:sse-client": "npx tsx test/continuous-test-suite-sse-client.ts",
     "test:stream-span": "npx tsx test/continuous-test-suite-stream-span.ts",
+    "test:vertex-langfuse-spans": "npx tsx test/continuous-test-suite-vertex-langfuse-spans.ts",
     "test:credentials": "npx tsx test/continuous-test-suite-credentials.ts",
     "test:dynamic": "npx tsx test/continuous-test-suite-dynamic.ts",
     "test:proxy": "npx tsx test/continuous-test-suite-proxy.ts",
