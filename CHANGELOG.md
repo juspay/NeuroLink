@@ -1,3 +1,9 @@
+## [9.70.3](https://github.com/juspay/neurolink/compare/v9.70.2...v9.70.3) (2026-06-13)
+
+### Bug Fixes
+
+- **(providers):** detect image MIME from magic bytes on native Vertex path ([0917919](https://github.com/juspay/neurolink/commit/0917919787740ee3f4f33c0ed6327fc865356ad5))
+
 ## [9.70.2](https://github.com/juspay/neurolink/compare/v9.70.1...v9.70.2) (2026-06-12)
 
 ### Bug Fixes
