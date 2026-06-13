@@ -1,3 +1,9 @@
+## [9.70.6](https://github.com/juspay/neurolink/compare/v9.70.5...v9.70.6) (2026-06-13)
+
+### Bug Fixes
+
+- **(fallback):** abort on deterministic 400 errors embedded in provider messages ([b2b95b5](https://github.com/juspay/neurolink/commit/b2b95b5bad4c8361281cde4a18b2e30eb5395a0e))
+
 ## [9.70.5](https://github.com/juspay/neurolink/compare/v9.70.4...v9.70.5) (2026-06-13)
 
 ### Bug Fixes
