@@ -56,6 +56,78 @@ function parseOrRepair(
   }
 }
 
+/** Bounds the recursive nested-string unwrap against pathological inputs. */
+const MAX_NESTED_UNWRAP_DEPTH = 6;
+
+/**
+ * Recursively replace any string-valued field whose content is itself a JSON
+ * object/array with the parsed value. Models sometimes double-encode a NESTED
+ * field — e.g. `{ "attachment": "{\"k\":1}" }` instead of
+ * `{ "attachment": { "k": 1 } }` — which fails schema validation even though the
+ * intended object is right there. (`coerceJsonToSchema` already unwraps a
+ * stringified TOP-LEVEL object; this handles the nested case.)
+ *
+ * A parsed string is NOT re-descended into: its own string fields (e.g. an
+ * attachment's `content`) are the model's intended values and must be left
+ * alone. Recursion only walks already-structural objects/arrays to find
+ * stringified fields anywhere in the tree. Returns a NEW value (never mutates
+ * the input) plus whether anything changed, so the caller can skip a redundant
+ * re-validation when nothing was unwrapped. Callers MUST re-validate the result
+ * against the schema — that gate is what keeps an over-eager unwrap (a field
+ * that should stay a string) from being accepted.
+ */
+function deepUnwrapJsonStrings(
+  value: unknown,
+  depth = 0,
+): { value: unknown; changed: boolean } {
+  if (depth > MAX_NESTED_UNWRAP_DEPTH) {
+    return { value, changed: false };
+  }
+  if (typeof value === "string") {
+    const s = value.trim();
+    const looksJson =
+      (s.startsWith("{") && s.endsWith("}")) ||
+      (s.startsWith("[") && s.endsWith("]"));
+    if (looksJson) {
+      try {
+        const parsed: unknown = JSON.parse(s);
+        if (parsed !== null && typeof parsed === "object") {
+          // Parsed one stringified layer. Do NOT descend into `parsed` — its
+          // own string fields are intended values, not double-encodings.
+          return { value: parsed, changed: true };
+        }
+      } catch {
+        // not JSON — leave the string as-is
+      }
+    }
+    return { value, changed: false };
+  }
+  if (Array.isArray(value)) {
+    let changed = false;
+    const out = value.map((item) => {
+      const r = deepUnwrapJsonStrings(item, depth + 1);
+      if (r.changed) {
+        changed = true;
+      }
+      return r.value;
+    });
+    return { value: changed ? out : value, changed };
+  }
+  if (value !== null && typeof value === "object") {
+    let changed = false;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const r = deepUnwrapJsonStrings(v, depth + 1);
+      if (r.changed) {
+        changed = true;
+      }
+      out[k] = r.value;
+    }
+    return { value: changed ? out : value, changed };
+  }
+  return { value, changed: false };
+}
+
 /**
  * Try to produce canonical JSON from `text`. Returns null when no JSON object
  * could be recovered (caller should then keep the raw text).
@@ -170,6 +242,25 @@ export function coerceJsonToSchema(
     };
     if (safeParseable.safeParse(outcome.value).success) {
       schemaValid.push(record);
+    } else {
+      // The model may have double-encoded a NESTED field as a JSON string
+      // (e.g. `{"attachment":"{...}"}` instead of `{"attachment":{...}}`),
+      // which fails validation even though the intended object is present.
+      // Unwrap stringified object/array fields and re-validate before giving
+      // up — the safeParse gate rejects any over-eager unwrap.
+      const unwrapped = deepUnwrapJsonStrings(outcome.value);
+      if (
+        unwrapped.changed &&
+        unwrapped.value !== null &&
+        typeof unwrapped.value === "object" &&
+        safeParseable.safeParse(unwrapped.value).success
+      ) {
+        schemaValid.push({
+          value: unwrapped.value,
+          repaired: true,
+          truncated: candidate.truncated,
+        });
+      }
     }
   }
 
