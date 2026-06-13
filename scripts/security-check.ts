@@ -40,10 +40,18 @@ const CRITICAL_SECURITY_RULES = [
 // TODO: Address these vulnerabilities in a separate security update
 const IGNORED_VULNERABLE_PACKAGES = [
   "jsondiffpatch", // XSS in ai dependency - tracked separately
-  "undici", // DoS in transitive dependency - requires upstream fix
   "ai", // File upload bypass - planned upgrade
-  "lodash", // TODO: track in #xxx — no patch available upstream for @semantic-release dev dep
-  "lodash-es", // TODO: track in #xxx — no patch available upstream for @semantic-release dev dep
+  // undici/lodash/lodash-es removed: now patched via pnpm.overrides in this change.
+  // The @opentelemetry/* advisories below come ONLY from a stale @juspay/neurolink@9.37.0
+  // that pnpm auto-installs to satisfy @juspay/hippocampus's ">=9.0.0" peer dependency.
+  // That old neurolink directly depends on the vulnerable OTEL; the latest published
+  // neurolink (>=9.70.x) removed those deps. They are a dev-install artifact and do NOT
+  // reach consumers of the published package (peer deps are not bundled). They are not
+  // fixable from this repo via pnpm.overrides (auto-installed peers ignore overrides).
+  // Real fix tracked upstream: https://github.com/juspay/hippocampus
+  "@opentelemetry/sdk-node",
+  "@opentelemetry/auto-instrumentations-node",
+  "@opentelemetry/exporter-prometheus",
 ];
 
 interface SecurityIssue {
