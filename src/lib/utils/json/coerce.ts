@@ -107,12 +107,38 @@ export function coerceJsonToSchema(
     candidates.push({ text: text.slice(firstOpen), truncated: true });
   }
 
+  // JSON-string-literal wrapper: some providers double-encode and return the
+  // object as a JSON *string* (e.g. `"{\"k\":1}"`). Unwrap one layer and add
+  // the inner text's balanced spans as candidates so the object is recovered.
+  const literal = text.trim();
+  if (literal.length > 1 && literal.startsWith('"') && literal.endsWith('"')) {
+    try {
+      const inner: unknown = JSON.parse(literal);
+      if (typeof inner === "string") {
+        let innerFrom = 0;
+        for (;;) {
+          const innerSpan = nextBalancedJsonSpan(inner, innerFrom);
+          if (!innerSpan) {
+            break;
+          }
+          candidates.push({ text: innerSpan.span, truncated: false });
+          innerFrom = innerSpan.end;
+        }
+      }
+    } catch {
+      // not a string literal — ignore
+    }
+  }
+
   let firstValid:
     | { value: unknown; repaired: boolean; truncated: boolean }
     | undefined;
-  let schemaMatch:
-    | { value: unknown; repaired: boolean; truncated: boolean }
-    | undefined;
+  const schemaValid: Array<{
+    value: unknown;
+    repaired: boolean;
+    truncated: boolean;
+  }> = [];
+  const hasSchema = !!(schema && hasSafeParse(schema));
   const seen = new Set<string>();
   for (const candidate of candidates) {
     if (seen.has(candidate.text)) {
@@ -135,19 +161,31 @@ export function coerceJsonToSchema(
     if (firstValid === undefined) {
       firstValid = record;
     }
-    if (schema && hasSafeParse(schema)) {
-      const safeParseable = schema as {
-        safeParse: (v: unknown) => { success: boolean };
-      };
-      if (safeParseable.safeParse(outcome.value).success) {
-        schemaMatch = record;
-        break;
-      }
-    } else {
+    if (!hasSchema) {
       // No Zod schema to discriminate — first parseable object wins.
       break;
     }
+    const safeParseable = schema as {
+      safeParse: (v: unknown) => { success: boolean };
+    };
+    if (safeParseable.safeParse(outcome.value).success) {
+      schemaValid.push(record);
+    }
   }
+
+  // Among schema-valid candidates prefer the MOST COMPLETE one. With nullable
+  // fields a lean object (e.g. `{summary, attachment: null}`) validates
+  // alongside the full object, so breaking on the first match would drop the
+  // richer payload (the classic preamble-then-real-answer case). Pick the
+  // candidate whose serialized form carries the most content.
+  const schemaMatch =
+    schemaValid.length > 0
+      ? schemaValid.reduce((best, cur) =>
+          JSON.stringify(cur.value).length > JSON.stringify(best.value).length
+            ? cur
+            : best,
+        )
+      : undefined;
 
   const chosen = schemaMatch ?? firstValid;
   if (chosen === undefined) {
