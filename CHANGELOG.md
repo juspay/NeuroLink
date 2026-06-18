@@ -1,3 +1,9 @@
+## [9.73.0](https://github.com/juspay/neurolink/compare/v9.72.0...v9.73.0) (2026-06-18)
+
+### Features
+
+- **(voice):** add support for s2s agent in neurolink through livekit ([ad76017](https://github.com/juspay/neurolink/commit/ad76017834e22ff589b485706e65b55dce1c05ec))
+
 ## [9.72.0](https://github.com/juspay/neurolink/compare/v9.71.0...v9.72.0) (2026-06-17)
 
 ### Features
