@@ -1,3 +1,9 @@
+## [9.77.0](https://github.com/juspay/neurolink/compare/v9.76.0...v9.77.0) (2026-06-20)
+
+### Features
+
+- **(routing):** model-tier router + multi-provider ModelPool with error-class fallback ([cea22bd](https://github.com/juspay/neurolink/commit/cea22bda59d6e5c0f5cd797e60591216f13fe516))
+
 ## [9.76.0](https://github.com/juspay/neurolink/compare/v9.75.0...v9.76.0) (2026-06-20)
 
 ### Features
