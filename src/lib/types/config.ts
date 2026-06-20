@@ -25,6 +25,8 @@ import type {
   AuthenticatedContext,
 } from "./auth.js";
 import type { NeurolinkCredentials } from "./providers.js";
+import type { ModelPoolConfig } from "./modelPool.js";
+import type { RequestRouter } from "./requestRouter.js";
 
 /**
  * Main NeuroLink configuration type
@@ -105,6 +107,22 @@ export type NeurolinkConstructorConfig = {
    * See {@link ToolDedupConfig}.
    */
   toolDedup?: ToolDedupConfig;
+  /**
+   * Multi-provider pool for error-class-aware failover with per-member
+   * cooldown. When set, generate() and stream() source their candidate
+   * provider sequence from the pool instead of (or in addition to) the
+   * static providerPriority fallback. Fails open: a pool error leaves
+   * existing behavior unchanged.
+   */
+  modelPool?: ModelPoolConfig;
+  /**
+   * Pluggable pre-call router: inspects lightweight request characteristics
+   * (token estimate, tools, vision, thinkingLevel) and returns an optional
+   * provider/model/region override. Only runs when the caller did NOT
+   * explicitly set options.provider/options.model. Fails open: a router
+   * error proceeds unrouted.
+   */
+  requestRouter?: RequestRouter;
 };
 
 /**
