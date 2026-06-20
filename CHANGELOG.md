@@ -1,3 +1,9 @@
+## [9.76.0](https://github.com/juspay/neurolink/compare/v9.75.0...v9.76.0) (2026-06-20)
+
+### Features
+
+- **(tools):** opt-in signature-similarity tool deduplication ([ec09464](https://github.com/juspay/neurolink/commit/ec09464031f89e6c8e39660baf0c80bbdf7222a3))
+
 ## [9.75.0](https://github.com/juspay/neurolink/compare/v9.74.0...v9.75.0) (2026-06-20)
 
 ### Features
