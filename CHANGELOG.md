@@ -1,3 +1,9 @@
+## [9.75.0](https://github.com/juspay/neurolink/compare/v9.74.0...v9.75.0) (2026-06-20)
+
+### Features
+
+- **(cli):** surface tool-routing config via CLI flags ([9ad353f](https://github.com/juspay/neurolink/commit/9ad353fa98759bee21ff79b14aa08d2bacfbaf7e))
+
 ## [9.74.0](https://github.com/juspay/neurolink/compare/v9.73.0...v9.74.0) (2026-06-20)
 
 ### Features
