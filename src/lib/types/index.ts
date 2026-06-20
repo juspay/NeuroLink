@@ -83,3 +83,9 @@ export * from "./replicate.js";
 
 // Safe-fetch helper types (SSRF-hardened download)
 export * from "./safeFetch.js";
+
+// ModelPool — multi-provider failover with per-member cooldown (M9.x+)
+export * from "./modelPool.js";
+
+// RequestRouter — pluggable pre-call provider/model selection (M9.x+)
+export * from "./requestRouter.js";

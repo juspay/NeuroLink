@@ -106,6 +106,8 @@ import type {
   ToolRoutingDecision,
   ToolRoutingServerDescriptor,
   ToolDedupConfig,
+  RequestRouter,
+  RouterInputContext,
 } from "./types/index.js";
 import { emergencyContentTruncation } from "./context/emergencyTruncation.js";
 import {
@@ -169,9 +171,6 @@ import {
   SpanType,
   CircuitBreakerOpenError,
   ConversationMemoryError,
-  AuthenticationError,
-  AuthorizationError,
-  InvalidModelError,
   ModelAccessDeniedError,
 } from "./types/index.js";
 import { SpanSerializer } from "./observability/utils/spanSerializer.js";
@@ -238,10 +237,6 @@ import { resolveModel } from "./utils/modelAliasResolver.js";
 // Import orchestration components
 import { ModelRouter } from "./utils/modelRouter.js";
 import { getBestProvider } from "./utils/providerUtils.js";
-import {
-  NON_RETRYABLE_HTTP_STATUS_CODES,
-  isDeterministicClientErrorMessage,
-} from "./utils/retryability.js";
 import { isZodSchema } from "./utils/schemaConversion.js";
 import { BinaryTaskClassifier } from "./utils/taskClassifier.js";
 // Tool detection and execution imports
@@ -260,6 +255,11 @@ import {
 import { isNonNullObject } from "./utils/typeUtils.js";
 import { getWorkflow } from "./workflow/core/workflowRegistry.js";
 import { runWorkflow } from "./workflow/core/workflowRunner.js";
+import { ModelPool, classifyProviderError } from "./routing/index.js";
+import {
+  looksLikeModelAccessDenied as sharedLooksLikeModelAccessDenied,
+  isNonRetryableProviderError as sharedIsNonRetryableProviderError,
+} from "./utils/providerErrorClassification.js";
 
 /**
  * NL-002: Classify MCP error messages into categories for AI disambiguation.
@@ -347,106 +347,12 @@ function mcpCategoryToErrorCategory(
  * This prevents wasting tokens and latency on guaranteed-to-fail retries.
  * For example, a NOT_FOUND error for a model causes 6 retries of a 418KB
  * message, wasting ~628,000 tokens and adding 10+ seconds of latency.
+ *
+ * Delegates to the shared utility in utils/providerErrorClassification.ts so
+ * that modelPool.ts (classifyProviderError) and this function stay in sync.
  */
-/**
- * Curator P2-3: detect model-access-denied without requiring the typed
- * ModelAccessDeniedError class to be present (Issue #1 ships that class
- * separately). Matches LiteLLM "team not allowed" / "team can only access
- * models=[...]" plus typed-error markers when present.
- */
-function looksLikeModelAccessDenied(error: unknown): boolean {
-  if (!error) {
-    return false;
-  }
-  const e = error as { name?: string; code?: string; message?: string };
-  if (e.name === "ModelAccessDeniedError") {
-    return true;
-  }
-  if (e.code === "MODEL_ACCESS_DENIED") {
-    return true;
-  }
-  const msg =
-    typeof e.message === "string"
-      ? e.message
-      : error instanceof Error
-        ? error.message
-        : String(error);
-  if (!msg) {
-    return false;
-  }
-  const lower = msg.toLowerCase();
-  return (
-    (lower.includes("team") && lower.includes("not allowed")) ||
-    lower.includes("team can only access") ||
-    /not\s+allowed\s+to\s+access\s+(this\s+)?model/i.test(msg)
-  );
-}
-
-function isNonRetryableProviderError(error: unknown): boolean {
-  // Check for typed error classes from providers
-  if (error instanceof InvalidModelError) {
-    return true;
-  }
-  if (error instanceof AuthenticationError) {
-    return true;
-  }
-  if (error instanceof AuthorizationError) {
-    return true;
-  }
-  // Curator P1-1: model-access-denied is permanent for the (provider, model)
-  // pair until the team whitelist changes. Retrying with the same config
-  // would just waste a second roundtrip. Caller / fallback-orchestrator
-  // should pick a different model.
-  if (error instanceof ModelAccessDeniedError) {
-    return true;
-  }
-  // Note: ContextBudgetExceededError is intentionally NOT non-retryable.
-  // Each provider has its own context window, so a budget rejection on
-  // one provider doesn't preclude another provider's window fitting the
-  // same payload. The directProviderGeneration loop should continue
-  // trying alternate providers; the after-loop rethrow preserves the
-  // typed error when all providers reject (see `directProviderGeneration`).
-
-  // Check for HTTP status codes on error objects (e.g., from Vercel AI SDK)
-  if (error && typeof error === "object") {
-    const err = error as Record<string, unknown>;
-    const status =
-      typeof err.status === "number"
-        ? err.status
-        : typeof err.statusCode === "number"
-          ? err.statusCode
-          : undefined;
-
-    if (status && NON_RETRYABLE_HTTP_STATUS_CODES.includes(status)) {
-      return true;
-    }
-  }
-
-  // Check error message for NOT_FOUND patterns (catches wrapped errors)
-  if (error instanceof Error) {
-    const msg = error.message;
-    if (
-      msg.includes("NOT_FOUND") ||
-      msg.includes("Model Not Found") ||
-      msg.includes("model not found") ||
-      msg.includes("PERMISSION_DENIED") ||
-      msg.includes("UNAUTHENTICATED")
-    ) {
-      return true;
-    }
-    // A deterministic 400 / malformed-request whose status is only present in
-    // the message string (e.g. Vertex wraps `{"code":400,"status":
-    // "INVALID_ARGUMENT"}` inside the message). The object-level status check
-    // above misses it, so without this the fallback orchestrator retries the
-    // identical bad payload on every other provider — they reject it the same
-    // way. The request itself is malformed, so abort fast.
-    if (isDeterministicClientErrorMessage(msg)) {
-      return true;
-    }
-  }
-
-  return false;
-}
+const looksLikeModelAccessDenied = sharedLooksLikeModelAccessDenied;
+const isNonRetryableProviderError = sharedIsNonRetryableProviderError;
 
 /**
  * NeuroLink - Universal AI Development Platform
@@ -731,6 +637,14 @@ export class NeuroLink {
     ) => Promise<{ provider?: string; model?: string } | null>;
     modelChain?: string[];
   } = {};
+
+  // ModelPool: opt-in multi-provider failover with per-member cooldown.
+  // Built once from config.modelPool in the constructor; null when not configured.
+  private readonly modelPool: ModelPool | null;
+
+  // RequestRouter: pluggable pre-call provider/model selector.
+  // Stored directly from config.requestRouter; null when not configured.
+  private readonly requestRouter: RequestRouter | null;
 
   /**
    * Merge instance-level credentials with per-call credentials.
@@ -1230,6 +1144,12 @@ export class NeuroLink {
     if (config?.toolDedup) {
       this.toolDedupConfig = { ...config.toolDedup };
     }
+
+    // ModelPool: build one instance from config; null when not configured.
+    this.modelPool = config?.modelPool ? new ModelPool(config.modelPool) : null;
+
+    // RequestRouter: store the host-supplied function; null when not configured.
+    this.requestRouter = config?.requestRouter ?? null;
 
     logger.setEventEmitter(this.emitter);
 
@@ -4263,6 +4183,19 @@ Current user's request: ${currentInput}`;
     const startTime = Date.now();
 
     await this.maybeApplyGenerateOrchestration(options);
+
+    // Pre-call request router: opt-in, only when the caller did not set both
+    // provider+model. Fails open (any router error leaves options unchanged).
+    await this.applyRequestRouter(
+      options,
+      options.input?.text ?? originalPrompt ?? "",
+      !options.disableTools &&
+        (!!(options.tools && Object.keys(options.tools).length > 0) ||
+          this.getCustomTools().size > 0),
+      !!(options.input?.images && options.input.images.length > 0),
+      options.thinkingConfig?.thinkingLevel,
+    );
+
     this.emitter.emit("generation:start", {
       provider: options.provider || "auto",
       timestamp: startTime,
@@ -4389,6 +4322,108 @@ Current user's request: ${currentInput}`;
       logger.warn("Orchestration failed, continuing with original options", {
         error: error instanceof Error ? error.message : String(error),
         originalProvider: options.provider || "auto",
+      });
+    }
+  }
+
+  /**
+   * Applies the host-configured `requestRouter` to `options` in place.
+   *
+   * The router is skipped when:
+   *   - no `requestRouter` is configured on this instance, or
+   *   - the caller explicitly set both `options.provider` AND `options.model`
+   *     (we only skip the router if BOTH are set; a caller setting only one
+   *     still lets the router fill in the other field).
+   *
+   * Fails open: any router error is logged at WARN level and the call
+   * continues with the original options unmodified.
+   *
+   * @param options — the mutable options object (generate or stream).
+   * @param promptText — the text prompt used to build the RouterInputContext.
+   * @param hasTools — true when at least one tool is available for this call.
+   * @param requiresVision — true when the call includes image attachments.
+   * @param thinkingLevel — optional thinking level string from the call options.
+   */
+  private async applyRequestRouter(
+    options: {
+      provider?: string;
+      model?: string;
+      region?: string;
+    },
+    promptText: string,
+    hasTools: boolean,
+    requiresVision: boolean,
+    thinkingLevel?: string,
+  ): Promise<void> {
+    if (!this.requestRouter) {
+      return;
+    }
+    // Skip if the caller explicitly set both provider AND model — they know
+    // what they want; the router should not override an intentional choice.
+    if (options.provider && options.model) {
+      return;
+    }
+    // Skip when a ModelPool is also configured: the pool unconditionally
+    // overrides provider+model for each member it selects.  Allowing the
+    // router to run first would set options.provider/model to a value the
+    // pool immediately clobbers, creating silent ownership confusion and
+    // making the pool bypass the "user didn't set provider+model" guard above
+    // on subsequent attempts.
+    if (this.modelPool) {
+      logger.debug(
+        "[NeuroLink] applyRequestRouter: skipped — modelPool takes precedence",
+      );
+      return;
+    }
+
+    const ctx: RouterInputContext = {
+      prompt: promptText,
+      // Cheap token estimate: ~4 chars/token.
+      estimatedInputTokens: Math.ceil(promptText.length / 4),
+      hasTools,
+      requiresVision,
+      thinkingLevel,
+    };
+
+    try {
+      const decision = await this.requestRouter(ctx);
+      // Apply provider/model/region as a coherent set: when the router supplies
+      // a provider (the caller didn't pin one), take its model and region too.
+      // If the caller pinned the provider but not the model, only apply the
+      // router's model when it targets the same provider.
+      if (decision.provider && !options.provider) {
+        options.provider = decision.provider;
+        // Adopt the router's model and region only when they belong to the
+        // provider the router just selected — never mix a router model onto a
+        // caller-pinned different provider.
+        if (decision.model && !options.model) {
+          options.model = decision.model;
+        }
+        if (decision.region && !options.region) {
+          options.region = decision.region;
+        }
+      } else if (!decision.provider) {
+        // Router returned a no-op or model-only decision.
+        if (decision.model && !options.model) {
+          options.model = decision.model;
+        }
+        if (decision.region && !options.region) {
+          options.region = decision.region;
+        }
+      }
+      // If decision.provider differs from the caller-pinned options.provider,
+      // we skip the router result entirely to avoid an incoherent pairing.
+      if (decision.reason) {
+        logger.debug("[NeuroLink] requestRouter decision", {
+          reason: decision.reason,
+          provider: options.provider,
+          model: options.model,
+        });
+      }
+    } catch (routerErr) {
+      logger.warn("[NeuroLink] requestRouter threw — proceeding unrouted", {
+        error:
+          routerErr instanceof Error ? routerErr.message : String(routerErr),
       });
     }
   }
@@ -6812,6 +6847,192 @@ Current user's request: ${currentInput}`;
       allowFallback: !requestedProvider || !!preferredOrchestrated,
     });
 
+    // ─── ModelPool path ──────────────────────────────────────────────────────
+    // When a ModelPool is configured, source the candidate sequence from the
+    // pool instead of (or in addition to) the static tryProviders list.
+    // Preserves the existing isNonRetryableProviderError short-circuit and
+    // AbortError propagation semantics. Falls through to the standard path
+    // when no pool is configured.
+    if (this.modelPool) {
+      const pool = this.modelPool;
+      const maxPoolAttempts = pool.maxAttempts;
+      const triedKeys = new Set<string>();
+      let poolLastError: Error | null = null;
+
+      for (let attempt = 0; attempt < maxPoolAttempts; attempt++) {
+        if (options.abortSignal?.aborted) {
+          throw new DOMException("The operation was aborted", "AbortError");
+        }
+
+        const member = pool.selectNext(triedKeys);
+        if (!member) {
+          // All available members exhausted.
+          break;
+        }
+        triedKeys.add(pool.memberKey(member));
+
+        // Temporarily override provider/model/region from the pool member.
+        const savedProvider = options.provider;
+        const savedModel = options.model;
+        const savedRegion = options.region;
+        options.provider = member.provider as AIProviderName;
+        // When the member omits model/region, clear inherited values so the
+        // provider's own default is used rather than a mismatched caller value.
+        options.model = member.model ?? undefined;
+        options.region = member.region ?? undefined;
+
+        const poolProviderName = member.provider;
+        logger.debug(`[${functionTag}] ModelPool: attempting member`, {
+          provider: poolProviderName,
+          model: member.model ?? options.model,
+          attempt,
+        });
+
+        try {
+          // Get conversation messages for context (use pre-compacted if provided)
+          const poolOptionsWithMessages = options as TextGenerationOptions & {
+            conversationMessages?: unknown[];
+          };
+          const poolConversationMessages = poolOptionsWithMessages
+            .conversationMessages?.length
+            ? poolOptionsWithMessages.conversationMessages
+            : await getConversationMessages(this.conversationMemory, options);
+
+          const poolProvider = await AIProviderFactory.createProvider(
+            poolProviderName as AIProviderName,
+            options.model,
+            !options.disableTools,
+            this as unknown as UnknownRecord,
+            options.region,
+            this.resolveCredentials(options.credentials),
+          );
+
+          poolProvider.setTraceContext(this._metricsTraceContext);
+          poolProvider.setupToolExecutor(
+            {
+              customTools: this.getCustomTools(),
+              executeTool: (toolName: string, params: unknown) =>
+                this.executeTool(toolName, params, {
+                  disableToolCache: options.disableToolCache,
+                }),
+            },
+            functionTag,
+          );
+
+          const poolResult = await poolProvider.generate({
+            ...options,
+            conversationMessages: poolConversationMessages,
+          });
+
+          if (!poolResult) {
+            throw new Error(
+              `ModelPool: provider ${poolProviderName} returned null result`,
+            );
+          }
+
+          pool.recordSuccess(member);
+          const responseTime = Date.now() - startTime;
+
+          // Restore original options fields so callers see a clean object.
+          options.provider = savedProvider;
+          options.model = savedModel;
+          options.region = savedRegion;
+
+          return {
+            content: poolResult.content || "",
+            provider: poolProviderName,
+            model: poolResult.model,
+            usage: poolResult.usage,
+            responseTime,
+            finishReason: poolResult.finishReason,
+            toolsUsed: poolResult.toolsUsed || [],
+            toolExecutions: poolResult.toolExecutions?.map((te) => {
+              const t = te as Record<string, unknown>;
+              return {
+                ...te,
+                toolName: te.name,
+                executionTime:
+                  typeof t.executionTime === "number"
+                    ? t.executionTime
+                    : typeof t.duration === "number"
+                      ? t.duration
+                      : 0,
+                success:
+                  typeof t.success === "boolean"
+                    ? t.success
+                    : t.status === "success",
+              };
+            }),
+            enhancedWithTools: !!poolResult.toolExecutions?.length,
+            analytics: poolResult.analytics,
+            evaluation: poolResult.evaluation,
+            audio: poolResult.audio,
+            video: poolResult.video,
+            avatar: poolResult.avatar,
+            music: poolResult.music,
+            ppt: poolResult.ppt,
+            imageOutput: poolResult.imageOutput,
+            reasoning: poolResult.reasoning,
+            reasoningTokens: poolResult.reasoningTokens,
+            _generationEndEmitted: (
+              poolResult as { _generationEndEmitted?: boolean }
+            )._generationEndEmitted,
+          } as TextGenerationResult & { _generationEndEmitted?: boolean };
+        } catch (poolError) {
+          // Restore options unconditionally on failure.
+          options.provider = savedProvider;
+          options.model = savedModel;
+          options.region = savedRegion;
+
+          if (isAbortError(poolError)) {
+            throw poolError;
+          }
+          if (isNonRetryableProviderError(poolError)) {
+            const poolErrMsg =
+              poolError instanceof Error
+                ? poolError.message
+                : String(poolError);
+            logger.warn(
+              `[${functionTag}] ModelPool: non-retryable error from ${poolProviderName}, stopping pool`,
+              { error: poolErrMsg },
+            );
+            pool.recordFailure(member, classifyProviderError(poolError));
+            // Wrap in a plain Error so runWithFallbackOrchestration does not
+            // mistake this for a ModelAccessDeniedError and start a second
+            // retry layer on top of the already-exhausted pool.
+            throw new Error(`[ModelPool] non-retryable: ${poolErrMsg}`, {
+              cause: poolError,
+            });
+          }
+
+          pool.recordFailure(member, classifyProviderError(poolError));
+          poolLastError =
+            poolError instanceof Error
+              ? poolError
+              : new Error(String(poolError));
+          logger.warn(
+            `[${functionTag}] ModelPool: member ${poolProviderName} failed`,
+            { error: poolLastError.message },
+          );
+        }
+      }
+
+      // All pool members failed or were exhausted.
+      const poolResponseTime = Date.now() - startTime;
+      logger.error(`[${functionTag}] ModelPool: all members failed`, {
+        triedKeys: Array.from(triedKeys),
+        lastError: poolLastError?.message,
+        responseTime: poolResponseTime,
+      });
+      // Wrap in a plain Error (not a typed error class) so that
+      // runWithFallbackOrchestration does not re-activate the modelChain /
+      // providerFallback layer on top of an already-exhausted pool.
+      throw new Error(
+        `[ModelPool] all members failed: ${poolLastError?.message ?? "no members available"}`,
+      );
+    }
+    // ─── End ModelPool path ───────────────────────────────────────────────────
+
     let lastError: Error | null = null;
 
     // Try each provider in order
@@ -7697,6 +7918,18 @@ Current user's request: ${currentInput}`;
         this.setLangfuseContextFromOptions(options, () =>
           this.applyToolRoutingExclusions(options, originalPrompt),
         ),
+      );
+
+      // Pre-call request router for stream: opt-in, fails open.
+      await this.applyRequestRouter(
+        options,
+        originalPrompt,
+        !options.disableTools &&
+          (!!(options.tools && Object.keys(options.tools).length > 0) ||
+            this.getCustomTools().size > 0),
+        !!(options.input?.images && options.input.images.length > 0),
+        (options as StreamOptions & { thinking?: { thinkingLevel?: string } })
+          .thinking?.thinkingLevel,
       );
 
       // TTS Mode 2 deferred: stream() emits text first, then synthesizes the
@@ -9711,6 +9944,152 @@ Current user's request: ${currentInput}`;
         }
       }
     }
+
+    // ─── ModelPool stream path ────────────────────────────────────────────────
+    // When a pool is configured, replaces the single provider.stream() call
+    // with a retry loop over pool members. Compaction/budget-check above ran
+    // once on the initially-selected `providerName`; the pool may redirect to
+    // a different provider, but those checks are conservative enough that the
+    // redirected provider will also accept the payload (if it has a smaller
+    // window, the budget check would have already thrown before we get here).
+    // On exhaustion, throws the last member error — does NOT fall through to
+    // the static provider path below.
+    if (this.modelPool) {
+      const streamPool = this.modelPool;
+      const maxStreamAttempts = streamPool.maxAttempts;
+      const streamTriedKeys = new Set<string>();
+      let streamLastError: Error | null = null;
+
+      for (let attempt = 0; attempt < maxStreamAttempts; attempt++) {
+        if (options.abortSignal?.aborted) {
+          throw new DOMException("The operation was aborted", "AbortError");
+        }
+
+        const streamMember = streamPool.selectNext(streamTriedKeys);
+        if (!streamMember) {
+          break;
+        }
+        streamTriedKeys.add(streamPool.memberKey(streamMember));
+
+        // Override provider/model/region from the pool member.
+        // When the member omits model/region, use undefined (provider default)
+        // rather than inheriting the caller's value for a different provider.
+        const poolStreamProviderName = streamMember.provider;
+        const poolStreamModel = streamMember.model ?? undefined;
+        const poolStreamRegion = streamMember.region ?? undefined;
+
+        logger.debug(
+          `[createMCPStream] ModelPool: attempting member ${poolStreamProviderName}`,
+          { model: poolStreamModel, attempt },
+        );
+
+        try {
+          const poolStreamProvider = await AIProviderFactory.createProvider(
+            poolStreamProviderName as AIProviderName,
+            poolStreamModel,
+            !options.disableTools,
+            this as unknown as UnknownRecord,
+            poolStreamRegion,
+            this.resolveCredentials(options.credentials),
+          );
+          poolStreamProvider.setTraceContext(this._metricsTraceContext);
+          poolStreamProvider.setupToolExecutor(
+            {
+              customTools: this.getCustomTools(),
+              executeTool: (toolName: string, params: unknown) =>
+                this.executeTool(toolName, params, {
+                  disableToolCache: options.disableToolCache,
+                }),
+            },
+            "NeuroLink.createMCPStream",
+          );
+
+          const poolStreamResult = await poolStreamProvider.stream({
+            ...options,
+            provider: poolStreamProviderName as AIProviderName,
+            model: poolStreamModel,
+            region: poolStreamRegion,
+            systemPrompt: enhancedSystemPrompt,
+            conversationMessages,
+          });
+
+          logger.debug("[createMCPStream] ModelPool stream handle obtained", {
+            provider: poolStreamProviderName,
+          });
+
+          // Wrap the stream so we can record success/failure based on what
+          // actually happens during consumption, not merely on obtaining the
+          // handle.  Recording success at handle-acquisition time (before any
+          // tokens are delivered) would mean a mid-stream provider drop is
+          // never reflected as a cooldown.
+          const capturedMember = streamMember;
+          const wrappedStream = (async function* () {
+            try {
+              yield* poolStreamResult.stream;
+              streamPool.recordSuccess(capturedMember);
+            } catch (streamConsumeErr) {
+              streamPool.recordFailure(
+                capturedMember,
+                classifyProviderError(streamConsumeErr),
+              );
+              throw streamConsumeErr;
+            }
+          })();
+
+          return {
+            stream: wrappedStream,
+            provider: poolStreamProviderName,
+            usage: poolStreamResult.usage,
+            model: poolStreamResult.model || poolStreamModel,
+            finishReason: poolStreamResult.finishReason,
+            toolCalls: poolStreamResult.toolCalls ?? [],
+            toolResults: poolStreamResult.toolResults ?? [],
+            analytics: poolStreamResult.analytics,
+          };
+        } catch (poolStreamError) {
+          if (isAbortError(poolStreamError)) {
+            throw poolStreamError;
+          }
+          if (isNonRetryableProviderError(poolStreamError)) {
+            const poolStreamErrMsg =
+              poolStreamError instanceof Error
+                ? poolStreamError.message
+                : String(poolStreamError);
+            streamPool.recordFailure(
+              streamMember,
+              classifyProviderError(poolStreamError),
+            );
+            // Wrap in a plain Error so runWithFallbackOrchestration /
+            // streamWithIterationFallback does not re-activate the modelChain
+            // layer on top of an already-exhausted pool.
+            throw new Error(`[ModelPool] non-retryable: ${poolStreamErrMsg}`, {
+              cause: poolStreamError,
+            });
+          }
+          streamPool.recordFailure(
+            streamMember,
+            classifyProviderError(poolStreamError),
+          );
+          streamLastError =
+            poolStreamError instanceof Error
+              ? poolStreamError
+              : new Error(String(poolStreamError));
+          logger.warn(
+            `[createMCPStream] ModelPool: member ${poolStreamProviderName} failed`,
+            { error: streamLastError.message },
+          );
+        }
+      }
+
+      // All pool stream members failed.
+      // Wrap in a plain Error (not a typed error class) so that the
+      // surrounding fallback orchestrator does not start a second retry layer
+      // over the already-exhausted pool.
+      throw new Error(
+        `[ModelPool] all stream members failed: ${streamLastError?.message ?? "no stream members available"}`,
+      );
+    }
+    // ─── End ModelPool stream path ────────────────────────────────────────────
 
     // 🔧 FIX: Pass enhanced system prompt to real streaming
     // Tools will be accessed through the streamText call in executeStream
