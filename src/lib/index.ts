@@ -678,6 +678,13 @@ export {
   DEFAULT_ROUTER_PROMPT_PREFIX,
 } from "./core/toolRouting.js";
 
+// Pre-call tool routing — embedding fast-path (ITEM B: L2 semantic retrieval)
+export {
+  cosineSimilarity,
+  ToolEmbeddingIndex,
+  selectRelevantToolNames,
+} from "./core/toolRoutingEmbedding.js";
+
 // ============================================================================
 // REAL-TIME SERVICES & TELEMETRY - Enterprise Platform Features
 // ============================================================================

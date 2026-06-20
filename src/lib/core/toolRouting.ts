@@ -16,14 +16,26 @@
  * Fail-open by design: missing query, <=1 routable server, validation
  * failure, empty/invalid pick, or any thrown error returns an EMPTY list
  * (exclude nothing -> all tools, identical to routing disabled). Never throws.
+ *
+ * L2 embedding fast-path (ITEM B): when `params.embedFn` is supplied and the
+ * catalog's total tool count exceeds `embeddingConfig.minToolsToActivate`, a
+ * hybrid cosine+BM25 retriever narrows the candidate set BEFORE the LLM router.
+ * Any embedding failure falls back to the standard LLM-router path.
+ *
+ * Tool granularity (ITEM D): when `params.granularity === "tool"`, individual
+ * unpicked tools are excluded rather than whole servers. Falls back to "server"
+ * if the embedding path is disabled or fails.
  */
 
 import { z } from "zod";
 import { logger } from "../utils/logger.js";
 import { withTimeout } from "../utils/async/index.js";
+import { selectRelevantToolNames } from "./toolRoutingEmbedding.js";
 import type {
+  ToolRetrievalItem,
   ToolRoutingCatalogEntry,
   ToolRoutingDecision,
+  ToolRoutingEmbeddingFastPathResult,
   ToolRoutingOutcome,
   ToolRoutingResolutionParams,
   ToolRoutingServerDescriptor,
@@ -33,6 +45,12 @@ import type {
 const routerOutputSchema = z.object({
   servers: z.array(z.string()),
 });
+
+/** Default minimum catalog tool count that activates the embedding fast-path. */
+const DEFAULT_EMBEDDING_MIN_TOOLS = 20;
+
+/** Default number of top-ranked tool candidates the embedding retriever keeps. */
+const DEFAULT_EMBEDDING_TOP_K = 20;
 
 /**
  * Upper bound on the user-query text interpolated into the router prompt.
@@ -218,6 +236,154 @@ function safeEmitDecision(
   }
 }
 
+// ---------------------------------------------------------------------------
+// L2 embedding fast-path helpers (ITEM B + D)
+// ---------------------------------------------------------------------------
+
+// ToolRoutingEmbeddingFastPathResult is imported from src/lib/types/toolRouting.ts
+// (Critical Rule 2 — all type aliases live in src/lib/types/).
+
+/**
+ * Runs the L2 embedding fast-path over `routableServers` for `userQuery`.
+ *
+ * Returns a result with `embeddingActivated: false` on any skip or error —
+ * the caller must treat this as a "fall back to LLM router" signal.
+ *
+ * This function is PURE with respect to provider access: the caller injects
+ * `embedFn` so no provider classes are imported here.
+ */
+async function runEmbeddingFastPath(
+  userQuery: string,
+  routableServers: ToolRoutingCatalogEntry[],
+  alwaysIncludeServerIds: string[],
+  embedFn: (texts: string[]) => Promise<number[][]>,
+  opts: {
+    topK: number;
+    minToolsToActivate: number;
+    weights?: { cosine: number; bm25: number };
+    granularity: "server" | "tool";
+    vectorCache?: Map<string, number[]>;
+  },
+): Promise<ToolRoutingEmbeddingFastPathResult> {
+  const { granularity, vectorCache } = opts;
+  const noop: ToolRoutingEmbeddingFastPathResult = {
+    excludedToolNames: [],
+    embeddingActivated: false,
+    candidateToolCount: 0,
+    granularity,
+  };
+
+  // Count routable tools (always-include servers are already excluded from
+  // routableServers at call site, but be defensive).
+  const routableToolCount = routableServers.reduce(
+    (sum, server) => sum + server.toolNames.length,
+    0,
+  );
+
+  if (routableToolCount < opts.minToolsToActivate) {
+    logger.debug(
+      "[ToolRouting] L2 embedding skipped — catalog below threshold",
+      {
+        toolCount: routableToolCount,
+        minToolsToActivate: opts.minToolsToActivate,
+      },
+    );
+    return noop;
+  }
+
+  // Build retrieval items: one per individual tool, with text =
+  // "<server description> — <tool name>" so both server context and the tool
+  // identifier itself inform the embedding.
+  const items: ToolRetrievalItem[] = routableServers.flatMap((server) =>
+    server.toolNames.map((toolName) => ({
+      name: toolName,
+      text: `${server.description} — ${toolName}`,
+    })),
+  );
+
+  try {
+    const topK = Math.min(opts.topK, items.length);
+    const topToolNames = await selectRelevantToolNames(userQuery, items, {
+      topK,
+      weights: opts.weights,
+      embedFn,
+      vectorCache,
+    });
+
+    const topToolSet = new Set(topToolNames);
+
+    if (granularity === "tool") {
+      // Tool-granularity (ITEM D): exclude every catalog tool NOT in the top-K,
+      // regardless of server. Always-include server tools are not in
+      // routableServers so they are untouched.
+      const excludedToolNames = items
+        .map((item) => item.name)
+        .filter((name) => !topToolSet.has(name));
+
+      logger.debug("[ToolRouting] L2 embedding applied (tool granularity)", {
+        totalTools: items.length,
+        topK,
+        keptTools: topToolNames.length,
+        excludedTools: excludedToolNames.length,
+      });
+
+      return {
+        excludedToolNames,
+        embeddingActivated: true,
+        candidateToolCount: topToolNames.length,
+        granularity: "tool",
+      };
+    }
+
+    // Server-granularity (default): map surviving tools back to their servers.
+    // A server is "kept" if at least one of its tools survived the top-K cut.
+    // The tools of every server with ZERO surviving tools are excluded.
+    const keptServerIds = new Set(
+      routableServers
+        .filter((server) =>
+          server.toolNames.some((toolName) => topToolSet.has(toolName)),
+        )
+        .map((server) => server.id),
+    );
+
+    // Never exclude always-include servers (defensive — they should not be in
+    // routableServers, but guard against caller mistakes).
+    const alwaysSet = new Set(alwaysIncludeServerIds);
+    const excludedServers = routableServers.filter(
+      (server) => !keptServerIds.has(server.id) && !alwaysSet.has(server.id),
+    );
+    const excludedToolNames = excludedServers.flatMap(
+      (server) => server.toolNames,
+    );
+
+    logger.debug("[ToolRouting] L2 embedding applied (server granularity)", {
+      totalTools: items.length,
+      topK,
+      keptServers: keptServerIds.size,
+      excludedServers: excludedServers.length,
+      excludedTools: excludedToolNames.length,
+    });
+
+    return {
+      excludedToolNames,
+      embeddingActivated: true,
+      candidateToolCount: topToolNames.length,
+      granularity: "server",
+    };
+  } catch (embeddingError) {
+    logger.warn(
+      "[ToolRouting] L2 embedding fast-path failed, falling back to LLM router",
+      {
+        error:
+          embeddingError instanceof Error
+            ? embeddingError.message
+            : String(embeddingError),
+      },
+    );
+    return noop;
+  }
+}
+
 /**
  * Resolves which registered tool names to EXCLUDE for a single stream() turn.
  * Returns an empty list on any skip/failure path — see module doc.
@@ -234,6 +400,11 @@ export async function resolveToolRoutingExclusions(
     timeoutMs,
     generateFn,
     emitDecision,
+    // L2 / ITEM D parameters (all optional — omitting reproduces today's behavior)
+    embedFn,
+    embeddingConfig,
+    granularity = "server",
+    embeddingVectorCache,
   } = params;
 
   const routableServers = catalog.filter(
@@ -264,6 +435,79 @@ export async function resolveToolRoutingExclusions(
       return [];
     }
 
+    // -------------------------------------------------------------------------
+    // L2 EMBEDDING FAST-PATH (ITEM B + D)
+    // -------------------------------------------------------------------------
+    // Attempt the embedding retriever when an embedFn is provided. On success,
+    // return the embedding-derived exclusion list immediately WITHOUT an LLM
+    // call. On any failure (embedFn throws, threshold not met, etc.), fall
+    // through to the existing LLM-router path below.
+    if (embedFn) {
+      const embResult = await runEmbeddingFastPath(
+        userQuery,
+        routableServers,
+        alwaysIncludeServerIds,
+        embedFn,
+        {
+          topK: embeddingConfig?.topK ?? DEFAULT_EMBEDDING_TOP_K,
+          minToolsToActivate:
+            embeddingConfig?.minToolsToActivate ?? DEFAULT_EMBEDDING_MIN_TOOLS,
+          weights: embeddingConfig?.weights,
+          granularity,
+          vectorCache: embeddingVectorCache,
+        },
+      );
+
+      if (embResult.embeddingActivated) {
+        logger.debug("[ToolRouting] L2 embedding fast-path succeeded", {
+          granularity: embResult.granularity,
+          candidateToolCount: embResult.candidateToolCount,
+          excludedToolCount: embResult.excludedToolNames.length,
+          routableServerCount: routableServers.length,
+          durationMs: Date.now() - routingStartTime,
+        });
+
+        // For server-granularity results, reconstruct selected/excluded server
+        // ids for the decision so telemetry fields are consistent.
+        let selectedServerIds: string[] = [];
+        let excludedServerIds: string[] = [];
+
+        if (embResult.granularity === "server") {
+          const excludedToolSet = new Set(embResult.excludedToolNames);
+          // A server is "excluded" if ALL its tools are excluded.
+          excludedServerIds = routableServers
+            .filter((server) =>
+              server.toolNames.every((name) => excludedToolSet.has(name)),
+            )
+            .map((server) => server.id);
+          selectedServerIds = routableServers
+            .filter((server) => !excludedServerIds.includes(server.id))
+            .map((server) => server.id);
+        }
+
+        safeEmitDecision(emitDecision, {
+          outcome: "applied",
+          selectedServerIds,
+          excludedServerIds,
+          hallucinatedIds: [],
+          excludedToolCount: embResult.excludedToolNames.length,
+          routableServerCount: routableServers.length,
+          cacheHit: false,
+          durationMs: Date.now() - routingStartTime,
+          embeddingActivated: true,
+          candidateToolCount: embResult.candidateToolCount,
+          granularity: embResult.granularity,
+        });
+
+        return embResult.excludedToolNames;
+      }
+      // embedFn was provided but threshold not met OR retriever failed open —
+      // fall through to the LLM-router path below.
+    }
+
+    // -------------------------------------------------------------------------
+    // EXISTING LLM ROUTER PATH (L3) — runs when embedding is off or fell back
+    // -------------------------------------------------------------------------
     const routerPrompt = buildRouterPrompt(
       userQuery,
       routableServers,
@@ -386,6 +630,7 @@ export async function resolveToolRoutingExclusions(
       routableServerCount: routableServers.length,
       cacheHit: false,
       durationMs: Date.now() - routingStartTime,
+      granularity: "server",
     });
 
     return excludedToolNames;

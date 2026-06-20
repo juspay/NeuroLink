@@ -42,6 +42,73 @@ export type ToolRoutingModelConfig = {
   temperature?: number;
 };
 
+/**
+ * Weights for the hybrid scoring formula used by `ToolEmbeddingIndex.rank()`.
+ * Scores are computed as: `cosine * cosine + bm25 * bm25Score` then
+ * normalized before sorting.
+ * Default: `{ cosine: 0.8, bm25: 0.2 }`.
+ */
+export type ToolRetrievalWeights = {
+  /** Weight applied to the cosine-similarity (dense) component. */
+  cosine: number;
+  /** Weight applied to the BM25 (sparse/lexical) component. */
+  bm25: number;
+};
+
+/**
+ * Configuration for the L2 embedding fast-path (ITEM B).
+ *
+ * When enabled and the catalog's total tool count reaches `minToolsToActivate`,
+ * a hybrid cosine + BM25 retriever ranks all tools by relevance to the query
+ * and takes the top-`topK` candidates. This is far cheaper than an LLM call
+ * (sub-10 ms warm) and fires BEFORE or INSTEAD of the LLM router.
+ *
+ * Fail-open: any embedding error (missing provider, network failure, wrong
+ * model) silently falls back to the existing LLM-router / server-granularity
+ * path — the turn is never broken.
+ */
+export type ToolRoutingEmbeddingConfig = {
+  /**
+   * Activate the embedding fast-path. Default: false (backward-compatible).
+   * Setting this to true without supplying `provider`/`model` causes the SDK
+   * to try the stream call's configured provider; if that provider does not
+   * support embeddings the layer fails open.
+   */
+  enabled?: boolean;
+  /**
+   * Maximum number of top-ranked tool candidates passed to the post-embedding
+   * decision stage. Default: 20.
+   */
+  topK?: number;
+  /**
+   * Minimum total tool count in the catalog before the embedding path
+   * activates. Below this threshold the catalog is small enough that the LLM
+   * router alone is cheap and fast. Default: 20.
+   */
+  minToolsToActivate?: number;
+  /**
+   * Weights for the hybrid scoring formula:
+   *   score = cosine * cosineSim + bm25 * bm25Score  (both normalized to [0,1])
+   * Default: `{ cosine: 0.8, bm25: 0.2 }`.
+   */
+  weights?: ToolRetrievalWeights;
+  /**
+   * Provider name to use for the embedding call (e.g. "openai", "vertex").
+   * Defaults to the stream/generate call's configured provider. The provider
+   * must support `embedMany()`.
+   */
+  provider?: string;
+  /**
+   * Embedding model name (provider-specific). When omitted the provider's
+   * default embedding model is used (e.g. text-embedding-3-small for OpenAI).
+   */
+  model?: string;
+  /**
+   * Timeout for embedding calls in milliseconds. Default: 10000.
+   */
+  timeoutMs?: number;
+};
+
 /** Constructor-level configuration for pre-call tool routing. */
 export type ToolRoutingConfig = {
   /** Master switch. Routing runs only when true AND the server catalog is non-empty. */
@@ -92,6 +159,24 @@ export type ToolRoutingConfig = {
     /** Number of turns for which a previously-selected server stays warm. Default: 3. */
     turns?: number;
   };
+  /**
+   * L2 embedding fast-path (ITEM B). When enabled the SDK ranks tools by
+   * semantic + lexical relevance using a hybrid cosine/BM25 score and narrows
+   * the candidate set BEFORE (or instead of) the LLM router. Disabled by
+   * default for backward compatibility.
+   */
+  embedding?: ToolRoutingEmbeddingConfig;
+  /**
+   * Routing granularity (ITEM D).
+   *
+   * - `"server"` (default) — routing excludes the tools of entire unpicked
+   *   servers. This is the original behavior.
+   * - `"tool"` — routing excludes individual tools that are not in the
+   *   embedding top-K candidate set, regardless of which server they belong
+   *   to. Requires `embedding.enabled: true`; if the embedding fast-path is
+   *   off (or fails) the granularity falls back to `"server"` automatically.
+   */
+  granularity?: "server" | "tool";
 };
 
 /** Catalog entry pairing a server descriptor with its registered tool names. */
@@ -170,6 +255,23 @@ export type ToolRoutingDecision = {
   cacheHit: boolean;
   /** Wall-clock time spent in the routing resolution in milliseconds. */
   durationMs: number;
+  // ---------------------------------------------------------------------------
+  // Optional L2 / tool-granularity telemetry fields (ITEM B + D).
+  // All optional so dashboards that don't use the embedding path are unaffected.
+  // ---------------------------------------------------------------------------
+  /** True when the L2 embedding fast-path ran and produced candidate results. */
+  embeddingActivated?: boolean;
+  /**
+   * Number of tool candidates produced by the embedding retriever before the
+   * post-embedding server or tool filtering step.
+   */
+  candidateToolCount?: number;
+  /**
+   * Granularity at which exclusions were applied ("server" or "tool").
+   * Matches `ToolRoutingConfig.granularity`; present only when routing was
+   * applied (outcome === "applied").
+   */
+  granularity?: "server" | "tool";
 };
 
 /** Parameters for `resolveToolRoutingExclusions()`. */
@@ -195,4 +297,129 @@ export type ToolRoutingResolutionParams = {
    * the resolver.
    */
   emitDecision?: (decision: ToolRoutingDecision) => void;
+  // ---------------------------------------------------------------------------
+  // L2 embedding fast-path parameters (ITEM B + D). All optional; omitting
+  // them reproduces today's LLM-router-only / server-granularity behavior.
+  // ---------------------------------------------------------------------------
+  /**
+   * Injected async function that converts an array of texts into embedding
+   * vectors. Built by the caller (NeuroLink) from the configured embedding
+   * provider so the resolver stays pure and free of provider imports.
+   * When undefined the embedding fast-path is skipped entirely.
+   */
+  embedFn?: (texts: string[]) => Promise<number[][]>;
+  /**
+   * Embedding fast-path configuration forwarded from `ToolRoutingConfig`.
+   * Only consulted when `embedFn` is provided.
+   */
+  embeddingConfig?: ToolRoutingEmbeddingConfig;
+  /**
+   * Routing granularity forwarded from `ToolRoutingConfig`. Default: "server".
+   */
+  granularity?: "server" | "tool";
+  /**
+   * Optional shared vector cache for the L2 embedding fast-path. When
+   * supplied, tool embedding vectors computed on prior turns are reused rather
+   * than re-fetched from the embedding provider on every call.
+   *
+   * The NeuroLink instance manages the lifecycle: it creates the Map once and
+   * passes the same reference across turns. It clears the reference when the
+   * tool catalog changes (via `setToolRoutingServers`) so stale vectors are
+   * never used after a catalog update.
+   */
+  embeddingVectorCache?: Map<string, number[]>;
+};
+
+// ---------------------------------------------------------------------------
+// L2 embedding fast-path internal result type (ITEM B + D).
+// Lives here per Critical Rule 2 — all type aliases must be in src/lib/types/.
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of running the L2 embedding fast-path inside
+ * `runEmbeddingFastPath()` (toolRouting.ts).
+ *
+ * `embeddingActivated: false` signals "fall back to LLM router". When true,
+ * `excludedToolNames` is the final exclusion list and the caller returns it
+ * directly without any LLM call.
+ *
+ * @internal
+ */
+export type ToolRoutingEmbeddingFastPathResult = {
+  excludedToolNames: string[];
+  embeddingActivated: boolean;
+  candidateToolCount: number;
+  granularity: "server" | "tool";
+};
+
+// ---------------------------------------------------------------------------
+// Embedding-retrieval subsystem types (L2 fast-path — ITEM B)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single item in the tool retrieval catalog, pairing a tool name with the
+ * text (tool description + server context) used to build its embedding vector.
+ */
+export type ToolRetrievalItem = {
+  /** Fully-qualified tool name (e.g. `${serverId}_${toolName}`). */
+  name: string;
+  /** Descriptive text used as the embedding document for this tool. */
+  text: string;
+};
+
+/**
+ * One ranked result from `ToolEmbeddingIndex.rank()` or
+ * `selectRelevantToolNames()`.
+ */
+export type ToolRetrievalRankedResult = {
+  /** Tool name (mirrors `ToolRetrievalItem.name`). */
+  name: string;
+  /** Combined hybrid score (higher = more relevant). */
+  score: number;
+};
+
+/**
+ * Options passed to `selectRelevantToolNames()` — the high-level convenience
+ * wrapper around `ToolEmbeddingIndex`.
+ */
+export type ToolRetrievalSelectOptions = {
+  /** Maximum number of tool names to return. */
+  topK: number;
+  /** Optional weight override (defaults to `{ cosine: 0.8, bm25: 0.2 }`). */
+  weights?: ToolRetrievalWeights;
+  /**
+   * Async function that converts an array of text strings into embedding
+   * vectors. Must return one vector per input text in the same order.
+   * Errors thrown here propagate to the caller (so it can fail open).
+   */
+  embedFn: (texts: string[]) => Promise<number[][]>;
+  /**
+   * Optional shared vector cache (keyed by text string). When supplied the
+   * underlying `ToolEmbeddingIndex` reads from and writes to this Map so that
+   * tool vectors computed on a prior call are reused on subsequent calls for
+   * the same item text. Callers that want warm-cache behavior across turns
+   * should pass the same Map instance each time.
+   */
+  vectorCache?: Map<string, number[]>;
+  /**
+   * Timeout for each embedding provider call in milliseconds. Default: 10000.
+   */
+  timeoutMs?: number;
+};
+
+// ---------------------------------------------------------------------------
+// Internal BM25 types (used by toolRoutingEmbedding.ts; must live here per
+// CLAUDE.md Critical Rule 2 — all type aliases belong in src/lib/types/).
+// ---------------------------------------------------------------------------
+
+/**
+ * Precomputed per-document data used by the BM25 scorer inside
+ * `ToolEmbeddingIndex`. Not part of the public SDK surface.
+ *
+ * @internal
+ */
+export type ToolRoutingBm25Doc = {
+  tokens: string[];
+  /** Frequency map: token → count (built once at index construction). */
+  tf: Map<string, number>;
 };

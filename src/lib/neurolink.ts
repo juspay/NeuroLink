@@ -614,6 +614,11 @@ export class NeuroLink {
   // Lazy-initialized routing decision cache (ITEM C). Created on first use so
   // instances that don't use routing pay no overhead.
   private toolRoutingCacheInstance?: ToolRoutingCache;
+  // Persisted vector cache for the L2 embedding fast-path (ITEM B). Populated
+  // on the first turn and reused across subsequent turns so tool embedding
+  // vectors are computed once. Cleared when the catalog changes via
+  // setToolRoutingServers() so stale vectors are never reused.
+  private toolRoutingVectorCache?: Map<string, number[]>;
 
   // Opt-in tool-signature deduplication config.
   private toolDedupConfig?: ToolDedupConfig;
@@ -8064,7 +8069,14 @@ Current user's request: ${currentInput}`;
       const cacheKey =
         cacheEnabled && sessionId ? `${sessionId}:${routingQuery}` : undefined;
 
+      const routableServerCount = catalog.filter(
+        (s) => !(routingConfig.alwaysIncludeServerIds ?? []).includes(s.id),
+      ).length;
+
       // --- ITEM E: build the emitDecision callback ---
+      // Constructed BEFORE the cache-hit check so it is available for all
+      // outcome paths, including cache-hit turns (Finding 4).
+      const routingStartTime = Date.now();
       const emitDecision = (decision: ToolRoutingDecision): void => {
         try {
           const activeSpan = trace.getActiveSpan();
@@ -8097,104 +8109,198 @@ Current user's request: ${currentInput}`;
             "tool_routing.duration_ms",
             decision.durationMs,
           );
-        } catch {
-          // Telemetry must never affect routing behaviour.
-        }
-      };
-
-      // Unified hit/miss block: always produces raw (pre-stickiness) exclusions
-      // so stickiness can be applied identically on both paths below.
-      let routedExcludeTools: string[];
-      let selectedServerIds: string[] = [];
-      let resolvedDecision: ToolRoutingDecision | undefined;
-      let fromCache = false;
-
-      const cached =
-        cacheEnabled && cache && cacheKey !== undefined
-          ? cache.get(cacheKey)
-          : undefined;
-
-      if (cached) {
-        // Cache HIT — use stored raw exclusions (pre-stickiness).
-        fromCache = true;
-        routedExcludeTools = [...cached.excludedToolNames];
-        selectedServerIds = [...cached.selectedServerIds];
-        logger.debug("[ToolRouting] Cache hit, skipping router LLM", {
-          cacheKey,
-        });
-        // Emit cache-hit telemetry with full parity to the miss path.
-        try {
-          const activeSpan = trace.getActiveSpan();
-          if (activeSpan) {
-            const routableCount = catalog.filter(
-              (s) =>
-                !(routingConfig.alwaysIncludeServerIds ?? []).includes(s.id),
-            ).length;
-            activeSpan.setAttribute("tool_routing.outcome", "cache-hit");
+          // Optional L2 / tool-granularity fields (present only when embedding ran).
+          if (decision.embeddingActivated !== undefined) {
             activeSpan.setAttribute(
-              "tool_routing.routable_server_count",
-              routableCount,
+              "tool_routing.embedding_activated",
+              decision.embeddingActivated,
             );
-            activeSpan.setAttribute("tool_routing.cache_hit", true);
+          }
+          if (decision.candidateToolCount !== undefined) {
             activeSpan.setAttribute(
-              "tool_routing.selected_server_ids",
-              spanJsonAttribute(selectedServerIds),
+              "tool_routing.candidate_tool_count",
+              decision.candidateToolCount,
             );
+          }
+          if (decision.granularity !== undefined) {
             activeSpan.setAttribute(
-              "tool_routing.excluded_tool_count",
-              routedExcludeTools.length,
+              "tool_routing.granularity",
+              decision.granularity,
             );
           }
         } catch {
           // Telemetry must never affect routing behaviour.
         }
-      } else {
-        // Cache MISS — run the router LLM.
-        // The router call re-enters the public generate(), whose finally block
-        // resets _disableToolCacheForCurrentRequest to false. That flag is
-        // turn-scoped and read by the main tool execution path after routing, so
-        // save it before the router call and restore it afterward.
-        const cacheDisabledForCurrentRequest =
-          this._disableToolCacheForCurrentRequest;
-        try {
-          // Intercept the decision so we can store it in the cache.
-          const captureDecision = (decision: ToolRoutingDecision): void => {
-            resolvedDecision = decision;
-            emitDecision(decision);
-          };
+      };
 
-          routedExcludeTools = await resolveToolRoutingExclusions({
-            catalog,
-            alwaysIncludeServerIds: routingConfig.alwaysIncludeServerIds ?? [],
-            userQuery: routingQuery,
-            routerPromptPrefix: routingConfig.routerPromptPrefix,
-            routerModel: {
-              provider:
-                routingConfig.routerModel?.provider ??
-                (options.provider as string | undefined),
-              model: routingConfig.routerModel?.model ?? options.model,
-              region: routingConfig.routerModel?.region ?? options.region,
-              temperature: routingConfig.routerModel?.temperature,
-            },
-            timeoutMs:
-              routingConfig.timeoutMs ?? DEFAULT_TOOL_ROUTING_TIMEOUT_MS,
-            // Forward the abort signal so a cancelled turn aborts the router
-            // call promptly instead of waiting out the routing timeout.
-            generateFn: (generateOptions) =>
-              this.generate({
-                ...generateOptions,
-                abortSignal: options.abortSignal,
-              }),
-            emitDecision: captureDecision,
+      // Check the cache first.
+      if (cacheEnabled && cache && cacheKey !== undefined) {
+        const cached = cache.get(cacheKey);
+        if (cached) {
+          // Decrement stickiness turn counter even on a cache hit so the window
+          // advances correctly regardless of whether the LLM router ran
+          // (Finding 3). Re-apply stickiness to the cached exclusion list so
+          // the live stickiness window, not the one at write-time, is honoured
+          // (Finding 2 complement: we stored the pre-stickiness list, so
+          // re-applying here gives the correct per-turn view).
+          let cachedExcluded = cached.excludedToolNames;
+          if (stickinessEnabled && sessionId) {
+            try {
+              const stickyIds = cache.getStickyServerIds(sessionId);
+              if (stickyIds.length > 0) {
+                cachedExcluded = cachedExcluded.filter(
+                  (toolName) =>
+                    !stickyIds.some((id) => toolName.startsWith(`${id}_`)),
+                );
+              }
+            } catch {
+              // Stickiness failure is non-fatal.
+            }
+          }
+
+          // Notify the emitDecision callback so custom telemetry sinks observe
+          // every routing outcome, not just non-cached turns (Finding 4).
+          const cachedSelectedSet = new Set(cached.selectedServerIds);
+          const cachedExcludedServerIds = catalog
+            .map((e) => e.id)
+            .filter((id) => !cachedSelectedSet.has(id));
+          emitDecision({
+            outcome: "cache-hit",
+            selectedServerIds: cached.selectedServerIds,
+            excludedServerIds: cachedExcludedServerIds,
+            hallucinatedIds: [],
+            excludedToolCount: cachedExcluded.length,
+            routableServerCount,
+            cacheHit: true,
+            durationMs: Date.now() - routingStartTime,
           });
-        } finally {
-          this._disableToolCacheForCurrentRequest =
-            cacheDisabledForCurrentRequest;
+
+          logger.debug("[ToolRouting] Cache hit, skipping router LLM", {
+            hasSessionId: !!sessionId,
+            routingQueryLength: routingQuery.length,
+          });
+          if (cachedExcluded.length > 0) {
+            options.excludeTools = [
+              ...(options.excludeTools ?? []),
+              ...cachedExcluded,
+            ];
+          }
+          return;
+        }
+      }
+
+      // The router call below re-enters the public generate(), whose finally
+      // block resets _disableToolCacheForCurrentRequest to false. That flag is
+      // turn-scoped (set at the top of this turn) and read by the main tool
+      // execution path that runs after routing, so save it before the router
+      // call and restore it afterward to keep the turn's cache setting intact.
+      const cacheDisabledForCurrentRequest =
+        this._disableToolCacheForCurrentRequest;
+      let routedExcludeTools: string[];
+      let resolvedDecision: ToolRoutingDecision | undefined;
+      try {
+        // Intercept the decision so we can store it in the cache.
+        const captureDecision = (decision: ToolRoutingDecision): void => {
+          resolvedDecision = decision;
+          emitDecision(decision);
+        };
+
+        // --- ITEM B: build the embedFn for the L2 embedding fast-path ---
+        // The vector cache is persisted at the NeuroLink instance level so
+        // tool embedding vectors are computed once and reused across turns
+        // (Finding 1 fix). It is cleared by setToolRoutingServers() when the
+        // catalog changes so stale vectors are never used after an update.
+        let routingEmbedFn:
+          | ((texts: string[]) => Promise<number[][]>)
+          | undefined;
+        const embeddingCfg = routingConfig.embedding;
+        if (embeddingCfg?.enabled === true) {
+          try {
+            // Resolve the embedding provider: use the explicitly configured one
+            // if present, otherwise fall back to the stream/generate call's
+            // provider. The factory call is wrapped in try/catch so a provider
+            // that doesn't support embedMany (it throws at call time, not
+            // construction time) fails open when routingEmbedFn is invoked.
+            const embProviderName =
+              embeddingCfg.provider ??
+              ((options.provider && options.provider !== "auto"
+                ? options.provider
+                : undefined) as string | undefined) ??
+              routingConfig.routerModel?.provider;
+            if (embProviderName) {
+              const embProvider = await AIProviderFactory.createProvider(
+                embProviderName,
+                embeddingCfg.model,
+                true,
+                this as unknown as Record<string, unknown>,
+                undefined,
+                this.resolveCredentials(options.credentials),
+              );
+              // Bind embedMany with the configured model (may be undefined —
+              // the provider uses its default embedding model in that case).
+              routingEmbedFn = (texts: string[]) =>
+                withTimeout(
+                  embProvider.embedMany(texts, embeddingCfg.model),
+                  embeddingCfg.timeoutMs ?? 10000,
+                );
+
+              // Lazy-init the persistent vector cache for this instance.
+              // Subsequent turns reuse the same Map so text→vector lookups
+              // already populated from earlier turns are served from memory.
+              if (!this.toolRoutingVectorCache) {
+                this.toolRoutingVectorCache = new Map<string, number[]>();
+              }
+            }
+          } catch (embSetupError) {
+            logger.debug(
+              "[ToolRouting] Embedding provider setup failed, L2 path disabled for this turn",
+              {
+                error:
+                  embSetupError instanceof Error
+                    ? embSetupError.message
+                    : String(embSetupError),
+              },
+            );
+            // routingEmbedFn remains undefined — fast-path is skipped.
+          }
         }
 
-        if (resolvedDecision?.outcome === "applied") {
-          selectedServerIds = resolvedDecision.selectedServerIds;
-        }
+        routedExcludeTools = await resolveToolRoutingExclusions({
+          catalog,
+          alwaysIncludeServerIds: routingConfig.alwaysIncludeServerIds ?? [],
+          userQuery: routingQuery,
+          routerPromptPrefix: routingConfig.routerPromptPrefix,
+          routerModel: {
+            provider:
+              routingConfig.routerModel?.provider ??
+              (options.provider as string | undefined),
+            model: routingConfig.routerModel?.model ?? options.model,
+            region: routingConfig.routerModel?.region ?? options.region,
+            temperature: routingConfig.routerModel?.temperature,
+          },
+          timeoutMs: routingConfig.timeoutMs ?? DEFAULT_TOOL_ROUTING_TIMEOUT_MS,
+          // Forward the abort signal so a cancelled turn aborts the router
+          // call promptly instead of waiting out the routing timeout.
+          generateFn: (generateOptions) =>
+            this.generate({
+              ...generateOptions,
+              abortSignal: options.abortSignal,
+            }),
+          emitDecision: captureDecision,
+          // L2 / ITEM D — only populated when embedding is configured.
+          embedFn: routingEmbedFn,
+          embeddingConfig: embeddingCfg,
+          granularity: routingConfig.granularity ?? "server",
+          // Pass the persistent vector cache so tool embeddings are reused
+          // across turns (Finding 1).
+          embeddingVectorCache:
+            routingEmbedFn !== undefined
+              ? this.toolRoutingVectorCache
+              : undefined,
+        });
+      } finally {
+        this._disableToolCacheForCurrentRequest =
+          cacheDisabledForCurrentRequest;
       }
 
       // Aborted during the router call — skip applying now-stale exclusions;
@@ -8203,15 +8309,16 @@ Current user's request: ${currentInput}`;
         return;
       }
 
-      // Capture raw (pre-stickiness) exclusions for cache storage on MISS path.
-      const rawExclusions = [...routedExcludeTools];
+      // Snapshot the raw (pre-stickiness) exclusion list before applying
+      // stickiness overrides. The cache stores this snapshot so future cache
+      // hits can re-apply the then-current stickiness state (Finding 2).
+      const preStickinessExcludeTools = routedExcludeTools;
 
-      // Apply stickiness on BOTH hit and miss paths: the sticky ids were
-      // recorded on a prior turn and represent servers that should stay warm for
-      // the current turn. Consuming (decrementing) them before recordSelection
-      // ensures the window covers the correct set of future turns rather than
-      // burning one count on the same turn the selection is recorded
-      // (off-by-one fix).
+      // Apply stickiness FIRST: the sticky ids were recorded on a prior turn and
+      // represent servers that should stay warm for the current turn. Consuming
+      // (decrementing) them before recordSelection ensures the window covers the
+      // correct set of future turns rather than burning one count on the same
+      // turn the selection is recorded (off-by-one fix).
       if (stickinessEnabled && cache && sessionId) {
         try {
           const stickyIds = cache.getStickyServerIds(sessionId);
@@ -8229,15 +8336,16 @@ Current user's request: ${currentInput}`;
         }
       }
 
-      // --- ITEM C: store result for future turns (MISS path only) ---
-      // Cache stores RAW (pre-stickiness) exclusions so the cached value is
-      // correct regardless of which sessions hit it on subsequent turns.
-      if (!fromCache && resolvedDecision?.outcome === "applied" && cache) {
+      // --- ITEM C: store result for future turns ---
+      if (resolvedDecision?.outcome === "applied" && cache) {
+        // Store the PRE-stickiness exclusion list in the cache so future hits
+        // re-apply the live stickiness window rather than the one from this
+        // turn (Finding 2).
         if (cacheEnabled && cacheKey !== undefined) {
           try {
             cache.set(cacheKey, {
-              excludedToolNames: rawExclusions,
-              selectedServerIds,
+              excludedToolNames: preStickinessExcludeTools,
+              selectedServerIds: resolvedDecision.selectedServerIds,
             });
           } catch {
             // Cache write failure is non-fatal.
@@ -8248,7 +8356,10 @@ Current user's request: ${currentInput}`;
         // the same turn it is set (the off-by-one fix above).
         if (stickinessEnabled && sessionId) {
           try {
-            cache.recordSelection(sessionId, selectedServerIds);
+            cache.recordSelection(
+              sessionId,
+              resolvedDecision.selectedServerIds,
+            );
           } catch {
             // Stickiness failure is non-fatal.
           }
@@ -8364,6 +8475,12 @@ Current user's request: ${currentInput}`;
       return;
     }
     this.toolRoutingConfig.servers = servers;
+    // Clear the persisted vector cache so tool vectors are recomputed against
+    // the new catalog on the next turn (stale vectors must never be reused).
+    this.toolRoutingVectorCache = undefined;
+    // Cached routing decisions are catalog-dependent too; force the next turn
+    // to recompute exclusions against the new server/tool set.
+    this.toolRoutingCacheInstance = undefined;
   }
 
   private async validateStreamRequestOptions(
