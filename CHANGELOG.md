@@ -1,3 +1,9 @@
+## [9.78.0](https://github.com/juspay/neurolink/compare/v9.77.0...v9.78.0) (2026-06-20)
+
+### Features
+
+- **(tool-routing):** embedding fast-path + tool-granularity narrowing ([1cdbbb6](https://github.com/juspay/neurolink/commit/1cdbbb609038dd15b15752e0bb8c5618f7d857e5))
+
 ## [9.77.0](https://github.com/juspay/neurolink/compare/v9.76.0...v9.77.0) (2026-06-20)
 
 ### Features
