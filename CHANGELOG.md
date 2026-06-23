@@ -1,3 +1,9 @@
+## [9.79.1](https://github.com/juspay/neurolink/compare/v9.79.0...v9.79.1) (2026-06-23)
+
+### Bug Fixes
+
+- **(vertex):** enable prompt caching on native Claude paths ([d68c3a9](https://github.com/juspay/neurolink/commit/d68c3a91b0e485bcbba04df059827d99f52a6e07))
+
 ## [9.79.0](https://github.com/juspay/neurolink/compare/v9.78.0...v9.79.0) (2026-06-23)
 
 ### Features
