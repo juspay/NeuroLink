@@ -2113,25 +2113,69 @@ export type VertexGenaiFunctionDeclaration = {
  * Message payload passed to the Anthropic Vertex SDK — mirrors the Anthropic
  * Messages API shape (role + structured content blocks).
  */
+/**
+ * Anthropic ephemeral prompt-cache breakpoint marker. Placed on a content
+ * block / tool / system block to make the rendered prefix up to that point a
+ * cache breakpoint. Vertex has NO automatic caching, so these explicit markers
+ * are the only way the conversation prefix is cached across turns.
+ */
+export type VertexAnthropicCacheControl = { type: "ephemeral" };
+
 export type VertexAnthropicMessage = {
   role: "user" | "assistant";
   content:
     | string
     | Array<
-        | { type: "text"; text: string }
+        | {
+            type: "text";
+            text: string;
+            cache_control?: VertexAnthropicCacheControl;
+          }
         | {
             type: "image";
             source: { type: "base64"; media_type: string; data: string };
+            cache_control?: VertexAnthropicCacheControl;
           }
         | {
             type: "document";
             source: { type: "base64"; media_type: string; data: string };
+            cache_control?: VertexAnthropicCacheControl;
           }
-        | { type: "tool_use"; id: string; name: string; input: unknown }
-        | { type: "tool_result"; tool_use_id: string; content: string }
-        | { type: "thinking"; thinking: string }
-        | { type: "redacted_thinking"; data: string }
+        | {
+            type: "tool_use";
+            id: string;
+            name: string;
+            input: unknown;
+            cache_control?: VertexAnthropicCacheControl;
+          }
+        | {
+            type: "tool_result";
+            tool_use_id: string;
+            content: string;
+            cache_control?: VertexAnthropicCacheControl;
+          }
+        | {
+            type: "thinking";
+            thinking: string;
+            cache_control?: VertexAnthropicCacheControl;
+          }
+        | {
+            type: "redacted_thinking";
+            data: string;
+            cache_control?: VertexAnthropicCacheControl;
+          }
       >;
+};
+
+/**
+ * System prompt block form accepted by the Anthropic Vertex SDK. Used instead
+ * of a bare string when a `cache_control` breakpoint must ride on the system
+ * prompt (a string `system` cannot carry one).
+ */
+export type VertexAnthropicSystemBlock = {
+  type: "text";
+  text: string;
+  cache_control?: VertexAnthropicCacheControl;
 };
 
 /** Tool definition accepted by the Anthropic Vertex SDK. */
@@ -2143,6 +2187,28 @@ export type VertexAnthropicTool = {
     properties?: Record<string, unknown>;
     required?: string[];
   };
+  cache_control?: VertexAnthropicCacheControl;
+};
+
+/** Input to `applyVertexAnthropicCacheBreakpoints`. */
+export type VertexAnthropicCacheInput = {
+  system?: string;
+  tools?: VertexAnthropicTool[];
+  messages: VertexAnthropicMessage[];
+  /**
+   * Cap on how many of the most-recent messages receive a rolling history
+   * breakpoint. Defaults to "use the remaining budget". Two or more gives
+   * cross-turn continuity and resilience against Anthropic's 20-block cache
+   * lookback window on tool-heavy turns.
+   */
+  maxHistoryBreakpoints?: number;
+};
+
+/** Output of `applyVertexAnthropicCacheBreakpoints` — a cache-annotated request. */
+export type VertexAnthropicCacheOutput = {
+  system?: string | VertexAnthropicSystemBlock[];
+  tools?: VertexAnthropicTool[];
+  messages: VertexAnthropicMessage[];
 };
 
 /**

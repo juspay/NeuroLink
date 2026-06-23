@@ -70,6 +70,7 @@
     "test": "npx tsx test/continuous-test-suite.ts",
     "test:client": "npx tsx test/continuous-test-suite-client.ts",
     "test:context": "npx tsx test/continuous-test-suite-context.ts",
+    "test:cache": "npx tsx test/continuous-test-suite-cache-breakpoints.ts",
     "test:evaluation": "npx tsx test/continuous-test-suite-evaluation.ts",
     "test:mcp": "npx tsx test/continuous-test-suite-mcp-infra.ts",
     "test:mcp:http": "npx tsx test/continuous-test-suite-mcp-http.ts",
