@@ -47,6 +47,7 @@ import {
   RateLimitError,
 } from "../types/index.js";
 import { ERROR_CODES, NeuroLinkError } from "../utils/errorHandling.js";
+import { applyVertexAnthropicCacheBreakpoints } from "../utils/anthropicCacheBreakpoints.js";
 import { FileDetector } from "../utils/fileDetector.js";
 import { processUnifiedFilesArray } from "../utils/messageBuilder.js";
 import { logger } from "../utils/logger.js";
@@ -3177,7 +3178,13 @@ export class GoogleVertexProvider extends BaseProvider {
     // Mutable holders the StreamResult references. Background loop updates
     // these as state progresses; consumer reads them after iterating the
     // stream to completion (channel.close() is called AFTER mutations).
-    const usage = { input: 0, output: 0, total: 0 };
+    const usage: {
+      input: number;
+      output: number;
+      total: number;
+      cacheReadTokens?: number;
+      cacheCreationTokens?: number;
+    } = { input: 0, output: 0, total: 0 };
     const metadata = {
       streamId: `native-anthropic-vertex-${Date.now()}`,
       startTime,
@@ -3306,9 +3313,31 @@ export class GoogleVertexProvider extends BaseProvider {
             >
           >;
           try {
+            // Vertex has no automatic prompt caching — place explicit
+            // cache_control breakpoints (system, tools, rolling history) so the
+            // conversation prefix is cached across turns instead of re-billed as
+            // fresh input every call. Re-applied per step: the stable prefix
+            // stays byte-identical (consistent cache key) while the rolling
+            // breakpoint follows the growing tail.
+            const cachedStream = applyVertexAnthropicCacheBreakpoints({
+              system: systemPromptWithSchema,
+              tools,
+              messages: currentMessages,
+            });
             const stream = await client.messages.stream({
               ...requestParams,
-              messages: currentMessages as Parameters<
+              ...(cachedStream.system !== undefined && {
+                system: cachedStream.system as Parameters<
+                  typeof client.messages.stream
+                >[0]["system"],
+              }),
+              ...(cachedStream.tools &&
+                cachedStream.tools.length > 0 && {
+                  tools: cachedStream.tools as Parameters<
+                    typeof client.messages.stream
+                  >[0]["tools"],
+                }),
+              messages: cachedStream.messages as Parameters<
                 typeof client.messages.stream
               >[0]["messages"],
             });
@@ -3664,6 +3693,18 @@ export class GoogleVertexProvider extends BaseProvider {
         metadata.totalToolExecutions = allToolCalls.filter(
           (tc) => tc.toolName !== "final_result",
         ).length;
+
+        // Surface cache metrics once, after the agentic loop, from the
+        // cumulative turnCacheUsage running totals (accumulated via += on every
+        // step above). Assigned here — not per-iteration — so the final values
+        // are unambiguous: analytics sees caching is working and calculateCost
+        // can price the cache-read/write tiers instead of full input rate.
+        if (turnCacheUsage.read > 0) {
+          usage.cacheReadTokens = turnCacheUsage.read;
+        }
+        if (turnCacheUsage.creation > 0) {
+          usage.cacheCreationTokens = turnCacheUsage.creation;
+        }
 
         const turnOutputAttribute = spanJsonAttribute({
           text: aggregatedTurnText,
@@ -4115,6 +4156,12 @@ export class GoogleVertexProvider extends BaseProvider {
     }> = [];
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    // Cache metrics (Anthropic reports these separately from input_tokens, which
+    // is the uncached remainder). Surfaced on the result so analytics can see
+    // caching is working and calculateCost can price the ~0.1x cache-read /
+    // ~1.25x cache-write tiers instead of billing everything at full input rate.
+    let totalCacheReadTokens = 0;
+    let totalCacheCreationTokens = 0;
     // Track the final Anthropic stop_reason so we can surface finishReason
     // (notably "length" on token truncation) — the legacy native path always
     // reported "stop", hiding truncation from callers.
@@ -4128,10 +4175,32 @@ export class GoogleVertexProvider extends BaseProvider {
         // Bound the SDK wait so a stalled Vertex/Anthropic call can't hang
         // generate forever. options.timeout wins if set, otherwise default
         // to 5 min — generous for tool-heavy turns.
+        // Vertex has no automatic prompt caching — place explicit cache_control
+        // breakpoints (system, tools, rolling history) so the conversation
+        // prefix is cached across turns instead of re-billed as fresh input
+        // every call. Re-applied per step: the stable prefix stays
+        // byte-identical (consistent cache key) while the rolling breakpoint
+        // follows the growing tail.
+        const cachedGenerate = applyVertexAnthropicCacheBreakpoints({
+          system: systemPromptWithSchema,
+          tools,
+          messages: currentMessages,
+        });
         const response = await withTimeout(
           client.messages.create({
             ...requestParams,
-            messages: currentMessages as Parameters<
+            ...(cachedGenerate.system !== undefined && {
+              system: cachedGenerate.system as Parameters<
+                typeof client.messages.create
+              >[0]["system"],
+            }),
+            ...(cachedGenerate.tools &&
+              cachedGenerate.tools.length > 0 && {
+                tools: cachedGenerate.tools as Parameters<
+                  typeof client.messages.create
+                >[0]["tools"],
+              }),
+            messages: cachedGenerate.messages as Parameters<
               typeof client.messages.create
             >[0]["messages"],
           }),
@@ -4139,9 +4208,14 @@ export class GoogleVertexProvider extends BaseProvider {
           "Anthropic generate timed out",
         );
 
-        // Update token counts
+        // Update token counts. input_tokens is the uncached remainder; cache
+        // reads/writes are reported separately and accumulated here so the
+        // result reflects the full picture.
         totalInputTokens += response.usage?.input_tokens || 0;
         totalOutputTokens += response.usage?.output_tokens || 0;
+        totalCacheReadTokens += response.usage?.cache_read_input_tokens || 0;
+        totalCacheCreationTokens +=
+          response.usage?.cache_creation_input_tokens || 0;
         lastStopReason = response.stop_reason;
 
         // Check if we need to handle tool use
@@ -4364,6 +4438,12 @@ export class GoogleVertexProvider extends BaseProvider {
         input: totalInputTokens,
         output: totalOutputTokens,
         total: totalInputTokens + totalOutputTokens,
+        ...(totalCacheReadTokens > 0 && {
+          cacheReadTokens: totalCacheReadTokens,
+        }),
+        ...(totalCacheCreationTokens > 0 && {
+          cacheCreationTokens: totalCacheCreationTokens,
+        }),
       },
       responseTime,
       toolsUsed: externalToolCalls.map((tc) => tc.toolName),
@@ -5037,6 +5117,8 @@ export class GoogleVertexProvider extends BaseProvider {
           inputTokens?: number;
           outputTokens?: number;
           totalTokens?: number;
+          cacheReadTokens?: number;
+          cacheCreationTokens?: number;
         }
       | undefined,
   ): void {
@@ -5047,6 +5129,8 @@ export class GoogleVertexProvider extends BaseProvider {
     const outputTokens = usage.output ?? usage.outputTokens ?? 0;
     const totalTokens =
       usage.total ?? usage.totalTokens ?? inputTokens + outputTokens;
+    const cacheReadTokens = usage.cacheReadTokens ?? 0;
+    const cacheCreationTokens = usage.cacheCreationTokens ?? 0;
     if (inputTokens > 0) {
       span.setAttribute("gen_ai.usage.input_tokens", inputTokens);
     }
@@ -5056,11 +5140,28 @@ export class GoogleVertexProvider extends BaseProvider {
     if (totalTokens > 0) {
       span.setAttribute("gen_ai.usage.total_tokens", totalTokens);
     }
+    if (cacheReadTokens > 0) {
+      span.setAttribute(
+        "gen_ai.usage.cache_read_input_tokens",
+        cacheReadTokens,
+      );
+    }
+    if (cacheCreationTokens > 0) {
+      span.setAttribute(
+        "gen_ai.usage.cache_creation_input_tokens",
+        cacheCreationTokens,
+      );
+    }
     try {
+      // Pass cache tokens through so calculateCost prices the ~0.1x cache-read
+      // and ~1.25x cache-write tiers instead of billing cached content at the
+      // full input rate.
       const cost = calculateCost(this.providerName, modelName, {
         input: inputTokens,
         output: outputTokens,
         total: totalTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
       });
       if (typeof cost === "number" && cost > 0) {
         span.setAttribute("neurolink.cost", cost);
