@@ -1,3 +1,9 @@
+## [9.80.0](https://github.com/juspay/neurolink/compare/v9.79.3...v9.80.0) (2026-06-30)
+
+### Features
+
+- **(routing):** add classifier router for dynamic model and tool selection ([abf2e5c](https://github.com/juspay/neurolink/commit/abf2e5c0326896406e9d852258c27ac1e8924406))
+
 ## [9.79.3](https://github.com/juspay/neurolink/compare/v9.79.2...v9.79.3) (2026-06-30)
 
 ### Bug Fixes
