@@ -1048,10 +1048,16 @@ export async function executeNativeToolCalls(
 }
 
 /**
- * Handle maxSteps termination by producing a final text when the model
- * was still calling tools when the step limit was reached.
+ * Handle maxSteps termination by producing a final answer when the model was
+ * still calling tools as the step limit was reached.
+ *
+ * Resolution order (always returns a non-empty string): the caller's
+ * `finalText` if present; else the `lastStepText` gathered from the final step;
+ * else a graceful, user-facing cap message from {@link buildToolLoopCapMessage}
+ * — which replaced the legacy bracketed step-limit placeholder string.
  *
  * @param logLabel - Label for log messages (e.g. "[GoogleAIStudio]" or "[GoogleVertex]")
+ * @returns The resolved final answer text (never the legacy placeholder).
  */
 export function handleMaxStepsTermination(
   logLabel: string,
@@ -1065,12 +1071,49 @@ export function handleMaxStepsTermination(
       `${logLabel} Tool call loop terminated after reaching maxSteps (${maxSteps}). ` +
         `Model was still calling tools. Using accumulated text from last step.`,
     );
-    return (
-      lastStepText ||
-      `[Tool execution limit reached after ${maxSteps} steps. The model continued requesting tool calls beyond the limit.]`
-    );
+    return lastStepText || buildToolLoopCapMessage(maxSteps, 0);
   }
   return finalText;
+}
+
+/**
+ * Detect whether an error represents an abort/cancellation (from an
+ * AbortSignal firing during a fetch/stream drain). Used by the native
+ * Gemini-3 agentic loops to break gracefully rather than re-throw.
+ */
+export function isAbortError(error: unknown): boolean {
+  if (!error) {
+    return false;
+  }
+  const e = error as { name?: string; message?: string; code?: number };
+  return (
+    e.name === "AbortError" ||
+    (typeof e.message === "string" && /abort/i.test(e.message)) ||
+    (typeof DOMException !== "undefined" &&
+      error instanceof DOMException &&
+      e.code === 20)
+  );
+}
+
+/**
+ * Build a graceful, user-facing message for when a single agentic turn hits
+ * the step cap (or is aborted mid-turn) without producing a final answer.
+ * Replaces the legacy bracketed "Tool execution limit reached" placeholder.
+ */
+export function buildToolLoopCapMessage(
+  maxSteps: number,
+  toolCallCount: number,
+): string {
+  const calls =
+    toolCallCount > 0
+      ? `I gathered information across ${toolCallCount} tool call${
+          toolCallCount === 1 ? "" : "s"
+        } but `
+      : "I ";
+  return (
+    `${calls}reached the ${maxSteps}-step limit for a single turn before I could finish. ` +
+    `Please narrow the request or break it into smaller asks and I'll continue.`
+  );
 }
 
 /**

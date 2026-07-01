@@ -119,6 +119,9 @@ export const DEFAULT_TIMEOUT = 60000;
 export const DEFAULT_MAX_STEPS = 200;
 export const DEFAULT_TOOL_MAX_RETRIES = 2; // Maximum retries per tool before permanently failing
 
+/** Defensive wall-clock ceiling for a native Gemini-3 agentic turn (generate + stream). */
+export const DEFAULT_GEMINI_STREAM_TIMEOUT_MS = 300_000;
+
 // Fire-and-forget tool storage writes (Redis). 5s is generous for a single
 // Redis write; if breached, the .catch logs a warning.
 export const TOOL_STORAGE_TIMEOUT_MS = 5000;
