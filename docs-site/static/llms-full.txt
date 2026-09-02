@@ -170126,7 +170126,7 @@ Default realtime configuration
 
 > **removeBreaker**(`name`): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:445](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L445)
+Defined in: [mcp/mcpCircuitBreaker.ts:491](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L491)
 
 Remove a circuit breaker and clean up its resources
 
@@ -170146,7 +170146,7 @@ Remove a circuit breaker and clean up its resources
 
 > **getBreakerNames**(): `string`[]
 
-Defined in: [mcp/mcpCircuitBreaker.ts:463](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L463)
+Defined in: [mcp/mcpCircuitBreaker.ts:509](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L509)
 
 Get all circuit breaker names
 
@@ -170160,7 +170160,7 @@ Get all circuit breaker names
 
 > **getAllStats**(): `Record`\
 
-Defined in: [mcp/mcpCircuitBreaker.ts:470](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L470)
+Defined in: [mcp/mcpCircuitBreaker.ts:516](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L516)
 
 Get statistics for all circuit breakers
 
@@ -170174,7 +170174,7 @@ Get statistics for all circuit breakers
 
 > **resetAll**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:483](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L483)
+Defined in: [mcp/mcpCircuitBreaker.ts:529](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L529)
 
 Reset all circuit breakers
 
@@ -170188,7 +170188,7 @@ Reset all circuit breakers
 
 > **getHealthSummary**(): `object`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:494](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L494)
+Defined in: [mcp/mcpCircuitBreaker.ts:540](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L540)
 
 Get health summary
 
@@ -170222,7 +170222,7 @@ Get health summary
 
 > **destroyAll**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:536](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L536)
+Defined in: [mcp/mcpCircuitBreaker.ts:582](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L582)
 
 Destroy all circuit breakers and clean up their resources
 This should be called during application shutdown to prevent memory leaks
@@ -183115,7 +183115,7 @@ Execute a tool on a specific server
 
 > **getAllTools**(): [`ExternalMCPToolInfo`](/docs/type-aliases/externalmcptoolinfo)[]
 
-Defined in: [mcp/externalServerManager.ts:2235](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2235)
+Defined in: [mcp/externalServerManager.ts:2242](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2242)
 
 Get all tools from all servers
 
@@ -183129,7 +183129,7 @@ Get all tools from all servers
 
 > **getServerTools**(`serverId`): [`ExternalMCPToolInfo`](/docs/type-aliases/externalmcptoolinfo)[]
 
-Defined in: [mcp/externalServerManager.ts:2242](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2242)
+Defined in: [mcp/externalServerManager.ts:2249](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2249)
 
 Get tools for a specific server
 
@@ -183149,7 +183149,7 @@ Get tools for a specific server
 
 > **getToolDiscovery**(): `ToolDiscoveryService`
 
-Defined in: [mcp/externalServerManager.ts:2249](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2249)
+Defined in: [mcp/externalServerManager.ts:2256](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2256)
 
 Get tool discovery service
 
@@ -195452,7 +195452,7 @@ Defined in: [types/proxy.ts:3132](https://github.com/juspay/neurolink/blob/relea
 
 > `const` **globalCircuitBreakerManager**: [`CircuitBreakerManager`](/docs/api/classes/CircuitBreakerManager)
 
-Defined in: [mcp/mcpCircuitBreaker.ts:547](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L547)
+Defined in: [mcp/mcpCircuitBreaker.ts:593](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L593)
 
 MCP (Model Context Protocol) Plugin Ecosystem
 
@@ -195634,7 +195634,7 @@ Global elicitation manager instance
 
 > **getStats**(): [`CircuitBreakerStats`](/docs/type-aliases/circuitbreakerstats)
 
-Defined in: [mcp/mcpCircuitBreaker.ts:318](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L318)
+Defined in: [mcp/mcpCircuitBreaker.ts:364](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L364)
 
 Get current statistics
 
@@ -195648,7 +195648,7 @@ Get current statistics
 
 > **reset**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:347](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L347)
+Defined in: [mcp/mcpCircuitBreaker.ts:393](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L393)
 
 Manually reset the circuit breaker
 
@@ -195662,7 +195662,7 @@ Manually reset the circuit breaker
 
 > **forceOpen**(`reason?`): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:357](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L357)
+Defined in: [mcp/mcpCircuitBreaker.ts:403](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L403)
 
 Force open the circuit breaker
 
@@ -195682,7 +195682,7 @@ Force open the circuit breaker
 
 > **getName**(): `string`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:365](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L365)
+Defined in: [mcp/mcpCircuitBreaker.ts:411](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L411)
 
 Get circuit breaker name
 
@@ -195696,7 +195696,7 @@ Get circuit breaker name
 
 > **isOpen**(): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:372](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L372)
+Defined in: [mcp/mcpCircuitBreaker.ts:418](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L418)
 
 Check if circuit is open
 
@@ -195710,7 +195710,7 @@ Check if circuit is open
 
 > **isClosed**(): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:379](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L379)
+Defined in: [mcp/mcpCircuitBreaker.ts:425](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L425)
 
 Check if circuit is closed
 
@@ -195724,7 +195724,7 @@ Check if circuit is closed
 
 > **isHalfOpen**(): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:386](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L386)
+Defined in: [mcp/mcpCircuitBreaker.ts:432](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L432)
 
 Check if circuit is half-open
 
@@ -195738,7 +195738,7 @@ Check if circuit is half-open
 
 > **destroy**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:395](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L395)
+Defined in: [mcp/mcpCircuitBreaker.ts:441](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L441)
 
 Destroy the circuit breaker and clean up resources
 This method should be called when the circuit breaker is no longer needed
@@ -267188,7 +267188,7 @@ Suggestions for improvement
 
 > `optional` **defaultTimeout?**: `number`
 
-Defined in: [types/externalMcp.ts:379](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L379)
+Defined in: [types/externalMcp.ts:387](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L387)
 
 Default timeout for operations
 
@@ -267198,7 +267198,7 @@ Default timeout for operations
 
 > `optional` **defaultHealthCheckInterval?**: `number`
 
-Defined in: [types/externalMcp.ts:382](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L382)
+Defined in: [types/externalMcp.ts:390](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L390)
 
 Default health check interval
 
@@ -267208,7 +267208,7 @@ Default health check interval
 
 > `optional` **enableAutoRestart?**: `boolean`
 
-Defined in: [types/externalMcp.ts:385](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L385)
+Defined in: [types/externalMcp.ts:393](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L393)
 
 Whether to enable automatic restart
 
@@ -267218,7 +267218,7 @@ Whether to enable automatic restart
 
 > `optional` **maxRestartAttempts?**: `number`
 
-Defined in: [types/externalMcp.ts:388](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L388)
+Defined in: [types/externalMcp.ts:396](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L396)
 
 Maximum restart attempts per server
 
@@ -267228,7 +267228,7 @@ Maximum restart attempts per server
 
 > `optional` **restartBackoffMultiplier?**: `number`
 
-Defined in: [types/externalMcp.ts:391](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L391)
+Defined in: [types/externalMcp.ts:399](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L399)
 
 Restart backoff multiplier
 
@@ -267238,7 +267238,7 @@ Restart backoff multiplier
 
 > `optional` **enablePerformanceMonitoring?**: `boolean`
 
-Defined in: [types/externalMcp.ts:394](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L394)
+Defined in: [types/externalMcp.ts:402](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L402)
 
 Whether to enable performance monitoring
 
@@ -267248,7 +267248,7 @@ Whether to enable performance monitoring
 
 > `optional` **logLevel?**: `"debug"` \| `"info"` \| `"warn"` \| `"error"`
 
-Defined in: [types/externalMcp.ts:397](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L397)
+Defined in: [types/externalMcp.ts:405](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L405)
 
 Log level for external MCP operations
 
@@ -267468,7 +267468,7 @@ Additional metadata
 
 > **connected**: `object`
 
-Defined in: [types/externalMcp.ts:322](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L322)
+Defined in: [types/externalMcp.ts:330](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L330)
 
 Server connected successfully
 
@@ -267494,7 +267494,7 @@ Server connected successfully
 
 > **disconnected**: `object`
 
-Defined in: [types/externalMcp.ts:330](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L330)
+Defined in: [types/externalMcp.ts:338](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L338)
 
 Server disconnected
 
@@ -267520,7 +267520,7 @@ Server disconnected
 
 > **failed**: `object`
 
-Defined in: [types/externalMcp.ts:338](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L338)
+Defined in: [types/externalMcp.ts:346](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L346)
 
 Server failed
 
@@ -267546,7 +267546,7 @@ Server failed
 
 > **toolDiscovered**: `object`
 
-Defined in: [types/externalMcp.ts:346](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L346)
+Defined in: [types/externalMcp.ts:354](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L354)
 
 Tool discovered
 
@@ -267576,7 +267576,7 @@ Tool discovered
 
 > **toolRemoved**: `object`
 
-Defined in: [types/externalMcp.ts:355](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L355)
+Defined in: [types/externalMcp.ts:363](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L363)
 
 Tool removed
 
@@ -267602,7 +267602,7 @@ Tool removed
 
 > **healthCheck**: `object`
 
-Defined in: [types/externalMcp.ts:363](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L363)
+Defined in: [types/externalMcp.ts:371](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L371)
 
 Health check completed
 
@@ -268117,11 +268117,24 @@ Error message if failed
 
 ---
 
+### isErrorResult?
+
+> `optional` **isErrorResult?**: `boolean`
+
+Defined in: [types/externalMcp.ts:302](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L302)
+
+True when the call completed at the transport level but the MCP result
+itself is `{ isError: true }`. `success` stays true for such results so
+the resolved MCP error payload still reaches the caller unchanged; this
+flag is what lets stats and telemetry count the call as a failure.
+
+---
+
 ### duration
 
 > **duration**: `number`
 
-Defined in: [types/externalMcp.ts:297](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L297)
+Defined in: [types/externalMcp.ts:305](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L305)
 
 Execution duration in milliseconds
 
@@ -268131,7 +268144,7 @@ Execution duration in milliseconds
 
 > `optional` **metadata?**: `object`
 
-Defined in: [types/externalMcp.ts:300](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L300)
+Defined in: [types/externalMcp.ts:308](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L308)
 
 Tool execution metadata
 
@@ -329883,7 +329896,7 @@ selection so we don't have to eat a 429 to discover an account is spent.
 
 > **RuntimeMCPServerInfo** = [`MCPServerInfo`](/docs/mcpserverinfo) & `object`
 
-Defined in: [types/externalMcp.ts:408](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L408)
+Defined in: [types/externalMcp.ts:416](https://github.com/juspay/neurolink/blob/release/src/lib/types/externalMcp.ts#L416)
 
 Extended MCPServerInfo with runtime state for external servers
 Represents the transition towards zero-conversion architecture by combining
