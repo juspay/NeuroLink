@@ -165609,7 +165609,7 @@ Defined in: [types/action.ts:201](https://github.com/juspay/neurolink/blob/relea
 
 > `const` **DEFAULT_CONFIG**: [`NeuroLinkConfig`](/docs/type-aliases/neurolinkconfig)
 
-Defined in: [types/config.ts:480](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L480)
+Defined in: [types/config.ts:490](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L490)
 
 Default configuration values
 
@@ -195588,7 +195588,7 @@ Helper: Create a mock Langfuse client for testing
 
 > `optional` **content?**: `unknown`
 
-Defined in: [types/context.ts:882](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L882)
+Defined in: [types/context.ts:891](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L891)
 
 Payload of a `tool_result` block. Other block kinds carry other fields.
 
@@ -195598,7 +195598,7 @@ Payload of a `tool_result` block. Other block kinds carry other fields.
 
 > `optional` **text?**: `string`
 
-Defined in: [types/context.ts:884](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L884)
+Defined in: [types/context.ts:893](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L893)
 
 Text of a `text` block.
 
@@ -195802,7 +195802,7 @@ client.use(
 
 > **content**: `string` \| [`AnthropicGuardBlock`](/docs/anthropicguardblock)[]
 
-Defined in: [types/context.ts:900](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L900)
+Defined in: [types/context.ts:909](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L909)
 
 ---
 
@@ -238860,7 +238860,7 @@ True if provider name is valid
 
 > **path**: `string`
 
-Defined in: [types/config.ts:438](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L438)
+Defined in: [types/config.ts:448](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L448)
 
 ---
 
@@ -238868,7 +238868,7 @@ Defined in: [types/config.ts:438](https://github.com/juspay/neurolink/blob/relea
 
 > **metadata**: [`BackupMetadata`](/docs/backupmetadata)
 
-Defined in: [types/config.ts:439](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L439)
+Defined in: [types/config.ts:449](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L449)
 
 ---
 
@@ -238876,7 +238876,7 @@ Defined in: [types/config.ts:439](https://github.com/juspay/neurolink/blob/relea
 
 > **config**: [`NeuroLinkConfig`](/docs/neurolinkconfig)
 
-Defined in: [types/config.ts:440](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L440)
+Defined in: [types/config.ts:450](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L450)
 
 ---
 
@@ -238920,7 +238920,7 @@ Type guard for valid RealtimeConfig
 
 > **timestamp**: `number`
 
-Defined in: [types/config.ts:448](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L448)
+Defined in: [types/config.ts:458](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L458)
 
 ---
 
@@ -238928,7 +238928,7 @@ Defined in: [types/config.ts:448](https://github.com/juspay/neurolink/blob/relea
 
 > **version**: `string`
 
-Defined in: [types/config.ts:449](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L449)
+Defined in: [types/config.ts:459](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L459)
 
 ---
 
@@ -238936,7 +238936,7 @@ Defined in: [types/config.ts:449](https://github.com/juspay/neurolink/blob/relea
 
 > **originalPath**: `string`
 
-Defined in: [types/config.ts:450](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L450)
+Defined in: [types/config.ts:460](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L460)
 
 ---
 
@@ -238944,7 +238944,7 @@ Defined in: [types/config.ts:450](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **hash?**: `string`
 
-Defined in: [types/config.ts:451](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L451)
+Defined in: [types/config.ts:461](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L461)
 
 ---
 
@@ -238952,7 +238952,7 @@ Defined in: [types/config.ts:451](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **size?**: `number`
 
-Defined in: [types/config.ts:452](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L452)
+Defined in: [types/config.ts:462](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L462)
 
 ---
 
@@ -238960,7 +238960,7 @@ Defined in: [types/config.ts:452](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **createdBy?**: `string`
 
-Defined in: [types/config.ts:453](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L453)
+Defined in: [types/config.ts:463](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L463)
 
 ---
 
@@ -256297,7 +256297,7 @@ Model configuration source type
 
 > `optional` **validate?**: `boolean`
 
-Defined in: [types/config.ts:471](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L471)
+Defined in: [types/config.ts:481](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L481)
 
 ---
 
@@ -256305,7 +256305,7 @@ Defined in: [types/config.ts:471](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **merge?**: `boolean`
 
-Defined in: [types/config.ts:472](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L472)
+Defined in: [types/config.ts:482](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L482)
 
 ---
 
@@ -256313,7 +256313,7 @@ Defined in: [types/config.ts:472](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **reason?**: `string`
 
-Defined in: [types/config.ts:473](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L473)
+Defined in: [types/config.ts:483](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L483)
 
 ---
 
@@ -256321,7 +256321,7 @@ Defined in: [types/config.ts:473](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **silent?**: `boolean`
 
-Defined in: [types/config.ts:474](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L474)
+Defined in: [types/config.ts:484](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L484)
 
 ---
 
@@ -256335,7 +256335,7 @@ Defined in: [types/config.ts:474](https://github.com/juspay/neurolink/blob/relea
 
 > **errors**: `string`[]
 
-Defined in: [types/config.ts:461](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L461)
+Defined in: [types/config.ts:471](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L471)
 
 ---
 
@@ -256343,7 +256343,7 @@ Defined in: [types/config.ts:461](https://github.com/juspay/neurolink/blob/relea
 
 > **warnings**: `string`[]
 
-Defined in: [types/config.ts:462](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L462)
+Defined in: [types/config.ts:472](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L472)
 
 ---
 
@@ -256351,7 +256351,7 @@ Defined in: [types/config.ts:462](https://github.com/juspay/neurolink/blob/relea
 
 > **suggestions**: `string`[]
 
-Defined in: [types/config.ts:463](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L463)
+Defined in: [types/config.ts:473](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L473)
 
 ---
 
@@ -258571,7 +258571,7 @@ Enable the Gemini door on its own, for the same reason.
 
 > `optional` **thinkingBudget?**: `number`
 
-Defined in: [types/config.ts:600](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L600)
+Defined in: [types/config.ts:610](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L610)
 
 Token budget for thinking (defaults to 10000)
 
@@ -258581,7 +258581,7 @@ Token budget for thinking (defaults to 10000)
 
 > `optional` **thinkingLevel?**: [`ThinkingLevel`](/docs/thinkinglevel)
 
-Defined in: [types/config.ts:602](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L602)
+Defined in: [types/config.ts:612](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L612)
 
 Thinking level for Gemini 3 models
 
@@ -259223,7 +259223,7 @@ Detection confidence 0-100 (100 for BOM/override, 0 for the UTF-8 fallback).
 
 > **messages**: [`ChatMessage`](/docs/chatmessage)[]
 
-Defined in: [types/context.ts:1021](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1021)
+Defined in: [types/context.ts:1030](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1030)
 
 ---
 
@@ -259231,7 +259231,7 @@ Defined in: [types/context.ts:1021](https://github.com/juspay/neurolink/blob/rel
 
 > **filesDeduped**: `number`
 
-Defined in: [types/context.ts:1022](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1022)
+Defined in: [types/context.ts:1031](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1031)
 
 ---
 
@@ -270671,7 +270671,7 @@ Target output token count for the summary
 
 > `optional` **model?**: `string`
 
-Defined in: [types/context.ts:1028](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1028)
+Defined in: [types/context.ts:1037](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1037)
 
 ---
 
@@ -271483,7 +271483,7 @@ Defined in: [types/cli.ts:1696](https://github.com/juspay/neurolink/blob/release
 
 > **parts**: `unknown`[]
 
-Defined in: [types/context.ts:910](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L910)
+Defined in: [types/context.ts:919](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L919)
 
 ---
 
@@ -286037,7 +286037,7 @@ Logo position options for slides
 
 > **tokens**: `number`
 
-Defined in: [types/context.ts:853](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L853)
+Defined in: [types/context.ts:862](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L862)
 
 Estimated tokens this entry currently costs.
 
@@ -286047,7 +286047,7 @@ Estimated tokens this entry currently costs.
 
 > `optional` **previewTokens?**: `number`
 
-Defined in: [types/context.ts:859](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L859)
+Defined in: [types/context.ts:868](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L868)
 
 Tokens this entry would cost with its payload replaced by a head/tail
 preview. Omitted when the entry cannot usefully shrink — which is exactly
@@ -286065,7 +286065,7 @@ the case that forces the policy to drop batches instead.
 
 > **truncate**: `number`[]
 
-Defined in: [types/context.ts:867](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L867)
+Defined in: [types/context.ts:876](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L876)
 
 Entries whose payload should be replaced by a preview.
 
@@ -286075,7 +286075,7 @@ Entries whose payload should be replaced by a preview.
 
 > **drop**: `number`[]
 
-Defined in: [types/context.ts:869](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L869)
+Defined in: [types/context.ts:878](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L878)
 
 Entries to remove entirely — always whole batches, never a partial pair.
 
@@ -286085,7 +286085,7 @@ Entries to remove entirely — always whole batches, never a partial pair.
 
 > **projectedTokens**: `number`
 
-Defined in: [types/context.ts:871](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L871)
+Defined in: [types/context.ts:880](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L880)
 
 Estimated total after applying the plan, including fixed overhead.
 
@@ -286101,7 +286101,7 @@ Estimated total after applying the plan, including fixed overhead.
 
 > **fixedOverheadTokens**: `number`
 
-Defined in: [types/context.ts:917](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L917)
+Defined in: [types/context.ts:926](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L926)
 
 System prompt + tool definitions — rides outside the message array.
 
@@ -286111,7 +286111,7 @@ System prompt + tool definitions — rides outside the message array.
 
 > `optional` **thresholdRatio?**: `number`
 
-Defined in: [types/context.ts:919](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L919)
+Defined in: [types/context.ts:928](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L928)
 
 Fraction of the window at which the guard fires.
 
@@ -286121,7 +286121,7 @@ Fraction of the window at which the guard fires.
 
 > `optional` **lowWaterRatio?**: `number`
 
-Defined in: [types/context.ts:921](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L921)
+Defined in: [types/context.ts:930](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L930)
 
 Fraction of the window the guard reclaims down to once it fires.
 
@@ -286131,7 +286131,7 @@ Fraction of the window the guard reclaims down to once it fires.
 
 > `optional` **protectedTailCount?**: `number`
 
-Defined in: [types/context.ts:923](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L923)
+Defined in: [types/context.ts:932](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L932)
 
 Newest entries the guard must never modify.
 
@@ -286141,7 +286141,7 @@ Newest entries the guard must never modify.
 
 > `optional` **calibration?**: `number`
 
-Defined in: [types/context.ts:925](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L925)
+Defined in: [types/context.ts:934](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L934)
 
 Observed/estimated token ratio, used to tighten both marks.
 
@@ -288821,7 +288821,7 @@ Defined in: [types/mcp.ts:548](https://github.com/juspay/neurolink/blob/release/
 
 > **McpOperationConfig** = _typeof_ `MCP_OPERATION_CONFIGS`\[keyof _typeof_ `MCP_OPERATION_CONFIGS`\]
 
-Defined in: [types/config.ts:557](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L557)
+Defined in: [types/config.ts:567](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L567)
 
 MCP-specific operation config.
 
@@ -294055,7 +294055,7 @@ Defined in: [types/generate.ts:1806](https://github.com/juspay/neurolink/blob/re
 
 > **thinkingLevel**: [`ThinkingLevel`](/docs/thinkinglevel)
 
-Defined in: [types/config.ts:608](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L608)
+Defined in: [types/config.ts:618](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L618)
 
 ---
 
@@ -303166,7 +303166,7 @@ Performance optimization priority
 
 > **PerformanceProfile** = keyof _typeof_ `PERFORMANCE_PROFILES`
 
-Defined in: [types/config.ts:550](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L550)
+Defined in: [types/config.ts:560](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L560)
 
 Performance profile keys from PERFORMANCE_PROFILES.
 
@@ -309645,7 +309645,7 @@ Extract provider names from enum
 
 > **ProviderOperationConfig** = _typeof_ `PROVIDER_OPERATION_CONFIGS`\[keyof _typeof_ `PROVIDER_OPERATION_CONFIGS`\]
 
-Defined in: [types/config.ts:553](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L553)
+Defined in: [types/config.ts:563](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L563)
 
 Provider-specific operation config.
 
@@ -320612,7 +320612,7 @@ Defined in: [types/proxy.ts:2819](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **minimumSavings?**: `number`
 
-Defined in: [types/context.ts:967](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L967)
+Defined in: [types/context.ts:976](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L976)
 
 ---
 
@@ -320620,7 +320620,7 @@ Defined in: [types/context.ts:967](https://github.com/juspay/neurolink/blob/rele
 
 > `optional` **protectedTools?**: `string`[]
 
-Defined in: [types/context.ts:968](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L968)
+Defined in: [types/context.ts:977](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L977)
 
 ---
 
@@ -320628,7 +320628,7 @@ Defined in: [types/context.ts:968](https://github.com/juspay/neurolink/blob/rele
 
 > `optional` **provider?**: `string`
 
-Defined in: [types/context.ts:969](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L969)
+Defined in: [types/context.ts:978](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L978)
 
 ---
 
@@ -320642,7 +320642,7 @@ Defined in: [types/context.ts:969](https://github.com/juspay/neurolink/blob/rele
 
 > **messages**: [`ChatMessage`](/docs/chatmessage)[]
 
-Defined in: [types/context.ts:975](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L975)
+Defined in: [types/context.ts:984](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L984)
 
 ---
 
@@ -320650,7 +320650,7 @@ Defined in: [types/context.ts:975](https://github.com/juspay/neurolink/blob/rele
 
 > **tokensSaved**: `number`
 
-Defined in: [types/context.ts:976](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L976)
+Defined in: [types/context.ts:985](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L985)
 
 ---
 
@@ -322511,7 +322511,7 @@ Defined in: [types/middleware.ts:449](https://github.com/juspay/neurolink/blob/r
 
 > **refillIntervalMs**: `number`
 
-Defined in: [types/config.ts:569](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L569)
+Defined in: [types/config.ts:579](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L579)
 
 Refill interval in milliseconds
 
@@ -322521,7 +322521,7 @@ Refill interval in milliseconds
 
 > **tokensPerRefill**: `number`
 
-Defined in: [types/config.ts:571](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L571)
+Defined in: [types/config.ts:581](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L581)
 
 Number of tokens to add per refill interval
 
@@ -322531,7 +322531,7 @@ Number of tokens to add per refill interval
 
 > **maxQueueSize**: `number`
 
-Defined in: [types/config.ts:573](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L573)
+Defined in: [types/config.ts:583](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L583)
 
 Maximum queue size for pending requests
 
@@ -322541,7 +322541,7 @@ Maximum queue size for pending requests
 
 > **queueTimeoutMs**: `number`
 
-Defined in: [types/config.ts:575](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L575)
+Defined in: [types/config.ts:585](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L585)
 
 Timeout for queued requests in milliseconds
 
@@ -325328,7 +325328,7 @@ Defined in: [types/ppt.ts:1297](https://github.com/juspay/neurolink/blob/release
 
 > **messages**: [`ChatMessage`](/docs/chatmessage)[]
 
-Defined in: [types/context.ts:835](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L835)
+Defined in: [types/context.ts:844](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L844)
 
 ---
 
@@ -325336,7 +325336,7 @@ Defined in: [types/context.ts:835](https://github.com/juspay/neurolink/blob/rele
 
 > **orphanedCallsFixed**: `number`
 
-Defined in: [types/context.ts:836](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L836)
+Defined in: [types/context.ts:845](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L845)
 
 ---
 
@@ -325344,7 +325344,7 @@ Defined in: [types/context.ts:836](https://github.com/juspay/neurolink/blob/rele
 
 > **orphanedResultsFixed**: `number`
 
-Defined in: [types/context.ts:837](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L837)
+Defined in: [types/context.ts:846](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L846)
 
 ---
 
@@ -325358,7 +325358,7 @@ Defined in: [types/context.ts:837](https://github.com/juspay/neurolink/blob/rele
 
 > **results**: [`ChatMessage`](/docs/chatmessage)[]
 
-Defined in: [types/context.ts:937](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L937)
+Defined in: [types/context.ts:946](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L946)
 
 ---
 
@@ -325366,7 +325366,7 @@ Defined in: [types/context.ts:937](https://github.com/juspay/neurolink/blob/rele
 
 > **endIndex**: `number`
 
-Defined in: [types/context.ts:938](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L938)
+Defined in: [types/context.ts:947](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L947)
 
 ---
 
@@ -328198,7 +328198,7 @@ Decide whether to retry
 
 > **RetryStrategy** = keyof _typeof_ `BACKOFF_CONFIG`
 
-Defined in: [types/config.ts:547](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L547)
+Defined in: [types/config.ts:557](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L557)
 
 Retry strategy keys from BACKOFF_CONFIG.
 
@@ -346901,7 +346901,7 @@ Maximum messages to receive (-1 for unlimited)
 
 > `optional` **previousSummary?**: `string`
 
-Defined in: [types/context.ts:951](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L951)
+Defined in: [types/context.ts:960](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L960)
 
 The previous summary to merge with (required for incremental mode)
 
@@ -346911,7 +346911,7 @@ The previous summary to merge with (required for incremental mode)
 
 > `optional` **filesRead?**: `string`[]
 
-Defined in: [types/context.ts:956](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L956)
+Defined in: [types/context.ts:965](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L965)
 
 List of files that have been read during the conversation
 
@@ -346921,7 +346921,7 @@ List of files that have been read during the conversation
 
 > `optional` **filesModified?**: `string`[]
 
-Defined in: [types/context.ts:961](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L961)
+Defined in: [types/context.ts:970](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L970)
 
 List of files that have been modified during the conversation
 
@@ -346937,7 +346937,7 @@ List of files that have been modified during the conversation
 
 > `optional` **model?**: `string`
 
-Defined in: [types/context.ts:1004](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1004)
+Defined in: [types/context.ts:1013](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1013)
 
 ---
 
@@ -346945,7 +346945,7 @@ Defined in: [types/context.ts:1004](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **keepRecentRatio?**: `number`
 
-Defined in: [types/context.ts:1005](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1005)
+Defined in: [types/context.ts:1014](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1014)
 
 ---
 
@@ -346953,7 +346953,7 @@ Defined in: [types/context.ts:1005](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **memoryConfig?**: `Partial`\
 
-Defined in: [types/context.ts:1006](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1006)
+Defined in: [types/context.ts:1015](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1015)
 
 ---
 
@@ -346961,7 +346961,7 @@ Defined in: [types/context.ts:1006](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **targetTokens?**: `number`
 
-Defined in: [types/context.ts:1008](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1008)
+Defined in: [types/context.ts:1017](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1017)
 
 Target token budget — when set, split uses token counting instead of message count
 
@@ -346977,7 +346977,7 @@ Target token budget — when set, split uses token counting instead of message c
 
 > **messages**: [`ChatMessage`](/docs/chatmessage)[]
 
-Defined in: [types/context.ts:1014](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1014)
+Defined in: [types/context.ts:1023](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1023)
 
 ---
 
@@ -346985,7 +346985,7 @@ Defined in: [types/context.ts:1014](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **summaryText?**: `string`
 
-Defined in: [types/context.ts:1015](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1015)
+Defined in: [types/context.ts:1024](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1024)
 
 ---
 
@@ -351926,7 +351926,7 @@ Defined in: [types/ppt.ts:27](https://github.com/juspay/neurolink/blob/release/s
 
 > `optional` **type?**: `"enabled"` \| `"disabled"`
 
-Defined in: [types/config.ts:588](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L588)
+Defined in: [types/config.ts:598](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L598)
 
 ---
 
@@ -351934,7 +351934,7 @@ Defined in: [types/config.ts:588](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **budgetTokens?**: `number`
 
-Defined in: [types/config.ts:590](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L590)
+Defined in: [types/config.ts:600](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L600)
 
 Token budget for thinking (Anthropic models: 5000-100000)
 
@@ -351944,7 +351944,7 @@ Token budget for thinking (Anthropic models: 5000-100000)
 
 > `optional` **thinkingLevel?**: [`ThinkingLevel`](/docs/thinkinglevel)
 
-Defined in: [types/config.ts:592](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L592)
+Defined in: [types/config.ts:602](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L602)
 
 Thinking level for Gemini 3 models
 
@@ -351964,7 +351964,7 @@ Thinking level for Gemini 3 models
 
 > **ThinkingLevel** = `"minimal"` \| `"low"` \| `"medium"` \| `"high"`
 
-Defined in: [types/config.ts:583](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L583)
+Defined in: [types/config.ts:593](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L593)
 
 ThinkingLevel type for Gemini 3 models.
 
@@ -352156,7 +352156,7 @@ Icon code (Unicode)
 
 > **TimeoutCategory** = keyof _typeof_ `TOOL_TIMEOUTS`
 
-Defined in: [types/config.ts:544](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L544)
+Defined in: [types/config.ts:554](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L554)
 
 Timeout category keys from TOOL_TIMEOUTS.
 
@@ -354000,6 +354000,22 @@ Whether the bash command execution tool should be enabled (opt-in, defaults to f
 
 ---
 
+### outputTruncationMaxBytes?
+
+> `optional` **outputTruncationMaxBytes?**: `number`
+
+Defined in: [types/config.ts:440](https://github.com/juspay/neurolink/blob/release/src/lib/types/config.ts#L440)
+
+Byte ceiling for the safety-net truncation `ToolsManager` applies to
+every direct/custom/external-MCP tool result before it reaches the AI
+SDK accumulator (BZ-666). Independent of `mcp.outputLimits`, which only
+governs external MCP results earlier in the pipeline via its own
+externalize-to-artifact-store strategy. Default: 51200 (50 KB) —
+unchanged from the previous hard-coded ceiling, so existing consumers
+see no behavior change unless they set this explicitly.
+
+---
+
 ## Type Alias: ToolContent
 
 <!-- Source: api/type-aliases/ToolContent.md -->
@@ -355458,6 +355474,21 @@ Fraction of preview budget allocated to the tail (default: 0.75)
 
 ---
 
+### notice?
+
+> `optional` **notice?**: `string` \| ((`omittedBytes`) => `string`)
+
+Defined in: [types/context.ts:828](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L828)
+
+Override the omission notice spliced between head and tail. A string is
+used verbatim; a function receives the omitted byte count and returns
+the notice text. When omitted, the built-in default is used, which
+names the `retrieve_context` tool — pass this when that tool is not
+registered on the calling instance so the model isn't pointed at a tool
+that doesn't exist.
+
+---
+
 ## Type Alias: ToolOutputPreviewResult
 
 <!-- Source: api/type-aliases/ToolOutputPreviewResult.md -->
@@ -355468,7 +355499,7 @@ Fraction of preview budget allocated to the tail (default: 0.75)
 
 > **truncated**: `boolean`
 
-Defined in: [types/context.ts:827](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L827)
+Defined in: [types/context.ts:836](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L836)
 
 Whether truncation was applied
 
@@ -355478,7 +355509,7 @@ Whether truncation was applied
 
 > **originalSize**: `number`
 
-Defined in: [types/context.ts:829](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L829)
+Defined in: [types/context.ts:838](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L838)
 
 Original byte size of the full output
 
@@ -358226,7 +358257,7 @@ Defined in: [types/context.ts:807](https://github.com/juspay/neurolink/blob/rele
 
 > `optional` **currentTokens?**: `number`
 
-Defined in: [types/context.ts:983](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L983)
+Defined in: [types/context.ts:992](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L992)
 
 Current estimated tokens (enables adaptive mode)
 
@@ -358236,7 +358267,7 @@ Current estimated tokens (enables adaptive mode)
 
 > `optional` **targetTokens?**: `number`
 
-Defined in: [types/context.ts:985](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L985)
+Defined in: [types/context.ts:994](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L994)
 
 Target token budget (enables adaptive mode)
 
@@ -358246,7 +358277,7 @@ Target token budget (enables adaptive mode)
 
 > `optional` **provider?**: `string`
 
-Defined in: [types/context.ts:987](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L987)
+Defined in: [types/context.ts:996](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L996)
 
 Provider for token estimation (enables adaptive mode)
 
@@ -358256,7 +358287,7 @@ Provider for token estimation (enables adaptive mode)
 
 > `optional` **adaptiveBuffer?**: `number`
 
-Defined in: [types/context.ts:989](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L989)
+Defined in: [types/context.ts:998](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L998)
 
 Buffer above required reduction (default: 0.15 = 15%)
 
@@ -358266,7 +358297,7 @@ Buffer above required reduction (default: 0.15 = 15%)
 
 > `optional` **maxIterations?**: `number`
 
-Defined in: [types/context.ts:991](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L991)
+Defined in: [types/context.ts:1000](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1000)
 
 Maximum iterations for adaptive truncation (default: 3)
 
@@ -358282,7 +358313,7 @@ Maximum iterations for adaptive truncation (default: 3)
 
 > **messages**: [`ChatMessage`](/docs/chatmessage)[]
 
-Defined in: [types/context.ts:997](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L997)
+Defined in: [types/context.ts:1006](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1006)
 
 ---
 
@@ -358290,7 +358321,7 @@ Defined in: [types/context.ts:997](https://github.com/juspay/neurolink/blob/rele
 
 > **messagesRemoved**: `number`
 
-Defined in: [types/context.ts:998](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L998)
+Defined in: [types/context.ts:1007](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1007)
 
 ---
 
