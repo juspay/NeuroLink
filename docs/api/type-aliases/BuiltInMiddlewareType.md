@@ -8,6 +8,6 @@
 
 > **BuiltInMiddlewareType** = `"analytics"` \| `"guardrails"` \| `"logging"` \| `"caching"` \| `"rateLimit"` \| `"retry"` \| `"timeout"` \| `"autoEvaluation"` \| `"lifecycle"`
 
-Defined in: [types/middleware.ts:149](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L149)
+Defined in: [types/middleware.ts:150](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L150)
 
 Built-in middleware types

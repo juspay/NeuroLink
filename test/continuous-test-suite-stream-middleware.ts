@@ -11,7 +11,7 @@ import "dotenv/config";
  */
 
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import { once } from "node:events";
 import { z } from "zod";
 import type {
@@ -835,6 +835,300 @@ await test("generate schema recovery still works with middleware enabled", async
     );
   } finally {
     await sdk.shutdown();
+    await server.close();
+  }
+});
+
+/**
+ * A prohibited term split across a boundary. The bad-word filter used to run
+ * on each text part (generate) and each text-delta (stream) in isolation, so a
+ * term that straddled two of them passed unchanged and was reassembled
+ * downstream — `lifecycle.ts` concatenates adjacent text parts, and every
+ * stream consumer concatenates deltas. Each case first proves the split reaches
+ * the consumer whole when no guardrail is configured, so a pass cannot come
+ * from the pieces never having been split, and only then asserts the guardrail
+ * catches the reassembled term.
+ */
+const SPLIT_TERM = ["inappro", "priate"] as const;
+const WHOLE_TERM = SPLIT_TERM.join("");
+
+const splitTermGuardrails = {
+  middlewareConfig: {
+    guardrails: {
+      enabled: true,
+      config: {
+        badWords: {
+          enabled: true,
+          list: [WHOLE_TERM],
+          replacementText: "CLEAN",
+        },
+      },
+    },
+  },
+};
+
+type SplitServer = {
+  baseURL: string;
+  requests: () => number;
+  close: () => Promise<void>;
+};
+
+const readRequestBody = (req: IncomingMessage): Promise<string> =>
+  new Promise((resolve) => {
+    let raw = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk: string) => {
+      raw += chunk;
+    });
+    req.on("end", () => resolve(raw));
+  });
+
+const listen = async (
+  server: Server,
+): Promise<{ port: number; close: () => Promise<void> }> => {
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  return {
+    port: typeof address === "object" && address ? address.port : 0,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
+};
+
+/** OpenAI-compatible server that streams each piece as its own SSE chunk. */
+const startSplitDeltaChatServer = async (
+  pieces: ReadonlyArray<string>,
+): Promise<SplitServer> => {
+  let requests = 0;
+  const chunk = (delta: Record<string, unknown>, finish: string | null) =>
+    `data: ${JSON.stringify({
+      id: "split",
+      object: "chat.completion.chunk",
+      created: 1,
+      model: "gpt-4o-mini",
+      choices: [{ index: 0, delta, finish_reason: finish }],
+    })}\n\n`;
+  const server = createServer(async (req, res) => {
+    await readRequestBody(req);
+    requests += 1;
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+    for (const piece of pieces) {
+      res.write(chunk({ role: "assistant", content: piece }, null));
+    }
+    res.write(chunk({}, "stop"));
+    res.write("data: [DONE]\n\n");
+    res.end();
+  });
+  const { port, close } = await listen(server);
+  return {
+    baseURL: `http://127.0.0.1:${port}/v1`,
+    requests: () => requests,
+    close,
+  };
+};
+
+/**
+ * Anthropic Messages server answering with one text block per piece — which
+ * the native Anthropic path turns into adjacent text parts in the V3 result.
+ * Serves both the JSON and the SSE form so whichever the generate path uses,
+ * the blocks stay split.
+ */
+const startSplitBlockAnthropicServer = async (
+  pieces: ReadonlyArray<string>,
+): Promise<SplitServer> => {
+  let requests = 0;
+  const model = "claude-sonnet-4-20250514";
+  const server = createServer(async (req, res) => {
+    const raw = await readRequestBody(req);
+    requests += 1;
+    const wantsStream = ((): boolean => {
+      try {
+        return (JSON.parse(raw) as { stream?: unknown }).stream === true;
+      } catch {
+        return false;
+      }
+    })();
+    if (!wantsStream) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id: "msg_split",
+          type: "message",
+          role: "assistant",
+          model,
+          content: pieces.map((text) => ({ type: "text", text })),
+          stop_reason: "end_turn",
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 2 },
+        }),
+      );
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+    const event = (type: string, data: Record<string, unknown>): void => {
+      res.write(
+        `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`,
+      );
+    };
+    event("message_start", {
+      message: {
+        id: "msg_split",
+        type: "message",
+        role: "assistant",
+        model,
+        content: [],
+        stop_reason: null,
+        usage: { input_tokens: 1, output_tokens: 0 },
+      },
+    });
+    pieces.forEach((text, index) => {
+      event("content_block_start", {
+        index,
+        content_block: { type: "text", text: "" },
+      });
+      event("content_block_delta", {
+        index,
+        delta: { type: "text_delta", text },
+      });
+      event("content_block_stop", { index });
+    });
+    event("message_delta", {
+      delta: { stop_reason: "end_turn", stop_sequence: null },
+      usage: { output_tokens: 2 },
+    });
+    event("message_stop", {});
+    res.end();
+  });
+  const { port, close } = await listen(server);
+  return {
+    baseURL: `http://127.0.0.1:${port}`,
+    requests: () => requests,
+    close,
+  };
+};
+
+const withEnv = async <T>(
+  vars: Record<string, string>,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const saved = new Map(
+    Object.keys(vars).map((key) => [key, process.env[key]] as const),
+  );
+  Object.assign(process.env, vars);
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+};
+
+await test("guardrail bad-word filtering catches a term split across stream deltas", async () => {
+  const server = await startSplitDeltaChatServer(SPLIT_TERM);
+  const sdk = new NeuroLink();
+  try {
+    const base = {
+      input: { text: "hello" },
+      provider: "openai",
+      model: "gpt-4o-mini",
+      disableTools: true,
+      disableInternalFallback: true,
+      credentials: {
+        openai: { apiKey: "sk-mock-local-server", baseURL: server.baseURL },
+      },
+    };
+    const unfiltered = await bounded(readText(await sdk.stream(base)));
+    assert.equal(
+      server.requests(),
+      1,
+      "precondition: split server not exercised",
+    );
+    assert.equal(
+      unfiltered,
+      WHOLE_TERM,
+      "precondition: split deltas did not reassemble into the whole term",
+    );
+    const filtered = await bounded(
+      readText(await sdk.stream({ ...base, middleware: splitTermGuardrails })),
+    );
+    assert.equal(
+      server.requests(),
+      2,
+      "guarded stream did not reach the provider",
+    );
+    assert.equal(
+      filtered,
+      "CLEAN",
+      "term split across stream deltas escaped the guardrail",
+    );
+  } finally {
+    await sdk.shutdown();
+    await server.close();
+  }
+});
+
+await test("guardrail bad-word filtering catches a term split across adjacent text parts (generate)", async () => {
+  const server = await startSplitBlockAnthropicServer(SPLIT_TERM);
+  try {
+    await withEnv(
+      {
+        ANTHROPIC_BASE_URL: server.baseURL,
+        ANTHROPIC_API_KEY: "sk-ant-mock-local-server",
+      },
+      async () => {
+        const sdk = new NeuroLink();
+        try {
+          const base = {
+            input: { text: "hello" },
+            provider: "anthropic",
+            model: "claude-sonnet-4-20250514",
+            disableTools: true,
+            disableInternalFallback: true,
+          };
+          const unfiltered = await sdk.generate(base);
+          assert.equal(
+            server.requests(),
+            1,
+            "precondition: split server not exercised",
+          );
+          assert.equal(
+            unfiltered.content,
+            WHOLE_TERM,
+            "precondition: adjacent text blocks did not reassemble into the whole term",
+          );
+          const filtered = await sdk.generate({
+            ...base,
+            middleware: splitTermGuardrails,
+          });
+          assert.equal(
+            server.requests(),
+            2,
+            "guarded generate did not reach the provider",
+          );
+          assert.equal(
+            filtered.content,
+            "CLEAN",
+            "term split across adjacent text parts escaped the guardrail",
+          );
+        } finally {
+          await sdk.shutdown();
+        }
+      },
+    );
+  } finally {
     await server.close();
   }
 });

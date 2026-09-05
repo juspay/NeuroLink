@@ -8,7 +8,7 @@
 
 > **MiddlewareChainConfig** = `object`
 
-Defined in: [types/middleware.ts:289](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L289)
+Defined in: [types/middleware.ts:290](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L290)
 
 Middleware chain configuration
 
@@ -18,7 +18,7 @@ Middleware chain configuration
 
 > **middlewares**: [`MiddlewareFactoryConfig`](MiddlewareFactoryConfig.md)[]
 
-Defined in: [types/middleware.ts:290](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L290)
+Defined in: [types/middleware.ts:291](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L291)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/middleware.ts:290](https://github.com/juspay/neurolink/blob/r
 
 > **errorHandling**: `"continue"` \| `"stop"` \| `"rollback"`
 
-Defined in: [types/middleware.ts:291](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L291)
+Defined in: [types/middleware.ts:292](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L292)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/middleware.ts:291](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **timeout?**: `number`
 
-Defined in: [types/middleware.ts:292](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L292)
+Defined in: [types/middleware.ts:293](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L293)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/middleware.ts:292](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **retries?**: `number`
 
-Defined in: [types/middleware.ts:293](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L293)
+Defined in: [types/middleware.ts:294](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L294)

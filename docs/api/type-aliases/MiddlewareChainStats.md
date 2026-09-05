@@ -8,7 +8,7 @@
 
 > **MiddlewareChainStats** = `object`
 
-Defined in: [types/middleware.ts:135](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L135)
+Defined in: [types/middleware.ts:136](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L136)
 
 Middleware chain execution statistics
 
@@ -18,7 +18,7 @@ Middleware chain execution statistics
 
 > **totalMiddleware**: `number`
 
-Defined in: [types/middleware.ts:137](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L137)
+Defined in: [types/middleware.ts:138](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L138)
 
 Total number of middleware in the chain
 
@@ -28,7 +28,7 @@ Total number of middleware in the chain
 
 > **appliedMiddleware**: `number`
 
-Defined in: [types/middleware.ts:139](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L139)
+Defined in: [types/middleware.ts:140](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L140)
 
 Number of middleware that were applied
 
@@ -38,7 +38,7 @@ Number of middleware that were applied
 
 > **totalExecutionTime**: `number`
 
-Defined in: [types/middleware.ts:141](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L141)
+Defined in: [types/middleware.ts:142](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L142)
 
 Total execution time for the chain
 
@@ -48,6 +48,6 @@ Total execution time for the chain
 
 > **results**: `Record`\<`string`, [`MiddlewareExecutionResult`](MiddlewareExecutionResult.md)\>
 
-Defined in: [types/middleware.ts:143](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L143)
+Defined in: [types/middleware.ts:144](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L144)
 
 Individual middleware execution results

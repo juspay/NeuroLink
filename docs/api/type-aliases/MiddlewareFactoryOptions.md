@@ -8,7 +8,7 @@
 
 > **MiddlewareFactoryOptions** = `object`
 
-Defined in: [types/middleware.ts:175](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L175)
+Defined in: [types/middleware.ts:176](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L176)
 
 Factory options for middleware
 
@@ -18,7 +18,7 @@ Factory options for middleware
 
 > `optional` **middleware?**: [`NeuroLinkMiddleware`](NeuroLinkMiddleware.md)[]
 
-Defined in: [types/middleware.ts:177](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L177)
+Defined in: [types/middleware.ts:178](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L178)
 
 Custom middleware to register on initialization
 
@@ -28,7 +28,7 @@ Custom middleware to register on initialization
 
 > `optional` **enabledMiddleware?**: `string`[]
 
-Defined in: [types/middleware.ts:179](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L179)
+Defined in: [types/middleware.ts:180](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L180)
 
 Enable specific middleware
 
@@ -38,7 +38,7 @@ Enable specific middleware
 
 > `optional` **disabledMiddleware?**: `string`[]
 
-Defined in: [types/middleware.ts:181](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L181)
+Defined in: [types/middleware.ts:182](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L182)
 
 Disable specific middleware
 
@@ -48,7 +48,7 @@ Disable specific middleware
 
 > `optional` **middlewareConfig?**: `Record`\<`string`, [`MiddlewareConfig`](MiddlewareConfig.md)\>
 
-Defined in: [types/middleware.ts:183](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L183)
+Defined in: [types/middleware.ts:184](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L184)
 
 Middleware configurations
 
@@ -58,7 +58,7 @@ Middleware configurations
 
 > `optional` **preset?**: `string`
 
-Defined in: [types/middleware.ts:185](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L185)
+Defined in: [types/middleware.ts:186](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L186)
 
 Use a preset configuration
 
@@ -68,7 +68,7 @@ Use a preset configuration
 
 > `optional` **global?**: `object`
 
-Defined in: [types/middleware.ts:187](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L187)
+Defined in: [types/middleware.ts:188](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L188)
 
 Global middleware settings
 

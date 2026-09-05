@@ -8,7 +8,7 @@
 
 > **MiddlewareValidationResult** = `object`
 
-Defined in: [types/middleware.ts:255](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L255)
+Defined in: [types/middleware.ts:256](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L256)
 
 Middleware validation result
 
@@ -18,7 +18,7 @@ Middleware validation result
 
 > **valid**: `boolean`
 
-Defined in: [types/middleware.ts:256](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L256)
+Defined in: [types/middleware.ts:257](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L257)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/middleware.ts:256](https://github.com/juspay/neurolink/blob/r
 
 > **errors**: `string`[]
 
-Defined in: [types/middleware.ts:257](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L257)
+Defined in: [types/middleware.ts:258](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L258)
 
 ---
 
@@ -34,4 +34,4 @@ Defined in: [types/middleware.ts:257](https://github.com/juspay/neurolink/blob/r
 
 > **warnings**: `string`[]
 
-Defined in: [types/middleware.ts:258](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L258)
+Defined in: [types/middleware.ts:259](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L259)

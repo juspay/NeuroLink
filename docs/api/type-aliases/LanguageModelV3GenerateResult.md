@@ -14,7 +14,7 @@ Defined in: [types/aiCompat.ts:430](https://github.com/juspay/neurolink/blob/rel
 
 ### content
 
-> **content**: `LanguageModelV3Content`[]
+> **content**: [`LanguageModelV3Content`](LanguageModelV3Content.md)[]
 
 Defined in: [types/aiCompat.ts:431](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L431)
 

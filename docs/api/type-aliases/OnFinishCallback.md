@@ -8,7 +8,7 @@
 
 > **OnFinishCallback** = (`payload`) => `void` \| `Promise`\<`void`\>
 
-Defined in: [types/middleware.ts:339](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L339)
+Defined in: [types/middleware.ts:340](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L340)
 
 Callback invoked when generation or streaming finishes successfully.
 

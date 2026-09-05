@@ -8,7 +8,7 @@
 
 > **MiddlewareContext** = `object`
 
-Defined in: [types/middleware.ts:90](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L90)
+Defined in: [types/middleware.ts:91](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L91)
 
 Context passed to middleware for decision making
 
@@ -18,7 +18,7 @@ Context passed to middleware for decision making
 
 > **provider**: `string`
 
-Defined in: [types/middleware.ts:92](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L92)
+Defined in: [types/middleware.ts:93](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L93)
 
 Provider name
 
@@ -28,7 +28,7 @@ Provider name
 
 > **model**: `string`
 
-Defined in: [types/middleware.ts:94](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L94)
+Defined in: [types/middleware.ts:95](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L95)
 
 Model name
 
@@ -38,7 +38,7 @@ Model name
 
 > **options**: `Record`\<`string`, `unknown`\>
 
-Defined in: [types/middleware.ts:96](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L96)
+Defined in: [types/middleware.ts:97](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L97)
 
 Request options
 
@@ -48,7 +48,7 @@ Request options
 
 > `optional` **session?**: `object`
 
-Defined in: [types/middleware.ts:98](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L98)
+Defined in: [types/middleware.ts:99](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L99)
 
 Session information
 
@@ -66,6 +66,6 @@ Session information
 
 > `optional` **metadata?**: `Record`\<`string`, [`JsonValue`](JsonValue.md)\>
 
-Defined in: [types/middleware.ts:103](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L103)
+Defined in: [types/middleware.ts:104](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L104)
 
 Additional metadata

@@ -458,6 +458,7 @@ console.log(result.content);
 - [LanguageModelV3ToolCall](type-aliases/LanguageModelV3ToolCall.md)
 - [LanguageModelV3Source](type-aliases/LanguageModelV3Source.md)
 - [LanguageModelV3ToolChoice](type-aliases/LanguageModelV3ToolChoice.md)
+- [LanguageModelV3Content](type-aliases/LanguageModelV3Content.md)
 - [LanguageModelV3GenerateResult](type-aliases/LanguageModelV3GenerateResult.md)
 - [LanguageModelV3StreamPart](type-aliases/LanguageModelV3StreamPart.md)
 - [LanguageModelV3StreamResult](type-aliases/LanguageModelV3StreamResult.md)

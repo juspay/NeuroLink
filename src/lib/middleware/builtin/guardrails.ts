@@ -3,6 +3,8 @@ import type {
   NeuroLinkMiddlewareMetadata,
   GuardrailsMiddlewareConfig,
   LanguageModelV3StreamPart,
+  BadWordsConfig,
+  LanguageModelV3Content,
 } from "../../types/index.js";
 import {
   createBlockedResponse,
@@ -13,6 +15,48 @@ import {
 import { logger } from "../../utils/logger.js";
 import { generateOnceNative } from "../../utils/nativeSingleShot.js";
 import type { LanguageModelMiddleware } from "../../types/index.js";
+
+/**
+ * Filter each contiguous run of text parts as one string.
+ *
+ * A prohibited term that straddles two adjacent text parts is invisible to a
+ * per-part filter, and the parts are concatenated downstream (`lifecycle.ts`
+ * joins adjacent text), so the term reached the caller whole. Anthropic's
+ * native path emits one text part per content block, so adjacent parts are a
+ * real shape, not a theoretical one. Non-text parts keep their position; a run
+ * is rebuilt as a single text part only when the filter changed it.
+ */
+const filterTextRuns = (
+  content: ReadonlyArray<LanguageModelV3Content>,
+  badWords: BadWordsConfig | undefined,
+  context: string,
+): LanguageModelV3Content[] => {
+  const out: LanguageModelV3Content[] = [];
+  let run: Array<Extract<LanguageModelV3Content, { type: "text" }>> = [];
+  const flushRun = (): void => {
+    if (run.length === 0) {
+      return;
+    }
+    const merged = run.map((part) => part.text).join("");
+    const filtered = applyContentFiltering(merged, badWords, context);
+    if (filtered.hasChanges) {
+      out.push({ ...run[0], text: filtered.filteredText });
+    } else {
+      out.push(...run);
+    }
+    run = [];
+  };
+  for (const part of content) {
+    if (part.type === "text") {
+      run.push(part);
+    } else {
+      flushRun();
+      out.push(part);
+    }
+  }
+  flushRun();
+  return out;
+};
 
 /**
  * Create Guardrails AI middleware for content filtering and policy enforcement
@@ -90,18 +134,7 @@ export function createGuardrailsMiddleware(
 
       result = {
         ...result,
-        content: result.content.map((part) =>
-          part.type === "text"
-            ? {
-                ...part,
-                text: applyContentFiltering(
-                  part.text,
-                  config.badWords,
-                  "generate",
-                ).filteredText,
-              }
-            : part,
-        ),
+        content: filterTextRuns(result.content, config.badWords, "generate"),
       };
 
       if (config.modelFilter?.enabled && config.modelFilter.filterModel) {
@@ -163,29 +196,52 @@ export function createGuardrailsMiddleware(
       const { stream, ...rest } = await doStream();
       let hasYieldedChunks = false;
 
+      // With bad-word filtering on, a text run is buffered and filtered as one
+      // string: a term split across deltas is invisible per delta and every
+      // consumer reassembles it. The run is released when a non-text part
+      // arrives or the stream ends, so the guardrail trades incremental
+      // delivery of that run for not being bypassable by chunking. With
+      // filtering off, deltas pass through untouched and unbuffered.
+      const bufferTextRuns = config.badWords?.enabled === true;
+      let pendingText:
+        | Extract<LanguageModelV3StreamPart, { type: "text-delta" }>
+        | undefined;
+      const releaseText = (
+        controller: TransformStreamDefaultController<LanguageModelV3StreamPart>,
+      ): void => {
+        if (!pendingText) {
+          return;
+        }
+        const filtered = applyContentFiltering(
+          pendingText.delta,
+          config.badWords,
+          "stream",
+        );
+        controller.enqueue(
+          filtered.hasChanges
+            ? { ...pendingText, delta: filtered.filteredText }
+            : pendingText,
+        );
+        pendingText = undefined;
+      };
+
       const transformStream = new TransformStream<
         LanguageModelV3StreamPart,
         LanguageModelV3StreamPart
       >({
         transform(chunk, controller) {
           hasYieldedChunks = true;
-          let filteredChunk = chunk;
-          if (filteredChunk.type === "text-delta") {
-            const filterResult = applyContentFiltering(
-              filteredChunk.delta,
-              config.badWords,
-              "stream",
-            );
-            if (filterResult.hasChanges) {
-              filteredChunk = {
-                ...filteredChunk,
-                delta: filterResult.filteredText,
-              };
-            }
+          if (chunk.type === "text-delta" && bufferTextRuns) {
+            pendingText = pendingText
+              ? { ...pendingText, delta: pendingText.delta + chunk.delta }
+              : chunk;
+            return;
           }
-          controller.enqueue(filteredChunk);
+          releaseText(controller);
+          controller.enqueue(chunk);
         },
-        flush() {
+        flush(controller) {
+          releaseText(controller);
           if (!hasYieldedChunks) {
             logger.warn(
               `[GuardrailsMiddleware] Stream ended without yielding any chunks`,

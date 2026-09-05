@@ -8,7 +8,7 @@
 
 > **MiddlewareRequestSchema** = `object`
 
-Defined in: [types/middleware.ts:493](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L493)
+Defined in: [types/middleware.ts:494](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L494)
 
 Simple structural validation schema used by the request-validation
 middleware. Named MiddlewareRequestSchema to disambiguate from the zod
@@ -20,7 +20,7 @@ middleware. Named MiddlewareRequestSchema to disambiguate from the zod
 
 > `optional` **required?**: `string`[]
 
-Defined in: [types/middleware.ts:494](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L494)
+Defined in: [types/middleware.ts:495](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L495)
 
 ---
 
@@ -28,7 +28,7 @@ Defined in: [types/middleware.ts:494](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **properties?**: `Record`\<`string`, [`PropertySchema`](PropertySchema.md)\>
 
-Defined in: [types/middleware.ts:495](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L495)
+Defined in: [types/middleware.ts:496](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L496)
 
 ---
 
@@ -36,4 +36,4 @@ Defined in: [types/middleware.ts:495](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **additionalProperties?**: `boolean`
 
-Defined in: [types/middleware.ts:496](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L496)
+Defined in: [types/middleware.ts:497](https://github.com/juspay/neurolink/blob/release/src/lib/types/middleware.ts#L497)
