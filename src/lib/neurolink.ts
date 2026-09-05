@@ -5871,6 +5871,7 @@ Current user's request: ${currentInput}`;
         : undefined,
       responseTime: textResult.responseTime,
       toolsUsed: textResult.toolsUsed,
+      toolCalls: textResult.toolCalls ?? [],
       toolExecutions: toToolExecutionRecords(textResult.toolExecutions),
       enhancedWithTools: textResult.enhancedWithTools,
       availableTools: transformAvailableTools(textResult.availableTools),
@@ -8085,6 +8086,7 @@ Current user's request: ${currentInput}`;
       rawFinishReason: result.rawFinishReason,
       stepsUsed: result.stepsUsed,
       toolsUsed: result.toolsUsed || [],
+      toolCalls: result.toolCalls ?? [],
       toolExecutions: transformedToolExecutions,
       enhancedWithTools: Boolean(hasToolExecutions),
       availableTools: transformToolsForMCP(
@@ -8277,6 +8279,7 @@ Current user's request: ${currentInput}`;
             rawFinishReason: poolResult.rawFinishReason,
             stepsUsed: poolResult.stepsUsed,
             toolsUsed: poolResult.toolsUsed || [],
+            toolCalls: poolResult.toolCalls ?? [],
             // Lossless pass-through: keep the full ToolExecutionRecord
             // fields (params/resultText/isError/timing) alongside the
             // legacy {toolName,executionTime,success} shape this internal
@@ -8749,6 +8752,9 @@ Current user's request: ${currentInput}`;
           rawFinishReason: result.rawFinishReason,
           stepsUsed: result.stepsUsed,
           toolsUsed: result.toolsUsed || [],
+          // The providers record executed calls; without this line the public
+          // result never carried them, whatever the provider returned.
+          toolCalls: result.toolCalls ?? [],
           // Lossless pass-through: keep the full ToolExecutionRecord fields
           // alongside the legacy {toolName,executionTime,success} shape this
           // internal result declares, so the final GenerateResult mapping

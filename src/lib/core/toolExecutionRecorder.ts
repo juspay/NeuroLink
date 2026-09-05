@@ -14,6 +14,8 @@ import type {
   Tool,
   ToolExecutionCaptureOptions,
   ToolExecutionRecord,
+  StandardRecord,
+  ToolExecutionSummaryInternal,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 
@@ -302,6 +304,31 @@ export function toToolExecutionRecords(
  * carried a recorder that saw executions, else a conversion of the loop's
  * legacy accumulator entries.
  */
+/**
+ * The public `toolCalls` view of a native turn's execution summaries.
+ *
+ * The native generate loops record every executed call in
+ * `ToolExecutionSummaryInternal[]` and surface it as `toolExecutions`, but
+ * never mapped it onto `EnhancedGenerateResult.toolCalls` — the field the type
+ * has always declared and the ai-package formatter used to fill. A caller
+ * reading `result.toolCalls` after a tool ran saw nothing. This is the one
+ * place that mapping lives, so the three native paths cannot drift apart.
+ */
+export function toolCallsFromSummaries(
+  summaries: ReadonlyArray<ToolExecutionSummaryInternal>,
+): Array<{ toolCallId: string; toolName: string; args: StandardRecord }> {
+  return summaries.map((summary) => ({
+    toolCallId: summary.toolCallId,
+    toolName: summary.toolName,
+    args:
+      summary.input !== null &&
+      typeof summary.input === "object" &&
+      !Array.isArray(summary.input)
+        ? (summary.input as StandardRecord)
+        : {},
+  }));
+}
+
 export function resolveToolExecutionRecords(
   options: unknown,
   legacyExecutions?: unknown[],

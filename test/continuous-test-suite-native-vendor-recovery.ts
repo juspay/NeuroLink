@@ -232,4 +232,58 @@ await test("a silently ignored response_format falls back to the schema in the s
   }
 });
 
+await test("a native tool round trip populates result.toolCalls", async () => {
+  // `EnhancedGenerateResult.toolCalls` is a public field. The native loop
+  // recorded the execution (toolExecutions, toolsUsed) but never mapped it
+  // back onto toolCalls, so a caller reading the field the type promises saw
+  // nothing after a tool ran. Pre-dates the SDK removal for this family.
+  const server = await startScriptedChatServer([
+    chatCompletion({
+      finishReason: "tool_calls",
+      toolCalls: [
+        {
+          id: "call_7",
+          type: "function",
+          function: { name: "lookup", arguments: '{"value":7}' },
+        },
+      ],
+    }),
+    chatCompletion({ content: "answer 42", finishReason: "stop" }),
+  ]);
+  try {
+    const nl = new NeuroLink();
+    const result = await nl.generate({
+      input: { text: "call lookup" },
+      provider: "openai",
+      model: "scripted-model",
+      credentials: credentialsFor(server.baseURL),
+      maxSteps: 3,
+      tools: {
+        lookup: tool({
+          description: "Looks a value up",
+          inputSchema: z.object({ value: z.number() }),
+          execute: async () => ({ answer: 42 }),
+        }),
+      },
+    });
+    if (server.requestCount() < 2) {
+      throw new Error(
+        "precondition failed: the tool round trip never happened",
+      );
+    }
+    const calls = result.toolCalls ?? [];
+    if (calls.length !== 1) {
+      throw new Error("result.toolCalls does not carry the executed call");
+    }
+    if (calls[0].toolName !== "lookup" || calls[0].toolCallId !== "call_7") {
+      throw new Error("result.toolCalls carries the wrong identity");
+    }
+    if ((calls[0].args as { value?: number }).value !== 7) {
+      throw new Error("result.toolCalls carries the wrong arguments");
+    }
+  } finally {
+    await server.close();
+  }
+});
+
 await runSuite();

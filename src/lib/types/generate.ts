@@ -1677,6 +1677,12 @@ export type TextGenerationResult = {
   model?: string;
   usage?: TokenUsage;
   responseTime?: number;
+  /** The executed tool calls of a native turn — the same shape `GenerateResult` exposes. */
+  toolCalls?: Array<{
+    toolCallId: string;
+    toolName: string;
+    args: StandardRecord;
+  }>;
   toolsUsed?: string[];
   toolExecutions?: Array<{
     toolName: string;

@@ -95,7 +95,10 @@ import {
 } from "../../core/nativeGenerateLoop.js";
 import { withProviderRetry } from "../../utils/providerRetry.js";
 import { resolveRequestKind } from "../../core/resolveRequestKind.js";
-import { resolveToolExecutionRecords } from "../../core/toolExecutionRecorder.js";
+import {
+  resolveToolExecutionRecords,
+  toolCallsFromSummaries,
+} from "../../core/toolExecutionRecorder.js";
 import { transformToolExecutions } from "../../utils/transformationUtils.js";
 import {
   createAnthropicConfig,
@@ -1891,6 +1894,7 @@ export class AnthropicProvider extends BaseProvider {
       },
       responseTime: Date.now() - startTime,
       toolsUsed: loop.toolsUsed,
+      toolCalls: toolCallsFromSummaries(toolExecutionSummaries),
       toolExecutions: resolveToolExecutionRecords(
         options,
         transformToolExecutions(toolExecutionSummaries),

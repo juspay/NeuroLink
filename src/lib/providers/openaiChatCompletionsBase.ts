@@ -87,7 +87,10 @@ import {
   hasNativeDoGenerate,
   runNativeGenerateLoop,
 } from "../core/nativeGenerateLoop.js";
-import { resolveToolExecutionRecords } from "../core/toolExecutionRecorder.js";
+import {
+  resolveToolExecutionRecords,
+  toolCallsFromSummaries,
+} from "../core/toolExecutionRecorder.js";
 import { convertZodToJsonSchema } from "../utils/schemaConversion.js";
 import { coerceJsonToSchema, schemaAccepts } from "../utils/json/coerce.js";
 import { resolveToolChoice } from "../utils/toolChoice.js";
@@ -1249,6 +1252,7 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
       },
       responseTime: Date.now() - startTime,
       toolsUsed,
+      toolCalls: toolCallsFromSummaries(toolExecutionSummaries),
       toolExecutions: resolveToolExecutionRecords(
         options,
         transformToolExecutions(toolExecutionSummaries),

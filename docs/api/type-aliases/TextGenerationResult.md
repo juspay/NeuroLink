@@ -74,6 +74,12 @@ True when the schema JSON appears truncated (output hit the token cap).
 
 > `optional` **responseTime?**: `number`
 
+### toolCalls?
+
+> `optional` **toolCalls?**: `object`[]
+
+The executed tool calls of a native turn — the same shape `GenerateResult` exposes.
+
 ### toolsUsed?
 
 > `optional` **toolsUsed?**: `string`[]
