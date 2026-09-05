@@ -8,7 +8,7 @@
 
 > **CachedSession** = `object`
 
-Defined in: [types/proxy.ts:1638](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1638)
+Defined in: [types/proxy.ts:1671](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1671)
 
 Cached session entry with TTL for the SessionIdentity cloaking plugin.
 
@@ -18,7 +18,7 @@ Cached session entry with TTL for the SessionIdentity cloaking plugin.
 
 > **userId**: `string`
 
-Defined in: [types/proxy.ts:1639](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1639)
+Defined in: [types/proxy.ts:1672](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1672)
 
 ---
 
@@ -26,4 +26,4 @@ Defined in: [types/proxy.ts:1639](https://github.com/juspay/neurolink/blob/relea
 
 > **expiresAt**: `number`
 
-Defined in: [types/proxy.ts:1640](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1640)
+Defined in: [types/proxy.ts:1673](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1673)

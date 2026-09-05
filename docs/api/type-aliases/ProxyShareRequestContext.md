@@ -8,7 +8,7 @@
 
 > **ProxyShareRequestContext** = `object`
 
-Defined in: [types/proxy.ts:3597](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3597)
+Defined in: [types/proxy.ts:3672](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3672)
 
 Request-scoped view of the grant serving the current borrowed request.
 
@@ -18,7 +18,7 @@ Request-scoped view of the grant serving the current borrowed request.
 
 > **grantId**: `string`
 
-Defined in: [types/proxy.ts:3598](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3598)
+Defined in: [types/proxy.ts:3673](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3673)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:3598](https://github.com/juspay/neurolink/blob/relea
 
 > **peerLabel**: `string`
 
-Defined in: [types/proxy.ts:3599](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3599)
+Defined in: [types/proxy.ts:3674](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3674)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:3599](https://github.com/juspay/neurolink/blob/relea
 
 > **level**: [`ProxyShareLevel`](ProxyShareLevel.md)
 
-Defined in: [types/proxy.ts:3600](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3600)
+Defined in: [types/proxy.ts:3675](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3675)
 
 ---
 
@@ -42,7 +42,7 @@ Defined in: [types/proxy.ts:3600](https://github.com/juspay/neurolink/blob/relea
 
 > **gates**: [`ProxyShareGates`](ProxyShareGates.md)
 
-Defined in: [types/proxy.ts:3601](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3601)
+Defined in: [types/proxy.ts:3676](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3676)
 
 ---
 
@@ -50,7 +50,7 @@ Defined in: [types/proxy.ts:3601](https://github.com/juspay/neurolink/blob/relea
 
 > **ledger**: [`ProxyShareLedgerMode`](ProxyShareLedgerMode.md)
 
-Defined in: [types/proxy.ts:3602](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3602)
+Defined in: [types/proxy.ts:3677](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3677)
 
 ---
 
@@ -58,7 +58,7 @@ Defined in: [types/proxy.ts:3602](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **holdId?**: `string`
 
-Defined in: [types/proxy.ts:3604](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3604)
+Defined in: [types/proxy.ts:3679](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3679)
 
 Pre-authorization opened at admission; settlement closes it.
 
@@ -68,6 +68,6 @@ Pre-authorization opened at admission; settlement closes it.
 
 > `optional` **model?**: `string`
 
-Defined in: [types/proxy.ts:3606](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3606)
+Defined in: [types/proxy.ts:3681](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3681)
 
 Model the borrower asked for, carried so settlement can price it.

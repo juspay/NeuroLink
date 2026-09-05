@@ -670,6 +670,14 @@ export type ProxyAccountSortMetrics = {
 };
 
 export type RequestLogEntry = {
+  /** First output text or tool-argument delta, excluding SSE control frames. */
+  firstUsefulOutputMs?: number;
+  /** Small routing evidence retained even when response bodies are pruned. */
+  fallbackPlan?: Array<{
+    provider: string;
+    model: string;
+    reasoningEffort?: string;
+  }>;
   timestamp: string;
   requestId: string;
   method: string;
@@ -726,9 +734,33 @@ export type RequestLogEntry = {
   routingDecision?: ProxyAccountRoutingDecision;
 };
 
+/** File-sink evidence is independent of model/request success counters. */
+export type ProxyRequestLogSinkSnapshot = {
+  attempted: number;
+  written: number;
+  inFlight: number;
+  pending: number;
+  /** Records not admitted because the bounded writer queue was full. */
+  dropped: number;
+  writeTimeouts: number;
+  unconfirmedWrites: number;
+  lastErrorCode?: string;
+};
+
+export type ProxyRequestLoggerSnapshot = {
+  enabled: boolean;
+  requests: ProxyRequestLogSinkSnapshot;
+  attempts: ProxyRequestLogSinkSnapshot;
+  debug: ProxyRequestLogSinkSnapshot;
+};
+
 export type RequestAttemptLogEntry = {
   timestamp: string;
   requestId: string;
+  /** Parent client request for an internal fallback invocation. */
+  parentRequestId?: string;
+  /** Requested effort retained independently of full body captures. */
+  reasoningEffort?: string;
   attempt: number;
   method: string;
   path: string;
@@ -783,6 +815,7 @@ export type CodexFinalLogExtra = Partial<
     | "cacheReadTokens"
     | "cacheCreationTokens"
     | "terminalOutcome"
+    | "firstUsefulOutputMs"
   >
 >;
 
@@ -1880,10 +1913,12 @@ export type ProxyResponseTrackingObserver = {
   }) => void;
   onTerminal?: (details: {
     outcome: ProxyResponseTerminalOutcome;
+    /** Underlying read failure for structured transport diagnostics. */
+    error?: unknown;
     /** Decoded response-body bytes observed by the adapter. */
     observedBodyBytes: number;
     responseChunks: number;
-  }) => void;
+  }) => unknown;
 };
 
 /** Versioned lifecycle event names persisted by the proxy adapter. */
@@ -1896,7 +1931,8 @@ export type ProxyLifecycleEventName =
 /** Client-facing terminal classifications recorded by lifecycle metadata. */
 export type ProxyLifecycleTerminalOutcome =
   | ProxyResponseTerminalOutcome
-  | "handler_error";
+  | "handler_error"
+  | "unknown";
 
 /** Content-free lifecycle event accepted by the bounded metadata logger. */
 export type ProxyLifecycleEventInput = {
@@ -1910,6 +1946,17 @@ export type ProxyLifecycleEventInput = {
   sessionHash?: string;
   requestBytes?: number;
   responseStatus?: number;
+  /** Semantic final status; the HTTP status may already have been committed. */
+  finalStatus?: number;
+  /** Terminal bookkeeping health, separate from the model outcome. */
+  telemetryStatus?: "complete" | "timeout" | "observer_error" | "missing_final";
+  /** Transport completion is independent of successful model completion. */
+  transportOutcome?: ProxyResponseTerminalOutcome;
+  outcomeSource?:
+    | "final_request"
+    | "transport_error"
+    | "http_status"
+    | "unknown";
   /** Decoded response-body bytes observed by the adapter. */
   observedBodyBytes?: number;
   responseChunks?: number;
@@ -1937,6 +1984,10 @@ export type ProxyLifecycleLoggerSnapshot = {
   writeFailures: number;
   /** Events requeued after a transient lifecycle metadata write failure. */
   writeRetries: number;
+  /** Slow appends still owned by the original writer, never replayed on timeout. */
+  writeTimeouts: number;
+  /** Records in failed appends that may have partially reached the file. */
+  unconfirmedWrites: number;
   pending: number;
   inFlight: number;
   flushing: boolean;
@@ -2018,6 +2069,12 @@ export type ProxyAnalysisReport = {
     unsupportedLifecycleLines: number;
     lifecycleSequenceGaps: number;
     lifecycleSequenceDuplicates: number;
+    conflictingLifecycleDuplicates: number;
+    duplicateAttempts: number;
+    finalOutcomeConflicts: number;
+    /** Missing evidence; may include in-flight or interrupted requests. */
+    acceptedWithoutFinal: number;
+    terminalWithoutFinal: number;
     streams: Record<
       ProxyAnalysisStreamName,
       {
@@ -2078,6 +2135,7 @@ export type ProxyAnalysisReport = {
   latencyMs: {
     headers: ProxyLatencySummary;
     firstChunk: ProxyLatencySummary;
+    firstUsefulOutput: ProxyLatencySummary;
     terminal: ProxyLatencySummary;
     finalRequest: ProxyLatencySummary;
     attempt: ProxyLatencySummary;
@@ -2143,6 +2201,7 @@ export type ProxyAnalysisAttemptRecord = {
 
 /** Final request fields retained while joining offline proxy log records. */
 export type ProxyAnalysisFinalRequestRecord = {
+  firstUsefulOutputMs: number | null;
   timestamp: string;
   status: number;
   durationMs: number | null;
@@ -2190,6 +2249,16 @@ export type CodexStreamUsage = {
   reasoningTokens: number;
 };
 
+/** Semantic completion evidence observed in native Codex SSE bytes. */
+export type CodexStreamEvidence = {
+  completed: boolean;
+  terminalBytes: number;
+  firstUsefulOutputAt?: number;
+  errorType?: string;
+  errorMessage?: string;
+  errorCode?: string;
+};
+
 /** Validated account-routing evidence joined to a final request log. */
 export type ProxyAnalysisRoutingRecord = {
   requestId: string;
@@ -2213,6 +2282,8 @@ export type RuntimeRequestMetadata = {
   rejectForUpdate?: boolean;
   terminalErrorType?: string;
   terminalErrorCode?: string;
+  /** Canonical final record, populated synchronously before asynchronous I/O. */
+  terminalResult?: RequestLogEntry;
   /** Releases this request's peer-share concurrency slot. Set by the share
    *  gate for borrowed traffic; invoked once the response body completes, so a
    *  long stream holds its slot for as long as it is actually streaming. */
@@ -2428,6 +2499,8 @@ export type SSEContentBlock = {
 
 /** Aggregated telemetry resolved when an SSE stream completes. */
 export type SSETelemetry = {
+  messageStopReceived: boolean;
+  firstUsefulOutputAt?: number;
   messageId: string;
   model: string;
   usage: {
@@ -2465,6 +2538,8 @@ export type StreamTerminalOutcomeTracker = {
 
 /** Mutable accumulator the SSE interceptor uses internally. */
 export type TelemetryAccumulator = {
+  messageStopReceived: boolean;
+  firstUsefulOutputAt?: number;
   messageId: string;
   model: string;
   inputTokens: number;

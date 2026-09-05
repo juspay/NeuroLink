@@ -392,6 +392,14 @@ export async function handleCodexResponsesRequest(
   // final status and can still recover with a later provider.
   const isFallbackRequest =
     ctx.metadata?.[CODEX_FALLBACK_METADATA_KEY] === true;
+  const reasoning = (body as Record<string, unknown>).reasoning;
+  const reasoningEffort =
+    reasoning &&
+    typeof reasoning === "object" &&
+    "effort" in reasoning &&
+    typeof reasoning.effort === "string"
+      ? reasoning.effort
+      : undefined;
 
   const writeFinalLog = (
     account: CodexRuntimeAccount | undefined,
@@ -464,6 +472,10 @@ export async function handleCodexResponsesRequest(
       timestamp: new Date().toISOString(),
       requestId: ctx.requestId,
       attempt,
+      ...(isFallbackRequest
+        ? { parentRequestId: ctx.requestId.replace(/:codex-fallback$/, "") }
+        : {}),
+      ...(reasoningEffort ? { reasoningEffort } : {}),
       method: ctx.method,
       path: ctx.path,
       model,
@@ -636,23 +648,43 @@ export async function handleCodexResponsesRequest(
         };
 
         if (!upstream.body) {
-          await recordFinalOutcome(account, upstream.status, {
-            terminalOutcome: "bodyless",
+          recordAttemptError(account.label, CODEX_ACCOUNT_TYPE, 502);
+          writeAttempt(account, attempt, attemptStartedAt, 502, {
+            errorType: "incomplete_stream",
+            errorMessage: "Codex returned no response stream",
+            retryable: false,
+          });
+          await recordFinalOutcome(account, 502, {
+            terminalOutcome: "stream_error",
+            errorType: "incomplete_stream",
+            errorMessage: "Codex returned no response stream",
           });
           return new Response(upstream.body, {
             status: upstream.status,
             headers,
           });
         }
-        const { stream: usageTap, usage: usageSeen } = createCodexUsageTap();
+        const {
+          stream: usageTap,
+          usage: usageSeen,
+          evidence,
+        } = createCodexUsageTap();
         const relay = new Response(upstream.body.pipeThrough(usageTap), {
           status: upstream.status,
           headers,
         });
         registerProxyResponseObserver(ctx.metadata, {
-          onTerminal: ({ outcome }) => {
-            void usageSeen
+          onTerminal: ({ outcome, error, observedBodyBytes }) => {
+            return usageSeen
               .then((usage) => {
+                const semantic = evidence();
+                const completedFrameDelivered =
+                  semantic.completed &&
+                  observedBodyBytes >= semantic.terminalBytes;
+                const failed =
+                  semantic.errorType ||
+                  ((outcome === "completed" || outcome === "bodyless") &&
+                    !semantic.completed);
                 const usageExtra = usage
                   ? {
                       inputTokens: usage.inputTokens,
@@ -661,10 +693,57 @@ export async function handleCodexResponsesRequest(
                       cacheCreationTokens: usage.cacheCreationTokens,
                     }
                   : {};
-                if (outcome === "completed" || outcome === "bodyless") {
-                  return recordFinalOutcome(account, upstream.status, {
-                    terminalOutcome: outcome,
+                const timing =
+                  semantic.firstUsefulOutputAt === undefined
+                    ? {}
+                    : {
+                        firstUsefulOutputMs: Math.max(
+                          0,
+                          semantic.firstUsefulOutputAt - requestStartTime,
+                        ),
+                      };
+                if (failed) {
+                  recordAttemptError(account.label, CODEX_ACCOUNT_TYPE, 502);
+                  writeAttempt(account, attempt, attemptStartedAt, 502, {
+                    errorType: semantic.errorType ?? "incomplete_stream",
+                    errorCode: semantic.errorCode,
+                    errorMessage:
+                      semantic.errorMessage ??
+                      "Codex stream ended without a completion event",
+                    retryable: false,
+                  });
+                  return recordFinalOutcome(account, 502, {
                     ...usageExtra,
+                    ...timing,
+                    terminalOutcome: "stream_error",
+                    errorType: semantic.errorType ?? "incomplete_stream",
+                    errorCode: semantic.errorCode,
+                    errorMessage:
+                      semantic.errorMessage ??
+                      "Codex stream ended without a completion event",
+                  });
+                }
+                if (
+                  outcome === "completed" ||
+                  outcome === "bodyless" ||
+                  (outcome === "client_cancelled" && completedFrameDelivered)
+                ) {
+                  return recordFinalOutcome(account, upstream.status, {
+                    terminalOutcome: "completed",
+                    ...usageExtra,
+                    ...timing,
+                  });
+                }
+                if (outcome === "stream_error") {
+                  recordAttemptError(account.label, CODEX_ACCOUNT_TYPE, 502);
+                  writeAttempt(account, attempt, attemptStartedAt, 502, {
+                    errorType: "stream_error",
+                    errorCode: getCodexTransportErrorCode(error),
+                    errorMessage: summarizeCodexUpstreamError(
+                      error instanceof Error ? error.message : "",
+                      "Codex upstream stream failed",
+                    ),
+                    retryable: false,
                   });
                 }
                 return recordFinalOutcome(
@@ -678,9 +757,16 @@ export async function handleCodexResponsesRequest(
                     errorMessage:
                       outcome === "client_cancelled"
                         ? "Client cancelled Codex stream"
-                        : "Codex upstream stream failed",
+                        : summarizeCodexUpstreamError(
+                            error instanceof Error ? error.message : "",
+                            "Codex upstream stream failed",
+                          ),
+                    ...(outcome === "stream_error"
+                      ? { errorCode: getCodexTransportErrorCode(error) }
+                      : {}),
                     terminalOutcome: outcome,
                     ...usageExtra,
+                    ...timing,
                   },
                 );
               })

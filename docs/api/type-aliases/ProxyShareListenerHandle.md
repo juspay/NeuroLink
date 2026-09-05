@@ -8,7 +8,7 @@
 
 > **ProxyShareListenerHandle** = `object`
 
-Defined in: [types/proxy.ts:3833](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3833)
+Defined in: [types/proxy.ts:3908](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3908)
 
 A running gate-only share listener, as its supervisor sees it.
 
@@ -18,7 +18,7 @@ A running gate-only share listener, as its supervisor sees it.
 
 > **port**: `number`
 
-Defined in: [types/proxy.ts:3834](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3834)
+Defined in: [types/proxy.ts:3909](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3909)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:3834](https://github.com/juspay/neurolink/blob/relea
 
 > **close**: () => `Promise`\<`void`\>
 
-Defined in: [types/proxy.ts:3835](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3835)
+Defined in: [types/proxy.ts:3910](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3910)
 
 #### Returns
 

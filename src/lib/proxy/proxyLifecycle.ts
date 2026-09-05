@@ -40,6 +40,8 @@ let invalidDrops = 0;
 let writeDrops = 0;
 let writeFailures = 0;
 let writeRetries = 0;
+let writeTimeouts = 0;
+let unconfirmedWrites = 0;
 let inFlight = 0;
 let queue: QueuedProxyLifecycleEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | undefined;
@@ -182,18 +184,45 @@ async function flushBatch(): Promise<void> {
     let retryDelayMs = 0;
     for (const [path, items] of byPath) {
       const lines = items.map((item) => `${JSON.stringify(item.record)}\n`);
+      // A timeout does not cancel appendFile. Keep ownership of the original
+      // operation until it settles; retrying it while it is still running can
+      // append the same batch twice. The request path remains non-blocking.
+      const timeout = setTimeout(() => {
+        writeTimeouts += 1;
+      }, LIFECYCLE_APPEND_TIMEOUT_MS);
+      timeout.unref?.();
       try {
         // This best-effort telemetry sink intentionally avoids fsync so request
         // throughput is not coupled to storage latency. Loss is surfaced by
         // writeDrops/writeFailures rather than delaying proxy responses.
-        await withTimeout(
-          appendLifecycleFile(path, lines.join(""), { mode: 0o600 }),
-          LIFECYCLE_APPEND_TIMEOUT_MS,
-          "Timed out writing proxy lifecycle metadata",
-        );
+        await appendLifecycleFile(path, lines.join(""), { mode: 0o600 });
         written += lines.length;
       } catch (error) {
         writeFailures += 1;
+        // These errors prevent opening the destination. Other failures (for
+        // example ENOSPC/EIO) can follow a partial append. Replaying those is
+        // unsafe; expose uncertainty instead of claiming either loss or success.
+        const code = (error as NodeJS.ErrnoException)?.code;
+        const definitelyNotWritten = new Set([
+          "ENOENT",
+          "EACCES",
+          "EPERM",
+          "EROFS",
+          "EMFILE",
+          "ENFILE",
+        ]).has(code ?? "");
+        if (!definitelyNotWritten) {
+          unconfirmedWrites += items.length;
+          logger.warn(
+            "[proxy] lifecycle metadata append outcome is uncertain",
+            {
+              path,
+              records: items.length,
+              code,
+            },
+          );
+          continue;
+        }
         const retryable = items.filter(
           (item) => item.writeRetries < maxWriteRetries,
         );
@@ -224,6 +253,8 @@ async function flushBatch(): Promise<void> {
           dropped: exhausted,
           error: error instanceof Error ? error.message : String(error),
         });
+      } finally {
+        clearTimeout(timeout);
       }
     }
     if (retries.length > 0) {
@@ -354,6 +385,16 @@ export function logProxyLifecycleEvent(input: ProxyLifecycleEventInput): void {
       ...(sessionHash !== undefined ? { sessionHash } : {}),
       ...(requestBytes !== undefined ? { requestBytes } : {}),
       ...(responseStatus !== undefined ? { responseStatus } : {}),
+      ...(input.finalStatus !== undefined
+        ? { finalStatus: nonNegativeInteger(input.finalStatus) }
+        : {}),
+      ...(input.telemetryStatus
+        ? { telemetryStatus: input.telemetryStatus }
+        : {}),
+      ...(input.transportOutcome
+        ? { transportOutcome: input.transportOutcome }
+        : {}),
+      ...(input.outcomeSource ? { outcomeSource: input.outcomeSource } : {}),
       ...(observedBodyBytes !== undefined ? { observedBodyBytes } : {}),
       ...(responseChunks !== undefined ? { responseChunks } : {}),
       ...(elapsedMs !== undefined
@@ -377,15 +418,23 @@ export function logProxyLifecycleEvent(input: ProxyLifecycleEventInput): void {
   }
 }
 
-export async function flushProxyLifecycleEvents(): Promise<void> {
+export async function flushProxyLifecycleEvents(
+  timeoutMs = 5_000,
+): Promise<void> {
   clearScheduledFlush();
+  const deadline = performance.now() + timeoutMs;
   while (queue.length > 0 || flushInFlight) {
-    if (flushInFlight) {
-      await flushInFlight;
-    } else {
-      await startFlush();
-    }
+    await withTimeout(
+      flushInFlight ?? startFlush(),
+      Math.max(1, deadline - performance.now()),
+      "Timed out flushing proxy lifecycle metadata; writes remain pending",
+    );
     clearScheduledFlush();
+    if (performance.now() >= deadline && (queue.length > 0 || flushInFlight)) {
+      throw new Error(
+        "Proxy lifecycle flush deadline exceeded; writes remain pending",
+      );
+    }
   }
 }
 
@@ -404,6 +453,8 @@ export function getProxyLifecycleLoggerSnapshot(): ProxyLifecycleLoggerSnapshot 
     writeDrops,
     writeFailures,
     writeRetries,
+    writeTimeouts,
+    unconfirmedWrites,
     pending: queue.length,
     inFlight,
     flushing: flushInFlight !== undefined,
@@ -430,6 +481,8 @@ export function resetProxyLifecycleLoggerForTests(): void {
   writeDrops = 0;
   writeFailures = 0;
   writeRetries = 0;
+  writeTimeouts = 0;
+  unconfirmedWrites = 0;
   inFlight = 0;
   queue = [];
   flushInFlight = undefined;

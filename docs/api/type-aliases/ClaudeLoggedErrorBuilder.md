@@ -8,7 +8,7 @@
 
 > **ClaudeLoggedErrorBuilder** = (`status`, `message`, `errorType?`, `extra?`) => [`ClaudeErrorResponse`](ClaudeErrorResponse.md)
 
-Defined in: [types/proxy.ts:848](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L848)
+Defined in: [types/proxy.ts:881](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L881)
 
 ## Parameters
 

@@ -8,7 +8,7 @@
 
 > **ProxyResidentGrant** = `object`
 
-Defined in: [types/proxy.ts:4198](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4198)
+Defined in: [types/proxy.ts:4273](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4273)
 
 A credential provisioned onto a borrower's device under a complete grant.
 
@@ -18,7 +18,7 @@ A credential provisioned onto a borrower's device under a complete grant.
 
 > **schemaVersion**: `1`
 
-Defined in: [types/proxy.ts:4199](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4199)
+Defined in: [types/proxy.ts:4274](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4274)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:4199](https://github.com/juspay/neurolink/blob/relea
 
 > **accountLabel**: `string`
 
-Defined in: [types/proxy.ts:4201](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4201)
+Defined in: [types/proxy.ts:4276](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4276)
 
 Local tokenStore label, unique on the borrower's device.
 
@@ -36,7 +36,7 @@ Local tokenStore label, unique on the borrower's device.
 
 > **grantId**: `string`
 
-Defined in: [types/proxy.ts:4202](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4202)
+Defined in: [types/proxy.ts:4277](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4277)
 
 ---
 
@@ -44,7 +44,7 @@ Defined in: [types/proxy.ts:4202](https://github.com/juspay/neurolink/blob/relea
 
 > **lenderName**: `string`
 
-Defined in: [types/proxy.ts:4203](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4203)
+Defined in: [types/proxy.ts:4278](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4278)
 
 ---
 
@@ -52,7 +52,7 @@ Defined in: [types/proxy.ts:4203](https://github.com/juspay/neurolink/blob/relea
 
 > **lenderUrl**: `string`
 
-Defined in: [types/proxy.ts:4204](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4204)
+Defined in: [types/proxy.ts:4279](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4279)
 
 ---
 
@@ -60,7 +60,7 @@ Defined in: [types/proxy.ts:4204](https://github.com/juspay/neurolink/blob/relea
 
 > **leaseSecret**: `string`
 
-Defined in: [types/proxy.ts:4206](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4206)
+Defined in: [types/proxy.ts:4281](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4281)
 
 Shared secret used to verify leases from this lender.
 
@@ -70,7 +70,7 @@ Shared secret used to verify leases from this lender.
 
 > **lease**: [`ProxyShareLease`](ProxyShareLease.md)
 
-Defined in: [types/proxy.ts:4207](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4207)
+Defined in: [types/proxy.ts:4282](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4282)
 
 ---
 
@@ -78,7 +78,7 @@ Defined in: [types/proxy.ts:4207](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **lastHeartbeatAt?**: `number`
 
-Defined in: [types/proxy.ts:4208](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4208)
+Defined in: [types/proxy.ts:4283](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4283)
 
 ---
 
@@ -86,7 +86,7 @@ Defined in: [types/proxy.ts:4208](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **unreportedCoins?**: `number`
 
-Defined in: [types/proxy.ts:4210](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4210)
+Defined in: [types/proxy.ts:4285](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4285)
 
 Coins spent since the last successful heartbeat, awaiting report.
 
@@ -96,4 +96,4 @@ Coins spent since the last successful heartbeat, awaiting report.
 
 > `optional` **unreportedRequests?**: `number`
 
-Defined in: [types/proxy.ts:4211](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4211)
+Defined in: [types/proxy.ts:4286](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4286)

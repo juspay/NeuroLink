@@ -8,7 +8,7 @@
 
 > **OpenAIContentPartText** = `object`
 
-Defined in: [types/proxy.ts:3225](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3225)
+Defined in: [types/proxy.ts:3300](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3300)
 
 OpenAI content part in a user message.
 
@@ -18,7 +18,7 @@ OpenAI content part in a user message.
 
 > **type**: `"text"`
 
-Defined in: [types/proxy.ts:3225](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3225)
+Defined in: [types/proxy.ts:3300](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3300)
 
 ---
 
@@ -26,4 +26,4 @@ Defined in: [types/proxy.ts:3225](https://github.com/juspay/neurolink/blob/relea
 
 > **text**: `string`
 
-Defined in: [types/proxy.ts:3225](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3225)
+Defined in: [types/proxy.ts:3300](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3300)

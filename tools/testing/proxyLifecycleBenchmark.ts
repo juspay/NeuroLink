@@ -184,6 +184,8 @@ try {
     hotPath.p95Micros <= budgets.hotPathP95Micros &&
     responseOverheadP95Micros <= budgets.responseOverheadP95Micros &&
     afterFlush.dropped === 0 &&
+    afterFlush.unconfirmedWrites === 0 &&
+    afterFlush.written === afterFlush.attempted &&
     afterFlush.pending === 0 &&
     afterFlush.inFlight === 0;
 
@@ -214,6 +216,8 @@ try {
           writeDrops: afterFlush.writeDrops,
           writeFailures: afterFlush.writeFailures,
           writeRetries: afterFlush.writeRetries,
+          writeTimeouts: afterFlush.writeTimeouts,
+          unconfirmedWrites: afterFlush.unconfirmedWrites,
           pending: afterFlush.pending,
           inFlight: afterFlush.inFlight,
         },

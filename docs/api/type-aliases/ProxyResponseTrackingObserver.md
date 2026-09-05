@@ -8,7 +8,7 @@
 
 > **ProxyResponseTrackingObserver** = `object`
 
-Defined in: [types/proxy.ts:1875](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1875)
+Defined in: [types/proxy.ts:1908](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1908)
 
 Non-blocking callbacks for response lifecycle metadata.
 
@@ -18,7 +18,7 @@ Non-blocking callbacks for response lifecycle metadata.
 
 > `optional` **onFirstChunk?**: (`details`) => `void`
 
-Defined in: [types/proxy.ts:1876](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1876)
+Defined in: [types/proxy.ts:1909](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1909)
 
 #### Parameters
 
@@ -42,9 +42,9 @@ Decoded response-body bytes observed by the adapter.
 
 ### onTerminal?
 
-> `optional` **onTerminal?**: (`details`) => `void`
+> `optional` **onTerminal?**: (`details`) => `unknown`
 
-Defined in: [types/proxy.ts:1881](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1881)
+Defined in: [types/proxy.ts:1914](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1914)
 
 #### Parameters
 
@@ -53,6 +53,12 @@ Defined in: [types/proxy.ts:1881](https://github.com/juspay/neurolink/blob/relea
 ###### outcome
 
 [`ProxyResponseTerminalOutcome`](ProxyResponseTerminalOutcome.md)
+
+###### error?
+
+`unknown`
+
+Underlying read failure for structured transport diagnostics.
 
 ###### observedBodyBytes
 
@@ -66,4 +72,4 @@ Decoded response-body bytes observed by the adapter.
 
 #### Returns
 
-`void`
+`unknown`

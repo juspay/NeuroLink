@@ -2,6 +2,7 @@ import type {
   ProxyActivitySnapshot,
   ProxyResponseTerminalOutcome,
   ProxyResponseTrackingObserver,
+  RequestLogEntry,
 } from "../types/index.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
 import { logger } from "../utils/logger.js";
@@ -19,6 +20,25 @@ const responseObserversByMetadata = new WeakMap<
   object,
   ProxyResponseTrackingObserver[]
 >();
+
+const finalLogObservers = new Map<string, (entry: RequestLogEntry) => void>();
+
+/** Join route accounting to the HTTP lifecycle without relying on write order. */
+export function observeProxyFinalLog(
+  requestId: string,
+  observer: (entry: RequestLogEntry) => void,
+): () => void {
+  finalLogObservers.set(requestId, observer);
+  return () => {
+    if (finalLogObservers.get(requestId) === observer) {
+      finalLogObservers.delete(requestId);
+    }
+  };
+}
+
+export function notifyProxyFinalLog(entry: RequestLogEntry): void {
+  finalLogObservers.get(entry.requestId)?.(entry);
+}
 
 export function registerProxyResponseObserver(
   metadata: object,
@@ -102,14 +122,16 @@ export function trackProxyResponse(
   observer?: ProxyResponseTrackingObserver,
 ): Response {
   if (!response.body) {
-    finishRequest();
-    safelyNotifyObserver(() =>
-      observer?.onTerminal?.({
+    try {
+      const notified = observer?.onTerminal?.({
         outcome: "bodyless",
         observedBodyBytes: 0,
         responseChunks: 0,
-      }),
-    );
+      });
+      void Promise.resolve(notified).then(finishRequest, finishRequest);
+    } catch {
+      finishRequest();
+    }
     return response;
   }
 
@@ -128,19 +150,27 @@ export function trackProxyResponse(
     () => undefined,
   );
 
-  const settle = (outcome: ProxyResponseTerminalOutcome): void => {
+  const settle = (
+    outcome: ProxyResponseTerminalOutcome,
+    error?: unknown,
+  ): void => {
     if (settled) {
       return;
     }
     settled = true;
-    finishRequest();
-    safelyNotifyObserver(() =>
-      observer?.onTerminal?.({
+    // Keep drain accounting open through bounded terminal bookkeeping, but
+    // never hold back the client's response body while telemetry is written.
+    try {
+      const notified = observer?.onTerminal?.({
         outcome,
+        error,
         observedBodyBytes,
         responseChunks,
-      }),
-    );
+      });
+      void Promise.resolve(notified).then(finishRequest, finishRequest);
+    } catch {
+      finishRequest();
+    }
   };
 
   const trackedBody = new ReadableStream<Uint8Array>({
@@ -164,7 +194,7 @@ export function trackProxyResponse(
           );
         }
       } catch (error) {
-        settle("stream_error");
+        settle("stream_error", error);
         controller.error(error);
       }
     },

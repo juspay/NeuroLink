@@ -8,7 +8,7 @@
 
 > **AccountQuota** = `object`
 
-Defined in: [types/proxy.ts:1281](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1281)
+Defined in: [types/proxy.ts:1314](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1314)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/proxy.ts:1281](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **unifiedStatus?**: `string`
 
-Defined in: [types/proxy.ts:1284](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1284)
+Defined in: [types/proxy.ts:1317](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1317)
 
 Top-level unified status. A rejected value can be authoritative even
 while both 5h and 7d sub-window statuses still report allowed.
@@ -27,7 +27,7 @@ while both 5h and 7d sub-window statuses still report allowed.
 
 > **sessionUsed**: `number`
 
-Defined in: [types/proxy.ts:1286](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1286)
+Defined in: [types/proxy.ts:1319](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1319)
 
 0.0-1.0 (from unified-5h-utilization)
 
@@ -37,7 +37,7 @@ Defined in: [types/proxy.ts:1286](https://github.com/juspay/neurolink/blob/relea
 
 > **sessionStatus**: `string`
 
-Defined in: [types/proxy.ts:1288](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1288)
+Defined in: [types/proxy.ts:1321](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1321)
 
 "allowed" | "throttled" | "rejected"
 
@@ -47,7 +47,7 @@ Defined in: [types/proxy.ts:1288](https://github.com/juspay/neurolink/blob/relea
 
 > **sessionResetAt**: `number`
 
-Defined in: [types/proxy.ts:1290](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1290)
+Defined in: [types/proxy.ts:1323](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1323)
 
 Unix timestamp (seconds) when the 5h window resets
 
@@ -57,7 +57,7 @@ Unix timestamp (seconds) when the 5h window resets
 
 > **weeklyUsed**: `number`
 
-Defined in: [types/proxy.ts:1292](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1292)
+Defined in: [types/proxy.ts:1325](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1325)
 
 0.0-1.0 (from unified-7d-utilization)
 
@@ -67,7 +67,7 @@ Defined in: [types/proxy.ts:1292](https://github.com/juspay/neurolink/blob/relea
 
 > **weeklyStatus**: `string`
 
-Defined in: [types/proxy.ts:1294](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1294)
+Defined in: [types/proxy.ts:1327](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1327)
 
 "allowed" | "throttled" | "rejected"
 
@@ -77,7 +77,7 @@ Defined in: [types/proxy.ts:1294](https://github.com/juspay/neurolink/blob/relea
 
 > **weeklyResetAt**: `number`
 
-Defined in: [types/proxy.ts:1296](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1296)
+Defined in: [types/proxy.ts:1329](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1329)
 
 Unix timestamp (seconds) when the 7d window resets
 
@@ -87,7 +87,7 @@ Unix timestamp (seconds) when the 7d window resets
 
 > **fallbackPercentage**: `number`
 
-Defined in: [types/proxy.ts:1298](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1298)
+Defined in: [types/proxy.ts:1331](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1331)
 
 0.0-1.0 (from fallback-percentage)
 
@@ -97,7 +97,7 @@ Defined in: [types/proxy.ts:1298](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **fallbackStatus?**: `string`
 
-Defined in: [types/proxy.ts:1300](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1300)
+Defined in: [types/proxy.ts:1333](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1333)
 
 Provider fallback availability, for example "available".
 
@@ -107,7 +107,7 @@ Provider fallback availability, for example "available".
 
 > `optional` **upgradePaths?**: `string`
 
-Defined in: [types/proxy.ts:1302](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1302)
+Defined in: [types/proxy.ts:1335](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1335)
 
 Comma-separated provider upgrade paths, for example "overage".
 
@@ -117,7 +117,7 @@ Comma-separated provider upgrade paths, for example "overage".
 
 > **overageStatus**: `string`
 
-Defined in: [types/proxy.ts:1304](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1304)
+Defined in: [types/proxy.ts:1337](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1337)
 
 "allowed" | "rejected"
 
@@ -127,7 +127,7 @@ Defined in: [types/proxy.ts:1304](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **overageInUse?**: `boolean`
 
-Defined in: [types/proxy.ts:1306](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1306)
+Defined in: [types/proxy.ts:1339](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1339)
 
 Whether Anthropic reports that paid overage is actively serving traffic.
 
@@ -137,7 +137,7 @@ Whether Anthropic reports that paid overage is actively serving traffic.
 
 > `optional` **overageDisabledReason?**: `string`
 
-Defined in: [types/proxy.ts:1310](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1310)
+Defined in: [types/proxy.ts:1343](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1343)
 
 Why overage is unavailable, verbatim from
 anthropic-ratelimit-unified-overage-disabled-reason (e.g.
@@ -149,7 +149,7 @@ anthropic-ratelimit-unified-overage-disabled-reason (e.g.
 
 > `optional` **overageEnabled?**: `boolean`
 
-Defined in: [types/proxy.ts:1314](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1314)
+Defined in: [types/proxy.ts:1347](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1347)
 
 Authoritative extra-usage switch from the usage API's
 `extra_usage.is_enabled`. Unlike the header trio this is reported even for
@@ -161,7 +161,7 @@ an account that has never served a request.
 
 > `optional` **representativeClaim?**: `string`
 
-Defined in: [types/proxy.ts:1317](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1317)
+Defined in: [types/proxy.ts:1350](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1350)
 
 Which window Anthropic considers binding right now, verbatim from
 anthropic-ratelimit-unified-representative-claim (e.g. "five_hour").
@@ -172,7 +172,7 @@ anthropic-ratelimit-unified-representative-claim (e.g. "five_hour").
 
 > **lastUpdated**: `number`
 
-Defined in: [types/proxy.ts:1319](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1319)
+Defined in: [types/proxy.ts:1352](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1352)
 
 Epoch ms when we last captured this data
 
@@ -182,7 +182,7 @@ Epoch ms when we last captured this data
 
 > `optional` **windows?**: [`AccountQuotaWindow`](AccountQuotaWindow.md)[]
 
-Defined in: [types/proxy.ts:1323](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1323)
+Defined in: [types/proxy.ts:1356](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1356)
 
 Dynamic per-plan limit buckets from the usage API `limits[]` array
 (session / weekly_all / model-scoped weeklies such as Fable / future
@@ -194,7 +194,7 @@ kinds). Absent on purely header-sourced snapshots.
 
 > `optional` **windowsUpdatedAt?**: `number`
 
-Defined in: [types/proxy.ts:1325](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1325)
+Defined in: [types/proxy.ts:1358](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1358)
 
 Epoch ms when `windows` was last refreshed from the usage API.
 
@@ -204,6 +204,6 @@ Epoch ms when `windows` was last refreshed from the usage API.
 
 > `optional` **source?**: [`AccountQuotaSource`](AccountQuotaSource.md)
 
-Defined in: [types/proxy.ts:1327](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1327)
+Defined in: [types/proxy.ts:1360](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1360)
 
 Provenance of this snapshot's numbers.

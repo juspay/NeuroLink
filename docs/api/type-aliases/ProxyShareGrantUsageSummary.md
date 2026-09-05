@@ -8,7 +8,7 @@
 
 > **ProxyShareGrantUsageSummary** = `object`
 
-Defined in: [types/proxy.ts:4002](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4002)
+Defined in: [types/proxy.ts:4077](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4077)
 
 Per-grant rollup for `share status`.
 
@@ -18,7 +18,7 @@ Per-grant rollup for `share status`.
 
 > **grantId**: `string`
 
-Defined in: [types/proxy.ts:4003](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4003)
+Defined in: [types/proxy.ts:4078](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4078)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:4003](https://github.com/juspay/neurolink/blob/relea
 
 > **coinsSpent**: `number`
 
-Defined in: [types/proxy.ts:4004](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4004)
+Defined in: [types/proxy.ts:4079](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4079)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:4004](https://github.com/juspay/neurolink/blob/relea
 
 > **requests**: `number`
 
-Defined in: [types/proxy.ts:4005](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4005)
+Defined in: [types/proxy.ts:4080](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4080)
 
 ---
 
@@ -42,7 +42,7 @@ Defined in: [types/proxy.ts:4005](https://github.com/juspay/neurolink/blob/relea
 
 > **accounts**: `number`
 
-Defined in: [types/proxy.ts:4006](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4006)
+Defined in: [types/proxy.ts:4081](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4081)
 
 ---
 
@@ -50,4 +50,4 @@ Defined in: [types/proxy.ts:4006](https://github.com/juspay/neurolink/blob/relea
 
 > **lastUsedAt**: `number` \| `null`
 
-Defined in: [types/proxy.ts:4007](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4007)
+Defined in: [types/proxy.ts:4082](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4082)

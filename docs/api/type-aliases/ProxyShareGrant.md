@@ -8,7 +8,7 @@
 
 > **ProxyShareGrant** = `object`
 
-Defined in: [types/proxy.ts:3508](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3508)
+Defined in: [types/proxy.ts:3583](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3583)
 
 One lender-issued authorization for one borrower.
 
@@ -18,7 +18,7 @@ One lender-issued authorization for one borrower.
 
 > **schemaVersion**: `1`
 
-Defined in: [types/proxy.ts:3509](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3509)
+Defined in: [types/proxy.ts:3584](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3584)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:3509](https://github.com/juspay/neurolink/blob/relea
 
 > **id**: `string`
 
-Defined in: [types/proxy.ts:3510](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3510)
+Defined in: [types/proxy.ts:3585](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3585)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:3510](https://github.com/juspay/neurolink/blob/relea
 
 > **peerLabel**: `string`
 
-Defined in: [types/proxy.ts:3511](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3511)
+Defined in: [types/proxy.ts:3586](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3586)
 
 ---
 
@@ -42,7 +42,7 @@ Defined in: [types/proxy.ts:3511](https://github.com/juspay/neurolink/blob/relea
 
 > **tokenHash**: `string`
 
-Defined in: [types/proxy.ts:3513](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3513)
+Defined in: [types/proxy.ts:3588](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3588)
 
 sha256(salt + token). The token itself is never persisted.
 
@@ -52,7 +52,7 @@ sha256(salt + token). The token itself is never persisted.
 
 > **tokenSalt**: `string`
 
-Defined in: [types/proxy.ts:3514](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3514)
+Defined in: [types/proxy.ts:3589](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3589)
 
 ---
 
@@ -60,7 +60,7 @@ Defined in: [types/proxy.ts:3514](https://github.com/juspay/neurolink/blob/relea
 
 > **level**: [`ProxyShareLevel`](ProxyShareLevel.md)
 
-Defined in: [types/proxy.ts:3515](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3515)
+Defined in: [types/proxy.ts:3590](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3590)
 
 ---
 
@@ -68,7 +68,7 @@ Defined in: [types/proxy.ts:3515](https://github.com/juspay/neurolink/blob/relea
 
 > **state**: [`ProxyShareGrantState`](ProxyShareGrantState.md)
 
-Defined in: [types/proxy.ts:3516](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3516)
+Defined in: [types/proxy.ts:3591](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3591)
 
 ---
 
@@ -76,7 +76,7 @@ Defined in: [types/proxy.ts:3516](https://github.com/juspay/neurolink/blob/relea
 
 > **entitlement**: [`ProxyShareEntitlement`](ProxyShareEntitlement.md)
 
-Defined in: [types/proxy.ts:3517](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3517)
+Defined in: [types/proxy.ts:3592](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3592)
 
 ---
 
@@ -84,7 +84,7 @@ Defined in: [types/proxy.ts:3517](https://github.com/juspay/neurolink/blob/relea
 
 > **gates**: [`ProxyShareGates`](ProxyShareGates.md)
 
-Defined in: [types/proxy.ts:3518](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3518)
+Defined in: [types/proxy.ts:3593](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3593)
 
 ---
 
@@ -92,7 +92,7 @@ Defined in: [types/proxy.ts:3518](https://github.com/juspay/neurolink/blob/relea
 
 > **createdAt**: `number`
 
-Defined in: [types/proxy.ts:3519](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3519)
+Defined in: [types/proxy.ts:3594](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3594)
 
 ---
 
@@ -100,7 +100,7 @@ Defined in: [types/proxy.ts:3519](https://github.com/juspay/neurolink/blob/relea
 
 > **updatedAt**: `number`
 
-Defined in: [types/proxy.ts:3520](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3520)
+Defined in: [types/proxy.ts:3595](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3595)
 
 ---
 
@@ -108,7 +108,7 @@ Defined in: [types/proxy.ts:3520](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **lastUsedAt?**: `number`
 
-Defined in: [types/proxy.ts:3521](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3521)
+Defined in: [types/proxy.ts:3596](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3596)
 
 ---
 
@@ -116,7 +116,7 @@ Defined in: [types/proxy.ts:3521](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **note?**: `string`
 
-Defined in: [types/proxy.ts:3522](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3522)
+Defined in: [types/proxy.ts:3597](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3597)
 
 ---
 
@@ -124,7 +124,7 @@ Defined in: [types/proxy.ts:3522](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **leaseSecret?**: `string`
 
-Defined in: [types/proxy.ts:3524](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3524)
+Defined in: [types/proxy.ts:3599](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3599)
 
 Complete-mode only: shared secret the lease signature is keyed by.
 
@@ -134,7 +134,7 @@ Complete-mode only: shared secret the lease signature is keyed by.
 
 > `optional` **receiptSecret?**: `string`
 
-Defined in: [types/proxy.ts:3530](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3530)
+Defined in: [types/proxy.ts:3605](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3605)
 
 Shared secret receipts and netting claims are keyed by. Minted with the
 grant and handed to the borrower in the share link; deliberately survives
@@ -146,7 +146,7 @@ grant and handed to the borrower in the share link; deliberately survives
 
 > `optional` **nettedCoins?**: `number`
 
-Defined in: [types/proxy.ts:3532](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3532)
+Defined in: [types/proxy.ts:3607](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3607)
 
 Cumulative coins forgiven by reciprocal netting on this grant.
 
@@ -156,7 +156,7 @@ Cumulative coins forgiven by reciprocal netting on this grant.
 
 > `optional` **provisionedAccount?**: `string`
 
-Defined in: [types/proxy.ts:3534](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3534)
+Defined in: [types/proxy.ts:3609](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3609)
 
 Complete-mode only: which of the lender's own accounts was provisioned.
 
@@ -166,7 +166,7 @@ Complete-mode only: which of the lender's own accounts was provisioned.
 
 > `optional` **leasePolicy?**: `object`
 
-Defined in: [types/proxy.ts:3536](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3536)
+Defined in: [types/proxy.ts:3611](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3611)
 
 Complete-mode lease shape. Absent means the defaults apply.
 

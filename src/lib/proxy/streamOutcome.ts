@@ -125,9 +125,16 @@ export function createStreamTerminalOutcomeTracker(): StreamTerminalOutcomeTrack
 export function mergeStreamTerminalOutcome(
   outcome: StreamTerminalOutcome,
   sseErrorMessage?: string,
+  messageStopReceived?: boolean,
 ): StreamTerminalOutcome {
   if (outcome.kind === "completed" && sseErrorMessage) {
     return { kind: "upstream_error", message: sseErrorMessage };
+  }
+  if (outcome.kind === "completed" && messageStopReceived === false) {
+    return {
+      kind: "upstream_error",
+      message: "Anthropic stream ended without a message_stop event",
+    };
   }
   return outcome;
 }

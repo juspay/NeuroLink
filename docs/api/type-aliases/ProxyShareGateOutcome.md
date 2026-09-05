@@ -8,7 +8,7 @@
 
 > **ProxyShareGateOutcome** = \{ `kind`: `"local"`; \} \| \{ `kind`: `"admitted"`; `context`: [`ProxyShareRequestContext`](ProxyShareRequestContext.md); `release`: () => `void`; \} \| \{ `kind`: `"refused"`; `response`: [`ProxyShareRefusalResponse`](ProxyShareRefusalResponse.md); \}
 
-Defined in: [types/proxy.ts:3916](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3916)
+Defined in: [types/proxy.ts:3991](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3991)
 
 What the inbound gate decided.
 

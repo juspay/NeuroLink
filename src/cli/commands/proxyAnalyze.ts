@@ -114,6 +114,7 @@ function printAnalysis(
   for (const [label, summary] of [
     ["Response headers", report.latencyMs.headers],
     ["First chunk", report.latencyMs.firstChunk],
+    ["First useful output", report.latencyMs.firstUsefulOutput],
     ["Terminal", report.latencyMs.terminal],
     ["Final request log", report.latencyMs.finalRequest],
     ["Account attempt", report.latencyMs.attempt],
@@ -162,7 +163,13 @@ function printAnalysis(
     );
   }
   logger.always(
-    `    ${report.dataQuality.linesRead} lines scanned, ${report.dataQuality.malformedLines} malformed, ${report.dataQuality.unsupportedLifecycleLines} unsupported lifecycle, ${report.dataQuality.lifecycleSequenceGaps} sequence gaps, ${report.dataQuality.lifecycleSequenceDuplicates} duplicates`,
+    `    ${report.dataQuality.linesRead} lines scanned, ${report.dataQuality.malformedLines} malformed, ${report.dataQuality.unsupportedLifecycleLines} unsupported lifecycle, ${report.dataQuality.lifecycleSequenceGaps} sequence gaps, ${report.dataQuality.lifecycleSequenceDuplicates} duplicates (${report.dataQuality.conflictingLifecycleDuplicates} conflicting)`,
+  );
+  logger.always(
+    `    Outcome evidence: ${report.dataQuality.finalOutcomeConflicts} conflicts reconciled, ${report.dataQuality.acceptedWithoutFinal} accepted without a final record, ${report.dataQuality.terminalWithoutFinal} transport terminals without a final record`,
+  );
+  logger.always(
+    `    Repeated attempt records merged: ${report.dataQuality.duplicateAttempts}`,
   );
   logger.always(
     `    Routing decisions: ${report.dataQuality.routingDecisions.valid} valid, ${report.dataQuality.routingDecisions.invalid} invalid, ${report.dataQuality.routingDecisions.absent} absent`,

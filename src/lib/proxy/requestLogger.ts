@@ -28,18 +28,97 @@ import type {
   RequestAttemptLogEntry,
   RequestLogEntry,
   StoredBodyArtifact,
+  ProxyRequestLoggerSnapshot,
+  ProxyRequestLogSinkSnapshot,
 } from "../types/index.js";
 import { isBorrowedRequest } from "./shareContext.js";
 import { OtelBridge } from "../observability/otelBridge.js";
 import { SeverityNumber } from "@opentelemetry/api-logs";
 import type { LoggerProvider } from "@opentelemetry/sdk-logs";
 import { configureProxyLifecycleLogger } from "./proxyLifecycle.js";
+import { notifyProxyFinalLog } from "./proxyActivity.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
 
 let logDir: string | null = null;
 let logEnabled = false;
 const pendingLogOperations = new Set<Promise<unknown>>();
 const REQUEST_LOG_IO_TIMEOUT_MS = 5_000;
+const MAX_PENDING_METADATA_RECORDS = 4_096;
+const appendChains = new Map<string, Promise<void>>();
+let appendMetadataFile: typeof writeFile = writeFile;
+const createSinkSnapshot = (): ProxyRequestLogSinkSnapshot => ({
+  attempted: 0,
+  written: 0,
+  inFlight: 0,
+  pending: 0,
+  dropped: 0,
+  writeTimeouts: 0,
+  unconfirmedWrites: 0,
+});
+const metadataSinks = {
+  requests: createSinkSnapshot(),
+  attempts: createSinkSnapshot(),
+  debug: createSinkSnapshot(),
+};
+
+export function getRequestLoggerSnapshot(): ProxyRequestLoggerSnapshot {
+  return {
+    enabled: logEnabled,
+    requests: { ...metadataSinks.requests },
+    attempts: { ...metadataSinks.attempts },
+    debug: { ...metadataSinks.debug },
+  };
+}
+
+async function appendMetadataRecord(
+  file: string,
+  line: string,
+  kind: keyof typeof metadataSinks,
+): Promise<void> {
+  const sink = metadataSinks[kind];
+  sink.attempted += 1;
+  if (sink.pending + sink.inFlight >= MAX_PENDING_METADATA_RECORDS) {
+    sink.dropped += 1;
+    return;
+  }
+  sink.pending += 1;
+  // writeFile may perform multiple append syscalls for a large record. Order
+  // them per destination so concurrent records cannot interleave in this worker.
+  const operation = trackLogOperation(
+    (appendChains.get(file) ?? Promise.resolve()).then(async () => {
+      sink.pending -= 1;
+      sink.inFlight += 1;
+      const timer = setTimeout(() => {
+        sink.writeTimeouts += 1;
+      }, REQUEST_LOG_IO_TIMEOUT_MS);
+      timer.unref?.();
+      try {
+        await appendMetadataFile(file, line, { mode: 0o600, flag: "a" });
+        sink.written += 1;
+      } catch (error) {
+        // A failed append may have written a prefix; never replay it.
+        sink.unconfirmedWrites += 1;
+        sink.lastErrorCode =
+          (error as NodeJS.ErrnoException)?.code ?? "UNKNOWN";
+      } finally {
+        clearTimeout(timer);
+        sink.inFlight -= 1;
+      }
+    }),
+  );
+  appendChains.set(file, operation);
+  void operation.then(() => {
+    if (appendChains.get(file) === operation) {
+      appendChains.delete(file);
+    }
+  });
+  // Bound the caller's wait, not the lifetime/ownership of the underlying write.
+  await withTimeout(
+    operation,
+    REQUEST_LOG_IO_TIMEOUT_MS,
+    "Proxy metadata write remains pending",
+  ).catch(() => undefined);
+}
 
 function trackLogOperation<T>(operation: Promise<T>): Promise<T> {
   pendingLogOperations.add(operation);
@@ -58,18 +137,11 @@ export async function flushRequestLogs(
   while (pendingLogOperations.size > 0) {
     const admitted = [...pendingLogOperations];
     const remainingMs = Math.max(1, deadline - Date.now());
-    try {
-      await withTimeout(
-        Promise.allSettled(admitted),
-        remainingMs,
-        `Timed out flushing ${admitted.length} proxy request log operation(s)`,
-      );
-    } catch (error) {
-      for (const operation of admitted) {
-        pendingLogOperations.delete(operation);
-      }
-      throw error;
-    }
+    await withTimeout(
+      Promise.allSettled(admitted),
+      remainingMs,
+      `Timed out flushing ${admitted.length} proxy request log operation(s)`,
+    );
     if (Date.now() >= deadline && pendingLogOperations.size > 0) {
       const remaining = pendingLogOperations.size;
       throw new Error(
@@ -83,6 +155,12 @@ export async function flushRequestLogs(
 export const __requestLoggerTestHooks = {
   pendingOperationCount: () => pendingLogOperations.size,
   trackLogOperation,
+  setAppendFileForTests: (writer: typeof writeFile) => {
+    appendMetadataFile = writer;
+  },
+  restoreAppendFileForTests: () => {
+    appendMetadataFile = writeFile;
+  },
 };
 
 /**
@@ -149,6 +227,15 @@ export function initRequestLogger(
 }
 
 export async function logRequest(entry: RequestLogEntry): Promise<void> {
+  entry.terminalOutcome ??=
+    entry.errorType === "client_cancelled" || entry.responseStatus === 499
+      ? "client_cancelled"
+      : entry.errorType?.includes("stream")
+        ? "stream_error"
+        : entry.responseStatus >= 400 || entry.errorType
+          ? "handler_error"
+          : "completed";
+  notifyProxyFinalLog(entry);
   if (!logEnabled || !logDir) {
     return;
   }
@@ -172,13 +259,7 @@ export async function logRequest(entry: RequestLogEntry): Promise<void> {
   const line = JSON.stringify(entry) + "\n";
 
   try {
-    await trackLogOperation(
-      writeFile(logFile, line, {
-        mode: 0o600,
-        flag: "a",
-        signal: AbortSignal.timeout(REQUEST_LOG_IO_TIMEOUT_MS),
-      }),
-    );
+    await appendMetadataRecord(logFile, line, "requests");
   } catch {
     // Non-fatal — don't crash proxy for logging failures
   }
@@ -215,13 +296,7 @@ export async function logRequestAttempt(
   const line = JSON.stringify(entry) + "\n";
 
   try {
-    await trackLogOperation(
-      writeFile(logFile, line, {
-        mode: 0o600,
-        flag: "a",
-        signal: AbortSignal.timeout(REQUEST_LOG_IO_TIMEOUT_MS),
-      }),
-    );
+    await appendMetadataRecord(logFile, line, "attempts");
   } catch {
     // Non-fatal — don't crash proxy for logging failures
   }
@@ -780,12 +855,10 @@ export async function logBodyCapture(
   }
 
   try {
-    await trackLogOperation(
-      writeFile(logFile, JSON.stringify(indexEntry) + "\n", {
-        mode: 0o600,
-        flag: "a",
-        signal: AbortSignal.timeout(REQUEST_LOG_IO_TIMEOUT_MS),
-      }),
+    await appendMetadataRecord(
+      logFile,
+      JSON.stringify(indexEntry) + "\n",
+      "debug",
     );
   } catch {
     // Non-fatal
@@ -891,12 +964,10 @@ export async function logStreamError(entry: {
   }
 
   try {
-    await trackLogOperation(
-      writeFile(logFile, JSON.stringify(logEntry) + "\n", {
-        mode: 0o600,
-        flag: "a",
-        signal: AbortSignal.timeout(REQUEST_LOG_IO_TIMEOUT_MS),
-      }),
+    await appendMetadataRecord(
+      logFile,
+      JSON.stringify(logEntry) + "\n",
+      "requests",
     );
   } catch {
     // Non-fatal — don't crash proxy for logging failures

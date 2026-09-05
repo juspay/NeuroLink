@@ -8,7 +8,7 @@
 
 > **ProxyAnalysisOptions** = `object`
 
-Defined in: [types/proxy.ts:2129](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2129)
+Defined in: [types/proxy.ts:2187](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2187)
 
 Inputs for the offline proxy JSONL analyzer.
 
@@ -18,7 +18,7 @@ Inputs for the offline proxy JSONL analyzer.
 
 > `optional` **logsDir?**: `string`
 
-Defined in: [types/proxy.ts:2130](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2130)
+Defined in: [types/proxy.ts:2188](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2188)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:2130](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **since?**: `string`
 
-Defined in: [types/proxy.ts:2131](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2131)
+Defined in: [types/proxy.ts:2189](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2189)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:2131](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **until?**: `string`
 
-Defined in: [types/proxy.ts:2132](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2132)
+Defined in: [types/proxy.ts:2190](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2190)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/proxy.ts:2132](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **nowMs?**: `number`
 
-Defined in: [types/proxy.ts:2133](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2133)
+Defined in: [types/proxy.ts:2191](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2191)

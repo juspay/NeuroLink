@@ -8,7 +8,7 @@
 
 > **ProxyRuntimeConfigProvider** = () => [`ProxyRequestRoutingSnapshot`](ProxyRequestRoutingSnapshot.md)
 
-Defined in: [types/proxy.ts:3090](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3090)
+Defined in: [types/proxy.ts:3165](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3165)
 
 Runtime configuration provider captured by route factories.
 

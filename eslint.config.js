@@ -411,6 +411,7 @@ export default [
             // real surface. Its last two cases drive the built CLI and are
             // deliberately outside the exception.
             "test/continuous-test-suite-codex.ts",
+            "test/continuous-test-suite-proxy-telemetry.ts",
             // Synthetic Codex response streams, upstream transport failures,
             // and provider-qualified persistence all need exact outcomes that
             // a live request cannot safely or deterministically reproduce.

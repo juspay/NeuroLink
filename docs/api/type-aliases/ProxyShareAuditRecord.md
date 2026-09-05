@@ -8,7 +8,7 @@
 
 > **ProxyShareAuditRecord** = `object`
 
-Defined in: [types/proxy.ts:4246](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4246)
+Defined in: [types/proxy.ts:4321](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4321)
 
 Rolling audit state for one complete-mode grant.
 
@@ -18,7 +18,7 @@ Rolling audit state for one complete-mode grant.
 
 > **grantId**: `string`
 
-Defined in: [types/proxy.ts:4247](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4247)
+Defined in: [types/proxy.ts:4322](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4322)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:4247](https://github.com/juspay/neurolink/blob/relea
 
 > **accountLabel**: `string`
 
-Defined in: [types/proxy.ts:4249](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4249)
+Defined in: [types/proxy.ts:4324](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4324)
 
 The lender's own account the credential was provisioned from.
 
@@ -36,7 +36,7 @@ The lender's own account the credential was provisioned from.
 
 > `optional` **lastObservation?**: [`ProxyShareAuditObservation`](ProxyShareAuditObservation.md)
 
-Defined in: [types/proxy.ts:4250](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4250)
+Defined in: [types/proxy.ts:4325](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4325)
 
 ---
 
@@ -44,7 +44,7 @@ Defined in: [types/proxy.ts:4250](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **lenderRequestsTotal?**: `number`
 
-Defined in: [types/proxy.ts:4253](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4253)
+Defined in: [types/proxy.ts:4328](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4328)
 
 Running lifetime total of lender-served requests on the account, kept so
 the next observation's delta can be computed.
@@ -55,7 +55,7 @@ the next observation's delta can be computed.
 
 > **driftStreak**: `number`
 
-Defined in: [types/proxy.ts:4255](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4255)
+Defined in: [types/proxy.ts:4330](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4330)
 
 Consecutive heartbeats where the account moved but nothing was reported.
 
@@ -65,7 +65,7 @@ Consecutive heartbeats where the account moved but nothing was reported.
 
 > `optional` **lastDriftAt?**: `number`
 
-Defined in: [types/proxy.ts:4256](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4256)
+Defined in: [types/proxy.ts:4331](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4331)
 
 ---
 
@@ -73,7 +73,7 @@ Defined in: [types/proxy.ts:4256](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **lastDriftDetail?**: `string`
 
-Defined in: [types/proxy.ts:4257](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4257)
+Defined in: [types/proxy.ts:4332](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4332)
 
 ---
 
@@ -81,6 +81,6 @@ Defined in: [types/proxy.ts:4257](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **autoPausedAt?**: `number`
 
-Defined in: [types/proxy.ts:4259](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4259)
+Defined in: [types/proxy.ts:4334](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4334)
 
 Set once the streak crossed the tolerance and the grant was paused.

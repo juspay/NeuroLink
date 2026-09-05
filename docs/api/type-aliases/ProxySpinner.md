@@ -8,6 +8,6 @@
 
 > **ProxySpinner** = `Ora` \| `null`
 
-Defined in: [types/proxy.ts:3004](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3004)
+Defined in: [types/proxy.ts:3079](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3079)
 
 ora spinner instance held by proxy CLI commands, nullable when --quiet.

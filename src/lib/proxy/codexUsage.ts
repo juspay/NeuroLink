@@ -41,9 +41,12 @@
  */
 
 import { appendFileSync } from "node:fs";
+import { extractSSEEvents } from "./sseInterceptor.js";
+import { sanitizeForLog } from "../utils/logSanitize.js";
 
 import type {
   CodexStreamUsage,
+  CodexStreamEvidence,
   ProxyCancellableTransformer,
 } from "../types/index.js";
 
@@ -186,7 +189,77 @@ function createCaptureSink(): ((chunk: Uint8Array) => void) | null {
 export function createCodexUsageTap(): {
   stream: TransformStream<Uint8Array, Uint8Array>;
   usage: Promise<CodexStreamUsage | null>;
+  evidence: () => CodexStreamEvidence;
 } {
+  const evidence: CodexStreamEvidence = { completed: false, terminalBytes: 0 };
+  let totalBytes = 0;
+  const inspectEvidence = (
+    events: Array<{ event: string; data: string }>,
+  ): void => {
+    for (const frame of events) {
+      try {
+        const event = JSON.parse(frame.data) as Record<string, unknown>;
+        if (!event || typeof event !== "object") {
+          continue;
+        }
+        const seen = extractCodexUsage(event);
+        if (seen) {
+          latest = seen;
+        }
+        const type = event.type ?? frame.event;
+        if (
+          (type === "response.output_text.delta" ||
+            type === "response.function_call_arguments.delta") &&
+          typeof event.delta === "string" &&
+          event.delta.length > 0
+        ) {
+          evidence.firstUsefulOutputAt ??= Date.now();
+        }
+        if (type === "response.completed") {
+          evidence.completed = true;
+          evidence.terminalBytes = totalBytes;
+        } else if (
+          type === "error" ||
+          type === "response.failed" ||
+          type === "response.incomplete"
+        ) {
+          evidence.errorType = "stream_error";
+          const response = event.response;
+          const details =
+            response && typeof response === "object"
+              ? (response as Record<string, unknown>)
+              : event;
+          const rawError = details.error;
+          const error =
+            rawError && typeof rawError === "object"
+              ? (rawError as Record<string, unknown>)
+              : details;
+          const incomplete = details.incomplete_details;
+          const reason =
+            incomplete &&
+            typeof incomplete === "object" &&
+            "reason" in incomplete
+              ? incomplete.reason
+              : undefined;
+          evidence.errorCode =
+            typeof error.code === "string"
+              ? sanitizeForLog(error.code).slice(0, 200)
+              : typeof reason === "string"
+                ? sanitizeForLog(reason).slice(0, 200)
+                : String(type);
+          evidence.errorMessage =
+            typeof error.message === "string"
+              ? sanitizeForLog(error.message).slice(0, 200)
+              : type === "response.incomplete"
+                ? "Codex reported an incomplete response"
+                : "Codex reported a stream failure";
+          evidence.terminalBytes = totalBytes;
+        }
+      } catch {
+        // Unknown frames cannot establish successful completion.
+      }
+    }
+  };
   let settleUsage: (value: CodexStreamUsage | null) => void = () => {};
   const usage = new Promise<CodexStreamUsage | null>((resolve) => {
     settleUsage = resolve;
@@ -207,55 +280,41 @@ export function createCodexUsageTap(): {
   let carry = "";
   let latest: CodexStreamUsage | null = null;
 
-  /**
-   * Ceiling on the unterminated tail we are willing to hold.
-   *
-   * `carry` normally holds a fraction of one SSE line, because every newline
-   * flushes it. A stream that never sends one — a hung upstream, a
-   * non-SSE body relayed by mistake — would otherwise grow it without bound
-   * for the life of the request. One `response.completed` event is a few
-   * hundred bytes, so a megabyte is far past any real event, and dropping the
-   * tail costs at most the usage reading this tap is allowed to miss anyway.
-   */
+  // Bound malformed unterminated events without ever withholding relay bytes.
   const CARRY_LIMIT_CHARS = 1024 * 1024;
+  let discardingEvent = false;
 
   const transformer: ProxyCancellableTransformer<Uint8Array, Uint8Array> = {
     transform(chunk, controller) {
       // Bytes go out first and unconditionally: nothing below can delay or
       // alter what the client receives.
       controller.enqueue(chunk);
+      totalBytes += chunk.byteLength;
       try {
         capture?.(chunk);
         carry += decoder.decode(chunk, { stream: true });
-        // Keep only the trailing partial line; events are newline-delimited.
-        const lastBreak = carry.lastIndexOf("\n");
-        if (lastBreak === -1) {
-          if (carry.length > CARRY_LIMIT_CHARS) {
-            // No line break in a megabyte: this is not the SSE stream we can
-            // read. Give up on the tail rather than grow forever.
-            carry = "";
+        if (discardingEvent) {
+          const boundary = /\r\n\r\n|\n\n|\r\r/.exec(carry);
+          if (!boundary) {
+            carry = carry.slice(-3);
+            return;
           }
-          return;
+          carry = carry.slice(boundary.index + boundary[0].length);
+          discardingEvent = false;
         }
-        const complete = carry.slice(0, lastBreak);
-        carry = carry.slice(lastBreak + 1);
-        const seen = scanCodexSSEForUsage(complete);
-        if (seen) {
-          latest = seen;
+        const { events, remainder } = extractSSEEvents(carry);
+        carry = remainder;
+        inspectEvidence(events);
+        if (carry.length > CARRY_LIMIT_CHARS) {
+          carry = carry.slice(-2);
+          discardingEvent = true;
         }
       } catch {
         // Telemetry must never break the relay.
       }
     },
     flush() {
-      try {
-        const seen = scanCodexSSEForUsage(carry);
-        if (seen) {
-          latest = seen;
-        }
-      } catch {
-        // ignored — see above
-      }
+      // An event without its dispatch delimiter is incomplete on the wire.
       settle(latest);
     },
     /**
@@ -271,5 +330,5 @@ export function createCodexUsageTap(): {
 
   const stream = new TransformStream<Uint8Array, Uint8Array>(transformer);
 
-  return { stream, usage };
+  return { stream, usage, evidence: () => ({ ...evidence }) };
 }

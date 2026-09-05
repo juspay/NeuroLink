@@ -8,7 +8,7 @@
 
 > **QueuedProxyLifecycleEvent** = `object`
 
-Defined in: [types/proxy.ts:1957](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1957)
+Defined in: [types/proxy.ts:2008](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2008)
 
 Serialized lifecycle line awaiting a bounded batch write.
 
@@ -18,7 +18,7 @@ Serialized lifecycle line awaiting a bounded batch write.
 
 > **logDir**: `string`
 
-Defined in: [types/proxy.ts:1958](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1958)
+Defined in: [types/proxy.ts:2009](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2009)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:1958](https://github.com/juspay/neurolink/blob/relea
 
 > **date**: `string`
 
-Defined in: [types/proxy.ts:1959](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1959)
+Defined in: [types/proxy.ts:2010](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2010)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:1959](https://github.com/juspay/neurolink/blob/relea
 
 > **record**: `Record`\<`string`, `unknown`\>
 
-Defined in: [types/proxy.ts:1960](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1960)
+Defined in: [types/proxy.ts:2011](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2011)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/proxy.ts:1960](https://github.com/juspay/neurolink/blob/relea
 
 > **writeRetries**: `number`
 
-Defined in: [types/proxy.ts:1961](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1961)
+Defined in: [types/proxy.ts:2012](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2012)

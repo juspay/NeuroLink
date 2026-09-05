@@ -8,7 +8,7 @@
 
 > **ProxyLifecycleLoggerOptions** = `object`
 
-Defined in: [types/proxy.ts:1946](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1946)
+Defined in: [types/proxy.ts:1997](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1997)
 
 Lifecycle logger configuration. Queue overrides are used by stress tests.
 
@@ -18,7 +18,7 @@ Lifecycle logger configuration. Queue overrides are used by stress tests.
 
 > **enabled**: `boolean`
 
-Defined in: [types/proxy.ts:1947](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1947)
+Defined in: [types/proxy.ts:1998](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1998)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:1947](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **logDir?**: `string`
 
-Defined in: [types/proxy.ts:1948](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1948)
+Defined in: [types/proxy.ts:1999](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1999)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:1948](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **queueCapacity?**: `number`
 
-Defined in: [types/proxy.ts:1949](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1949)
+Defined in: [types/proxy.ts:2000](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2000)
 
 ---
 
@@ -42,7 +42,7 @@ Defined in: [types/proxy.ts:1949](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **batchSize?**: `number`
 
-Defined in: [types/proxy.ts:1950](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1950)
+Defined in: [types/proxy.ts:2001](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2001)
 
 ---
 
@@ -50,7 +50,7 @@ Defined in: [types/proxy.ts:1950](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **flushIntervalMs?**: `number`
 
-Defined in: [types/proxy.ts:1951](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1951)
+Defined in: [types/proxy.ts:2002](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2002)
 
 ---
 
@@ -58,6 +58,6 @@ Defined in: [types/proxy.ts:1951](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **maxWriteRetries?**: `number`
 
-Defined in: [types/proxy.ts:1953](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1953)
+Defined in: [types/proxy.ts:2004](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2004)
 
 Bounded retries for a metadata batch that cannot be appended immediately.

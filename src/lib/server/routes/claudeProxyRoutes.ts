@@ -74,7 +74,11 @@ import {
   createCodexFallbackStream,
   convertClaudeRequestToCodex,
 } from "../../proxy/codexFallback.js";
-import { registerProxyResponseObserver } from "../../proxy/proxyActivity.js";
+import {
+  registerProxyResponseObserver,
+  takeProxyResponseObservers,
+  trackProxyResponse,
+} from "../../proxy/proxyActivity.js";
 import {
   buildAnthropicModelsListResponse,
   buildTranslationOptions,
@@ -3443,6 +3447,7 @@ async function handleClaudePassthroughStreamResponse(args: {
   const trackedStream = trackUpstreamReadableStream(responseBody);
   let streamSource: ReadableStream<Uint8Array> = trackedStream.stream;
   let streamFinalized = false;
+  let telemetryDone: Promise<void>;
   const finalizeStream = (
     status: number,
     errorType?: string,
@@ -3483,12 +3488,18 @@ async function handleClaudePassthroughStreamResponse(args: {
       const capturedResponse = response;
       const capturedRequestBytes = bodyStr.length;
 
-      Promise.all([telemetry, clientCapture, trackedStream.outcome])
+      telemetryDone = Promise.all([
+        telemetry,
+        clientCapture,
+        trackedStream.outcome,
+      ])
         .then(([data, clientBody, rawOutcome]) => {
           const terminalOutcome = mergeStreamTerminalOutcome(
             rawOutcome,
             data.streamErrorMessage,
+            data.messageStopReceived,
           );
+          ctx.metadata.firstUsefulOutputAt = data.firstUsefulOutputAt;
           const failure = getStreamFailureDetails(terminalOutcome);
           capturedTracer.setUsage({
             inputTokens: data.usage.inputTokens,
@@ -3588,7 +3599,7 @@ async function handleClaudePassthroughStreamResponse(args: {
           finalizeStream(500, "stream_telemetry_error", message);
         });
     } catch {
-      trackedStream.outcome.then((outcome) => {
+      telemetryDone = trackedStream.outcome.then((outcome) => {
         const failure = getStreamFailureDetails(outcome);
         upstreamSpan?.end();
         if (failure) {
@@ -3611,12 +3622,18 @@ async function handleClaudePassthroughStreamResponse(args: {
         captureRawText: true,
       });
       streamSource = streamSource.pipeThrough(interceptor);
-      Promise.all([telemetry, clientCapture, trackedStream.outcome])
+      telemetryDone = Promise.all([
+        telemetry,
+        clientCapture,
+        trackedStream.outcome,
+      ])
         .then(([data, clientBody, rawOutcome]) => {
           const terminalOutcome = mergeStreamTerminalOutcome(
             rawOutcome,
             data.streamErrorMessage,
+            data.messageStopReceived,
           );
+          ctx.metadata.firstUsefulOutputAt = data.firstUsefulOutputAt;
           const failure = getStreamFailureDetails(terminalOutcome);
           finalizeStream(
             failure?.status ?? response.status,
@@ -3666,7 +3683,7 @@ async function handleClaudePassthroughStreamResponse(args: {
     } catch {
       // Streaming capture is best-effort; the tracked source still propagates
       // the transport failure to the client.
-      trackedStream.outcome.then((outcome) => {
+      telemetryDone = trackedStream.outcome.then((outcome) => {
         const failure = getStreamFailureDetails(outcome);
         finalizeStream(
           failure?.status ?? response.status,
@@ -3678,6 +3695,9 @@ async function handleClaudePassthroughStreamResponse(args: {
   }
 
   const clientStream = streamSource.pipeThrough(clientCaptureStream);
+  registerProxyResponseObserver(ctx.metadata, {
+    onTerminal: () => telemetryDone,
+  });
   return new Response(clientStream, {
     status: response.status,
     // Upstream headers first, then the proxy's own — passthrough already
@@ -5161,7 +5181,30 @@ async function executeClaudeCodexFallback(args: {
     // validation. A failed Codex attempt must not look like a served request.
     responseHeaders: {},
   };
-  const codexResponse = await handleCodexResponsesRequest(codexCtx);
+  const childResponse = await handleCodexResponsesRequest(codexCtx);
+  const childObservers = takeProxyResponseObservers(codexCtx.metadata);
+  let finishChildAccounting = () => {};
+  const childAccounting = new Promise<void>((resolve) => {
+    finishChildAccounting = resolve;
+  });
+  // The translated child has no HTTP runtime of its own. Drive its terminal
+  // observers here so stream failures enrich the actual Codex attempt, while
+  // the parent remains the sole client request in final success/error totals.
+  const codexResponse = trackProxyResponse(
+    childResponse,
+    finishChildAccounting,
+    {
+      onTerminal: (details) =>
+        Promise.allSettled(
+          childObservers.map(async (observer) =>
+            observer.onTerminal?.(details),
+          ),
+        ),
+    },
+  );
+  registerProxyResponseObserver(ctx.metadata, {
+    onTerminal: () => childAccounting,
+  });
   const codexHeaders = { ...(codexCtx.responseHeaders ?? {}) };
 
   if (body.stream) {
@@ -5274,6 +5317,12 @@ async function executeClaudeCodexFallback(args: {
             return;
           }
           const frame = capture(next.value);
+          if (
+            frame.startsWith("event: content_block_delta\n") &&
+            /"(?:text|partial_json)":"(?:[^"\\]|\\.)+"/.test(frame)
+          ) {
+            ctx.metadata.firstUsefulOutputAt ??= Date.now();
+          }
           if (frame.startsWith("event: message_stop\n")) {
             // Finalize before exposing the terminal frame: a client can close
             // immediately after receiving it without making another pull.
@@ -5502,6 +5551,13 @@ async function tryConfiguredClaudeFallbackChain(args: {
       body.model,
       parsedFallbackRequest,
     );
+  ctx.metadata.fallbackPlan = fallbackPlan.attempts
+    .slice(1)
+    .map(({ provider, model, reasoningEffort }) => ({
+      provider,
+      model,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+    }));
   logProxyBody({
     phase: "routing_decision",
     contentType: "application/json",
@@ -6612,6 +6668,7 @@ async function handleAnthropicStreamingSuccessResponse(args: {
       attemptNumber,
       finalBodyStr,
       upstreamSpan,
+      logAttempt,
       logProxyBody,
       logFinalRequest,
     });
@@ -6645,9 +6702,11 @@ function getStreamFailureDetails(
 function recordCommittedAnthropicStreamAttemptFailure(
   outcome: StreamTerminalOutcome,
   account: ProxyPassthroughAccount,
+  logAttempt: AnthropicAttemptLogger,
 ): void {
   if (outcome.kind === "upstream_error") {
     recordAttemptError(account.label, account.type, 502);
+    logAttempt(502, "stream_error", outcome.message, { retryable: false });
   }
 }
 
@@ -6663,6 +6722,7 @@ function attachAnthropicSuccessStreamTelemetry(args: {
   attemptNumber: number;
   finalBodyStr: string;
   upstreamSpan?: import("@opentelemetry/api").Span;
+  logAttempt: AnthropicAttemptLogger;
   logProxyBody: ProxyBodyCaptureLogger;
   logFinalRequest: (
     status: number,
@@ -6690,6 +6750,7 @@ function attachAnthropicSuccessStreamTelemetry(args: {
     attemptNumber,
     finalBodyStr,
     upstreamSpan,
+    logAttempt,
     logProxyBody,
     logFinalRequest,
   } = args;
@@ -6716,10 +6777,13 @@ function attachAnthropicSuccessStreamTelemetry(args: {
           const terminalOutcome = mergeStreamTerminalOutcome(
             rawOutcome,
             data.streamErrorMessage,
+            data.messageStopReceived,
           );
+          ctx.metadata.firstUsefulOutputAt = data.firstUsefulOutputAt;
           recordCommittedAnthropicStreamAttemptFailure(
             terminalOutcome,
             account,
+            logAttempt,
           );
           capturedTracer.setUsage({
             inputTokens: data.usage.inputTokens,
@@ -6850,7 +6914,11 @@ function attachAnthropicSuccessStreamTelemetry(args: {
       // still settle the request from the actual stream terminal outcome.
       telemetryDone = streamOutcome
         .then((outcome) => {
-          recordCommittedAnthropicStreamAttemptFailure(outcome, account);
+          recordCommittedAnthropicStreamAttemptFailure(
+            outcome,
+            account,
+            logAttempt,
+          );
           const failure = getStreamFailureDetails(outcome);
           upstreamSpan?.end();
           if (failure) {
@@ -6889,10 +6957,13 @@ function attachAnthropicSuccessStreamTelemetry(args: {
           const terminalOutcome = mergeStreamTerminalOutcome(
             rawOutcome,
             data.streamErrorMessage,
+            data.messageStopReceived,
           );
+          ctx.metadata.firstUsefulOutputAt = data.firstUsefulOutputAt;
           recordCommittedAnthropicStreamAttemptFailure(
             terminalOutcome,
             account,
+            logAttempt,
           );
           const failure = getStreamFailureDetails(terminalOutcome);
           const usage = {
@@ -6981,7 +7052,11 @@ function attachAnthropicSuccessStreamTelemetry(args: {
         });
       telemetryDone = streamOutcome
         .then((outcome) => {
-          recordCommittedAnthropicStreamAttemptFailure(outcome, account);
+          recordCommittedAnthropicStreamAttemptFailure(
+            outcome,
+            account,
+            logAttempt,
+          );
           const failure = getStreamFailureDetails(outcome);
           if (failure) {
             logFinalRequest(
@@ -7000,6 +7075,9 @@ function attachAnthropicSuccessStreamTelemetry(args: {
   }
 
   const clientStream = streamSource.pipeThrough(clientCaptureStream);
+  registerProxyResponseObserver(ctx.metadata, {
+    onTerminal: () => telemetryDone,
+  });
   // Limit headers published on the context are applied here rather than left
   // to the runtime wrapper: this Response goes straight to the client on every
   // mount (proxy runtime and the generic server adapters alike), so the
@@ -8587,6 +8665,14 @@ function createClaudeRequestRuntimeContext(args: {
       ...buildClientAttribution(ctx.headers),
       responseStatus: status,
       responseTimeMs: Date.now() - requestStartTime,
+      ...(typeof ctx.metadata.firstUsefulOutputAt === "number"
+        ? {
+            firstUsefulOutputMs: Math.max(
+              0,
+              ctx.metadata.firstUsefulOutputAt - requestStartTime,
+            ),
+          }
+        : {}),
       ...(errorType ? { errorType } : {}),
       ...(errorMessage ? { errorMessage } : {}),
       ...(extra?.errorCode ? { errorCode: extra.errorCode } : {}),
@@ -8609,6 +8695,9 @@ function createClaudeRequestRuntimeContext(args: {
         ? { traceId: traceCtx.traceId, spanId: traceCtx.spanId }
         : {}),
       ...(routingDecision ? { routingDecision } : {}),
+      ...(Array.isArray(ctx.metadata.fallbackPlan)
+        ? { fallbackPlan: ctx.metadata.fallbackPlan }
+        : {}),
     });
   };
   const buildLoggedClaudeError: ClaudeLoggedErrorBuilder = (

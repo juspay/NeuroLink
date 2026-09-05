@@ -6,8 +6,8 @@
 
 # Type Alias: ProxyLifecycleTerminalOutcome
 
-> **ProxyLifecycleTerminalOutcome** = [`ProxyResponseTerminalOutcome`](ProxyResponseTerminalOutcome.md) \| `"handler_error"`
+> **ProxyLifecycleTerminalOutcome** = [`ProxyResponseTerminalOutcome`](ProxyResponseTerminalOutcome.md) \| `"handler_error"` \| `"unknown"`
 
-Defined in: [types/proxy.ts:1897](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1897)
+Defined in: [types/proxy.ts:1932](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1932)
 
 Client-facing terminal classifications recorded by lifecycle metadata.

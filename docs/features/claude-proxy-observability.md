@@ -253,3 +253,96 @@ Counts and token-heavy charts default to whole numbers when practical, while rat
 - Log traffic moving while the telemetry tab is flat means the OTEL metrics path needs attention.
 - Rising `Cache Creation Tokens` without matching `Cache Read Tokens` means prompt reuse is weak or the cache is still warming.
 - A slow chart on the latency tab plus the same operation on the trace tab gives you the fastest path to a concrete trace investigation.
+
+## Request telemetry and evidence quality
+
+Use `neurolink proxy analyze --since 1h --format json` to reconcile retained
+request, attempt, lifecycle, and capture-index records. Read `dataQuality` before
+interpreting success rates or latency. The analyzer does not require captured
+prompt or response bodies.
+
+A client request has one generated `requestId`. Internal Codex fallback attempts
+retain their own ID plus `parentRequestId`, model, account, and `reasoningEffort`.
+The final Claude record retains the configured `fallbackPlan`; attempt records
+show which entries were actually tried. This evidence survives body retention.
+
+### Completion and timing
+
+| Field                                             | What it establishes                                                                                                   |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `responseStatus` on a lifecycle terminal          | HTTP status committed by the adapter; a stream can still fail after HTTP 200                                          |
+| `finalStatus`, `terminalOutcome`, `outcomeSource` | Route outcome, joined before terminal publication; `unknown` means final evidence was unavailable                     |
+| `transportOutcome`                                | EOF, bodyless response, read error, or cancellation observed by the response adapter                                  |
+| `telemetryStatus`                                 | Whether terminal bookkeeping completed, timed out, failed, or lacked a final record; separate from the provider error |
+| `latencyMs.firstChunk`                            | First body chunk, including SSE control events                                                                        |
+| `latencyMs.firstUsefulOutput`                     | First nonempty text or tool-argument delta parsed at the proxy; excludes thinking and control events                  |
+| `latencyMs.terminal`                              | Adapter terminal time, captured before waiting for bookkeeping or log writes                                          |
+
+Anthropic streams require `message_stop`; native Codex streams require
+`response.completed`. In-band error events, incomplete responses, and EOF without
+the expected completion event are failures even if HTTP 200 was already sent.
+An unterminated SSE event is not dispatched completion evidence. Native Codex
+cancellation after the adapter observed the chunk containing a completion event
+counts as completed; a close before completion remains a cancellation. Provider
+error codes are retained in metadata, and a failed stream enriches its original
+attempt instead of inventing a new upstream call.
+
+Timing and byte counts describe observation at the proxy, not proof that the
+remote client received or consumed every byte. Useful-output timestamps use the
+worker's wall clock; lifecycle elapsed times use a monotonic clock. Requests with
+no useful output do not contribute a zero-latency sample.
+
+### Storage health
+
+`GET /status` exposes `observability.lifecycle` and `observability.requestLogs`.
+The latter has independent `requests`, `attempts`, and `debug` sinks. For each
+metadata sink:
+
+```text
+attempted = written + pending + inFlight + dropped + unconfirmedWrites
+```
+
+`written` means the append promise completed. `pending` means queued;
+`inFlight` means an append still owns its destination. The per-sink queue admits
+up to 4,096 queued or active records; further records increment `dropped`.
+`writeTimeouts` diagnoses slow appends and overlaps these states. A timeout never
+replays an append or forgets the underlying operation. Metadata writes are
+serialized per file within each worker.
+
+Lifecycle appends retry only destination-open failures that cannot have written
+any bytes. Other failed appends increment `unconfirmedWrites`: they may have
+written a prefix and are never replayed. Queue drops and definite exhausted
+write failures are exposed separately. A bounded shutdown flush may fail while
+writes remain pending; a successful flush alone does not prove that every record
+was written. Check drop and uncertainty counters too.
+
+These are buffered, best-effort local files, without per-record `fsync` or a
+transaction across log files. A killed process, power loss, retention, disk
+failure, or overlapping workers can leave gaps or malformed records. Counters
+are worker-local and reset on restart. They do not prove delivery to an OTEL
+collector or OpenObserve. Exporter/backend health must be checked separately.
+
+### Reconciliation limits
+
+The analyzer deduplicates lifecycle `(processInstanceId, sequence)` identities
+before aggregating outcomes and latency. Conflicting duplicate payloads remain
+visible in `conflictingLifecycleDuplicates`, and affected requests are excluded
+from lifecycle latency samples. Repeated `(requestId, attempt)`
+records are merged, preserving failure evidence. Legacy `:codex-fallback` IDs are
+joined to their parents.
+
+`finalOutcomeConflicts` counts lifecycle/final disagreements. Final request
+failures override an old lifecycle success; a lifecycle success with no final
+record becomes `unknown`. `acceptedWithoutFinal` and `terminalWithoutFinal`
+report missing evidence, which can include active requests, interrupted workers,
+retention, or storage loss. They are not automatically provider failures.
+
+The time filter admits events in the selected window and follows already
+accepted requests through later retained lifecycle, attempt, and final records.
+Consequently, a request started near the window boundary can finish after
+`--until`. The observed ranges show that retained follow-up. Sequence gaps only
+measure gaps between observed sequence numbers; they cannot identify missing
+prefixes, suffixes, or an entire missing worker. Stream `completeWindow` fields
+indicate temporal coverage, not proof of lossless collection. Historical final
+records without protocol evidence retain their reported outcome; this analysis
+cannot retrospectively certify completion or reconstruct discarded error causes.

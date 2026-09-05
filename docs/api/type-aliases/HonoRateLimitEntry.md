@@ -8,7 +8,7 @@
 
 > **HonoRateLimitEntry** = `object`
 
-Defined in: [types/proxy.ts:1612](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1612)
+Defined in: [types/proxy.ts:1645](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1645)
 
 Rate limit store entry (Hono adapter).
 
@@ -18,7 +18,7 @@ Rate limit store entry (Hono adapter).
 
 > **count**: `number`
 
-Defined in: [types/proxy.ts:1613](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1613)
+Defined in: [types/proxy.ts:1646](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1646)
 
 ---
 
@@ -26,4 +26,4 @@ Defined in: [types/proxy.ts:1613](https://github.com/juspay/neurolink/blob/relea
 
 > **resetAt**: `number`
 
-Defined in: [types/proxy.ts:1614](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1614)
+Defined in: [types/proxy.ts:1647](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1647)

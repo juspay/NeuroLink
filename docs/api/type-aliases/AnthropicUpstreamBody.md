@@ -8,7 +8,7 @@
 
 > **AnthropicUpstreamBody** = `object`
 
-Defined in: [types/proxy.ts:917](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L917)
+Defined in: [types/proxy.ts:950](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L950)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/proxy.ts:917](https://github.com/juspay/neurolink/blob/releas
 
 > **bodyStr**: `string`
 
-Defined in: [types/proxy.ts:918](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L918)
+Defined in: [types/proxy.ts:951](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L951)
 
 ---
 
@@ -24,4 +24,4 @@ Defined in: [types/proxy.ts:918](https://github.com/juspay/neurolink/blob/releas
 
 > `optional` **sessionId?**: `string`
 
-Defined in: [types/proxy.ts:919](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L919)
+Defined in: [types/proxy.ts:952](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L952)

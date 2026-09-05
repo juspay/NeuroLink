@@ -8,7 +8,7 @@
 
 > **ProxyPeerLimitsSnapshot** = `object`
 
-Defined in: [types/proxy.ts:3873](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3873)
+Defined in: [types/proxy.ts:3948](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3948)
 
 What `GET /peer/limits` tells a borrower.
 
@@ -23,7 +23,7 @@ window, which is different from a ceiling with nothing left.
 
 > **grantState**: [`ProxyShareGrantState`](ProxyShareGrantState.md)
 
-Defined in: [types/proxy.ts:3874](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3874)
+Defined in: [types/proxy.ts:3949](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3949)
 
 ---
 
@@ -31,7 +31,7 @@ Defined in: [types/proxy.ts:3874](https://github.com/juspay/neurolink/blob/relea
 
 > **level**: [`ProxyShareLevel`](ProxyShareLevel.md)
 
-Defined in: [types/proxy.ts:3875](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3875)
+Defined in: [types/proxy.ts:3950](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3950)
 
 ---
 
@@ -39,7 +39,7 @@ Defined in: [types/proxy.ts:3875](https://github.com/juspay/neurolink/blob/relea
 
 > **ledger**: [`ProxyShareLedgerMode`](ProxyShareLedgerMode.md)
 
-Defined in: [types/proxy.ts:3876](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3876)
+Defined in: [types/proxy.ts:3951](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3951)
 
 ---
 
@@ -47,7 +47,7 @@ Defined in: [types/proxy.ts:3876](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **remainingCoins?**: `number`
 
-Defined in: [types/proxy.ts:3877](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3877)
+Defined in: [types/proxy.ts:3952](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3952)
 
 ---
 
@@ -55,7 +55,7 @@ Defined in: [types/proxy.ts:3877](https://github.com/juspay/neurolink/blob/relea
 
 > **servable**: `boolean`
 
-Defined in: [types/proxy.ts:3879](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3879)
+Defined in: [types/proxy.ts:3954](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3954)
 
 Whether at least one of the lender's accounts can serve this grant now.
 
@@ -65,7 +65,7 @@ Whether at least one of the lender's accounts can serve this grant now.
 
 > `optional` **withheldReason?**: [`ProxyShareRefusalReason`](ProxyShareRefusalReason.md)
 
-Defined in: [types/proxy.ts:3880](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3880)
+Defined in: [types/proxy.ts:3955](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3955)
 
 ---
 
@@ -73,7 +73,7 @@ Defined in: [types/proxy.ts:3880](https://github.com/juspay/neurolink/blob/relea
 
 > **sliceLeftPct**: `object`
 
-Defined in: [types/proxy.ts:3881](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3881)
+Defined in: [types/proxy.ts:3956](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3956)
 
 #### session
 
@@ -89,4 +89,4 @@ Defined in: [types/proxy.ts:3881](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **retryAfterSeconds?**: `number`
 
-Defined in: [types/proxy.ts:3885](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3885)
+Defined in: [types/proxy.ts:3960](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3960)

@@ -8,7 +8,7 @@
 
 > **ProxyQuotaRefreshMetrics** = `object`
 
-Defined in: [types/proxy.ts:1426](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1426)
+Defined in: [types/proxy.ts:1459](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1459)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/proxy.ts:1426](https://github.com/juspay/neurolink/blob/relea
 
 > **attempted**: `number`
 
-Defined in: [types/proxy.ts:1427](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1427)
+Defined in: [types/proxy.ts:1460](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1460)
 
 ---
 
@@ -24,7 +24,7 @@ Defined in: [types/proxy.ts:1427](https://github.com/juspay/neurolink/blob/relea
 
 > **succeeded**: `number`
 
-Defined in: [types/proxy.ts:1428](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1428)
+Defined in: [types/proxy.ts:1461](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1461)
 
 ---
 
@@ -32,7 +32,7 @@ Defined in: [types/proxy.ts:1428](https://github.com/juspay/neurolink/blob/relea
 
 > **failed**: `number`
 
-Defined in: [types/proxy.ts:1429](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1429)
+Defined in: [types/proxy.ts:1462](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1462)
 
 ---
 
@@ -40,7 +40,7 @@ Defined in: [types/proxy.ts:1429](https://github.com/juspay/neurolink/blob/relea
 
 > **coalesced**: `number`
 
-Defined in: [types/proxy.ts:1430](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1430)
+Defined in: [types/proxy.ts:1463](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1463)
 
 ---
 
@@ -48,7 +48,7 @@ Defined in: [types/proxy.ts:1430](https://github.com/juspay/neurolink/blob/relea
 
 > **backoffSuppressed**: `number`
 
-Defined in: [types/proxy.ts:1431](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1431)
+Defined in: [types/proxy.ts:1464](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1464)
 
 ---
 
@@ -56,4 +56,4 @@ Defined in: [types/proxy.ts:1431](https://github.com/juspay/neurolink/blob/relea
 
 > **triggerDeduplicated**: `number`
 
-Defined in: [types/proxy.ts:1432](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1432)
+Defined in: [types/proxy.ts:1465](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1465)

@@ -68,20 +68,19 @@ export function extractSSEEvents(buffer: string): ParsedSSEBuffer {
     cursor = boundary + boundaryMatch[0].length;
 
     let eventType = "";
-    let dataValue = "";
+    const dataLines: string[] = [];
 
     const lines = rawBlock.split(/\r\n|\n|\r/);
     for (const line of lines) {
-      if (line.startsWith("event: ")) {
-        eventType = line.slice(7).trim();
-      } else if (line.startsWith("data: ")) {
-        dataValue = line.slice(6);
+      if (line.startsWith("event:")) {
+        eventType = line.slice(6).trim();
       } else if (line.startsWith("data:")) {
-        // handle `data:` with no space (edge case)
-        dataValue = line.slice(5);
+        const value = line.slice(5);
+        dataLines.push(value.startsWith(" ") ? value.slice(1) : value);
       }
     }
 
+    const dataValue = dataLines.join("\n");
     if (eventType || dataValue) {
       events.push({ event: eventType, data: dataValue });
     }
@@ -96,6 +95,7 @@ export function extractSSEEvents(buffer: string): ParsedSSEBuffer {
 
 function createAccumulator(captureRawText: boolean): TelemetryAccumulator {
   return {
+    messageStopReceived: false,
     messageId: "",
     model: "",
     inputTokens: 0,
@@ -213,6 +213,8 @@ function finalize(acc: TelemetryAccumulator): SSETelemetry {
   const totalTokens = acc.inputTokens + acc.outputTokens;
   return {
     messageId: acc.messageId,
+    messageStopReceived: acc.messageStopReceived,
+    firstUsefulOutputAt: acc.firstUsefulOutputAt,
     model: acc.model,
     usage: {
       inputTokens: acc.inputTokens,
@@ -410,7 +412,13 @@ function processEvent(
     return;
   }
 
-  if (event.event === "error") {
+  const payloadType =
+    parsed && typeof parsed === "object" && "type" in parsed
+      ? parsed.type
+      : undefined;
+  const eventType =
+    event.event || (typeof payloadType === "string" ? payloadType : "");
+  if (eventType === "error" || payloadType === "error") {
     const payload =
       parsed && typeof parsed === "object"
         ? (parsed as Record<string, unknown>)
@@ -426,7 +434,30 @@ function processEvent(
         : truncateString(event.data, MAX_EVENT_DATA_BYTES);
   }
 
-  switch (event.event) {
+  if (eventType === "message_stop") {
+    acc.messageStopReceived = true;
+  }
+  if (
+    eventType === "content_block_delta" &&
+    parsed &&
+    typeof parsed === "object" &&
+    "delta" in parsed
+  ) {
+    const delta = parsed.delta;
+    if (
+      delta &&
+      typeof delta === "object" &&
+      (("text" in delta &&
+        typeof delta.text === "string" &&
+        delta.text.length > 0) ||
+        ("partial_json" in delta &&
+          typeof delta.partial_json === "string" &&
+          delta.partial_json.length > 0))
+    ) {
+      acc.firstUsefulOutputAt ??= Date.now();
+    }
+  }
+  switch (eventType) {
     case "message_start":
       processMessageStart(acc, parsed);
       break;
@@ -514,14 +545,8 @@ export function createSSEInterceptor(
         sseBuffer += finalChunk;
       }
 
-      // Process any trailing data left in the buffer (e.g. a final event
-      // not followed by a double-newline).
-      if (sseBuffer.trim()) {
-        const { events } = extractSSEEvents(sseBuffer + "\n\n");
-        for (const event of events) {
-          processEvent(acc, event);
-        }
-      }
+      // SSE dispatch requires a blank line. An unterminated terminal event
+      // is not evidence that the client could observe protocol completion.
 
       settle();
     },

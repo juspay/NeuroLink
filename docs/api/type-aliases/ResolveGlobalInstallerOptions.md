@@ -8,7 +8,7 @@
 
 > **ResolveGlobalInstallerOptions** = `object`
 
-Defined in: [types/proxy.ts:2632](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2632)
+Defined in: [types/proxy.ts:2707](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2707)
 
 Overrides used while resolving the global package manager.
 
@@ -18,7 +18,7 @@ Overrides used while resolving the global package manager.
 
 > `optional` **entryScript?**: `string`
 
-Defined in: [types/proxy.ts:2633](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2633)
+Defined in: [types/proxy.ts:2708](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2708)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:2633](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **env?**: `NodeJS.ProcessEnv`
 
-Defined in: [types/proxy.ts:2634](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2634)
+Defined in: [types/proxy.ts:2709](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2709)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:2634](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **homeDir?**: `string`
 
-Defined in: [types/proxy.ts:2635](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2635)
+Defined in: [types/proxy.ts:2710](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2710)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/proxy.ts:2635](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **execFileSync?**: [`GlobalInstallerExecFile`](GlobalInstallerExecFile.md)
 
-Defined in: [types/proxy.ts:2636](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2636)
+Defined in: [types/proxy.ts:2711](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2711)

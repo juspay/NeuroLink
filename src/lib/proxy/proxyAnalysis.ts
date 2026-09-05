@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { isDeepStrictEqual } from "node:util";
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
@@ -468,7 +469,10 @@ function summarizeFinalRequests(
   const errorCodes: Record<string, number> = {};
 
   for (const [requestId, request] of finalRequests) {
-    const failed = request.status >= 400 || terminalStreamErrors.has(requestId);
+    const failed =
+      request.status >= 400 ||
+      !!request.errorType ||
+      terminalStreamErrors.has(requestId);
     if (failed) {
       errors += 1;
     } else {
@@ -755,21 +759,30 @@ export async function analyzeProxyLogs(
   const terminalOutcomes: Record<string, number> = {};
   const lifecycleErrorTypes: Record<string, number> = {};
   const lifecycleErrorCodes: Record<string, number> = {};
-  const headersLatency: number[] = [];
-  const firstChunkLatency: number[] = [];
-  const terminalLatency: number[] = [];
+  const headersLatencyByRequest = new Map<string, number>();
+  const firstChunkLatencyByRequest = new Map<string, number>();
+  const terminalLatencyByRequest = new Map<string, number>();
   const sequences = new Map<string, number[]>();
+  const seenLifecycleEvents = new Map<string, Record<string, unknown>>();
+  let conflictingLifecycleDuplicates = 0;
+  const conflictedRequests = new Set<string>();
+  const terminalRecords = new Map<string, Record<string, unknown>>();
 
   for (const filePath of lifecycleFiles) {
     linesRead += await readJsonLines(
       filePath,
       (record) => {
         const timestamp = observeTimestamp("lifecycle", record);
-        if (timestamp === null || timestamp < sinceMs || timestamp > untilMs) {
+        const requestId = stringValue(record.requestId);
+        if (
+          timestamp === null ||
+          !requestId ||
+          (!accepted.has(requestId) &&
+            (timestamp < sinceMs || timestamp > untilMs))
+        ) {
           return;
         }
         const event = stringValue(record.event);
-        const requestId = stringValue(record.requestId);
         if (
           record.schemaVersion !== 1 ||
           !event ||
@@ -785,24 +798,48 @@ export async function analyzeProxyLogs(
           const values = sequences.get(processId) ?? [];
           values.push(sequence);
           sequences.set(processId, values);
+          const identity = `${processId}:${sequence}`;
+          const previous = seenLifecycleEvents.get(identity);
+          if (previous) {
+            if (!isDeepStrictEqual(previous, record)) {
+              conflictingLifecycleDuplicates += 1;
+              conflictedRequests.add(requestId);
+              const previousRequestId = stringValue(previous.requestId);
+              if (previousRequestId) {
+                conflictedRequests.add(previousRequestId);
+              }
+            }
+            return;
+          }
+          seenLifecycleEvents.set(identity, record);
         }
         const elapsed = finiteNumber(record.elapsedMs);
         if (event === "request_accepted") {
           accepted.add(requestId);
         } else if (event === "response_headers") {
+          if (headers.has(requestId)) {
+            return;
+          }
           headers.add(requestId);
           if (elapsed !== null && elapsed >= 0) {
-            headersLatency.push(elapsed);
+            headersLatencyByRequest.set(requestId, elapsed);
           }
         } else if (event === "response_first_chunk") {
+          if (firstChunks.has(requestId)) {
+            return;
+          }
           firstChunks.add(requestId);
           if (elapsed !== null && elapsed >= 0) {
-            firstChunkLatency.push(elapsed);
+            firstChunkLatencyByRequest.set(requestId, elapsed);
           }
         } else {
+          if (terminal.has(requestId)) {
+            return;
+          }
           terminal.add(requestId);
+          terminalRecords.set(requestId, record);
           if (elapsed !== null && elapsed >= 0) {
-            terminalLatency.push(elapsed);
+            terminalLatencyByRequest.set(requestId, elapsed);
           }
           increment(
             terminalOutcomes,
@@ -823,6 +860,16 @@ export async function analyzeProxyLogs(
       },
     );
   }
+
+  // Contradictory copies are not reliable latency samples. Keep their data
+  // quality count, but do not choose one timing arbitrarily.
+  const verifiedLatencies = (values: Map<string, number>): number[] =>
+    [...values]
+      .filter(([id]) => !conflictedRequests.has(id))
+      .map(([, ms]) => ms);
+  const headersLatency = verifiedLatencies(headersLatencyByRequest);
+  const firstChunkLatency = verifiedLatencies(firstChunkLatencyByRequest);
+  const terminalLatency = verifiedLatencies(terminalLatencyByRequest);
 
   let lifecycleSequenceGaps = 0;
   let lifecycleSequenceDuplicates = 0;
@@ -850,75 +897,119 @@ export async function analyzeProxyLogs(
   let transientRateLimits = 0;
   let quotaRateLimits = 0;
   let unclassifiedRateLimits = 0;
+  const uniqueAttempts = new Map<string, Record<string, unknown>>();
+  let duplicateAttempts = 0;
 
   for (const filePath of attemptFiles) {
     linesRead += await readJsonLines(
       filePath,
       (record) => {
         const timestamp = observeTimestamp("attempts", record);
-        if (timestamp === null || timestamp < sinceMs || timestamp > untilMs) {
+        const requestId = stringValue(record.requestId);
+        const parentId =
+          stringValue(record.parentRequestId) ??
+          requestId?.replace(/:codex-fallback$/, "");
+        if (
+          timestamp === null ||
+          !requestId ||
+          (!accepted.has(parentId ?? requestId) &&
+            (timestamp < sinceMs || timestamp > untilMs))
+        ) {
           return;
         }
-        const requestId = stringValue(record.requestId);
         const status = finiteNumber(record.responseStatus);
-        const duration = finiteNumber(record.attemptDurationMs);
         if (!requestId || status === null) {
           return;
         }
-        const account = stringValue(record.account) ?? "unknown";
-        const accountType = stringValue(record.accountType) ?? "unknown";
-        const accountStats = accountEntry(accounts, account, accountType);
-        totalAttempts += 1;
-        accountStats.attempts += 1;
-        const hadError = status >= 400 || !!stringValue(record.errorType);
-        if (hadError) {
-          totalAttemptErrors += 1;
-          accountStats.attemptErrors += 1;
-          increment(
-            attemptErrorTypes,
-            stringValue(record.errorType) ?? `http_${status}`,
-          );
-          const errorCode = stringValue(record.errorCode);
-          if (errorCode) {
-            increment(attemptErrorCodes, errorCode);
-          }
+        const identity = `${requestId}:${String(record.attempt ?? record.timestamp)}`;
+        const previous = uniqueAttempts.get(identity);
+        if (previous) {
+          duplicateAttempts += 1;
         }
-        const transportScope = stringValue(record.transportScope);
-        if (transportScope) {
-          increment(attemptTransportScopes, transportScope);
-        }
-        const requestAttempts = attemptsByRequest.get(requestId) ?? {
-          count: 0,
-          hadError: false,
-          totalDurationMs: 0,
-          durationCount: 0,
-        };
-        requestAttempts.count += 1;
-        requestAttempts.hadError = requestAttempts.hadError || hadError;
-        if (duration !== null && duration >= 0) {
-          requestAttempts.totalDurationMs += duration;
-          requestAttempts.durationCount += 1;
-          attemptLatency.push(duration);
-        }
-        attemptsByRequest.set(requestId, requestAttempts);
-        if (status === 429) {
-          attemptRateLimits += 1;
-          if (record.rateLimitKind === "transient") {
-            transientRateLimits += 1;
-            accountStats.transientRateLimits += 1;
-          } else if (record.rateLimitKind === "quota") {
-            quotaRateLimits += 1;
-            accountStats.quotaRateLimits += 1;
-          } else {
-            unclassifiedRateLimits += 1;
-            accountStats.unclassifiedRateLimits += 1;
-          }
-        }
+        // A later terminal update enriches the same attempt, never creates a
+        // second upstream call. Preserve failure evidence across enrichment.
+        uniqueAttempts.set(
+          identity,
+          previous
+            ? {
+                ...previous,
+                ...record,
+                ...((previous.errorType ||
+                  Number(previous.responseStatus) >= 400) &&
+                !record.errorType &&
+                status < 400
+                  ? {
+                      errorType: previous.errorType,
+                      responseStatus: previous.responseStatus,
+                      errorCode: previous.errorCode,
+                    }
+                  : {}),
+              }
+            : record,
+        );
       },
       () => {
         malformedLines += 1;
       },
     );
+  }
+
+  for (const record of uniqueAttempts.values()) {
+    const rawRequestId = String(record.requestId);
+    const requestId =
+      stringValue(record.parentRequestId) ??
+      rawRequestId.replace(/:codex-fallback$/, "");
+    const status = Number(record.responseStatus);
+    const duration = finiteNumber(record.attemptDurationMs);
+    const account = stringValue(record.account) ?? "unknown";
+    const accountType = stringValue(record.accountType) ?? "unknown";
+    const accountStats = accountEntry(accounts, account, accountType);
+    totalAttempts += 1;
+    accountStats.attempts += 1;
+    const hadError = status >= 400 || !!stringValue(record.errorType);
+    if (hadError) {
+      totalAttemptErrors += 1;
+      accountStats.attemptErrors += 1;
+      increment(
+        attemptErrorTypes,
+        stringValue(record.errorType) ?? `http_${status}`,
+      );
+      const errorCode = stringValue(record.errorCode);
+      if (errorCode) {
+        increment(attemptErrorCodes, errorCode);
+      }
+    }
+    const transportScope = stringValue(record.transportScope);
+    if (transportScope) {
+      increment(attemptTransportScopes, transportScope);
+    }
+    const requestAttempts = attemptsByRequest.get(requestId) ?? {
+      count: 0,
+      hadError: false,
+      totalDurationMs: 0,
+      durationCount: 0,
+    };
+    requestAttempts.count += 1;
+    requestAttempts.hadError = requestAttempts.hadError || hadError;
+    if (duration !== null && duration >= 0) {
+      requestAttempts.totalDurationMs += duration;
+      requestAttempts.durationCount += 1;
+      attemptLatency.push(duration);
+    }
+    attemptsByRequest.set(requestId, requestAttempts);
+    if (status === 429) {
+      attemptRateLimits += 1;
+      if (record.rateLimitKind === "transient") {
+        transientRateLimits += 1;
+        accountStats.transientRateLimits += 1;
+      } else if (record.rateLimitKind === "quota") {
+        quotaRateLimits += 1;
+        accountStats.quotaRateLimits += 1;
+      } else {
+        unclassifiedRateLimits += 1;
+        accountStats.unclassifiedRateLimits += 1;
+      }
+    }
   }
 
   const finalRequests = new Map<string, ProxyAnalysisFinalRequestRecord>();
@@ -948,7 +1039,9 @@ export async function analyzeProxyLogs(
         // report to say so. A request the window already admitted therefore
         // keeps accepting its own later records.
         const alreadyAdmitted =
-          finalRequests.has(requestId) || terminalStreamErrors.has(requestId);
+          accepted.has(requestId) ||
+          finalRequests.has(requestId) ||
+          terminalStreamErrors.has(requestId);
         if (!alreadyAdmitted && (timestamp < sinceMs || timestamp > untilMs)) {
           return;
         }
@@ -975,6 +1068,7 @@ export async function analyzeProxyLogs(
           absentRoutingDecisions += 1;
         }
         const parsed: ProxyAnalysisFinalRequestRecord = {
+          firstUsefulOutputMs: finiteNumber(record.firstUsefulOutputMs),
           timestamp: new Date(timestamp).toISOString(),
           status,
           durationMs: finiteNumber(record.responseTimeMs),
@@ -1006,6 +1100,9 @@ export async function analyzeProxyLogs(
                     ([, value]) => value !== null && value !== undefined,
                   ),
                 ),
+                ...(previous.status >= 400 && status < 400
+                  ? { status: previous.status }
+                  : {}),
                 // Attribute the request to when it was first seen. A late
                 // completion record must not move it out of the window that
                 // admitted it.
@@ -1018,6 +1115,40 @@ export async function analyzeProxyLogs(
         malformedLines += 1;
       },
     );
+  }
+
+  // Old lifecycle records described transport EOF as success even when the
+  // final request recorded a semantic failure. Reconcile, and expose every
+  // disagreement instead of letting a choice of input file change the answer.
+  let finalOutcomeConflicts = 0;
+  for (const key of Object.keys(terminalOutcomes)) {
+    delete terminalOutcomes[key];
+  }
+  for (const [requestId, record] of terminalRecords) {
+    const final = finalRequests.get(requestId);
+    const recorded = stringValue(record.terminalOutcome) ?? "unknown";
+    const resolved = final
+      ? final.status === 499 || final.errorType === "client_cancelled"
+        ? "client_cancelled"
+        : final.errorType?.includes("stream") ||
+            terminalStreamErrors.has(requestId)
+          ? "stream_error"
+          : final.status >= 400 || final.errorType
+            ? "handler_error"
+            : "completed"
+      : conflictedRequests.has(requestId) ||
+          recorded === "completed" ||
+          recorded === "bodyless"
+        ? "unknown"
+        : recorded;
+    if (
+      final &&
+      recorded !== resolved &&
+      !(recorded === "bodyless" && resolved === "completed")
+    ) {
+      finalOutcomeConflicts += 1;
+    }
+    increment(terminalOutcomes, resolved);
   }
 
   let capturesIndexed = 0;
@@ -1135,6 +1266,13 @@ export async function analyzeProxyLogs(
       unsupportedLifecycleLines,
       lifecycleSequenceGaps,
       lifecycleSequenceDuplicates,
+      conflictingLifecycleDuplicates,
+      duplicateAttempts,
+      finalOutcomeConflicts,
+      acceptedWithoutFinal: [...accepted].filter((id) => !finalRequests.has(id))
+        .length,
+      terminalWithoutFinal: [...terminal].filter((id) => !finalRequests.has(id))
+        .length,
       streams: Object.fromEntries(
         Object.entries(observedRanges).map(([stream, range]) => [
           stream,
@@ -1192,6 +1330,13 @@ export async function analyzeProxyLogs(
     latencyMs: {
       headers: summarizeLatency(headersLatency),
       firstChunk: summarizeLatency(firstChunkLatency),
+      firstUsefulOutput: summarizeLatency(
+        [...finalRequests.values()].flatMap((record) =>
+          record.firstUsefulOutputMs === null
+            ? []
+            : [record.firstUsefulOutputMs],
+        ),
+      ),
       terminal: summarizeLatency(terminalLatency),
       finalRequest: summarizeLatency(finalSummary.finalRequestLatency),
       attempt: summarizeLatency(attemptLatency),

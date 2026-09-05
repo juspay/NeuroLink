@@ -2867,7 +2867,7 @@ const tests: TestFunction[] = [
       };
       const sequence: string[] = [];
       const result = await __testHooks.handleAnthropicStreamingSuccessResponse({
-        ctx: {} as never,
+        ctx: { metadata: {} } as never,
         body: {
           model: "claude-opus-4-8",
           messages: [],

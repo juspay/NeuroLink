@@ -85,6 +85,7 @@ import { resolveProxyStatusAccountIdentity } from "../../lib/proxy/codexAccountU
 import {
   beginProxyRequest,
   getProxyActivitySnapshot,
+  observeProxyFinalLog,
   takeProxyResponseObservers,
   trackProxyResponse,
 } from "../../lib/proxy/proxyActivity.js";
@@ -1423,10 +1424,17 @@ function registerProxyRequestTracking(
       rejectForUpdate: readiness.drainingForUpdate,
     };
     requestMetadata.set(c.req.raw, metadata);
+    const stopObservingFinalLog = observeProxyFinalLog(
+      metadata.requestId,
+      (entry) => {
+        metadata.terminalResult = entry;
+      },
+    );
     const finishActivity = metadata.rejectForUpdate
       ? () => undefined
       : beginProxyRequest();
     const finish = () => {
+      stopObservingFinalLog();
       finishActivity();
       // Borrowed traffic holds a concurrency slot for the lifetime of the
       // response body, so it is released here rather than when the handler
@@ -1477,18 +1485,21 @@ function registerProxyRequestTracking(
           }
         }
       };
-      const notifyRouteTerminal = (
+      const notifyRouteTerminal = async (
         details: Parameters<
           NonNullable<ProxyResponseTrackingObserver["onTerminal"]>
         >[0],
-      ): void => {
-        for (const observer of routeResponseObservers) {
-          try {
-            observer.onTerminal?.(details);
-          } catch {
-            // Route-level accounting must never interfere with the relay.
-          }
-        }
+      ): Promise<boolean> => {
+        const results = await withTimeout(
+          Promise.allSettled(
+            routeResponseObservers.map(async (observer) =>
+              observer.onTerminal?.(details),
+            ),
+          ),
+          2_000,
+          "Timed out joining proxy response accounting",
+        );
+        return results.some((result) => result.status === "rejected");
       };
       c.res = trackProxyResponse(c.res, finish, {
         onFirstChunk: ({ observedBodyBytes, responseChunks }) => {
@@ -1512,15 +1523,44 @@ function registerProxyRequestTracking(
             responseChunks,
           });
         },
-        onTerminal: ({ outcome, observedBodyBytes, responseChunks }) => {
-          if (
-            outcome === "completed" &&
-            metadata.terminalErrorType === "stream_error"
-          ) {
-            outcome = "stream_error";
+        onTerminal: async ({
+          outcome,
+          error,
+          observedBodyBytes,
+          responseChunks,
+        }) => {
+          const terminalMonotonicMs = performance.now();
+          const terminalTimestampMs = Date.now();
+          // Route accounting may await SSE parsing/cancellation. Join it before
+          // publishing the semantic terminal record; transport EOF alone is not
+          // evidence of a successful model response.
+          let accountingTimedOut = false;
+          let accountingFailed = false;
+          try {
+            accountingFailed = await notifyRouteTerminal({
+              outcome,
+              error,
+              observedBodyBytes,
+              responseChunks,
+            });
+          } catch {
+            accountingTimedOut = true;
           }
+          const final = metadata.terminalResult;
+          const terminalOutcome =
+            final?.terminalOutcome ??
+            (outcome === "stream_error" ||
+            metadata.terminalErrorType === "stream_error"
+              ? "stream_error"
+              : outcome === "client_cancelled"
+                ? "client_cancelled"
+                : responseStatus >= 400
+                  ? "handler_error"
+                  : "unknown");
           logProxyLifecycleEvent({
             event: "request_terminal",
+            timestampMs: terminalTimestampMs,
+            monotonicMs: terminalMonotonicMs,
             requestId: metadata.requestId,
             method: metadata.method,
             path: metadata.path,
@@ -1532,19 +1572,32 @@ function registerProxyRequestTracking(
             responseStatus,
             observedBodyBytes,
             responseChunks,
-            elapsedMs: performance.now() - startedMonotonicMs,
-            terminalOutcome: outcome,
-            errorType: metadata.terminalErrorType,
-            errorCode: metadata.terminalErrorCode,
+            elapsedMs: terminalMonotonicMs - startedMonotonicMs,
+            terminalOutcome,
+            finalStatus: final?.responseStatus,
+            transportOutcome: outcome,
+            outcomeSource: final
+              ? "final_request"
+              : responseStatus >= 400
+                ? "http_status"
+                : terminalOutcome === "unknown"
+                  ? "unknown"
+                  : "transport_error",
+            telemetryStatus: accountingTimedOut
+              ? "timeout"
+              : accountingFailed
+                ? "observer_error"
+                : final
+                  ? "complete"
+                  : "missing_final",
+            errorType: final?.errorType ?? metadata.terminalErrorType,
+            errorCode: final?.errorCode ?? metadata.terminalErrorCode,
           });
-          notifyRouteTerminal({
-            outcome,
-            observedBodyBytes,
-            responseChunks,
-          });
+          stopObservingFinalLog();
         },
       });
     } catch (error) {
+      stopObservingFinalLog();
       // Keep metadata available to app.onError, which records the client-facing
       // failure with the same request ID before deleting the WeakMap entry.
       finishActivity();
@@ -1608,7 +1661,7 @@ export async function createProxyStartApp(params: {
     await import("../../lib/server/routes/codexProxyRoutes.js");
   const { createGeminiProxyRoutes } =
     await import("../../lib/server/routes/geminiProxyRoutes.js");
-  const { logBodyCapture, logRequest } =
+  const { logBodyCapture, logRequest, getRequestLoggerSnapshot } =
     await import("../../lib/proxy/requestLogger.js");
   const { recordFinalError } = await import("../../lib/proxy/usageStats.js");
   const { admitInboundShareRequest, isGrantRequiredByEnv } =
@@ -2530,6 +2583,7 @@ export async function createProxyStartApp(params: {
       })(),
       observability: {
         lifecycle: getProxyLifecycleLoggerSnapshot(),
+        requestLogs: getRequestLoggerSnapshot(),
       },
       autoUpdate: {
         enabled: isProxyAutoUpdateEnabled(),

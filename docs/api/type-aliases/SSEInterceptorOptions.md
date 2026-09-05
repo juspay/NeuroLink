@@ -8,7 +8,7 @@
 
 > **SSEInterceptorOptions** = `object`
 
-Defined in: [types/proxy.ts:2496](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2496)
+Defined in: [types/proxy.ts:2571](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2571)
 
 Options for createSSEInterceptor.
 
@@ -18,4 +18,4 @@ Options for createSSEInterceptor.
 
 > `optional` **captureRawText?**: `boolean`
 
-Defined in: [types/proxy.ts:2497](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2497)
+Defined in: [types/proxy.ts:2572](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2572)

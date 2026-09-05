@@ -8,7 +8,7 @@
 
 > **InstalledVersionValidation** = `object`
 
-Defined in: [types/proxy.ts:2599](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2599)
+Defined in: [types/proxy.ts:2674](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2674)
 
 Result of validating a newly installed CLI through the stable trampoline.
 
@@ -18,7 +18,7 @@ Result of validating a newly installed CLI through the stable trampoline.
 
 > `optional` **version?**: `string`
 
-Defined in: [types/proxy.ts:2600](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2600)
+Defined in: [types/proxy.ts:2675](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2675)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:2600](https://github.com/juspay/neurolink/blob/relea
 
 > **attempts**: `number`
 
-Defined in: [types/proxy.ts:2601](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2601)
+Defined in: [types/proxy.ts:2676](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2676)
 
 ---
 
@@ -34,4 +34,4 @@ Defined in: [types/proxy.ts:2601](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **failure?**: `string`
 
-Defined in: [types/proxy.ts:2602](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2602)
+Defined in: [types/proxy.ts:2677](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2677)

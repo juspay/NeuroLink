@@ -8,7 +8,7 @@
 
 > **ProxyStatsLockOwner** = `object`
 
-Defined in: [types/proxy.ts:1231](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1231)
+Defined in: [types/proxy.ts:1264](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1264)
 
 Ownership metadata for the proxy statistics cross-process lock.
 
@@ -18,7 +18,7 @@ Ownership metadata for the proxy statistics cross-process lock.
 
 > **token**: `string`
 
-Defined in: [types/proxy.ts:1232](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1232)
+Defined in: [types/proxy.ts:1265](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1265)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:1232](https://github.com/juspay/neurolink/blob/relea
 
 > **pid**: `number`
 
-Defined in: [types/proxy.ts:1233](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1233)
+Defined in: [types/proxy.ts:1266](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1266)
 
 ---
 
@@ -34,4 +34,4 @@ Defined in: [types/proxy.ts:1233](https://github.com/juspay/neurolink/blob/relea
 
 > **acquiredAt**: `number`
 
-Defined in: [types/proxy.ts:1234](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1234)
+Defined in: [types/proxy.ts:1267](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1267)

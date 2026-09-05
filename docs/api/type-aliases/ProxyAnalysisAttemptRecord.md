@@ -8,7 +8,7 @@
 
 > **ProxyAnalysisAttemptRecord** = `object`
 
-Defined in: [types/proxy.ts:2137](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2137)
+Defined in: [types/proxy.ts:2195](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2195)
 
 Attempt timing retained while joining offline proxy log records.
 
@@ -18,7 +18,7 @@ Attempt timing retained while joining offline proxy log records.
 
 > **count**: `number`
 
-Defined in: [types/proxy.ts:2138](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2138)
+Defined in: [types/proxy.ts:2196](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2196)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/proxy.ts:2138](https://github.com/juspay/neurolink/blob/relea
 
 > **hadError**: `boolean`
 
-Defined in: [types/proxy.ts:2139](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2139)
+Defined in: [types/proxy.ts:2197](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2197)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/proxy.ts:2139](https://github.com/juspay/neurolink/blob/relea
 
 > **totalDurationMs**: `number`
 
-Defined in: [types/proxy.ts:2140](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2140)
+Defined in: [types/proxy.ts:2198](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2198)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/proxy.ts:2140](https://github.com/juspay/neurolink/blob/relea
 
 > **durationCount**: `number`
 
-Defined in: [types/proxy.ts:2141](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2141)
+Defined in: [types/proxy.ts:2199](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L2199)

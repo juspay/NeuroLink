@@ -8,7 +8,7 @@
 
 > **ProxyShareAuditFile** = `object`
 
-Defined in: [types/proxy.ts:4262](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4262)
+Defined in: [types/proxy.ts:4337](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4337)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/proxy.ts:4262](https://github.com/juspay/neurolink/blob/relea
 
 > **schemaVersion**: `1`
 
-Defined in: [types/proxy.ts:4263](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4263)
+Defined in: [types/proxy.ts:4338](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4338)
 
 ---
 
@@ -24,4 +24,4 @@ Defined in: [types/proxy.ts:4263](https://github.com/juspay/neurolink/blob/relea
 
 > **records**: `Record`\<`string`, [`ProxyShareAuditRecord`](ProxyShareAuditRecord.md)\>
 
-Defined in: [types/proxy.ts:4264](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4264)
+Defined in: [types/proxy.ts:4339](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4339)
