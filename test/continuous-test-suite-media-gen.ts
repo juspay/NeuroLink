@@ -1511,10 +1511,9 @@ async function testVideoGenerationVertexAI(): Promise<boolean | null> {
 
 import { NeuroLink } from '${process.cwd()}/dist/index.js';
 
-import { assertDistFresh } from "./helpers/distFreshness.js";
-
-// Fail loudly rather than silently testing a stale build (see distFreshness.ts).
-assertDistFresh();
+// No freshness check here: this script runs from a temp directory with no
+// ./helpers to import it from, and the parent suite already ran
+// assertDistFresh() against the same dist before writing this file.
 
 async function testVideoGenerationVertexAI() {
   console.log('Testing video generation via Vertex AI generate()...');

@@ -136,7 +136,7 @@ async function testGenerateOnFinish(): Promise<boolean | null> {
       model: TEST_CONFIG.model,
       thinkingLevel: TEST_CONFIG.thinkingLevel,
       disableTools: TEST_CONFIG.disableTools,
-      maxTokens: 50,
+      maxTokens: 200,
       onFinish: (payload) => {
         finishPayload = payload;
       },
@@ -271,7 +271,7 @@ async function testGenerateCallbackIsolation(): Promise<boolean | null> {
       model: TEST_CONFIG.model,
       thinkingLevel: TEST_CONFIG.thinkingLevel,
       disableTools: TEST_CONFIG.disableTools,
-      maxTokens: 50,
+      maxTokens: 200,
       onFinish: () => {
         throw new Error("Consumer callback blew up");
       },
@@ -333,7 +333,7 @@ async function testStreamOnFinish(): Promise<boolean | null> {
       model: TEST_CONFIG.model,
       thinkingLevel: TEST_CONFIG.thinkingLevel,
       disableTools: TEST_CONFIG.disableTools,
-      maxTokens: 50,
+      maxTokens: 200,
       onFinish: (payload) => {
         finishPayload = payload;
       },
@@ -541,7 +541,7 @@ async function testStreamCallbackIsolation(): Promise<boolean | null> {
       model: TEST_CONFIG.model,
       thinkingLevel: TEST_CONFIG.thinkingLevel,
       disableTools: TEST_CONFIG.disableTools,
-      maxTokens: 50,
+      maxTokens: 200,
       onFinish: () => {
         throw new Error("Consumer stream callback blew up");
       },

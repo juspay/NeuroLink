@@ -94,7 +94,11 @@ async function runMatrix(): Promise<void> {
             const r = await sdk.generate({
               ...baseOpts,
               input: { text: "Reply with exactly: HELLO" },
-              maxTokens: 50,
+              // Several catalog defaults are reasoning models (Cerebras and Groq
+              // gpt-oss-120b, Fireworks kimi) that spend the whole budget on
+              // hidden reasoning at 50 and return empty text with
+              // finishReason "length". 200 matches the other cells.
+              maxTokens: 200,
               disableTools: true,
             } as never);
             lastContent = r.content;
@@ -117,7 +121,7 @@ async function runMatrix(): Promise<void> {
             const r = await sdk.stream({
               ...baseOpts,
               input: { text: "Count from 1 to 3." },
-              maxTokens: 50,
+              maxTokens: 200,
               disableTools: true,
             } as never);
             let count = 0;

@@ -140,7 +140,7 @@ async function runMatrix(): Promise<void> {
           "--model",
           p.defaultModel,
           "--maxTokens",
-          "30",
+          "200",
           "--disableTools",
           "Reply with the single word HELLO and nothing else.",
         ]);
@@ -165,7 +165,7 @@ async function runMatrix(): Promise<void> {
               "--model",
               p.defaultModel,
               "--maxTokens",
-              "30",
+              "200",
               "--disableTools",
               "Count from 1 to 3.",
             ]);
