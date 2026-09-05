@@ -1105,6 +1105,18 @@ const CATALOG_ALIAS_CHECKS: AliasCheck[] = [
     urlMatch: "neuro.mancer.tech/oai/v1/chat/completions",
     model: "deepseek-v4-flash",
   },
+  {
+    alias: "morph",
+    envVar: "MORPH_API_KEY",
+    urlMatch: "api.morphllm.com/v1/chat/completions",
+    model: "morph-v3-large",
+  },
+  {
+    alias: "morphllm",
+    envVar: "MORPH_API_KEY",
+    urlMatch: "api.morphllm.com/v1/chat/completions",
+    model: "morph-v3-large",
+  },
 ];
 
 async function testCatalogStructuralInvariants(): Promise<void> {
