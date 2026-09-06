@@ -452,7 +452,10 @@ export class ProviderRegistry {
             await import("../providers/nvidiaNim/index.js");
           return new NvidiaNimProvider(modelName, sdk, undefined, nimCreds);
         },
-        process.env.NVIDIA_NIM_MODEL || NvidiaNimModels.LLAMA_3_3_70B_INSTRUCT,
+        process.env.NVIDIA_NIM_MODEL ||
+          PROVIDER_DESCRIPTORS_BY_NAME.get(AIProviderName.NVIDIA_NIM)
+            ?.defaultModel ||
+          NvidiaNimModels.GPT_OSS_20B,
         ["nvidia", "nim", "nvidia-nim"],
         PROVIDER_DESCRIPTORS_BY_NAME.get(AIProviderName.NVIDIA_NIM),
       );

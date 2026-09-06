@@ -472,7 +472,12 @@ const PROVIDER_ROWS: Array<[string, ProviderEntry]> = [
     "nvidia-nim",
     {
       name: "nvidia-nim",
-      defaultModel: "meta/llama-3.1-8b-instruct",
+      // NVIDIA retired meta/llama-3.1-8b-instruct on 2026-08-26, which left
+      // four permanently-red matrix cells. Most of the published roster also
+      // 404s as "not found for account", so the replacement is one this
+      // account can actually reach, verified live for text, streaming, tool
+      // calling and structured output.
+      defaultModel: "openai/gpt-oss-20b",
       envVars: ["NVIDIA_NIM_API_KEY"],
       text: true,
       streaming: true,

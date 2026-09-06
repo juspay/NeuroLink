@@ -349,7 +349,7 @@ const HAND_DESCRIPTORS: readonly ProviderDescriptor[] = [
       baseURL: "NVIDIA_NIM_BASE_URL",
       model: "NVIDIA_NIM_MODEL",
     },
-    defaultModel: NvidiaNimModels.LLAMA_3_3_70B_INSTRUCT,
+    defaultModel: NvidiaNimModels.GPT_OSS_20B,
     toolSupport: "native",
     localRuntime: false,
     healthCheck: "env-only",

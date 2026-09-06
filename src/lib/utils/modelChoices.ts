@@ -462,7 +462,7 @@ export const DEFAULT_MODELS: Record<
   [AIProviderName.OPENROUTER]: OpenRouterModels.CLAUDE_SONNET_4_5,
   [AIProviderName.OPENAI_COMPATIBLE]: "gpt-4o",
   [AIProviderName.DEEPSEEK]: DeepSeekModels.DEEPSEEK_CHAT,
-  [AIProviderName.NVIDIA_NIM]: NvidiaNimModels.LLAMA_3_3_70B_INSTRUCT,
+  [AIProviderName.NVIDIA_NIM]: NvidiaNimModels.GPT_OSS_20B,
   // LM Studio + llama.cpp auto-discover their loaded model from /v1/models;
   // an empty default is the documented signal to use that path.
   [AIProviderName.LM_STUDIO]: "",

@@ -1028,6 +1028,13 @@ export enum DeepSeekModels {
  * Note: NIM hosts hundreds of models; pass arbitrary IDs via --model.
  */
 export enum NvidiaNimModels {
+  // NVIDIA retired a large part of this list upstream on 2026-08-26 —
+  // llama-3.3-70b, llama-3.1-70b, llama-3.2-90b-vision, the deepseek-r1
+  // distill and gemma-3-27b all answer "no longer available" now. The members
+  // are kept so existing callers still compile, but the provider default
+  // below must point at something live: gpt-oss-20b is on the current roster
+  // and was probed for text, streaming, tool calling and structured output.
+  GPT_OSS_20B = "openai/gpt-oss-20b",
   // Meta Llama
   LLAMA_3_3_70B_INSTRUCT = "meta/llama-3.3-70b-instruct",
   LLAMA_3_1_405B_INSTRUCT = "meta/llama-3.1-405b-instruct",

@@ -25,6 +25,7 @@ import {
   validateApiKey,
 } from "../../utils/providerConfig.js";
 import { OpenAIChatCompletionsProvider } from "../openaiChatCompletionsBase.js";
+import { PROVIDER_DESCRIPTORS_BY_NAME } from "../../factories/providerDescriptors.js";
 
 /**
  * Decide whether a NIM 400 response body is a rejection of the named
@@ -178,9 +179,18 @@ const getNimApiKey = (): string => {
 };
 
 const getDefaultNimModel = (): string => {
+  // NVIDIA retired meta/llama-3.3-70b-instruct upstream on 2026-08-26, so this
+  // fallback answered "no longer available" for anyone who selected nvidia-nim
+  // without naming a model. gpt-oss-20b is on the current roster and was
+  // probed for text, streaming, tool calling and structured output.
+  // Read the descriptor rather than repeating the literal. Review on this PR
+  // pointed out the default lived in four places and that changing only some
+  // of them is a no-op — which happened twice while tracking this down. The
+  // descriptor is the Factory+Registry convention's source of truth.
   return getProviderModel(
     "NVIDIA_NIM_MODEL",
-    NvidiaNimModels.LLAMA_3_3_70B_INSTRUCT,
+    PROVIDER_DESCRIPTORS_BY_NAME.get("nvidia-nim" as AIProviderName)
+      ?.defaultModel ?? NvidiaNimModels.GPT_OSS_20B,
   );
 };
 

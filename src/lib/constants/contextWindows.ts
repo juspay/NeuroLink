@@ -82,6 +82,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, Record<string, number>> = {
     "mistralai/mixtral-8x7b-instruct-v0.1": 32_768,
     "microsoft/phi-4": 16_384,
     "google/gemma-3-27b-it": 8_192,
+    "openai/gpt-oss-20b": 131_072,
   },
   "lm-studio": {
     _default: 8_192,

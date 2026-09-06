@@ -264,16 +264,16 @@ const PROVIDERS: readonly ProviderUnderTest[] = [
     name: "nvidia-nim",
     available: HAS_NIM,
     unavailableReason: "NVIDIA_NIM_API_KEY not set",
-    // DeepSeek-R1-Distill emits proper <think>...</think> reasoning markers
-    // (E1 thinking.high asserts on those). The full deepseek-ai/deepseek-r1
-    // route returned 404 on NIM as of 2026-05; the 70B-Llama distill is the
-    // stable replacement and still emits reasoning. Previous nemotron model
-    // returned content but no reasoning signal, causing E1 to skip.
-    reasoningModel: "deepseek-ai/deepseek-r1-distill-llama-70b",
-    visionModel: "meta/llama-3.2-90b-vision-instruct",
-    // Pin a tool-trained NIM model for B2 stream-with-tools (the previous
-    // default landed on a model that declined to call tools).
-    fastModel: "meta/llama-3.3-70b-instruct",
+    // All three pins here went dead upstream: the deepseek-r1 distill,
+    // llama-3.2-90b-vision and llama-3.3-70b all answer "not available" now.
+    // Most of NIM's published roster additionally 404s as "not found for
+    // account", so these are chosen from what this account can actually
+    // reach and each was probed live for the property the cases need:
+    // gpt-oss-20b returns reasoning_content (E1 thinking.high) and calls
+    // tools (B2 stream-with-tools); llama-3.2-11b is the vision route.
+    reasoningModel: "openai/gpt-oss-20b",
+    visionModel: "meta/llama-3.2-11b-vision-instruct",
+    fastModel: "openai/gpt-oss-20b",
   },
   {
     name: "lm-studio",
@@ -1411,7 +1411,10 @@ async function section9Errors(): Promise<void> {
           const res = await sdk.generate({
             input: { text: TINY_PROMPT },
             provider: "nvidia-nim",
-            model: "google/gemma-3-27b-it", // typically doesn't support reasoning_budget
+            // google/gemma-3-27b-it was retired upstream. This one is live on
+            // this account and, being non-reasoning, still does not take a
+            // reasoning budget — which is what the case needs to provoke.
+            model: "meta/llama-3.2-11b-vision-instruct",
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             thinkingConfig: { thinkingLevel: "high" } as any,
             abortSignal: signal,

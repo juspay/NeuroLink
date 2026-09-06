@@ -535,6 +535,14 @@ const PRICING: Record<
     },
   },
   "nvidia-nim": {
+    // Source: NVIDIA build.nvidia.com listed rates for openai/gpt-oss-20b,
+    // read 2026-09-06. NIM prices and models both rot — this PR exists
+    // because the default model was decommissioned — so re-check against
+    // https://build.nvidia.com/openai/gpt-oss-20b rather than trusting this.
+    "openai/gpt-oss-20b": {
+      input: 0.05 / 1_000_000,
+      output: 0.2 / 1_000_000,
+    },
     "meta/llama-3.3-70b-instruct": {
       input: 0.4 / 1_000_000,
       output: 0.4 / 1_000_000,
