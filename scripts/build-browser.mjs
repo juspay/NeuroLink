@@ -81,7 +81,25 @@ export const isAbsolute = () => false;
 export const sep = '/';
 export const posix = { normalize:(p)=>p, join:(...a)=>a.join('/'), resolve:(...a)=>a.join('/'), sep:'/' };
 export const normalize = (p) => p;
-export const EventEmitter = class { on(){return this} off(){return this} emit(){return this} once(){return this} removeListener(){return this} addListener(){return this} removeAllListeners(){return this} };
+export const EventEmitter = class EventEmitter {
+  constructor(){ this._ev = new Map(); }
+  _list(t){ let l = this._ev.get(t); if(!l){ l=[]; this._ev.set(t,l);} return l; }
+  on(t,f){ this._list(t).push(f); return this; }
+  addListener(t,f){ return this.on(t,f); }
+  prependListener(t,f){ this._list(t).unshift(f); return this; }
+  once(t,f){ const g=(...a)=>{ this.off(t,g); f(...a); }; g.listener=f; return this.on(t,g); }
+  prependOnceListener(t,f){ const g=(...a)=>{ this.off(t,g); f(...a); }; g.listener=f; return this.prependListener(t,g); }
+  off(t,f){ const l=this._ev.get(t); if(l){ const i=l.findIndex(x=>x===f||x.listener===f); if(i>=0) l.splice(i,1); } return this; }
+  removeListener(t,f){ return this.off(t,f); }
+  removeAllListeners(t){ if(t===undefined) this._ev.clear(); else this._ev.delete(t); return this; }
+  emit(t,...a){ const l=this._ev.get(t); if(!l||l.length===0){ if(t==="error"){ throw a[0] instanceof Error ? a[0] : new Error("Unhandled error."); } return false; } for(const f of [...l]) f.apply(this,a); return true; }
+  listenerCount(t){ return (this._ev.get(t)||[]).length; }
+  listeners(t){ return [...(this._ev.get(t)||[])]; }
+  rawListeners(t){ return this.listeners(t); }
+  eventNames(){ return [...this._ev.keys()]; }
+  setMaxListeners(){ return this; }
+  getMaxListeners(){ return 10; }
+};
 export const AsyncLocalStorage = class { getStore(){} run(s,fn,...a){return fn(...a)} enterWith(){} disable(){} };
 export const Readable = class { pipe(){return this} on(){return this} read(){return null} push(){} destroy(){} };
 export const Writable = class { write(){return true} end(){} on(){return this} destroy(){} };

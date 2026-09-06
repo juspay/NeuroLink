@@ -21,6 +21,8 @@ import "dotenv/config";
  */
 
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { NeuroLink } from "../dist/index.js";
 import { defineSuite, runCommand } from "./helpers/harness.js";
 import {
@@ -30,6 +32,19 @@ import {
 import { assertDistFresh } from "./helpers/distFreshness.js";
 
 assertDistFresh();
+
+// assertDistFresh only proves dist/index.js is present and newer than src/.
+// This suite's whole subject is the browser artifact, which build:browser
+// emits separately — so say precisely which build is missing.
+const bundlePath = fileURLToPath(
+  new URL("../dist/browser/neurolink.min.js", import.meta.url),
+);
+if (!existsSync(bundlePath)) {
+  throw new Error(
+    "dist/browser/neurolink.min.js is missing — this suite tests the browser " +
+      "bundle specifically. Run `pnpm run build` first (it runs build:browser).",
+  );
+}
 
 const { test, runSuite } = defineSuite("Browser bundle", { offline: true });
 
@@ -197,6 +212,74 @@ await test("browser artifact supplies callback timers when Node immediates are a
     console.error(result.stderr);
   }
   assert.equal(result.exitCode, 0, "browser timer fixture failed");
+});
+
+await test("importing the bundle and exiting leaves no uncaught error", async () => {
+  const { spawn } = await import("node:child_process");
+  const script = `await import(${JSON.stringify(bundleURL.href)}); console.log("ok");`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
+  child.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
+  // Bounded: this case is about teardown, so a bundle that keeps the child
+  // alive must fail readably rather than hang until the runner kills it.
+  const code: number = await new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve(-2);
+    }, 30_000);
+    child.on("close", (c) => {
+      clearTimeout(timer);
+      resolve(c ?? -1);
+    });
+  });
+  assert.notEqual(code, -2, "the child never exited — the bundle held it open");
+  assert.ok(stdout.includes("ok"), "precondition: the bundle never imported");
+  assert.equal(
+    /TypeError|is not a function/.test(stderr),
+    false,
+    "the bundle raised a TypeError on the way out",
+  );
+  assert.equal(code, 0, "importing the bundle and exiting did not exit 0");
+});
+
+/**
+ * `doStream` on a factory handle is advertised as a function but cannot
+ * stream: the delegating model it forwards to implements generation only, and
+ * NeuroLink's own streaming runs through `executeStream`. The old assertion
+ * checked `typeof doStream === "function"` and so passed over this entirely.
+ * Pin the real behaviour instead — including that the message names the
+ * supported path — so the limitation cannot be mistaken for a capability.
+ */
+await test("a factory handle's doStream fails with an actionable message", async () => {
+  const make = bundle.createOpenAI as Factory;
+  const model = make({ apiKey: "sk-not-used" })("gpt-4o-mini");
+  assert.equal(
+    typeof model.doStream,
+    "function",
+    "precondition: doStream is not even advertised",
+  );
+  let message = "";
+  try {
+    await (model.doStream as (o: unknown) => Promise<unknown>)({ prompt: [] });
+    assert.fail("doStream resolved; it cannot stream and must say so");
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error);
+  }
+  // `includes("NeuroLink")` was too weak: it passed while the message was a
+  // malformed multi-line template literal whose text contained a stray quote,
+  // a `+` and the source indentation. Pin the exact string.
+  assert.equal(
+    message,
+    "openai: doStream is not implemented on the delegating model. " +
+      "NeuroLink streams through executeStream, reached via NeuroLink.stream() — " +
+      "use that (the browser bundle exports the NeuroLink class) rather than " +
+      "calling doStream on a model handle.",
+    "doStream's failure message is not the intended one",
+  );
 });
 
 await runSuite();

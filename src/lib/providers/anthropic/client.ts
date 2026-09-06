@@ -1634,7 +1634,10 @@ export class AnthropicProvider extends BaseProvider {
       },
       doStream: () => {
         throw new Error(
-          `${providerName}: doStream is not implemented on the delegating model — the streaming path uses executeStream directly.`,
+          `${providerName}: doStream is not implemented on the delegating model. ` +
+            `NeuroLink streams through executeStream, reached via NeuroLink.stream() — ` +
+            `use that (the browser bundle exports the NeuroLink class) rather than ` +
+            `calling doStream on a model handle.`,
         );
       },
     };
