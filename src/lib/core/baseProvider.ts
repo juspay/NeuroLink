@@ -10,7 +10,6 @@ import type { NeuroLink } from "../neurolink.js";
 import { resolveRequestKind } from "./resolveRequestKind.js";
 import { ATTR, tracers } from "../telemetry/index.js";
 import type {
-  GenerateTextResult,
   JsonValue,
   UnknownRecord,
   LifecycleMiddlewareConfig,
@@ -26,8 +25,6 @@ import type {
   TTSResult,
   TextGenerationOptions,
   TextGenerationResult,
-  StandardRecord,
-  ToolExecutionRecord,
   ValidationSchema,
   ZodUnknownSchema,
 } from "../types/index.js";
@@ -81,10 +78,7 @@ import {
 } from "../utils/timeout.js";
 import { shouldDisableBuiltinTools } from "../utils/toolUtils.js";
 import { getKeyCount, getKeysAsString } from "../utils/transformationUtils.js";
-import {
-  ToolExecutionRecorder,
-  resolveToolExecutionRecords,
-} from "./toolExecutionRecorder.js";
+import { ToolExecutionRecorder } from "./toolExecutionRecorder.js";
 import { TTS_ERROR_CODES, TTSProcessor } from "../utils/ttsProcessor.js";
 import {
   executeVideoAnalysis,
@@ -98,7 +92,6 @@ import {
   isDiscoveryMetaTool,
   LARGE_CATALOG_WARN_THRESHOLD,
 } from "../tools/toolDiscovery.js";
-import { GenerationHandler } from "./modules/GenerationHandler.js";
 // Import modules for composition
 import { MessageBuilder } from "./modules/MessageBuilder.js";
 import { StreamHandler } from "./modules/StreamHandler.js";
@@ -224,7 +217,6 @@ export abstract class BaseProvider implements AIProvider {
   // alone.
   private messageBuilder: MessageBuilder;
   private streamHandler: StreamHandler;
-  private generationHandler: GenerationHandler;
   protected telemetryHandler: TelemetryHandler;
   private utilities: Utilities;
   private readonly toolsManager: ToolsManager;
@@ -247,24 +239,6 @@ export abstract class BaseProvider implements AIProvider {
       this.providerName,
       this.modelName,
       this.neurolink,
-    );
-    this.generationHandler = new GenerationHandler(
-      this.providerName,
-      this.modelName,
-      () => this.supportsTools(),
-      (options, type) =>
-        this.telemetryHandler.getTelemetryConfig(
-          options,
-          type as "stream" | "generate",
-        ),
-      (toolCalls, toolResults, options, timestamp) =>
-        this.handleToolExecutionStorage(
-          toolCalls,
-          toolResults,
-          options,
-          timestamp,
-        ),
-      { getEmitterFn: () => this.neurolink?.getEventEmitter() },
     );
     this.utilities = new Utilities(
       this.providerName,
@@ -305,24 +279,6 @@ export abstract class BaseProvider implements AIProvider {
       this.providerName,
       this.modelName,
       this.neurolink,
-    );
-    this.generationHandler = new GenerationHandler(
-      this.providerName,
-      this.modelName,
-      () => this.supportsTools(),
-      (options, type) =>
-        this.telemetryHandler.getTelemetryConfig(
-          options,
-          type as "stream" | "generate",
-        ),
-      (toolCalls, toolResults, options, timestamp) =>
-        this.handleToolExecutionStorage(
-          toolCalls,
-          toolResults,
-          options,
-          timestamp,
-        ),
-      { getEmitterFn: () => this.neurolink?.getEventEmitter() },
     );
     this.utilities = new Utilities(
       this.providerName,
@@ -1603,32 +1559,6 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
-   * Execute the generation with AI SDK - delegated to GenerationHandler
-   */
-  private async executeGeneration(
-    model: LanguageModel,
-    messages: ModelMessage[],
-    tools: Record<string, Tool>,
-    options: TextGenerationOptions,
-  ): Promise<GenerateTextResult<Record<string, Tool>, unknown>> {
-    return this.generationHandler.executeGeneration(
-      model,
-      messages,
-      tools,
-      options,
-    );
-  }
-
-  /**
-   * Log generation completion information - delegated to GenerationHandler
-   */
-  private logGenerationComplete(
-    generateResult: GenerateTextResult<Record<string, Tool>, unknown>,
-  ): void {
-    this.generationHandler.logGenerationComplete(generateResult);
-  }
-
-  /**
    * Record performance metrics - delegated to TelemetryHandler
    */
   protected async recordPerformanceMetrics(
@@ -1636,48 +1566,6 @@ export abstract class BaseProvider implements AIProvider {
     responseTime: number,
   ): Promise<void> {
     await this.telemetryHandler.recordPerformanceMetrics(usage, responseTime);
-  }
-
-  /**
-   * Extract tool information from generation result - delegated to GenerationHandler
-   */
-  private extractToolInformation(
-    generateResult: GenerateTextResult<Record<string, Tool>, unknown>,
-  ): {
-    toolsUsed: string[];
-    toolExecutions: Array<{
-      name: string;
-      input: StandardRecord;
-      output: unknown;
-    }>;
-  } {
-    return this.generationHandler.extractToolInformation(generateResult);
-  }
-
-  /**
-   * Format the enhanced result - delegated to GenerationHandler
-   */
-  private formatEnhancedResult(
-    generateResult: GenerateTextResult<Record<string, Tool>, unknown>,
-    tools: Record<string, Tool>,
-    toolsUsed: string[],
-    toolExecutions: ToolExecutionRecord[],
-    options: TextGenerationOptions,
-  ): EnhancedGenerateResult {
-    return this.generationHandler.formatEnhancedResult(
-      generateResult,
-      tools,
-      toolsUsed,
-      toolExecutions,
-      options,
-    );
-  }
-
-  /**
-   * Analyze AI response structure and log detailed debugging information - delegated to GenerationHandler
-   */
-  private analyzeAIResponse(result: unknown): void {
-    this.generationHandler.analyzeAIResponse(result);
   }
 
   /**
@@ -1881,7 +1769,9 @@ export abstract class BaseProvider implements AIProvider {
         return this.handleDirectTTSSynthesis(options, startTime);
       }
 
-      const { tools, model } = await this.prepareGenerationContext(options);
+      // Only `model` is used now — the video-frame path needs it. `tools`
+      // fed the standard generate flow, which no longer exists.
+      const { model } = await this.prepareGenerationContext(options);
       const messages = await this.buildMessages(options);
       const videoFrameResult = await this.handleVideoFrameGeneration(
         options,
@@ -1893,13 +1783,20 @@ export abstract class BaseProvider implements AIProvider {
         return videoFrameResult;
       }
 
-      return await this.executeStandardGenerateFlow(
-        options,
-        startTime,
-        model,
-        messages,
-        tools,
-      );
+      // Every provider that generates text overrides `generate()` and runs a
+      // native loop. There is no shared fallback any more: the standard flow
+      // called the ai package's `generateText`, and once that was gone the
+      // flow could only throw. Reaching here means a provider was asked for
+      // text without implementing it — an image or embedding provider handed
+      // a text model, or a new subclass with no `generate()` yet.
+      throw new NeuroLinkError({
+        code: ERROR_CODES.INVALID_CONFIGURATION,
+        message: `${this.providerName} cannot generate text: it does not override generate(). Every text provider implements a native generate() — see docs/plans/2026-09-03-completing-the-ai-sdk-removal.md`,
+        category: ErrorCategory.CONFIGURATION,
+        severity: ErrorSeverity.CRITICAL,
+        retriable: false,
+        context: { provider: this.providerName, model: this.modelName },
+      });
     } catch (error) {
       otelSpan.setStatus({
         code: SpanStatusCode.ERROR,
@@ -2070,85 +1967,6 @@ export abstract class BaseProvider implements AIProvider {
       options,
       startTime,
     );
-  }
-
-  private async executeStandardGenerateFlow(
-    options: TextGenerationOptions,
-    startTime: number,
-    model: LanguageModel,
-    messages: ModelMessage[],
-    tools: Record<string, Tool>,
-  ): Promise<EnhancedGenerateResult> {
-    // Apply a defensive default timeout when the caller didn't pass one.
-    // Without this guard, AI SDK's generateText() will wait forever on
-    // an upstream that accepts the connection but never produces a response
-    // (observed against the litellm gateway when a request triggers the
-    // team-access denial path — connection stays open, no response is sent,
-    // and the matrix test hangs the entire suite). Callers can still pass
-    // a larger value (e.g. video generation passes 10 min).
-    //
-    // A provider descriptor may declare a LARGER generate budget than the
-    // 3-min floor (litellm: 300s — slow proxied models routinely need more
-    // than 180s end-to-end even while streaming). The declared value only
-    // ever raises the default, never lowers it: several descriptors carry
-    // aspirational sub-180s numbers (openai 30s, bedrock 45s) that were
-    // never enforced on this path, and enforcing them now would break
-    // long-running generations that have always been allowed.
-    const descriptorGenerateMs = PROVIDER_DESCRIPTORS_BY_NAME.get(
-      this.providerName,
-    )?.timeouts?.generateMs;
-    // An explicit, valid turnTimeoutMs is the caller's whole-turn contract
-    // and owns this hard abort; `timeout` then keeps its per-model-call
-    // meaning (it reaches the model layer via providerOptions.neurolink).
-    // Before this, `timeout` alone bounded the ENTIRE multi-step loop, so a
-    // caller asking for a 40-minute turn of 5-minute calls was killed at 5
-    // minutes flat — mid-loop, dressed as "Request was aborted.".
-    const generateResult = await this.withTurnTimeout(
-      options,
-      descriptorGenerateMs,
-      (timedOptions) =>
-        this.executeGeneration(model, messages, tools, timedOptions),
-    );
-
-    this.analyzeAIResponse(generateResult);
-    this.logGenerationComplete(generateResult);
-    const responseTime = Date.now() - startTime;
-
-    const { toolsUsed, toolExecutions } =
-      this.extractToolInformation(generateResult);
-    // Prefer the per-call recorder's real records (params/result/timing per
-    // execution); fall back to a conversion of the step-extraction entries
-    // for tools the recorder could not wrap (provider-executed tools).
-    const toolExecutionRecords = resolveToolExecutionRecords(
-      options,
-      toolExecutions,
-    );
-    let enhancedResult = this.formatEnhancedResult(
-      generateResult,
-      tools,
-      toolsUsed,
-      toolExecutionRecords,
-      options,
-    );
-
-    // Recorded AFTER formatEnhancedResult so telemetry sees the same usage
-    // the caller gets: the cross-step aggregate (totalUsage, not last-step
-    // usage) WITH the providerMetadata cache merge applied — otherwise
-    // providers whose cache data lives only in providerMetadata would have
-    // their cache tokens billed at the full input rate in OTEL metrics,
-    // diverging from analytics.cost.
-    await this.recordPerformanceMetrics(enhancedResult.usage, responseTime);
-    enhancedResult = await this.synthesizeAIResponseIfNeeded(
-      enhancedResult,
-      options,
-    );
-
-    const finalResult = await this.enhanceResult(
-      enhancedResult,
-      options,
-      startTime,
-    );
-    return finalResult;
   }
 
   /**
