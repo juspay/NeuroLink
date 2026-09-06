@@ -2511,8 +2511,13 @@ async function testCLIStreamCSVAndScreenshot(): Promise<boolean | null> {
   logSection("Testing CLI Stream with CSV and Screenshot");
 
   try {
-    // Check if screenshot test file exists, skip if not
-    const screenshotPath = "test/fixtures/sample-screenshot.png";
+    // A dedicated fixture rendered from transactions.csv, NOT the shared
+    // sample-screenshot.png. That one is a solid blue square other suites
+    // rely on (provider-matrix asserts the dominant colour is blue to catch
+    // a model that never received the image); comparing a CSV against it is
+    // impossible, which is why this case used to fail on the model correctly
+    // saying so.
+    const screenshotPath = "test/fixtures/transactions-screenshot.png";
     if (!fs.existsSync(screenshotPath)) {
       logTest(
         "CLI Stream CSV and Screenshot",
