@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { withTimeout } from "../utils/async/withTimeout.js";
 import { logger } from "../utils/logger.js";
+import { startProxyRuntimeMetrics } from "./proxyRuntimeMetrics.js";
 import type {
   ProxyLifecycleEventInput,
   ProxyLifecycleLoggerOptions,
@@ -22,8 +23,12 @@ const LIFECYCLE_APPEND_TIMEOUT_MS = 2_000;
 const MAX_SHORT_FIELD_LENGTH = 256;
 const SESSION_KEY_FILE = ".proxy-lifecycle-session-key";
 
+let chmodLifecycleDirectory: typeof chmodSync = chmodSync;
 let loggerEnabled = false;
+let loggerRequired = false;
+let stopRuntimeMetrics: (() => void) | undefined;
 let lifecycleLogDir: string | undefined;
+let filePrefix = "proxy-lifecycle";
 let queueCapacity = DEFAULT_QUEUE_CAPACITY;
 let batchSize = DEFAULT_BATCH_SIZE;
 let flushIntervalMs = DEFAULT_FLUSH_INTERVAL_MS;
@@ -164,6 +169,10 @@ function scheduleFlush(delayMs: number = flushIntervalMs): void {
   flushTimer.unref?.();
 }
 
+/**
+ * Append a bounded metadata batch and confirm each admission without
+ * replaying ambiguous writes.
+ */
 async function flushBatch(): Promise<void> {
   if (queue.length === 0) {
     return;
@@ -174,7 +183,10 @@ async function flushBatch(): Promise<void> {
   try {
     const byPath = new Map<string, QueuedProxyLifecycleEvent[]>();
     for (const item of batch) {
-      const path = join(item.logDir, `proxy-lifecycle-${item.date}.jsonl`);
+      const path = join(
+        item.logDir,
+        `${item.filePrefix ?? "proxy-lifecycle"}-${item.date}.jsonl`,
+      );
       const items = byPath.get(path) ?? [];
       items.push(item);
       byPath.set(path, items);
@@ -192,11 +204,13 @@ async function flushBatch(): Promise<void> {
       }, LIFECYCLE_APPEND_TIMEOUT_MS);
       timeout.unref?.();
       try {
-        // This best-effort telemetry sink intentionally avoids fsync so request
-        // throughput is not coupled to storage latency. Loss is surfaced by
-        // writeDrops/writeFailures rather than delaying proxy responses.
+        // OS-acknowledged append survives serving-process death. This is not
+        // an fsync/power-loss guarantee. Admission waits on its own record.
         await appendLifecycleFile(path, lines.join(""), { mode: 0o600 });
         written += lines.length;
+        for (const item of items) {
+          item.onPersisted?.(true);
+        }
       } catch (error) {
         writeFailures += 1;
         // These errors prevent opening the destination. Other failures (for
@@ -213,6 +227,9 @@ async function flushBatch(): Promise<void> {
         ]).has(code ?? "");
         if (!definitelyNotWritten) {
           unconfirmedWrites += items.length;
+          for (const item of items) {
+            item.onPersisted?.(false);
+          }
           logger.warn(
             "[proxy] lifecycle metadata append outcome is uncertain",
             {
@@ -246,6 +263,11 @@ async function flushBatch(): Promise<void> {
         if (exhausted > 0) {
           dropped += exhausted;
           writeDrops += exhausted;
+          for (const item of items) {
+            if (item.writeRetries >= maxWriteRetries) {
+              item.onPersisted?.(false);
+            }
+          }
         }
         logger.warn("[proxy] lifecycle metadata write failed", {
           path,
@@ -271,6 +293,10 @@ async function flushBatch(): Promise<void> {
   }
 }
 
+/**
+ * Serialize batch ownership so timeouts cannot create overlapping append
+ * retries.
+ */
 function startFlush(): Promise<void> {
   if (flushInFlight) {
     return flushInFlight;
@@ -299,12 +325,20 @@ function startFlush(): Promise<void> {
   return currentFlush;
 }
 
+/**
+ * Configure private journal storage while retaining required admission
+ * when initialization fails.
+ */
 export function configureProxyLifecycleLogger(
   options: ProxyLifecycleLoggerOptions,
 ): void {
+  stopRuntimeMetrics?.();
+  stopRuntimeMetrics = undefined;
   clearScheduledFlush();
   nextFlushDelayMs = undefined;
   loggerEnabled = false;
+  loggerRequired = options.enabled;
+  filePrefix = options.filePrefix ?? "proxy-lifecycle";
   lifecycleLogDir = undefined;
   queueCapacity = positiveInteger(
     options.queueCapacity,
@@ -323,9 +357,21 @@ export function configureProxyLifecycleLogger(
   if (options.enabled && options.logDir) {
     try {
       mkdirSync(options.logDir, { recursive: true, mode: 0o700 });
+      // mkdir mode does not harden an existing directory. Keep admission
+      // required but the sink disabled if its privacy boundary cannot be set.
+      chmodLifecycleDirectory(options.logDir, 0o700);
       sessionHashKey = resolveSessionHashKey(options.logDir);
       lifecycleLogDir = options.logDir;
       loggerEnabled = true;
+      stopRuntimeMetrics = startProxyRuntimeMetrics((runtimeSample) => {
+        logProxyLifecycleEvent({
+          event: "runtime_sample",
+          requestId: "-",
+          method: "-",
+          path: "-",
+          runtimeSample,
+        });
+      });
     } catch (error) {
       logger.warn("[proxy] lifecycle metadata logging disabled", {
         error: error instanceof Error ? error.message : String(error),
@@ -341,16 +387,29 @@ export function configureProxyLifecycleLogger(
 
 /** Enqueue fixed-size lifecycle metadata without awaiting filesystem work. */
 export function logProxyLifecycleEvent(input: ProxyLifecycleEventInput): void {
+  enqueueLifecycleEvent(input);
+}
+
+/**
+ * Enqueue bounded metadata and resolve admission failure immediately when
+ * capacity is unavailable.
+ */
+function enqueueLifecycleEvent(
+  input: ProxyLifecycleEventInput,
+  onPersisted?: (confirmed: boolean) => void,
+): void {
   if (!loggerEnabled || !lifecycleLogDir) {
+    onPersisted?.(false);
     return;
   }
 
   try {
     attempted += 1;
     const sequence = nextSequence++;
-    if (queue.length >= queueCapacity) {
+    if (queue.length + inFlight >= queueCapacity) {
       dropped += 1;
       queueDrops += 1;
+      onPersisted?.(false);
       return;
     }
 
@@ -403,18 +462,62 @@ export function logProxyLifecycleEvent(input: ProxyLifecycleEventInput): void {
       ...(terminalOutcome !== undefined ? { terminalOutcome } : {}),
       ...(errorType !== undefined ? { errorType } : {}),
       ...(errorCode !== undefined ? { errorCode } : {}),
+      ...(input.supervisorEvent
+        ? {
+            supervisorEvent: {
+              ...input.supervisorEvent,
+              reason: clip(input.supervisorEvent.reason),
+            },
+          }
+        : {}),
+      ...(input.runtimeSample ? { runtimeSample: input.runtimeSample } : {}),
     };
     queue.push({
+      filePrefix,
       logDir: lifecycleLogDir,
       date: String(record.timestamp).slice(0, 10),
       record,
       writeRetries: 0,
+      onPersisted,
     });
     enqueued += 1;
     scheduleFlush();
   } catch {
     dropped += 1;
     invalidDrops += 1;
+    onPersisted?.(false);
+  }
+}
+
+/** Confirm admission before upstream dispatch, without waiting for later traffic.
+ * Disabled logging is explicit; an enabled but unhealthy sink refuses dispatch.
+ * A timeout never retries an ambiguous provider request or the pending append.
+ */
+export async function persistProxyLifecycleAcceptance(
+  input: Omit<ProxyLifecycleEventInput, "event">,
+  timeoutMs = LIFECYCLE_APPEND_TIMEOUT_MS,
+): Promise<void> {
+  if (!loggerRequired) {
+    return;
+  }
+  const confirmed = new Promise<boolean>((resolve) => {
+    enqueueLifecycleEvent({ ...input, event: "request_accepted" }, resolve);
+  });
+  // Yield one turn for concurrent admissions to share a bounded batch.
+  clearScheduledFlush();
+  scheduleFlush(0);
+  const persisted = await withTimeout(
+    confirmed,
+    timeoutMs,
+    "Proxy admission metadata append is still pending",
+  ).catch(() => false);
+  if (!persisted) {
+    throw Object.assign(
+      new Error("Proxy admission metadata could not be confirmed"),
+      {
+        code: "PROXY_TELEMETRY_UNAVAILABLE",
+      },
+    );
   }
 }
 
@@ -438,6 +541,10 @@ export async function flushProxyLifecycleEvents(
   }
 }
 
+/**
+ * Expose journal accounting, process identity, and outstanding writes
+ * without changing them.
+ */
 export function getProxyLifecycleLoggerSnapshot(): ProxyLifecycleLoggerSnapshot {
   return {
     enabled: loggerEnabled,
@@ -461,9 +568,16 @@ export function getProxyLifecycleLoggerSnapshot(): ProxyLifecycleLoggerSnapshot 
   };
 }
 
+/**
+ * Reset timers, accounting, and injected I/O after isolated tests have
+ * drained their work.
+ */
 export function resetProxyLifecycleLoggerForTests(): void {
+  stopRuntimeMetrics?.();
+  stopRuntimeMetrics = undefined;
   clearScheduledFlush();
   loggerEnabled = false;
+  loggerRequired = false;
   lifecycleLogDir = undefined;
   queueCapacity = DEFAULT_QUEUE_CAPACITY;
   batchSize = DEFAULT_BATCH_SIZE;
@@ -488,10 +602,20 @@ export function resetProxyLifecycleLoggerForTests(): void {
   flushInFlight = undefined;
   nextFlushDelayMs = undefined;
   appendLifecycleFile = appendFile;
+  chmodLifecycleDirectory = chmodSync;
 }
 
 /** Isolated failure injection for lifecycle durability tests. */
 export const __proxyLifecycleTestHooks = {
+  /**
+   * Inject directory-hardening failures without altering real filesystem permissions.
+   */
+  setChmodForTests(chmod: typeof chmodSync): void {
+    chmodLifecycleDirectory = chmod;
+  },
+  /**
+   * Inject controlled append outcomes while preserving the production admission and queue paths.
+   */
   setAppendFileForTests(append: typeof appendFile): void {
     appendLifecycleFile = append;
   },

@@ -12,8 +12,13 @@ import {
   isProxyWorkerStatusMessage,
   PROXY_SOCKET_WORKER_ENV,
   PROXY_SOCKET_OFFER_TIMEOUT,
+  PROXY_SOCKET_COMMIT_TIMEOUT,
 } from "./rollingWorkerProtocol.js";
 
+/**
+ * Spawn a generation-specific IPC worker with separate offer and commit
+ * ownership deadlines.
+ */
 export function spawnProxySocketWorker(
   options: SpawnProxySocketWorkerOptions,
 ): RollingWorkerHandle {
@@ -33,7 +38,7 @@ export function spawnProxySocketWorker(
   >();
   const pendingStatusMessages: ProxyWorkerStatusMessage[] = [];
   let spawnError: Error | undefined;
-  const child = spawn(options.command, options.args, {
+  const child = (options.spawn ?? spawn)(options.command, options.args, {
     env: {
       ...process.env,
       ...options.env,
@@ -80,6 +85,10 @@ export function spawnProxySocketWorker(
     );
   }
 
+  /**
+   * Finish a handoff once and cancel its worker-side copy on uncertain
+   * delivery.
+   */
   const settleSocket = (socketId: string, error?: Error): void => {
     const pending = pendingSockets.get(socketId);
     if (!pending) {
@@ -87,7 +96,7 @@ export function spawnProxySocketWorker(
     }
     pendingSockets.delete(socketId);
     clearTimeout(pending.timeout);
-    if (error && child.connected && !pending.accepted) {
+    if (error && child.connected) {
       try {
         child.send(
           {
@@ -106,6 +115,10 @@ export function spawnProxySocketWorker(
     }
     pending.callback(error);
   };
+  /**
+   * Accept messages only from this worker and start a fresh deadline for
+   * the commit phase.
+   */
   const onInternalMessage = (message: unknown): void => {
     if (
       isProxyWorkerStatusMessage(message) &&
@@ -118,6 +131,17 @@ export function spawnProxySocketWorker(
         return;
       }
       pending.accepted = true;
+      // Acceptance and commit are distinct phases. A late acceptance must not
+      // inherit an almost-expired offer timer and kill established streams.
+      clearTimeout(pending.timeout);
+      pending.timeout = setTimeout(() => {
+        const error: NodeJS.ErrnoException = new Error(
+          `proxy worker ${childPid} socket commit remained pending for ${socketAckTimeoutMs}ms`,
+        );
+        error.code = PROXY_SOCKET_COMMIT_TIMEOUT;
+        settleSocket(message.socketId, error);
+      }, socketAckTimeoutMs);
+      pending.timeout.unref?.();
       try {
         child.send(
           {
@@ -182,11 +206,7 @@ export function spawnProxySocketWorker(
         const error: NodeJS.ErrnoException = new Error(
           `proxy worker ${childPid} did not accept socket within ${socketAckTimeoutMs}ms`,
         );
-        if (!pendingSockets.get(socketId)?.accepted) {
-          // No commit was sent. The cancel message settles this offer without
-          // terminating unrelated requests already owned by the worker.
-          error.code = PROXY_SOCKET_OFFER_TIMEOUT;
-        }
+        error.code = PROXY_SOCKET_OFFER_TIMEOUT;
         settleSocket(socketId, error);
       }, socketAckTimeoutMs);
       timeout.unref?.();

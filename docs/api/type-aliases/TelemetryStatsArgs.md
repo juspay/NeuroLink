@@ -8,7 +8,7 @@
 
 > **TelemetryStatsArgs** = [`TelemetryCommandArgs`](TelemetryCommandArgs.md) & `object`
 
-Defined in: [types/cli.ts:1198](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1198)
+Defined in: [types/cli.ts:1199](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1199)
 
 Telemetry stats sub-command args
 

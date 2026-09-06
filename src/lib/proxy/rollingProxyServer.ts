@@ -1,4 +1,4 @@
-import { createServer } from "node:net";
+import { createServer, type Socket } from "node:net";
 import type {
   RollingProxyServer,
   RollingProxyServerOptions,
@@ -160,10 +160,14 @@ export async function startRollingProxyServer(
     socketQueueTimeoutMs: options.socketQueueTimeoutMs,
     shutdownTimeoutMs: options.shutdownTimeoutMs,
     onStateChange: stateChanged,
+    onEvent: options.onEvent,
     onReplacementRequested: scheduleRequestedReplacement,
     log: options.log,
   });
+  const ownedSockets = new Set<Socket>();
   const listener = createServer({ pauseOnConnect: true }, (socket) => {
+    ownedSockets.add(socket);
+    socket.once("close", () => ownedSockets.delete(socket));
     // The parent keeps its descriptor until the worker commits the IPC
     // transfer. Consume client resets during that interval so they cannot
     // terminate the long-lived supervisor process.
@@ -266,10 +270,22 @@ export async function startRollingProxyServer(
       }
       requestedReplacementSchedule += 1;
       requestedReplacementPending = false;
-      const listenerClosed = new Promise<void>((resolve, reject) => {
-        listener.close((error) => (error ? reject(error) : resolve()));
-      });
-      await Promise.all([listenerClosed, supervisor.close()]);
+      // Stop accepting immediately, then await the ownership we actually hold.
+      // Node's net.Server can retain _usingWorkers=true with an empty worker
+      // list after an IPC recipient exits. Its close callback then never fires,
+      // even though the listener and every descriptor have closed. Avoid that
+      // private bookkeeping path; the supervisor owns remote worker draining.
+      listener.close();
+      await supervisor.close();
+      await Promise.all(
+        [...ownedSockets].map(
+          (socket) =>
+            new Promise<void>((resolve) => {
+              socket.once("close", resolve);
+              socket.destroy();
+            }),
+        ),
+      );
     },
   };
 }

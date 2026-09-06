@@ -151,17 +151,26 @@ export function createSocketWorkerRuntime(
   };
 }
 
+/**
+ * Attach the IPC ownership protocol and keep committed sockets addressable
+ * by late cancellation.
+ */
 export function attachSocketWorkerProcess(
   server: Server,
   input: {
     generation: number;
     version: string;
+    processInstanceId?: string;
     onActivated?: () => void;
     onDrained?: () => void;
   },
 ): SocketWorkerRuntime {
   let activated = false;
   let gracefulDrain = false;
+  // A commit can reach the worker before its parent's send callback settles.
+  // Retain ownership until close so a late cancellation affects only that
+  // connection, never the worker's other requests. Never replay this socket.
+  const committedSockets = new Map<string, DetachableTransferableProxySocket>();
   const pendingSockets = new Map<
     string,
     {
@@ -211,6 +220,7 @@ export function attachSocketWorkerProcess(
     pending.socket.off("close", pending.onClose);
     return pending.socket;
   };
+  /** Apply supervisor messages while retaining ownership of pending and committed sockets. */
   const onMessage = (message: unknown, handle: unknown): void => {
     if (
       message &&
@@ -236,7 +246,7 @@ export function attachSocketWorkerProcess(
           socket.destroy();
           return;
         }
-        if (pendingSockets.has(socketId)) {
+        if (pendingSockets.has(socketId) || committedSockets.has(socketId)) {
           socket.destroy();
           return;
         }
@@ -316,13 +326,20 @@ export function attachSocketWorkerProcess(
         message.type === "proxy-worker:socket-commit" ||
         message.type === "proxy-worker:socket-cancel"
       ) {
-        const socket = takePendingSocket(message.socketId);
+        const socket =
+          takePendingSocket(message.socketId) ??
+          (message.type === "proxy-worker:socket-cancel"
+            ? committedSockets.get(message.socketId)
+            : undefined);
         if (!socket) {
           return;
         }
         if (message.type === "proxy-worker:socket-commit") {
+          committedSockets.set(message.socketId, socket);
+          socket.once("close", () => committedSockets.delete(message.socketId));
           runtime.acceptSocket(socket);
         } else {
+          committedSockets.delete(message.socketId);
           socket.destroy();
         }
         drainWhenPendingSettled();
@@ -358,6 +375,7 @@ export function attachSocketWorkerProcess(
     generation: input.generation,
     pid: process.pid,
     version: input.version,
+    processInstanceId: input.processInstanceId,
   });
   return {
     ...runtime,
@@ -370,6 +388,7 @@ export function attachSocketWorkerProcess(
         takePendingSocket(socketId)?.destroy();
       }
       runtime.close();
+      committedSockets.clear();
     },
   };
 }

@@ -8,7 +8,7 @@
 
 > **isLangfuseInternalSpan**(`span`): `boolean`
 
-Defined in: [services/server/ai/observability/instrumentation.ts:757](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L757)
+Defined in: [services/server/ai/observability/instrumentation.ts:763](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L763)
 
 True when a span is an internal NeuroLink wrapper that should NOT be sent to
 Langfuse. Internal wrappers carry the `langfuse.internal: true` attribute.

@@ -8,7 +8,7 @@
 
 > **isUsingExternalTracerProvider**(): `boolean`
 
-Defined in: [services/server/ai/observability/instrumentation.ts:1585](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L1585)
+Defined in: [services/server/ai/observability/instrumentation.ts:1591](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L1591)
 
 Check if using external TracerProvider mode
 

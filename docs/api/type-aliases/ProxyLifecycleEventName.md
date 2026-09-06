@@ -6,8 +6,8 @@
 
 # Type Alias: ProxyLifecycleEventName
 
-> **ProxyLifecycleEventName** = `"request_accepted"` \| `"response_headers"` \| `"response_first_chunk"` \| `"request_terminal"`
+> **ProxyLifecycleEventName** = `"runtime_sample"` \| `"supervisor_event"` \| `"request_accepted"` \| `"response_headers"` \| `"response_first_chunk"` \| `"request_terminal"`
 
-Defined in: [types/proxy.ts:1925](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1925)
+Defined in: [types/proxy.ts:1944](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1944)
 
 Versioned lifecycle event names persisted by the proxy adapter.

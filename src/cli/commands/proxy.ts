@@ -90,7 +90,9 @@ import {
   trackProxyResponse,
 } from "../../lib/proxy/proxyActivity.js";
 import {
+  configureProxyLifecycleLogger,
   flushProxyLifecycleEvents,
+  persistProxyLifecycleAcceptance,
   getProxyLifecycleLoggerSnapshot,
   hashProxyLifecycleSessionId,
   logProxyLifecycleEvent,
@@ -105,6 +107,7 @@ import {
 import { startUpdaterWorkerSupervisor } from "../../lib/proxy/updaterSupervisor.js";
 import { openProxyWorkerLog } from "../../lib/proxy/workerLog.js";
 import { startRollingProxyServer } from "../../lib/proxy/rollingProxyServer.js";
+import { isProxyAuxiliaryRequest } from "../../lib/proxy/proxyRequestKind.js";
 import { spawnProxySocketWorker } from "../../lib/proxy/rollingWorkerProcess.js";
 import {
   PROXY_ROLLING_SUPERVISOR_ENV,
@@ -1394,11 +1397,16 @@ function redactStatusPrimaryAccount(
   };
 }
 
+/**
+ * Confirm durable admission and reconcile route finals with the actual
+ * response transport lifecycle.
+ */
 function registerProxyRequestTracking(
   app: Hono,
   requestMetadata: WeakMap<Request, RuntimeRequestMetadata>,
   readiness: ProxyReadinessState,
 ): void {
+  /** Persist admission before dispatch and observe the response through termination. */
   const trackingHandler = async (c: Context, next: Next): Promise<void> => {
     const startedMonotonicMs = performance.now();
     const contentLengthHeader = c.req.raw.headers.get("content-length");
@@ -1445,17 +1453,16 @@ function registerProxyRequestTracking(
     // The route adapter populates model/stream/toolCount after parsing. Omit
     // them at acceptance instead of publishing misleading placeholder values;
     // subsequent events carry the parsed metadata under the same request ID.
-    logProxyLifecycleEvent({
-      event: "request_accepted",
-      requestId: metadata.requestId,
-      method: metadata.method,
-      path: metadata.path,
-      sessionHash,
-      requestBytes,
-      elapsedMs: 0,
-      monotonicMs: startedMonotonicMs,
-    });
     try {
+      await persistProxyLifecycleAcceptance({
+        requestId: metadata.requestId,
+        method: metadata.method,
+        path: metadata.path,
+        sessionHash,
+        requestBytes,
+        elapsedMs: 0,
+        monotonicMs: startedMonotonicMs,
+      });
       await next();
       const responseStatus = c.res.status;
       logProxyLifecycleEvent({
@@ -1547,6 +1554,10 @@ function registerProxyRequestTracking(
             accountingTimedOut = true;
           }
           const final = metadata.terminalResult;
+          const auxiliary = isProxyAuxiliaryRequest(
+            metadata.method,
+            metadata.path,
+          );
           const terminalOutcome =
             final?.terminalOutcome ??
             (outcome === "stream_error" ||
@@ -1556,7 +1567,9 @@ function registerProxyRequestTracking(
                 ? "client_cancelled"
                 : responseStatus >= 400
                   ? "handler_error"
-                  : "unknown");
+                  : auxiliary
+                    ? outcome
+                    : "unknown");
           logProxyLifecycleEvent({
             event: "request_terminal",
             timestampMs: terminalTimestampMs,
@@ -1578,7 +1591,9 @@ function registerProxyRequestTracking(
             transportOutcome: outcome,
             outcomeSource: final
               ? "final_request"
-              : responseStatus >= 400
+              : responseStatus >= 400 ||
+                  (auxiliary &&
+                    (outcome === "completed" || outcome === "bodyless"))
                 ? "http_status"
                 : terminalOutcome === "unknown"
                   ? "unknown"
@@ -1587,7 +1602,7 @@ function registerProxyRequestTracking(
               ? "timeout"
               : accountingFailed
                 ? "observer_error"
-                : final
+                : final || auxiliary
                   ? "complete"
                   : "missing_final",
             errorType: final?.errorType ?? metadata.terminalErrorType,
@@ -1638,6 +1653,10 @@ function registerProxyRequestTracking(
   app.use("/backend-api/*", trackingHandler);
 }
 
+/**
+ * Assemble proxy routes with shared admission, runtime error accounting,
+ * and response tracking.
+ */
 export async function createProxyStartApp(params: {
   neurolink: ProxyNeurolinkRuntime["neurolink"];
   modelRouter: ModelRouterInterface | undefined;
@@ -1765,13 +1784,24 @@ export async function createProxyStartApp(params: {
       stream: false,
       toolCount: 0,
     };
-    metadata.terminalErrorType = "unhandled_proxy_error";
     metadata.terminalErrorCode = getProxyRuntimeErrorCode(err);
-    await recordRuntimeError(metadata, 502, "unhandled_proxy_error", errMsg, {
-      clientMessage: "Proxy internal error",
-      clientErrorType: "api_error",
-      errorCode: metadata.terminalErrorCode,
-    });
+    const telemetryUnavailable =
+      metadata.terminalErrorCode === "PROXY_TELEMETRY_UNAVAILABLE";
+    const status = telemetryUnavailable ? 503 : 502;
+    metadata.terminalErrorType = telemetryUnavailable
+      ? "telemetry_unavailable"
+      : "unhandled_proxy_error";
+    await recordRuntimeError(
+      metadata,
+      status,
+      metadata.terminalErrorType,
+      errMsg,
+      {
+        clientMessage: "Proxy internal error",
+        clientErrorType: "api_error",
+        errorCode: metadata.terminalErrorCode,
+      },
+    );
     requestMetadata.delete(c.req.raw);
     return c.json(
       {
@@ -1781,7 +1811,7 @@ export async function createProxyStartApp(params: {
           message: "Proxy internal error",
         },
       },
-      502,
+      status,
     );
   });
 
@@ -2901,6 +2931,7 @@ function startProxyBackgroundMaintenance(
   return { refreshInterval, logCleanupScheduler };
 }
 
+/** Register signal handlers and return the shared, idempotent drain-and-flush operation. */
 function registerProxyShutdownHandlers(params: {
   server: { close?: (callback?: (error?: Error) => void) => void };
   host: string;
@@ -2982,6 +3013,7 @@ function registerProxyShutdownHandlers(params: {
     });
   };
 
+  /** Stop background work, drain connections, and flush pending telemetry before exit. */
   const shutdown = async (
     signal: string,
     options?: { skipServerClose?: boolean },
@@ -3038,11 +3070,9 @@ function registerProxyShutdownHandlers(params: {
         PROXY_LIFECYCLE_SHUTDOWN_TIMEOUT_MS,
         "Timed out flushing proxy lifecycle metadata during shutdown",
       ),
-      withTimeout(
-        requestLogsFlush,
-        PROXY_LIFECYCLE_SHUTDOWN_TIMEOUT_MS,
-        "Timed out flushing proxy request logs during shutdown",
-      ),
+      // This flush owns a separate bounded budget covering the body worker
+      // deadline plus index/OTLP publication; do not truncate it to five seconds.
+      requestLogsFlush,
     ]);
     if (usageStatsFlushResult.status === "rejected") {
       const error = usageStatsFlushResult.reason;
@@ -3112,6 +3142,7 @@ function registerProxyShutdownHandlers(params: {
   return shutdown;
 }
 
+/** Start the HTTP runtime and connect its worker, configuration, and shutdown lifecycles. */
 async function startProxyRuntime(params: {
   argv: ProxyStartArgs;
   spinner: ProxySpinner;
@@ -3484,6 +3515,7 @@ async function startProxyRuntime(params: {
     attachSocketWorkerProcess(server as import("node:http").Server, {
       generation: getProxyWorkerGeneration(),
       version: PROXY_VERSION,
+      processInstanceId: getProxyLifecycleLoggerSnapshot().processInstanceId,
       onActivated: () => {
         persistInitialProxyState();
         void reconcileActivatedUpdate();
@@ -3495,6 +3527,10 @@ async function startProxyRuntime(params: {
   }
 }
 
+/**
+ * Run the stable listener and journal worker incidents independently of
+ * serving-process exits.
+ */
 async function runLaunchdProxySupervisor(
   argv: ProxyStartArgs,
   spinner: ProxySpinner,
@@ -3508,8 +3544,21 @@ async function runLaunchdProxySupervisor(
   const port = argv.port ?? 55669;
   const workerArgs = process.argv.slice(2);
   const supervisorStartedAt = new Date().toISOString();
+  configureProxyLifecycleLogger({
+    enabled: true,
+    logDir: join(homedir(), ".neurolink", "logs"),
+    filePrefix: "proxy-supervisor",
+  });
   let currentUpdaterPid: number | undefined;
   const rollingServer = await startRollingProxyServer({
+    onEvent: (event) =>
+      logProxyLifecycleEvent({
+        event: "supervisor_event",
+        requestId: "-",
+        method: "-",
+        path: "-",
+        supervisorEvent: event,
+      }),
     host,
     port,
     initialVersion: PROXY_VERSION,
@@ -3613,6 +3662,7 @@ async function runLaunchdProxySupervisor(
   );
 
   let stopping = false;
+  /** Drain the rolling workers and flush the supervisor journal before clearing ownership. */
   const shutdown = async (signal: string): Promise<void> => {
     if (stopping) {
       return;
@@ -3622,6 +3672,9 @@ async function runLaunchdProxySupervisor(
     process.off("SIGUSR2", activatePendingUpdate);
     updaterSupervisor.stop();
     await rollingServer.close();
+    await flushProxyLifecycleEvents().catch((error) =>
+      logger.warn(String(error)),
+    );
     const supervisorState = loadProxySupervisorState();
     if (supervisorState?.pid === process.pid) {
       clearProxySupervisorState();

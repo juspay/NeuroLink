@@ -58,6 +58,10 @@ function createOtelResource(config: LangfuseConfig, serviceName: string) {
   });
 }
 
+/**
+ * Configure OTLP metrics and logs with bounded serialization batches for
+ * request-serving processes.
+ */
 function initializeOtlpMetricsAndLogs(
   resource: ReturnType<typeof resourceFromAttributes>,
   otlpEndpoint: string | undefined,
@@ -109,7 +113,9 @@ function initializeOtlpMetricsAndLogs(
     });
     const logProcessor = new BatchLogRecordProcessor(logExporter, {
       maxQueueSize: 2048,
-      maxExportBatchSize: 512,
+      // Body logs contain up to 16 KB each. Bound exporter JSON work to
+      // roughly 1 MB per batch instead of an 8 MB main-thread serialization.
+      maxExportBatchSize: 64,
       scheduledDelayMillis: 2000,
       exportTimeoutMillis: 30000,
     });

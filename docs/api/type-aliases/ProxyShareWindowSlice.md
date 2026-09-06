@@ -8,7 +8,7 @@
 
 > **ProxyShareWindowSlice** = `object`
 
-Defined in: [types/proxy.ts:3511](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3511)
+Defined in: [types/proxy.ts:3589](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3589)
 
 A ceiling expressed as a percentage of each subscription window.
 
@@ -18,7 +18,7 @@ A ceiling expressed as a percentage of each subscription window.
 
 > `optional` **session5hPct?**: `number`
 
-Defined in: [types/proxy.ts:3513](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3513)
+Defined in: [types/proxy.ts:3591](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3591)
 
 Percent of the 5-hour session window.
 
@@ -28,6 +28,6 @@ Percent of the 5-hour session window.
 
 > `optional` **weekly7dPct?**: `number`
 
-Defined in: [types/proxy.ts:3515](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3515)
+Defined in: [types/proxy.ts:3593](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L3593)
 
 Percent of the 7-day weekly window.

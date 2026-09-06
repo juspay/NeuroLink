@@ -8,6 +8,6 @@
 
 > **ProxyShareHeartbeatResponse** = \{ `ok`: `true`; `lease`: [`ProxyShareLease`](ProxyShareLease.md); \} \| \{ `ok`: `false`; `stop`: `true`; `reason`: `string`; \}
 
-Defined in: [types/proxy.ts:4256](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4256)
+Defined in: [types/proxy.ts:4334](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L4334)
 
 What the lender answers with.

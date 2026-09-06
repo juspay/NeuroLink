@@ -1,4 +1,8 @@
 reviews:
+  # TypeDoc output is checked for exact source drift by CI. Review the source
+  # and authored documentation without exhausting the generated-file limit.
+  path_filters:
+    - "!docs/api/**"
   profile: chill # or "assertive" / "followup"
   auto_review:
     enabled: true

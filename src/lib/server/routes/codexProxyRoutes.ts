@@ -560,6 +560,7 @@ export async function handleCodexResponsesRequest(
   let attempt = 0;
   let lastErrorMessage = "All Codex accounts failed";
   let lastErrorStatus = 502;
+  let lastFailure: CodexFinalLogExtra = { errorType: "all_accounts_failed" };
   let lastAttemptedAccount: CodexRuntimeAccount | undefined;
 
   for (const account of eligible) {
@@ -617,8 +618,35 @@ export async function handleCodexResponsesRequest(
           errorMessage,
           ...(errorCode ? { errorCode } : {}),
           transportScope,
-          retryable: true,
+          // These codes prove failure before HTTP dispatch. Socket resets,
+          // EPIPE and generic timeouts may follow dispatch and must not replay.
+          retryable: [
+            "UND_ERR_CONNECT_TIMEOUT",
+            "ECONNREFUSED",
+            "ENOTFOUND",
+            "EAI_AGAIN",
+          ].includes(errorCode ?? ""),
         });
+        lastFailure = {
+          errorType: "network_error",
+          errorMessage,
+          errorCode,
+          transportScope,
+        };
+        if (
+          ![
+            "UND_ERR_CONNECT_TIMEOUT",
+            "ECONNREFUSED",
+            "ENOTFOUND",
+            "EAI_AGAIN",
+          ].includes(errorCode ?? "")
+        ) {
+          await recordFinalOutcome(account, 502, {
+            ...lastFailure,
+            errorMessage,
+          });
+          return buildCodexErrorResponse(502, "Codex upstream request failed");
+        }
         lastErrorMessage = "Codex upstream request failed";
         lastErrorStatus = 502;
         break; // rotate to next account
@@ -826,6 +854,10 @@ export async function handleCodexResponsesRequest(
                 `[proxy] codex account=${account.label} disabled until re-authentication. Run: neurolink auth login codex --label ${account.label}`,
               );
             }
+            lastFailure = {
+              errorType: "authentication_error",
+              errorCode: "refresh_invalid",
+            };
             lastErrorStatus = 401;
             lastErrorMessage = "Codex token refresh failed; re-login required";
             break;
@@ -840,6 +872,10 @@ export async function handleCodexResponsesRequest(
           logger.debug(
             `[proxy] codex account=${account.label} refresh failed transiently; cooling and rotating`,
           );
+          lastFailure = {
+            errorType: "auth_refresh_unavailable",
+            errorCode: getCodexTransportErrorCode(error),
+          };
           lastErrorStatus = 503;
           lastErrorMessage = "Codex token refresh temporarily unavailable";
           break;
@@ -880,6 +916,7 @@ export async function handleCodexResponsesRequest(
           rateLimitKind,
           cooldownReason: plan.reason,
         });
+        lastFailure = { errorType: "rate_limit_error" };
         lastErrorStatus = 429;
         lastErrorMessage = "Codex account rate-limited";
         break; // rotate
@@ -907,6 +944,7 @@ export async function handleCodexResponsesRequest(
         errorMessage,
         retryable: upstream.status >= 500,
       });
+      lastFailure = { errorType };
       lastErrorStatus = upstream.status >= 500 ? 502 : upstream.status;
       lastErrorMessage = errorMessage;
       break; // rotate
@@ -914,8 +952,8 @@ export async function handleCodexResponsesRequest(
   }
 
   await recordFinalOutcome(lastAttemptedAccount, lastErrorStatus, {
-    errorType: "all_accounts_failed",
-    errorMessage: lastErrorMessage,
+    ...lastFailure,
+    errorMessage: lastFailure.errorMessage ?? lastErrorMessage,
   });
   return buildCodexErrorResponse(lastErrorStatus, lastErrorMessage);
 }

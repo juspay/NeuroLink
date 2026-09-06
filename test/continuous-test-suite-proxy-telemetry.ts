@@ -17,11 +17,14 @@ import {
   flushProxyLifecycleEvents,
   getProxyLifecycleLoggerSnapshot,
   logProxyLifecycleEvent,
+  persistProxyLifecycleAcceptance,
   resetProxyLifecycleLoggerForTests,
 } from "../src/lib/proxy/proxyLifecycle.js";
 import {
   initRequestLogger,
+  cleanupLogsAt,
   logRequest,
+  logBodyCapture,
   getRequestLoggerSnapshot,
   flushRequestLogs,
   __requestLoggerTestHooks,
@@ -31,11 +34,19 @@ import { getProxyActivitySnapshot } from "../src/lib/proxy/proxyActivity.js";
 import { ProxyRuntimeConfigStore } from "../src/lib/proxy/runtimeConfig.js";
 import { tokenStore } from "../src/lib/auth/tokenStore.js";
 
+import { __bodyCaptureWorkerTestHooks } from "../src/lib/proxy/bodyCaptureWorker.js";
+await __bodyCaptureWorkerTestHooks.reset(
+  new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+);
+
 const { test, runSuite } = defineSuite("Proxy Telemetry Accuracy", {
   offline: true,
 });
 const pause = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+/**
+ * Wait for asynchronous fixture bookkeeping with a bounded, failure-reporting deadline.
+ */
 async function eventually(predicate: () => boolean): Promise<void> {
   const deadline = Date.now() + 4_000;
   while (!predicate() && Date.now() < deadline) {
@@ -67,6 +78,9 @@ function enqueue(id = "one") {
     path: "/v1/messages",
   });
 }
+/**
+ * Read records from one isolated fixture journal using its generated daily filename.
+ */
 async function lines(
   dir: string,
   prefix: string,
@@ -268,7 +282,9 @@ await test("queue pressure is counted without replaying or interleaving metadata
     );
     release();
     await Promise.all(writes);
-    await flushRequestLogs();
+    // This case checks 4,096 real appends and exact queue accounting, not the
+    // production shutdown latency budget. Drain them even on a busy CI disk.
+    await flushRequestLogs(60_000);
     const after = getRequestLoggerSnapshot().requests;
     assertEqual(
       after.written - before.written,
@@ -293,7 +309,7 @@ await test("queue pressure is counted without replaying or interleaving metadata
     );
   } finally {
     release();
-    await flushRequestLogs();
+    await flushRequestLogs(60_000);
     __requestLoggerTestHooks.restoreAppendFileForTests();
     initRequestLogger(false);
     await rm(dir, { recursive: true, force: true });
@@ -323,15 +339,28 @@ await test("lifecycle queue overflow preserves its accounting identity", async (
   });
 });
 
+/**
+ * Drive real proxy HTTP routes with isolated accounts and recorded upstream responses.
+ */
 async function withHttpFixture(
   provider: "anthropic" | "codex" | "fallback",
   upstream: () => Response,
   run: (response: Response, dir: string) => Promise<void>,
+  requestPath?: string,
+  additionalCodexAccount = false,
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "telemetry-http-"));
   const key = `${provider === "fallback" ? "codex" : provider}:telemetry@example.test`;
+  const secondKey = "codex:z-telemetry@example.test";
   const oldFetch = globalThis.fetch;
   initRequestLogger(true, dir);
+  if (additionalCodexAccount) {
+    await tokenStore.saveTokens(secondKey, {
+      accessToken: "isolated-second-fixture",
+      tokenType: "Bearer",
+      expiresAt: Date.now() + 3_600_000,
+    });
+  }
   await tokenStore.saveTokens(key, {
     accessToken: "isolated-fixture",
     tokenType: "Bearer",
@@ -409,10 +438,13 @@ async function withHttpFixture(
             }
           : null,
       primaryAccountKey: undefined,
-      accountAllowlist: new Set([key]),
+      accountAllowlist: new Set(
+        additionalCodexAccount ? [key, secondKey] : [key],
+      ),
     });
     const path =
-      provider !== "codex" ? "/v1/messages" : "/backend-api/codex/responses";
+      requestPath ??
+      (provider !== "codex" ? "/v1/messages" : "/backend-api/codex/responses");
     const body =
       provider !== "codex"
         ? {
@@ -440,9 +472,15 @@ async function withHttpFixture(
     await flushProxyLifecycleEvents();
     initRequestLogger(false);
     await tokenStore.clearTokens(key);
+    if (additionalCodexAccount) {
+      await tokenStore.clearTokens(secondKey);
+    }
     await rm(dir, { recursive: true, force: true });
   }
 }
+/**
+ * Flush fixture bookkeeping and read final and lifecycle records after response consumption.
+ */
 async function recordsAfterBody(dir: string) {
   await eventually(() => getProxyActivitySnapshot().activeRequests === 0);
   await flushRequestLogs();
@@ -1035,4 +1073,1120 @@ await test("built analyze reconciles failures, deduplicates timings, and joins f
   }
 });
 
+await test("token counting completes HTTP telemetry without requiring a model final", async () => {
+  await withHttpFixture(
+    "anthropic",
+    () => {
+      throw new Error("token counting unexpectedly called inference");
+    },
+    async (response, dir) => {
+      assertEqual(response.status, 200);
+      await response.text();
+      await eventually(() => getProxyActivitySnapshot().activeRequests === 0);
+      await flushProxyLifecycleEvents();
+      const terminals = (await lines(dir, "proxy-lifecycle")).filter(
+        (r) => r.event === "request_terminal",
+      );
+      assertEqual(terminals.length, 1);
+      assertEqual(terminals[0].terminalOutcome, "completed");
+      assertEqual(terminals[0].telemetryStatus, "complete");
+      assertEqual(terminals[0].outcomeSource, "http_status");
+    },
+    "/v1/messages/count_tokens",
+  );
+});
+
+await test("bounded analysis audits intervening sequences without admitting excluded requests", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "telemetry-window-"));
+  const common = {
+    schemaVersion: 1,
+    processInstanceId: "window",
+    method: "POST",
+    path: "/v1/messages",
+  };
+  /** Build a journal record with independently controlled time, sequence, and request identity. */
+  const event = (
+    sequence: number,
+    seconds: number,
+    requestId: string,
+    kind: string,
+  ) => ({
+    ...common,
+    sequence,
+    timestamp: `2026-01-01T00:00:${String(seconds).padStart(2, "0")}.000Z`,
+    requestId,
+    event: kind,
+  });
+  try {
+    await writeFile(
+      join(dir, "proxy-lifecycle-2026-01-01.jsonl"),
+      [
+        event(1, 1, "old", "request_accepted"),
+        event(100, 5, "selected", "request_accepted"),
+        event(101, 20, "excluded", "request_accepted"),
+        {
+          ...event(102, 21, "excluded", "request_terminal"),
+          terminalOutcome: "completed",
+          responseStatus: 200,
+        },
+        event(103, 22, "selected", "response_headers"),
+        // 104 is a real absent journal record; 101 and 102 are retained.
+        {
+          ...event(105, 23, "selected", "request_terminal"),
+          terminalOutcome: "completed",
+          responseStatus: 200,
+        },
+        event(200, 24, "later", "request_accepted"),
+      ]
+        .map((r) => JSON.stringify(r))
+        .join("\n") + "\n",
+    );
+    await writeFile(
+      join(dir, "proxy-2026-01-01.jsonl"),
+      JSON.stringify({
+        timestamp: "2026-01-01T00:00:23.000Z",
+        requestId: "selected",
+        method: "POST",
+        responseStatus: 200,
+        responseTimeMs: 18000,
+      }) + "\n",
+    );
+    const result = await runCLI([
+      "proxy",
+      "analyze",
+      "--logs-dir",
+      dir,
+      "--since",
+      "2026-01-01T00:00:04Z",
+      "--until",
+      "2026-01-01T00:00:10Z",
+      "--format",
+      "json",
+    ]);
+    assertEqual(result.exitCode, 0);
+    const report = JSON.parse(result.stdout.slice(result.stdout.indexOf("{")));
+    assertEqual(
+      report.lifecycle.accepted,
+      1,
+      "excluded requests entered the cohort",
+    );
+    assertEqual(report.lifecycle.terminal, 1, "follow-up terminal was lost");
+    assertEqual(
+      report.requests.success,
+      1,
+      "follow-up final was not reconciled",
+    );
+    assertEqual(
+      report.dataQuality.lifecycleSequenceGaps,
+      1,
+      "filtering invented gaps or hid a real gap",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("analysis separates auxiliary HTTP outcomes from missing inference finals", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "telemetry-auxiliary-"));
+  const common = {
+    schemaVersion: 1,
+    processInstanceId: "auxiliary",
+    timestamp: "2026-01-01T00:00:05.000Z",
+  };
+  const endpoints = [
+    {
+      requestId: "tokens",
+      method: "POST",
+      path: "/v1/messages/count_tokens",
+      responseStatus: 200,
+    },
+    {
+      requestId: "models",
+      method: "GET",
+      path: "/backend-api/codex/models",
+      responseStatus: 503,
+    },
+    {
+      requestId: "inference",
+      method: "POST",
+      path: "/v1/messages",
+      responseStatus: 200,
+    },
+    {
+      requestId: "cancelled-models",
+      method: "GET",
+      path: "/v1/models",
+      responseStatus: 200,
+    },
+  ];
+  try {
+    const rows = endpoints.flatMap((endpoint, i) => [
+      {
+        ...common,
+        ...endpoint,
+        sequence: i * 2 + 1,
+        event: "request_accepted",
+      },
+      {
+        ...common,
+        ...endpoint,
+        sequence: i * 2 + 2,
+        event: "request_terminal",
+        terminalOutcome: "unknown",
+        telemetryStatus: "missing_final",
+        transportOutcome:
+          endpoint.requestId === "cancelled-models"
+            ? "client_cancelled"
+            : "completed",
+      },
+    ]);
+    await writeFile(
+      join(dir, "proxy-lifecycle-2026-01-01.jsonl"),
+      rows.map((r) => JSON.stringify(r)).join("\n") + "\n",
+    );
+    const result = await runCLI([
+      "proxy",
+      "analyze",
+      "--logs-dir",
+      dir,
+      "--since",
+      "2026-01-01T00:00:00Z",
+      "--until",
+      "2026-01-01T00:01:00Z",
+      "--format",
+      "json",
+    ]);
+    assertEqual(result.exitCode, 0);
+    const report = JSON.parse(result.stdout.slice(result.stdout.indexOf("{")));
+    assertEqual(report.lifecycle.auxiliaryRequests, 3);
+    assertEqual(report.lifecycle.terminalOutcomes.completed, 1);
+    assertEqual(
+      report.lifecycle.terminalOutcomes.handler_error,
+      1,
+      "auxiliary HTTP failure was hidden",
+    );
+    assertEqual(
+      report.lifecycle.terminalOutcomes.client_cancelled,
+      1,
+      "auxiliary cancellation became success",
+    );
+    assertEqual(
+      report.lifecycle.terminalOutcomes.unknown,
+      1,
+      "inference without a final became success",
+    );
+    assertEqual(
+      report.requests.success,
+      0,
+      "metadata requests inflated model successes",
+    );
+    assertEqual(report.dataQuality.acceptedWithoutFinal, 1);
+    assertEqual(report.dataQuality.terminalWithoutFinal, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("HTTP admission waits for its append before dispatching any upstream work", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let upstreamCalls = 0;
+  __proxyLifecycleTestHooks.setAppendFileForTests(async (...args) => {
+    await gate;
+    return appendFile(...args);
+  });
+  const exercise = withHttpFixture(
+    "codex",
+    () => {
+      upstreamCalls += 1;
+      return new Response(
+        sse("response.completed", {
+          response: { status: "completed", output: [] },
+        }),
+      );
+    },
+    async (response, dir) => {
+      await response.text();
+      assertEqual(upstreamCalls, 1);
+      const admitted = (await lines(dir, "proxy-lifecycle")).filter(
+        (r) => r.event === "request_accepted",
+      );
+      assertEqual(admitted.length, 1);
+    },
+  );
+  try {
+    await pause(100);
+    assertEqual(
+      upstreamCalls,
+      0,
+      "provider dispatch escaped the journal barrier",
+    );
+    release();
+    await exercise;
+  } finally {
+    release();
+    __proxyLifecycleTestHooks.setAppendFileForTests(appendFile);
+    await exercise;
+  }
+});
+
+await test("HTTP admission returns a classified 503 when its enabled journal cannot write", async () => {
+  let calls = 0;
+  __proxyLifecycleTestHooks.setAppendFileForTests(async () => {
+    throw Object.assign(new Error("fixture permission denied"), {
+      code: "EACCES",
+    });
+  });
+  try {
+    await withHttpFixture(
+      "codex",
+      () => {
+        calls += 1;
+        return new Response();
+      },
+      async (response, dir) => {
+        await response.text();
+        assertEqual(response.status, 503, "unrecorded work was admitted");
+        assertEqual(calls, 0);
+        await flushRequestLogs();
+        const finals = await lines(dir, "proxy");
+        assertEqual(finals.length, 1);
+        assertEqual(finals[0].errorCode, "PROXY_TELEMETRY_UNAVAILABLE");
+      },
+    );
+  } finally {
+    __proxyLifecycleTestHooks.setAppendFileForTests(appendFile);
+  }
+});
+
+await test("an admission barrier settles independently of later traffic and never replays an uncertain append", async () => {
+  await withWriter(async (dir) => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let writes = 0;
+    __proxyLifecycleTestHooks.setAppendFileForTests(async (...args) => {
+      if (++writes > 1) {
+        await gate;
+      }
+      return appendFile(...args);
+    });
+    await persistProxyLifecycleAcceptance({
+      requestId: "first",
+      method: "POST",
+      path: "/v1/messages",
+    });
+    const later = persistProxyLifecycleAcceptance(
+      { requestId: "later", method: "POST", path: "/v1/messages" },
+      30,
+    ).then(
+      () => false,
+      () => true,
+    );
+    try {
+      assert(await later, "a pending admission did not respect its deadline");
+      assertEqual(writes, 2);
+    } finally {
+      release();
+    }
+    await flushProxyLifecycleEvents();
+    const records = await lines(dir, "proxy-lifecycle");
+    assertEqual(records.length, 2, "timed-out append was replayed");
+  });
+});
+
+await test("bulk captures remain redacted, byte bounded and reconstructable in the shipped worker", async () => {
+  const { gunzipSync } = await import("node:zlib");
+  const { createHash } = await import("node:crypto");
+  const dir = await mkdtemp(join(tmpdir(), "body-worker-"));
+  await __bodyCaptureWorkerTestHooks.reset(
+    new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+  );
+  initRequestLogger(true, dir);
+  try {
+    await logBodyCapture({
+      timestamp: new Date().toISOString(),
+      requestId: "large",
+      phase: "client_request",
+      model: "fixture",
+      stream: false,
+      headers: { authorization: "secret-header" },
+      body: { api_key: "secret-body", text: "🙂".repeat(280_000) },
+    });
+    await flushRequestLogs();
+    const [index] = await lines(dir, "proxy-debug");
+    assert(!index.bodyWriteFailed, "worker capture failed");
+    assertEqual(index.bodyTruncated, true);
+    const artifact = JSON.parse(
+      gunzipSync(await readFile(String(index.bodyPath))).toString(),
+    );
+    assert(
+      !artifact.body.includes("secret-body") &&
+        !JSON.stringify(artifact.headers).includes("secret-header"),
+      "redaction regressed",
+    );
+    assert(!artifact.body.includes("�"), "UTF-8 truncation split a code point");
+    assert(
+      Buffer.byteLength(artifact.body) <= 1024 * 1024,
+      "captured artifact exceeded its byte limit",
+    );
+    assertEqual(
+      createHash("sha256").update(artifact.body).digest("hex"),
+      index.bodySha256,
+    );
+    assertEqual(getRequestLoggerSnapshot().bodyCapture?.completed, 1);
+    assert(
+      typeof index.captureProcessingMs === "number" &&
+        typeof index.captureQueueWaitMs === "number",
+      "capture timings were not recorded",
+    );
+  } finally {
+    await flushRequestLogs();
+    initRequestLogger(false);
+    await __bodyCaptureWorkerTestHooks.reset(
+      new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+    );
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("capture pressure and worker failure preserve exact accounting and visible index failures", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "body-pressure-"));
+  // A missing worker file provokes a real child-thread failure after admission.
+  await __bodyCaptureWorkerTestHooks.reset(
+    new URL("./fixtures/missing-body-worker.js", import.meta.url),
+  );
+  initRequestLogger(true, dir);
+  try {
+    const tasks = Array.from({ length: 24 }, (_, i) =>
+      logBodyCapture({
+        timestamp: new Date().toISOString(),
+        requestId: `pressure-${i}`,
+        phase: "client_request",
+        model: "fixture",
+        stream: false,
+        body: "bounded fixture",
+      }),
+    );
+    const queued = getRequestLoggerSnapshot().bodyCapture!;
+    assertEqual(queued.pending, 16);
+    assertEqual(queued.rejected, 8);
+    assert(
+      queued.pendingBytes <= queued.maxPendingBytes,
+      "capture queue exceeded its byte budget",
+    );
+    await Promise.all(tasks);
+    await flushRequestLogs();
+    const state = getRequestLoggerSnapshot().bodyCapture!;
+    assertEqual(
+      state.attempted,
+      state.completed + state.failed + state.rejected + state.pending,
+    );
+    assertEqual(state.failed, 16);
+    const indexes = await lines(dir, "proxy-debug");
+    assertEqual(indexes.length, 24);
+    assert(
+      indexes.every(
+        (r) => r.bodyWriteFailed && typeof r.captureError === "string",
+      ),
+      "capture failure index omitted its error classification",
+    );
+  } finally {
+    initRequestLogger(false);
+    await __bodyCaptureWorkerTestHooks.reset(
+      new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+    );
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+for (const code of ["EPIPE", "UND_ERR_SOCKET", "UND_ERR_CONNECT_TIMEOUT"]) {
+  await test(`HTTP Codex terminal transport failure retains ${code} and account attribution`, async () => {
+    await withHttpFixture(
+      "codex",
+      () => {
+        throw new TypeError("fixture fetch failed", {
+          cause: Object.assign(new Error("fixture socket"), { code }),
+        });
+      },
+      async (response, dir) => {
+        const clientBody = await response.text();
+        assert(
+          !clientBody.includes("fixture fetch failed"),
+          "transport internals reached the client",
+        );
+        const { finals, terminals } = await recordsAfterBody(dir);
+        assertEqual(response.status, 502);
+        assertEqual(finals.length, 1);
+        assertEqual(
+          finals[0].errorMessage,
+          "fixture fetch failed",
+          "final telemetry lost the transport detail",
+        );
+        assertEqual(finals[0].errorType, "network_error");
+        assertEqual(finals[0].errorCode, code);
+        assertEqual(terminals[0].errorCode, code);
+        const attempts = await lines(dir, "proxy-attempts");
+        assertEqual(
+          finals[0].accountKey,
+          attempts.at(-1)?.accountKey,
+          "final error lost the account of the last attempted provider call",
+        );
+        assertEqual(
+          new Set(attempts.map((attempt) => attempt.accountKey)).size,
+          code === "UND_ERR_CONNECT_TIMEOUT" ? 2 : 1,
+        );
+        assertEqual(
+          attempts.length,
+          code === "UND_ERR_CONNECT_TIMEOUT" ? 2 : 1,
+          "unsafe POST rotation or missing safe connect retry",
+        );
+        assertEqual(
+          attempts[0].retryable,
+          code === "UND_ERR_CONNECT_TIMEOUT",
+          "ambiguous dispatch was retryable",
+        );
+      },
+      undefined,
+      true,
+    );
+  });
+}
+
+/**
+ * Exercise real child-process handoffs with isolated storage and
+ * deterministic IPC delivery faults.
+ */
+async function withIncidentProxy(
+  timings: {
+    acceptanceMs?: number;
+    commitMs?: number;
+    delayedSocket?: string;
+    commitErrorCode?: string;
+    logs?: string[];
+  },
+  run: (
+    proxy: import("../src/lib/types/index.js").RollingProxyServer,
+    dir: string,
+  ) => Promise<void>,
+): Promise<void> {
+  const { startRollingProxyServer } =
+    await import("../src/lib/proxy/rollingProxyServer.js");
+  const { spawnProxySocketWorker } =
+    await import("../src/lib/proxy/rollingWorkerProcess.js");
+  const { spawn } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  const dir = await mkdtemp(join(tmpdir(), "incident-worker-"));
+  resetProxyLifecycleLoggerForTests();
+  configureProxyLifecycleLogger({
+    enabled: true,
+    logDir: dir,
+    filePrefix: "proxy-supervisor",
+  });
+  const proxy = await startRollingProxyServer({
+    host: "127.0.0.1",
+    port: 0,
+    initialVersion: "1.0.0",
+    readyTimeoutMs: 10_000,
+    log: (message) => timings.logs?.push(message),
+    onEvent: (supervisorEvent) =>
+      logProxyLifecycleEvent({
+        event: "supervisor_event",
+        requestId: "-",
+        method: "-",
+        path: "-",
+        supervisorEvent,
+      }),
+    spawnWorker: (generation, expectedVersion) =>
+      spawnProxySocketWorker({
+        generation,
+        expectedVersion,
+        command: process.execPath,
+        args: [
+          fileURLToPath(
+            new URL(
+              "./fixtures/proxyIncidentSocketWorker.cjs",
+              import.meta.url,
+            ),
+          ),
+        ],
+        socketAckTimeoutMs: 250,
+        stdout: "ignore",
+        stderr: "ignore",
+        env: {
+          NEUROLINK_INCIDENT_BUILT_PROXY_DIR: fileURLToPath(
+            new URL("../dist/proxy/", import.meta.url),
+          ),
+          NEUROLINK_INCIDENT_LOG_DIR: dir,
+          NEUROLINK_INCIDENT_ACCEPT_DELAY_MS: String(timings.acceptanceMs ?? 0),
+        },
+        spawn: ((...args: Parameters<typeof spawn>) => {
+          const child = spawn(...args);
+          const original = child.send;
+          child.send = function (
+            this: typeof child,
+            message: unknown,
+            ...sendArgs: unknown[]
+          ) {
+            const control = message as { type?: string; socketId?: string };
+            if (
+              control.type === "proxy-worker:socket-commit" &&
+              (!timings.delayedSocket ||
+                control.socketId === timings.delayedSocket)
+            ) {
+              const callback = sendArgs.at(-1);
+              if (typeof callback === "function") {
+                sendArgs[sendArgs.length - 1] = (...values: unknown[]) =>
+                  setTimeout(
+                    () =>
+                      timings.commitErrorCode
+                        ? callback(
+                            Object.assign(
+                              new Error("fixture IPC write failed"),
+                              { code: timings.commitErrorCode },
+                            ),
+                          )
+                        : callback(...values),
+                    timings.commitMs ?? 0,
+                  );
+              }
+            }
+            return Reflect.apply(original, this, [message, ...sendArgs]);
+          } as typeof child.send;
+          return child;
+        }) as typeof spawn,
+      }),
+  });
+  try {
+    await run(proxy, dir);
+  } finally {
+    await proxy.close();
+    await flushProxyLifecycleEvents();
+    resetProxyLifecycleLoggerForTests();
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Observe fixture response headers and completion with a bounded loopback
+ * request lifetime.
+ */
+async function incidentRequest(port: number, path: string) {
+  const { get } = await import("node:http");
+  let headers!: (id: string) => void;
+  const started = new Promise<string>((resolve) => {
+    headers = resolve;
+  });
+  const finished = new Promise<{ failed: boolean; body: string }>((resolve) => {
+    const req = get({ host: "127.0.0.1", port, path, agent: false }, (res) => {
+      let body = "";
+      headers(String(res.headers["x-request-id"]));
+      res.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      res.on("end", () => resolve({ failed: false, body }));
+      res.on("error", () => resolve({ failed: true, body }));
+    });
+    req.on("error", () => {
+      headers("");
+      resolve({ failed: true, body: "" });
+    });
+    req.setTimeout(8_000, () => req.destroy());
+  });
+  return { started, finished };
+}
+
+await test("a late accepted socket gets a full commit deadline without killing its worker", async () => {
+  await withIncidentProxy(
+    { acceptanceMs: 150, commitMs: 150 },
+    async (proxy) => {
+      const pid = proxy.snapshot().active?.pid;
+      const request = await incidentRequest(proxy.address.port, "/ok");
+      assertEqual((await request.finished).body, "ok");
+      await pause(400);
+      assertEqual(
+        proxy.snapshot().failedTransfers,
+        0,
+        "commit inherited the expired offer deadline",
+      );
+      assertEqual(proxy.snapshot().active?.pid, pid);
+    },
+  );
+});
+
+for (const fault of [
+  {
+    reason: "socket_commit_timeout",
+    commitMs: 700,
+    commitErrorCode: undefined,
+  },
+  { reason: "socket_transfer_failure", commitMs: 50, commitErrorCode: "EPIPE" },
+]) {
+  await test(`${fault.reason} cancels only that connection while replacement preserves another stream`, async () => {
+    const logs: string[] = [];
+    await withIncidentProxy(
+      { ...fault, delayedSocket: "1:2", logs },
+      async (proxy) => {
+        const first = await incidentRequest(proxy.address.port, "/stream");
+        await first.started;
+        const originalPid = proxy.snapshot().active?.pid;
+        const second = await incidentRequest(proxy.address.port, "/hold");
+        await second.started;
+        const cancelled = await second.finished;
+        assert(
+          cancelled.failed,
+          "late cancellation did not close the committed socket",
+        );
+        await eventually(() => proxy.snapshot().active?.pid !== originalPid);
+        const preserved = await first.finished;
+        assert(
+          !preserved.failed &&
+            preserved.body === `start${"chunk".repeat(200)}done`,
+          "unrelated stream was cut by a handoff failure",
+        );
+        assert(
+          logs.some((message) => message.includes(`reason=${fault.reason}`)),
+          "replacement request reported the wrong failure phase",
+        );
+        assertEqual(proxy.snapshot().failedTransfers, 1);
+        assertEqual(proxy.snapshot().rejectedSockets, 1);
+        assertEqual(
+          proxy.snapshot().lastFailure?.supervisorAction,
+          "cancel_socket_replace_before_drain",
+        );
+        const healthy = await incidentRequest(proxy.address.port, "/ok");
+        assertEqual((await healthy.finished).body, "ok");
+      },
+    );
+  });
+}
+
+await test("worker death preserves durable admission and the built analyzer reports unconfirmed outcome without inventing success", async () => {
+  await withIncidentProxy({}, async (proxy, dir) => {
+    const request = await incidentRequest(proxy.address.port, "/hold");
+    const requestId = await request.started;
+    const pid = proxy.snapshot().active!.pid;
+    // This PID was created by this test; never read or signal the installed proxy.
+    process.kill(pid, "SIGKILL");
+    assert(
+      (await request.finished).failed,
+      "killed fixture stream unexpectedly completed",
+    );
+    await eventually(() =>
+      proxy
+        .snapshot()
+        .recentEvents.some(
+          (event) => event.type === "worker_exit" && event.workerPid === pid,
+        ),
+    );
+    await flushProxyLifecycleEvents();
+    const result = await runCLI([
+      "proxy",
+      "analyze",
+      "--logs-dir",
+      dir,
+      "--since",
+      new Date(Date.now() - 60_000).toISOString(),
+      "--format",
+      "json",
+    ]);
+    assertEqual(result.exitCode, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assertEqual(report.lifecycle.accepted, 1);
+    assertEqual(report.lifecycle.terminal, 0);
+    assertEqual(report.lifecycle.unconfirmedAtWorkerExit.length, 1);
+    assertEqual(
+      report.lifecycle.unconfirmedAtWorkerExit[0].requestId,
+      requestId,
+    );
+    assertEqual(
+      report.lifecycle.unconfirmedAtWorkerExit[0].workerExitSignal,
+      "SIGKILL",
+    );
+    assertEqual(report.requests.success, 0);
+    assertEqual(report.dataQuality.acceptedWithoutFinal, 1);
+    assertEqual(report.dataQuality.lifecycleSequenceGaps, 0);
+  });
+});
+
+await test("a burst of 150 concurrent sockets completes with 150 durable unique admissions and no transfer loss", async () => {
+  await withIncidentProxy({}, async (proxy, dir) => {
+    const startedAt = performance.now();
+    const requests = await Promise.all(
+      Array.from({ length: 150 }, () =>
+        incidentRequest(proxy.address.port, "/ok"),
+      ),
+    );
+    const results = await Promise.all(
+      requests.map((request) => request.finished),
+    );
+    const durationMs = performance.now() - startedAt;
+    assert(
+      results.every((result) => !result.failed && result.body === "ok"),
+      "burst lost or corrupted a response",
+    );
+    const admitted = (await lines(dir, "proxy-lifecycle")).filter(
+      (record) => record.event === "request_accepted",
+    );
+    assertEqual(admitted.length, 150);
+    assertEqual(new Set(admitted.map((record) => record.requestId)).size, 150);
+    assertEqual(proxy.snapshot().failedTransfers, 0);
+    assertEqual(proxy.snapshot().rejectedSockets, 0);
+    console.log(
+      `    Isolated burst: 150/150 completed in ${durationMs.toFixed(1)}ms; zero missing admissions or transfer failures`,
+    );
+  });
+});
+
+await test("runtime load and conflicting supervisor evidence never inflate request counts or invent an exit outcome", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "incident-analysis-"));
+  const timestamp = new Date().toISOString();
+  const day = timestamp.slice(0, 10);
+  const base = {
+    schemaVersion: 1,
+    timestamp,
+    method: "POST",
+    path: "/v1/messages",
+  };
+  const runtime = {
+    ...base,
+    requestId: "-",
+    processInstanceId: "worker",
+    sequence: 2,
+    event: "runtime_sample",
+    runtimeSample: {
+      hostLoad1m: 139,
+      rssBytes: 12345,
+      cpuPercentOneCore: 11.5,
+      eventLoopDelayMaxMs: 41,
+    },
+  };
+  const exit = {
+    ...base,
+    requestId: "-",
+    processInstanceId: "parent",
+    sequence: 1,
+    event: "supervisor_event",
+    supervisorEvent: {
+      type: "worker_exit",
+      workerProcessInstanceId: "worker",
+      workerExitCode: null,
+      workerExitSignal: "SIGKILL",
+    },
+  };
+  try {
+    await writeFile(
+      join(dir, `proxy-lifecycle-${day}.jsonl`),
+      [
+        {
+          ...base,
+          requestId: "one",
+          processInstanceId: "worker",
+          sequence: 1,
+          event: "request_accepted",
+        },
+        runtime,
+        runtime,
+      ]
+        .map((record) => JSON.stringify(record))
+        .join("\n") + "\n",
+    );
+    await writeFile(
+      join(dir, `proxy-supervisor-${day}.jsonl`),
+      [
+        exit,
+        {
+          ...exit,
+          supervisorEvent: {
+            ...exit.supervisorEvent,
+            workerExitSignal: "SIGTERM",
+          },
+        },
+      ]
+        .map((record) => JSON.stringify(record))
+        .join("\n") + "\n",
+    );
+    const result = await runCLI([
+      "proxy",
+      "analyze",
+      "--logs-dir",
+      dir,
+      "--since",
+      new Date(Date.now() - 60_000).toISOString(),
+      "--format",
+      "json",
+    ]);
+    assertEqual(result.exitCode, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assertEqual(report.lifecycle.accepted, 1);
+    assertEqual(
+      report.lifecycle.unconfirmedAtWorkerExit.length,
+      0,
+      "contradictory exit evidence was treated as confirmed",
+    );
+    assertEqual(report.runtime.samples, 1, "runtime samples were duplicated");
+    assertEqual(report.runtime.maxHostLoad1m, 139);
+    assertEqual(report.runtime.maxEventLoopDelayMs, 41);
+    assertEqual(report.dataQuality.lifecycleSequenceDuplicates, 2);
+    assertEqual(report.dataQuality.conflictingLifecycleDuplicates, 1);
+    assertEqual(report.requests.completed, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("capture slots stay reserved while completed bodies await a slow debug sink", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "body-publication-"));
+  await __bodyCaptureWorkerTestHooks.reset(
+    new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+  );
+  initRequestLogger(true, dir);
+  const before = getRequestLoggerSnapshot().debug.attempted;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  __requestLoggerTestHooks.setAppendFileForTests(async (...args) => {
+    await gate;
+    return writeFile(...args);
+  });
+  const tasks = Array.from({ length: 16 }, (_, index) =>
+    logBodyCapture({
+      timestamp: new Date().toISOString(),
+      requestId: `retained-${index}`,
+      phase: "client_request",
+      model: "fixture",
+      stream: false,
+      body: "bounded fixture",
+    }),
+  );
+  try {
+    await eventually(
+      () => getRequestLoggerSnapshot().debug.attempted - before === 16,
+    );
+    assertEqual(
+      getRequestLoggerSnapshot().bodyCapture?.pending,
+      16,
+      "completed worker results escaped the memory budget",
+    );
+    // The metadata caller deadline must not release capture ownership while
+    // the actual index write remains blocked behind this gate.
+    await pause(5_100);
+    assertEqual(
+      getRequestLoggerSnapshot().bodyCapture?.pending,
+      16,
+      "metadata timeout released capture capacity before the index write settled",
+    );
+    tasks.push(
+      logBodyCapture({
+        timestamp: new Date().toISOString(),
+        requestId: "overflow",
+        phase: "client_request",
+        model: "fixture",
+        stream: false,
+        body: "bounded fixture",
+      }),
+    );
+    assertEqual(getRequestLoggerSnapshot().bodyCapture?.rejected, 1);
+    release();
+    await Promise.all(tasks);
+    await flushRequestLogs();
+    assertEqual(getRequestLoggerSnapshot().bodyCapture?.completed, 16);
+    assertEqual(getRequestLoggerSnapshot().bodyCapture?.pending, 0);
+    const indexes = await lines(dir, "proxy-debug");
+    assertEqual(indexes.length, 17);
+    assertEqual(
+      indexes.filter(
+        (record) => record.captureError === "body_capture_queue_full",
+      ).length,
+      1,
+    );
+  } finally {
+    release();
+    await Promise.all(tasks);
+    await flushRequestLogs();
+    __requestLoggerTestHooks.restoreAppendFileForTests();
+    initRequestLogger(false);
+    await __bodyCaptureWorkerTestHooks.reset();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+for (const serialized of [false, true]) {
+  await test(`body capture redacts sensitive non-string values from ${serialized ? "JSON text" : "objects"}`, async () => {
+    const { gunzipSync } = await import("node:zlib");
+    const dir = await mkdtemp(join(tmpdir(), "body-sensitive-values-"));
+    await __bodyCaptureWorkerTestHooks.reset(
+      new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+    );
+    initRequestLogger(true, dir);
+    const input = {
+      authorization: ["Bearer secret-array"],
+      api_key: 1234567,
+      credential: { value: "secret-object" },
+      nested: [{ Password: false, harmless: "retained" }],
+    };
+    const original = JSON.stringify(input);
+    try {
+      await logBodyCapture({
+        timestamp: new Date().toISOString(),
+        requestId: "sensitive",
+        phase: "client_request",
+        model: "fixture",
+        stream: false,
+        body: serialized ? original : input,
+      });
+      await flushRequestLogs();
+      const [index] = await lines(dir, "proxy-debug");
+      assert(!index.bodyWriteFailed, "capture failed");
+      const artifact = JSON.parse(
+        gunzipSync(await readFile(String(index.bodyPath))).toString(),
+      );
+      const body = JSON.parse(artifact.body);
+      for (const key of ["authorization", "api_key", "credential"]) {
+        assertEqual(body[key], "[REDACTED]", `non-string ${key} leaked`);
+      }
+      assertEqual(body.nested[0].Password, "[REDACTED]");
+      assertEqual(body.nested[0].harmless, "retained");
+      assertEqual(
+        JSON.stringify(input),
+        original,
+        "capture mutated the request",
+      );
+    } finally {
+      initRequestLogger(false);
+      await __bodyCaptureWorkerTestHooks.reset();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+await test("permission hardening failure keeps the lifecycle sink disabled and refuses HTTP dispatch", async () => {
+  const { chmod, stat, readdir } = await import("node:fs/promises");
+  const { chmodSync } = await import("node:fs");
+  const dir = await mkdtemp(join(tmpdir(), "telemetry-private-dir-"));
+  await chmod(dir, 0o755);
+  __proxyLifecycleTestHooks.setChmodForTests(() => {
+    throw Object.assign(new Error("fixture chmod denied"), { code: "EPERM" });
+  });
+  let upstreamCalls = 0;
+  try {
+    configureProxyLifecycleLogger({ enabled: true, logDir: dir });
+    assertEqual(getProxyLifecycleLoggerSnapshot().enabled, false);
+    assertEqual((await stat(dir)).mode & 0o777, 0o755);
+    logProxyLifecycleEvent({
+      event: "request_accepted",
+      requestId: "unsecured",
+      method: "POST",
+      path: "/v1/messages",
+    });
+    await flushProxyLifecycleEvents();
+    assert(
+      !(await readdir(dir)).some((name) => name.startsWith("proxy-lifecycle-")),
+      "unsecured directory received telemetry",
+    );
+    await withHttpFixture(
+      "codex",
+      () => {
+        upstreamCalls += 1;
+        return new Response();
+      },
+      async (response, logsDir) => {
+        await response.text();
+        assertEqual(response.status, 503);
+        assertEqual(
+          upstreamCalls,
+          0,
+          "permission failure disabled the admission requirement",
+        );
+        assert(
+          !(await readdir(logsDir)).some((name) =>
+            name.startsWith("proxy-lifecycle-"),
+          ),
+          "disabled lifecycle sink created a journal",
+        );
+      },
+    );
+    __proxyLifecycleTestHooks.setChmodForTests(chmodSync);
+    configureProxyLifecycleLogger({ enabled: true, logDir: dir });
+    assertEqual(
+      (await stat(dir)).mode & 0o777,
+      0o700,
+      "existing directory was not hardened",
+    );
+    assertEqual(getProxyLifecycleLoggerSnapshot().enabled, true);
+  } finally {
+    resetProxyLifecycleLoggerForTests();
+    initRequestLogger(false);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("size retention preserves the current supervisor journal and still removes older journals", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "supervisor-retention-"));
+  const today = new Date().toISOString().slice(0, 10);
+  const current = join(dir, `proxy-supervisor-${today}.jsonl`);
+  const older = join(dir, "proxy-supervisor-2000-01-01.jsonl");
+  try {
+    await writeFile(current, "first\n");
+    await writeFile(older, "older\n");
+    cleanupLogsAt(dir, 7, 0);
+    await appendFile(current, "second\n");
+    assertEqual(
+      await readFile(current, "utf8"),
+      "first\nsecond\n",
+      "current journal was unlinked",
+    );
+    const { readdir } = await import("node:fs/promises");
+    assert(
+      !(await readdir(dir)).includes("proxy-supervisor-2000-01-01.jsonl"),
+      "older journal escaped retention",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("default shutdown flush waits for a capture beyond the metadata-only five-second budget", async () => {
+  const { pathToFileURL } = await import("node:url");
+  const dir = await mkdtemp(join(tmpdir(), "capture-shutdown-"));
+  const fixture = join(dir, "delayed-worker.mjs");
+  // Execute the shipped worker, delaying only its message boundary.
+  await writeFile(
+    fixture,
+    `
+    import { parentPort } from "node:worker_threads";
+    const original = parentPort.postMessage.bind(parentPort);
+    parentPort.postMessage = (message) => setTimeout(() => original(message), 5200);
+    await import(${JSON.stringify(new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url).href)});
+  `,
+  );
+  await __bodyCaptureWorkerTestHooks.reset(pathToFileURL(fixture));
+  initRequestLogger(true, dir);
+  const capture = logBodyCapture({
+    timestamp: new Date().toISOString(),
+    requestId: "shutdown",
+    phase: "client_request",
+    model: "fixture",
+    stream: false,
+    body: "retained capture",
+  });
+  try {
+    await flushRequestLogs();
+    await capture;
+    assertEqual(getRequestLoggerSnapshot().bodyCapture?.completed, 1);
+    assertEqual(getRequestLoggerSnapshot().bodyCapture?.pending, 0);
+    assertEqual((await lines(dir, "proxy-debug")).length, 1);
+  } finally {
+    await capture;
+    initRequestLogger(false);
+    await __bodyCaptureWorkerTestHooks.reset();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await __bodyCaptureWorkerTestHooks.reset();
 await runSuite();

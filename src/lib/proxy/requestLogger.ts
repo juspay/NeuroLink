@@ -19,15 +19,24 @@ import {
   unlinkSync,
 } from "fs";
 import { writeFile } from "fs/promises";
-import { createHash } from "crypto";
-import { promisify } from "util";
-import { gzip as gzipCallback } from "zlib";
+import { setImmediate as yieldToRequests } from "node:timers/promises";
+import {
+  captureProxyBody,
+  getBodyCaptureWorkerSnapshot,
+  PROXY_BODY_CAPTURE_DEADLINE_MS,
+} from "./bodyCaptureWorker.js";
+import {
+  prepareProxyBodyForLogging as prepareRedactedBody,
+  redactProxyHeadersForLogging as redactHeaders,
+  splitUtf8StringByBytes,
+} from "./bodyCaptureProcessing.js";
 import type {
   ManagedLogFile,
   ProxyBodyCaptureEntry,
   RequestAttemptLogEntry,
   RequestLogEntry,
   StoredBodyArtifact,
+  ProcessedProxyBodyCapture,
   ProxyRequestLoggerSnapshot,
   ProxyRequestLogSinkSnapshot,
 } from "../types/index.js";
@@ -61,19 +70,27 @@ const metadataSinks = {
   debug: createSinkSnapshot(),
 };
 
+/**
+ * Expose independent metadata-sink and body-capture counters for incident reconciliation.
+ */
 export function getRequestLoggerSnapshot(): ProxyRequestLoggerSnapshot {
   return {
     enabled: logEnabled,
     requests: { ...metadataSinks.requests },
     attempts: { ...metadataSinks.attempts },
     debug: { ...metadataSinks.debug },
+    bodyCapture: getBodyCaptureWorkerSnapshot(),
   };
 }
 
+/**
+ * Serialize append ownership; capture callers retain their memory lease until the write settles.
+ */
 async function appendMetadataRecord(
   file: string,
   line: string,
   kind: keyof typeof metadataSinks,
+  options: { waitForPersistence?: boolean } = {},
 ): Promise<void> {
   const sink = metadataSinks[kind];
   sink.attempted += 1;
@@ -112,6 +129,11 @@ async function appendMetadataRecord(
       appendChains.delete(file);
     }
   });
+  if (options.waitForPersistence) {
+    // Bulk capture owns a memory lease until publication settles. A caller
+    // timeout must not release that lease while the serialized index is queued.
+    return operation;
+  }
   // Bound the caller's wait, not the lifetime/ownership of the underlying write.
   await withTimeout(
     operation,
@@ -120,6 +142,9 @@ async function appendMetadataRecord(
   ).catch(() => undefined);
 }
 
+/**
+ * Retain asynchronous log ownership until settlement so shutdown can await admitted publication.
+ */
 function trackLogOperation<T>(operation: Promise<T>): Promise<T> {
   pendingLogOperations.add(operation);
   void operation.then(
@@ -131,7 +156,8 @@ function trackLogOperation<T>(operation: Promise<T>): Promise<T> {
 
 /** Wait, up to a bounded deadline, for admitted request/body writes to settle. */
 export async function flushRequestLogs(
-  timeoutMs: number = REQUEST_LOG_IO_TIMEOUT_MS,
+  timeoutMs: number = PROXY_BODY_CAPTURE_DEADLINE_MS +
+    2 * REQUEST_LOG_IO_TIMEOUT_MS,
 ): Promise<void> {
   const deadline = Date.now() + Math.max(1, timeoutMs);
   while (pendingLogOperations.size > 0) {
@@ -173,30 +199,11 @@ let otelResolveAttempts = 0;
 /** Max number of resolve attempts before giving up. */
 const MAX_RESOLVE_ATTEMPTS = 10;
 
-/** Maximum body chunk size emitted to OTLP logs. */
 const BODY_OTLP_CHUNK_SIZE = 16_000;
-/** Maximum redacted body bytes persisted per capture entry. */
-const MAX_CAPTURED_BODY_BYTES = 1024 * 1024;
-const BODY_TRUNCATION_MARKER = "\n...[TRUNCATED]";
 
-const gzip = promisify(gzipCallback);
-
-/** Headers whose values must always be redacted. */
-const SENSITIVE_HEADER_NAMES = new Set([
-  "authorization",
-  "proxy-authorization",
-  "x-api-key",
-  "cookie",
-  "set-cookie",
-]);
-
-/** Pattern that matches header names likely to contain secrets. */
-const SENSITIVE_HEADER_PATTERN = /token|secret|key|password|credential/i;
-
-/** JSON keys whose values should be redacted in request/response bodies. */
-const SENSITIVE_BODY_KEYS =
-  /("(?:password|access_token|refresh_token|api_key|apiKey|secret|authorization|token|credential|x-api-key)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
-
+/**
+ * Initialize private request logs and preserve required lifecycle admission on startup failures.
+ */
 export function initRequestLogger(
   enabled: boolean = true,
   customLogsDir?: string,
@@ -219,7 +226,10 @@ export function initRequestLogger(
   } catch (err) {
     logEnabled = false;
     logDir = null;
-    configureProxyLifecycleLogger({ enabled: false });
+    configureProxyLifecycleLogger({
+      enabled: true,
+      logDir: customLogsDir ?? join(homedir(), ".neurolink", "logs"),
+    });
     logger.warn(
       `[proxy] Request logging disabled — failed to create log directory: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -442,157 +452,21 @@ export function getLogDir(): string | null {
 /**
  * Redact sensitive header values in-place.
  */
-function redactHeaders(
-  headers: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-  if (!headers) {
-    return headers;
-  }
-  const redacted: Record<string, string> = {};
-  for (const [key, value] of Object.entries(headers)) {
-    const lower = key.toLowerCase();
-    if (
-      SENSITIVE_HEADER_NAMES.has(lower) ||
-      SENSITIVE_HEADER_PATTERN.test(lower)
-    ) {
-      redacted[key] = "[REDACTED]";
-    } else {
-      redacted[key] = value;
-    }
-  }
-  return redacted;
-}
-
-function serializeBody(body: unknown): string | undefined {
-  if (body === undefined || body === null) {
-    return undefined;
-  }
-  return typeof body === "string" ? body : JSON.stringify(body);
-}
-
-/**
- * Redact sensitive keys from a JSON body string without truncation.
- */
-function redactBody(body: unknown): string | undefined {
-  const str = serializeBody(body);
-  if (str === undefined) {
-    return undefined;
-  }
-  return str.replace(SENSITIVE_BODY_KEYS, '$1"[REDACTED]"');
-}
-
-function sanitizePhase(phase: string): string {
-  return phase.replace(/[^a-zA-Z0-9._-]+/g, "_");
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function utf8ByteLength(value: string): number {
-  return Buffer.byteLength(value, "utf8");
-}
-
-function truncateUtf8String(
-  input: string,
-  maxBytes: number,
-  marker: string = BODY_TRUNCATION_MARKER,
-): { value: string; bytes: number; truncated: boolean } {
-  const inputBytes = utf8ByteLength(input);
-  if (inputBytes <= maxBytes) {
-    return { value: input, bytes: inputBytes, truncated: false };
-  }
-
-  const markerBytes = utf8ByteLength(marker);
-  if (maxBytes <= markerBytes) {
-    return { value: marker, bytes: markerBytes, truncated: true };
-  }
-
-  let value = "";
-  let bytes = 0;
-  for (const char of input) {
-    const charBytes = utf8ByteLength(char);
-    if (bytes + charBytes + markerBytes > maxBytes) {
-      break;
-    }
-    value += char;
-    bytes += charBytes;
-  }
-
-  const truncatedValue = `${value}${marker}`;
-  return {
-    value: truncatedValue,
-    bytes: utf8ByteLength(truncatedValue),
-    truncated: true,
-  };
-}
-
-function splitUtf8StringByBytes(input: string, maxBytes: number): string[] {
-  if (!input) {
-    return [""];
-  }
-
-  const chunks: string[] = [];
-  let currentChunk = "";
-  let currentBytes = 0;
-
-  for (const char of input) {
-    const charBytes = utf8ByteLength(char);
-    if (currentChunk && currentBytes + charBytes > maxBytes) {
-      chunks.push(currentChunk);
-      currentChunk = char;
-      currentBytes = charBytes;
-      continue;
-    }
-
-    currentChunk += char;
-    currentBytes += charBytes;
-  }
-
-  if (currentChunk) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks;
-}
-
-function prepareRedactedBody(body: unknown): {
-  value?: string;
-  bytes?: number;
-  truncated: boolean;
-} {
-  const redacted = redactBody(body);
-  if (redacted === undefined) {
-    return { truncated: false };
-  }
-
-  return truncateUtf8String(redacted, MAX_CAPTURED_BODY_BYTES);
-}
-
-/** Shared redaction used by offline replay exports and direct comparisons. */
 export function redactProxyHeadersForLogging(
   headers: Record<string, string> | undefined,
-): Record<string, string> | undefined {
+) {
   return redactHeaders(headers);
 }
-
-/**
- * Apply the same bounded body redaction used by persisted proxy captures.
- * `value` and `bytes` are omitted only when the input is null or undefined.
- * This performs serialization immediately, so callers must keep it off proxy
- * hot paths unless body processing has already been explicitly requested.
- */
-export function prepareProxyBodyForLogging(body: unknown): {
-  value?: string;
-  bytes?: number;
-  truncated: boolean;
-} {
+/** Return a redacted body representation suitable for persisted request diagnostics. */
+export function prepareProxyBodyForLogging(body: unknown) {
   return prepareRedactedBody(body);
 }
 
+/** Enumerate recognized proxy journals and body artifacts for retention accounting. */
 function collectManagedLogFiles(rootDir: string): ManagedLogFile[] {
   const managedFiles: ManagedLogFile[] = [];
 
+  /** Collect file sizes and modification times while descending the log directory. */
   const walk = (directory: string): void => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const entryPath = join(directory, entry.name);
@@ -603,7 +477,9 @@ function collectManagedLogFiles(rootDir: string): ManagedLogFile[] {
 
       const isTopLevelProxyLog =
         directory === rootDir &&
-        /^proxy(?:-attempts|-debug|-lifecycle)?-.*\.jsonl$/.test(entry.name);
+        /^proxy(?:-attempts|-debug|-lifecycle|-supervisor)?-.*\.jsonl$/.test(
+          entry.name,
+        );
       const isBodyArtifact =
         entry.name.endsWith(".json.gz") &&
         entryPath.includes(`${join(rootDir, "bodies")}`);
@@ -650,68 +526,13 @@ function pruneEmptyDirectories(directory: string, stopAt: string): void {
   }
 }
 
-async function writeBodyArtifact(
-  entry: ProxyBodyCaptureEntry,
-  redactedHeaders: Record<string, string> | undefined,
-  redactedBody: string | undefined,
-  bodyTruncated: boolean,
-): Promise<StoredBodyArtifact> {
-  if (!logDir || redactedBody === undefined) {
-    return {};
-  }
-
-  const dateStr = new Date(entry.timestamp).toISOString().split("T")[0];
-  const bodyDir = join(logDir, "bodies", dateStr, entry.requestId);
-  if (!existsSync(bodyDir)) {
-    mkdirSync(bodyDir, { recursive: true, mode: 0o700 });
-  }
-  chmodSync(bodyDir, 0o700);
-
-  const fileName =
-    `${Date.now()}-${sanitizePhase(entry.phase)}` +
-    (entry.attempt !== undefined ? `-attempt-${entry.attempt}` : "") +
-    `.json.gz`;
-  const bodyPath = join(bodyDir, fileName);
-  const payload = JSON.stringify({
-    timestamp: entry.timestamp,
-    requestId: entry.requestId,
-    phase: entry.phase,
-    model: entry.model,
-    stream: entry.stream,
-    account: entry.account,
-    accountType: entry.accountType,
-    attempt: entry.attempt,
-    responseStatus: entry.responseStatus,
-    durationMs: entry.durationMs,
-    contentType: entry.contentType,
-    headers: redactedHeaders,
-    body: redactedBody,
-    traceId: entry.traceId,
-    spanId: entry.spanId,
-    metadata: entry.metadata,
-  });
-  const compressed = await gzip(payload);
-  await writeFile(bodyPath, compressed, {
-    mode: 0o600,
-    signal: AbortSignal.timeout(REQUEST_LOG_IO_TIMEOUT_MS),
-  });
-
-  return {
-    bodyPath,
-    bodySha256: sha256(redactedBody),
-    redactedBodyBytes: utf8ByteLength(redactedBody),
-    storedFileBytes: compressed.byteLength,
-    redactedBody,
-    bodyTruncated,
-  };
-}
-
+/** Publish redacted UTF-8 chunks, yielding between groups to keep requests responsive. */
 function emitOtlpBodyLogRecord(
   entry: ProxyBodyCaptureEntry,
   stored: StoredBodyArtifact,
-): void {
-  resolveLoggerProvider()
-    .then((provider) => {
+): Promise<void> {
+  return resolveLoggerProvider()
+    .then(async (provider) => {
       if (!provider || stored.redactedBody === undefined) {
         return;
       }
@@ -724,6 +545,9 @@ function emitOtlpBodyLogRecord(
       const totalChunks = Math.max(1, chunks.length);
 
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        if (chunkIndex > 0 && chunkIndex % 4 === 0) {
+          await yieldToRequests();
+        }
         const chunk = chunks[chunkIndex] ?? "";
 
         otelLogger.emit({
@@ -778,6 +602,7 @@ function emitOtlpBodyLogRecord(
     });
 }
 
+/** Capture an owned request body with bounded processing and tracked index/export publication. */
 export async function logBodyCapture(
   entry: ProxyBodyCaptureEntry,
 ): Promise<void> {
@@ -797,81 +622,74 @@ export async function logBodyCapture(
     entry.traceId && entry.spanId
       ? { traceId: entry.traceId, spanId: entry.spanId }
       : bridge.getCurrentTraceContext();
-  const redactedHeaders = redactHeaders(entry.headers);
-  const preparedBody = prepareRedactedBody(entry.body);
+  const destination = logDir;
+  // Publication callbacks retain metadata and the bounded redacted result,
+  // never the original unbounded body while a sink is slow.
+  const metadata = { ...entry, body: undefined };
+  /** Persist the processed capture index and publish its redacted body before releasing capacity. */
+  const consume = async (
+    processed: ProcessedProxyBodyCapture,
+  ): Promise<void> => {
+    const redactedHeaders = processed.headers;
+    const stored = processed.stored;
 
-  let stored: StoredBodyArtifact;
-  try {
-    stored = await trackLogOperation(
-      writeBodyArtifact(
-        entry,
-        redactedHeaders,
-        preparedBody.value,
-        preparedBody.truncated,
-      ),
-    );
-  } catch (writeError) {
-    logger.warn(
-      "[RequestLogger] writeBodyArtifact failed, falling back to in-memory body for OTLP",
-      { error: writeError },
-    );
-    stored = {
-      redactedBody: preparedBody.value,
-      redactedBodyBytes: preparedBody.bytes,
-      bodyTruncated: preparedBody.truncated,
-      bodyWriteFailed: true,
+    const dateStr = new Date(metadata.timestamp).toISOString().split("T")[0];
+    const logFile = join(destination, `proxy-debug-${dateStr}.jsonl`);
+    const indexEntry: Record<string, unknown> = {
+      timestamp: metadata.timestamp,
+      type: "body_capture",
+      requestId: metadata.requestId,
+      phase: metadata.phase,
+      model: metadata.model,
+      stream: metadata.stream,
+      headers: redactedHeaders,
+      contentType: metadata.contentType,
+      responseStatus: metadata.responseStatus,
+      durationMs: metadata.durationMs,
+      account: metadata.account,
+      accountType: metadata.accountType,
+      attempt: metadata.attempt,
+      bodyPath: stored.bodyPath,
+      bodySha256: stored.bodySha256,
+      observedBodyBytes: metadata.bodySize,
+      redactedBodyBytes: stored.redactedBodyBytes,
+      storedFileBytes: stored.storedFileBytes,
+      bodyTruncated: stored.bodyTruncated,
+      bodyWriteFailed: stored.bodyWriteFailed,
+      captureError: processed.error,
+      captureQueueWaitMs: processed.queueWaitMs,
+      captureProcessingMs: processed.processingMs,
+      metadata: processed.error ? undefined : metadata.metadata,
     };
-  }
 
-  const dateStr = new Date(entry.timestamp).toISOString().split("T")[0];
-  const logFile = join(logDir, `proxy-debug-${dateStr}.jsonl`);
-  const indexEntry: Record<string, unknown> = {
-    timestamp: entry.timestamp,
-    type: "body_capture",
-    requestId: entry.requestId,
-    phase: entry.phase,
-    model: entry.model,
-    stream: entry.stream,
-    headers: redactedHeaders,
-    contentType: entry.contentType,
-    responseStatus: entry.responseStatus,
-    durationMs: entry.durationMs,
-    account: entry.account,
-    accountType: entry.accountType,
-    attempt: entry.attempt,
-    bodyPath: stored.bodyPath,
-    bodySha256: stored.bodySha256,
-    observedBodyBytes: entry.bodySize,
-    redactedBodyBytes: stored.redactedBodyBytes ?? preparedBody.bytes,
-    storedFileBytes: stored.storedFileBytes,
-    bodyTruncated: stored.bodyTruncated ?? preparedBody.truncated,
-    bodyWriteFailed: stored.bodyWriteFailed,
-    metadata: entry.metadata,
-  };
+    if (traceCtx) {
+      indexEntry.traceId = traceCtx.traceId;
+      indexEntry.spanId = traceCtx.spanId;
+    }
 
-  if (traceCtx) {
-    indexEntry.traceId = traceCtx.traceId;
-    indexEntry.spanId = traceCtx.spanId;
-  }
+    try {
+      await appendMetadataRecord(
+        logFile,
+        JSON.stringify(indexEntry) + "\n",
+        "debug",
+        { waitForPersistence: true },
+      );
+    } catch {
+      // Non-fatal
+    }
 
-  try {
-    await appendMetadataRecord(
-      logFile,
-      JSON.stringify(indexEntry) + "\n",
-      "debug",
+    // Emission yields between chunk groups. Keep it in the shutdown flush set
+    // so an exporter flush cannot race unfinished body-log publication.
+    await emitOtlpBodyLogRecord(
+      {
+        ...metadata,
+        traceId: traceCtx?.traceId ?? metadata.traceId,
+        spanId: traceCtx?.spanId ?? metadata.spanId,
+      },
+      stored,
     );
-  } catch {
-    // Non-fatal
-  }
-
-  emitOtlpBodyLogRecord(
-    {
-      ...entry,
-      traceId: traceCtx?.traceId ?? entry.traceId,
-      spanId: traceCtx?.spanId ?? entry.spanId,
-    },
-    stored,
-  );
+  };
+  return trackLogOperation(captureProxyBody(entry, destination, consume));
 }
 
 /**
@@ -1014,9 +832,13 @@ export function cleanupLogsAt(
   ); // oldest first
   const currentDate = new Date().toISOString().split("T")[0];
   const currentMetadataLogs = new Set(
-    ["proxy", "proxy-attempts", "proxy-debug", "proxy-lifecycle"].map(
-      (prefix) => join(activeLogDir, `${prefix}-${currentDate}.jsonl`),
-    ),
+    [
+      "proxy",
+      "proxy-attempts",
+      "proxy-debug",
+      "proxy-lifecycle",
+      "proxy-supervisor",
+    ].map((prefix) => join(activeLogDir, `${prefix}-${currentDate}.jsonl`)),
   );
   const canDelete = (file: ManagedLogFile) =>
     !currentMetadataLogs.has(file.path);

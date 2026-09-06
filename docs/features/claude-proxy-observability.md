@@ -316,9 +316,15 @@ write failures are exposed separately. A bounded shutdown flush may fail while
 writes remain pending; a successful flush alone does not prove that every record
 was written. Check drop and uncertainty counters too.
 
-These are buffered, best-effort local files, without per-record `fsync` or a
-transaction across log files. A killed process, power loss, retention, disk
-failure, or overlapping workers can leave gaps or malformed records. Counters
+When lifecycle logging is enabled, the HTTP adapter confirms the admission
+append before dispatching upstream. It waits for that record, not for all later
+traffic, with a two-second deadline. Failure returns HTTP 503 with local error
+code `PROXY_TELEMETRY_UNAVAILABLE`; it does not send an unrecorded provider request.
+A timed-out append can still complete later and is never replayed. Explicitly
+disabling logging disables this barrier. Confirmed appends survive serving-process
+death, but these files have no per-record `fsync` or transaction across log files.
+Power loss, retention, disk failure, and unconfirmed terminal tails remain
+possible. Counters
 are worker-local and reset on restart. They do not prove delivery to an OTEL
 collector or OpenObserve. Exporter/backend health must be checked separately.
 
@@ -337,12 +343,93 @@ record becomes `unknown`. `acceptedWithoutFinal` and `terminalWithoutFinal`
 report missing evidence, which can include active requests, interrupted workers,
 retention, or storage loss. They are not automatically provider failures.
 
+Token counting (`POST /v1/messages/count_tokens`) and model discovery
+(`GET /v1/models`, `GET /backend-api/codex/models`) have HTTP terminal outcomes
+without model final records. The analyzer identifies these as
+`lifecycle.auxiliaryRequests` and excludes them from missing-final counts. Their
+transport errors and unsuccessful HTTP statuses remain failures. They do not
+contribute model successes to `requests.success`.
+
 The time filter admits events in the selected window and follows already
 accepted requests through later retained lifecycle, attempt, and final records.
 Consequently, a request started near the window boundary can finish after
 `--until`. The observed ranges show that retained follow-up. Sequence gaps only
-measure gaps between observed sequence numbers; they cannot identify missing
+measure gaps across the selected sequence span for each worker, including
+intervening retained events belonging to requests outside the time window.
+Excluding those requests from the outcome cohort does not create a sequence gap.
+The audit cannot identify missing
 prefixes, suffixes, or an entire missing worker. Stream `completeWindow` fields
 indicate temporal coverage, not proof of lossless collection. Historical final
 records without protocol evidence retain their reported outcome; this analysis
 cannot retrospectively certify completion or reconstruct discarded error causes.
+
+### Worker incidents and host pressure
+
+The launchd supervisor writes `proxy-supervisor-YYYY-MM-DD.jsonl` independently
+of serving workers. The bounded recent-event ring is a status summary; the journal
+retains activation, failures, rejected connections, and actual worker exits past
+that ring. Exit records include the worker process-instance ID learned at readiness,
+PID, generation, version, exit code and signal. Supervisor actions are recorded
+separately from observed exits. Startup permits up to 120 seconds for a candidate;
+an existing worker keeps serving while its replacement starts.
+
+`lifecycle.unconfirmedAtWorkerExit` joins durable admissions without transport
+terminals to actual worker exits by process-instance ID. This establishes missing
+completion evidence at exit, not proof that the provider failed or that the client
+received nothing. A final provider record alone cannot prove client delivery.
+Older workers that do not report an instance ID remain unclassified.
+
+Every ten seconds, enabled journals record `runtime_sample`: actual sample duration,
+process CPU as a percentage of one core, RSS, heap, event-loop delay p99/max, host
+one-minute load average, and available CPU parallelism. Delayed sampling includes
+the extended interval. `proxy analyze` reports maxima in `runtime`; host load is
+never interpreted as a request count or a provider rate limit. Compare these
+samples with admission, first-output and attempt timings in the same interval.
+
+Socket offer and commit each get their own deadline. An offer timeout cancels an
+uncommitted connection. A commit timeout closes only that connection, whose dispatch
+is uncertain, and requests a replacement before draining existing streams. Neither
+path kills a serving worker because one handoff failed, and neither replays the
+socket. Replacements remain bounded by the existing candidate/draining limits and
+one-minute stall cooldown. Actual worker exits use the normal recovery backoff.
+
+### Bounded body capture
+
+Bulk body serialization, redaction, hashing, compression and artifact writes run
+in a separate worker thread. The queue admits at most 16 captures and 32 MiB of
+estimated clone data, with an 8 MiB per-entry ceiling and a 20-second deadline.
+The estimate conservatively accounts for UTF-8 strings and object traversal;
+oversized or unsupported values are explicitly rejected. Persisted redacted
+bodies retain the 1 MiB cap and UTF-8 boundaries. Borrowed traffic still excludes
+body capture.
+
+`observability.requestLogs.bodyCapture` reconciles:
+
+```text
+attempted = completed + failed + rejected + pending
+```
+
+Debug indexes include `bodyWriteFailed`, `captureError`, `captureQueueWaitMs`, and
+`captureProcessingMs`. Queue rejection and worker errors never fall back to bulk
+serialization on the serving thread. A worker crash can leave an orphan artifact;
+it does not turn a missing index into a successful capture. Regular retention
+cleans both indexed and orphan artifacts.
+
+OTLP body chunks remain compatible with existing dashboards. Chunk construction
+uses byte slices, emission yields between groups, and exporter batches are limited
+to 64 records (approximately 1 MiB of body text). OTLP remains a separate,
+best-effort export; local append counters do not certify backend delivery.
+
+Native Codex final errors retain the final attempt's transport code and account.
+Only explicit pre-connect transport failures may rotate automatically. EPIPE,
+socket resets and generic timeouts can occur after POST dispatch, so they are
+terminal instead of silently replaying potentially executed work.
+
+Request-log shutdown uses a 30-second flush budget, covering the body worker's
+20-second deadline plus index and export publication. Storage failures can still
+leave explicitly unconfirmed writes after that deadline. Existing log directories
+are hardened to mode `0700` before lifecycle recording is enabled; failure keeps
+admission required and rejects dispatch with `PROXY_TELEMETRY_UNAVAILABLE`.
+Current-day supervisor journals are protected by the same retention rule as other
+active metadata logs. Sensitive JSON keys are redacted at every nesting level
+regardless of whether their values are strings, numbers, arrays, or objects.

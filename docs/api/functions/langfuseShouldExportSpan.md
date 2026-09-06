@@ -8,7 +8,7 @@
 
 > **langfuseShouldExportSpan**(`__namedParameters`): `boolean`
 
-Defined in: [services/server/ai/observability/instrumentation.ts:773](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L773)
+Defined in: [services/server/ai/observability/instrumentation.ts:779](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L779)
 
 Drop-in `shouldExportSpan` predicate for a `LangfuseSpanProcessor` that
 filters out NeuroLink internal wrapper spans.

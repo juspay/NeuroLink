@@ -22,7 +22,7 @@ import "dotenv/config";
 
 import assert from "node:assert/strict";
 import type { NeuroLink } from "../dist/index.js";
-import { defineSuite } from "./helpers/harness.js";
+import { defineSuite, runCommand } from "./helpers/harness.js";
 import {
   startMockChatServer,
   mockOpenAICredentials,
@@ -169,5 +169,34 @@ for (const mode of ["generate", "stream"] as const) {
     }
   });
 }
+
+await test("browser artifact supplies callback timers when Node immediates are absent", async () => {
+  const script = `
+    import assert from "node:assert/strict";
+    process.on("unhandledRejection", (error) => {
+      console.error(String(error?.message ?? error));
+      process.exitCode = 1;
+    });
+    delete globalThis.setImmediate;
+    delete globalThis.clearImmediate;
+    await import(${JSON.stringify(bundleURL.href)});
+    const value = await new Promise((resolve) => setImmediate(resolve, 42));
+    assert.equal(value, 42);
+    let fired = false;
+    const handle = setImmediate(() => { fired = true; });
+    clearImmediate(handle);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fired, false);
+  `;
+  const result = await runCommand(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    { timeoutMs: 30_000 },
+  );
+  if (result.exitCode !== 0) {
+    console.error(result.stderr);
+  }
+  assert.equal(result.exitCode, 0, "browser timer fixture failed");
+});
 
 await runSuite();

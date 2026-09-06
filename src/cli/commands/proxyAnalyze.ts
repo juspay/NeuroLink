@@ -13,6 +13,10 @@ function formatLatency(label: string, summary: ProxyLatencySummary): string {
   return `${label.padEnd(22)} ${String(summary.count).padStart(7)} ${value(summary.p50).padStart(9)} ${value(summary.p95).padStart(9)} ${value(summary.p99).padStart(9)} ${value(summary.max).padStart(9)}`;
 }
 
+/**
+ * Render the offline evidence report without converting missing outcomes
+ * into inferred success.
+ */
 function printAnalysis(
   report: Awaited<ReturnType<typeof analyzeProxyLogs>>,
 ): void {
@@ -58,9 +62,14 @@ function printAnalysis(
   }
   logger.always(
     report.coverage.lifecycle
-      ? `    Lifecycle: ${report.lifecycle.accepted} accepted, ${report.lifecycle.terminal} terminal, ${report.lifecycle.unsettled} unsettled`
+      ? `    Lifecycle: ${report.lifecycle.accepted} accepted (${report.lifecycle.auxiliaryRequests} auxiliary), ${report.lifecycle.terminal} terminal, ${report.lifecycle.unsettled} unsettled (${report.lifecycle.unconfirmedAtWorkerExit.length} unconfirmed at worker exit)`
       : chalk.yellow("    Lifecycle: unavailable (no lifecycle metadata)"),
   );
+  if (report.runtime.samples > 0) {
+    logger.always(
+      `    Runtime: ${report.runtime.samples} samples, max event-loop delay ${report.runtime.maxEventLoopDelayMs ?? "unknown"}ms, max CPU ${report.runtime.maxCpuPercentOneCore?.toFixed(1) ?? "unknown"}% of one core, max host load ${report.runtime.maxHostLoad1m ?? "unknown"}`,
+    );
+  }
   if (report.coverage.attempts) {
     const finalRateLimits = report.coverage.finalRequests
       ? `${report.requests.finalRateLimits} final`

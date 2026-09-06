@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
+import { isProxyAuxiliaryRequest } from "./proxyRequestKind.js";
 import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { createInterface } from "node:readline";
@@ -29,12 +30,15 @@ import {
   isExactPricingMatch,
 } from "../utils/pricing.js";
 
-const LIFECYCLE_FILE_PATTERN = /^proxy-lifecycle-\d{4}-\d{2}-\d{2}\.jsonl$/;
+const LIFECYCLE_FILE_PATTERN =
+  /^proxy-(?:lifecycle|supervisor)-\d{4}-\d{2}-\d{2}\.jsonl$/;
 const REQUEST_FILE_PATTERN = /^proxy-\d{4}-\d{2}-\d{2}\.jsonl$/;
 const ATTEMPT_FILE_PATTERN = /^proxy-attempts-\d{4}-\d{2}-\d{2}\.jsonl$/;
 const DEBUG_FILE_PATTERN = /^proxy-debug-\d{4}-\d{2}-\d{2}\.jsonl$/;
 const ARTIFACT_STAT_CONCURRENCY = 64;
 const LIFECYCLE_EVENTS = new Set([
+  "runtime_sample",
+  "supervisor_event",
   "request_accepted",
   "response_headers",
   "response_first_chunk",
@@ -753,6 +757,7 @@ export async function analyzeProxyLogs(
   let malformedLines = 0;
   let unsupportedLifecycleLines = 0;
   const accepted = new Set<string>();
+  const auxiliaryRequests = new Set<string>();
   const headers = new Set<string>();
   const firstChunks = new Set<string>();
   const terminal = new Set<string>();
@@ -763,23 +768,43 @@ export async function analyzeProxyLogs(
   const firstChunkLatencyByRequest = new Map<string, number>();
   const terminalLatencyByRequest = new Map<string, number>();
   const sequences = new Map<string, number[]>();
+  const selectedSequenceRanges = new Map<
+    string,
+    { min: number; max: number }
+  >();
   const seenLifecycleEvents = new Map<string, Record<string, unknown>>();
   let conflictingLifecycleDuplicates = 0;
   const conflictedRequests = new Set<string>();
   const terminalRecords = new Map<string, Record<string, unknown>>();
+  const acceptedWorkers = new Map<string, string>();
+  const admittedWorkerIds = new Set<string>();
+  const conflictedWorkerExits = new Set<string>();
+  const conflictingIdentities = new Set<string>();
+  const runtimeRecords = new Map<string, Record<string, unknown>>();
+  const workerExits = new Map<string, Record<string, unknown>>();
+  const runtime: ProxyAnalysisReport["runtime"] = {
+    samples: 0,
+    maxEventLoopDelayMs: null,
+    maxRssBytes: null,
+    maxCpuPercentOneCore: null,
+    maxHostLoad1m: null,
+  };
 
   for (const filePath of lifecycleFiles) {
     linesRead += await readJsonLines(
       filePath,
       (record) => {
-        const timestamp = observeTimestamp("lifecycle", record);
+        const operational =
+          record.event === "runtime_sample" ||
+          record.event === "supervisor_event";
+        const operationalTimestamp = Date.parse(String(record.timestamp));
+        const timestamp = operational
+          ? Number.isFinite(operationalTimestamp)
+            ? operationalTimestamp
+            : null
+          : observeTimestamp("lifecycle", record);
         const requestId = stringValue(record.requestId);
-        if (
-          timestamp === null ||
-          !requestId ||
-          (!accepted.has(requestId) &&
-            (timestamp < sinceMs || timestamp > untilMs))
-        ) {
+        if (timestamp === null || !requestId) {
           return;
         }
         const event = stringValue(record.event);
@@ -789,7 +814,12 @@ export async function analyzeProxyLogs(
           !LIFECYCLE_EVENTS.has(event) ||
           !requestId
         ) {
-          unsupportedLifecycleLines += 1;
+          if (
+            accepted.has(requestId) ||
+            (timestamp >= sinceMs && timestamp <= untilMs)
+          ) {
+            unsupportedLifecycleLines += 1;
+          }
           return;
         }
         const processId = stringValue(record.processInstanceId);
@@ -798,11 +828,46 @@ export async function analyzeProxyLogs(
           const values = sequences.get(processId) ?? [];
           values.push(sequence);
           sequences.set(processId, values);
+        }
+        const details =
+          record.supervisorEvent && typeof record.supervisorEvent === "object"
+            ? (record.supervisorEvent as Record<string, unknown>)
+            : undefined;
+        const exitedWorkerId = stringValue(details?.workerProcessInstanceId);
+        const relatedExit =
+          event === "supervisor_event" &&
+          details?.type === "worker_exit" &&
+          exitedWorkerId &&
+          admittedWorkerIds.has(exitedWorkerId);
+        // Audit intervening sequences before selecting the request cohort.
+        if (
+          !accepted.has(requestId) &&
+          !relatedExit &&
+          (timestamp < sinceMs || timestamp > untilMs)
+        ) {
+          return;
+        }
+        if (processId && sequence !== null && Number.isInteger(sequence)) {
+          const range = selectedSequenceRanges.get(processId);
+          selectedSequenceRanges.set(processId, {
+            min: Math.min(range?.min ?? sequence, sequence),
+            max: Math.max(range?.max ?? sequence, sequence),
+          });
           const identity = `${processId}:${sequence}`;
           const previous = seenLifecycleEvents.get(identity);
           if (previous) {
             if (!isDeepStrictEqual(previous, record)) {
               conflictingLifecycleDuplicates += 1;
+              conflictingIdentities.add(identity);
+              for (const copy of [previous, record]) {
+                const detail = copy.supervisorEvent as
+                  | Record<string, unknown>
+                  | undefined;
+                const workerId = stringValue(detail?.workerProcessInstanceId);
+                if (workerId) {
+                  conflictedWorkerExits.add(workerId);
+                }
+              }
               conflictedRequests.add(requestId);
               const previousRequestId = stringValue(previous.requestId);
               if (previousRequestId) {
@@ -813,9 +878,47 @@ export async function analyzeProxyLogs(
           }
           seenLifecycleEvents.set(identity, record);
         }
+
+        if (event === "runtime_sample") {
+          if (
+            record.runtimeSample &&
+            typeof record.runtimeSample === "object" &&
+            processId &&
+            sequence !== null
+          ) {
+            runtimeRecords.set(
+              `${processId}:${sequence}`,
+              record.runtimeSample as Record<string, unknown>,
+            );
+          }
+          return;
+        }
+        if (event === "supervisor_event") {
+          if (details?.type === "worker_exit" && exitedWorkerId) {
+            const exit = { ...details, at: record.timestamp };
+            const previous = workerExits.get(exitedWorkerId);
+            if (previous && !isDeepStrictEqual(previous, exit)) {
+              conflictedWorkerExits.add(exitedWorkerId);
+            }
+            workerExits.set(exitedWorkerId, exit);
+          }
+          return;
+        }
+        if (
+          isProxyAuxiliaryRequest(
+            stringValue(record.method) ?? "",
+            stringValue(record.path) ?? "",
+          )
+        ) {
+          auxiliaryRequests.add(requestId);
+        }
         const elapsed = finiteNumber(record.elapsedMs);
         if (event === "request_accepted") {
           accepted.add(requestId);
+          if (processId) {
+            acceptedWorkers.set(requestId, processId);
+            admittedWorkerIds.add(processId);
+          }
         } else if (event === "response_headers") {
           if (headers.has(requestId)) {
             return;
@@ -861,6 +964,26 @@ export async function analyzeProxyLogs(
     );
   }
 
+  for (const [identity, sample] of runtimeRecords) {
+    if (conflictingIdentities.has(identity)) {
+      continue;
+    }
+    runtime.samples += 1;
+    const mapping = {
+      maxEventLoopDelayMs: "eventLoopDelayMaxMs",
+      maxRssBytes: "rssBytes",
+      maxCpuPercentOneCore: "cpuPercentOneCore",
+      maxHostLoad1m: "hostLoad1m",
+    } as const;
+    for (const [key, source] of Object.entries(mapping)) {
+      const value = finiteNumber(sample[source]);
+      if (value !== null && value >= 0) {
+        const target = key as keyof typeof mapping;
+        runtime[target] = Math.max(runtime[target] ?? value, value);
+      }
+    }
+  }
+
   // Contradictory copies are not reliable latency samples. Keep their data
   // quality count, but do not choose one timing arbitrarily.
   const verifiedLatencies = (values: Map<string, number>): number[] =>
@@ -873,7 +996,14 @@ export async function analyzeProxyLogs(
 
   let lifecycleSequenceGaps = 0;
   let lifecycleSequenceDuplicates = 0;
-  for (const values of sequences.values()) {
+  for (const [processId, allValues] of sequences) {
+    const range = selectedSequenceRanges.get(processId);
+    if (!range) {
+      continue;
+    }
+    const values = allValues.filter(
+      (value) => value >= range.min && value <= range.max,
+    );
     values.sort((a, b) => a - b);
     for (let index = 1; index < values.length; index += 1) {
       const difference = values[index] - values[index - 1];
@@ -1127,6 +1257,9 @@ export async function analyzeProxyLogs(
   for (const [requestId, record] of terminalRecords) {
     const final = finalRequests.get(requestId);
     const recorded = stringValue(record.terminalOutcome) ?? "unknown";
+    const auxiliaryTransport = auxiliaryRequests.has(requestId)
+      ? (stringValue(record.transportOutcome) ?? recorded)
+      : null;
     const resolved = final
       ? final.status === 499 || final.errorType === "client_cancelled"
         ? "client_cancelled"
@@ -1136,11 +1269,20 @@ export async function analyzeProxyLogs(
           : final.status >= 400 || final.errorType
             ? "handler_error"
             : "completed"
-      : conflictedRequests.has(requestId) ||
-          recorded === "completed" ||
-          recorded === "bodyless"
-        ? "unknown"
-        : recorded;
+      : auxiliaryTransport && !conflictedRequests.has(requestId)
+        ? auxiliaryTransport === "completed" ||
+          auxiliaryTransport === "bodyless"
+          ? finiteNumber(record.responseStatus) === null
+            ? "unknown"
+            : Number(record.responseStatus) >= 400
+              ? "handler_error"
+              : auxiliaryTransport
+          : auxiliaryTransport
+        : conflictedRequests.has(requestId) ||
+            recorded === "completed" ||
+            recorded === "bodyless"
+          ? "unknown"
+          : recorded;
     if (
       final &&
       recorded !== resolved &&
@@ -1269,10 +1411,12 @@ export async function analyzeProxyLogs(
       conflictingLifecycleDuplicates,
       duplicateAttempts,
       finalOutcomeConflicts,
-      acceptedWithoutFinal: [...accepted].filter((id) => !finalRequests.has(id))
-        .length,
-      terminalWithoutFinal: [...terminal].filter((id) => !finalRequests.has(id))
-        .length,
+      acceptedWithoutFinal: [...accepted].filter(
+        (id) => !finalRequests.has(id) && !auxiliaryRequests.has(id),
+      ).length,
+      terminalWithoutFinal: [...terminal].filter(
+        (id) => !finalRequests.has(id) && !auxiliaryRequests.has(id),
+      ).length,
       streams: Object.fromEntries(
         Object.entries(observedRanges).map(([stream, range]) => [
           stream,
@@ -1302,8 +1446,37 @@ export async function analyzeProxyLogs(
         absent: absentRoutingDecisions,
       },
     },
+    runtime,
     lifecycle: {
+      unconfirmedAtWorkerExit: [...accepted].flatMap((requestId) => {
+        const workerProcessInstanceId = acceptedWorkers.get(requestId);
+        const exit = workerProcessInstanceId
+          ? workerExits.get(workerProcessInstanceId)
+          : undefined;
+        if (
+          !exit ||
+          !workerProcessInstanceId ||
+          conflictedWorkerExits.has(workerProcessInstanceId) ||
+          terminal.has(requestId) ||
+          conflictedRequests.has(requestId)
+        ) {
+          return [];
+        }
+        return [
+          {
+            requestId,
+            workerProcessInstanceId,
+            at: String(exit.at),
+            workerExitCode: finiteNumber(exit.workerExitCode),
+            workerExitSignal: stringValue(exit.workerExitSignal),
+            // A provider final cannot prove the client received the entire body.
+            providerFinalRecorded: finalRequests.has(requestId),
+          },
+        ];
+      }),
       accepted: accepted.size,
+      auxiliaryRequests: [...accepted].filter((id) => auxiliaryRequests.has(id))
+        .length,
       headers: headers.size,
       firstChunks: firstChunks.size,
       terminal: terminal.size,

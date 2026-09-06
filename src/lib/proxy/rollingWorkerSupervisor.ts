@@ -10,9 +10,12 @@ import type {
   TransferableProxySocket,
 } from "../types/index.js";
 import { ErrorFactory } from "../utils/errorHandling.js";
-import { PROXY_SOCKET_OFFER_TIMEOUT } from "./rollingWorkerProtocol.js";
+import {
+  PROXY_SOCKET_OFFER_TIMEOUT,
+  PROXY_SOCKET_COMMIT_TIMEOUT,
+} from "./rollingWorkerProtocol.js";
 
-const DEFAULT_READY_TIMEOUT_MS = 30_000;
+const DEFAULT_READY_TIMEOUT_MS = 120_000;
 const DEFAULT_SOCKET_QUEUE_LIMIT = 1_024;
 const DEFAULT_SOCKET_QUEUE_TIMEOUT_MS = 30_000;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
@@ -144,10 +147,14 @@ export class RollingWorkerSupervisor {
     return this.replacement;
   }
 
+  /**
+   * Admit a paused socket to the active generation or the bounded
+   * readiness queue.
+   */
   acceptSocket(socket: TransferableProxySocket): void {
     socket.pause();
     if (this.closed) {
-      this.rejectSocket(socket);
+      this.rejectSocket(socket, undefined, undefined, "supervisor_closed");
       return;
     }
     if (
@@ -162,9 +169,13 @@ export class RollingWorkerSupervisor {
     this.flushQueuedSockets();
   }
 
+  /**
+   * Retain a socket only within the queue capacity and deadline, recording
+   * classified rejection.
+   */
   private queueSocket(socket: TransferableProxySocket): void {
     if (this.queuedSockets.length >= this.options.socketQueueLimit) {
-      this.rejectSocket(socket);
+      this.rejectSocket(socket, undefined, undefined, "queue_capacity");
       return;
     }
 
@@ -174,7 +185,7 @@ export class RollingWorkerSupervisor {
         const index = this.queuedSockets.indexOf(queued);
         if (index >= 0) {
           this.queuedSockets.splice(index, 1);
-          this.rejectSocket(socket);
+          this.rejectSocket(socket, undefined, undefined, "queue_timeout");
         }
       }, this.options.socketQueueTimeoutMs),
     };
@@ -262,10 +273,15 @@ export class RollingWorkerSupervisor {
     }
   }
 
+  /**
+   * Validate candidate readiness and activation while preserving an
+   * independent listener for actual exit.
+   */
   private spawnCandidate(
     expectedVersion: string,
   ): Promise<RollingWorkerSupervisorSnapshot> {
     const generation = ++this.generation;
+    let workerProcessInstanceId: string | undefined;
     let handle: RollingWorkerHandle;
     try {
       handle = this.options.spawnWorker(generation, expectedVersion);
@@ -282,6 +298,19 @@ export class RollingWorkerSupervisor {
       );
     }
 
+    // Keep this evidence listener until actual exit, even when candidate
+    // failure or a fatal message detaches the operational state listeners.
+    handle.onExit((code, signal) => {
+      this.recordEvent({
+        type: "worker_exit",
+        generation,
+        version: expectedVersion,
+        workerPid: handle.pid,
+        workerProcessInstanceId,
+        workerExitCode: code,
+        workerExitSignal: signal,
+      });
+    });
     return new Promise((resolve, reject) => {
       let settled = false;
       const finish = (
@@ -354,6 +383,7 @@ export class RollingWorkerSupervisor {
           return;
         }
         if (message.type === "proxy-worker:ready") {
+          workerProcessInstanceId = message.processInstanceId;
           if (message.version !== expectedVersion) {
             finish(
               new Error(
@@ -569,6 +599,10 @@ export class RollingWorkerSupervisor {
     }
   }
 
+  /**
+   * Cancel the affected handoff and request bounded replacement without
+   * killing unrelated streams.
+   */
   private handleTransferFailure(
     worker: RollingManagedWorker,
     socket: TransferableProxySocket,
@@ -590,13 +624,19 @@ export class RollingWorkerSupervisor {
     const cancelledOffer =
       error instanceof Error &&
       (error as NodeJS.ErrnoException).code === PROXY_SOCKET_OFFER_TIMEOUT;
-    if (cancelledOffer && this.active?.generation === worker.generation) {
+    const commitTimeout =
+      error instanceof Error &&
+      (error as NodeJS.ErrnoException).code === PROXY_SOCKET_COMMIT_TIMEOUT;
+    if (
+      !lifecycle.observedExit &&
+      this.active?.generation === worker.generation
+    ) {
       this.consecutiveOfferTimeouts += 1;
       // Persistent stalls need recovery, but keep serving existing streams
       // until a replacement activates. Avoid accumulating draining workers or
       // spawning repeatedly when the whole host is under pressure.
       if (
-        this.consecutiveOfferTimeouts >= 3 &&
+        (this.consecutiveOfferTimeouts >= 3 || !cancelledOffer) &&
         !this.candidate &&
         this.draining.size === 0 &&
         Date.now() - this.lastStallReplacementAt >= 60_000 &&
@@ -606,7 +646,11 @@ export class RollingWorkerSupervisor {
         this.options.onReplacementRequested?.({
           generation: worker.generation,
           pid: worker.handle.pid,
-          reason: "socket_offer_timeout",
+          reason: commitTimeout
+            ? "socket_commit_timeout"
+            : cancelledOffer
+              ? "socket_offer_timeout"
+              : "socket_transfer_failure",
         });
       }
     }
@@ -614,7 +658,7 @@ export class RollingWorkerSupervisor {
       worker.generation,
       worker.version,
       "transfer",
-      `worker ${worker.handle.pid} failed to accept a transferred socket: ${detail}`,
+      `worker ${worker.handle.pid} socket transfer failed: ${detail}`,
       {
         ...lifecycle.details,
         // If the error already records an exit, the supervisor did not cause
@@ -624,27 +668,15 @@ export class RollingWorkerSupervisor {
           ? "cancel_uncommitted_socket"
           : lifecycle.observedExit
             ? "none"
-            : "sigkill_after_transfer_failure",
+            : "cancel_socket_replace_before_drain",
       },
     );
     this.options.log?.(
       `[proxy-supervisor] socket transfer failed generation=${worker.generation} pid=${worker.handle.pid}: ${detail}`,
     );
-    if (
-      !cancelledOffer &&
-      this.active?.generation === worker.generation &&
-      !this.closed
-    ) {
-      this.active = null;
-      this.draining.set(worker.generation, worker);
-      if (!lifecycle.observedExit) {
-        // The child may own a duplicate of an incompletely transferred socket.
-        // SIGKILL closes its descriptor without worker-side shutdown(2), after
-        // which the parent rejects its copy rather than attempting unsafe replay.
-        worker.handle.terminate("SIGKILL");
-      }
-      this.publishState();
-    }
+    // A failed handoff is not evidence that every connection on this worker
+    // failed. Cancel only the affected socket and activate a replacement before
+    // draining existing streams. Actual exits are handled by onExit below.
     this.rejectSocket(
       socket,
       worker.generation,
@@ -653,6 +685,10 @@ export class RollingWorkerSupervisor {
     );
   }
 
+  /**
+   * Record a classified admission rejection before releasing the
+   * parent-owned socket.
+   */
   private rejectSocket(
     socket: TransferableProxySocket,
     generation: number | null = this.active?.generation ?? null,
@@ -710,6 +746,10 @@ export class RollingWorkerSupervisor {
     };
   }
 
+  /**
+   * Retain the latest failure and its observed process evidence in the
+   * incident journal.
+   */
   private recordFailure(
     generation: number,
     version: string,
@@ -731,15 +771,28 @@ export class RollingWorkerSupervisor {
       version,
       phase,
       reason: message,
+      ...details,
     });
   }
 
+  /**
+   * Publish an independent incident record and retain only a bounded
+   * recent summary.
+   */
   private recordEvent(event: Omit<RollingWorkerSupervisorEvent, "at">): void {
-    this.recentEvents.push({
+    const recorded: RollingWorkerSupervisorEvent = {
       at: new Date().toISOString(),
       ...event,
       ...(event.reason ? { reason: event.reason.slice(0, 1_000) } : {}),
-    });
+    };
+    this.recentEvents.push(recorded);
+    try {
+      this.options.onEvent?.(recorded);
+    } catch (error) {
+      this.options.log?.(
+        `[proxy-supervisor] event journal failed: ${String(error)}`,
+      );
+    }
     if (this.recentEvents.length > MAX_RECENT_SUPERVISOR_EVENTS) {
       this.recentEvents.splice(
         0,

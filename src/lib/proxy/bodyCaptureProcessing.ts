@@ -1,0 +1,287 @@
+import { join } from "node:path";
+import { mkdir, chmod, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { promisify } from "node:util";
+import { gzip as gzipCallback } from "node:zlib";
+import type {
+  ProxyBodyCaptureEntry,
+  StoredBodyArtifact,
+  ProcessedProxyBodyCapture,
+} from "../types/index.js";
+const REQUEST_LOG_IO_TIMEOUT_MS = 5_000;
+/** Maximum redacted body bytes persisted per capture entry. */
+const MAX_CAPTURED_BODY_BYTES = 1024 * 1024;
+const BODY_TRUNCATION_MARKER = "\n...[TRUNCATED]";
+
+const gzip = promisify(gzipCallback);
+
+/** Headers whose values must always be redacted. */
+const SENSITIVE_HEADER_NAMES = new Set([
+  "authorization",
+  "proxy-authorization",
+  "x-api-key",
+  "cookie",
+  "set-cookie",
+]);
+
+/** Pattern that matches header names likely to contain secrets. */
+const SENSITIVE_HEADER_PATTERN = /token|secret|key|password|credential/i;
+
+/** JSON keys whose values should be redacted in request/response bodies. */
+const SENSITIVE_BODY_KEYS =
+  /("(?:password|access_token|refresh_token|api_key|apiKey|secret|authorization|token|credential|x-api-key)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
+
+/**
+ * Copy headers while removing credential values, including custom
+ * secret-bearing header names.
+ */
+function redactHeaders(
+  headers: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!headers) {
+    return headers;
+  }
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lower = key.toLowerCase();
+    if (
+      SENSITIVE_HEADER_NAMES.has(lower) ||
+      SENSITIVE_HEADER_PATTERN.test(lower)
+    ) {
+      redacted[key] = "[REDACTED]";
+    } else {
+      redacted[key] = value;
+    }
+  }
+  return redacted;
+}
+
+const SENSITIVE_BODY_KEY =
+  /^(?:password|access_token|refresh_token|api_key|apiKey|secret|authorization|token|credential|x-api-key)$/i;
+
+/** Redact every value under a sensitive key, including objects and arrays. */
+function redactBody(body: unknown): string | undefined {
+  if (body === undefined || body === null) {
+    return undefined;
+  }
+  let value = body;
+  if (typeof body === "string") {
+    try {
+      value = JSON.parse(body);
+    } catch {
+      // Non-JSON bodies (including SSE transcripts) keep the legacy fallback.
+      return body.replace(SENSITIVE_BODY_KEYS, '$1"[REDACTED]"');
+    }
+  }
+  return JSON.stringify(value, (key, nested) =>
+    SENSITIVE_BODY_KEY.test(key) ? "[REDACTED]" : nested,
+  );
+}
+
+/**
+ * Restrict request and phase identifiers to characters safe for artifact
+ * path components.
+ */
+function sanitizePhase(phase: string): string {
+  return phase.replace(/[^a-zA-Z0-9._-]+/g, "_");
+}
+
+/**
+ * Hash the redacted artifact body so offline reconstruction can verify its
+ * contents.
+ */
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * Measure persisted UTF-8 bytes rather than JavaScript UTF-16 character
+ * counts.
+ */
+function utf8ByteLength(value: string): number {
+  return Buffer.byteLength(value, "utf8");
+}
+
+/**
+ * Reserve space for the truncation marker and cut only at a UTF-8 code
+ * point boundary.
+ */
+function truncateUtf8String(
+  input: string,
+  maxBytes: number,
+  marker: string = BODY_TRUNCATION_MARKER,
+): { value: string; bytes: number; truncated: boolean } {
+  const inputBytes = utf8ByteLength(input);
+  if (inputBytes <= maxBytes) {
+    return { value: input, bytes: inputBytes, truncated: false };
+  }
+
+  const markerBytes = utf8ByteLength(marker);
+  if (maxBytes <= markerBytes) {
+    return { value: marker, bytes: markerBytes, truncated: true };
+  }
+
+  const buffer = Buffer.from(input, "utf8");
+  let end = maxBytes - markerBytes;
+  while (end > 0 && (buffer[end] & 0xc0) === 0x80) {
+    end -= 1;
+  }
+  const value = buffer.subarray(0, end).toString("utf8");
+  const truncatedValue = `${value}${marker}`;
+  return {
+    value: truncatedValue,
+    bytes: utf8ByteLength(truncatedValue),
+    truncated: true,
+  };
+}
+
+/**
+ * Split redacted text into byte-bounded OTLP chunks without splitting
+ * encoded characters.
+ */
+export function splitUtf8StringByBytes(
+  input: string,
+  maxBytes: number,
+): string[] {
+  if (!input) {
+    return [""];
+  }
+
+  const chunks: string[] = [];
+  const buffer = Buffer.from(input, "utf8");
+  for (let start = 0; start < buffer.length; ) {
+    let end = Math.min(start + Math.max(4, maxBytes), buffer.length);
+    while (end < buffer.length && (buffer[end] & 0xc0) === 0x80) {
+      end -= 1;
+    }
+    chunks.push(buffer.subarray(start, end).toString("utf8"));
+    start = end;
+  }
+
+  return chunks;
+}
+
+/**
+ * Apply structural redaction before enforcing the per-artifact byte
+ * ceiling.
+ */
+function prepareRedactedBody(body: unknown): {
+  value?: string;
+  bytes?: number;
+  truncated: boolean;
+} {
+  const redacted = redactBody(body);
+  if (redacted === undefined) {
+    return { truncated: false };
+  }
+
+  return truncateUtf8String(redacted, MAX_CAPTURED_BODY_BYTES);
+}
+
+/**
+ * Write a private gzip artifact with a unique name and return its
+ * redacted-body digest.
+ */
+async function writeBodyArtifact(
+  logDir: string,
+  entry: ProxyBodyCaptureEntry,
+  redactedHeaders: Record<string, string> | undefined,
+  redactedBody: string | undefined,
+  bodyTruncated: boolean,
+): Promise<StoredBodyArtifact> {
+  if (redactedBody === undefined) {
+    return {};
+  }
+
+  const dateStr = new Date(entry.timestamp).toISOString().split("T")[0];
+  const bodyDir = join(
+    logDir,
+    "bodies",
+    dateStr,
+    sanitizePhase(entry.requestId),
+  );
+  await mkdir(bodyDir, { recursive: true, mode: 0o700 });
+  await chmod(bodyDir, 0o700);
+
+  const fileName =
+    `${randomUUID()}-${sanitizePhase(entry.phase)}` +
+    (entry.attempt !== undefined ? `-attempt-${entry.attempt}` : "") +
+    `.json.gz`;
+  const bodyPath = join(bodyDir, fileName);
+  const payload = JSON.stringify({
+    timestamp: entry.timestamp,
+    requestId: entry.requestId,
+    phase: entry.phase,
+    model: entry.model,
+    stream: entry.stream,
+    account: entry.account,
+    accountType: entry.accountType,
+    attempt: entry.attempt,
+    responseStatus: entry.responseStatus,
+    durationMs: entry.durationMs,
+    contentType: entry.contentType,
+    headers: redactedHeaders,
+    body: redactedBody,
+    traceId: entry.traceId,
+    spanId: entry.spanId,
+    metadata: entry.metadata,
+  });
+  const compressed = await gzip(payload);
+  await writeFile(bodyPath, compressed, {
+    mode: 0o600,
+    signal: AbortSignal.timeout(REQUEST_LOG_IO_TIMEOUT_MS),
+  });
+
+  return {
+    bodyPath,
+    bodySha256: sha256(redactedBody),
+    redactedBodyBytes: utf8ByteLength(redactedBody),
+    storedFileBytes: compressed.byteLength,
+    redactedBody,
+    bodyTruncated,
+  };
+}
+
+/** Shared pure redaction for replay; serving paths invoke it in the worker. */
+export function prepareProxyBodyForLogging(body: unknown) {
+  return prepareRedactedBody(body);
+}
+/**
+ * Expose the same header-redaction policy to replay and metadata
+ * consumers.
+ */
+export function redactProxyHeadersForLogging(
+  headers: Record<string, string> | undefined,
+) {
+  return redactHeaders(headers);
+}
+
+/**
+ * Process a capture in the worker and retain redacted output when artifact
+ * persistence fails.
+ */
+export async function processProxyBodyCapture(
+  entry: ProxyBodyCaptureEntry,
+  logDir: string,
+): Promise<ProcessedProxyBodyCapture> {
+  const headers = redactHeaders(entry.headers);
+  const prepared = prepareRedactedBody(entry.body);
+  let stored: StoredBodyArtifact;
+  try {
+    stored = await writeBodyArtifact(
+      logDir,
+      entry,
+      headers,
+      prepared.value,
+      prepared.truncated,
+    );
+  } catch {
+    stored = {
+      redactedBody: prepared.value,
+      redactedBodyBytes: prepared.bytes,
+      bodyTruncated: prepared.truncated,
+      bodyWriteFailed: true,
+    };
+  }
+  return { headers, stored };
+}

@@ -8,7 +8,7 @@
 
 > **EvaluateScoreArgs** = [`BaseEvaluateArgs`](BaseEvaluateArgs.md) & `object`
 
-Defined in: [types/cli.ts:1542](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1542)
+Defined in: [types/cli.ts:1543](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1543)
 
 Arguments for `neurolink evaluate score`.
 

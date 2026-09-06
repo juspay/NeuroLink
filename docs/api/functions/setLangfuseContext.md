@@ -8,7 +8,7 @@
 
 > **setLangfuseContext**\<`T`\>(`context`, `callback?`): `Promise`\<`void` \| `T`\>
 
-Defined in: [services/server/ai/observability/instrumentation.ts:1360](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L1360)
+Defined in: [services/server/ai/observability/instrumentation.ts:1366](https://github.com/juspay/neurolink/blob/release/src/lib/services/server/ai/observability/instrumentation.ts#L1366)
 
 Set user and session context for Langfuse spans in the current async context
 

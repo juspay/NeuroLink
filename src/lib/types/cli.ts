@@ -1003,6 +1003,7 @@ export type ProxyRollingState = {
     supervisorAction?:
       | "none"
       | "sigkill_after_transfer_failure"
+      | "cancel_socket_replace_before_drain"
       | "cancel_uncommitted_socket";
   } | null;
 };

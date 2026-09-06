@@ -747,7 +747,26 @@ export type ProxyRequestLogSinkSnapshot = {
   lastErrorCode?: string;
 };
 
+export type ProcessedProxyBodyCapture = {
+  headers?: Record<string, string>;
+  stored: StoredBodyArtifact;
+  error?: string;
+  queueWaitMs?: number;
+  processingMs?: number;
+};
+export type ProxyBodyCaptureWorkerSnapshot = {
+  attempted: number;
+  completed: number;
+  rejected: number;
+  failed: number;
+  pending: number;
+  pendingBytes: number;
+  maxPending: number;
+  maxPendingBytes: number;
+  lastError?: string;
+};
 export type ProxyRequestLoggerSnapshot = {
+  bodyCapture?: ProxyBodyCaptureWorkerSnapshot;
   enabled: boolean;
   requests: ProxyRequestLogSinkSnapshot;
   attempts: ProxyRequestLogSinkSnapshot;
@@ -1923,6 +1942,8 @@ export type ProxyResponseTrackingObserver = {
 
 /** Versioned lifecycle event names persisted by the proxy adapter. */
 export type ProxyLifecycleEventName =
+  | "runtime_sample"
+  | "supervisor_event"
   | "request_accepted"
   | "response_headers"
   | "response_first_chunk"
@@ -1966,6 +1987,21 @@ export type ProxyLifecycleEventInput = {
   errorCode?: string;
   timestampMs?: number;
   monotonicMs?: number;
+  /** Parent-owned evidence, independent of the serving worker's journal tail. */
+  supervisorEvent?: RollingWorkerSupervisorEvent;
+  runtimeSample?: ProxyRuntimeSample;
+};
+
+/** Process CPU and event-loop evidence; host load is not a request count. */
+export type ProxyRuntimeSample = {
+  intervalMs: number;
+  cpuPercentOneCore: number;
+  rssBytes: number;
+  heapUsedBytes: number;
+  eventLoopDelayP99Ms: number;
+  eventLoopDelayMaxMs: number;
+  hostLoad1m: number;
+  availableParallelism: number;
 };
 
 /** Data-quality counters for the bounded lifecycle metadata sink. */
@@ -1995,6 +2031,7 @@ export type ProxyLifecycleLoggerSnapshot = {
 
 /** Lifecycle logger configuration. Queue overrides are used by stress tests. */
 export type ProxyLifecycleLoggerOptions = {
+  filePrefix?: "proxy-lifecycle" | "proxy-supervisor";
   enabled: boolean;
   logDir?: string;
   queueCapacity?: number;
@@ -2006,10 +2043,13 @@ export type ProxyLifecycleLoggerOptions = {
 
 /** Serialized lifecycle line awaiting a bounded batch write. */
 export type QueuedProxyLifecycleEvent = {
+  filePrefix?: string;
   logDir: string;
   date: string;
   record: Record<string, unknown>;
   writeRetries: number;
+  /** Resolve only after the original append settles; uncertain writes fail. */
+  onPersisted?: (confirmed: boolean) => void;
 };
 
 /** Percentile summary used by offline proxy log analysis. */
@@ -2042,6 +2082,13 @@ export type ProxyAnalysisStreamName =
   | "debug";
 
 export type ProxyAnalysisReport = {
+  runtime: {
+    samples: number;
+    maxEventLoopDelayMs: number | null;
+    maxRssBytes: number | null;
+    maxCpuPercentOneCore: number | null;
+    maxHostLoad1m: number | null;
+  };
   generatedAt: string;
   since: string;
   until: string;
@@ -2101,7 +2148,18 @@ export type ProxyAnalysisReport = {
     };
   };
   lifecycle: {
+    /** Accepted requests lacking transport terminals when their worker exited. */
+    unconfirmedAtWorkerExit: Array<{
+      requestId: string;
+      workerProcessInstanceId: string;
+      at: string;
+      workerExitCode: number | null;
+      workerExitSignal: string | null;
+      providerFinalRecorded: boolean;
+    }>;
     accepted: number;
+    /** Accepted metadata requests that do not require model final records. */
+    auxiliaryRequests: number;
     headers: number;
     firstChunks: number;
     terminal: number;
@@ -2764,6 +2822,7 @@ export type ProxyWorkerStatusMessage =
       generation: number;
       pid: number;
       version: string;
+      processInstanceId?: string;
     }
   | {
       type: "proxy-worker:drained";
@@ -2832,6 +2891,8 @@ export type RollingWorkerHandle = {
 };
 
 export type SpawnProxySocketWorkerOptions = {
+  /** Injectable process boundary for deterministic IPC fault tests. */
+  spawn?: typeof import("node:child_process").spawn;
   generation: number;
   expectedVersion: string;
   command: string;
@@ -2849,16 +2910,27 @@ export type RollingWorkerFailureDetails = {
   supervisorAction?:
     | "none"
     | "sigkill_after_transfer_failure"
+    | "cancel_socket_replace_before_drain"
     | "cancel_uncommitted_socket";
 };
 
 export type RollingWorkerSupervisorEvent = {
   at: string;
-  type: "activated" | "failure" | "failed_transfer" | "rejected_socket";
+  type:
+    | "activated"
+    | "failure"
+    | "failed_transfer"
+    | "rejected_socket"
+    | "worker_exit";
   generation: number | null;
   version: string | null;
   phase?: "startup" | "activation" | "runtime" | "transfer";
   reason?: string;
+  workerPid?: number;
+  workerProcessInstanceId?: string;
+  workerExitCode?: number | null;
+  workerExitSignal?: string | null;
+  supervisorAction?: RollingWorkerFailureDetails["supervisorAction"];
 };
 
 export type RollingWorkerSupervisorSnapshot = {
@@ -2900,10 +2972,15 @@ export type RollingWorkerSupervisorOptions = {
   socketQueueTimeoutMs?: number;
   shutdownTimeoutMs?: number;
   onStateChange?: (snapshot: RollingWorkerSupervisorSnapshot) => void;
+  onEvent?: (event: RollingWorkerSupervisorEvent) => void;
   onReplacementRequested?: (request: {
     generation: number;
     pid: number;
-    reason: "environment" | "socket_offer_timeout";
+    reason:
+      | "environment"
+      | "socket_offer_timeout"
+      | "socket_commit_timeout"
+      | "socket_transfer_failure";
   }) => void;
   log?: (message: string) => void;
 };
@@ -2924,6 +3001,7 @@ export type RollingProxyServerOptions = {
   recoveryDelayMs?: number;
   maxRecoveryDelayMs?: number;
   onStateChange?: (snapshot: RollingWorkerSupervisorSnapshot) => void;
+  onEvent?: (event: RollingWorkerSupervisorEvent) => void;
   log?: (message: string) => void;
 };
 

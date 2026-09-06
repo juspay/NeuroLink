@@ -8,7 +8,7 @@
 
 > **ServerState** = `object`
 
-Defined in: [types/cli.ts:1280](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1280)
+Defined in: [types/cli.ts:1281](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1281)
 
 Server status stored in state file
 
@@ -18,7 +18,7 @@ Server status stored in state file
 
 > **pid**: `number`
 
-Defined in: [types/cli.ts:1281](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1281)
+Defined in: [types/cli.ts:1282](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1282)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/cli.ts:1281](https://github.com/juspay/neurolink/blob/release
 
 > **port**: `number`
 
-Defined in: [types/cli.ts:1282](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1282)
+Defined in: [types/cli.ts:1283](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1283)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/cli.ts:1282](https://github.com/juspay/neurolink/blob/release
 
 > **host**: `string`
 
-Defined in: [types/cli.ts:1283](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1283)
+Defined in: [types/cli.ts:1284](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1284)
 
 ---
 
@@ -42,7 +42,7 @@ Defined in: [types/cli.ts:1283](https://github.com/juspay/neurolink/blob/release
 
 > **framework**: [`ServerFramework`](ServerFramework.md)
 
-Defined in: [types/cli.ts:1284](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1284)
+Defined in: [types/cli.ts:1285](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1285)
 
 ---
 
@@ -50,7 +50,7 @@ Defined in: [types/cli.ts:1284](https://github.com/juspay/neurolink/blob/release
 
 > **startTime**: `string`
 
-Defined in: [types/cli.ts:1285](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1285)
+Defined in: [types/cli.ts:1286](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1286)
 
 ---
 
@@ -58,4 +58,4 @@ Defined in: [types/cli.ts:1285](https://github.com/juspay/neurolink/blob/release
 
 > **basePath**: `string`
 
-Defined in: [types/cli.ts:1286](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1286)
+Defined in: [types/cli.ts:1287](https://github.com/juspay/neurolink/blob/release/src/lib/types/cli.ts#L1287)

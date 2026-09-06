@@ -6,6 +6,8 @@ import type {
 export const PROXY_SOCKET_WORKER_ENV = "NEUROLINK_PROXY_SOCKET_WORKER";
 /** The worker has not been sent a commit and cannot have served this socket. */
 export const PROXY_SOCKET_OFFER_TIMEOUT = "PROXY_SOCKET_OFFER_TIMEOUT";
+/** Commit delivery is uncertain; close only this socket and never replay it. */
+export const PROXY_SOCKET_COMMIT_TIMEOUT = "PROXY_SOCKET_COMMIT_TIMEOUT";
 export const PROXY_ROLLING_SUPERVISOR_ENV =
   "NEUROLINK_PROXY_ROLLING_SUPERVISOR";
 
@@ -39,6 +41,10 @@ export function isProxyWorkerControlMessage(
   );
 }
 
+/**
+ * Validate worker status and bounded process identity before the
+ * supervisor trusts IPC evidence.
+ */
 export function isProxyWorkerStatusMessage(
   value: unknown,
 ): value is ProxyWorkerStatusMessage {
@@ -50,6 +56,7 @@ export function isProxyWorkerStatusMessage(
     generation?: unknown;
     pid?: unknown;
     version?: unknown;
+    processInstanceId?: unknown;
     message?: unknown;
     socketId?: unknown;
     reason?: unknown;
@@ -63,7 +70,14 @@ export function isProxyWorkerStatusMessage(
     return false;
   }
   if (message.type === "proxy-worker:ready") {
-    return typeof message.version === "string" && message.version.length > 0;
+    return (
+      typeof message.version === "string" &&
+      message.version.length > 0 &&
+      (message.processInstanceId === undefined ||
+        (typeof message.processInstanceId === "string" &&
+          message.processInstanceId.length > 0 &&
+          message.processInstanceId.length <= 256))
+    );
   }
   if (
     message.type === "proxy-worker:activated" ||

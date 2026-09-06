@@ -3,6 +3,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // === Global shims (must run before any imports) ===
+if (typeof globalThis.setImmediate === "undefined") {
+  (globalThis as any).setImmediate = (
+    callback: (...args: any[]) => void,
+    ...args: any[]
+  ) => setTimeout(callback, 0, ...args);
+  (globalThis as any).clearImmediate = (
+    handle: ReturnType<typeof setTimeout>,
+  ) => clearTimeout(handle);
+}
+
 if (typeof globalThis.process === "undefined") {
   (globalThis as any).process = new Proxy(
     {

@@ -8,7 +8,7 @@
 
 > **AccountCooldownPlan** = `object`
 
-Defined in: [types/proxy.ts:1069](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1069)
+Defined in: [types/proxy.ts:1088](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1088)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/proxy.ts:1069](https://github.com/juspay/neurolink/blob/relea
 
 > **reason**: [`RateLimitCoolingReason`](RateLimitCoolingReason.md)
 
-Defined in: [types/proxy.ts:1070](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1070)
+Defined in: [types/proxy.ts:1089](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1089)
 
 ---
 
@@ -24,7 +24,7 @@ Defined in: [types/proxy.ts:1070](https://github.com/juspay/neurolink/blob/relea
 
 > **scope**: `"account"` \| `"model"`
 
-Defined in: [types/proxy.ts:1076](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1076)
+Defined in: [types/proxy.ts:1095](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1095)
 
 Whether this limit applies to every request on the account or only to the
 requested model. Model scope must never be persisted as an account
@@ -36,7 +36,7 @@ cooldown; the quota window itself remains the routing evidence.
 
 > **coolingUntil**: `number`
 
-Defined in: [types/proxy.ts:1078](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1078)
+Defined in: [types/proxy.ts:1097](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1097)
 
 Epoch-ms until which the limiting window is expected to recover.
 
@@ -46,7 +46,7 @@ Epoch-ms until which the limiting window is expected to recover.
 
 > **rotateImmediately**: `boolean`
 
-Defined in: [types/proxy.ts:1082](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1082)
+Defined in: [types/proxy.ts:1101](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1101)
 
 When true (unified/5h/7d rejected), rotate immediately — retrying the
 same account is futile until its window resets. When false (transient
