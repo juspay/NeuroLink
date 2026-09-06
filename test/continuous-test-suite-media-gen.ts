@@ -1261,7 +1261,10 @@ async function testImageLRUCacheEviction(): Promise<boolean | null> {
         },
         provider: "vertex",
         model: "gemini-2.5-flash",
-        maxTokens: 50,
+        // 200, not 50: gemini-2.5-flash spends its budget on hidden
+        // reasoning first, so a 50-token cap returns empty visible text and
+        // this cell reports a harness defect as a product failure.
+        maxTokens: 200,
       });
       results.push(!!(result?.content && result.content.length > 0));
       if (i < 2) {
@@ -1314,7 +1317,8 @@ async function testImageRetryLogic(): Promise<boolean | null> {
       input: { text: "Describe the color blue in one sentence." },
       provider: "vertex",
       model: "gemini-2.5-flash",
-      maxTokens: 50,
+      // 200 for the same reason as the cache-eviction cell above.
+      maxTokens: 200,
     });
 
     if (!result?.content || result.content.length === 0) {
@@ -1512,8 +1516,10 @@ async function testVideoGenerationVertexAI(): Promise<boolean | null> {
 import { NeuroLink } from '${process.cwd()}/dist/index.js';
 
 // No freshness check here: this script runs from a temp directory with no
-// ./helpers to import it from, and the parent suite already ran
-// assertDistFresh() against the same dist before writing this file.
+// ./helpers to import it from. Note the parent suite does NOT run
+// assertDistFresh() either — the runner only checks that dist/index.js
+// exists, not that it is newer than src/. So this suite has no staleness
+// protection at all; the import below just needs dist to be present.
 
 async function testVideoGenerationVertexAI() {
   console.log('Testing video generation via Vertex AI generate()...');

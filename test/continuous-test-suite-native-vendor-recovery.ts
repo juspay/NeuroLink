@@ -233,6 +233,7 @@ await test("a silently ignored response_format falls back to the schema in the s
 });
 
 await test("a native tool round trip populates result.toolCalls", async () => {
+  let executions = 0;
   // `EnhancedGenerateResult.toolCalls` is a public field. The native loop
   // recorded the execution (toolExecutions, toolsUsed) but never mapped it
   // back onto toolCalls, so a caller reading the field the type promises saw
@@ -262,14 +263,34 @@ await test("a native tool round trip populates result.toolCalls", async () => {
         lookup: tool({
           description: "Looks a value up",
           inputSchema: z.object({ value: z.number() }),
-          execute: async () => ({ answer: 42 }),
+          execute: async () => {
+            executions += 1;
+            return { answer: 42 };
+          },
         }),
       },
     });
+    // A request count alone proves nothing: the server answers a second time
+    // for any second request, whether or not the tool ran or its result was
+    // submitted. Assert the execution itself and the tool result on the wire.
+    if (executions !== 1) {
+      throw new Error(
+        `precondition failed: the tool executed ${executions} times, expected 1`,
+      );
+    }
     if (server.requestCount() < 2) {
       throw new Error(
         "precondition failed: the tool round trip never happened",
       );
+    }
+    const followUp = JSON.parse(server.getAllRequestBodies()[1] ?? "{}") as {
+      messages?: Array<{ role?: string; tool_call_id?: string }>;
+    };
+    const toolResult = (followUp.messages ?? []).find(
+      (m) => m.role === "tool" && m.tool_call_id === "call_7",
+    );
+    if (!toolResult) {
+      throw new Error("the follow-up request carried no result for call_7");
     }
     const calls = result.toolCalls ?? [];
     if (calls.length !== 1) {

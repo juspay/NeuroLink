@@ -56,8 +56,13 @@ function logTest(
 // in CI (vertex) instead of one that requires a local daemon (ollama),
 // so the suite returns real PASS rather than blanket SKIPs.
 //
-// `thinkingLevel: "minimal"` keeps Gemini 2.5+ from spending its 50-token
-// budget on hidden reasoning and returning empty visible text. Combined
+// `thinkingLevel: "minimal"` reduces how much of the budget Gemini 2.5+
+// spends on hidden reasoning, but is not sufficient on its own: at
+// maxTokens 50 a probe measured 28 of 29 output tokens going to reasoning
+// anyway. The four cases that assert on generated content therefore ask
+// for 200. The rest of the file is deliberately smaller — the two
+// invalid-provider negative cases use 10 (they assert on the error, and
+// never reach a model) and the onChunk streaming case uses 100. Combined
 // with `disableTools: true` we keep the request shape pure-text so the
 // model isn't tempted to multi-step into a tool call (e.g. calculateMath
 // for "what is 2+2?") and exhaust the tiny token budget on tool plumbing
