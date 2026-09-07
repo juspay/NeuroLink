@@ -367,6 +367,12 @@ export default [
         "error",
         {
           allow: [
+            // Which of convertZodToJsonSchema's two branches ran is visible
+            // only as a logger warning; the schema both branches return is
+            // valid, so a live generate() call cannot tell them apart. The
+            // regression also needs a Zod 3 shaped schema, and this repo
+            // installs only Zod 4.
+            "test/continuous-test-suite-zod3-schema-native-path.ts",
             // Chunk boundaries and reranker ordering are exact outcomes;
             // generate({ rag }) only ever shows the model's answer.
             "test/continuous-test-suite-rag.ts",

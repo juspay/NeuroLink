@@ -481,7 +481,7 @@ export function convertZodToJsonSchema(
   // Translate our `target` to Zod 4's native dialect identifier so the
   // openApi3 path emits the OpenAPI 3 schema shape Vertex/Gemini expect
   // (and not the default draft-07 anyOf/null union).
-  if (zodToJsonSchemaV4) {
+  if (zodToJsonSchemaV4 && isZod4Schema(zodSchema)) {
     const nativeTarget: Zod4NativeTarget =
       target === "openApi3" ? "openapi-3.0" : "draft-07";
     try {
@@ -763,6 +763,18 @@ export function isZodSchema(value: unknown): boolean {
     "_def" in value &&
     typeof (value as Record<string, unknown>).parse === "function"
   );
+}
+
+/**
+ * Whether a schema was built by Zod 4 specifically.
+ *
+ * Zod 4 hangs its internals off `_zod` (and `z.toJSONSchema` reads
+ * `schema._zod.def`); Zod 3 has only `_def`. The two can coexist in one install
+ * — a host on Zod 3 still resolves NeuroLink's own Zod 4 — so the presence of
+ * `z.toJSONSchema` says nothing about the schema actually being handed to it.
+ */
+export function isZod4Schema(value: unknown): boolean {
+  return !!(value && typeof value === "object" && "_zod" in value);
 }
 
 /**
