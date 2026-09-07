@@ -314,7 +314,11 @@ const CELLS: Cell[] = [
   { provider: "xai", model: "grok-3", tier: "breadth", strictSchema: false },
   {
     provider: "groq",
-    model: "llama-3.3-70b-versatile",
+    // llama-3.3-70b-versatile was decommissioned upstream — it now answers
+    // "does not exist or you do not have access to it", so this cell could
+    // only ever fail. gpt-oss-120b is groq's catalog default and was probed
+    // live for text and tool calling.
+    model: "openai/gpt-oss-120b",
     tier: "breadth",
     strictSchema: false,
   },
