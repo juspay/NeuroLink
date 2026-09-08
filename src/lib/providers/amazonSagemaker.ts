@@ -209,7 +209,71 @@ export class AmazonSageMakerProvider extends BaseProvider {
         new Error("sagemaker: model handle exposes no doGenerate()"),
       );
     }
-    const doGenerate = model.doGenerate.bind(model);
+    const doGenerate = async (
+      call: Record<string, unknown>,
+    ): Promise<Record<string, unknown>> => {
+      const format = call.responseFormat as Record<string, unknown> | undefined;
+      const result = await model.doGenerate({
+        ...call,
+        ...(call.maxOutputTokens !== undefined
+          ? { maxTokens: call.maxOutputTokens }
+          : {}),
+        ...(format?.type === "json"
+          ? {
+              responseFormat: format.schema
+                ? {
+                    type: "json_schema",
+                    json_schema: { name: "response", schema: format.schema },
+                  }
+                : { type: "json_object" },
+            }
+          : {}),
+      });
+      // SageMaker's low-level model retains its legacy result for streaming
+      // and direct consumers. The shared loop consumes V3 content and usage.
+      if (Array.isArray(result.content)) {
+        return result;
+      }
+      const content: Array<Record<string, unknown>> = [];
+      if (typeof result.text === "string" && result.text) {
+        content.push({ type: "text", text: result.text });
+      }
+      if (typeof result.reasoning === "string" && result.reasoning) {
+        content.push({ type: "reasoning", text: result.reasoning });
+      }
+      for (const call of Array.isArray(result.toolCalls)
+        ? result.toolCalls
+        : []) {
+        if (typeof call !== "object" || call === null) {
+          continue;
+        }
+        const item = call as Record<string, unknown>;
+        const fn = item.function as Record<string, unknown> | undefined;
+        if (typeof item.id === "string" && typeof fn?.name === "string") {
+          content.push({
+            type: "tool-call",
+            toolCallId: item.id,
+            toolName: fn.name,
+            input: fn.arguments ?? "{}",
+          });
+        }
+      }
+      const usage = result.usage as Record<string, unknown> | undefined;
+      return {
+        ...result,
+        content,
+        usage: {
+          inputTokens: {
+            total:
+              typeof usage?.inputTokens === "number" ? usage.inputTokens : 0,
+          },
+          outputTokens: {
+            total:
+              typeof usage?.outputTokens === "number" ? usage.outputTokens : 0,
+          },
+        },
+      };
+    };
 
     const shouldUseTools = !options.disableTools && this.supportsTools();
     const toolsRecord = shouldUseTools

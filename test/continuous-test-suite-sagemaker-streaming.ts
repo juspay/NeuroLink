@@ -23,6 +23,7 @@ import "dotenv/config";
  */
 
 import { createServer, type Server } from "node:http";
+import { z } from "zod";
 import { assert, defineSuite } from "./helpers/harness.js";
 import { assertDistFresh } from "./helpers/distFreshness.js";
 
@@ -30,7 +31,7 @@ assertDistFresh();
 
 const { test, runSuite } = defineSuite("SageMaker streaming");
 
-const { NeuroLink } = await import("../dist/index.js");
+const { NeuroLink, tool } = await import("../dist/index.js");
 
 type StandIn = {
   requests: number;
@@ -40,15 +41,22 @@ type StandIn = {
 
 /** Local stand-in for the SageMaker runtime endpoint. */
 async function startStandIn(
-  respond: (requestIndex: number) => { status: number; body: string },
+  respond: (
+    requestIndex: number,
+    requestBody: string,
+  ) => { status: number; body: string },
 ): Promise<StandIn> {
   let requests = 0;
   const server: Server = createServer((req, res) => {
     const index = requests;
     requests++;
-    req.resume();
+    let requestBody = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk: string) => {
+      requestBody += chunk;
+    });
     req.on("end", () => {
-      const { status, body } = respond(index);
+      const { status, body } = respond(index, requestBody);
       res.writeHead(status, { "content-type": "application/json" });
       res.end(body);
     });
@@ -432,6 +440,183 @@ await test("an aborted SageMaker turn ends promptly and still reads as an abort"
     } else {
       process.env.NEUROLINK_SKIP_MCP = priorSkipMcp;
     }
+    restoreEnv();
+    await server.close();
+  }
+});
+
+await test("generate preserves SageMaker text, endpoint usage and sampling options", async () => {
+  let sent: Record<string, unknown> = {};
+  const server = await startStandIn((_, raw) => {
+    sent = JSON.parse(raw);
+    return {
+      status: 200,
+      body: JSON.stringify({
+        generated_text: "SAGEMAKER_TEXT",
+        usage: { prompt_tokens: 17, completion_tokens: 9, total_tokens: 26 },
+      }),
+    };
+  });
+  const restoreEnv = withoutAwsEnv();
+  const sdk = new NeuroLink();
+  try {
+    const result = await sdk.generate({
+      input: { text: "hello" },
+      provider: "sagemaker",
+      model: "test-endpoint",
+      disableTools: true,
+      disableInternalFallback: true,
+      maxTokens: 37,
+      temperature: 0,
+      credentials: credentialsFor(server.port),
+    });
+    assert(
+      server.requests > 0,
+      "precondition: request never reached SageMaker endpoint",
+    );
+    assert(
+      result.content === "SAGEMAKER_TEXT",
+      "SageMaker text did not survive the native loop",
+    );
+    assert(
+      result.usage?.input === 17 && result.usage?.output === 9,
+      "endpoint token counts did not survive the native loop",
+    );
+    const parameters = sent.parameters as Record<string, unknown>;
+    assert(
+      parameters.max_new_tokens === 37 && parameters.temperature === 0,
+      "explicit sampling options did not reach endpoint",
+    );
+  } finally {
+    await sdk.shutdown();
+    restoreEnv();
+    await server.close();
+  }
+});
+
+await test("generate executes SageMaker tool calls and replays their result", async () => {
+  let executed = 0;
+  let replayed = false;
+  let leakedEnvelope = false;
+  const server = await startStandIn((i, raw) => {
+    if (i === 0) {
+      return {
+        status: 200,
+        body: JSON.stringify({
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "sagemaker_call",
+                    type: "function",
+                    function: { name: "lookup", arguments: '{"key":"item"}' },
+                  },
+                ],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+          usage: { prompt_tokens: 7, completion_tokens: 3 },
+        }),
+      };
+    }
+    replayed =
+      raw.includes("SAGEMAKER_TOOL_RESULT") && raw.includes("sagemaker_call");
+    leakedEnvelope = raw.includes("choices");
+    return {
+      status: 200,
+      body: JSON.stringify({
+        generated_text: "SAGEMAKER_DONE",
+        usage: { prompt_tokens: 11, completion_tokens: 5 },
+      }),
+    };
+  });
+  const restoreEnv = withoutAwsEnv();
+  const sdk = new NeuroLink();
+  try {
+    const result = await sdk.generate({
+      input: { text: "lookup item" },
+      provider: "sagemaker",
+      model: "test-endpoint",
+      disableInternalFallback: true,
+      maxSteps: 3,
+      credentials: credentialsFor(server.port),
+      tools: {
+        lookup: tool({
+          description: "Lookup item",
+          inputSchema: z.object({ key: z.string() }),
+          execute: async ({ key }) => {
+            assert(key === "item", "tool arguments were corrupted");
+            executed++;
+            return "SAGEMAKER_TOOL_RESULT";
+          },
+        }),
+      },
+    });
+    assert(server.requests > 0, "precondition: endpoint never ran");
+    assert(
+      executed === 1 && server.requests === 2,
+      "SageMaker tool call was not executed exactly once",
+    );
+    assert(
+      replayed,
+      "SageMaker next request lost the tool result or call identity",
+    );
+    assert(
+      !leakedEnvelope,
+      "raw endpoint envelope leaked into the assistant replay",
+    );
+    assert(
+      result.content === "SAGEMAKER_DONE",
+      "tool loop final answer was lost",
+    );
+    assert(
+      result.usage?.input === 18 && result.usage?.output === 8,
+      "multi-step usage was not accumulated",
+    );
+  } finally {
+    await sdk.shutdown();
+    restoreEnv();
+    await server.close();
+  }
+});
+
+await test("generate forwards the SageMaker JSON schema and returns structured data", async () => {
+  let format: unknown;
+  const server = await startStandIn((_, raw) => {
+    format = (JSON.parse(raw) as { response_format?: unknown }).response_format;
+    return {
+      status: 200,
+      body: JSON.stringify({ generated_text: '{"answer":42}' }),
+    };
+  });
+  const restoreEnv = withoutAwsEnv();
+  const sdk = new NeuroLink();
+  try {
+    const schema = z.object({ answer: z.number() });
+    const result = await sdk.generate({
+      input: { text: "return JSON" },
+      provider: "sagemaker",
+      model: "test-endpoint",
+      disableTools: true,
+      disableInternalFallback: true,
+      credentials: credentialsFor(server.port),
+      schema,
+    });
+    assert(server.requests > 0, "precondition: endpoint never ran");
+    assert(
+      (format as { type?: string })?.type === "json_schema",
+      "JSON schema was not sent to SageMaker",
+    );
+    assert(
+      schema.safeParse(result.structuredData).success,
+      "SageMaker structured result was lost",
+    );
+  } finally {
+    await sdk.shutdown();
     restoreEnv();
     await server.close();
   }

@@ -588,8 +588,8 @@ export class SageMakerLanguageModel implements SageMakerAsLanguageModel {
         ...(options.maxTokens !== undefined
           ? { max_new_tokens: options.maxTokens }
           : {}),
-        temperature: options.temperature || 0.7,
-        top_p: options.topP || 0.9,
+        temperature: options.temperature ?? 0.7,
+        top_p: options.topP ?? 0.9,
         stop: options.stopSequences || [],
       },
     };
@@ -804,8 +804,13 @@ export class SageMakerLanguageModel implements SageMakerAsLanguageModel {
     // Handle response with tool calls
     if (responseBody.choices && Array.isArray(responseBody.choices)) {
       const choice = responseBody.choices[0];
-      if (choice?.message?.content) {
+      if (typeof choice?.message?.content === "string") {
         return choice.message.content;
+      }
+      // A tool-only assistant turn has no text. Serializing the entire
+      // endpoint response here would replay its envelope as assistant prose.
+      if (choice?.message?.tool_calls?.length) {
+        return "";
       }
     }
 
