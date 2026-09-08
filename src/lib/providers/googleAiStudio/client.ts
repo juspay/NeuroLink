@@ -1841,9 +1841,8 @@ export class GoogleAIStudioProvider extends BaseProvider {
     try {
       // Wrap in `neurolink.executeGeneration` so the observability span
       // chain (Test: Generate Span Chain) sees a third inner span on the
-      // native @google/genai path — Pipeline A providers get this from
-      // GenerationHandler.executeGeneration; the native path bypasses
-      // GenerationHandler so we add the span here.
+      // native @google/genai path. This provider overrides generate() instead
+      // of using BaseProvider's shared flow, so the span is added here.
       let result = await withSpan(
         {
           name: "neurolink.executeGeneration",

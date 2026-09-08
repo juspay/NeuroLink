@@ -8,7 +8,7 @@
 
 > **TruncateResult** = `object`
 
-Defined in: [types/context.ts:826](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L826)
+Defined in: [types/context.ts:803](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L803)
 
 ## Deprecated
 
@@ -20,7 +20,7 @@ Use ToolOutputPreviewResult instead.
 
 > **content**: `string`
 
-Defined in: [types/context.ts:827](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L827)
+Defined in: [types/context.ts:804](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L804)
 
 ---
 
@@ -28,7 +28,7 @@ Defined in: [types/context.ts:827](https://github.com/juspay/neurolink/blob/rele
 
 > **truncated**: `boolean`
 
-Defined in: [types/context.ts:828](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L828)
+Defined in: [types/context.ts:805](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L805)
 
 ---
 
@@ -36,7 +36,7 @@ Defined in: [types/context.ts:828](https://github.com/juspay/neurolink/blob/rele
 
 > `optional` **savedPath?**: `string`
 
-Defined in: [types/context.ts:829](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L829)
+Defined in: [types/context.ts:806](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L806)
 
 ---
 
@@ -44,4 +44,4 @@ Defined in: [types/context.ts:829](https://github.com/juspay/neurolink/blob/rele
 
 > **originalSize**: `number`
 
-Defined in: [types/context.ts:830](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L830)
+Defined in: [types/context.ts:807](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L807)

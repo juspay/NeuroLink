@@ -1,6 +1,7 @@
 # Removing the remaining Vercel AI SDK dependencies
 
-Status: in progress. Supersedes the Google-only milestone in
+Status: done — finished by `docs/plans/2026-09-03-completing-the-ai-sdk-removal.md`
+(last item landed in `47717a665`). Supersedes the Google-only milestone in
 `docs/plans/2026-05-02-remove-aisdk-execution-agent-prompt.md`, which shipped as
 `adc51feb` and deliberately deferred everything below.
 

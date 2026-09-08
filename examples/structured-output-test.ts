@@ -1,12 +1,7 @@
-// NOTE: This example requires the Vercel AI SDK (`ai`) as a peer dependency
-// (`pnpm add ai zod`). NeuroLink uses `ai` internally via the distributed seam
-// (`src/lib/utils/{tool,generation,generationErrors}.ts`) but does NOT re-export
-// `tool` on its public surface. Consumers who want to construct tools must
-// import `tool` directly from `"ai"` until a future major release elevates it
-// into the NeuroLink public API (memory-bank/native-runtime/).
+// NeuroLink exports `tool` itself (src/lib/utils/tool.ts, re-exported from the
+// package root), so constructing tools needs no third-party SDK.
 import { z } from "zod";
-import { tool } from "ai";
-import { NeuroLink } from "../dist/index.js";
+import { NeuroLink, tool } from "../dist/index.js";
 
 // Initialize NeuroLink
 const neurolink = new NeuroLink();

@@ -1,5 +1,10 @@
 # Completing the ai-sdk removal
 
+> **Status: done.** All 8 items landed. Item 7 — deleting `GenerationHandler` —
+> was the last, in `47717a665`. `ai` and `@ai-sdk/*` are gone from
+> `package.json` and `pnpm-lock.yaml`, and `scripts/check-banned-deps.ts` keeps
+> them out.
+
 What is left, how each piece is solved, and the order forced by their
 dependencies. Every claim here was checked against the source or the installed
 package, not inferred.

@@ -2340,11 +2340,12 @@ async function testToolResultStoredInRedis(): Promise<boolean | null> {
     //   4. Redis preserves the [user, ..., assistant] thread.
     //
     // Note on the original "tool_result message stored in Redis" check:
-    // with Vercel AI SDK 6 + the OpenAI Responses API and Vertex's new
-    // streaming shape, `step.toolResults` arrives without the actual
-    // output payload (NeuroLink falls back to the literal string
-    // "success" — see GenerationHandler.ts:670-675). Until that
-    // upstream-shape gap is closed, we can verify END-TO-END flow via
+    // with the OpenAI Responses API and Vertex's streaming shape,
+    // `step.toolResults` arrives without the actual output payload and
+    // NeuroLink falls back to the literal string "success". The code that
+    // did this lived in GenerationHandler, deleted with the ai-package
+    // path; the gap is recorded here because the assertion below still
+    // works around it. Until it is closed, we verify END-TO-END flow via
     // the model's final content (which IS populated from the real tool
     // return value), not via Redis-stored tool_result rows. Tracked as
     // a separate SDK gap.

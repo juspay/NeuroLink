@@ -114,7 +114,7 @@ function anthropicMessageResponse(text: string, model: string): unknown {
 
 // ───────────────────────────────────────────────────────────────────────
 // Section: xAI / Groq / Together / Fireworks / Perplexity
-// (All five wrap @ai-sdk/openai with their own baseURL.)
+// (All five are OpenAI-wire-compatible endpoints on their own baseURL.)
 // ───────────────────────────────────────────────────────────────────────
 
 type OpenAICompatSpec = {

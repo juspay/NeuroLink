@@ -6805,8 +6805,8 @@ export class GoogleVertexProvider extends BaseProvider {
           // Wrap the actual native generate call in `neurolink.executeGeneration`
           // so the observability span chain (tested by
           // "Tracing: Generate Span Chain") sees a third inner span on the
-          // native @google/genai / @anthropic-ai/vertex-sdk path — Pipeline A
-          // gets this for free from GenerationHandler.executeGeneration.
+          // native @google/genai / @anthropic-ai/vertex-sdk path. This
+          // provider overrides generate(), so the span is added here.
           result = await withSpan(
             {
               name: "neurolink.executeGeneration",

@@ -85,11 +85,11 @@ export function applyVertexAnthropicCacheBreakpoints(
 
 /**
  * Count the `cache_control` markers already present on a request. The direct
- * Anthropic path (AI-SDK pipeline) arrives with markers the upstream layers
- * placed — MessageBuilder tags the system prompt, GenerationHandler tags the
- * last tool definition, and message content blocks may carry translated
- * AI-SDK markers. Anthropic rejects requests with more than four markers, so
- * any additional history breakpoints must fit in the remaining budget.
+ * Anthropic path arrives with markers the upstream layers placed —
+ * MessageBuilder tags the system prompt, and message content blocks may carry
+ * their own. Tool definitions can carry one too, though nothing marks them
+ * today. Anthropic rejects requests with more than four markers, so any
+ * additional history breakpoints must fit in the remaining budget.
  */
 export function countAnthropicCacheMarkers(input: {
   system?: string | ReadonlyArray<{ cache_control?: unknown }> | undefined;
@@ -115,8 +115,8 @@ export function countAnthropicCacheMarkers(input: {
 
 /**
  * Rolling history breakpoints for request paths whose stable-prefix markers
- * are managed upstream (direct Anthropic: system via MessageBuilder, last
- * tool via GenerationHandler). Marks the last content block of up to `budget`
+ * are managed upstream (direct Anthropic: the system prompt, via
+ * MessageBuilder). Marks the last content block of up to `budget`
  * tail messages; a tail block that already carries a marker is left as-is
  * without consuming budget (it already serves as that breakpoint). Pure —
  * the input array is cloned, never mutated.

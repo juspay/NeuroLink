@@ -1763,24 +1763,6 @@ export type GenerateOptionsNormalized = GenerateOptions & {
 };
 
 /**
- * Per-call configuration for GenerationHandler's AI-SDK loop invocation,
- * shared by the initial call and every fallback retry so they cannot drift.
- */
-export type GenerationCallConfig = {
-  shouldUseTools: boolean;
-  includeStructuredOutput: boolean;
-  /** Anchor for the turn deadline — the ORIGINAL executeGeneration start,
-   *  shared across fallback/provider retries so they can't refresh the
-   *  wall-clock budget. */
-  turnStartMs: number;
-  /** Structured-output fallback retry: also spell the JSON Schema out in the
-   *  system prompt, for vendors that ignore `response_format`. */
-  promptJsonInstruction?: boolean;
-  /** Set on the single toolChoice:"none" re-ask so it can never recurse. */
-  isToolReask?: boolean;
-};
-
-/**
  * Inputs to the shared native generate loop (`core/nativeGenerateLoop.ts`).
  * One loop serves every provider whose delegating model exposes a v3-shaped
  * `doGenerate`; the provider supplies the wire details.

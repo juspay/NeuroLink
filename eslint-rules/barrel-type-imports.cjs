@@ -18,7 +18,7 @@
  *   - `from ".../types/index"`
  *   - `from ".../types"`                          (dir import, resolves to index)
  *   - Files inside `src/lib/types/` (they import from each other).
- *   - External packages (`from "zod"`, `from "@ai-sdk/provider"`, etc.).
+ *   - External packages (`from "zod"`, `from "@anthropic-ai/sdk"`, etc.).
  */
 
 "use strict";

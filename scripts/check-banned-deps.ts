@@ -2,11 +2,12 @@
 /**
  * check-banned-deps.ts
  *
- * Structured dependency-graph guard for the Google AI SDK removal milestone.
+ * Structured dependency-graph guard for the completed Vercel AI SDK removal.
  *
- * Fails the build/test if @ai-sdk/google or @ai-sdk/google-vertex (the two
- * banned Google AI SDK wrappers) are reachable through any production
- * dependency path, lockfile package snapshot, or non-comment source import.
+ * Fails the build/test if any package in BANNED_PACKAGES — `ai`,
+ * `@ai-sdk/provider` and every `@ai-sdk/*` provider wrapper NeuroLink used to
+ * depend on — is reachable through any production dependency path, lockfile
+ * package snapshot, or non-comment source import.
  *
  * Detection strategy
  * ------------------
@@ -31,10 +32,13 @@
  *      package is reachable from runtime dependencies.
  *
  * 4. Source/test/script imports
- *    - Greps src/, test/, scripts/ for `from "<banned>"` or `require("<banned>")`.
+ *    - Greps the repo's own source trees for `from "<banned>"` or
+ *      `require("<banned>")`.
  *    - Comments are explicitly ignored so explanatory references like
  *      "GoogleVertexProvider no longer uses @ai-sdk/google-vertex" remain
  *      legal.
+ *    - ALLOWED_IMPORT_PREFIXES exempts consumer-facing integration examples,
+ *      where the banned package is the reader's dependency and not ours.
  *
  * Exit codes
  * ----------
@@ -100,7 +104,7 @@ function record(
   findings.push({ severity, source, detail });
 }
 
-function checkPackageJson(rootDir: string): void {
+function checkPackageJson(rootDir: string, label = "package.json"): void {
   const pkgPath = join(rootDir, "package.json");
   if (!existsSync(pkgPath)) {
     return;
@@ -129,7 +133,7 @@ function checkPackageJson(rootDir: string): void {
       if (deps[lookup]) {
         record(
           "error",
-          `package.json:${section}`,
+          `${label}:${section}`,
           `Banned package "${lookup}" present (version "${deps[lookup]}").`,
         );
       }
@@ -145,7 +149,7 @@ function checkPackageJson(rootDir: string): void {
       if (dev[lookup]) {
         record(
           "warning",
-          "package.json:devDependencies",
+          `${label}:devDependencies`,
           `Banned package "${lookup}" present in devDependencies (version "${dev[lookup]}"). Allowed by milestone scope but flagged for awareness.`,
         );
       }
@@ -341,6 +345,12 @@ function checkPnpmWhy(): void {
 }
 
 const SOURCE_EXTS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
+// Paths where a banned import is the READER's dependency, not NeuroLink's.
+// examples/client-sdks/ demonstrates driving NeuroLink from a third-party SDK
+// (see createNeuroLinkProvider in src/lib/client/aiSdkAdapter.ts); the consumer
+// installs that SDK in their own project.
+const ALLOWED_IMPORT_PREFIXES = ["examples/client-sdks/"];
+
 const SKIP_DIRS = new Set([
   "node_modules",
   "dist",
@@ -351,7 +361,17 @@ const SKIP_DIRS = new Set([
 
 function collectSourceFiles(rootDir: string): string[] {
   const out: string[] = [];
-  const stack: string[] = ["src", "test", "scripts"]
+  const stack: string[] = [
+    "src",
+    "test",
+    "scripts",
+    "tools",
+    "eslint-rules",
+    "landing",
+    "docs-site",
+    "neurolink-demo",
+    "examples",
+  ]
     .map((d) => join(rootDir, d))
     .filter((p) => existsSync(p));
   while (stack.length > 0) {
@@ -386,6 +406,12 @@ function checkSourceImports(rootDir: string): void {
   const files = collectSourceFiles(rootDir);
 
   for (const file of files) {
+    const rel = file.startsWith(rootDir + "/")
+      ? file.slice(rootDir.length + 1)
+      : file;
+    if (ALLOWED_IMPORT_PREFIXES.some((prefix) => rel.startsWith(prefix))) {
+      continue;
+    }
     let contents: string;
     try {
       contents = readFileSync(file, "utf8");
@@ -443,7 +469,7 @@ function checkSourceImports(rootDir: string): void {
         if (importPattern.test(code)) {
           record(
             "error",
-            `${file}:${i + 1}`,
+            `${rel}:${i + 1}`,
             `Source file imports banned package "${banned}".`,
           );
         }
@@ -452,10 +478,46 @@ function checkSourceImports(rootDir: string): void {
   }
 }
 
+function collectPackageJsonDirs(rootDir: string): string[] {
+  const out: string[] = [];
+  const stack: string[] = [rootDir];
+  while (stack.length > 0) {
+    const dir = stack.shift()!;
+    if (existsSync(join(dir, "package.json"))) {
+      out.push(dir);
+    }
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (SKIP_DIRS.has(entry)) {
+        continue;
+      }
+      const full = join(dir, entry);
+      let stat: Stats;
+      try {
+        stat = statSync(full);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        stack.push(full);
+      }
+    }
+  }
+  return out;
+}
+
 function main(): void {
   const rootDir = process.cwd();
 
-  checkPackageJson(rootDir);
+  for (const dir of collectPackageJsonDirs(rootDir)) {
+    const rel = dir === rootDir ? "package.json" : `${dir.slice(rootDir.length + 1)}/package.json`;
+    checkPackageJson(dir, rel);
+  }
   checkPnpmLock(rootDir);
   checkPnpmWhy();
   checkSourceImports(rootDir);

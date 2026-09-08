@@ -884,10 +884,9 @@ async function section4Structured(): Promise<void> {
         schema: schema as any,
         maxTokens: 256,
       });
-      // Prefer `res.object` when populated (json_schema mode). When the
-      // provider runs in json_object fallback mode (`supportsStructuredOutputs:
-      // false` on @ai-sdk/openai-compatible), `res.object` may be empty even
-      // though the model returned valid JSON in `res.content`. Try parsing
+      // Prefer `res.structuredData`, the canonical parsed-object field. A
+      // provider running in json_object fallback mode may leave it empty even
+      // though the model returned valid JSON in `res.content`, so parse
       // content as a fallback before declaring failure. Also tolerates
       // ```json fenced blocks the model sometimes wraps the object in.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -909,7 +908,7 @@ async function section4Structured(): Promise<void> {
           return null;
         }
       };
-      const candidate = r?.object ?? tryParse(r?.content);
+      const candidate = r?.structuredData ?? tryParse(r?.content);
       const parsed = schema.safeParse(candidate);
       return parsed.success;
     });
@@ -944,9 +943,9 @@ async function section5Reasoning(): Promise<void> {
         maxTokens: 512,
       });
       // Accept reasoning signal in any of:
-      //   • `res.reasoning` (string, populated by GenerationHandler from AI SDK)
+      //   • `res.reasoning` (string, when the provider populates it)
       //   • `res.analytics.reasoning` (some providers route reasoning here)
-      //   • `res.reasoning` (array of {type:"reasoning", text} from AI SDK v6)
+      //   • `res.reasoning` (array of {type:"reasoning", text})
       //   • `<think>...</think>` markers inside `res.content` (DeepSeek, NIM
       //     reasoning models that emit CoT inline rather than in a separate
       //     `reasoning_content` field).

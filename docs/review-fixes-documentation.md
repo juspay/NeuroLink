@@ -198,6 +198,8 @@ protected formatProviderError(error: unknown): Error {
 
 **Root Cause:** When these providers were initially implemented, the `maxRetries: 0` convention (established in NL11) was not applied. The HTTP retry handler included `ENOTFOUND` in its retryable error codes list.
 
+**Historical note:** this fix targeted the Vercel AI SDK's `streamText()` retry behaviour. That code path no longer exists — every provider now runs a native loop — so the fix is superseded by the SDK removal, not re-broken by it. The `ENOTFOUND` half still applies.
+
 **Fix Applied:**
 
 1. Added `maxRetries: 0` to `streamText()` calls in: Azure, Google AI Studio, HuggingFace, Mistral, OpenAI Compatible.

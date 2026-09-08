@@ -316,13 +316,13 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
 
   /**
    * When true (default), `response_format` is NOT sent on requests that carry
-   * tools. The AI SDK sets responseFormat on EVERY step of a tool loop, and
-   * generic/proxy backends (LiteLLM→vllm/GLM, openai-compatible, local
+   * tools. The generate loop sets responseFormat on EVERY step of a tool
+   * loop, and generic/proxy backends (LiteLLM→vllm/GLM, openai-compatible, local
    * servers) may silently honor it over tool calling — answering with
    * final-shape JSON on step 1 instead of running the agentic loop. No error
    * is raised, so the runtime tools↔schema conflict detector cannot catch it.
-   * The schema is still enforced post-hoc (GenerationHandler coerces the final
-   * text against it) — the same contract as the Gemini tools↔schema exclusion.
+   * The schema is still enforced post-hoc (`coerceJsonToSchema` runs against
+   * the final text) — the same contract as the Gemini tools↔schema exclusion.
    * Mirrors the streaming path, which never sends response_format.
    *
    * Backends with first-party support for tools + json_schema in one request
@@ -967,8 +967,10 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
             : "") ?? "";
         const content: Array<{ type: string } & Record<string, unknown>> = [];
         // Reasoner-model output (DeepSeek `reasoning_content`, gateway
-        // `reasoning`) becomes a V3 reasoning part ahead of the text part —
-        // GenerationHandler joins reasoning parts into `result.reasoning`.
+        // `reasoning`) becomes a V3 reasoning part ahead of the text part.
+        // Nothing joins those parts into `result.reasoning` on the generate
+        // path today — GenerationHandler did, and went with the ai-package
+        // path — so the part is emitted here and currently dropped.
         // `||` so an empty-string reasoning_content falls through to a
         // non-empty `reasoning` field instead of shadowing it.
         const reasoningText =
@@ -1239,11 +1241,11 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
     // words instead: drop `response_format` and spell the JSON Schema into the
     // system prompt, letting coerceJsonToSchema recover the object from text.
     //
-    // Ported from GenerationHandler's `promptJsonInstruction` fallback, which
-    // runs this on the ai-package path. That path is unreachable for every
-    // provider driven by this loop — GMI Cloud's MiniMax endpoint, the one it
-    // was written for, is a Tier-2 catalog provider on this very base class —
-    // so without this the recovery would simply not happen for it.
+    // Ported from GenerationHandler's `promptJsonInstruction` fallback on the
+    // ai-package path, which has since been deleted — GMI Cloud's MiniMax
+    // endpoint, the one it was written for, is a Tier-2 catalog provider on
+    // this very base class, so without this the recovery would simply not
+    // happen for it.
     let loop: Awaited<ReturnType<typeof runNativeGenerateLoop>>;
     try {
       loop = await runLoop(conversation, responseFormat);

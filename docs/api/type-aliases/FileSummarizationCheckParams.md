@@ -8,7 +8,7 @@
 
 > **FileSummarizationCheckParams** = `object`
 
-Defined in: [types/context.ts:714](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L714)
+Defined in: [types/context.ts:691](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L691)
 
 Parameters for `shouldSummarizeFiles()`.
 
@@ -18,7 +18,7 @@ Parameters for `shouldSummarizeFiles()`.
 
 > **provider**: `string`
 
-Defined in: [types/context.ts:716](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L716)
+Defined in: [types/context.ts:693](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L693)
 
 AI provider name (e.g. "vertex", "anthropic")
 
@@ -28,7 +28,7 @@ AI provider name (e.g. "vertex", "anthropic")
 
 > `optional` **model?**: `string`
 
-Defined in: [types/context.ts:718](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L718)
+Defined in: [types/context.ts:695](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L695)
 
 Model name (optional -- falls back to provider default)
 
@@ -38,7 +38,7 @@ Model name (optional -- falls back to provider default)
 
 > **systemPromptTokens**: `number`
 
-Defined in: [types/context.ts:720](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L720)
+Defined in: [types/context.ts:697](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L697)
 
 Token estimate for the system prompt
 
@@ -48,7 +48,7 @@ Token estimate for the system prompt
 
 > **conversationHistoryTokens**: `number`
 
-Defined in: [types/context.ts:722](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L722)
+Defined in: [types/context.ts:699](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L699)
 
 Token estimate for conversation history
 
@@ -58,7 +58,7 @@ Token estimate for conversation history
 
 > **currentPromptTokens**: `number`
 
-Defined in: [types/context.ts:724](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L724)
+Defined in: [types/context.ts:701](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L701)
 
 Token estimate for the current user prompt
 
@@ -68,7 +68,7 @@ Token estimate for the current user prompt
 
 > **toolDefinitionTokens**: `number`
 
-Defined in: [types/context.ts:726](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L726)
+Defined in: [types/context.ts:703](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L703)
 
 Token estimate for tool definitions
 
@@ -78,7 +78,7 @@ Token estimate for tool definitions
 
 > **fileTokens**: `number`
 
-Defined in: [types/context.ts:728](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L728)
+Defined in: [types/context.ts:705](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L705)
 
 Token estimate for all attached files (sum)
 
@@ -88,7 +88,7 @@ Token estimate for all attached files (sum)
 
 > `optional` **fileCount?**: `number`
 
-Defined in: [types/context.ts:730](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L730)
+Defined in: [types/context.ts:707](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L707)
 
 Number of attached files
 
@@ -98,7 +98,7 @@ Number of attached files
 
 > `optional` **maxTokens?**: `number`
 
-Defined in: [types/context.ts:732](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L732)
+Defined in: [types/context.ts:709](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L709)
 
 Explicit maxTokens (output reserve) from user config
 
@@ -108,7 +108,7 @@ Explicit maxTokens (output reserve) from user config
 
 > `optional` **threshold?**: `number`
 
-Defined in: [types/context.ts:734](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L734)
+Defined in: [types/context.ts:711](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L711)
 
 Context usage fraction that triggers summarization (0.0-1.0, default 0.80)
 
@@ -118,7 +118,7 @@ Context usage fraction that triggers summarization (0.0-1.0, default 0.80)
 
 > `optional` **minTokensPerFile?**: `number`
 
-Defined in: [types/context.ts:736](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L736)
+Defined in: [types/context.ts:713](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L713)
 
 Minimum tokens per file in the summarization plan
 
@@ -128,6 +128,6 @@ Minimum tokens per file in the summarization plan
 
 > `optional` **maxTokensPerFile?**: `number`
 
-Defined in: [types/context.ts:738](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L738)
+Defined in: [types/context.ts:715](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L715)
 
 Maximum tokens per file in the summarization plan

@@ -2251,7 +2251,9 @@ async function test_input_recording(): Promise<boolean | null> {
 
     await tracingDelay(500);
 
-    // Look for the Vercel AI SDK span or the NeuroLink generate span
+    // Look for the NeuroLink generate span. The `ai.` prefix below is the
+    // Vercel AI SDK's own auto-instrumentation, which nothing emits since the
+    // SDK was removed; it is kept only so the matcher stays permissive.
     const allSpans = spanExporter.getFinishedSpans();
     const aiSpan = allSpans.find(
       (s) =>

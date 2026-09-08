@@ -1350,8 +1350,9 @@ export class AnthropicProvider extends BaseProvider {
         let tools: Anthropic.Messages.Tool[] | undefined = (options.tools ?? [])
           .filter((t) => t.type === "function")
           .map((t) => {
-            // GenerationHandler marks the last tool definition with a cache
-            // breakpoint when prompt caching is active — keep honoring it.
+            // Honor a cache breakpoint if a caller marked this tool. Nothing
+            // marks the last tool definition today: that was
+            // GenerationHandler's job and it went with the ai-package path.
             const cc = cacheControlOf(t);
             return {
               name: t.name,
@@ -1397,10 +1398,10 @@ export class AnthropicProvider extends BaseProvider {
 
         // Additive structured output: when the caller wants a schema AND real
         // tools, the forced-json path above cannot be used (it replaces the
-        // tools array), and the AI-SDK experimental_output path is excluded
-        // for this surface by structuredOutputPolicy. GenerationHandler hands
-        // the JSON Schema down here instead, and we APPEND a `final_result`
-        // tool — tool_choice stays auto, so every real tool keeps working and
+        // tools array), and structured output is excluded for this surface
+        // by structuredOutputPolicy. The schema arrives instead on
+        // `providerOptions.anthropic.finalResultSchema` and we APPEND a
+        // `final_result` tool — tool_choice stays auto, so every real tool keeps working and
         // the model self-selects final_result when it is ready to answer.
         const finalResultSchema = options.providerOptions?.anthropic
           ?.finalResultSchema as Record<string, unknown> | undefined;
@@ -1420,8 +1421,8 @@ export class AnthropicProvider extends BaseProvider {
           | undefined;
 
         // Prompt-cache parity with the native Vertex+Claude path: upstream
-        // layers mark only the stable prefix (system via MessageBuilder,
-        // last tool via GenerationHandler) — the growing conversation
+        // layers mark only the stable prefix (the system prompt, via
+        // MessageBuilder) — the growing conversation
         // history has no breakpoint, so on every turn it falls after the
         // last marker and is re-billed as fresh input. Add rolling history
         // breakpoints in whatever budget remains under Anthropic's

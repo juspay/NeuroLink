@@ -8,7 +8,7 @@
 
 > **SummarizeResult** = `object`
 
-Defined in: [types/context.ts:1035](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1035)
+Defined in: [types/context.ts:1012](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1012)
 
 Result of structured LLM summarization (Stage 3).
 
@@ -18,7 +18,7 @@ Result of structured LLM summarization (Stage 3).
 
 > **summarized**: `boolean`
 
-Defined in: [types/context.ts:1036](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1036)
+Defined in: [types/context.ts:1013](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1013)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/context.ts:1036](https://github.com/juspay/neurolink/blob/rel
 
 > **messages**: [`ChatMessage`](ChatMessage.md)[]
 
-Defined in: [types/context.ts:1037](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1037)
+Defined in: [types/context.ts:1014](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1014)
 
 ---
 
@@ -34,4 +34,4 @@ Defined in: [types/context.ts:1037](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **summaryText?**: `string`
 
-Defined in: [types/context.ts:1038](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1038)
+Defined in: [types/context.ts:1015](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L1015)

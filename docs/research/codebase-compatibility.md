@@ -1,5 +1,10 @@
 # Codebase Compatibility Analysis for Dependency Upgrades
 
+> **Describes the pre-removal dependency state.** "AI SDK Core" below maps
+> usage of `ai`/`@ai-sdk/*` and `src/lib/core/modules/GenerationHandler.ts`,
+> all of which have since been removed — see
+> `docs/plans/2026-09-03-completing-the-ai-sdk-removal.md`. Kept as a record.
+
 This document maps every outdated dependency to its usage within the NeuroLink codebase, identifying specific APIs consumed, files affected, and potential compatibility risks.
 
 ---

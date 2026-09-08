@@ -57,8 +57,9 @@ export function schemaAccepts(
  * object/array case is handled by `coerceJsonToSchema`; this covers the
  * residual scalar root after that path returns null. Encapsulates the JSON
  * parsing, the empty-string normalization, and the `schemaAccepts` gate so the
- * same policy cannot drift between consumers (`neurolink.recoverStructuredData`
- * and `GenerationHandler.coerceTextMode`).
+ * same policy cannot drift between consumers. `neurolink.recoverStructuredData`
+ * is the only one left; `GenerationHandler.coerceTextMode` was the other until
+ * the ai-package path was deleted.
  */
 export function recoverScalarRoot(
   text: string,

@@ -8,7 +8,7 @@
 
 > **SummarizedFile** = `object`
 
-Defined in: [types/context.ts:770](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L770)
+Defined in: [types/context.ts:747](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L747)
 
 Result item from `planFileSummarization()`.
 
@@ -18,7 +18,7 @@ Result item from `planFileSummarization()`.
 
 > **fileName**: `string`
 
-Defined in: [types/context.ts:772](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L772)
+Defined in: [types/context.ts:749](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L749)
 
 File display name
 
@@ -28,7 +28,7 @@ File display name
 
 > **fileType**: `string`
 
-Defined in: [types/context.ts:774](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L774)
+Defined in: [types/context.ts:751](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L751)
 
 File type label
 
@@ -38,7 +38,7 @@ File type label
 
 > **summary**: `string`
 
-Defined in: [types/context.ts:776](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L776)
+Defined in: [types/context.ts:753](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L753)
 
 Summary text (or original content if not summarized)
 
@@ -48,7 +48,7 @@ Summary text (or original content if not summarized)
 
 > **originalTokens**: `number`
 
-Defined in: [types/context.ts:778](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L778)
+Defined in: [types/context.ts:755](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L755)
 
 Original token estimate
 
@@ -58,7 +58,7 @@ Original token estimate
 
 > **summaryTokens**: `number`
 
-Defined in: [types/context.ts:780](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L780)
+Defined in: [types/context.ts:757](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L757)
 
 Token estimate of the summary
 
@@ -68,6 +68,6 @@ Token estimate of the summary
 
 > **wasSummarized**: `boolean`
 
-Defined in: [types/context.ts:782](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L782)
+Defined in: [types/context.ts:759](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L759)
 
 Whether this file was actually summarized

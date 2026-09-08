@@ -66,7 +66,3 @@ export const stepCountIs =
   (stepCount: number) =>
   ({ steps }: { steps: unknown[] }): boolean =>
     steps.length === stepCount;
-
-// `Output` still comes from the upstream package: its only consumer is the
-// GenerationHandler path that the native provider loops made unreachable, and
-// that whole path is removed in a following change rather than kept alive here.

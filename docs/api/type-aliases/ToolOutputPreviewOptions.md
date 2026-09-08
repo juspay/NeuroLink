@@ -8,7 +8,7 @@
 
 > **ToolOutputPreviewOptions** = `object`
 
-Defined in: [types/context.ts:834](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L834)
+Defined in: [types/context.ts:811](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L811)
 
 Options for tool output preview generation.
 
@@ -18,7 +18,7 @@ Options for tool output preview generation.
 
 > `optional` **maxBytes?**: `number`
 
-Defined in: [types/context.ts:836](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L836)
+Defined in: [types/context.ts:813](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L813)
 
 Maximum bytes for the preview (default: 50KB)
 
@@ -28,7 +28,7 @@ Maximum bytes for the preview (default: 50KB)
 
 > `optional` **maxLines?**: `number`
 
-Defined in: [types/context.ts:838](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L838)
+Defined in: [types/context.ts:815](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L815)
 
 Maximum lines for the preview (default: 2000)
 
@@ -38,7 +38,7 @@ Maximum lines for the preview (default: 2000)
 
 > `optional` **headRatio?**: `number`
 
-Defined in: [types/context.ts:840](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L840)
+Defined in: [types/context.ts:817](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L817)
 
 Fraction of preview budget allocated to the head (default: 0.25)
 
@@ -48,6 +48,6 @@ Fraction of preview budget allocated to the head (default: 0.25)
 
 > `optional` **tailRatio?**: `number`
 
-Defined in: [types/context.ts:842](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L842)
+Defined in: [types/context.ts:819](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L819)
 
 Fraction of preview budget allocated to the tail (default: 0.75)

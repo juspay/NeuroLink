@@ -2,7 +2,8 @@
 
 **Date**: 2026-01-01
 **Branch**: `feat/remove-ai-sdk-google`
-**Status**: Planning
+**Status**: Done — implemented in `076b9f4c3` (native `@google/genai` +
+`@anthropic-ai/vertex-sdk`). The Success Criteria below are all met.
 
 ---
 

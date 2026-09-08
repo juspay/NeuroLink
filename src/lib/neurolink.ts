@@ -5900,13 +5900,14 @@ Current user's request: ${currentInput}`;
       avatar: textResult.avatar,
       music: textResult.music,
       ppt: textResult.ppt,
-      // Forward reasoning/reasoningTokens from the provider layer.
-      // BaseProvider's GenerationHandler extracts these from AI-SDK reasoning
-      // parts (DeepSeek's `reasoning_content`, Anthropic thinking blocks,
-      // Gemini thought parts, OpenAI o1) and they're declared on
-      // `GenerateResult`, but the builder previously dropped them on the
-      // floor — so callers asking for `result.reasoning` got `undefined`
-      // even when the model emitted a chain-of-thought.
+      // Forward reasoning/reasoningTokens from the provider layer. They are
+      // declared on `GenerateResult` (DeepSeek's `reasoning_content`,
+      // Anthropic thinking blocks, Gemini thought parts, OpenAI o1) and the
+      // builder used to drop them on the floor, so callers asking for
+      // `result.reasoning` got `undefined` even when the model emitted a
+      // chain-of-thought. Providers on the shared native generate loop still
+      // do not populate the field — openaiChatCompletionsBase's doGenerate
+      // emits the reasoning part, but nothing joins it.
       reasoning: textResult.reasoning,
       reasoningTokens: textResult.reasoningTokens,
       ...(textResult.retries && { retries: textResult.retries }),

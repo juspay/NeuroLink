@@ -1,5 +1,11 @@
 # NeuroLink Dependency Upgrade Report
 
+> **Describes the pre-removal dependency state.** The Vercel AI SDK sections
+> below (§4.1–4.7, §4.25) analyse `ai` and `@ai-sdk/*` packages that have since
+> been removed from this repo — see
+> `docs/plans/2026-09-03-completing-the-ai-sdk-removal.md`. Kept as a record;
+> those upgrade recommendations are no longer actionable.
+
 **Date:** 2026-02-27
 **Version:** 9.12.1
 **Branch:** fix/security-fixes

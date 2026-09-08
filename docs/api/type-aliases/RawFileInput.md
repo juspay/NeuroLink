@@ -8,7 +8,7 @@
 
 > **RawFileInput** = `object`
 
-Defined in: [types/context.ts:793](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L793)
+Defined in: [types/context.ts:770](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L770)
 
 Raw file input before text extraction.
 
@@ -18,7 +18,7 @@ Raw file input before text extraction.
 
 > **content**: `string` \| `Buffer`
 
-Defined in: [types/context.ts:795](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L795)
+Defined in: [types/context.ts:772](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L772)
 
 File content -- either a UTF-8 string or a raw Buffer
 
@@ -28,7 +28,7 @@ File content -- either a UTF-8 string or a raw Buffer
 
 > **mimeType**: `string`
 
-Defined in: [types/context.ts:797](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L797)
+Defined in: [types/context.ts:774](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L774)
 
 MIME type (e.g. "application/pdf", "text/plain")
 
@@ -38,7 +38,7 @@ MIME type (e.g. "application/pdf", "text/plain")
 
 > **fileName**: `string`
 
-Defined in: [types/context.ts:799](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L799)
+Defined in: [types/context.ts:776](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L776)
 
 Display file name
 
@@ -48,6 +48,6 @@ Display file name
 
 > `optional` **originalSize?**: `number`
 
-Defined in: [types/context.ts:801](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L801)
+Defined in: [types/context.ts:778](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L778)
 
 Original byte size on disk (optional)

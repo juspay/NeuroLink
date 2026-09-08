@@ -407,7 +407,7 @@ async function testBaselineExperimentRuns(): Promise<void> {
 /**
  * `ResearchWorker.getTools()` is declared `Record<string, unknown>` — the
  * tools it actually returns are always executable (built via `tool()` in
- * autoresearch/tools.ts), but the ai-sdk `Tool` type makes `execute`
+ * autoresearch/tools.ts), but the `Tool` type makes `execute`
  * optional (to accommodate client-side, no-execute tools), so narrowing to
  * the central `Tool` type would still leave every `.execute()` call flagged
  * as possibly undefined. Narrow locally to the executable shape this suite

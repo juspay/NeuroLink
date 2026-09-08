@@ -8,7 +8,7 @@
 
 > **BudgetFileInput** = `object`
 
-Defined in: [types/context.ts:805](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L805)
+Defined in: [types/context.ts:782](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L782)
 
 Input file for aggregate budget enforcement.
 
@@ -18,7 +18,7 @@ Input file for aggregate budget enforcement.
 
 > **name**: `string`
 
-Defined in: [types/context.ts:806](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L806)
+Defined in: [types/context.ts:783](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L783)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/context.ts:806](https://github.com/juspay/neurolink/blob/rele
 
 > **sizeBytes**: `number`
 
-Defined in: [types/context.ts:807](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L807)
+Defined in: [types/context.ts:784](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L784)
 
 ---
 
@@ -34,6 +34,6 @@ Defined in: [types/context.ts:807](https://github.com/juspay/neurolink/blob/rele
 
 > `optional` **fileType?**: `string`
 
-Defined in: [types/context.ts:809](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L809)
+Defined in: [types/context.ts:786](https://github.com/juspay/neurolink/blob/release/src/lib/types/context.ts#L786)
 
 Optional file type hint for type-aware token estimation

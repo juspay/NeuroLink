@@ -1,5 +1,9 @@
 # Execution Agent Prompt: Remove Google AI SDK Dependencies, Vertex-Protected Milestone
 
+> **Status: done.** This Google-only milestone shipped as `adc51feb`. The
+> "Future Full-AISDK Removal Scope" it deliberately deferred is complete too —
+> see `docs/plans/2026-09-03-completing-the-ai-sdk-removal.md`.
+
 ## Role
 
 You are the execution agent. The orchestrator has already audited the current

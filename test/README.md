@@ -484,7 +484,7 @@ live test runs:
    on both stream and generate paths.
 5. **`reasoning_content` plumbing** — DeepSeek-reasoner CoT and NIM
    reasoning models now surface through the full result chain
-   (`GenerationHandler` → `TextGenerationResult` → `GenerateResult`)
+   (provider result → `TextGenerationResult` → `GenerateResult`)
    at all three build sites.
 6. **Per-call credentials kebab-case fix**
    (`factories/providerFactory.ts`) — `credentialKeyMap` now includes

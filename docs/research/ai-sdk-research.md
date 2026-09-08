@@ -1,5 +1,9 @@
 # AI SDK Dependency Upgrade Research
 
+> **Describes the pre-removal dependency state.** Every package researched here
+> (`ai`, `@ai-sdk/*`) has since been removed from this repo — see
+> `docs/plans/2026-09-03-completing-the-ai-sdk-removal.md`. Kept as a record.
+
 **Date:** 2026-02-27
 **Researcher:** ai-sdk-researcher (automated)
 **Scope:** 7 AI SDK packages from vercel/ai monorepo

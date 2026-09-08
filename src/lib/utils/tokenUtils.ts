@@ -3,7 +3,6 @@
  * Handles multiple provider formats and optional fields
  *
  * Consolidates token extraction logic from:
- * - GenerationHandler.ts
  * - analytics.ts
  * - streamAnalytics.ts
  */

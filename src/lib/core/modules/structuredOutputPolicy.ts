@@ -40,12 +40,12 @@ export function isGeminiProvider(
  * matched here (different transport, no conflict).
  *
  * Being excluded here no longer means the schema is LOST for provider
- * "anthropic": GenerationHandler forwards the JSON Schema to the provider via
- * `providerOptions.anthropic.finalResultSchema`, and the provider appends an
- * additive `final_result` tool (see providers/anthropic/structuredOutput.ts) —
- * schema enforcement without giving up tool calling. "bedrock" has no such
- * handling (it talks to the raw AWS SDK directly, not an ai-sdk provider
- * package) and still falls back to text-mode coercion.
+ * "anthropic": the client puts the JSON Schema on
+ * `providerOptions.anthropic.finalResultSchema` and its `doGenerate` appends
+ * an additive `final_result` tool (see providers/anthropic/structuredOutput.ts)
+ * — schema enforcement without giving up tool calling. "bedrock" has no such
+ * handling (it talks to the raw AWS SDK directly) and still falls back to
+ * text-mode coercion.
  */
 export function isNativeAnthropicProvider(providerName: string): boolean {
   return providerName === "anthropic" || providerName === "bedrock";

@@ -42,8 +42,8 @@ import type {
 import type { Tool } from "./tools.js";
 
 // Language-model handles, embedding/image models, and generation-result shapes.
-// Today these resolve through the upstream generation library; consumers should
-// import via the package barrel.
+// These are declared locally in types/aiCompat.ts; consumers should import via
+// the package barrel.
 export type {
   LanguageModel,
   EmbeddingModel,

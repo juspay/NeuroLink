@@ -120,7 +120,7 @@ export class ConfiguredOpenAICompatProvider extends OpenAIChatCompletionsProvide
    * a `tools` array — Mancer's free model rejects one with 400 — so the
    * declaration wins here and the registry is only consulted otherwise.
    * Like the other entry-reading overrides above, this runs only after
-   * construction: BaseProvider merely closes over it for GenerationHandler.
+   * construction: BaseProvider merely closes over it.
    */
   supportsTools(): boolean {
     if (this.entry.supportsTools === false) {
