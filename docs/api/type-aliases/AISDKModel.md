@@ -8,7 +8,7 @@
 
 > **AISDKModel** = `object`
 
-Defined in: [types/providers.ts:77](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L77)
+Defined in: [types/providers.ts:76](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L76)
 
 Generic AI SDK model interface
 

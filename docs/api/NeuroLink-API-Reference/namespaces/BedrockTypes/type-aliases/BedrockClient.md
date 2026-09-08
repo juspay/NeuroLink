@@ -8,7 +8,7 @@
 
 > **BedrockClient** = `object`
 
-Defined in: [types/providers.ts:1936](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1936)
+Defined in: [types/providers.ts:1920](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1920)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/providers.ts:1936](https://github.com/juspay/neurolink/blob/r
 
 > **config**: `object`
 
-Defined in: [types/providers.ts:1938](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1938)
+Defined in: [types/providers.ts:1922](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1922)
 
 #### region?
 
@@ -32,7 +32,7 @@ Defined in: [types/providers.ts:1938](https://github.com/juspay/neurolink/blob/r
 
 > **send**(`command`): `Promise`\<`unknown`\>
 
-Defined in: [types/providers.ts:1937](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1937)
+Defined in: [types/providers.ts:1921](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1921)
 
 #### Parameters
 

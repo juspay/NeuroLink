@@ -23,7 +23,6 @@ import {
 import type { ValidationSchema } from "./aliases.js";
 import type {
   EnhancedGenerateResult,
-  GenerateResult,
   TextGenerationOptions,
 } from "./generate.js";
 import type { MultimodalAudioEntry } from "./file.js";
@@ -971,21 +970,6 @@ export type ProviderCapability =
  * Extended tool type that combines AI SDK tools with external MCP tool info
  */
 export type ExtendedTool = Tool & Partial<ExternalMCPToolInfo>;
-
-/**
- * AI SDK generate result with steps support (extends GenerateResult)
- */
-export type AISDKGenerateResult = GenerateResult & {
-  steps?: Array<{
-    toolCalls?: Array<{
-      toolName?: string;
-      name?: string;
-      [key: string]: unknown;
-    }>;
-    [key: string]: unknown;
-  }>;
-  [key: string]: unknown;
-};
 
 // ============================================================================
 // Provider-Specific Type Definitions
@@ -2116,16 +2100,6 @@ export type CollectedChunkResult = {
 export type LanguageModelObject = {
   readonly modelId: string;
   readonly provider: string;
-};
-
-/** Step finish event shape for multi-step generation. */
-export type StepFinishEvent = {
-  readonly toolCalls: ReadonlyArray<unknown>;
-  readonly toolResults: ReadonlyArray<unknown>;
-  readonly text: string;
-  readonly finishReason: string;
-  readonly usage: { inputTokens?: number; outputTokens?: number };
-  [key: string]: unknown;
 };
 
 /**

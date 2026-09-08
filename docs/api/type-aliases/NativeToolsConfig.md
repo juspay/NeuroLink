@@ -8,7 +8,7 @@
 
 > **NativeToolsConfig** = `object`[]
 
-Defined in: [types/providers.ts:2049](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L2049)
+Defined in: [types/providers.ts:2033](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L2033)
 
 The tools config array expected by the @google/genai SDK.
 

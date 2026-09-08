@@ -344,7 +344,10 @@ describe.sequential("Codex quota observability", () => {
     });
     expect(getTerminalErrors().recent.at(-1)).toMatchObject({
       accountKey: account.key,
-      errorType: "all_accounts_failed",
+      // Not the `all_accounts_failed` default: a transport failure overwrites
+      // lastFailure with the specific cause and its code.
+      errorType: "network_error",
+      errorCode: "ECONNRESET",
     });
 
     const attempts = await logEntries("proxy-attempts-");

@@ -8,7 +8,7 @@
 
 > **ModelsResponse** = `object`
 
-Defined in: [types/providers.ts:1316](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1316)
+Defined in: [types/providers.ts:1300](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1300)
 
 OpenAI-compatible models endpoint response structure
 
@@ -18,7 +18,7 @@ OpenAI-compatible models endpoint response structure
 
 > **data**: `object`[]
 
-Defined in: [types/providers.ts:1317](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1317)
+Defined in: [types/providers.ts:1301](https://github.com/juspay/neurolink/blob/release/src/lib/types/providers.ts#L1301)
 
 #### id
 
