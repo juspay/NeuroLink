@@ -3,9 +3,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 /**
  * Read an Anthropic cache breakpoint from a message/part/tool carrier.
  * MessageBuilder marks system messages with
- * `providerOptions.anthropic.cacheControl`. A tool carrier is still read so a
- * marked tool is honored, but nothing marks one today — GenerationHandler
- * tagged the last tool definition and went with the ai-package path.
+ * `providerOptions.anthropic.cacheControl`; the Anthropic client marks the last
+ * tool definition on the assembled request. This reader is what honors both.
  *
  * Extracted from anthropic/client.ts so `src/lib/core/nativeToolFormat.ts`
  * can share it without importing the provider client (which would create a

@@ -136,6 +136,7 @@ export async function runNativeGenerateLoop(
 ): Promise<NativeGenerateLoopResult> {
   const toolsUsed: string[] = [];
   let text = "";
+  let reasoning = "";
   let finishReason = "stop";
   let rawFinishReason: string | undefined;
   let inputTokens = 0;
@@ -224,6 +225,15 @@ export async function runNativeGenerateLoop(
     // answer is the turn's answer, matching what generateText reported.
     text = parts
       .filter((p) => p.type === "text" && typeof p.text === "string")
+      .map((p) => p.text as string)
+      .join("");
+    // Reasoner models (DeepSeek `reasoning_content`, gateway `reasoning`,
+    // OpenAI o-series) emit reasoning as its own V3 content part. Join it on
+    // the same replace-per-step rule as the text so the caller can surface
+    // `result.reasoning`; without this the provider builds the part and the
+    // loop drops it.
+    reasoning = parts
+      .filter((p) => p.type === "reasoning" && typeof p.text === "string")
       .map((p) => p.text as string)
       .join("");
 
@@ -352,6 +362,7 @@ export async function runNativeGenerateLoop(
 
   return {
     text,
+    ...(reasoning ? { reasoning } : {}),
     finishReason,
     ...(rawFinishReason ? { rawFinishReason } : {}),
     inputTokens,

@@ -967,10 +967,8 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
             : "") ?? "";
         const content: Array<{ type: string } & Record<string, unknown>> = [];
         // Reasoner-model output (DeepSeek `reasoning_content`, gateway
-        // `reasoning`) becomes a V3 reasoning part ahead of the text part.
-        // Nothing joins those parts into `result.reasoning` on the generate
-        // path today — GenerationHandler did, and went with the ai-package
-        // path — so the part is emitted here and currently dropped.
+        // `reasoning`) becomes a V3 reasoning part ahead of the text part —
+        // the native generate loop joins those parts into `result.reasoning`.
         // `||` so an empty-string reasoning_content falls through to a
         // non-empty `reasoning` field instead of shadowing it.
         const reasoningText =
@@ -1329,6 +1327,7 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
           : {}),
       },
       responseTime: Date.now() - startTime,
+      ...(loop.reasoning ? { reasoning: loop.reasoning } : {}),
       toolsUsed,
       toolCalls: toolCallsFromSummaries(toolExecutionSummaries),
       toolExecutions: resolveToolExecutionRecords(

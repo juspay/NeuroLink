@@ -1794,6 +1794,8 @@ export type NativeGenerateLoopArgs = {
 
 export type NativeGenerateLoopResult = {
   text: string;
+  /** Joined reasoning content parts from the final step, when the vendor sent any. */
+  reasoning?: string;
   finishReason: string;
   rawFinishReason?: string;
   inputTokens: number;

@@ -33,6 +33,8 @@ import "dotenv/config";
  * Run: pnpm run build && npx tsx test/continuous-test-suite-native-vendor-recovery.ts
  */
 
+import { createServer } from "node:http";
+import { once } from "node:events";
 import { z } from "zod";
 import { defineSuite } from "./helpers/harness.js";
 import { assertDistFresh } from "./helpers/distFreshness.js";
@@ -304,6 +306,198 @@ await test("a native tool round trip populates result.toolCalls", async () => {
     }
   } finally {
     await server.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Native-loop result contracts.
+//
+// These are not vendor recoveries: they are fields the loop is supposed to
+// carry that it silently drops. Both were found when the ai-sdk removal's
+// leftover comments were audited — each comment credited `GenerationHandler`
+// with work that nothing does now.
+// ---------------------------------------------------------------------------
+
+await test("a vendor reasoning part reaches result.reasoning", async () => {
+  const REASONING = "step one, then step two";
+  const server = await startScriptedChatServer([
+    {
+      id: "reasoner",
+      object: "chat.completion",
+      created: 1,
+      model: "scripted-reasoner",
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: "assistant",
+            content: "42",
+            reasoning_content: REASONING,
+          },
+          finish_reason: "stop",
+        },
+      ],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    },
+  ]);
+  const sdk = new NeuroLink();
+  try {
+    const result = await sdk.generate({
+      input: { text: "what is the answer?" },
+      provider: "openai",
+      model: "scripted-reasoner",
+      disableTools: true,
+      disableInternalFallback: true,
+      credentials: credentialsFor(server.baseURL),
+    });
+    // Precondition: a pass must not come from the call never happening.
+    if (server.requestCount() !== 1) {
+      throw new Error(
+        "precondition: the scripted endpoint was not called once",
+      );
+    }
+    if (result.content !== "42") {
+      throw new Error(
+        "precondition: the scripted answer did not reach content",
+      );
+    }
+    if (result.reasoning !== REASONING) {
+      throw new Error(
+        "the vendor reasoning part did not reach result.reasoning",
+      );
+    }
+  } finally {
+    await sdk.shutdown();
+    await server.close();
+  }
+});
+
+type AnthropicToolProbe = {
+  baseURL: string;
+  requests(): number;
+  lastTools(): Array<Record<string, unknown>>;
+};
+
+/** Minimal Messages endpoint that records the tool block it was sent. */
+const startAnthropicToolProbe = async (): Promise<AnthropicToolProbe> => {
+  let requests = 0;
+  let tools: Array<Record<string, unknown>> = [];
+  const server = createServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const part of req) {
+      chunks.push(part as Buffer);
+    }
+    requests += 1;
+    try {
+      const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
+        tools?: Array<Record<string, unknown>>;
+      };
+      tools = parsed.tools ?? [];
+    } catch {
+      tools = [];
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        id: "msg_probe",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-4-20250514",
+        content: [{ type: "text", text: "done" }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address !== "object") {
+    throw new Error("probe server did not bind");
+  }
+  return {
+    baseURL: `http://127.0.0.1:${address.port}`,
+    requests: () => requests,
+    lastTools: () => tools,
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+  } as AnthropicToolProbe & { close: () => Promise<void> };
+};
+
+await test("the Anthropic tools block carries one cache breakpoint", async () => {
+  const probe = (await startAnthropicToolProbe()) as AnthropicToolProbe & {
+    close: () => Promise<void>;
+  };
+  const saved = {
+    url: process.env.ANTHROPIC_BASE_URL,
+    key: process.env.ANTHROPIC_API_KEY,
+  };
+  process.env.ANTHROPIC_BASE_URL = probe.baseURL;
+  process.env.ANTHROPIC_API_KEY = "sk-ant-mock-local-server";
+  const sdk = new NeuroLink();
+  try {
+    await sdk.generate({
+      input: { text: "hello" },
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      disableInternalFallback: true,
+      tools: {
+        first_tool: tool({
+          description: "first",
+          inputSchema: z.object({ a: z.string() }),
+          execute: async () => "a",
+        }),
+        second_tool: tool({
+          description: "second",
+          inputSchema: z.object({ b: z.string() }),
+          execute: async () => "b",
+        }),
+      },
+    });
+    // Preconditions: the request must actually have carried both tools,
+    // otherwise "no marker" would prove nothing.
+    if (probe.requests() < 1) {
+      throw new Error("precondition: the probe endpoint was never called");
+    }
+    // The SDK merges built-in/MCP tools with the caller's, so assert a floor
+    // rather than an exact count: what matters is that a tools block was sent.
+    const tools = probe.lastTools();
+    if (tools.length < 2) {
+      throw new Error("precondition: the request carried no tools block");
+    }
+    const marked = tools.filter(
+      (t) =>
+        (t as { cache_control?: { type?: string } }).cache_control?.type ===
+        "ephemeral",
+    );
+    if (marked.length !== 1) {
+      throw new Error(
+        "the tools block does not carry exactly one cache breakpoint",
+      );
+    }
+    const last = tools[tools.length - 1] as {
+      cache_control?: { type?: string };
+    };
+    if (last.cache_control?.type !== "ephemeral") {
+      throw new Error("the cache breakpoint is not on the last tool");
+    }
+  } finally {
+    await sdk.shutdown();
+    await probe.close();
+    if (saved.url === undefined) {
+      delete process.env.ANTHROPIC_BASE_URL;
+    } else {
+      process.env.ANTHROPIC_BASE_URL = saved.url;
+    }
+    if (saved.key === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = saved.key;
+    }
   }
 });
 

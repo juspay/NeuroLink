@@ -2205,11 +2205,9 @@ export abstract class BaseProvider implements AIProvider {
       analytics: result.analytics,
       evaluation: result.evaluation,
       audio: result.audio,
-      // Forward reasoning fields from the provider result (DeepSeek
-      // `reasoning_content`, Anthropic thinking, Gemini thought parts,
-      // OpenAI o1). Providers on the shared native generate loop do not
-      // populate them yet: the loop emits a V3 reasoning content part but
-      // nothing joins it into `reasoning`, so this forwards undefined there.
+      // Forward reasoning fields populated by the native generate loop from
+      // vendor reasoning parts (DeepSeek `reasoning_content`, Anthropic
+      // thinking, Gemini thought parts, OpenAI o1).
       reasoning: result.reasoning,
       reasoningTokens: result.reasoningTokens,
     };

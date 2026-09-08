@@ -284,6 +284,7 @@ export class AmazonSageMakerProvider extends BaseProvider {
         total: loop.inputTokens + loop.outputTokens,
       },
       responseTime: Date.now() - startTime,
+      ...(loop.reasoning ? { reasoning: loop.reasoning } : {}),
       toolsUsed: loop.toolsUsed,
       toolCalls: toolCallsFromSummaries(toolExecutionSummaries),
       toolExecutions: resolveToolExecutionRecords(
