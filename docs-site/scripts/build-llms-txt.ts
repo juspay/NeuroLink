@@ -367,12 +367,23 @@ function extractApiSignatures(): string {
 `.trim();
 }
 
+/** Total-order tiebreak by codepoint. `localeCompare` is not used: collation
+ *  depends on the Node ICU build, so it could order CI and a laptop
+ *  differently and reintroduce the churn this replaces. */
+function byCodepoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /**
  * Get all documentation files
  */
 async function getDocFiles(): Promise<DocFile[]> {
   const pattern = "**/*.md";
-  const files = await glob(pattern, { cwd: DOCS_DIR, nodir: true });
+  // glob resolves in filesystem order, which differs between machines and
+  // between runs. Sort it before anything downstream depends on it.
+  const files = (await glob(pattern, { cwd: DOCS_DIR, nodir: true })).sort(
+    byCodepoint,
+  );
 
   const docFiles: DocFile[] = [];
 
@@ -408,8 +419,13 @@ async function getDocFiles(): Promise<DocFile[]> {
     });
   }
 
-  // Sort by order
-  docFiles.sort((a, b) => a.order - b.order);
+  // `order` alone is not a total order — many files share one. Ties used to
+  // fall back to glob's filesystem order, so two identical builds produced
+  // different output (215,862 differing lines in llms-full.txt). Tiebreak on
+  // the path so the result is a pure function of the docs.
+  docFiles.sort(
+    (a, b) => a.order - b.order || byCodepoint(a.relativePath, b.relativePath),
+  );
 
   return docFiles;
 }
@@ -438,7 +454,9 @@ function sortSections(sections: Map<string, DocFile[]>): string[] {
     const bIndex = SECTION_ORDER.indexOf(b);
     const aOrder = aIndex >= 0 ? aIndex : 999;
     const bOrder = bIndex >= 0 ? bIndex : 999;
-    return aOrder - bOrder;
+    // Every section outside SECTION_ORDER scores 999, so without this tiebreak
+    // their relative order came from Map insertion order — i.e. file order.
+    return aOrder - bOrder || byCodepoint(a, b);
   });
 }
 
@@ -449,7 +467,6 @@ function buildSummaryLlmsTxt(
   files: DocFile[],
   truncateChars: number = SUMMARY_CONTENT_TRUNCATE_CHARS,
 ): string {
-  const timestamp = new Date().toISOString();
   const lines: string[] = [];
 
   // Header
@@ -457,7 +474,6 @@ function buildSummaryLlmsTxt(
   lines.push("");
   lines.push("> Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI");
   lines.push("");
-  lines.push(`Generated: ${timestamp}`);
   lines.push(`Full documentation: ${DOCS_BASE_URL}/llms-full.txt`);
   lines.push("");
   lines.push("---");
@@ -575,7 +591,6 @@ function buildSummaryWithinTarget(files: DocFile[]): {
  * Build the full llms-full.txt content
  */
 function buildFullLlmsTxt(files: DocFile[]): string {
-  const timestamp = new Date().toISOString();
   const sections = groupBySection(files);
   const sortedSections = sortSections(sections);
   const lines: string[] = [];
@@ -585,7 +600,6 @@ function buildFullLlmsTxt(files: DocFile[]): string {
   lines.push("");
   lines.push("> Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI");
   lines.push("");
-  lines.push(`Generated: ${timestamp}`);
   lines.push(`Summary version: ${DOCS_BASE_URL}/llms.txt`);
   lines.push(`Total files: ${files.length}`);
   lines.push("");

@@ -2,7 +2,6 @@
 
 > Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI
 
-Generated: 2026-09-08T14:10:23.601Z
 Full documentation: https://docs.neurolink.ink/llms-full.txt
 
 ---
@@ -81,8 +80,8 @@ NeuroLink is an enterprise AI development platform that provides:
 - ⚙️ Provider Configuration Guide
 - Azure Speech Services
 - Beatoven.ai Provider Guide (music)
-- Redis Quick Start (5 Minutes)
 - Cartesia TTS Provider Guide
+- Redis Quick Start (5 Minutes)
 - Cerebras Provider Guide
 - Cloudflare Workers AI Provider Guide
 - Cohere Provider Guide
@@ -414,24 +413,6 @@ AZURE_SPEECH_REGION=eastus
 
 ---
 
-## Redis Quick Start (5 Minutes)
-
-<!-- Source: getting-started/redis-quickstart.md -->
-
-# Redis Quick Start (5 Minutes)
-
-Get Redis storage up and running with NeuroLink in under 5 minutes.
-
-## Prerequisites
-
-- Docker installed **OR** Redis installed locally
-- NeuroLink SDK installed (`pnpm add @juspay/neurolink`)
-
-
-[Content truncated - see llms-full.txt for complete documentation]
-
----
-
 ## Cartesia TTS Provider Guide
 
 <!-- Source: getting-started/providers/cartesia.md -->
@@ -446,6 +427,24 @@ synchronous `/tts/bytes` REST endpoint**
 ### 1. Get an API Key
 
 Sign up at [play.cartesia.ai](https://play.cartesia.ai/), open
+
+[Content truncated - see llms-full.txt for complete documentation]
+
+---
+
+## Redis Quick Start (5 Minutes)
+
+<!-- Source: getting-started/redis-quickstart.md -->
+
+# Redis Quick Start (5 Minutes)
+
+Get Redis storage up and running with NeuroLink in under 5 minutes.
+
+## Prerequisites
+
+- Docker installed **OR** Redis installed locally
+- NeuroLink SDK installed (`pnpm add @juspay/neurolink`)
+
 
 [Content truncated - see llms-full.txt for complete documentation]
 

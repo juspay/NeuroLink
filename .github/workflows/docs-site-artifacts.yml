@@ -1,0 +1,102 @@
+# docs-site/static/{llms.txt,llms-full.txt,search-index.json} are generated,
+# committed, and shipped: search-index.json is listed in package.json `files`,
+# so the copy in this repo is the copy inside the published tarball.
+#
+# Nothing kept them current. `build-llms-txt.ts` and the search-index plugin's
+# postBuild hook run only in docs-deploy.yml, which fires on push to
+# main/release and holds `contents: read` — it can serve the rebuilt files but
+# cannot commit them. They drifted 66 documentation commits before anyone
+# noticed.
+#
+# Why this is a check and not a write-back. The obvious fix — give docs-deploy
+# `contents: write` and commit the result — cannot work here: `release` carries
+# five required status checks, and a push that arrives outside a pull request
+# carries no check runs, so every required context reads as missing and the
+# push is declined (GH013). That is the same wall that forced
+# @semantic-release/git out of the release job. So currency is enforced where a
+# push CAN happen: on the pull request that changes the docs.
+#
+# Deliberately NOT a required status check. It installs the docs-site
+# dependency tree, which no other job needs; a hiccup there must not be able to
+# block a pull request that never touched documentation. It is path-filtered
+# for the same reason.
+name: Docs-site Artifacts
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "docs-site/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-site-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  currency:
+    name: Generated artifacts are current
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: docs-site/pnpm-lock.yaml
+
+      - name: Restore Docusaurus cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            docs-site/.docusaurus
+            docs-site/node_modules/.cache
+          key: ${{ runner.os }}-docusaurus-${{ hashFiles('docs-site/pnpm-lock.yaml') }}-${{ hashFiles('docs-site/**/*.{ts,tsx,mdx,css}') }}
+          restore-keys: |
+            ${{ runner.os }}-docusaurus-${{ hashFiles('docs-site/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-docusaurus-
+
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm run build` is sync-docs + build:llms-txt + docusaurus build. The
+      # search index is a postBuild hook on the docusaurus build, so there is no
+      # cheaper command that regenerates all three artifacts.
+      - name: Rebuild the documentation site
+        working-directory: docs-site
+        run: pnpm run build
+
+      # Scoped to static/: sync-docs also writes into docs-site/docs, and only
+      # these three files are the shipped artifacts. `git status --porcelain`
+      # rather than `git diff` so a newly emitted or removed file is caught too.
+      - name: Check the generated artifacts are current
+        run: |
+          if [ -n "$(git status --porcelain docs-site/static)" ]; then
+            echo "::error::docs-site/static artifacts are out of date with docs/."
+            echo ""
+            echo "These files are generated AND committed, and search-index.json"
+            echo "ships inside the npm tarball, so a stale copy is published."
+            echo ""
+            echo "Regenerate and commit:"
+            echo "    pnpm run docs:build"
+            echo "    git add docs-site/static"
+            echo ""
+            git --no-pager diff --stat docs-site/static
+            git status --porcelain docs-site/static
+            exit 1
+          fi
+          echo "✅ docs-site/static artifacts match the documentation they index."
