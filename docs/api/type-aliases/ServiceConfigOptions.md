@@ -8,7 +8,7 @@
 
 > **ServiceConfigOptions** = `object`
 
-Defined in: [types/service.ts:72](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L72)
+Defined in: [types/service.ts:58](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L58)
 
 Service configuration options
 
@@ -18,7 +18,7 @@ Service configuration options
 
 > `optional` **singleton?**: `boolean`
 
-Defined in: [types/service.ts:73](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L73)
+Defined in: [types/service.ts:59](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L59)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/service.ts:73](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **lazy?**: `boolean`
 
-Defined in: [types/service.ts:74](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L74)
+Defined in: [types/service.ts:60](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L60)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/service.ts:74](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **timeout?**: `number`
 
-Defined in: [types/service.ts:75](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L75)
+Defined in: [types/service.ts:61](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L61)
 
 ---
 
@@ -42,7 +42,7 @@ Defined in: [types/service.ts:75](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **retries?**: `number`
 
-Defined in: [types/service.ts:76](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L76)
+Defined in: [types/service.ts:62](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L62)
 
 ---
 
@@ -50,4 +50,4 @@ Defined in: [types/service.ts:76](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **dependencies?**: `string`[]
 
-Defined in: [types/service.ts:77](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L77)
+Defined in: [types/service.ts:63](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L63)

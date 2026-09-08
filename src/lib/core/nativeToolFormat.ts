@@ -71,8 +71,9 @@ export function toNativeToolDeclarations(
         ? convertZodToJsonSchema(rawSchema as never)
         : { type: "object", properties: {} }
     ) as Record<string, unknown>;
-    // Honor a cache breakpoint the caller set on this tool. The direct
-    // Anthropic path marks the last tool itself, on the assembled request.
+    // Honor a cache breakpoint the caller set on this tool. Closing the
+    // stable prefix is a separate step: both Anthropic paths call
+    // `withLastToolCacheBreakpoint` on the assembled array afterwards.
     const cc = cacheControlOf(tool);
     const declaration: NativeAnthropicToolDeclaration = {
       name,

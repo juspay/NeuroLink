@@ -2205,9 +2205,12 @@ export abstract class BaseProvider implements AIProvider {
       analytics: result.analytics,
       evaluation: result.evaluation,
       audio: result.audio,
-      // Forward reasoning fields populated by the native generate loop from
-      // vendor reasoning parts (DeepSeek `reasoning_content`, Anthropic
-      // thinking, Gemini thought parts, OpenAI o1).
+      // Forward reasoning fields. They are populated by the shared native
+      // generate loop, which serves the OpenAI-compatible, Anthropic and
+      // SageMaker providers (DeepSeek `reasoning_content`, gateway
+      // `reasoning`, Anthropic thinking, OpenAI o-series). Vertex and AI Studio
+      // override generate() and never reach that loop; they report a numeric
+      // `usage.reasoning` token count and leave this text field undefined.
       reasoning: result.reasoning,
       reasoningTokens: result.reasoningTokens,
     };

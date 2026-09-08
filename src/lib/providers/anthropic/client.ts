@@ -134,7 +134,7 @@ import { createStreamChannel } from "../../core/streamChannel.js";
 import { toNativeToolDeclarations } from "../../core/nativeToolFormat.js";
 
 import { ANTHROPIC_BETA_HEADERS } from "./constants.js";
-import { cacheControlOf } from "./cacheControl.js";
+import { cacheControlOf, withLastToolCacheBreakpoint } from "./cacheControl.js";
 import {
   appendFinalResultInstruction,
   appendFinalResultTool,
@@ -1419,23 +1419,9 @@ export class AnthropicProvider extends BaseProvider {
           | { type: "enabled"; budget_tokens: number }
           | undefined;
 
-        // Close the stable prefix with a breakpoint on the LAST tool. Tool
-        // definitions sit between the system prompt and the conversation and
-        // rarely change, so without this the whole tools block is re-billed
-        // every turn. Applied after every tool mutation above (including the
-        // appended final_result tool) so the marker really is last, and before
-        // the count below so the history budget accounts for it. A caller that
-        // marked a tool itself wins.
-        if (tools && tools.length > 0) {
-          const alreadyMarked = tools.some((t) => cacheControlOf(t));
-          if (!alreadyMarked) {
-            const last = tools[tools.length - 1];
-            tools = [
-              ...tools.slice(0, -1),
-              { ...last, cache_control: { type: "ephemeral" } },
-            ];
-          }
-        }
+        // Close the stable prefix with a breakpoint on the last tool. The
+        // stream path does the same, just before its own marker count.
+        tools = withLastToolCacheBreakpoint(tools);
 
         // Prompt-cache parity with the native Vertex+Claude path: upstream
         // layers mark the stable prefix (system via MessageBuilder, and the
@@ -2292,12 +2278,18 @@ export class AnthropicProvider extends BaseProvider {
           }
         }
 
+        // Close the stable prefix with a breakpoint on the last tool, exactly
+        // as the generate path does. This was missing: the marker was applied
+        // only in doGenerate, so a streaming turn re-billed the entire tools
+        // block every step and could not reuse the prefix generate() cached.
+        const cachedTools = withLastToolCacheBreakpoint(anthropicTools);
+
         // Prompt-cache parity with the native Vertex+Claude path — rolling
         // history breakpoints, re-applied per step so the stable prefix stays
         // byte-identical while the breakpoint follows the growing tail.
         const cacheMarkersUsed = countAnthropicCacheMarkers({
           system: payload.system,
-          tools: anthropicTools,
+          tools: cachedTools,
           messages: conversation as VertexAnthropicMessage[],
         });
         const cachedConversation = applyAnthropicHistoryCacheBreakpoints(
@@ -2324,8 +2316,8 @@ export class AnthropicProvider extends BaseProvider {
           ...(streamSamplingParams.temperature !== undefined
             ? { temperature: streamSamplingParams.temperature }
             : {}),
-          ...(anthropicTools && anthropicTools.length > 0
-            ? { tools: anthropicTools }
+          ...(cachedTools && cachedTools.length > 0
+            ? { tools: cachedTools }
             : {}),
           ...(anthropicToolChoice ? { tool_choice: anthropicToolChoice } : {}),
           ...(thinking ? { thinking } : {}),

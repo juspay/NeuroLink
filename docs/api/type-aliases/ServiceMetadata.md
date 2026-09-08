@@ -8,7 +8,7 @@
 
 > **ServiceMetadata** = `object`
 
-Defined in: [types/service.ts:36](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L36)
+Defined in: [types/service.ts:22](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L22)
 
 Service metadata for describing service capabilities
 
@@ -18,7 +18,7 @@ Service metadata for describing service capabilities
 
 > **description**: `string`
 
-Defined in: [types/service.ts:37](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L37)
+Defined in: [types/service.ts:23](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L23)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/service.ts:37](https://github.com/juspay/neurolink/blob/relea
 
 > **tags**: `string`[]
 
-Defined in: [types/service.ts:38](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L38)
+Defined in: [types/service.ts:24](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L24)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/service.ts:38](https://github.com/juspay/neurolink/blob/relea
 
 > **dependencies**: `string`[]
 
-Defined in: [types/service.ts:39](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L39)
+Defined in: [types/service.ts:25](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L25)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/service.ts:39](https://github.com/juspay/neurolink/blob/relea
 
 > **capabilities**: `string`[]
 
-Defined in: [types/service.ts:40](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L40)
+Defined in: [types/service.ts:26](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L26)

@@ -8,7 +8,7 @@
 
 > **ServiceDefinition**\<`T`\> = `object`
 
-Defined in: [types/service.ts:25](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L25)
+Defined in: [types/service.ts:11](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L11)
 
 Service definition with metadata and status
 
@@ -24,7 +24,7 @@ Service definition with metadata and status
 
 > **name**: `string`
 
-Defined in: [types/service.ts:26](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L26)
+Defined in: [types/service.ts:12](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L12)
 
 ---
 
@@ -32,7 +32,7 @@ Defined in: [types/service.ts:26](https://github.com/juspay/neurolink/blob/relea
 
 > **version**: `string`
 
-Defined in: [types/service.ts:27](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L27)
+Defined in: [types/service.ts:13](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L13)
 
 ---
 
@@ -40,7 +40,7 @@ Defined in: [types/service.ts:27](https://github.com/juspay/neurolink/blob/relea
 
 > **instance**: `T`
 
-Defined in: [types/service.ts:28](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L28)
+Defined in: [types/service.ts:14](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L14)
 
 ---
 
@@ -48,7 +48,7 @@ Defined in: [types/service.ts:28](https://github.com/juspay/neurolink/blob/relea
 
 > **metadata**: [`ServiceMetadata`](ServiceMetadata.md)
 
-Defined in: [types/service.ts:29](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L29)
+Defined in: [types/service.ts:15](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L15)
 
 ---
 
@@ -56,4 +56,4 @@ Defined in: [types/service.ts:29](https://github.com/juspay/neurolink/blob/relea
 
 > **status**: [`ServiceStatus`](ServiceStatus.md)
 
-Defined in: [types/service.ts:30](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L30)
+Defined in: [types/service.ts:16](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L16)

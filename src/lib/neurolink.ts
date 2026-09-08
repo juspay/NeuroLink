@@ -5901,9 +5901,11 @@ Current user's request: ${currentInput}`;
       music: textResult.music,
       ppt: textResult.ppt,
       // Forward reasoning/reasoningTokens from the provider layer.
-      // The native generate loop extracts these from vendor reasoning
+      // The shared native generate loop extracts these from vendor reasoning
       // parts (DeepSeek's `reasoning_content`, Anthropic thinking blocks,
-      // Gemini thought parts, OpenAI o1) and they're declared on
+      // OpenAI o-series) for the providers that use it — OpenAI-compatible,
+      // Anthropic and SageMaker. Vertex and AI Studio override generate() and
+      // leave the text field undefined. They're declared on
       // `GenerateResult`, but the builder previously dropped them on the
       // floor — so callers asking for `result.reasoning` got `undefined`
       // even when the model emitted a chain-of-thought.

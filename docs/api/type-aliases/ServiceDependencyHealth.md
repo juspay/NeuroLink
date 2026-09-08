@@ -8,7 +8,7 @@
 
 > **ServiceDependencyHealth** = `object`
 
-Defined in: [types/service.ts:62](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L62)
+Defined in: [types/service.ts:48](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L48)
 
 Service dependency health status
 
@@ -18,7 +18,7 @@ Service dependency health status
 
 > **name**: `string`
 
-Defined in: [types/service.ts:63](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L63)
+Defined in: [types/service.ts:49](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L49)
 
 ---
 
@@ -26,7 +26,7 @@ Defined in: [types/service.ts:63](https://github.com/juspay/neurolink/blob/relea
 
 > **status**: [`ServiceStatus`](ServiceStatus.md)
 
-Defined in: [types/service.ts:64](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L64)
+Defined in: [types/service.ts:50](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L50)
 
 ---
 
@@ -34,7 +34,7 @@ Defined in: [types/service.ts:64](https://github.com/juspay/neurolink/blob/relea
 
 > **lastChecked**: `Date`
 
-Defined in: [types/service.ts:65](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L65)
+Defined in: [types/service.ts:51](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L51)
 
 ---
 
@@ -42,4 +42,4 @@ Defined in: [types/service.ts:65](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **responseTime?**: `number`
 
-Defined in: [types/service.ts:66](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L66)
+Defined in: [types/service.ts:52](https://github.com/juspay/neurolink/blob/release/src/lib/types/service.ts#L52)

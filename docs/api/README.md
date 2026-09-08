@@ -2654,8 +2654,6 @@ console.log(result.content);
 - [ServerVoiceConnectionCtx](type-aliases/ServerVoiceConnectionCtx.md)
 - [ServerVoiceSessionState](type-aliases/ServerVoiceSessionState.md)
 - [ServerVoiceWebSocketOptions](type-aliases/ServerVoiceWebSocketOptions.md)
-- [ServiceFactory](type-aliases/ServiceFactory.md)
-- [ServiceRegistration](type-aliases/ServiceRegistration.md)
 - [ServiceDefinition](type-aliases/ServiceDefinition.md)
 - [ServiceMetadata](type-aliases/ServiceMetadata.md)
 - [ServiceStatus](type-aliases/ServiceStatus.md)

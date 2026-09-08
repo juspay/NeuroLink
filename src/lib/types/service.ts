@@ -6,20 +6,6 @@
 import type { UnknownRecord } from "./common.js";
 
 /**
- * Service factory function type
- */
-export type ServiceFactory<T = unknown> = () => T | Promise<T>;
-
-/**
- * Service registration configuration
- */
-export type ServiceRegistration<T = unknown> = {
-  factory: ServiceFactory<T>;
-  singleton: boolean;
-  instance?: T;
-};
-
-/**
  * Service definition with metadata and status
  */
 export type ServiceDefinition<T = UnknownRecord> = {

@@ -388,13 +388,56 @@ const startAnthropicToolProbe = async (): Promise<AnthropicToolProbe> => {
       chunks.push(part as Buffer);
     }
     requests += 1;
+    let wantsStream = false;
     try {
       const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as {
         tools?: Array<Record<string, unknown>>;
+        stream?: unknown;
       };
       tools = parsed.tools ?? [];
+      wantsStream = parsed.stream === true;
     } catch {
       tools = [];
+    }
+    if (wantsStream) {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+      const event = (type: string, data: Record<string, unknown>): void => {
+        res.write(
+          `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`,
+        );
+      };
+      event("message_start", {
+        message: {
+          id: "msg_probe",
+          type: "message",
+          role: "assistant",
+          model: "claude-sonnet-4-20250514",
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 0 },
+        },
+      });
+      event("content_block_start", {
+        index: 0,
+        content_block: { type: "text", text: "" },
+      });
+      event("content_block_delta", {
+        index: 0,
+        delta: { type: "text_delta", text: "done" },
+      });
+      event("content_block_stop", { index: 0 });
+      event("message_delta", {
+        delta: { stop_reason: "end_turn", stop_sequence: null },
+        usage: { output_tokens: 1 },
+      });
+      event("message_stop", {});
+      res.end();
+      return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -484,6 +527,155 @@ await test("the Anthropic tools block carries one cache breakpoint", async () =>
     };
     if (last.cache_control?.type !== "ephemeral") {
       throw new Error("the cache breakpoint is not on the last tool");
+    }
+  } finally {
+    await sdk.shutdown();
+    await probe.close();
+    if (saved.url === undefined) {
+      delete process.env.ANTHROPIC_BASE_URL;
+    } else {
+      process.env.ANTHROPIC_BASE_URL = saved.url;
+    }
+    if (saved.key === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = saved.key;
+    }
+  }
+});
+
+await test("the Anthropic tools block carries one cache breakpoint on stream() too", async () => {
+  const probe = (await startAnthropicToolProbe()) as AnthropicToolProbe & {
+    close: () => Promise<void>;
+  };
+  const saved = {
+    url: process.env.ANTHROPIC_BASE_URL,
+    key: process.env.ANTHROPIC_API_KEY,
+  };
+  process.env.ANTHROPIC_BASE_URL = probe.baseURL;
+  process.env.ANTHROPIC_API_KEY = "sk-ant-mock-local-server";
+  const sdk = new NeuroLink();
+  try {
+    const result = await sdk.stream({
+      input: { text: "hello" },
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      disableInternalFallback: true,
+      tools: {
+        first_tool: tool({
+          description: "first",
+          inputSchema: z.object({ a: z.string() }),
+          execute: async () => "a",
+        }),
+        second_tool: tool({
+          description: "second",
+          inputSchema: z.object({ b: z.string() }),
+          execute: async () => "b",
+        }),
+      },
+    });
+    // Drain: the request only reaches the wire once the stream is consumed.
+    let drained = "";
+    for await (const chunk of result.stream) {
+      drained += (chunk as { content?: string }).content ?? "";
+    }
+    // Preconditions, before the claim: the stream must actually have run and
+    // the request must have carried a tools block.
+    if (probe.requests() < 1) {
+      throw new Error("precondition: the probe endpoint was never called");
+    }
+    if (drained.length === 0) {
+      throw new Error("precondition: the stream produced no content");
+    }
+    const tools = probe.lastTools();
+    if (tools.length < 2) {
+      throw new Error("precondition: the request carried no tools block");
+    }
+    const marked = tools.filter(
+      (t) =>
+        (t as { cache_control?: { type?: string } }).cache_control?.type ===
+        "ephemeral",
+    );
+    if (marked.length !== 1) {
+      throw new Error(
+        "the streaming tools block does not carry exactly one cache breakpoint",
+      );
+    }
+    const last = tools[tools.length - 1] as {
+      cache_control?: { type?: string };
+    };
+    if (last.cache_control?.type !== "ephemeral") {
+      throw new Error("the streaming cache breakpoint is not on the last tool");
+    }
+  } finally {
+    await sdk.shutdown();
+    await probe.close();
+    if (saved.url === undefined) {
+      delete process.env.ANTHROPIC_BASE_URL;
+    } else {
+      process.env.ANTHROPIC_BASE_URL = saved.url;
+    }
+    if (saved.key === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = saved.key;
+    }
+  }
+});
+
+await test("stream preserves an explicit caller cache marker without adding another", async () => {
+  const probe = (await startAnthropicToolProbe()) as AnthropicToolProbe & {
+    close: () => Promise<void>;
+  };
+  const saved = {
+    url: process.env.ANTHROPIC_BASE_URL,
+    key: process.env.ANTHROPIC_API_KEY,
+  };
+  process.env.ANTHROPIC_BASE_URL = probe.baseURL;
+  process.env.ANTHROPIC_API_KEY = "sk-ant-mock-local-server";
+  const sdk = new NeuroLink();
+  try {
+    const markedTool = {
+      ...tool({
+        description: "Caller chooses this cache boundary",
+        inputSchema: z.object({}),
+        execute: async () => "ok",
+      }),
+      providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
+    };
+    const result = await sdk.stream({
+      input: { text: "hello" },
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+      disableInternalFallback: true,
+      tools: {
+        caller_marked: markedTool,
+        following_tool: tool({
+          description: "After caller boundary",
+          inputSchema: z.object({}),
+          execute: async () => "ok",
+        }),
+      },
+    });
+    let text = "";
+    for await (const chunk of result.stream) {
+      if ("content" in chunk && typeof chunk.content === "string") {
+        text += chunk.content;
+      }
+    }
+    if (!probe.requests() || text !== "done") {
+      throw new Error("precondition: local stream did not complete");
+    }
+    const tools = probe.lastTools();
+    if (
+      !tools.some((t) => t.name === "caller_marked") ||
+      !tools.some((t) => t.name === "following_tool")
+    ) {
+      throw new Error("precondition: caller tools missing on wire");
+    }
+    const marked = tools.filter((t) => t.cache_control !== undefined);
+    if (marked.length !== 1 || marked[0].name !== "caller_marked") {
+      throw new Error("caller cache boundary was not preserved exclusively");
     }
   } finally {
     await sdk.shutdown();
