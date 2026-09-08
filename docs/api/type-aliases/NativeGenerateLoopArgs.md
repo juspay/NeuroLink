@@ -16,11 +16,54 @@ One loop serves every provider whose delegating model exposes a v3-shaped
 
 ## Properties
 
+### observeUsage?
+
+> `optional` **observeUsage?**: (`usage`) => `void`
+
+Defined in: [types/generate.ts:1772](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1772)
+
+Observed usage for calibrating the next step against the last request.
+
+#### Parameters
+
+##### usage
+
+`unknown`
+
+#### Returns
+
+`void`
+
+---
+
+### guardConversation?
+
+> `optional` **guardConversation?**: (`conversation`) => `Record`\<`string`, `unknown`\>[] \| `undefined`
+
+Defined in: [types/generate.ts:1779](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1779)
+
+Per-step context reclaim, called before every model call with the
+conversation as it now stands. Return a replacement to have the loop adopt
+it, or undefined to leave it untouched. The provider owns this because the
+reclaim has to understand its wire shape.
+
+#### Parameters
+
+##### conversation
+
+`Record`\<`string`, `unknown`\>[]
+
+#### Returns
+
+`Record`\<`string`, `unknown`\>[] \| `undefined`
+
+---
+
 ### doGenerate
 
 > **doGenerate**: (`options`) => `Promise`\<`Record`\<`string`, `unknown`\>\>
 
-Defined in: [types/generate.ts:1771](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1771)
+Defined in: [types/generate.ts:1782](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1782)
 
 #### Parameters
 
@@ -38,7 +81,7 @@ Defined in: [types/generate.ts:1771](https://github.com/juspay/neurolink/blob/re
 
 > **conversation**: `Record`\<`string`, `unknown`\>[]
 
-Defined in: [types/generate.ts:1775](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1775)
+Defined in: [types/generate.ts:1786](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1786)
 
 Conversation in the message-builder shape each doGenerate converts itself.
 
@@ -48,7 +91,7 @@ Conversation in the message-builder shape each doGenerate converts itself.
 
 > `optional` **tools?**: `Record`\<`string`, `unknown`\>[]
 
-Defined in: [types/generate.ts:1777](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1777)
+Defined in: [types/generate.ts:1788](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1788)
 
 Tool declarations in the v3 shape doGenerate already knows how to convert.
 
@@ -58,7 +101,7 @@ Tool declarations in the v3 shape doGenerate already knows how to convert.
 
 > **toolsRecord**: `Record`\<`string`, `unknown`\>
 
-Defined in: [types/generate.ts:1779](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1779)
+Defined in: [types/generate.ts:1790](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1790)
 
 Registered tools, used to execute a call the model asks for.
 
@@ -68,7 +111,7 @@ Registered tools, used to execute a call the model asks for.
 
 > `optional` **toolChoice?**: `unknown`
 
-Defined in: [types/generate.ts:1780](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1780)
+Defined in: [types/generate.ts:1791](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1791)
 
 ---
 
@@ -76,7 +119,7 @@ Defined in: [types/generate.ts:1780](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **responseFormat?**: `Record`\<`string`, `unknown`\>
 
-Defined in: [types/generate.ts:1781](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1781)
+Defined in: [types/generate.ts:1792](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1792)
 
 ---
 
@@ -84,7 +127,7 @@ Defined in: [types/generate.ts:1781](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **providerOptions?**: `Record`\<`string`, `Record`\<`string`, `unknown`\>\>
 
-Defined in: [types/generate.ts:1782](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1782)
+Defined in: [types/generate.ts:1793](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1793)
 
 ---
 
@@ -92,7 +135,7 @@ Defined in: [types/generate.ts:1782](https://github.com/juspay/neurolink/blob/re
 
 > **maxSteps**: `number`
 
-Defined in: [types/generate.ts:1783](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1783)
+Defined in: [types/generate.ts:1794](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1794)
 
 ---
 
@@ -100,7 +143,7 @@ Defined in: [types/generate.ts:1783](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **maxOutputTokens?**: `number`
 
-Defined in: [types/generate.ts:1784](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1784)
+Defined in: [types/generate.ts:1795](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1795)
 
 ---
 
@@ -108,7 +151,7 @@ Defined in: [types/generate.ts:1784](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **temperature?**: `number`
 
-Defined in: [types/generate.ts:1785](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1785)
+Defined in: [types/generate.ts:1796](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1796)
 
 ---
 
@@ -116,7 +159,7 @@ Defined in: [types/generate.ts:1785](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **abortSignal?**: `AbortSignal`
 
-Defined in: [types/generate.ts:1786](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1786)
+Defined in: [types/generate.ts:1797](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1797)
 
 ---
 
@@ -124,7 +167,7 @@ Defined in: [types/generate.ts:1786](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **toolTimeoutMs?**: `number`
 
-Defined in: [types/generate.ts:1788](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1788)
+Defined in: [types/generate.ts:1799](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1799)
 
 Per-tool-execution cap, forwarded into `guardToolExecutor`.
 
@@ -134,7 +177,7 @@ Per-tool-execution cap, forwarded into `guardToolExecutor`.
 
 > **runStep**: (`call`) => `Promise`\<`Record`\<`string`, `unknown`\>\>
 
-Defined in: [types/generate.ts:1790](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1790)
+Defined in: [types/generate.ts:1801](https://github.com/juspay/neurolink/blob/release/src/lib/types/generate.ts#L1801)
 
 Wraps one step: retry ladder plus provider error classification.
 

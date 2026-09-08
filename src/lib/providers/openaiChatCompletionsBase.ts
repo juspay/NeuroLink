@@ -27,6 +27,8 @@ import {
   registerRuntimeContextWindow,
 } from "../constants/contextWindows.js";
 import { guardOpenAICompatConversation } from "../context/openaiCompatLoopGuard.js";
+import { estimateTokens } from "../utils/tokenEstimation.js";
+import { createNativeGenerateGuard } from "../context/nativeGenerateGuard.js";
 import {
   isContextOverflowError,
   parseProviderOverflowDetails,
@@ -1189,6 +1191,19 @@ export abstract class OpenAIChatCompletionsProvider extends BaseProvider {
       runNativeGenerateLoop(
         {
           doGenerate,
+          ...createNativeGenerateGuard({
+            provider: this.providerName,
+            availableInputTokens: getAvailableInputTokens(
+              this.providerName,
+              modelId,
+              options.maxTokens ?? undefined,
+            ),
+            getFixedOverheadTokens: () =>
+              estimateTokens(
+                JSON.stringify({ tools: v3Tools, responseFormat: format }),
+                this.providerName,
+              ),
+          }),
           conversation: conv,
           ...(v3Tools ? { tools: v3Tools } : {}),
           toolsRecord,
