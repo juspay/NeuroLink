@@ -423,6 +423,10 @@ jobs:
         if: matrix.group == 'rest'
         run: pnpm run test:anthropic-loop-characterization
 
+      - name: Anthropic execution control contract (local SSE stand-in, no API keys required)
+        if: matrix.group == 'rest'
+        run: pnpm run test:anthropic-execution-control
+
       - name: Proxy telemetry accuracy (isolated storage faults and HTTP fixtures)
         if: matrix.group == 'rest'
         run: pnpm run test:proxy-telemetry

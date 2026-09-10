@@ -1544,3 +1544,166 @@ export function createValidationSummary(
 export function hasOnlyWarnings(result: EnhancedValidationResult): boolean {
   return result.errors.length === 0 && result.warnings.length > 0;
 }
+
+// ============================================================================
+// EXECUTION CONTROL
+// ============================================================================
+
+/**
+ * Default bound on a `beforeStep` callback (ms).
+ *
+ * A boundary callback sits between two model calls, in the one place no other
+ * timer in the turn is watching: the request deadline has been disposed and
+ * the next one is not armed yet. An unbounded callback therefore stalls the
+ * turn silently and indefinitely.
+ */
+export const DEFAULT_BEFORE_STEP_TIMEOUT_MS = 30_000;
+
+function isFinitePositive(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+/**
+ * Validate an opt-in `executionControl` object and its provider support.
+ *
+ * Rejecting rather than ignoring is the whole point. A caller that asked for
+ * no lifetime ceiling and got one anyway does not find out at call time — it
+ * finds out much later, when a long turn dies at a limit its owner believed it
+ * had removed, reported as an ordinary cancel. So an unsupported provider is an
+ * error here, and so is every shape that could be read two ways.
+ *
+ * Throws ValidationError; returns void when the control is absent or valid.
+ *
+ * @param request the sibling options on the SAME call that this control has to
+ *   be read together with. `turnTimeoutMs`, because a combination in which one
+ *   of the two ceilings would be silently discarded is rejected instead; and
+ *   `toolTimeoutMs`, because removing the turn's ceiling makes the per-tool
+ *   deadline the last thing watching a tool that never returns.
+ */
+export function validateExecutionControl(
+  control: unknown,
+  providerName: string,
+  supported: boolean,
+  request: { turnTimeoutMs?: unknown; toolTimeoutMs?: unknown } = {},
+): void {
+  const { turnTimeoutMs, toolTimeoutMs } = request;
+  if (control === undefined || control === null) {
+    return;
+  }
+  if (!isNonNullObject(control)) {
+    throw new ValidationError(
+      "executionControl must be an object",
+      "executionControl",
+      "INVALID_TYPE",
+    );
+  }
+  if (!supported) {
+    throw new ValidationError(
+      `executionControl is not supported by provider "${providerName}" — it is implemented only on the native Anthropic stream path. Remove it, or route this turn to anthropic.`,
+      "executionControl",
+      "UNSUPPORTED_PROVIDER",
+      [
+        "Use provider: 'anthropic' for turns that need executionControl",
+        "Use turnTimeoutMs / maxSteps for other providers",
+      ],
+    );
+  }
+
+  const opts = control as {
+    requestTimeoutMs?: unknown;
+    lifetimeTimeoutMs?: unknown;
+    beforeStep?: unknown;
+    beforeStepTimeoutMs?: unknown;
+  };
+
+  if (!isFinitePositive(opts.requestTimeoutMs)) {
+    throw new ValidationError(
+      `executionControl.requestTimeoutMs is required and must be a finite positive number of milliseconds (received ${String(opts.requestTimeoutMs)}). It is the deadline that bounds a stalled upstream even when the turn has no lifetime ceiling, so there is no valid turn without it.`,
+      "executionControl.requestTimeoutMs",
+      "INVALID_VALUE",
+    );
+  }
+
+  // `null` is a value here, not an omission: it is the only way to say "no
+  // lifetime timer at all", which no number can express — a very large one is
+  // still a ceiling that fires mid-turn.
+  if (
+    opts.lifetimeTimeoutMs !== undefined &&
+    opts.lifetimeTimeoutMs !== null &&
+    !isFinitePositive(opts.lifetimeTimeoutMs)
+  ) {
+    throw new ValidationError(
+      `executionControl.lifetimeTimeoutMs must be null (no lifetime ceiling), a finite positive number of milliseconds, or absent (inherit the legacy timeout handling). Received ${String(opts.lifetimeTimeoutMs)}.`,
+      "executionControl.lifetimeTimeoutMs",
+      "INVALID_VALUE",
+    );
+  }
+
+  // Two whole-turn ceilings, one turn. An explicit `lifetimeTimeoutMs` — a
+  // number or `null` — takes over the turn's lifetime timer completely, so a
+  // `turnTimeoutMs` supplied alongside it was read by nothing at all. Dropping
+  // it silently is the same defect this contract exists to remove, one layer
+  // up: the caller's stated ceiling is discarded and it finds out when the
+  // turn ends somewhere it did not expect.
+  //
+  // Scoped deliberately to the case where the drop happens. `lifetimeTimeoutMs`
+  // ABSENT means "no opinion about the turn's lifetime", and that documented
+  // case inherits `turnTimeoutMs` and honours it — there is nothing to reject.
+  if (
+    opts.lifetimeTimeoutMs !== undefined &&
+    typeof turnTimeoutMs === "number" &&
+    Number.isFinite(turnTimeoutMs) &&
+    turnTimeoutMs > 0
+  ) {
+    throw new ValidationError(
+      `turnTimeoutMs (${turnTimeoutMs}) cannot be combined with executionControl.lifetimeTimeoutMs (${String(opts.lifetimeTimeoutMs)}): both set the turn's wall-clock ceiling, and executionControl wins, so the turnTimeoutMs would be ignored. Set exactly one of them.`,
+      "executionControl.lifetimeTimeoutMs",
+      "INVALID_VALUE",
+      [
+        "Drop turnTimeoutMs and express the ceiling as executionControl.lifetimeTimeoutMs",
+        "Or drop executionControl.lifetimeTimeoutMs to inherit turnTimeoutMs unchanged",
+      ],
+    );
+  }
+
+  // No ceiling, and no floor either. `lifetimeTimeoutMs: null` deliberately
+  // arms no turn-level timer, which leaves the per-tool deadline as the only
+  // thing that will ever end a tool that neither returns nor honours its
+  // signal — the step cap does not advance while a tool is in flight, and the
+  // request deadline was disposed when the step settled. `toolTimeoutMs: null`
+  // removes that too, and the turn then has nothing watching it anywhere.
+  //
+  // Refused rather than resolved, because there is no safe way to pick which
+  // of the two the caller meant to keep, and picking one silently is how a
+  // turn ends up bounded by a limit its owner did not choose.
+  if (opts.lifetimeTimeoutMs === null && toolTimeoutMs === null) {
+    throw new ValidationError(
+      "executionControl.lifetimeTimeoutMs: null removes the turn's wall-clock ceiling, which leaves toolTimeoutMs as the only bound on a tool that never returns — and toolTimeoutMs: null removes that one too, so the turn would have no bound anywhere. Keep one of them.",
+      "executionControl.lifetimeTimeoutMs",
+      "INVALID_VALUE",
+      [
+        "Give toolTimeoutMs a finite bound, or omit it to take the 300000ms default",
+        "Or give executionControl.lifetimeTimeoutMs a finite ceiling instead of null",
+      ],
+    );
+  }
+
+  if (opts.beforeStep !== undefined && typeof opts.beforeStep !== "function") {
+    throw new ValidationError(
+      "executionControl.beforeStep must be a function",
+      "executionControl.beforeStep",
+      "INVALID_TYPE",
+    );
+  }
+
+  if (
+    opts.beforeStepTimeoutMs !== undefined &&
+    !isFinitePositive(opts.beforeStepTimeoutMs)
+  ) {
+    throw new ValidationError(
+      `executionControl.beforeStepTimeoutMs must be a finite positive number of milliseconds when supplied. Received ${String(opts.beforeStepTimeoutMs)}.`,
+      "executionControl.beforeStepTimeoutMs",
+      "INVALID_VALUE",
+    );
+  }
+}

@@ -441,6 +441,18 @@ export default [
             // real endpoints, and are deliberately outside this exception. Its
             // header states this in full.
             "test/continuous-test-suite-proxy-sharing.ts",
+            // `resolveToolTimeoutMs` is a pure translation table: it maps the
+            // three shapes of `toolTimeoutMs` — absent, a number, and an
+            // explicit `null` — onto a bound or no bound at all. Two of those
+            // three are indistinguishable from outside. "No bound" and "the
+            // 300_000ms default" differ only for a tool that runs longer than
+            // 300s, and a case in that suite has 60s, so a live `stream()`
+            // call cannot tell an honoured opt-out from one that silently
+            // collapsed back to the default — which is exactly the regression
+            // the opt-out exists to prevent. Every other assertion in the file
+            // drives `new NeuroLink().stream()`; this one function is the
+            // exception, and the suite's header says so.
+            "test/continuous-test-suite-anthropic-execution-control.ts",
 
             // ---------------------------------------------------------------
             // Grandfathered when this rule was extended to cover deep `dist/`

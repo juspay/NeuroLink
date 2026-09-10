@@ -6,6 +6,10 @@ import type {
   NativeFunctionCall,
   NativeToolDeclarationsResult,
 } from "./providers.js";
+import type {
+  ExecutionControlDecision,
+  ExecutionControlStepContext,
+} from "./stream.js";
 
 /**
  * One chunk on the engine's stream.
@@ -192,6 +196,20 @@ export type AgenticLoopAdapter<TConversation = unknown, TRaw = unknown> = {
   /** Set only for adapter instances whose client has the TOOL_NOT_FOUND strike breaker today: both Gemini adapters (AI Studio, Vertex+Gemini) AND the Vertex+Claude call to createAnthropicLoopAdapter — NOT the native-Anthropic call to that same factory, and not Bedrock. See Verified Fact 4. */
   readonly toolFailureBreaker?: AgenticLoopToolFailureBreaker;
   /**
+   * Append a planning nudge to the conversation, in the provider's own message
+   * type. Supplied only by adapters whose caller can pass a step-boundary
+   * callback; the engine skips a nudge it has no way to write.
+   *
+   * Provider-supplied for the same reason `buildToolResultMessages` is: the
+   * engine does not know what a valid user turn looks like on this wire, and
+   * on Anthropic a nudge appended after a tool-result turn has to merge into
+   * that turn rather than open a second consecutive user message.
+   */
+  readonly appendPlanningNudge?: (
+    conversation: TConversation,
+    text: string,
+  ) => TConversation;
+  /**
    * Second lookup path, consulted when a tool call names nothing executable
    * in the caller's `options.tools` — used by adapters supporting mid-turn
    * discovery to hydrate a tool the model just found via `search_tools`, or a
@@ -325,6 +343,30 @@ export type AnthropicLoopAdapterConfig<
    * tell them apart would be guesswork, so the adapter says which happened.
    */
   onTerminalResult?: (text: string) => void;
+  /**
+   * Hard deadline for ONE `messages.create` request (ms). Composed with the
+   * engine's signal for the duration of that step only, so it bounds a stalled
+   * upstream even when the turn itself has no lifetime ceiling — and is armed
+   * fresh per step, which is why a step boundary can never extend a deadline
+   * already running.
+   *
+   * When the deadline fires, the step throws the timer's own TimeoutError
+   * rather than returning what it had: the Anthropic SDK's stream iterator
+   * exits WITHOUT throwing on an aborted read, so a truncated step would
+   * otherwise be reported as a model turn that simply said less.
+   */
+  requestTimeoutMs?: number;
+  /**
+   * Require the upstream terminal event (`message_stop`) before a step counts
+   * as complete.
+   *
+   * A response that ends early carries syntactically complete content blocks —
+   * including tool_use blocks — so without this the loop dispatches tools the
+   * model never finished asking for and reports the turn as a normal stop.
+   * Off by default: turning it on unconditionally would change what every
+   * existing caller sees from a flaky connection.
+   */
+  requireTerminalEvent?: boolean;
   toolFailureBreaker?: AgenticLoopToolFailureBreaker;
   /**
    * In-turn context reclaim, run once per step before the request is built.
@@ -369,8 +411,15 @@ export type AnthropicLoopAdapterConfig<
  * never had.
  */
 export type ToolExecutionGuards = {
-  /** Upper bound on a single execute(); omit for no bound. */
-  toolTimeoutMs?: number;
+  /**
+   * Upper bound on a single execute(). Omit, or pass `null`, for no bound.
+   *
+   * `null` is accepted as well as `undefined` because it is what a caller's
+   * own `toolTimeoutMs: null` resolves to, and the two must not diverge: a
+   * value that means "unbounded" at the public surface cannot arrive here
+   * meaning "0ms".
+   */
+  toolTimeoutMs?: number | null;
   /**
    * Turn-level abort, raced against the call so a deadline or caller cancel is
    * observed immediately instead of after the tool settles.
@@ -583,6 +632,46 @@ export type AgenticLoopOptions = {
    * because only they threaded a span before moving onto the engine.
    */
   span?: Span;
+  /**
+   * Upper bound on a single `tool.execute()` (ms), or `null` for no bound.
+   * Defaults to `DEFAULT_TOOL_EXECUTION_TIMEOUT_MS` (300_000) when omitted.
+   *
+   * The turn-level timers do not cover this: a per-request deadline bounds one
+   * model call and is disposed when the step settles, and the step cap only
+   * advances when a step completes. Between two steps, a tool that never
+   * returns has nothing watching it, and a turn that opted out of a lifetime
+   * ceiling then hangs forever. A tool that exceeds the bound is told to stop
+   * — the signal it was handed is aborted — and fails with an error tool
+   * result costing one step, exactly as it does on the native generate path.
+   *
+   * `null` restores the behaviour of a loop with no per-tool timer at all:
+   * `execute` is awaited unguarded, with the turn's own signal. Callers that
+   * relied on unbounded tool execution say so with it. The one combination
+   * refused is `null` together with `executionControl.lifetimeTimeoutMs: null`
+   * — that would leave the turn with no bound anywhere.
+   *
+   * Callers that already guard their executors (Vertex and the Gemini
+   * adapters, via `guardToolExecutor`) should pass the SAME value they gave
+   * those guards, so this backstop can never be tighter than what the caller
+   * asked for.
+   */
+  toolTimeoutMs?: number | null;
+  /**
+   * Step-boundary callback. Runs after a step's tool results have settled and
+   * been written into the conversation, and BEFORE the loop re-checks the step
+   * cap — the one point in a turn where raising the cap changes what happens
+   * next without replaying anything that already happened.
+   *
+   * Already bounded and cancellable by the time it reaches the engine: the
+   * caller owns the callback's own budget, because the caller is what the
+   * public option was validated against. The engine only calls it, applies a
+   * strictly-larger finite cap if one comes back, and asks the adapter to
+   * write the nudge. It never restarts a step, retries a request, or replays a
+   * tool.
+   */
+  beforeStep?: (
+    context: ExecutionControlStepContext,
+  ) => Promise<ExecutionControlDecision | undefined>;
 };
 
 export type AgenticLoopResult<TConversation> = {
@@ -611,4 +700,18 @@ export type AgenticLoopResult<TConversation> = {
   finishReason: string;
   rawStopReason: string | undefined;
   conversation: TConversation;
+  /**
+   * True when the turn ended because its abort signal fired rather than
+   * because the model finished.
+   *
+   * Not derivable from anything else on this result, which is why it is here.
+   * A turn cut short mid-stream never receives a terminal event, so
+   * `rawStopReason` is undefined and `mapFinishReason` lands on exactly the
+   * value a model that answered and stopped produces. Without this flag a
+   * caller reading the result cannot tell "the model finished" from "we
+   * stopped listening", and every consumer that branches on the outcome —
+   * fallback gates, retry policy, a UI that says why a turn ended — reads the
+   * interrupted turn as a success.
+   */
+  aborted: boolean;
 };

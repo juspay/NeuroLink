@@ -8,7 +8,7 @@
 
 > **AgenticLoopToolCallResult** = [`AgenticLoopToolCall`](AgenticLoopToolCall.md) & `object`
 
-Defined in: [types/loopEngine.ts:64](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L64)
+Defined in: [types/loopEngine.ts:68](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L68)
 
 ## Type Declaration
 

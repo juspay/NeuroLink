@@ -8,7 +8,7 @@
 
 > **AgenticLoopStepResult**\<`TRaw`\> = `object`
 
-Defined in: [types/loopEngine.ts:52](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L52)
+Defined in: [types/loopEngine.ts:56](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L56)
 
 ## Type Parameters
 
@@ -22,7 +22,7 @@ Defined in: [types/loopEngine.ts:52](https://github.com/juspay/neurolink/blob/re
 
 > **text**: `string`
 
-Defined in: [types/loopEngine.ts:53](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L53)
+Defined in: [types/loopEngine.ts:57](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L57)
 
 ---
 
@@ -30,7 +30,7 @@ Defined in: [types/loopEngine.ts:53](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **reasoning?**: `string`
 
-Defined in: [types/loopEngine.ts:54](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L54)
+Defined in: [types/loopEngine.ts:58](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L58)
 
 ---
 
@@ -38,7 +38,7 @@ Defined in: [types/loopEngine.ts:54](https://github.com/juspay/neurolink/blob/re
 
 > **toolCalls**: [`AgenticLoopToolCall`](AgenticLoopToolCall.md)[]
 
-Defined in: [types/loopEngine.ts:55](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L55)
+Defined in: [types/loopEngine.ts:59](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L59)
 
 ---
 
@@ -46,7 +46,7 @@ Defined in: [types/loopEngine.ts:55](https://github.com/juspay/neurolink/blob/re
 
 > **usage**: [`AgenticLoopUsage`](AgenticLoopUsage.md)
 
-Defined in: [types/loopEngine.ts:56](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L56)
+Defined in: [types/loopEngine.ts:60](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L60)
 
 ---
 
@@ -54,7 +54,7 @@ Defined in: [types/loopEngine.ts:56](https://github.com/juspay/neurolink/blob/re
 
 > **rawStopReason**: `string` \| `undefined`
 
-Defined in: [types/loopEngine.ts:58](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L58)
+Defined in: [types/loopEngine.ts:62](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L62)
 
 Provider's own raw stop/finish-reason string, e.g. "tool_use", "MAX_TOKENS"
 
@@ -64,7 +64,7 @@ Provider's own raw stop/finish-reason string, e.g. "tool_use", "MAX_TOKENS"
 
 > **raw**: `TRaw`
 
-Defined in: [types/loopEngine.ts:61](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L61)
+Defined in: [types/loopEngine.ts:65](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L65)
 
 Adapter-private accumulated response data needed by buildToolResultMessages
 (e.g. Anthropic's ordered content blocks, Gemini's rawResponseParts).

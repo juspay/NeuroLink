@@ -228,6 +228,122 @@ export type ProviderStreamChunk =
   | { type: "tts_audio"; audio: TTSChunk }
   | { type: "image"; imageOutput: { base64: string } };
 
+/**
+ * What a `beforeStep` callback is told at a step boundary.
+ *
+ * The boundary is reached only after that step's tool results have settled and
+ * been written into the conversation, and before the step cap is re-checked —
+ * so a decision taken here applies to the NEXT step of the SAME turn, never to
+ * a step already in flight.
+ */
+export type ExecutionControlStepContext = {
+  /** Zero-based index of the step that just settled. */
+  stepIndex: number;
+  /** Steps that have completed in this turn, including the one that just settled. */
+  stepsCompleted: number;
+  /** The step cap currently in force — the number a renewal must exceed. */
+  maxSteps: number;
+  /** Milliseconds since the turn's first request was built. */
+  elapsedMs: number;
+  /** Names of the tools dispatched on the step that just settled, in order. */
+  toolNames: string[];
+  /**
+   * Fires when the turn is cancelled or the callback outlives its own budget.
+   * A callback that does real work (reading a live budget, asking a service)
+   * must honour it — the turn does not wait for a callback that ignores it.
+   */
+  signal: AbortSignal;
+};
+
+/**
+ * What a `beforeStep` callback may change about the rest of the turn.
+ *
+ * Returning nothing is a decision too: it declines the renewal, so the
+ * existing cap stands and a turn that has reached it ends as a step-limit
+ * outcome exactly as it would with no callback at all.
+ */
+export type ExecutionControlDecision = {
+  /**
+   * A new absolute step cap. Must be finite and greater than the cap in force;
+   * anything else is ignored, so a callback cannot shorten a turn by returning
+   * a smaller number or unbound one by returning Infinity.
+   */
+  maxSteps?: number;
+  /**
+   * A planning nudge appended to the conversation before the next step, in the
+   * same loop and the same history — this is how a caller tells the model that
+   * its budget changed without restarting the turn.
+   */
+  nudge?: string;
+};
+
+/**
+ * Opt-in execution policy for one streamed turn. Supported only on the native
+ * Anthropic stream path today; any other provider REJECTS it rather than
+ * ignoring it, because silently dropping a policy the caller set is how a turn
+ * ends at a limit its owner believed it had removed.
+ *
+ * Absent, none of the turn-level policy here applies: the turn is bounded by
+ * `timeout` / `turnTimeoutMs` / `maxSteps` as it always was.
+ *
+ * One thing is NOT conditional on this option, and it is worth stating because
+ * it changed: the agentic engine bounds every tool call, at
+ * `toolTimeoutMs` or the 300s default, whether or not `executionControl` is
+ * present. Loops that previously ran tools with no per-tool timer at all — the
+ * Bedrock and Google AI Studio paths — therefore acquired one. A caller that
+ * relied on unbounded tool execution says so with `toolTimeoutMs: null`, which
+ * restores exactly the old behaviour.
+ */
+export type ExecutionControlOptions = {
+  /**
+   * Hard deadline for a single HTTP request (ms). Required, finite, positive.
+   *
+   * This is the floor that makes the rest of the contract safe: whatever the
+   * turn-level policy is — including no lifetime ceiling at all — a stalled
+   * upstream is always caught here, with the timer's own identity on the
+   * error. A step boundary cannot reset a deadline already running.
+   */
+  requestTimeoutMs: number;
+  /**
+   * The turn's wall-clock ceiling (ms).
+   *
+   * - `null` — no lifetime timer is armed at all. This is the case that cannot
+   *   be expressed any other way: a very large number is still a ceiling, and
+   *   it fires eventually, in the middle of work, dressed as a cancel. With no
+   *   lifetime timer the per-tool deadline is the turn's last bound, so
+   *   `toolTimeoutMs: null` is refused alongside it.
+   * - a finite positive number — an explicit cap, reported as `time-limit`.
+   * - `0`, negative, or non-finite — rejected.
+   * - absent — the legacy handling (`turnTimeoutMs`, else the provider
+   *   timeout) is inherited untouched.
+   *
+   * Set to anything other than absent, this OWNS the turn's lifetime timer, so
+   * a `turnTimeoutMs` on the same request would be read by nothing. That
+   * combination is rejected rather than silently resolved — set one or the
+   * other. Note that "absent" means the property is not there AND that it is
+   * present holding `undefined`: both say "no opinion", and both inherit.
+   */
+  lifetimeTimeoutMs?: number | null;
+  /**
+   * Runs at each step boundary. May renew the step cap and append a planning
+   * nudge. It is itself bounded by `beforeStepTimeoutMs` and cancelled with
+   * the turn; a callback that throws, or outlives its budget, is treated as
+   * declining to renew.
+   */
+  beforeStep?: (
+    context: ExecutionControlStepContext,
+  ) =>
+    | ExecutionControlDecision
+    | undefined
+    | Promise<ExecutionControlDecision | undefined>;
+  /**
+   * Bound on `beforeStep` itself (ms, finite and positive; default 30_000).
+   * A boundary callback sits between two model calls, so an unbounded one
+   * stalls the turn in a place no other timer is watching.
+   */
+  beforeStepTimeoutMs?: number;
+};
+
 export type StreamOptions = {
   /**
    * Opt this stream call into the knowledge grounding configured on the
@@ -429,12 +545,39 @@ export type StreamOptions = {
   timeout?: number | string;
   /** Wall-clock cap for the whole agentic turn (ms). See GenerateOptions.turnTimeoutMs. */
   turnTimeoutMs?: number;
+  /**
+   * Opt-in execution policy for this turn (native Anthropic streaming only).
+   * See ExecutionControlOptions. Absent means the legacy bounds apply
+   * unchanged; present on any other provider is an error, not a no-op.
+   *
+   * Two consequences of that "error, not a no-op" stance are worth knowing
+   * before you set it:
+   *
+   * - **It is incompatible with provider fallback.** Only the native Anthropic
+   *   stream path implements the contract, so a turn that falls back to any
+   *   other provider — internal fallback, or a configured fallback chain —
+   *   fails there with a ValidationError instead of being served without the
+   *   policy. That is deliberate: a fallback that silently dropped the policy
+   *   would produce exactly the invisible ceiling this option exists to
+   *   remove. Pair it with `disableInternalFallback: true` when you want the
+   *   turn to stay on Anthropic, and handle the error if you do not.
+   * - **It cannot be combined with `turnTimeoutMs`** when it sets
+   *   `lifetimeTimeoutMs`, because both name the turn's wall-clock ceiling and
+   *   only one of them can win. Supplying both is rejected up front rather
+   *   than resolved in silence.
+   * - **`lifetimeTimeoutMs: null` cannot be combined with
+   *   `toolTimeoutMs: null`.** Removing the turn's ceiling leaves the per-tool
+   *   deadline as the only thing that will ever end a tool which never
+   *   returns; removing that as well leaves the turn with no bound anywhere.
+   *   Also rejected up front.
+   */
+  executionControl?: ExecutionControlOptions;
   /** Max time with no progress before the turn ends as "stalled" (ms). Native Vertex loops only — see GenerateOptions.stallTimeoutMs. */
   stallTimeoutMs?: number;
   /** Remaining-time threshold that triggers the wrap-up nudge (ms). See GenerateOptions.wrapupTimeLeadMs. */
   wrapupTimeLeadMs?: number;
-  /** Per-tool-execution timeout (ms, default 300_000). See GenerateOptions.toolTimeoutMs. */
-  toolTimeoutMs?: number;
+  /** Per-tool-execution timeout (ms, default 300_000; `null` for no bound). See GenerateOptions.toolTimeoutMs. */
+  toolTimeoutMs?: number | null;
   /** AbortSignal for external cancellation of the AI call */
   abortSignal?: AbortSignal;
   /** Bounds for tool execution capture. See GenerateOptions.toolExecutionCapture. */
@@ -761,9 +904,10 @@ export type StreamResult = {
 
   /**
    * Why the agentic turn ended (see GenerateStopReason). For background-loop
-   * streams (native Vertex paths) prefer `metadata.stopReason` after draining
-   * the stream — this top-level field may be a getter that resolves late, and
-   * wrapper spreads can snapshot it before the loop finishes.
+   * streams (the native Vertex paths and the native Anthropic stream path)
+   * prefer `metadata.stopReason` after draining the stream — this top-level
+   * field may be a getter that resolves late, and wrapper spreads can
+   * snapshot it before the loop finishes.
    */
   stopReason?: GenerateStopReason;
   /** Verbatim provider finish/stop reason for the turn's terminal model call. */

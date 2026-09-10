@@ -54,6 +54,8 @@ import type {
   ClaudeLimitSnapshot,
   ClaudeSubscriptionTier,
   ClaudeUsageInfo,
+  ExecutionControlDecision,
+  ExecutionControlStepContext,
   OAuthToken,
   ProviderErrorRule,
   ZodUnknownSchema,
@@ -87,6 +89,7 @@ import type {
 import { calculateCost } from "../../utils/pricing.js";
 import { stringifyAnthropicToolOutput } from "./toolOutput.js";
 import { createAnthropicLoopAdapter } from "./loopAdapter.js";
+import { DEFAULT_BEFORE_STEP_TIMEOUT_MS } from "../../utils/parameterValidation.js";
 import type { AgenticLoopReclaimResult } from "../../types/index.js";
 import { runAgenticLoop } from "../../core/loopEngine.js";
 import {
@@ -107,10 +110,12 @@ import {
 } from "../../utils/providerConfig.js";
 import {
   composeAbortSignals,
+  composeAbortSignalsScoped,
   createTimeoutController,
   mergeAbortSignals,
   TimeoutError,
 } from "../../utils/timeout.js";
+import { raceWithAbort } from "../../utils/async/index.js";
 import { resolveToolChoice } from "../../utils/toolChoice.js";
 import { emitToolEndFromStepFinish } from "../../utils/toolEndEmitter.js";
 import type { LanguageModel, Tool } from "../../types/index.js";
@@ -1926,6 +1931,17 @@ export class AnthropicProvider extends BaseProvider {
     logClaudeLimitSnapshot(snapshot, this.modelName);
   }
 
+  /**
+   * The native stream loop below is the one implementation of the
+   * `executionControl` contract: it arms the lifetime policy, hands the
+   * per-request deadline and the terminal-event requirement to the loop
+   * adapter, and runs the step-boundary callback through the engine. Every
+   * other provider rejects the option rather than ignoring it.
+   */
+  override supportsExecutionControl(): boolean {
+    return true;
+  }
+
   protected async executeStream(
     options: StreamOptions,
     analysisSchema?: ValidationSchema,
@@ -1948,9 +1964,42 @@ export class AnthropicProvider extends BaseProvider {
     await this.refreshAuthIfNeeded();
     this.validateStreamOptions(options);
 
-    const timeout = this.getTimeout(options);
+    // Validated in BaseProvider.stream() before this point, so the shape here
+    // is known good: requestTimeoutMs finite positive, lifetimeTimeoutMs null
+    // or finite positive or absent.
+    const control = options.executionControl;
+
+    // Same split the generate path already enforces in
+    // `BaseProvider.withTurnTimeout`: an explicit, valid `turnTimeoutMs` is
+    // the caller's whole-turn contract and owns this timer. Without it the
+    // native stream path armed only the provider's own `timeout`, so a caller
+    // asking for a 40-minute turn of 5-minute calls was killed at the shorter
+    // value — and a caller asking for a 200ms turn was not bounded at all.
+    const hasValidTurnTimeout =
+      typeof options.turnTimeoutMs === "number" &&
+      Number.isFinite(options.turnTimeoutMs) &&
+      options.turnTimeoutMs > 0;
+    // `lifetimeTimeoutMs: null` means NO lifetime timer, which is why this
+    // resolves to undefined rather than to a large number:
+    // createTimeoutController arms nothing for a falsy duration, so the turn
+    // ends up bounded by its per-request deadline and its step cap alone.
+    //
+    // Tested with `!== undefined` rather than `"lifetimeTimeoutMs" in control`:
+    // `in` is true for `{ lifetimeTimeoutMs: undefined }`, which is the shape
+    // any programmatic construction produces — an optional field spread, a
+    // JSON round trip, a config object assembled field by field. Under `in`
+    // that shape removed the turn's ceiling entirely while the caller had said
+    // nothing at all about it, and TypeScript could not warn because the field
+    // is `?: number | null`. An absent value means "no opinion", and no
+    // opinion inherits the legacy handling below.
+    const lifetimeTimeoutMs =
+      control && control.lifetimeTimeoutMs !== undefined
+        ? (control.lifetimeTimeoutMs ?? undefined)
+        : hasValidTurnTimeout
+          ? options.turnTimeoutMs
+          : this.getTimeout(options);
     const timeoutController = createTimeoutController(
-      timeout,
+      lifetimeTimeoutMs,
       this.providerName,
       "stream",
     );
@@ -2330,6 +2379,14 @@ export class AnthropicProvider extends BaseProvider {
         toolsRecord,
         buildParams,
         planReclaim,
+        // Both are opt-in with the control and absent without it, so a caller
+        // that never passed executionControl sees the turn it saw before.
+        ...(control
+          ? {
+              requestTimeoutMs: control.requestTimeoutMs,
+              requireTerminalEvent: true,
+            }
+          : {}),
         noteObservedPromptTokens: (tokens) => {
           lastObservedPromptTokens = tokens;
         },
@@ -2455,6 +2512,70 @@ export class AnthropicProvider extends BaseProvider {
       // The engine passed `undefined` in its place, so the attribute silently
       // stopped being emitted for every native Anthropic turn.
       const activeSpan = trace.getActiveSpan();
+
+      // The caller's step-boundary callback, made finite and cancellable
+      // before the engine ever sees it. The engine's contract is "already
+      // bounded", and this is the layer that knows the budget, because the
+      // budget is a field on the public option this layer validated.
+      //
+      // A callback that throws or outlives its budget declines the renewal
+      // rather than failing the turn: the cap it did not raise still stands,
+      // so the turn ends at the step limit the caller originally set. Failing
+      // instead would let a flaky budget service kill work already done.
+      const callerBeforeStep = control?.beforeStep;
+      const beforeStep = callerBeforeStep
+        ? async (
+            context: ExecutionControlStepContext,
+          ): Promise<ExecutionControlDecision | undefined> => {
+            const budgetMs =
+              control?.beforeStepTimeoutMs ?? DEFAULT_BEFORE_STEP_TIMEOUT_MS;
+            const callbackTimeout = createTimeoutController(
+              budgetMs,
+              this.providerName,
+              "stream",
+            );
+            const composed = composeAbortSignalsScoped(
+              context.signal,
+              callbackTimeout?.controller.signal,
+            );
+            try {
+              // One timer, not two. `callbackTimeout` already aborts the
+              // composed signal at `budgetMs`, so the second `withTimeout`
+              // that used to sit here armed a duplicate timer for the same
+              // deadline. Racing the composed signal instead keeps the budget
+              // COMPULSORY — a callback that ignores its signal must not be
+              // able to park the turn at a step boundary, which is the one
+              // place no other timer is watching — while arming nothing new.
+              // It also ends the wait the moment the TURN is cancelled, which
+              // the old duplicate timer did not do.
+              return await raceWithAbort(
+                Promise.resolve(
+                  callerBeforeStep({
+                    ...context,
+                    signal: composed.signal ?? context.signal,
+                  }),
+                ),
+                composed.signal ?? context.signal,
+              );
+            } catch (callbackError) {
+              logger.warn(
+                "[Anthropic] executionControl.beforeStep failed or timed out; the step cap stands",
+                {
+                  error:
+                    callbackError instanceof Error
+                      ? callbackError.message
+                      : String(callbackError),
+                  stepsCompleted: context.stepsCompleted,
+                },
+              );
+              return undefined;
+            } finally {
+              composed.dispose();
+              callbackTimeout?.cleanup();
+            }
+          }
+        : undefined;
+
       const { stream, resultPromise } = runAgenticLoop(
         adapter,
         payload.messages.slice(),
@@ -2462,6 +2583,14 @@ export class AnthropicProvider extends BaseProvider {
           tools: engineTools,
           ...(abortSignal ? { abortSignal } : {}),
           ...(activeSpan ? { span: activeSpan } : {}),
+          ...(beforeStep ? { beforeStep } : {}),
+          // `engineTools` above only fixes the context object; it adds no
+          // deadline. The engine's per-tool bound is therefore the only thing
+          // watching a wedged tool on this path — which matters most when the
+          // caller asked for no lifetime ceiling at all.
+          ...(options.toolTimeoutMs !== undefined
+            ? { toolTimeoutMs: options.toolTimeoutMs }
+            : {}),
         },
       );
 
@@ -2512,6 +2641,33 @@ export class AnthropicProvider extends BaseProvider {
       totalCacheRead += result.usage.cacheReadTokens ?? 0;
       totalCacheWrite += result.usage.cacheWriteTokens ?? 0;
       lastStop = result.rawStopReason ?? lastStop;
+
+      // An interrupted turn is not a stop. The Anthropic SDK's stream
+      // iterator exits WITHOUT throwing when its request is aborted, so a
+      // turn killed by the caller's signal or by the turn deadline drains
+      // through here carrying no terminal event — and the ordinary path below
+      // would report it with the same `finishReason` and the same resolved
+      // stop reason as a model that answered and stopped.
+      //
+      // The merged signal's reason is what separates the two causes: NeuroLink's
+      // own timers abort with a TimeoutError, and nothing else does.
+      // Everything the completed steps produced is still reported — the text
+      // was already pushed to the consumer, and the tokens were billed.
+      if (result.aborted) {
+        const reason = abortSignal?.aborted ? abortSignal.reason : undefined;
+        turnMetadata.stopReason =
+          reason instanceof TimeoutError ? "time-limit" : "aborted";
+        turnMetadata.finishReason = "other";
+        if (result.rawStopReason) {
+          turnMetadata.rawFinishReason = result.rawStopReason;
+        }
+        resolveUsage(buildDeferredUsage());
+        // Returns before the step-cap branch below: a turn aborted while the
+        // model still wanted tools carries stop_reason "tool_use", which that
+        // branch would read as the caller's own maxSteps bound.
+        resolveFinish("other");
+        return;
+      }
 
       turnMetadata.finishReason = result.finishReason;
       if (result.rawStopReason) {

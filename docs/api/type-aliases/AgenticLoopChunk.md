@@ -8,7 +8,7 @@
 
 > **AgenticLoopChunk** = `object`
 
-Defined in: [types/loopEngine.ts:20](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L20)
+Defined in: [types/loopEngine.ts:24](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L24)
 
 One chunk on the engine's stream.
 
@@ -25,7 +25,7 @@ silently, since the text path would keep working.
 
 > **content**: `string`
 
-Defined in: [types/loopEngine.ts:21](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L21)
+Defined in: [types/loopEngine.ts:25](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L25)
 
 ---
 
@@ -33,4 +33,4 @@ Defined in: [types/loopEngine.ts:21](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **reasoning?**: `string`
 
-Defined in: [types/loopEngine.ts:22](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L22)
+Defined in: [types/loopEngine.ts:26](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L26)

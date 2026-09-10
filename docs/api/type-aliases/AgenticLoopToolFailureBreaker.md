@@ -8,7 +8,7 @@
 
 > **AgenticLoopToolFailureBreaker** = `object`
 
-Defined in: [types/loopEngine.ts:106](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L106)
+Defined in: [types/loopEngine.ts:110](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L110)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/loopEngine.ts:106](https://github.com/juspay/neurolink/blob/r
 
 > **maxRetries**: `number`
 
-Defined in: [types/loopEngine.ts:107](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L107)
+Defined in: [types/loopEngine.ts:111](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L111)
 
 ---
 
@@ -24,7 +24,7 @@ Defined in: [types/loopEngine.ts:107](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **consecutive?**: `boolean`
 
-Defined in: [types/loopEngine.ts:118](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L118)
+Defined in: [types/loopEngine.ts:122](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L122)
 
 Count CONSECUTIVE failures rather than lifetime ones: a clean result
 clears the strike count for that tool.
@@ -41,7 +41,7 @@ tool for the rest of the turn.
 
 > `optional` **classifyResultFailure?**: (`output`) => `string` \| `undefined`
 
-Defined in: [types/loopEngine.ts:131](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L131)
+Defined in: [types/loopEngine.ts:135](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L135)
 
 Decide whether a RESOLVED tool result is really a failure.
 

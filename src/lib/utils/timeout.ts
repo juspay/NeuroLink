@@ -353,8 +353,16 @@ export async function withTimeout<T>(
     return promise;
   }
 
+  // The handle is captured, unref'd and cleared — the same shape
+  // `createTimeoutPromise` above already uses. `Promise.race` settles on the
+  // first outcome but cancels nothing, so an uncaptured timer stayed pending
+  // for its full duration after the wrapped promise had already resolved: one
+  // live timer per call, each holding the event loop open until it fired. The
+  // `finally` clears it the moment the race is decided, which is what makes
+  // this safe to wrap around something invoked once per tool call.
+  let timeoutHandle: NodeJS.Timeout | number | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       reject(
         new TimeoutError(
           `${provider} ${operation} operation timed out after ${timeoutMs}ms`,
@@ -364,9 +372,26 @@ export async function withTimeout<T>(
         ),
       );
     }, timeoutMs);
+    timeoutHandle = timer;
+
+    // Unref the timer so it doesn't keep the process alive (Node.js only)
+    if (
+      typeof timer === "object" &&
+      timer &&
+      "unref" in timer &&
+      typeof timer.unref === "function"
+    ) {
+      (timer as NodeJS.Timeout).unref();
+    }
   });
 
-  return Promise.race([promise, timeoutPromise]);
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle !== undefined) {
+      clearTimeout(timeoutHandle as NodeJS.Timeout);
+    }
+  }
 }
 
 /**

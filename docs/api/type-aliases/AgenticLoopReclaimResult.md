@@ -8,7 +8,7 @@
 
 > **AgenticLoopReclaimResult**\<`TConversation`\> = `object`
 
-Defined in: [types/loopEngine.ts:86](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L86)
+Defined in: [types/loopEngine.ts:90](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L90)
 
 ## Type Parameters
 
@@ -22,7 +22,7 @@ Defined in: [types/loopEngine.ts:86](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **conversation?**: `TConversation`
 
-Defined in: [types/loopEngine.ts:87](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L87)
+Defined in: [types/loopEngine.ts:91](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L91)
 
 ---
 
@@ -30,7 +30,7 @@ Defined in: [types/loopEngine.ts:87](https://github.com/juspay/neurolink/blob/re
 
 > `optional` **stop?**: `boolean`
 
-Defined in: [types/loopEngine.ts:103](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L103)
+Defined in: [types/loopEngine.ts:107](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L107)
 
 End the turn now, BEFORE this step's request is issued.
 

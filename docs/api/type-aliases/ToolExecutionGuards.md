@@ -8,7 +8,7 @@
 
 > **ToolExecutionGuards** = `object`
 
-Defined in: [types/loopEngine.ts:371](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L371)
+Defined in: [types/loopEngine.ts:413](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L413)
 
 The things a native loop wraps around every tool call that the shared engine
 does not do itself.
@@ -29,11 +29,16 @@ never had.
 
 ### toolTimeoutMs?
 
-> `optional` **toolTimeoutMs?**: `number`
+> `optional` **toolTimeoutMs?**: `number` \| `null`
 
-Defined in: [types/loopEngine.ts:373](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L373)
+Defined in: [types/loopEngine.ts:422](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L422)
 
-Upper bound on a single execute(); omit for no bound.
+Upper bound on a single execute(). Omit, or pass `null`, for no bound.
+
+`null` is accepted as well as `undefined` because it is what a caller's
+own `toolTimeoutMs: null` resolves to, and the two must not diverge: a
+value that means "unbounded" at the public surface cannot arrive here
+meaning "0ms".
 
 ---
 
@@ -41,7 +46,7 @@ Upper bound on a single execute(); omit for no bound.
 
 > `optional` **abortSignal?**: `AbortSignal`
 
-Defined in: [types/loopEngine.ts:378](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L378)
+Defined in: [types/loopEngine.ts:427](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L427)
 
 Turn-level abort, raced against the call so a deadline or caller cancel is
 observed immediately instead of after the tool settles.
@@ -52,7 +57,7 @@ observed immediately instead of after the tool settles.
 
 > `optional` **onProgress?**: () => `void`
 
-Defined in: [types/loopEngine.ts:384](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L384)
+Defined in: [types/loopEngine.ts:433](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L433)
 
 Stall-watchdog ping, called either side of the await. The watchdog is a
 whole-turn interval measuring wall-clock since the last mark, so a
@@ -68,7 +73,7 @@ legitimately slow tool reads as a stalled turn without this.
 
 > `optional` **withToolSpan?**: \<`T`\>(`name`, `run`) => `Promise`\<`T`\>
 
-Defined in: [types/loopEngine.ts:399](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L399)
+Defined in: [types/loopEngine.ts:448](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L448)
 
 Wrap one tool call in the provider's own observability.
 

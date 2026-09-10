@@ -137,9 +137,29 @@ export const DEFAULT_GEMINI_STREAM_TIMEOUT_MS = 300_000;
  * Default per-tool-execution timeout for native agentic loops. A tool that
  * exceeds it fails with an error tool_result and costs one step — the turn
  * continues instead of hanging on a wedged tool. Override per call with
- * `toolTimeoutMs`.
+ * `toolTimeoutMs`, or remove the bound entirely with `toolTimeoutMs: null`.
  */
 export const DEFAULT_TOOL_EXECUTION_TIMEOUT_MS = 300_000;
+
+/**
+ * Resolve a caller's `toolTimeoutMs` into the bound a loop should actually
+ * apply: a number of milliseconds, or `null` for no bound at all.
+ *
+ * The three-way distinction is the whole point, and `??` cannot express it:
+ * `undefined` means "no opinion, take the default", while `null` is a stated
+ * choice to run tools unbounded — the pre-existing behaviour of the loops that
+ * never had a per-tool timer, and the only way to say it, since a finite
+ * number is always a ceiling and `Infinity` silently desugars to `setTimeout`'s
+ * ~24.9-day cap. Every loop resolves it through here so `null` cannot come to
+ * mean "the default" on one provider and "unbounded" on another.
+ */
+export function resolveToolTimeoutMs(
+  toolTimeoutMs: number | null | undefined,
+): number | null {
+  return toolTimeoutMs === null
+    ? null
+    : (toolTimeoutMs ?? DEFAULT_TOOL_EXECUTION_TIMEOUT_MS);
+}
 
 /**
  * Default wrap-up lead applied when `turnTimeoutMs` is set but

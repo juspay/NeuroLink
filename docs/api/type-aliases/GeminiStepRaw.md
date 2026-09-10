@@ -8,7 +8,7 @@
 
 > **GeminiStepRaw** = `object`
 
-Defined in: [types/loopEngine.ts:411](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L411)
+Defined in: [types/loopEngine.ts:460](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L460)
 
 What one Gemini step produced, carried to `buildToolResultMessages`.
 
@@ -18,7 +18,7 @@ What one Gemini step produced, carried to `buildToolResultMessages`.
 
 > **rawResponseParts**: `unknown`[]
 
-Defined in: [types/loopEngine.ts:412](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L412)
+Defined in: [types/loopEngine.ts:461](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L461)
 
 ---
 
@@ -26,4 +26,4 @@ Defined in: [types/loopEngine.ts:412](https://github.com/juspay/neurolink/blob/r
 
 > **stepFunctionCalls**: [`NativeFunctionCall`](NativeFunctionCall.md)[]
 
-Defined in: [types/loopEngine.ts:413](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L413)
+Defined in: [types/loopEngine.ts:462](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L462)

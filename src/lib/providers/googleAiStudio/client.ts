@@ -1187,6 +1187,13 @@ export class GoogleAIStudioProvider extends BaseProvider {
                 {
                   tools: engineTools,
                   ...(composedSignal ? { abortSignal: composedSignal } : {}),
+                  // This loop guards no executor of its own, so the engine's
+                  // per-tool bound is the only thing standing between a wedged
+                  // tool and a turn that never ends. Honour the caller's value
+                  // when there is one; the engine defaults otherwise.
+                  ...(options.toolTimeoutMs !== undefined
+                    ? { toolTimeoutMs: options.toolTimeoutMs }
+                    : {}),
                 },
               );
 
@@ -1642,6 +1649,11 @@ export class GoogleAIStudioProvider extends BaseProvider {
             {
               tools: engineTools,
               ...(composedSignal ? { abortSignal: composedSignal } : {}),
+              // This loop guards no executor of its own — see the streaming
+              // path above for why the engine's bound has to be reachable.
+              ...(options.toolTimeoutMs !== undefined
+                ? { toolTimeoutMs: options.toolTimeoutMs }
+                : {}),
             },
           );
 

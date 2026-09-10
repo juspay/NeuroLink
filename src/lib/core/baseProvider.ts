@@ -111,6 +111,7 @@ import type {
   ToolSet,
 } from "../types/index.js";
 import { generateOnceNative } from "../utils/nativeSingleShot.js";
+import { validateExecutionControl } from "../utils/parameterValidation.js";
 import { extractTokenUsage } from "../utils/tokenUtils.js";
 
 /**
@@ -298,6 +299,19 @@ export abstract class BaseProvider implements AIProvider {
   }
 
   /**
+   * Whether this provider implements the opt-in `executionControl` contract.
+   *
+   * Default false, and that default is load-bearing: a provider that has not
+   * implemented the contract must REJECT it, not ignore it. Silently dropping
+   * a caller-set execution policy is invisible until a long turn dies at a
+   * ceiling its owner believed had been removed. Overridden only where the
+   * control is genuinely honoured end to end.
+   */
+  supportsExecutionControl(): boolean {
+    return false;
+  }
+
+  /**
    * Apply the shared tool gate and optionally report registry-backed
    * suppression at the request entry point.
    */
@@ -339,6 +353,20 @@ export abstract class BaseProvider implements AIProvider {
     // maxTokens (getSafeMaxTokens consults the discovered output ceiling).
     await this.ensureModelLimits();
     let options = this.normalizeStreamOptions(optionsOrPrompt);
+
+    // Before anything else, and before a single byte leaves the process: an
+    // execution policy this provider cannot honour is an error, and a policy
+    // whose shape could be read two ways is an error. Both are silent bugs at
+    // the point they would otherwise matter.
+    validateExecutionControl(
+      options.executionControl,
+      this.providerName,
+      this.supportsExecutionControl(),
+      {
+        turnTimeoutMs: options.turnTimeoutMs,
+        toolTimeoutMs: options.toolTimeoutMs,
+      },
+    );
 
     logger.info(`Starting stream`, {
       provider: this.providerName,

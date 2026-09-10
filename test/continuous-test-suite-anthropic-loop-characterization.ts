@@ -39,7 +39,7 @@ import "dotenv/config";
  *      pnpm run test:anthropic-loop-characterization
  */
 
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type ServerResponse } from "node:http";
 import { z } from "zod";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import {
@@ -56,6 +56,13 @@ assertDistFresh();
 
 const { test, section, runSuite } = defineSuite(
   "Anthropic loop characterization",
+  // Every case here points ANTHROPIC_BASE_URL at a 127.0.0.1 stand-in, so
+  // nothing in this file waits on a network. Without `offline` the harness
+  // downgrades a case that exceeds `perTestTimeoutMs` to SKIP and still
+  // reports the suite green — and a hang is the exact regression mode of the
+  // interrupted-turn cases below: if the whole-stream timer stops being armed,
+  // the turn never ends and the suite would go quiet instead of red.
+  { offline: true },
 );
 
 // Registered BEFORE NeuroLink is imported, so its tracers bind to this
@@ -887,6 +894,388 @@ await test("a caller abort never consults the providerFallback callback", async 
   assert(
     fallbackConsulted === 0,
     `a caller cancel must not consult the fallback callback, consulted ${fallbackConsulted} time(s)`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// terminal truth: a turn that did NOT finish on its own
+//
+// The native stream path drains the engine and then reports the turn with
+// `mapFinishReason(rawStopReason, …)`. A turn cut short by an abort or a
+// deadline never receives a `message_delta`, so `rawStopReason` is undefined
+// and that mapping lands on "stop" — the same value a model that answered and
+// stopped produces. A caller cannot tell the two apart, which is the whole
+// point of `metadata.stopReason`.
+//
+// These three cases pin the repaired contract: an abort says "aborted", a
+// blown `turnTimeoutMs` says "time-limit", and a turn that really did end on
+// its own is untouched.
+// ---------------------------------------------------------------------------
+
+/** The opening of a text turn: no `message_delta`, no `message_stop`. */
+function openingTextFrames(text: string): string[] {
+  return [
+    sse("message_start", {
+      message: { id: "msg_1", usage: { input_tokens: 5, output_tokens: 0 } },
+    }),
+    sse("content_block_start", {
+      index: 0,
+      content_block: { type: "text", text: "" },
+    }),
+    sse("content_block_delta", {
+      index: 0,
+      delta: { type: "text_delta", text },
+    }),
+  ];
+}
+
+/**
+ * A stand-in that writes an opening burst of SSE frames and then HOLDS the
+ * connection open forever.
+ *
+ * Every "the turn ended before the model did" case needs the interruption to
+ * arrive while the SDK is parked waiting for the next event — a server that
+ * ends the response first would let the turn finish normally and characterize
+ * nothing. `release()` destroys the held sockets so `close()` can resolve.
+ */
+async function startHoldingStandIn(
+  opening: (callIndex: number) => string[],
+): Promise<StandIn & { release: () => void }> {
+  const calls: StandInCall[] = [];
+  const held = new Set<ServerResponse>();
+  const server: Server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => {
+      const parseBody = (): Record<string, unknown> => {
+        try {
+          return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+        } catch {
+          return {};
+        }
+      };
+      calls.push({ body: parseBody() });
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      for (const frame of opening(calls.length - 1)) {
+        res.write(frame);
+      }
+      held.add(res);
+      res.on("close", () => held.delete(res));
+      // Deliberately never `res.end()`.
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const release = () => {
+    for (const res of held) {
+      res.destroy();
+    }
+    held.clear();
+  };
+  return {
+    calls,
+    port: typeof address === "object" && address ? address.port : 0,
+    release,
+    close: () =>
+      new Promise<void>((resolve) => {
+        release();
+        server.closeAllConnections?.();
+        server.close(() => resolve());
+      }),
+  };
+}
+
+/**
+ * The value handed to `resolveFinish`, observed where it is actually
+ * consumed. The deferred finish promise is not on `StreamResult`, but the
+ * provider span reads it and records it verbatim, so the attribute IS the
+ * promise's resolution.
+ */
+function finishReasonsOnProviderSpans(): string[] {
+  return spanExporter
+    .getFinishedSpans()
+    .filter(
+      (span: ReadableSpan) => span.name === "neurolink.provider.streamText",
+    )
+    .map((span: ReadableSpan) =>
+      String(span.attributes["gen_ai.response.finish_reason"]),
+    );
+}
+
+section("terminal truth for interrupted turns");
+
+await test("a caller abort mid-stream is reported as an aborted turn, not a normal stop", async () => {
+  const server = await startHoldingStandIn(() =>
+    openingTextFrames("partial answer"),
+  );
+  const restore = withAnthropicEnv(server.port);
+  const controller = new AbortController();
+  spanExporter.reset();
+  let streamed = "";
+  let threw: string | undefined;
+  let stopReason: unknown;
+  let finishReason: unknown;
+  try {
+    const nl = new NeuroLink();
+    const result = await nl.stream({
+      input: { text: "start talking" },
+      provider: "anthropic",
+      disableInternalFallback: true,
+      model: MODEL,
+      maxTokens: 32,
+      abortSignal: controller.signal,
+    });
+    try {
+      for await (const chunk of result.stream) {
+        if ("content" in chunk && typeof chunk.content === "string") {
+          streamed += chunk.content;
+          if (
+            streamed.includes("partial answer") &&
+            !controller.signal.aborted
+          ) {
+            controller.abort();
+          }
+        }
+      }
+    } catch (error) {
+      threw = error instanceof Error ? error.constructor.name : "unknown";
+    }
+    // metadata is the mutable-reference contract: read it after draining.
+    stopReason = result.metadata?.stopReason;
+    finishReason = result.metadata?.finishReason;
+  } finally {
+    restore();
+    await server.close();
+  }
+  // The span ends inside the finish promise's continuation.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const finishes = finishReasonsOnProviderSpans();
+  console.log(
+    `    [diagnostic] abort mid-stream: text=${JSON.stringify(streamed)} stopReason=${String(stopReason)} finishReason=${String(finishReason)} threw=${String(threw)} spanFinish=${finishes.join(",")}`,
+  );
+  assert(
+    streamed.includes("partial answer"),
+    "the partial text produced before the abort never reached the consumer",
+  );
+  assert(
+    stopReason === "aborted",
+    `an aborted turn must report stopReason "aborted", reported ${String(stopReason)}`,
+  );
+  assert(
+    finishReason === "other",
+    `an aborted turn must report finishReason "other", reported ${String(finishReason)}`,
+  );
+  assert(
+    finishes.length === 1 && finishes[0] === "other",
+    `the resolved finish reason must be "other", was ${finishes.join(",") || "(none)"}`,
+  );
+});
+
+await test("a turn that outlives turnTimeoutMs is reported as a time limit, not a normal stop", async () => {
+  const server = await startHoldingStandIn(() =>
+    openingTextFrames("thinking out loud"),
+  );
+  const restore = withAnthropicEnv(server.port);
+  spanExporter.reset();
+  let streamed = "";
+  let threw: string | undefined;
+  let stopReason: unknown;
+  let finishReason: unknown;
+  try {
+    const nl = new NeuroLink();
+    const result = await nl.stream({
+      input: { text: "take your time" },
+      provider: "anthropic",
+      disableInternalFallback: true,
+      model: MODEL,
+      maxTokens: 32,
+      turnTimeoutMs: 200,
+    });
+    try {
+      for await (const chunk of result.stream) {
+        if ("content" in chunk && typeof chunk.content === "string") {
+          streamed += chunk.content;
+        }
+      }
+    } catch (error) {
+      threw = error instanceof Error ? error.constructor.name : "unknown";
+    }
+    stopReason = result.metadata?.stopReason;
+    finishReason = result.metadata?.finishReason;
+  } finally {
+    restore();
+    await server.close();
+  }
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const finishes = finishReasonsOnProviderSpans();
+  console.log(
+    `    [diagnostic] turnTimeoutMs 200: text=${JSON.stringify(streamed)} stopReason=${String(stopReason)} finishReason=${String(finishReason)} threw=${String(threw)} spanFinish=${finishes.join(",")}`,
+  );
+  assert(
+    stopReason === "time-limit",
+    `a turn killed by turnTimeoutMs must report stopReason "time-limit", reported ${String(stopReason)}`,
+  );
+  assert(
+    finishReason === "other",
+    `a timed-out turn must report finishReason "other", reported ${String(finishReason)}`,
+  );
+});
+
+await test("a turn the model ended itself still reports a plain stop", async () => {
+  // The regression guard for the two cases above: the interrupted-turn
+  // branch must not fire on a turn that reached `message_stop` normally.
+  const server = await startStandIn(() => textTurn("all done"));
+  const restore = withAnthropicEnv(server.port);
+  spanExporter.reset();
+  let streamed = "";
+  let stopReason: unknown;
+  let finishReason: unknown;
+  try {
+    const nl = new NeuroLink();
+    const result = await nl.stream({
+      input: { text: "answer briefly" },
+      provider: "anthropic",
+      disableInternalFallback: true,
+      model: MODEL,
+      maxTokens: 32,
+    });
+    for await (const chunk of result.stream) {
+      if ("content" in chunk && typeof chunk.content === "string") {
+        streamed += chunk.content;
+      }
+    }
+    stopReason = result.metadata?.stopReason;
+    finishReason = result.metadata?.finishReason;
+  } finally {
+    restore();
+    await server.close();
+  }
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const finishes = finishReasonsOnProviderSpans();
+  console.log(
+    `    [diagnostic] clean turn: text=${JSON.stringify(streamed)} stopReason=${String(stopReason)} finishReason=${String(finishReason)} spanFinish=${finishes.join(",")}`,
+  );
+  assert(
+    streamed.includes("all done"),
+    "the clean turn's text was not surfaced",
+  );
+  assert(
+    finishReason === "stop",
+    `a clean turn must still report finishReason "stop", reported ${String(finishReason)}`,
+  );
+  assert(
+    stopReason === undefined,
+    `a clean turn must not claim an interrupted stopReason, claimed ${String(stopReason)}`,
+  );
+  assert(
+    finishes.length === 1 && finishes[0] === "end_turn",
+    `a clean turn must resolve its provider stop reason verbatim, resolved ${finishes.join(",") || "(none)"}`,
+  );
+});
+
+await test("an abort is graded by what the stream delivered, not by what the consumer read", async () => {
+  // Recorded because a reviewer proposed adding a `normalTerminalCompletion`
+  // flag so that an abort landing AFTER normal completion would keep "stop"
+  // instead of reporting "other". This case pins what the two abort
+  // positions actually do, so the question is answerable from a run rather
+  // than from reading the guard.
+  //
+  // Both stand-ins serve the same complete, conformant turn — text, a
+  // message_delta carrying stop_reason "end_turn", and message_stop. Only
+  // WHEN the caller aborts differs.
+  //
+  //  - in-flight: the abort lands on the first content chunk. All of the
+  //    model's text still reaches the consumer, but the terminal events were
+  //    never parsed — which is why rawFinishReason is absent. The turn is
+  //    reported as aborted, and that is the truth: nothing ever said the
+  //    model was done.
+  //  - post-drain: the abort lands after the stream has fully ended. The
+  //    loop has already exited, so it changes nothing retroactively and the
+  //    provider's own reason survives.
+  //
+  // The reviewer's case is the second one, and it already reports "stop"
+  // without a flag. What stays open — deliberately not decided here — is
+  // whether a turn that was cancelled while its whole answer happened to
+  // arrive should read as "aborted"; today it does, and this case is what
+  // makes that choice visible if it is ever revisited.
+  const observed: Record<string, string> = {};
+  for (const position of ["in-flight", "post-drain"] as const) {
+    const server = await startStandIn(() => textTurn("all done"));
+    const restore = withAnthropicEnv(server.port);
+    const controller = new AbortController();
+    let streamed = "";
+    let threw = false;
+    try {
+      const nl = new NeuroLink();
+      const result = await nl.stream({
+        input: { text: "say something short" },
+        provider: "anthropic",
+        disableInternalFallback: true,
+        model: MODEL,
+        maxTokens: 32,
+        abortSignal: controller.signal,
+      });
+      try {
+        for await (const chunk of result.stream) {
+          if ("content" in chunk && typeof chunk.content === "string") {
+            streamed += chunk.content;
+            if (
+              position === "in-flight" &&
+              streamed.length > 0 &&
+              !controller.signal.aborted
+            ) {
+              controller.abort();
+            }
+          }
+        }
+      } catch {
+        threw = true;
+      }
+      if (position === "post-drain" && !controller.signal.aborted) {
+        controller.abort();
+      }
+      observed[position] =
+        `text=${JSON.stringify(streamed)} stopReason=${String(result.metadata?.stopReason)} finishReason=${String(result.metadata?.finishReason)} rawFinishReason=${String(result.metadata?.rawFinishReason)} threw=${threw}`;
+      observed[`${position}.stopReason`] = String(result.metadata?.stopReason);
+      observed[`${position}.finishReason`] = String(
+        result.metadata?.finishReason,
+      );
+      observed[`${position}.rawFinishReason`] = String(
+        result.metadata?.rawFinishReason,
+      );
+      observed[`${position}.text`] = streamed;
+    } finally {
+      restore();
+      await server.close();
+    }
+  }
+  console.log(`    [diagnostic] in-flight:  ${observed["in-flight"]}`);
+  console.log(`    [diagnostic] post-drain: ${observed["post-drain"]}`);
+
+  // Both positions deliver the model's whole answer; that is what makes the
+  // difference in grading interesting rather than obvious.
+  assert(
+    observed["in-flight.text"] === "all done" &&
+      observed["post-drain.text"] === "all done",
+    `both turns must deliver the full text, delivered ${JSON.stringify(observed["in-flight.text"])} and ${JSON.stringify(observed["post-drain.text"])}`,
+  );
+  assert(
+    observed["in-flight.stopReason"] === "aborted" &&
+      observed["in-flight.finishReason"] === "other",
+    `an abort mid-stream must report an aborted turn, reported ${observed["in-flight.stopReason"]} / ${observed["in-flight.finishReason"]}`,
+  );
+  assert(
+    observed["in-flight.rawFinishReason"] === "undefined",
+    `an abort mid-stream never parsed a terminal event, so no provider reason should survive, but ${observed["in-flight.rawFinishReason"]} did`,
+  );
+  assert(
+    observed["post-drain.stopReason"] === "undefined" &&
+      observed["post-drain.finishReason"] === "stop",
+    `an abort after the stream ended must not rewrite the turn, reported ${observed["post-drain.stopReason"]} / ${observed["post-drain.finishReason"]}`,
+  );
+  assert(
+    observed["post-drain.rawFinishReason"] === "end_turn",
+    `a completed turn must keep the provider's own reason, kept ${observed["post-drain.rawFinishReason"]}`,
   );
 });
 

@@ -8,7 +8,7 @@
 
 > **GeminiTurnContent** = `object`
 
-Defined in: [types/loopEngine.ts:417](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L417)
+Defined in: [types/loopEngine.ts:466](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L466)
 
 One turn entry in a Gemini conversation: a role plus its content parts.
 
@@ -18,7 +18,7 @@ One turn entry in a Gemini conversation: a role plus its content parts.
 
 > **role**: `string`
 
-Defined in: [types/loopEngine.ts:418](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L418)
+Defined in: [types/loopEngine.ts:467](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L467)
 
 ---
 
@@ -26,4 +26,4 @@ Defined in: [types/loopEngine.ts:418](https://github.com/juspay/neurolink/blob/r
 
 > **parts**: `unknown`[]
 
-Defined in: [types/loopEngine.ts:419](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L419)
+Defined in: [types/loopEngine.ts:468](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L468)

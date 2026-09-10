@@ -8,7 +8,7 @@
 
 > **AgenticLoopOptions** = `object`
 
-Defined in: [types/loopEngine.ts:562](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L562)
+Defined in: [types/loopEngine.ts:611](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L611)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/loopEngine.ts:562](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **tools?**: `Record`\<`string`, \{ `execute?`: (`args`, `opts`) => `Promise`\<`unknown`\>; \}\>
 
-Defined in: [types/loopEngine.ts:563](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L563)
+Defined in: [types/loopEngine.ts:612](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L612)
 
 ---
 
@@ -24,7 +24,7 @@ Defined in: [types/loopEngine.ts:563](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **abortSignal?**: `AbortSignal`
 
-Defined in: [types/loopEngine.ts:572](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L572)
+Defined in: [types/loopEngine.ts:621](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L621)
 
 ---
 
@@ -32,7 +32,7 @@ Defined in: [types/loopEngine.ts:572](https://github.com/juspay/neurolink/blob/r
 
 > `optional` **span?**: `Span`
 
-Defined in: [types/loopEngine.ts:585](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L585)
+Defined in: [types/loopEngine.ts:634](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L634)
 
 Span the per-step provider retry annotates, via
 `withProviderRetry(..., span, ...)` — it records
@@ -44,3 +44,63 @@ engine, including ones whose hand-rolled loops never emitted it, and a
 refactor that silently ADDS observable behaviour is the same defect as one
 that silently drops it. Today only the direct Anthropic loops set this,
 because only they threaded a span before moving onto the engine.
+
+---
+
+### toolTimeoutMs?
+
+> `optional` **toolTimeoutMs?**: `number` \| `null`
+
+Defined in: [types/loopEngine.ts:658](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L658)
+
+Upper bound on a single `tool.execute()` (ms), or `null` for no bound.
+Defaults to `DEFAULT_TOOL_EXECUTION_TIMEOUT_MS` (300_000) when omitted.
+
+The turn-level timers do not cover this: a per-request deadline bounds one
+model call and is disposed when the step settles, and the step cap only
+advances when a step completes. Between two steps, a tool that never
+returns has nothing watching it, and a turn that opted out of a lifetime
+ceiling then hangs forever. A tool that exceeds the bound is told to stop
+— the signal it was handed is aborted — and fails with an error tool
+result costing one step, exactly as it does on the native generate path.
+
+`null` restores the behaviour of a loop with no per-tool timer at all:
+`execute` is awaited unguarded, with the turn's own signal. Callers that
+relied on unbounded tool execution say so with it. The one combination
+refused is `null` together with `executionControl.lifetimeTimeoutMs: null`
+— that would leave the turn with no bound anywhere.
+
+Callers that already guard their executors (Vertex and the Gemini
+adapters, via `guardToolExecutor`) should pass the SAME value they gave
+those guards, so this backstop can never be tighter than what the caller
+asked for.
+
+---
+
+### beforeStep?
+
+> `optional` **beforeStep?**: (`context`) => `Promise`\<[`ExecutionControlDecision`](ExecutionControlDecision.md) \| `undefined`\>
+
+Defined in: [types/loopEngine.ts:672](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L672)
+
+Step-boundary callback. Runs after a step's tool results have settled and
+been written into the conversation, and BEFORE the loop re-checks the step
+cap — the one point in a turn where raising the cap changes what happens
+next without replaying anything that already happened.
+
+Already bounded and cancellable by the time it reaches the engine: the
+caller owns the callback's own budget, because the caller is what the
+public option was validated against. The engine only calls it, applies a
+strictly-larger finite cap if one comes back, and asks the adapter to
+write the nudge. It never restarts a step, retries a request, or replays a
+tool.
+
+#### Parameters
+
+##### context
+
+[`ExecutionControlStepContext`](ExecutionControlStepContext.md)
+
+#### Returns
+
+`Promise`\<[`ExecutionControlDecision`](ExecutionControlDecision.md) \| `undefined`\>

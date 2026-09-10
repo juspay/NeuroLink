@@ -55,7 +55,12 @@ export function guardToolExecutor(
       const raced = guards.abortSignal
         ? raceWithAbort(call(), guards.abortSignal)
         : call();
-      return await (guards.toolTimeoutMs === undefined
+      // `== null` catches both an omitted bound and an explicit `null` — a
+      // caller that asked for unbounded tool execution. Testing only for
+      // `undefined` would send `null` into `withTimeout`, where it parses as
+      // no delay and fires the deadline immediately.
+      return await (guards.toolTimeoutMs === undefined ||
+      guards.toolTimeoutMs === null
         ? raced
         : withTimeout(
             raced,

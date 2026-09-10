@@ -8,7 +8,7 @@
 
 > **AgenticLoopToolCall** = `object`
 
-Defined in: [types/loopEngine.ts:25](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L25)
+Defined in: [types/loopEngine.ts:29](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L29)
 
 ## Properties
 
@@ -16,7 +16,7 @@ Defined in: [types/loopEngine.ts:25](https://github.com/juspay/neurolink/blob/re
 
 > **id**: `string`
 
-Defined in: [types/loopEngine.ts:26](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L26)
+Defined in: [types/loopEngine.ts:30](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L30)
 
 ---
 
@@ -24,7 +24,7 @@ Defined in: [types/loopEngine.ts:26](https://github.com/juspay/neurolink/blob/re
 
 > **name**: `string`
 
-Defined in: [types/loopEngine.ts:27](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L27)
+Defined in: [types/loopEngine.ts:31](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L31)
 
 ---
 
@@ -32,4 +32,4 @@ Defined in: [types/loopEngine.ts:27](https://github.com/juspay/neurolink/blob/re
 
 > **args**: `Record`\<`string`, `unknown`\>
 
-Defined in: [types/loopEngine.ts:28](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L28)
+Defined in: [types/loopEngine.ts:32](https://github.com/juspay/neurolink/blob/release/src/lib/types/loopEngine.ts#L32)

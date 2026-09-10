@@ -11,6 +11,7 @@ import type {
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import { withProviderRetry } from "../utils/providerRetry.js";
+import { resolveToolTimeoutMs } from "./constants.js";
 
 /**
  * Marks a step error that occurred AFTER at least one chunk had already
@@ -49,6 +50,88 @@ function sumUsage(a: AgenticLoopUsage, b: AgenticLoopUsage): AgenticLoopUsage {
 }
 
 /**
+ * Run one tool call under its deadline, cancelling it rather than abandoning it.
+ *
+ * The signal handed to `execute` is a controller owned by THIS call, not the
+ * turn's — the deadline aborts it. A tool that honours its signal is therefore
+ * told to stop when its time is up, instead of being left running while the
+ * loop records that it failed: a terminal outcome reported for something that
+ * has not terminated, still holding its resources and, for a side-effecting
+ * tool, still applying its effect after the model was told it did not. A retry
+ * would then start a second copy alongside the first.
+ *
+ * What this cannot do is stop a tool that ignores its signal. Nothing in this
+ * process can; the loop stops waiting and the call runs on. That limit is
+ * stated in `toolTimeoutMs`'s own documentation rather than left implied.
+ *
+ * The turn's abort is forwarded into the same controller, so cancelling a turn
+ * reaches an in-flight tool exactly as it did before. Only the deadline is
+ * raced — a turn-level abort still lets the call settle on its own terms.
+ *
+ * `null` means the caller opted out of the bound: the call is awaited
+ * unguarded, with the turn's own signal, which is what the loops that never
+ * had a per-tool timer did.
+ */
+async function executeToolCall(params: {
+  name: string;
+  execute: (
+    args: Record<string, unknown>,
+    opts: unknown,
+  ) => Promise<unknown> | unknown;
+  args: Record<string, unknown>;
+  toolCallId: string;
+  turnSignal: AbortSignal;
+  toolTimeoutMs: number | null;
+}): Promise<unknown> {
+  const { name, execute, args, toolCallId, turnSignal, toolTimeoutMs } = params;
+
+  if (toolTimeoutMs === null) {
+    return execute(args, { toolCallId, abortSignal: turnSignal });
+  }
+
+  const toolAbort = new AbortController();
+  const onTurnAbort = () => toolAbort.abort(turnSignal.reason);
+  if (turnSignal.aborted) {
+    toolAbort.abort(turnSignal.reason);
+  } else {
+    turnSignal.addEventListener("abort", onTurnAbort, { once: true });
+  }
+
+  // One timer does both jobs — abort the tool, then stop waiting for it — so
+  // the two can never drift apart. That is why this is not `withTimeout`,
+  // which would need a second timer to reach the controller. It is
+  // deliberately NOT unref'd: while a tool is in flight this timer is the only
+  // thing that will ever end a wedged one, so it must be able to hold the
+  // event loop open long enough to fire. `finally` clears it the instant the
+  // call settles, so it never outlives its tool.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(
+        `Tool "${name}" execution timed out after ${toolTimeoutMs}ms`,
+      );
+      toolAbort.abort(error);
+      reject(error);
+    }, toolTimeoutMs);
+  });
+
+  try {
+    // `Promise.race` subscribes to both, so a tool that eventually rejects
+    // after its deadline has already been reported cannot resurface as an
+    // unhandled rejection and kill the consumer's process.
+    return await Promise.race([
+      Promise.resolve(
+        execute(args, { toolCallId, abortSignal: toolAbort.signal }),
+      ),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    turnSignal.removeEventListener("abort", onTurnAbort);
+  }
+}
+
+/**
  * Dispatch one step's tool calls.
  *
  * Split out of `runAgenticLoop` because it is the one part of the turn with
@@ -66,6 +149,11 @@ async function dispatchStepTools(params: {
   tools: AgenticLoopOptions["tools"];
   failedTools: Map<string, { count: number; lastError: string }>;
   abortSignal: AbortSignal;
+  /**
+   * Resolved per-tool deadline (ms), or `null` for no bound. Never `undefined`
+   * by the time it lands here — the default is applied by the caller.
+   */
+  toolTimeoutMs: number | null;
 }): Promise<{
   toolResults: AgenticLoopToolCallResult[];
   executions: AgenticLoopResult<unknown>["toolExecutions"];
@@ -74,7 +162,8 @@ async function dispatchStepTools(params: {
    *  partial tool-result turn. */
   abortedMidBatch: boolean;
 }> {
-  const { calls, adapter, tools, failedTools, abortSignal } = params;
+  const { calls, adapter, tools, failedTools, abortSignal, toolTimeoutMs } =
+    params;
   const toolResults: AgenticLoopToolCallResult[] = [];
   const executions: AgenticLoopResult<unknown>["toolExecutions"] = [];
   const dispatched: AgenticLoopToolCall[] = [];
@@ -158,9 +247,24 @@ async function dispatchStepTools(params: {
       continue;
     }
     try {
-      const output = await tool.execute(call.args, {
+      // Bounded unless the caller opted out. `abortSignal` alone only ends a
+      // tool that honours it, and between two steps there is no other timer
+      // running: the step's request deadline was disposed when the step
+      // settled and the next one is not armed yet. A tool that neither returns
+      // nor watches its signal would otherwise hang the whole turn with
+      // nothing to end it — the case a turn that removed its lifetime ceiling
+      // has no defence against.
+      //
+      // A breach lands in the catch below and is recorded as an ordinary tool
+      // failure, so the turn spends one step and carries on, matching what
+      // `toolTimeoutMs` already means on the native generate path.
+      const output = await executeToolCall({
+        name: call.name,
+        execute: tool.execute,
+        args: call.args,
         toolCallId: call.id,
-        abortSignal: abortSignal,
+        turnSignal: abortSignal,
+        toolTimeoutMs,
       });
       // A result can report failure without throwing — an MCP isError
       // payload, a proxy-blocked call resolving with `{ error }`. When
@@ -264,9 +368,14 @@ export function runAgenticLoop<TConversation>(
     const allToolExecutions: AgenticLoopResult<TConversation>["toolExecutions"] =
       [];
     let hadToolCallsAtCap = false;
+    // The cap is a variable, not `adapter.maxSteps` read in place, because a
+    // step-boundary callback may renew it mid-turn. With no callback nothing
+    // ever writes to it, so the loop is the same loop it was.
+    let stepCap = adapter.maxSteps;
+    const turnStartedAt = Date.now();
 
     try {
-      for (let step = 0; step < adapter.maxSteps; step++) {
+      for (let step = 0; step < stepCap; step++) {
         if (internalAbort.signal.aborted) {
           break;
         }
@@ -350,7 +459,7 @@ export function runAgenticLoop<TConversation>(
         ) {
           malformedRetryUsed = true;
           logger.warn(
-            `[${adapter.providerLabel}] Malformed function call at step ${step + 1}/${adapter.maxSteps}; retrying once.`,
+            `[${adapter.providerLabel}] Malformed function call at step ${step + 1}/${stepCap}; retrying once.`,
           );
           conversation =
             adapter.buildMalformedRetryNote?.(conversation, step) ??
@@ -363,7 +472,7 @@ export function runAgenticLoop<TConversation>(
           break;
         }
 
-        if (step === adapter.maxSteps - 1) {
+        if (step === stepCap - 1) {
           hadToolCallsAtCap = true;
         }
 
@@ -373,6 +482,7 @@ export function runAgenticLoop<TConversation>(
           tools: options.tools,
           failedTools,
           abortSignal: internalAbort.signal,
+          toolTimeoutMs: resolveToolTimeoutMs(options.toolTimeoutMs),
         });
         const toolResults = dispatch.toolResults;
         allToolCalls.push(...dispatch.dispatched);
@@ -395,8 +505,61 @@ export function runAgenticLoop<TConversation>(
           toolResults,
           step,
         );
+
+        // THE step boundary. Everything this step did has settled — tools ran,
+        // their results are in the conversation — and the cap has not yet been
+        // re-checked, so this is the only point where raising it changes what
+        // happens next without replaying anything. Deliberately not reached
+        // when the step asked for no tools (the turn ended on its own; renewing
+        // there would be a restart) or when the turn is already cancelled.
+        if (options.beforeStep && !internalAbort.signal.aborted) {
+          const decision = await options.beforeStep({
+            stepIndex: step,
+            stepsCompleted: step + 1,
+            maxSteps: stepCap,
+            elapsedMs: Date.now() - turnStartedAt,
+            toolNames: dispatch.dispatched.map((call) => call.name),
+            signal: internalAbort.signal,
+          });
+          // Strictly larger and finite. A smaller number would end a turn the
+          // engine has already committed steps to, and Infinity would remove
+          // the bound entirely — the callback's job is to extend a budget, not
+          // to delete it.
+          //
+          // Floored BEFORE the comparison, not after. A cap is a whole number
+          // of steps, so `stepCap + 0.5` is not a renewal at all — it floors
+          // back to the cap already in force. Comparing the raw value first
+          // let it pass the guard, leave the cap where it was, and still clear
+          // `hadToolCallsAtCap` below, which drops the turn's last-step-text
+          // fallback and reports a capped turn as an uncapped one.
+          const renewed =
+            typeof decision?.maxSteps === "number" &&
+            Number.isFinite(decision.maxSteps)
+              ? Math.floor(decision.maxSteps)
+              : undefined;
+          if (renewed !== undefined && renewed > stepCap) {
+            stepCap = renewed;
+            // The step that just ran is no longer the last one, so the turn is
+            // no longer capped. Left set, a renewed turn would report itself
+            // as having run out of steps.
+            hadToolCallsAtCap = false;
+          }
+          if (decision?.nudge && adapter.appendPlanningNudge) {
+            conversation = adapter.appendPlanningNudge(
+              conversation,
+              decision.nudge,
+            );
+          }
+        }
       }
 
+      // Read AFTER the loop, so it covers every way an abort can end a turn:
+      // the step-top check, a tool batch cut short, and an adapter whose
+      // provider SDK swallows the cancellation and returns what it had. The
+      // Anthropic SDK does exactly that last one — its stream iterator treats
+      // an aborted read as a clean end — so an interrupted turn arrives here
+      // indistinguishable from a completed one unless the signal is consulted.
+      const aborted = internalAbort.signal.aborted;
       const finishReason = adapter.mapFinishReason(
         rawStopReason,
         hadToolCallsAtCap,
@@ -413,9 +576,18 @@ export function runAgenticLoop<TConversation>(
         toolCalls: allToolCalls,
         toolExecutions: allToolExecutions,
         usage,
-        finishReason,
+        // A turn that was cut short before any terminal event reached it has
+        // no provider stop reason to map, and `mapFinishReason`'s default
+        // branch reports "stop" for that absence — the same value a model
+        // that finished normally produces. "other" is the AI-SDK-shaped value
+        // for "ended for a reason outside this enum", which is the truth.
+        // When the provider DID report a stop reason before the abort, that
+        // reason is real and is kept.
+        finishReason:
+          aborted && rawStopReason === undefined ? "other" : finishReason,
         rawStopReason,
         conversation,
+        aborted,
       };
     } catch (err) {
       // Must run before the finally block's channel.close(): a consumer

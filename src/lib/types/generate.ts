@@ -440,11 +440,24 @@ export type GenerateOptions = {
    */
   wrapupTimeLeadMs?: number;
   /**
-   * Per-tool-execution timeout in milliseconds (default 300_000). A tool
-   * that exceeds it fails with an error tool_result and costs one step —
-   * the turn continues instead of hanging on a wedged tool.
+   * Per-tool-execution timeout in milliseconds (default 300_000), or `null`
+   * for no bound at all.
+   *
+   * A tool that exceeds it is told to stop — the AbortSignal it was handed is
+   * aborted — and then fails with an error tool_result costing one step, so
+   * the turn continues instead of hanging on a wedged tool. A tool that
+   * ignores its signal keeps running to completion in the background; nothing
+   * here can stop it, and its eventual result is discarded.
+   *
+   * `null` removes the bound and awaits `execute` unguarded, which is what the
+   * native loops did before they had a per-tool timer. It is the way to keep a
+   * legitimately long-running tool, since a finite number is always a ceiling
+   * and `Infinity` silently becomes `setTimeout`'s ~24.9-day cap. The one
+   * combination refused is `null` together with
+   * `executionControl.lifetimeTimeoutMs: null`, which would leave the turn
+   * with no bound anywhere.
    */
-  toolTimeoutMs?: number;
+  toolTimeoutMs?: number | null;
   /** AbortSignal for external cancellation of the AI call */
   abortSignal?: AbortSignal;
   /**
@@ -1330,8 +1343,8 @@ export type TextGenerationOptions = {
   stallTimeoutMs?: number;
   /** Remaining-time threshold that triggers the wrap-up nudge (ms). See GenerateOptions.wrapupTimeLeadMs. */
   wrapupTimeLeadMs?: number;
-  /** Per-tool-execution timeout (ms, default 300_000). See GenerateOptions.toolTimeoutMs. */
-  toolTimeoutMs?: number;
+  /** Per-tool-execution timeout (ms, default 300_000; `null` for no bound). See GenerateOptions.toolTimeoutMs. */
+  toolTimeoutMs?: number | null;
   /** AbortSignal for external cancellation of the AI call */
   abortSignal?: AbortSignal;
   /** Bounds for tool execution capture. See GenerateOptions.toolExecutionCapture. */
@@ -1784,8 +1797,8 @@ export type NativeGenerateLoopArgs = {
   maxOutputTokens?: number;
   temperature?: number;
   abortSignal?: AbortSignal;
-  /** Per-tool-execution cap, forwarded into `guardToolExecutor`. */
-  toolTimeoutMs?: number;
+  /** Per-tool-execution cap, forwarded into `guardToolExecutor`. `null` for no bound. */
+  toolTimeoutMs?: number | null;
   /** Wraps one step: retry ladder plus provider error classification. */
   runStep: (
     call: () => Promise<Record<string, unknown>>,

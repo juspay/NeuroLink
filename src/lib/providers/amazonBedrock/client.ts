@@ -432,6 +432,11 @@ export class AmazonBedrockProvider extends BaseProvider {
         {
           tools: this.toEngineTools(tools),
           abortSignal: options.abortSignal,
+          // `toEngineTools` adds no deadline of its own, so this is the only
+          // per-tool bound on the turn. The engine defaults when it is absent.
+          ...(options.toolTimeoutMs !== undefined
+            ? { toolTimeoutMs: options.toolTimeoutMs }
+            : {}),
         },
       );
       const result = await resultPromise;
@@ -1220,6 +1225,11 @@ export class AmazonBedrockProvider extends BaseProvider {
       {
         tools: this.toEngineTools(tools),
         abortSignal: options.abortSignal,
+        // `toEngineTools` adds no deadline of its own, so this is the only
+        // per-tool bound on the turn. The engine defaults when it is absent.
+        ...(options.toolTimeoutMs !== undefined
+          ? { toolTimeoutMs: options.toolTimeoutMs }
+          : {}),
       },
     );
 

@@ -17,9 +17,9 @@ import { getMimeTypeForExtension } from "../../processors/config/mimeConstants.j
 import {
   DEFAULT_GEMINI_STREAM_TIMEOUT_MS,
   DEFAULT_MAX_STEPS,
-  DEFAULT_TOOL_EXECUTION_TIMEOUT_MS,
   DEFAULT_TOOL_MAX_RETRIES,
   GLOBAL_LOCATION_MODELS,
+  resolveToolTimeoutMs,
   TOOL_STORAGE_TIMEOUT_MS,
 } from "../../core/constants.js";
 import { resolveRequestKind } from "../../core/resolveRequestKind.js";
@@ -2088,8 +2088,7 @@ export class GoogleVertexProvider extends BaseProvider {
     // request/tool-exec receives effectiveSignal.
     const streamTimeoutMs =
       parseTimeout(options.timeout) ?? DEFAULT_GEMINI_STREAM_TIMEOUT_MS;
-    const toolExecTimeoutMs =
-      options.toolTimeoutMs ?? DEFAULT_TOOL_EXECUTION_TIMEOUT_MS;
+    const toolExecTimeoutMs = resolveToolTimeoutMs(options.toolTimeoutMs);
     const effectiveTurnDeadlineMs = options.turnTimeoutMs ?? streamTimeoutMs;
     const internalAbort = new AbortController();
     const onCallerAbort = () => internalAbort.abort();
@@ -2381,6 +2380,10 @@ export class GoogleVertexProvider extends BaseProvider {
             onProgress: () => turnClock.noteProgress(),
           }),
           abortSignal: effectiveSignal,
+          // The engine bounds every tool call itself. Passing the value this
+          // loop already gave `buildDedupedEngineTools` keeps the engine's
+          // backstop from being tighter than what the caller asked for.
+          toolTimeoutMs: toolExecTimeoutMs,
         },
       );
 
@@ -3113,8 +3116,7 @@ export class GoogleVertexProvider extends BaseProvider {
     // request/tool-exec receives effectiveSignal.
     const streamTimeoutMs =
       parseTimeout(options.timeout) ?? DEFAULT_GEMINI_STREAM_TIMEOUT_MS;
-    const toolExecTimeoutMs =
-      options.toolTimeoutMs ?? DEFAULT_TOOL_EXECUTION_TIMEOUT_MS;
+    const toolExecTimeoutMs = resolveToolTimeoutMs(options.toolTimeoutMs);
     const effectiveTurnDeadlineMs = options.turnTimeoutMs ?? streamTimeoutMs;
     const internalAbort = new AbortController();
     const onCallerAbort = () => internalAbort.abort();
@@ -3405,6 +3407,10 @@ export class GoogleVertexProvider extends BaseProvider {
             onProgress: () => turnClock.noteProgress(),
           }),
           abortSignal: effectiveSignal,
+          // The engine bounds every tool call itself. Passing the value this
+          // loop already gave `buildDedupedEngineTools` keeps the engine's
+          // backstop from being tighter than what the caller asked for.
+          toolTimeoutMs: toolExecTimeoutMs,
         },
       );
 
@@ -4342,8 +4348,7 @@ export class GoogleVertexProvider extends BaseProvider {
     if (options.abortSignal?.aborted) {
       internalAbort.abort();
     }
-    const toolExecTimeoutMs =
-      options.toolTimeoutMs ?? DEFAULT_TOOL_EXECUTION_TIMEOUT_MS;
+    const toolExecTimeoutMs = resolveToolTimeoutMs(options.toolTimeoutMs);
     const effectiveTurnDeadlineMs = options.turnTimeoutMs ?? streamTimeoutMs;
     // Whole-turn deadline + optional stall watchdog. When the caller sets no
     // explicit turn budget, keep the pre-existing defensive bound
@@ -4815,6 +4820,9 @@ export class GoogleVertexProvider extends BaseProvider {
             tools: engineTools,
             abortSignal: internalAbort.signal,
             ...(activeSpan ? { span: activeSpan } : {}),
+            // Same value `guardToolExecutor` already received above, so the
+            // engine's own per-tool bound cannot undercut it.
+            toolTimeoutMs: toolExecTimeoutMs,
           },
         );
 
@@ -5793,8 +5801,7 @@ export class GoogleVertexProvider extends BaseProvider {
     if (options.abortSignal?.aborted) {
       internalAbort.abort();
     }
-    const toolExecTimeoutMs =
-      options.toolTimeoutMs ?? DEFAULT_TOOL_EXECUTION_TIMEOUT_MS;
+    const toolExecTimeoutMs = resolveToolTimeoutMs(options.toolTimeoutMs);
     // Whole-turn deadline + optional stall watchdog. NOTE: unlike the stream
     // twin, this path historically had NO whole-turn bound (only the per-call
     // withTimeout) — so no defensive default is introduced here: without an
@@ -6051,6 +6058,9 @@ export class GoogleVertexProvider extends BaseProvider {
       {
         tools: engineTools,
         abortSignal: internalAbort.signal,
+        // Same value `guardToolExecutor` already received above, so the
+        // engine's own per-tool bound cannot undercut it.
+        toolTimeoutMs: toolExecTimeoutMs,
       },
     );
 
