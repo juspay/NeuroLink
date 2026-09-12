@@ -262883,7 +262883,7 @@ Embedding dimension
 
 > **EmbeddingModel** = `string` \| `Record`\
 
-Defined in: [types/aiCompat.ts:533](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L533)
+Defined in: [types/aiCompat.ts:537](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L537)
 
 ---
 
@@ -274500,7 +274500,7 @@ Gemini MALFORMED_FUNCTION_CALL provider errors).
 
 > **GenerateTextResult**\ = [`StepResult`](/docs/stepresult)\ & `object`
 
-Defined in: [types/aiCompat.ts:570](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L570)
+Defined in: [types/aiCompat.ts:574](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L574)
 
 ## Type Declaration
 
@@ -278174,7 +278174,7 @@ Error message if execution failed
 
 > **ImageModel** = `string` \| `Record`\
 
-Defined in: [types/aiCompat.ts:534](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L534)
+Defined in: [types/aiCompat.ts:538](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L538)
 
 ---
 
@@ -282347,7 +282347,7 @@ Defined in: [types/observability.ts:62](https://github.com/juspay/neurolink/blob
 
 > **LanguageModel** = `string` \| [`LanguageModelV3`](/docs/languagemodelv3)
 
-Defined in: [types/aiCompat.ts:531](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L531)
+Defined in: [types/aiCompat.ts:535](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L535)
 
 Upstream also admits a v2 model and a bare id string.
 
@@ -282367,7 +282367,7 @@ Upstream also admits a v2 model and a bare id string.
 
 > **LanguageModelMiddleware** = [`LanguageModelV3Middleware`](/docs/languagemodelv3middleware)
 
-Defined in: [types/aiCompat.ts:528](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L528)
+Defined in: [types/aiCompat.ts:532](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L532)
 
 ---
 
@@ -282525,7 +282525,7 @@ Defined in: [types/aiCompat.ts:321](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **provider**: `string`
 
-Defined in: [types/aiCompat.ts:489](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L489)
+Defined in: [types/aiCompat.ts:493](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L493)
 
 ---
 
@@ -282533,7 +282533,7 @@ Defined in: [types/aiCompat.ts:489](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **modelId**: `string`
 
-Defined in: [types/aiCompat.ts:490](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L490)
+Defined in: [types/aiCompat.ts:494](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L494)
 
 ---
 
@@ -282541,7 +282541,7 @@ Defined in: [types/aiCompat.ts:490](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **supportedUrls**: `Record`\ \| `PromiseLike`\\>
 
-Defined in: [types/aiCompat.ts:491](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L491)
+Defined in: [types/aiCompat.ts:495](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L495)
 
 ## Methods
 
@@ -282549,7 +282549,7 @@ Defined in: [types/aiCompat.ts:491](https://github.com/juspay/neurolink/blob/rel
 
 > **doGenerate**(`options`): `PromiseLike`\
 
-Defined in: [types/aiCompat.ts:494](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L494)
+Defined in: [types/aiCompat.ts:498](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L498)
 
 #### Parameters
 
@@ -282567,7 +282567,7 @@ Defined in: [types/aiCompat.ts:494](https://github.com/juspay/neurolink/blob/rel
 
 > **doStream**(`options`): `PromiseLike`\
 
-Defined in: [types/aiCompat.ts:497](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L497)
+Defined in: [types/aiCompat.ts:501](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L501)
 
 #### Parameters
 
@@ -282735,7 +282735,7 @@ Defined in: [types/aiCompat.ts:376](https://github.com/juspay/neurolink/blob/rel
 
 # Type Alias: LanguageModelV3Content
 
-> **LanguageModelV3Content** = \{ `type`: `"text"`; `text`: `string`; \} \| \{ `type`: `"reasoning"`; `text`: `string`; \} \| \{ `type`: `"file"`; `data`: `unknown`; `mediaType`: `string`; \} \| [`LanguageModelV3ToolCall`](/docs/languagemodelv3toolcall) \| [`LanguageModelV3Source`](/docs/languagemodelv3source) \| `object` & `Record`\ \| `object` & `Record`\
+> **LanguageModelV3Content** = \{ `type`: `"text"`; `text`: `string`; \} \| \{ `type`: `"reasoning"`; `text`: `string`; `providerOptions?`: `Record`\\>; \} \| \{ `type`: `"file"`; `data`: `unknown`; `mediaType`: `string`; \} \| [`LanguageModelV3ToolCall`](/docs/languagemodelv3toolcall) \| [`LanguageModelV3Source`](/docs/languagemodelv3source) \| `object` & `Record`\ \| `object` & `Record`\
 
 Defined in: [types/aiCompat.ts:401](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L401)
 
@@ -282751,7 +282751,7 @@ Defined in: [types/aiCompat.ts:401](https://github.com/juspay/neurolink/blob/rel
 
 > **finishReason**: `LanguageModelV3FinishReason`
 
-Defined in: [types/aiCompat.ts:432](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L432)
+Defined in: [types/aiCompat.ts:436](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L436)
 
 ---
 
@@ -282759,7 +282759,7 @@ Defined in: [types/aiCompat.ts:432](https://github.com/juspay/neurolink/blob/rel
 
 > **usage**: `LanguageModelV3Usage`
 
-Defined in: [types/aiCompat.ts:433](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L433)
+Defined in: [types/aiCompat.ts:437](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L437)
 
 ---
 
@@ -282767,7 +282767,7 @@ Defined in: [types/aiCompat.ts:433](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **warnings?**: `unknown`[]
 
-Defined in: [types/aiCompat.ts:434](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L434)
+Defined in: [types/aiCompat.ts:438](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L438)
 
 ---
 
@@ -282775,7 +282775,7 @@ Defined in: [types/aiCompat.ts:434](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **request?**: `unknown`
 
-Defined in: [types/aiCompat.ts:435](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L435)
+Defined in: [types/aiCompat.ts:439](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L439)
 
 ---
 
@@ -282783,7 +282783,7 @@ Defined in: [types/aiCompat.ts:435](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **response?**: `unknown`
 
-Defined in: [types/aiCompat.ts:436](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L436)
+Defined in: [types/aiCompat.ts:440](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L440)
 
 ---
 
@@ -282791,7 +282791,7 @@ Defined in: [types/aiCompat.ts:436](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **providerMetadata?**: `Record`\\>
 
-Defined in: [types/aiCompat.ts:437](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L437)
+Defined in: [types/aiCompat.ts:441](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L441)
 
 ---
 
@@ -282823,7 +282823,7 @@ Defined in: [types/aiCompat.ts:333](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **overrideProvider?**: (`options`) => `string`
 
-Defined in: [types/aiCompat.ts:504](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L504)
+Defined in: [types/aiCompat.ts:508](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L508)
 
 #### Parameters
 
@@ -282843,7 +282843,7 @@ Defined in: [types/aiCompat.ts:504](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **overrideModelId?**: (`options`) => `string`
 
-Defined in: [types/aiCompat.ts:505](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L505)
+Defined in: [types/aiCompat.ts:509](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L509)
 
 #### Parameters
 
@@ -282863,7 +282863,7 @@ Defined in: [types/aiCompat.ts:505](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **overrideSupportedUrls?**: (`options`) => `Record`\ \| `PromiseLike`\\>
 
-Defined in: [types/aiCompat.ts:506](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L506)
+Defined in: [types/aiCompat.ts:510](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L510)
 
 #### Parameters
 
@@ -282883,7 +282883,7 @@ Defined in: [types/aiCompat.ts:506](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **transformParams?**: (`options`) => `PromiseLike`\
 
-Defined in: [types/aiCompat.ts:509](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L509)
+Defined in: [types/aiCompat.ts:513](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L513)
 
 #### Parameters
 
@@ -282911,7 +282911,7 @@ Defined in: [types/aiCompat.ts:509](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **wrapGenerate?**: (`options`) => `PromiseLike`\
 
-Defined in: [types/aiCompat.ts:514](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L514)
+Defined in: [types/aiCompat.ts:518](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L518)
 
 #### Parameters
 
@@ -282943,7 +282943,7 @@ Defined in: [types/aiCompat.ts:514](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **wrapStream?**: (`options`) => `PromiseLike`\
 
-Defined in: [types/aiCompat.ts:520](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L520)
+Defined in: [types/aiCompat.ts:524](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L524)
 
 #### Parameters
 
@@ -283041,7 +283041,7 @@ Defined in: [types/aiCompat.ts:392](https://github.com/juspay/neurolink/blob/rel
 
 > **LanguageModelV3StreamPart** = \{ `type`: `"text-start"`; `id?`: `string`; \} \| \{ `type`: `"text-delta"`; `id?`: `string`; `delta`: `string`; \} \| \{ `type`: `"text-end"`; `id?`: `string`; \} \| \{ `type`: `"reasoning-start"`; `id?`: `string`; \} \| \{ `type`: `"reasoning-delta"`; `id?`: `string`; `delta`: `string`; \} \| \{ `type`: `"reasoning-end"`; `id?`: `string`; \} \| \{ `type`: `"tool-call"`; `toolCallId`: `string`; `toolName`: `string`; `input`: `string`; `providerExecuted?`: `boolean`; \} \| `object` & `Record`\ \| `object` & `Record`\ \| `object` & `Record`\ \| `object` & `Record`\ \| \{ `type`: `"source"`; `sourceType`: `string`; `id`: `string`; `url?`: `string`; `title?`: `string`; \} \| `object` & `Record`\ \| `object` & `Record`\ \| `object` & `Record`\ \| `object` & `Record`\ \| \{ `type`: `"error"`; `error`: `unknown`; \} \| \{ `type`: `"finish"`; `finishReason`: `LanguageModelV3FinishReason`; `usage`: `LanguageModelV3Usage`; `providerMetadata?`: `Record`\\>; \}
 
-Defined in: [types/aiCompat.ts:444](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L444)
+Defined in: [types/aiCompat.ts:448](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L448)
 
 Discriminated rather than a loose record: consumers switch on `type` and
 read variant-specific fields (a finish part's usage, a tool-call's input).
@@ -283058,7 +283058,7 @@ read variant-specific fields (a finish part's usage, a tool-call's input).
 
 > `optional` **request?**: `unknown`
 
-Defined in: [types/aiCompat.ts:483](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L483)
+Defined in: [types/aiCompat.ts:487](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L487)
 
 ---
 
@@ -283066,7 +283066,7 @@ Defined in: [types/aiCompat.ts:483](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **response?**: `unknown`
 
-Defined in: [types/aiCompat.ts:484](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L484)
+Defined in: [types/aiCompat.ts:488](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L488)
 
 ---
 
@@ -305881,7 +305881,7 @@ Defined in: [types/guardrails.ts:23](https://github.com/juspay/neurolink/blob/re
 
 > **PrepareStepFunction**\ = (`options`) => [`PrepareStepResult`](/docs/preparestepresult)\ \| `undefined` \| `PromiseLike`\ \| `undefined`\>
 
-Defined in: [types/aiCompat.ts:601](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L601)
+Defined in: [types/aiCompat.ts:605](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L605)
 
 ## Type Parameters
 
@@ -305933,7 +305933,7 @@ Defined in: [types/aiCompat.ts:601](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **toolChoice?**: [`ToolChoice`](/docs/toolchoice)\
 
-Defined in: [types/aiCompat.ts:593](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L593)
+Defined in: [types/aiCompat.ts:597](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L597)
 
 ---
 
@@ -305941,7 +305941,7 @@ Defined in: [types/aiCompat.ts:593](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **activeTools?**: keyof `TOOLS`[]
 
-Defined in: [types/aiCompat.ts:594](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L594)
+Defined in: [types/aiCompat.ts:598](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L598)
 
 ---
 
@@ -305949,7 +305949,7 @@ Defined in: [types/aiCompat.ts:594](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **system?**: `string`
 
-Defined in: [types/aiCompat.ts:595](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L595)
+Defined in: [types/aiCompat.ts:599](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L599)
 
 ---
 
@@ -305957,7 +305957,7 @@ Defined in: [types/aiCompat.ts:595](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **messages?**: [`ModelMessage`](/docs/modelmessage)[]
 
-Defined in: [types/aiCompat.ts:596](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L596)
+Defined in: [types/aiCompat.ts:600](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L600)
 
 ---
 
@@ -305965,7 +305965,7 @@ Defined in: [types/aiCompat.ts:596](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **providerOptions?**: `Record`\\>
 
-Defined in: [types/aiCompat.ts:597](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L597)
+Defined in: [types/aiCompat.ts:601](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L601)
 
 ---
 
@@ -305973,7 +305973,7 @@ Defined in: [types/aiCompat.ts:597](https://github.com/juspay/neurolink/blob/rel
 
 > `optional` **tools?**: `TOOLS`
 
-Defined in: [types/aiCompat.ts:598](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L598)
+Defined in: [types/aiCompat.ts:602](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L602)
 
 ---
 
@@ -342903,7 +342903,7 @@ Defined in: [types/proxy.ts:3339](https://github.com/juspay/neurolink/blob/relea
 
 > `readonly` **content**: `object` & `Record`\[]
 
-Defined in: [types/aiCompat.ts:538](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L538)
+Defined in: [types/aiCompat.ts:542](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L542)
 
 ---
 
@@ -342911,7 +342911,7 @@ Defined in: [types/aiCompat.ts:538](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **text**: `string`
 
-Defined in: [types/aiCompat.ts:539](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L539)
+Defined in: [types/aiCompat.ts:543](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L543)
 
 ---
 
@@ -342919,7 +342919,7 @@ Defined in: [types/aiCompat.ts:539](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **reasoning?**: `unknown`
 
-Defined in: [types/aiCompat.ts:540](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L540)
+Defined in: [types/aiCompat.ts:544](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L544)
 
 ---
 
@@ -342927,7 +342927,7 @@ Defined in: [types/aiCompat.ts:540](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **reasoningText?**: `string`
 
-Defined in: [types/aiCompat.ts:541](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L541)
+Defined in: [types/aiCompat.ts:545](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L545)
 
 ---
 
@@ -342935,7 +342935,7 @@ Defined in: [types/aiCompat.ts:541](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **files?**: `unknown`[]
 
-Defined in: [types/aiCompat.ts:542](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L542)
+Defined in: [types/aiCompat.ts:546](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L546)
 
 ---
 
@@ -342943,7 +342943,7 @@ Defined in: [types/aiCompat.ts:542](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **sources?**: `unknown`[]
 
-Defined in: [types/aiCompat.ts:543](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L543)
+Defined in: [types/aiCompat.ts:547](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L547)
 
 ---
 
@@ -342951,7 +342951,7 @@ Defined in: [types/aiCompat.ts:543](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **toolCalls**: `object` & `Record`\[]
 
-Defined in: [types/aiCompat.ts:544](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L544)
+Defined in: [types/aiCompat.ts:548](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L548)
 
 ---
 
@@ -342959,7 +342959,7 @@ Defined in: [types/aiCompat.ts:544](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **toolResults**: `object` & `Record`\[]
 
-Defined in: [types/aiCompat.ts:550](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L550)
+Defined in: [types/aiCompat.ts:554](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L554)
 
 ---
 
@@ -342967,7 +342967,7 @@ Defined in: [types/aiCompat.ts:550](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **stepType?**: `string`
 
-Defined in: [types/aiCompat.ts:556](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L556)
+Defined in: [types/aiCompat.ts:560](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L560)
 
 ---
 
@@ -342975,7 +342975,7 @@ Defined in: [types/aiCompat.ts:556](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **finishReason**: [`FinishReason`](/docs/finishreason)
 
-Defined in: [types/aiCompat.ts:557](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L557)
+Defined in: [types/aiCompat.ts:561](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L561)
 
 ---
 
@@ -342983,7 +342983,7 @@ Defined in: [types/aiCompat.ts:557](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **rawFinishReason?**: `string`
 
-Defined in: [types/aiCompat.ts:558](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L558)
+Defined in: [types/aiCompat.ts:562](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L562)
 
 ---
 
@@ -342991,7 +342991,7 @@ Defined in: [types/aiCompat.ts:558](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` **usage**: [`LanguageModelUsage`](/docs/languagemodelusage)
 
-Defined in: [types/aiCompat.ts:559](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L559)
+Defined in: [types/aiCompat.ts:563](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L563)
 
 ---
 
@@ -342999,7 +342999,7 @@ Defined in: [types/aiCompat.ts:559](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **warnings?**: `unknown`[]
 
-Defined in: [types/aiCompat.ts:560](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L560)
+Defined in: [types/aiCompat.ts:564](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L564)
 
 ---
 
@@ -343007,7 +343007,7 @@ Defined in: [types/aiCompat.ts:560](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **request?**: [`LanguageModelRequestMetadata`](/docs/languagemodelrequestmetadata)
 
-Defined in: [types/aiCompat.ts:561](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L561)
+Defined in: [types/aiCompat.ts:565](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L565)
 
 ---
 
@@ -343015,7 +343015,7 @@ Defined in: [types/aiCompat.ts:561](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **response?**: [`LanguageModelResponseMetadata`](/docs/languagemodelresponsemetadata) & `object`
 
-Defined in: [types/aiCompat.ts:562](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L562)
+Defined in: [types/aiCompat.ts:566](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L566)
 
 #### Type Declaration
 
@@ -343033,7 +343033,7 @@ Defined in: [types/aiCompat.ts:562](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **providerMetadata?**: `Record`\\>
 
-Defined in: [types/aiCompat.ts:566](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L566)
+Defined in: [types/aiCompat.ts:570](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L570)
 
 ---
 
@@ -343041,7 +343041,7 @@ Defined in: [types/aiCompat.ts:566](https://github.com/juspay/neurolink/blob/rel
 
 > `readonly` `optional` **tools?**: `TOOLS`
 
-Defined in: [types/aiCompat.ts:567](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L567)
+Defined in: [types/aiCompat.ts:571](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L571)
 
 ---
 
@@ -354211,7 +354211,7 @@ Defined in: [types/aiCompat.ts:238](https://github.com/juspay/neurolink/blob/rel
 
 > **ToolCallRepairFunction**\ = (`options`) => `Promise`\
 
-Defined in: [types/aiCompat.ts:579](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L579)
+Defined in: [types/aiCompat.ts:583](https://github.com/juspay/neurolink/blob/release/src/lib/types/aiCompat.ts#L583)
 
 ## Type Parameters
 
