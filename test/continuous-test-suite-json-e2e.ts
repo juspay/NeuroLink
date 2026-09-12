@@ -576,4 +576,47 @@ await test("anthropic:claude-sonnet-4-6 — forced truncation yields a partial o
   );
 });
 
+// This suite sets NEUROLINK_DISABLE_BUILTIN_TOOLS at the top, so it cannot
+// reach the case below on its own: every OpenAI-compatible provider except
+// OpenAI and Azure suppresses `response_format` when the request carries
+// tools, and the caller's schema then never reaches the wire at all. Passing a
+// tool explicitly reproduces it regardless of the built-in setting.
+//
+// Before the fix the prompt-based fallback was gated on `response_format`
+// having been sent, so the suppressed case — the one the fallback exists for —
+// could never trigger it. The answer came back as prose with structuredData
+// undefined, silently breaking the documented generate({ schema }) contract.
+await test("deepseek:deepseek-chat — a schema survives a request that also carries tools", async () => {
+  let res;
+  try {
+    res = await nl.generate({
+      input: { text: "Capital of France and its population." },
+      provider: "deepseek",
+      model: "deepseek-chat",
+      maxTokens: 300,
+      tools: { ping: pingTool },
+      schema: z.object({ capital: z.string(), population: z.number() }),
+    });
+  } catch (e) {
+    if (isInfraError(String((e as Error)?.message ?? e))) {
+      throw new Skip("deepseek unavailable for provider reasons");
+    }
+    throw new Error("schema request with tools present failed outright", {
+      cause: e,
+    });
+  }
+  const data = res.structuredData as Record<string, unknown> | undefined;
+  assert(
+    !!data && typeof data === "object" && !Array.isArray(data),
+    "structuredData must be produced even when tools suppress response_format",
+  );
+  assert(
+    typeof data?.capital === "string" && data.capital.length > 0,
+    "the required string property must be present and non-empty",
+  );
+  console.log(
+    "      · schema honoured on a tools-bearing request (prompt fallback)",
+  );
+});
+
 await runSuite();
