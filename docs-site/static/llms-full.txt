@@ -170132,7 +170132,7 @@ Default realtime configuration
 
 > **removeBreaker**(`name`): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:445](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L445)
+Defined in: [mcp/mcpCircuitBreaker.ts:466](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L466)
 
 Remove a circuit breaker and clean up its resources
 
@@ -170152,7 +170152,7 @@ Remove a circuit breaker and clean up its resources
 
 > **getBreakerNames**(): `string`[]
 
-Defined in: [mcp/mcpCircuitBreaker.ts:463](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L463)
+Defined in: [mcp/mcpCircuitBreaker.ts:484](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L484)
 
 Get all circuit breaker names
 
@@ -170166,7 +170166,7 @@ Get all circuit breaker names
 
 > **getAllStats**(): `Record`\
 
-Defined in: [mcp/mcpCircuitBreaker.ts:470](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L470)
+Defined in: [mcp/mcpCircuitBreaker.ts:491](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L491)
 
 Get statistics for all circuit breakers
 
@@ -170180,7 +170180,7 @@ Get statistics for all circuit breakers
 
 > **resetAll**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:483](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L483)
+Defined in: [mcp/mcpCircuitBreaker.ts:504](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L504)
 
 Reset all circuit breakers
 
@@ -170194,7 +170194,7 @@ Reset all circuit breakers
 
 > **getHealthSummary**(): `object`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:494](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L494)
+Defined in: [mcp/mcpCircuitBreaker.ts:515](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L515)
 
 Get health summary
 
@@ -170228,7 +170228,7 @@ Get health summary
 
 > **destroyAll**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:536](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L536)
+Defined in: [mcp/mcpCircuitBreaker.ts:557](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L557)
 
 Destroy all circuit breakers and clean up their resources
 This should be called during application shutdown to prevent memory leaks
@@ -182822,7 +182822,7 @@ console.log("Tiers executed:", result.ensembleResponses.length);
 
 > **setHITLManager**(`hitlManager?`): `void`
 
-Defined in: [mcp/externalServerManager.ts:361](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L361)
+Defined in: [mcp/externalServerManager.ts:447](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L447)
 
 Set HITL manager for human-in-the-loop safety mechanisms
 
@@ -182844,7 +182844,7 @@ HITL manager instance (optional, can be undefined to disable)
 
 > **getHITLManager**(): `HITLManager` \| `undefined`
 
-Defined in: [mcp/externalServerManager.ts:377](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L377)
+Defined in: [mcp/externalServerManager.ts:463](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L463)
 
 Get current HITL manager
 
@@ -182858,7 +182858,7 @@ Get current HITL manager
 
 > **getServerName**(`serverId`): `string`
 
-Defined in: [mcp/externalServerManager.ts:385](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L385)
+Defined in: [mcp/externalServerManager.ts:471](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L471)
 
 Resolve the human-readable server name for an event payload.
 Falls back to serverId if the instance or config.name isn't available.
@@ -182879,7 +182879,7 @@ Falls back to serverId if the instance or config.name isn't available.
 
 > **loadMCPConfiguration**(`configPath?`, `options?`): `Promise`\
 
-Defined in: [mcp/externalServerManager.ts:397](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L397)
+Defined in: [mcp/externalServerManager.ts:483](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L483)
 
 Load MCP server configurations from .mcp-config.json file with parallel loading support
 Automatically registers servers found in the configuration
@@ -182912,7 +182912,7 @@ Promise resolving to { serversLoaded, errors }
 
 > **loadMCPConfigurationParallel**(`configPath?`): `Promise`\
 
-Defined in: [mcp/externalServerManager.ts:412](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L412)
+Defined in: [mcp/externalServerManager.ts:498](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L498)
 
 Load MCP servers in parallel for improved performance
 
@@ -182936,7 +182936,7 @@ Promise resolving to batch operation result
 
 > **loadMCPConfigurationSequential**(`configPath?`): `Promise`\
 
-Defined in: [mcp/externalServerManager.ts:594](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L594)
+Defined in: [mcp/externalServerManager.ts:680](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L680)
 
 Load MCP servers sequentially (original implementation for backward compatibility)
 
@@ -182960,7 +182960,7 @@ Promise resolving to batch operation result
 
 > **validateConfig**(`config`): [`ExternalMCPConfigValidation`](/docs/type-aliases/externalmcpconfigvalidation)
 
-Defined in: [mcp/externalServerManager.ts:751](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L751)
+Defined in: [mcp/externalServerManager.ts:837](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L837)
 
 Validate external MCP server configuration
 
@@ -182982,7 +182982,7 @@ Validate external MCP server configuration
 
 > **addServer**(`serverId`, `config`): `Promise`\\>
 
-Defined in: [mcp/externalServerManager.ts:851](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L851)
+Defined in: [mcp/externalServerManager.ts:937](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L937)
 
 Add a new external MCP server - Backward compatibility overload
 
@@ -183004,7 +183004,7 @@ Add a new external MCP server - Backward compatibility overload
 
 > **addServer**(`serverId`, `serverInfo`): `Promise`\\>
 
-Defined in: [mcp/externalServerManager.ts:859](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L859)
+Defined in: [mcp/externalServerManager.ts:945](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L945)
 
 Add a new external MCP server - Updated to accept MCPServerInfo
 
@@ -183028,7 +183028,7 @@ Add a new external MCP server - Updated to accept MCPServerInfo
 
 > **removeServer**(`serverId`): `Promise`\\>
 
-Defined in: [mcp/externalServerManager.ts:1030](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1030)
+Defined in: [mcp/externalServerManager.ts:1116](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1116)
 
 Remove an external MCP server
 
@@ -183048,7 +183048,7 @@ Remove an external MCP server
 
 > **getServer**(`serverId`): [`ExternalMCPServerInstance`](/docs/type-aliases/externalmcpserverinstance) \| `undefined`
 
-Defined in: [mcp/externalServerManager.ts:1686](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1686)
+Defined in: [mcp/externalServerManager.ts:1790](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1790)
 
 Get server instance - converted to ExternalMCPServerInstance for compatibility
 
@@ -183068,7 +183068,7 @@ Get server instance - converted to ExternalMCPServerInstance for compatibility
 
 > **getAllServers**(): `Map`\
 
-Defined in: [mcp/externalServerManager.ts:1716](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1716)
+Defined in: [mcp/externalServerManager.ts:1820](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1820)
 
 Get all servers - converted to ExternalMCPServerInstance for compatibility
 
@@ -183082,7 +183082,7 @@ Get all servers - converted to ExternalMCPServerInstance for compatibility
 
 > **listServers**(): [`MCPServerInfo`](/docs/api/type-aliases/MCPServerInfo)[]
 
-Defined in: [mcp/externalServerManager.ts:1745](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1745)
+Defined in: [mcp/externalServerManager.ts:1849](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1849)
 
 List servers as MCPServerInfo - ZERO conversion needed
 
@@ -183096,7 +183096,7 @@ List servers as MCPServerInfo - ZERO conversion needed
 
 > **getServerStatuses**(): [`ExternalMCPServerHealth`](/docs/type-aliases/externalmcpserverhealth)[]
 
-Defined in: [mcp/externalServerManager.ts:1752](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1752)
+Defined in: [mcp/externalServerManager.ts:1856](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1856)
 
 Get server statuses
 
@@ -183110,7 +183110,7 @@ Get server statuses
 
 > **shutdown**(): `Promise`\
 
-Defined in: [mcp/externalServerManager.ts:1781](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1781)
+Defined in: [mcp/externalServerManager.ts:1885](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1885)
 
 Shutdown all servers and clean up resources
 This method should be called during application shutdown to prevent memory leaks
@@ -183125,7 +183125,7 @@ This method should be called during application shutdown to prevent memory leaks
 
 > **destroy**(): `Promise`\
 
-Defined in: [mcp/externalServerManager.ts:1818](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1818)
+Defined in: [mcp/externalServerManager.ts:1922](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1922)
 
 Destroy the manager and all associated resources
 Alias for shutdown() to match the pattern used by other components
@@ -183140,7 +183140,7 @@ Alias for shutdown() to match the pattern used by other components
 
 > **getStatistics**(): `object`
 
-Defined in: [mcp/externalServerManager.ts:1825](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1825)
+Defined in: [mcp/externalServerManager.ts:1929](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L1929)
 
 Get manager statistics
 
@@ -183178,7 +183178,7 @@ Get manager statistics
 
 > **executeTool**(`serverId`, `toolName`, `parameters`, `options?`): `Promise`\
 
-Defined in: [mcp/externalServerManager.ts:2038](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2038)
+Defined in: [mcp/externalServerManager.ts:2142](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2142)
 
 Execute a tool on a specific server
 
@@ -183212,7 +183212,7 @@ Execute a tool on a specific server
 
 > **getAllTools**(): [`ExternalMCPToolInfo`](/docs/type-aliases/externalmcptoolinfo)[]
 
-Defined in: [mcp/externalServerManager.ts:2235](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2235)
+Defined in: [mcp/externalServerManager.ts:2339](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2339)
 
 Get all tools from all servers
 
@@ -183226,7 +183226,7 @@ Get all tools from all servers
 
 > **getServerTools**(`serverId`): [`ExternalMCPToolInfo`](/docs/type-aliases/externalmcptoolinfo)[]
 
-Defined in: [mcp/externalServerManager.ts:2242](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2242)
+Defined in: [mcp/externalServerManager.ts:2346](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2346)
 
 Get tools for a specific server
 
@@ -183246,7 +183246,7 @@ Get tools for a specific server
 
 > **getToolDiscovery**(): `ToolDiscoveryService`
 
-Defined in: [mcp/externalServerManager.ts:2249](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2249)
+Defined in: [mcp/externalServerManager.ts:2353](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/externalServerManager.ts#L2353)
 
 Get tool discovery service
 
@@ -195569,7 +195569,7 @@ Defined in: [types/proxy.ts:3132](https://github.com/juspay/neurolink/blob/relea
 
 > `const` **globalCircuitBreakerManager**: [`CircuitBreakerManager`](/docs/api/classes/CircuitBreakerManager)
 
-Defined in: [mcp/mcpCircuitBreaker.ts:547](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L547)
+Defined in: [mcp/mcpCircuitBreaker.ts:568](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L568)
 
 MCP (Model Context Protocol) Plugin Ecosystem
 
@@ -195751,7 +195751,7 @@ Global elicitation manager instance
 
 > **getStats**(): [`CircuitBreakerStats`](/docs/type-aliases/circuitbreakerstats)
 
-Defined in: [mcp/mcpCircuitBreaker.ts:318](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L318)
+Defined in: [mcp/mcpCircuitBreaker.ts:339](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L339)
 
 Get current statistics
 
@@ -195765,7 +195765,7 @@ Get current statistics
 
 > **reset**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:347](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L347)
+Defined in: [mcp/mcpCircuitBreaker.ts:368](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L368)
 
 Manually reset the circuit breaker
 
@@ -195779,7 +195779,7 @@ Manually reset the circuit breaker
 
 > **forceOpen**(`reason?`): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:357](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L357)
+Defined in: [mcp/mcpCircuitBreaker.ts:378](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L378)
 
 Force open the circuit breaker
 
@@ -195799,7 +195799,7 @@ Force open the circuit breaker
 
 > **getName**(): `string`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:365](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L365)
+Defined in: [mcp/mcpCircuitBreaker.ts:386](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L386)
 
 Get circuit breaker name
 
@@ -195813,7 +195813,7 @@ Get circuit breaker name
 
 > **isOpen**(): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:372](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L372)
+Defined in: [mcp/mcpCircuitBreaker.ts:393](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L393)
 
 Check if circuit is open
 
@@ -195827,7 +195827,7 @@ Check if circuit is open
 
 > **isClosed**(): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:379](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L379)
+Defined in: [mcp/mcpCircuitBreaker.ts:400](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L400)
 
 Check if circuit is closed
 
@@ -195841,7 +195841,7 @@ Check if circuit is closed
 
 > **isHalfOpen**(): `boolean`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:386](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L386)
+Defined in: [mcp/mcpCircuitBreaker.ts:407](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L407)
 
 Check if circuit is half-open
 
@@ -195855,7 +195855,7 @@ Check if circuit is half-open
 
 > **destroy**(): `void`
 
-Defined in: [mcp/mcpCircuitBreaker.ts:395](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L395)
+Defined in: [mcp/mcpCircuitBreaker.ts:416](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpCircuitBreaker.ts#L416)
 
 Destroy the circuit breaker and clean up resources
 This method should be called when the circuit breaker is no longer needed
@@ -195953,7 +195953,7 @@ Global protocol adapter instance
 
 > `static` **getStderrTail**(`transport`): `string`[]
 
-Defined in: [mcp/mcpClientFactory.ts:366](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L366)
+Defined in: [mcp/mcpClientFactory.ts:364](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L364)
 
 The most recent stderr lines written by the stdio server behind
 `transport`. Empty for network transports and for servers that have
@@ -195976,7 +195976,7 @@ started, so an early boot failure is included.
 
 > `static` **closeClient**(`client`, `transport`, `process?`): `Promise`\
 
-Defined in: [mcp/mcpClientFactory.ts:815](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L815)
+Defined in: [mcp/mcpClientFactory.ts:831](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L831)
 
 Close an MCP client and clean up resources
 
@@ -196004,7 +196004,7 @@ Close an MCP client and clean up resources
 
 > `static` **testConnection**(`config`, `timeout?`): `Promise`\
 
-Defined in: [mcp/mcpClientFactory.ts:886](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L886)
+Defined in: [mcp/mcpClientFactory.ts:902](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L902)
 
 Test connection to an MCP server
 
@@ -196028,7 +196028,7 @@ Test connection to an MCP server
 
 > `static` **validateClientConfig**(`config`): `object`
 
-Defined in: [mcp/mcpClientFactory.ts:948](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L948)
+Defined in: [mcp/mcpClientFactory.ts:964](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L964)
 
 Validate MCP server configuration for client creation
 
@@ -196056,7 +196056,7 @@ Validate MCP server configuration for client creation
 
 > `static` **getSupportedTransports**(): [`MCPTransportType`](/docs/type-aliases/mcptransporttype)[]
 
-Defined in: [mcp/mcpClientFactory.ts:999](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L999)
+Defined in: [mcp/mcpClientFactory.ts:1015](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L1015)
 
 Get supported transport types
 
@@ -196070,7 +196070,7 @@ Get supported transport types
 
 > `static` **getDefaultCapabilities**(): `object`
 
-Defined in: [mcp/mcpClientFactory.ts:1006](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L1006)
+Defined in: [mcp/mcpClientFactory.ts:1022](https://github.com/juspay/neurolink/blob/release/src/lib/mcp/mcpClientFactory.ts#L1022)
 
 Get default client capabilities
 
