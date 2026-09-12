@@ -1,3 +1,4 @@
+import { isProxyOtelOnly } from "./otelLogSink.js";
 import {
   chmodSync,
   closeSync,
@@ -14,6 +15,9 @@ export function openProxyWorkerLog(
   filename: string,
   logDir: string = join(homedir(), ".neurolink", "logs"),
 ): { stdio: number | "ignore"; close: () => void; error?: string } {
+  if (isProxyOtelOnly()) {
+    return { stdio: "ignore", close: () => undefined };
+  }
   let fd: number | undefined;
   try {
     if (basename(filename) !== filename) {

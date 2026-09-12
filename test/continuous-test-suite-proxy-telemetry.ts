@@ -2189,4 +2189,390 @@ await test("default shutdown flush waits for a capture beyond the metadata-only 
 });
 
 await __bodyCaptureWorkerTestHooks.reset();
+await test("OTel-only exports finals, attempts, lifecycle, redacted bodies and console without creating a log directory", async () => {
+  const { createServer } = await import("node:http");
+  const { readdir } = await import("node:fs/promises");
+  const { logRequestAttempt, logStreamError } =
+    await import("../src/lib/proxy/requestLogger.js");
+  const { openProxyWorkerLog } = await import("../src/lib/proxy/workerLog.js");
+  const { startProxyLogCleanupScheduler } =
+    await import("../src/lib/proxy/logCleanupScheduler.js");
+  const {
+    initializeProxyOtelLogs,
+    flushProxyOtelLogs,
+    shutdownProxyOtelLogs,
+    getProxyOtelLogSnapshot,
+    routeProxyConsoleToOtel,
+  } = await import("../src/lib/proxy/otelLogSink.js");
+  const received: any[] = [];
+  const collector = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const payload = JSON.parse(Buffer.concat(chunks).toString());
+    for (const resource of payload.resourceLogs ?? []) {
+      for (const scope of resource.scopeLogs ?? []) {
+        received.push(...scope.logRecords);
+      }
+    }
+    res.writeHead(200, { "content-type": "application/json" }).end("{}");
+  });
+  await new Promise<void>((resolve) =>
+    collector.listen(0, "127.0.0.1", resolve),
+  );
+  const address = collector.address();
+  if (!address || typeof address === "string") {
+    throw new Error("collector did not listen");
+  }
+  const before = {
+    mode: process.env.NEUROLINK_PROXY_LOG_SINK,
+    endpoint: process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
+  };
+  const dir = await mkdtemp(join(tmpdir(), "otel-only-"));
+  const destination = join(dir, "must-not-exist");
+  process.env.NEUROLINK_PROXY_LOG_SINK = "otel";
+  process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = `http://127.0.0.1:${address.port}/v1/logs`;
+  resetProxyLifecycleLoggerForTests();
+  await __bodyCaptureWorkerTestHooks.reset(
+    new URL("../dist/proxy/bodyCaptureWorkerEntry.js", import.meta.url),
+  );
+  let fileWrites = 0;
+  __requestLoggerTestHooks.setAppendFileForTests(async () => {
+    fileWrites++;
+    throw new Error("must not write");
+  });
+  __proxyLifecycleTestHooks.setAppendFileForTests(async () => {
+    fileWrites++;
+    throw new Error("must not write");
+  });
+  try {
+    initializeProxyOtelLogs("fixture");
+    initRequestLogger(true, destination);
+    const base = {
+      timestamp: new Date().toISOString(),
+      requestId: "otel-fixture",
+      method: "POST",
+      path: "/v1/messages",
+      model: "fixture",
+      stream: false,
+      toolCount: 0,
+      account: "fixture",
+      accountType: "oauth",
+      responseStatus: 200,
+      responseTimeMs: 1,
+    };
+    await persistProxyLifecycleAcceptance(base);
+    await logRequestAttempt({ ...base, attempt: 1, responseStatus: 503 });
+    await logRequest(base);
+    logProxyLifecycleEvent({
+      ...base,
+      event: "request_terminal",
+      terminalOutcome: "completed",
+    });
+    await logStreamError({
+      ...base,
+      errorMessage: "fixture stream error",
+      durationMs: 1,
+    });
+    await logBodyCapture({
+      ...base,
+      phase: "client_request",
+      headers: { authorization: "Bearer fixture-secret" },
+      body: {
+        api_key: "must-not-export",
+        messages: [{ role: "user", content: "redacted fixture" }],
+      },
+    });
+    configureProxyLifecycleLogger({
+      enabled: true,
+      filePrefix: "proxy-supervisor",
+    });
+    logProxyLifecycleEvent({
+      event: "supervisor_event",
+      requestId: "-",
+      method: "-",
+      path: "-",
+    });
+    routeProxyConsoleToOtel();
+    console.warn("OTel console fixture");
+    await flushRequestLogs();
+    await flushProxyLifecycleEvents();
+    await flushProxyOtelLogs();
+    assertEqual(fileWrites, 0, "file writers were called");
+    assertEqual(
+      (await readdir(dir)).length,
+      0,
+      "log directory or body files were created",
+    );
+    assertEqual(
+      openProxyWorkerLog("proxy-updater.log", destination).stdio,
+      "ignore",
+    );
+    const cleanup = startProxyLogCleanupScheduler({ logsDir: destination });
+    assertEqual(cleanup.trigger(), false, "file retention scanner started");
+    await cleanup.stop();
+    const kind = (r: any) =>
+      r.attributes?.find((a: any) => a.key === "proxy.record_kind")?.value
+        ?.stringValue;
+    for (const expected of [
+      "request_final",
+      "attempt",
+      "lifecycle",
+      "stream_error",
+      "supervisor",
+      "body_capture_index",
+      "body",
+      "console",
+    ]) {
+      assert(
+        received.some((r) => kind(r) === expected),
+        `missing exported ${expected}`,
+      );
+    }
+    assertEqual(
+      received.filter((r) => kind(r) === "request_final").length,
+      1,
+      "final dashboard count duplicated",
+    );
+    const attempt = received.find((r) => kind(r) === "attempt");
+    assert(
+      !attempt.attributes.some((a: any) => a.key === "is_success"),
+      "attempt polluted final dashboard fields",
+    );
+    const body = received
+      .filter((r) => kind(r) === "body")
+      .map((r) => r.body.stringValue)
+      .join("");
+    assert(body.includes("redacted fixture"), "body disappeared");
+    assert(
+      !JSON.stringify(received).includes("must-not-export"),
+      "body secret exported",
+    );
+    assert(
+      !JSON.stringify(received).includes("Bearer fixture-secret"),
+      "header secret exported",
+    );
+    const snapshot = getProxyOtelLogSnapshot();
+    assertEqual(
+      snapshot.queues.reduce((sum, q) => sum + q.outstanding, 0),
+      0,
+    );
+    assertEqual(
+      snapshot.queues.reduce((sum, q) => sum + q.transportAcknowledged, 0),
+      received.length,
+    );
+    assertEqual(getRequestLoggerSnapshot().diskEnabled, false);
+    assertEqual(
+      getProxyLifecycleLoggerSnapshot().admissionPolicy,
+      "best-effort",
+    );
+    const { proxyGuardCommand } = await import("../src/cli/commands/proxy.js");
+    const guardHandler = proxyGuardCommand.handler;
+    if (typeof guardHandler !== "function") {
+      throw new Error("guard handler is missing");
+    }
+    initializeProxyOtelLogs()
+      ?.getLogger("guard-exit-fixture")
+      .emit({ body: "guard exit must flush" });
+    await guardHandler({ _: [], $0: "fixture", parentPid: -1 });
+    assert(
+      received.some((r) => r.body?.stringValue === "guard exit must flush"),
+      "guard exit lost queued logs",
+    );
+    assertEqual(
+      getProxyOtelLogSnapshot().initialized,
+      false,
+      "guard exporter was not shut down",
+    );
+  } finally {
+    initRequestLogger(false);
+    resetProxyLifecycleLoggerForTests();
+    await shutdownProxyOtelLogs();
+    __requestLoggerTestHooks.restoreAppendFileForTests();
+    await __bodyCaptureWorkerTestHooks.reset();
+    if (before.mode === undefined) {
+      delete process.env.NEUROLINK_PROXY_LOG_SINK;
+    } else {
+      process.env.NEUROLINK_PROXY_LOG_SINK = before.mode;
+    }
+    if (before.endpoint === undefined) {
+      delete process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT;
+    } else {
+      process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = before.endpoint;
+    }
+    await new Promise<void>((resolve) => collector.close(() => resolve()));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+await test("OTel collector rejection exposes loss and queue bounds without rejecting proxy admission", async () => {
+  const { createServer } = await import("node:http");
+  const {
+    initializeProxyOtelLogs,
+    emitProxyOtelEvent,
+    flushProxyOtelLogs,
+    shutdownProxyOtelLogs,
+    getProxyOtelLogSnapshot,
+  } = await import("../src/lib/proxy/otelLogSink.js");
+  const collector = createServer(async (req, res) => {
+    for await (const chunk of req) {
+      void chunk;
+    }
+    res
+      .writeHead(400, { "content-type": "application/json" })
+      .end('{"message":"fixture rejection"}');
+  });
+  await new Promise<void>((resolve) =>
+    collector.listen(0, "127.0.0.1", resolve),
+  );
+  const address = collector.address();
+  if (!address || typeof address === "string") {
+    throw new Error("collector did not listen");
+  }
+  const previous = {
+    mode: process.env.NEUROLINK_PROXY_LOG_SINK,
+    endpoint: process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
+  };
+  process.env.NEUROLINK_PROXY_LOG_SINK = "otel";
+  process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = `http://127.0.0.1:${address.port}/v1/logs`;
+  try {
+    initializeProxyOtelLogs("outage-fixture");
+    configureProxyLifecycleLogger({ enabled: true });
+    const bodyLogger = initializeProxyOtelLogs()!.getLogger("fixture-bodies");
+    for (let i = 0; i < 300; i++) {
+      bodyLogger.emit({
+        body: "fixture",
+        attributes: { "proxy.record_kind": "body" },
+      });
+    }
+    assertEqual(
+      getProxyOtelLogSnapshot().queues[1].outstanding,
+      256,
+      "body queue exceeded capacity",
+    );
+    assertEqual(
+      getProxyOtelLogSnapshot().queues[1].dropped,
+      44,
+      "body queue loss was hidden",
+    );
+    for (let i = 0; i < 2200; i++) {
+      emitProxyOtelEvent("fixture", { requestId: String(i) });
+    }
+    const queued = getProxyOtelLogSnapshot().queues[0];
+    assertEqual(queued.outstanding, 2048, "queue exceeded capacity");
+    assertEqual(queued.dropped, 152, "queue loss was hidden");
+    const started = Date.now();
+    await persistProxyLifecycleAcceptance({
+      requestId: "outage",
+      method: "POST",
+      path: "/v1/messages",
+    });
+    assert(Date.now() - started < 500, "request admission waited for exporter");
+    await flushProxyOtelLogs().catch(() => undefined);
+    const outcome = getProxyOtelLogSnapshot().queues[0];
+    assertEqual(
+      outcome.transportAcknowledged,
+      0,
+      "collector rejection counted as success",
+    );
+    assertEqual(outcome.exportUnconfirmed, 2048, "failed exports missing");
+    assertEqual(outcome.outstanding, 0, "failed exports leaked capacity");
+    const { OTLPLogExporter } =
+      await import("@opentelemetry/exporter-logs-otlp-http");
+    const originalExport = OTLPLogExporter.prototype.export;
+    try {
+      OTLPLogExporter.prototype.export = () => {
+        throw new Error("fixture synchronous exporter fault");
+      };
+      emitProxyOtelEvent("fixture", { requestId: "synchronous-fault" });
+      await flushProxyOtelLogs().catch(() => undefined);
+      const failed = getProxyOtelLogSnapshot().queues[0];
+      assertEqual(
+        failed.outstanding,
+        0,
+        "synchronous export failure leaked capacity",
+      );
+      assertEqual(
+        failed.exportUnconfirmed,
+        2049,
+        "synchronous failure was hidden",
+      );
+    } finally {
+      OTLPLogExporter.prototype.export = originalExport;
+    }
+  } finally {
+    resetProxyLifecycleLoggerForTests();
+    await shutdownProxyOtelLogs();
+    if (previous.mode === undefined) {
+      delete process.env.NEUROLINK_PROXY_LOG_SINK;
+    } else {
+      process.env.NEUROLINK_PROXY_LOG_SINK = previous.mode;
+    }
+    if (previous.endpoint === undefined) {
+      delete process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT;
+    } else {
+      process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = previous.endpoint;
+    }
+    await new Promise<void>((resolve) => collector.close(() => resolve()));
+  }
+});
+
+await test("OTel-only launchd environment survives an ambient-only install and unsafe endpoints are rejected", async () => {
+  const { buildProxyLaunchdPlist } =
+    await import("../src/cli/commands/proxy.js");
+  const { initializeProxyOtelLogs, shutdownProxyOtelLogs } =
+    await import("../src/lib/proxy/otelLogSink.js");
+  const names = [
+    "NEUROLINK_PROXY_LOG_SINK",
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+  ];
+  const previous = names.map((name) => process.env[name]);
+  try {
+    process.env.NEUROLINK_PROXY_LOG_SINK = "otel";
+    delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+    process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT =
+      "https://collector.example.test/v1/logs?x=1&y=2";
+    process.env.OTEL_EXPORTER_OTLP_LOGS_HEADERS = "authorization=fixture&token";
+    const plist = buildProxyLaunchdPlist(0, "127.0.0.1");
+    assert(
+      plist.includes("<key>NEUROLINK_PROXY_LOG_SINK</key>"),
+      "sink missing from launchd environment",
+    );
+    assert(
+      plist.includes("https://collector.example.test/v1/logs?x=1&amp;y=2"),
+      "endpoint missing or not XML escaped",
+    );
+    assert(
+      plist.includes("authorization=fixture&amp;token"),
+      "headers missing or not XML escaped",
+    );
+    assertEqual(
+      plist.match(/<string>\/dev\/null<\/string>/g)?.length,
+      2,
+      "stdio still writes to disk",
+    );
+    process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT =
+      "http://collector.example.test/v1/logs";
+    let rejected = false;
+    try {
+      initializeProxyOtelLogs();
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, "remote cleartext collector was accepted");
+  } finally {
+    await shutdownProxyOtelLogs();
+    names.forEach((name, i) => {
+      if (previous[i] === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = previous[i];
+      }
+    });
+  }
+});
+
 await runSuite();

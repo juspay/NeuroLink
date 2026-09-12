@@ -11,7 +11,7 @@ parentPort?.on(
   (message: {
     id: number;
     entry: ProxyBodyCaptureEntry;
-    logDir: string;
+    logDir: string | null;
     queuedAt: number;
   }) => {
     tail = tail.then(async () => {

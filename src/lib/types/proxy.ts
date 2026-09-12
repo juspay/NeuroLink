@@ -766,6 +766,10 @@ export type ProxyBodyCaptureWorkerSnapshot = {
   lastError?: string;
 };
 export type ProxyRequestLoggerSnapshot = {
+  diskEnabled?: boolean;
+  otel?: ReturnType<
+    typeof import("../proxy/otelLogSink.js").getProxyOtelLogSnapshot
+  >;
   bodyCapture?: ProxyBodyCaptureWorkerSnapshot;
   enabled: boolean;
   requests: ProxyRequestLogSinkSnapshot;
@@ -2006,6 +2010,8 @@ export type ProxyRuntimeSample = {
 
 /** Data-quality counters for the bounded lifecycle metadata sink. */
 export type ProxyLifecycleLoggerSnapshot = {
+  sink?: "otel" | "file";
+  admissionPolicy?: "best-effort" | "durable-file";
   enabled: boolean;
   schemaVersion: number;
   processInstanceId: string;

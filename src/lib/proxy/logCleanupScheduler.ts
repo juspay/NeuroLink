@@ -1,3 +1,4 @@
+import { isProxyOtelOnly } from "./otelLogSink.js";
 import { Worker } from "node:worker_threads";
 import type { ProxyLogCleanupScheduler } from "../types/index.js";
 import { withTimeout } from "../utils/async/withTimeout.js";
@@ -20,6 +21,9 @@ export function startProxyLogCleanupScheduler(params: {
   /** @internal Test-only worker entry override. */
   workerUrl?: URL;
 }): ProxyLogCleanupScheduler {
+  if (isProxyOtelOnly()) {
+    return { trigger: () => false, stop: async () => {} };
+  }
   const maxAgeDays = params.maxAgeDays ?? 7;
   const maxSizeMb = params.maxSizeMb ?? 500;
   let activeWorker: Worker | undefined;
