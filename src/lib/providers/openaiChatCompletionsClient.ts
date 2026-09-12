@@ -475,6 +475,101 @@ export const v3ToolChoiceToOpenAI = (
   }
 };
 
+/**
+ * OpenAI's strict structured-output mode rejects a schema unless every object
+ * node carries `additionalProperties: false` AND lists every one of its
+ * properties in `required` — recursively, including through array `items`.
+ * A plain JSON Schema satisfies neither, so sending one with `strict: true`
+ * fails the request outright rather than degrading.
+ *
+ * Adding `additionalProperties: false` is safe: it forbids keys the caller
+ * never asked for, which strict mode would forbid anyway. Filling in
+ * `required` is NOT safe — it would silently make the caller's optional
+ * fields mandatory. So when a schema still has optional properties after
+ * normalisation, the request drops to `strict: false`, which OpenAI accepts
+ * and which honours optionality. Callers whose schemas are already strict-
+ * compatible keep the stronger guarantee.
+ */
+// `properties` and `$defs` are MAPS of schemas, not schemas — recursing into
+// them as if they were nodes silently skips every child, which is exactly the
+// bug that let a nested object through without `additionalProperties: false`.
+const SCHEMA_MAPS = ["properties", "$defs", "definitions"] as const;
+const SCHEMA_NODES = ["items", "anyOf", "oneOf", "allOf", "not"] as const;
+
+const mapValues = (
+  obj: unknown,
+  fn: (v: unknown) => unknown,
+): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries((obj ?? {}) as Record<string, unknown>).map(([k, v]) => [
+      k,
+      fn(v),
+    ]),
+  );
+
+const withClosedObjects = (node: unknown): unknown => {
+  if (Array.isArray(node)) {
+    return node.map(withClosedObjects);
+  }
+  if (!node || typeof node !== "object") {
+    return node;
+  }
+  const next: Record<string, unknown> = {
+    ...(node as Record<string, unknown>),
+  };
+  for (const key of SCHEMA_MAPS) {
+    if (key in next) {
+      next[key] = mapValues(next[key], withClosedObjects);
+    }
+  }
+  for (const key of SCHEMA_NODES) {
+    if (key in next) {
+      next[key] = withClosedObjects(next[key]);
+    }
+  }
+  if (
+    next.type === "object" &&
+    next.properties &&
+    !("additionalProperties" in next)
+  ) {
+    next.additionalProperties = false;
+  }
+  return next;
+};
+
+/** True when every object node lists all of its properties as required. */
+const satisfiesStrictRequired = (node: unknown): boolean => {
+  if (Array.isArray(node)) {
+    return node.every(satisfiesStrictRequired);
+  }
+  if (!node || typeof node !== "object") {
+    return true;
+  }
+  const rec = node as Record<string, unknown>;
+  if (
+    rec.type === "object" &&
+    rec.properties &&
+    typeof rec.properties === "object"
+  ) {
+    const names = Object.keys(rec.properties as Record<string, unknown>);
+    const required = Array.isArray(rec.required)
+      ? (rec.required as unknown[])
+      : [];
+    if (names.some((n) => !required.includes(n))) {
+      return false;
+    }
+  }
+  const mapsOk = SCHEMA_MAPS.filter((k) => k in rec).every((k) =>
+    Object.values((rec[k] ?? {}) as Record<string, unknown>).every(
+      satisfiesStrictRequired,
+    ),
+  );
+  const nodesOk = SCHEMA_NODES.filter((k) => k in rec).every((k) =>
+    satisfiesStrictRequired(rec[k]),
+  );
+  return mapsOk && nodesOk;
+};
+
 export const v3ResponseFormatToOpenAI = (rf: {
   type: "text" | "json";
   schema?: Record<string, unknown>;
@@ -487,13 +582,14 @@ export const v3ResponseFormatToOpenAI = (rf: {
   if (!rf.schema) {
     return { type: "json_object" };
   }
+  const schema = withClosedObjects(rf.schema) as Record<string, unknown>;
   return {
     type: "json_schema",
     json_schema: {
       name: rf.name ?? "response",
-      schema: rf.schema as never,
+      schema: schema as never,
       ...(rf.description ? { description: rf.description } : {}),
-      strict: true,
+      strict: satisfiesStrictRequired(schema),
     },
   };
 };

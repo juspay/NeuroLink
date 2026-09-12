@@ -576,4 +576,91 @@ await test("anthropic:claude-sonnet-4-6 — forced truncation yields a partial o
   );
 });
 
+// A plain JSON Schema — the shape every JSON-Schema caller writes — carries no
+// `additionalProperties` and may leave properties optional. OpenAI's strict
+// structured-output mode rejects both, so sending one with `strict: true`
+// failed the request outright instead of degrading. Assertions below never
+// quote the payload: a message echoing provider-ish text is downgraded to a
+// skip by the harness, which would hide a real break.
+await test("openai:gpt-4o-mini — a plain JSON Schema is accepted, not rejected by strict mode", async () => {
+  let res;
+  try {
+    res = await nl.generate({
+      input: { text: "Capital of France and its population." },
+      provider: "openai",
+      model: "gpt-4o-mini",
+      maxTokens: 200,
+      schema: {
+        type: "object",
+        properties: {
+          capital: { type: "string" },
+          population: { type: "number" },
+        },
+        required: ["capital", "population"],
+      },
+    });
+  } catch (e) {
+    if (isInfraError(String((e as Error)?.message ?? e))) {
+      throw new Skip("openai unavailable for provider reasons");
+    }
+    throw new Error(
+      "plain JSON Schema was rejected before the model could answer",
+      { cause: e },
+    );
+  }
+  const data = res.structuredData as Record<string, unknown> | undefined;
+  assert(
+    !!data && typeof data === "object" && !Array.isArray(data),
+    "structuredData must be a plain object for a plain JSON Schema",
+  );
+  assert(
+    typeof data?.capital === "string" && data.capital.length > 0,
+    "the required string property must be present and non-empty",
+  );
+  console.log("      · plain JSON Schema accepted on the strict path");
+});
+
+// Forcing every property into `required` would satisfy strict mode but would
+// silently make the caller's optional fields mandatory. The request must drop
+// to non-strict instead, which OpenAI accepts and which honours optionality.
+await test("openai:gpt-4o-mini — an optional property stays optional", async () => {
+  let res;
+  try {
+    res = await nl.generate({
+      input: {
+        text: "Name the capital of France. Omit any field you are unsure of.",
+      },
+      provider: "openai",
+      model: "gpt-4o-mini",
+      maxTokens: 200,
+      schema: {
+        type: "object",
+        properties: {
+          capital: { type: "string" },
+          population: { type: "number" },
+        },
+        required: ["capital"],
+      },
+    });
+  } catch (e) {
+    if (isInfraError(String((e as Error)?.message ?? e))) {
+      throw new Skip("openai unavailable for provider reasons");
+    }
+    throw new Error(
+      "a schema with an optional property was rejected outright",
+      { cause: e },
+    );
+  }
+  const data = res.structuredData as Record<string, unknown> | undefined;
+  assert(
+    !!data && typeof data === "object",
+    "structuredData must be present when a property is optional",
+  );
+  assert(
+    typeof data?.capital === "string",
+    "the one required property must still be produced",
+  );
+  console.log("      · optional property preserved, request not rejected");
+});
+
 await runSuite();
