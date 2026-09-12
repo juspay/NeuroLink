@@ -1,5 +1,16 @@
 import type { JsonObject } from "./common.js";
 
+/** Options forwarded through `applyAllClients` into a configurator's `apply`. */
+export type CliProxyClientApplyOptions = {
+  /**
+   * Absolute path of the proxy routing config this process loaded.
+   * The Grok writer reads `routing.model-mappings` from this file so a
+   * `proxy start --config` catalog matches `/v1/models`. Omit to use
+   * `~/.neurolink/proxy-config.yaml`.
+   */
+  configPath?: string;
+};
+
 /**
  * One AI coding CLI the proxy can point at itself.
  *
@@ -23,7 +34,10 @@ export type CliProxyClientConfigurator = {
    * suffix its CLI needs. Returns false when nothing was written, so callers
    * never print a success message for work that did not happen.
    */
-  apply: (proxyBaseUrl: string) => Promise<boolean>;
+  apply: (
+    proxyBaseUrl: string,
+    options?: CliProxyClientApplyOptions,
+  ) => Promise<boolean>;
   /**
    * Restore the user's previous configuration. `proxyBaseUrl` is the same bare
    * origin; a configurator that finds a different URL configured must leave it
@@ -80,6 +94,31 @@ export type CliOpenCodeSnapshot = {
   original: unknown;
   /** What the writer last wrote, so apply() can recognise its own block. */
   written?: unknown;
+};
+
+/**
+ * One Grok Build picker entry the proxy writer emits under `[model.<id>]`.
+ *
+ * `contextWindow` is Grok's compaction limit and must be <= the upstream
+ * model's window. `supportsReasoningEffort` is false when Grok's `xhigh`
+ * would become Anthropic adaptive thinking that the model rejects.
+ */
+export type CliGrokProxyModelSpec = {
+  id: string;
+  name: string;
+  apiBackend: "messages" | "chat_completions";
+  contextWindow: number;
+  maxCompletionTokens: number;
+  supportsReasoningEffort: boolean;
+};
+
+/**
+ * Snapshot of whether `~/.grok/config.toml` existed before the proxy wrote
+ * its managed block. Persisted to `~/.neurolink/grok-proxy-snapshot.json`.
+ */
+export type CliGrokSnapshot = {
+  originalExisted: boolean;
+  writtenBaseUrl: string;
 };
 
 /**

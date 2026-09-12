@@ -40,6 +40,9 @@ const CLIENT_PREFIXES: ReadonlyArray<readonly [string, string]> = [
   // different token, and it is left unmapped until someone measures it rather
   // than pattern-matched on a guess.
   ["codex_exec/", "codex"],
+  // "grok-shell/1.0.30 (macos; aarch64)" — measured 2026-09-12 on
+  // POST /v1/messages from Grok Build 1.0.30.
+  ["grok-shell/", "grok"],
 ];
 
 /**

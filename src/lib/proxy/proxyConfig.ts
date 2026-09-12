@@ -12,7 +12,8 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { homedir } from "node:os";
+import { extname, join, resolve } from "node:path";
 import {
   MAX_MAX_INFLIGHT_PER_ACCOUNT,
   MIN_MAX_INFLIGHT_PER_ACCOUNT,
@@ -29,6 +30,19 @@ import type {
   ProxyRoutingConfig,
   YamlModule,
 } from "../types/index.js";
+
+/** Default on-disk path used when `proxy start` is not given `--config`. */
+export function defaultProxyConfigPath(): string {
+  return join(homedir(), ".neurolink", "proxy-config.yaml");
+}
+
+/** Resolve `--config` the same way `proxy start` / `proxy install` do. */
+export function resolveProxyConfigPath(explicit?: string): string {
+  const trimmed = explicit?.trim();
+  return trimmed && trimmed.length > 0
+    ? resolve(trimmed)
+    : defaultProxyConfigPath();
+}
 
 // ---------------------------------------------------------------------------
 // Environment variable resolution

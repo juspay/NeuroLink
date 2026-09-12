@@ -13,7 +13,7 @@
 import type { CommandModule, Argv } from "yargs";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import chalk from "chalk";
 import ora from "ora";
@@ -31,6 +31,7 @@ import {
   applyAllClients,
   restoreAllClients,
 } from "../proxy-clients/registry.js";
+import { resolveProxyConfigPath } from "../../lib/proxy/proxyConfig.js";
 import {
   redactUrlsInText,
   sanitizeForLog,
@@ -3158,6 +3159,7 @@ async function startProxyRuntime(params: {
   passthrough: boolean;
   logsDir: ProxyNeurolinkRuntime["logsDir"];
   runtimeConfigStore?: ProxyRuntimeConfigStore;
+  configPath: string;
 }): Promise<void> {
   const socketWorker = isProxySocketWorkerProcess();
   const { createAdaptorServer, serve } = await import("@hono/node-server");
@@ -3458,7 +3460,9 @@ async function startProxyRuntime(params: {
   }
 
   if (!isDev) {
-    for (const result of await applyAllClients(url)) {
+    for (const result of await applyAllClients(url, {
+      configPath: params.configPath,
+    })) {
       if (result.error) {
         // Visible, not debug-level. A client whose config could not be written
         // will keep talking to its own upstream, which looks like the proxy
@@ -3796,9 +3800,7 @@ async function startProxyCommandHandler(argv: ProxyStartArgs): Promise<void> {
     const { neurolink, logsDir } = await createProxyNeurolinkRuntime(
       devPaths?.logsDir,
     );
-    const configPath = argv.config
-      ? resolve(argv.config)
-      : join(homedir(), ".neurolink", "proxy-config.yaml");
+    const configPath = resolveProxyConfigPath(argv.config);
     const runtimeConfigStore = await ProxyRuntimeConfigStore.create({
       configPath,
       configRequired: Boolean(argv.config),
@@ -3868,6 +3870,7 @@ async function startProxyCommandHandler(argv: ProxyStartArgs): Promise<void> {
       passthrough,
       logsDir,
       runtimeConfigStore,
+      configPath,
     });
   } catch (error) {
     if (spinner) {
@@ -5443,7 +5446,11 @@ export const proxySetupCommand: CommandModule = {
         chalk.blue(`\nStep ${nextStep}:`) + " Configuring Claude Code...",
       );
       const url = `http://127.0.0.1:${port}`;
-      for (const result of await applyAllClients(url)) {
+      for (const result of await applyAllClients(url, {
+        configPath: resolveProxyConfigPath(
+          (argv as { config?: string }).config,
+        ),
+      })) {
         if (result.error) {
           console.info(
             chalk.yellow(
@@ -5673,9 +5680,7 @@ export const proxyInstallCommand: CommandModule = {
     });
     const envFile = envResolution.path;
     const explicitConfig = (argv as { config?: string }).config;
-    const configPath = explicitConfig
-      ? resolve(explicitConfig)
-      : join(homedir(), ".neurolink", "proxy-config.yaml");
+    const configPath = resolveProxyConfigPath(explicitConfig);
     if (explicitConfig && !existsSync(configPath)) {
       console.info(chalk.red(`Proxy config file not found: ${configPath}`));
       process.exit(1);

@@ -1,7 +1,7 @@
 /**
  * Model IDs the proxy advertises when no routing config narrows the list.
  *
- * Two consumers need the same answer and must not drift apart:
+ * Three consumers need the same answer and must not drift apart:
  *
  *   - `proxyTranslationEngine` serves them from `GET /v1/models`.
  *   - The OpenCode client configurator writes them into `provider.neurolink.
@@ -9,6 +9,12 @@
  *     It does not call `/v1/models`, so an empty map means every model id is
  *     unknown and `opencode run` fails with `ProviderModelNotFoundError`
  *     before a request is ever made.
+ *   - The Grok Build configurator writes the same ids (plus any
+ *     `routing.model-mappings` in the active proxy config — default
+ *     `~/.neurolink/proxy-config.yaml`, or the path passed to `--config`)
+ *     into `~/.grok/config.toml` as `[model.<id>]` entries, with
+ *     `api_backend` and `context_window` so Grok's compaction matches the
+ *     upstream. Built-in grok-* ids are skipped.
  *
  * Format matches the IDs used throughout `src/lib/models/` and
  * `src/lib/constants/` (e.g. `claude-3-5-haiku-20241022`, not

@@ -1892,6 +1892,641 @@ async function testCodexConfiguratorRoundTrip(): Promise<boolean> {
 }
 
 /**
+ * Grok Build is a TOML client. The writer must add the proxy catalog without
+ * remapping built-in grok-4.6, must set context_window to the upstream limit
+ * (Grok compacts; the proxy does not truncate), must send Claude models
+ * through the messages door, and must turn reasoning off on Haiku because
+ * Grok's xhigh becomes Anthropic adaptive thinking which Haiku 4.5 rejects.
+ */
+async function testGrokConfiguratorDetectsInstall(): Promise<boolean> {
+  const { grokConfigurator } = await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-detect-"));
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    if (await grokConfigurator.detect()) {
+      log("Grok detect() was true with no ~/.grok directory", "red");
+      return false;
+    }
+    fs.mkdirSync(path.join(root, ".grok"), { recursive: true });
+    if (!(await grokConfigurator.detect())) {
+      log("Grok detect() was false after ~/.grok was created", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGrokConfiguratorRoundTrip(): Promise<boolean> {
+  const { grokConfigurator, __grokTestHooks } =
+    await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-"));
+  const url = "http://127.0.0.1:55669";
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    fs.mkdirSync(path.join(root, ".grok"), { recursive: true });
+    const configPath = __grokTestHooks.getGrokConfigPath();
+    const original = [
+      "[cli]",
+      'installer = "internal"',
+      "",
+      "[models]",
+      'default = "grok-4.6"',
+      'default_reasoning_effort = "xhigh"',
+      "",
+    ].join("\n");
+    fs.writeFileSync(configPath, original);
+
+    if (!(await grokConfigurator.apply(url))) {
+      log("Grok writer reported no write", "red");
+      return false;
+    }
+    const applied = fs.readFileSync(configPath, "utf8");
+    if (!applied.includes('default = "grok-4.6"')) {
+      log("Grok writer changed the default model", "red");
+      return false;
+    }
+    if (!applied.includes('base_url = "http://127.0.0.1:55669/v1"')) {
+      log("Grok writer did not point models at the /v1 door", "red");
+      return false;
+    }
+    if (!applied.includes("[model.claude-sonnet-4-6]")) {
+      log("Grok writer omitted claude-sonnet-4-6", "red");
+      return false;
+    }
+    if (!applied.includes('api_backend = "messages"')) {
+      log(
+        "Grok writer did not use the Anthropic messages door for Claude",
+        "red",
+      );
+      return false;
+    }
+    if (!applied.includes("context_window = 1000000")) {
+      log("Grok writer did not set Sonnet 4.6's 1M compaction window", "red");
+      return false;
+    }
+    if (!applied.includes("[model.claude-haiku-4-5]")) {
+      log("Grok writer omitted claude-haiku-4-5", "red");
+      return false;
+    }
+    if (!applied.includes("supports_reasoning_effort = false")) {
+      log("Grok writer left Haiku able to send adaptive thinking", "red");
+      return false;
+    }
+    const sonnetStart = applied.indexOf("[model.claude-sonnet-4-6]");
+    const haikuStart = applied.indexOf("[model.claude-haiku-4-5]");
+    const sonnetBlock = applied.slice(
+      sonnetStart,
+      haikuStart === -1 ? undefined : haikuStart,
+    );
+    if (sonnetBlock.includes("supports_reasoning_effort = false")) {
+      log("Grok writer disabled reasoning on Sonnet 4.6", "red");
+      return false;
+    }
+    if (!applied.includes('[model."gemini-2.5-pro"]')) {
+      log("Grok writer did not quote gemini-2.5-pro (TOML dotted key)", "red");
+      return false;
+    }
+    if (!applied.includes('api_backend = "chat_completions"')) {
+      log("Grok writer did not use chat_completions for Gemini", "red");
+      return false;
+    }
+    if (
+      applied.includes("[model.grok-4.6]") ||
+      applied.includes('[model."grok-4.6"]')
+    ) {
+      log("Grok writer remapped built-in grok-4.6 onto the proxy", "red");
+      return false;
+    }
+
+    if (!(await grokConfigurator.restore(url))) {
+      log("Grok restore reported that it did nothing", "red");
+      return false;
+    }
+    const restored = fs.readFileSync(configPath, "utf8");
+    if (restored.includes("neurolink-proxy")) {
+      log("Grok restore left the managed block behind", "red");
+      return false;
+    }
+    if (!restored.includes('default = "grok-4.6"')) {
+      log("Grok restore lost the user's default model", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGrokRestoreRefusesWithoutSnapshot(): Promise<boolean> {
+  const { __grokTestHooks } = await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-nosnap-"));
+  const url = "http://127.0.0.1:55669/v1";
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    fs.mkdirSync(path.join(root, ".grok"), { recursive: true });
+    fs.writeFileSync(
+      __grokTestHooks.getGrokConfigPath(),
+      `${await __grokTestHooks.buildGrokManagedBlock(url)}\n`,
+    );
+    const restored = await __grokTestHooks.clearGrokProxySettings(url);
+    if (restored) {
+      log("Grok restore stripped a block with no snapshot", "red");
+      return false;
+    }
+    const after = fs.readFileSync(__grokTestHooks.getGrokConfigPath(), "utf8");
+    if (!after.includes("neurolink-proxy")) {
+      log("Grok restore destroyed a block it could not prove it owned", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGrokRestoreRefusesForeignUrl(): Promise<boolean> {
+  const { grokConfigurator, __grokTestHooks } =
+    await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-url-"));
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    fs.mkdirSync(path.join(root, ".grok"), { recursive: true });
+    await grokConfigurator.apply("http://127.0.0.1:55669");
+    const restored = await grokConfigurator.restore("http://127.0.0.1:9");
+    if (restored) {
+      log("Grok restore clobbered a block pointing at another proxy", "red");
+      return false;
+    }
+    const after = fs.readFileSync(__grokTestHooks.getGrokConfigPath(), "utf8");
+    if (!after.includes("http://127.0.0.1:55669/v1")) {
+      log("Grok restore removed a foreign-owned block", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGrokCatalogWindowsAndBackends(): Promise<boolean> {
+  const { __grokTestHooks } = await import("../src/cli/proxy-clients/grok.js");
+  const sonnet = __grokTestHooks.classifyGrokProxyModel("claude-sonnet-4-6");
+  if (sonnet.apiBackend !== "messages" || sonnet.contextWindow !== 1_000_000) {
+    log("claude-sonnet-4-6 is not messages/1M", "red");
+    return false;
+  }
+  if (sonnet.supportsReasoningEffort !== true) {
+    log("claude-sonnet-4-6 should keep adaptive thinking", "red");
+    return false;
+  }
+  const haiku = __grokTestHooks.classifyGrokProxyModel("claude-haiku-4-5");
+  if (haiku.apiBackend !== "messages" || haiku.contextWindow !== 200_000) {
+    log("claude-haiku-4-5 is not messages/200k", "red");
+    return false;
+  }
+  if (haiku.supportsReasoningEffort !== false) {
+    log("claude-haiku-4-5 must not send adaptive thinking", "red");
+    return false;
+  }
+  const gemini = __grokTestHooks.classifyGrokProxyModel("gemini-2.5-pro");
+  if (
+    gemini.apiBackend !== "chat_completions" ||
+    gemini.contextWindow !== 1_048_576
+  ) {
+    log("gemini-2.5-pro is not chat_completions/1M", "red");
+    return false;
+  }
+  const alias = __grokTestHooks.classifyGrokProxyModel("enterprise-sonnet", {
+    from: "enterprise-sonnet",
+    to: "claude-sonnet-4-6",
+    provider: "anthropic",
+  });
+  if (alias.id !== "enterprise-sonnet") {
+    log("routed alias did not keep from as the picker id", "red");
+    return false;
+  }
+  if (alias.apiBackend !== "messages" || alias.contextWindow !== 1_000_000) {
+    log(
+      "enterprise-sonnet was classified from its alias name, not the target",
+      "red",
+    );
+    return false;
+  }
+  if (alias.supportsReasoningEffort !== true) {
+    log("enterprise-sonnet should inherit Sonnet 4.6 adaptive thinking", "red");
+    return false;
+  }
+  const thinking = __grokTestHooks.classifyGrokProxyModel(
+    "claude-sonnet-4-thinking",
+    {
+      from: "claude-sonnet-4-thinking",
+      to: "claude-sonnet-4-6",
+      provider: "anthropic",
+    },
+  );
+  if (thinking.contextWindow !== 1_000_000) {
+    log("claude-sonnet-4-thinking used the alias window instead of 1M", "red");
+    return false;
+  }
+  return true;
+}
+
+/**
+ * `~/.neurolink/proxy-config.yaml` is YAML. JSON.parse throws on comments and
+ * unquoted keys, and the previous loader swallowed that into `[]`, so
+ * routing.model-mappings never reached the Grok catalog.
+ */
+async function testGrokYamlRoutedMappings(): Promise<boolean> {
+  const { grokConfigurator, __grokTestHooks } =
+    await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const prevRoutedFrom = process.env.GROK_TEST_ROUTED_FROM;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-yaml-"));
+  const routedId = "claude-sonnet-4-thinking";
+  let yamlPath: string | undefined;
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    process.env.GROK_TEST_ROUTED_FROM = routedId;
+    fs.mkdirSync(__grokTestHooks.getGrokConfigDir(), { recursive: true });
+    yamlPath = path.join(os.homedir(), ".neurolink", "proxy-config.yaml");
+    fs.mkdirSync(path.dirname(yamlPath), { recursive: true });
+    const yaml = [
+      "# YAML, not JSON. JSON.parse must throw on this file.",
+      "routing:",
+      "  model-mappings:",
+      "    - from: ${GROK_TEST_ROUTED_FROM}",
+      "      to: claude-sonnet-4-6",
+      "      provider: anthropic",
+      "    - from: grok-4.6",
+      "      to: claude-sonnet-4-6",
+      "      provider: anthropic",
+      "",
+    ].join("\n");
+    fs.writeFileSync(yamlPath, yaml);
+    try {
+      JSON.parse(yaml);
+      log(
+        "YAML fixture parsed as JSON; the test no longer covers the bug",
+        "red",
+      );
+      return false;
+    } catch {
+      // expected: comments and unquoted keys are not JSON
+    }
+
+    const routed = await __grokTestHooks.loadRoutedModelIds();
+    if (!routed.includes(routedId)) {
+      log(
+        `YAML mappings did not interpolate to ${routedId}: ${JSON.stringify(routed)}`,
+        "red",
+      );
+      return false;
+    }
+    if (!routed.includes("grok-4.6")) {
+      log("YAML grok-4.6 mapping was dropped before the catalog skip", "red");
+      return false;
+    }
+
+    const ids = await __grokTestHooks.catalogModelIds();
+    if (!ids.includes(routedId)) {
+      log("catalog omitted the YAML-mapped model id", "red");
+      return false;
+    }
+    if (ids.some((id) => id.startsWith("grok-"))) {
+      log("catalog included a grok-* id from model-mappings", "red");
+      return false;
+    }
+
+    if (!(await grokConfigurator.apply("http://127.0.0.1:55669"))) {
+      log("Grok writer reported no write with YAML mappings", "red");
+      return false;
+    }
+    const applied = fs.readFileSync(
+      __grokTestHooks.getGrokConfigPath(),
+      "utf8",
+    );
+    if (!applied.includes(`[model.${routedId}]`)) {
+      log("Grok writer omitted the YAML-mapped model from config.toml", "red");
+      return false;
+    }
+    if (
+      applied.includes("[model.grok-4.6]") ||
+      applied.includes('[model."grok-4.6"]')
+    ) {
+      log("Grok writer remapped grok-4.6 from YAML mappings", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    if (prevRoutedFrom === undefined) {
+      delete process.env.GROK_TEST_ROUTED_FROM;
+    } else {
+      process.env.GROK_TEST_ROUTED_FROM = prevRoutedFrom;
+    }
+    if (yamlPath !== undefined) {
+      fs.rmSync(yamlPath, { force: true });
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/**
+ * `proxy start --config` loads mappings from that file, not the default
+ * ~/.neurolink/proxy-config.yaml. The Grok writer has to use the same path
+ * or the catalog silently drifts from GET /v1/models.
+ */
+async function testGrokCustomConfigPath(): Promise<boolean> {
+  const { grokConfigurator, __grokTestHooks } =
+    await import("../src/cli/proxy-clients/grok.js");
+  const { applyAllClients } =
+    await import("../src/cli/proxy-clients/registry.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-cfg-"));
+  const defaultId = "claude-from-default";
+  const customId = "claude-from-custom";
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    fs.mkdirSync(__grokTestHooks.getGrokConfigDir(), { recursive: true });
+    const defaultPath = path.join(
+      os.homedir(),
+      ".neurolink",
+      "proxy-config.yaml",
+    );
+    fs.mkdirSync(path.dirname(defaultPath), { recursive: true });
+    fs.writeFileSync(
+      defaultPath,
+      [
+        "# default path",
+        "routing:",
+        "  model-mappings:",
+        `    - from: ${defaultId}`,
+        "      to: claude-sonnet-4-6",
+        "      provider: anthropic",
+        "",
+      ].join("\n"),
+    );
+    const customPath = path.join(root, "elsewhere", "proxy-config.yaml");
+    fs.mkdirSync(path.dirname(customPath), { recursive: true });
+    fs.writeFileSync(
+      customPath,
+      [
+        "# custom --config path",
+        "routing:",
+        "  model-mappings:",
+        `    - from: ${customId}`,
+        "      to: claude-sonnet-4-6",
+        "      provider: anthropic",
+        "",
+      ].join("\n"),
+    );
+
+    const fromDefault = await __grokTestHooks.loadRoutedModelIds();
+    if (!fromDefault.includes(defaultId) || fromDefault.includes(customId)) {
+      log(`default path mappings wrong: ${JSON.stringify(fromDefault)}`, "red");
+      return false;
+    }
+    const fromCustom = await __grokTestHooks.loadRoutedModelIds(customPath);
+    if (!fromCustom.includes(customId) || fromCustom.includes(defaultId)) {
+      log(`custom path mappings wrong: ${JSON.stringify(fromCustom)}`, "red");
+      return false;
+    }
+
+    if (
+      !(await grokConfigurator.apply("http://127.0.0.1:55669", {
+        configPath: customPath,
+      }))
+    ) {
+      log("Grok apply with custom configPath reported no write", "red");
+      return false;
+    }
+    const applied = fs.readFileSync(
+      __grokTestHooks.getGrokConfigPath(),
+      "utf8",
+    );
+    if (!applied.includes(`[model.${customId}]`)) {
+      log("Grok writer omitted the --config mapping", "red");
+      return false;
+    }
+    if (applied.includes(`[model.${defaultId}]`)) {
+      log("Grok writer used the default path despite --config", "red");
+      return false;
+    }
+
+    const results = await applyAllClients("http://127.0.0.1:9", {
+      configPath: customPath,
+    });
+    const grok = results.find((result) => result.id === "grok");
+    if (grok?.applied !== true) {
+      log("applyAllClients did not apply grok with a custom configPath", "red");
+      return false;
+    }
+    const afterAll = fs.readFileSync(
+      __grokTestHooks.getGrokConfigPath(),
+      "utf8",
+    );
+    if (!afterAll.includes("http://127.0.0.1:9/v1")) {
+      log(
+        "applyAllClients did not forward configPath through grok apply",
+        "red",
+      );
+      return false;
+    }
+    if (!afterAll.includes(`[model.${customId}]`)) {
+      log("applyAllClients dropped the custom mapping", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGrokRoutedAliasUsesTargetMetadata(): Promise<boolean> {
+  const { grokConfigurator, __grokTestHooks } =
+    await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-alias-"));
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    fs.mkdirSync(__grokTestHooks.getGrokConfigDir(), { recursive: true });
+    const yamlPath = path.join(os.homedir(), ".neurolink", "proxy-config.yaml");
+    fs.mkdirSync(path.dirname(yamlPath), { recursive: true });
+    fs.writeFileSync(
+      yamlPath,
+      [
+        "routing:",
+        "  model-mappings:",
+        "    - from: enterprise-sonnet",
+        "      to: claude-sonnet-4-6",
+        "      provider: anthropic",
+        "",
+      ].join("\n"),
+    );
+    if (!(await grokConfigurator.apply("http://127.0.0.1:55669"))) {
+      log("Grok apply reported no write for routed alias", "red");
+      return false;
+    }
+    const applied = fs.readFileSync(
+      __grokTestHooks.getGrokConfigPath(),
+      "utf8",
+    );
+    const start = applied.indexOf("[model.enterprise-sonnet]");
+    if (start === -1) {
+      log("Grok writer omitted the routed alias picker id", "red");
+      return false;
+    }
+    const next = applied.indexOf("\n[model.", start + 1);
+    const block = applied.slice(start, next === -1 ? undefined : next);
+    if (!block.includes('api_backend = "messages"')) {
+      log("routed alias did not use the target's messages door", "red");
+      return false;
+    }
+    if (!block.includes("context_window = 1000000")) {
+      log("routed alias did not use the target's 1M window", "red");
+      return false;
+    }
+    if (block.includes("supports_reasoning_effort = false")) {
+      log("routed alias disabled reasoning on Sonnet 4.6", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testGrokApplyRefusesUnreadableConfig(): Promise<boolean> {
+  const { __grokTestHooks } = await import("../src/cli/proxy-clients/grok.js");
+  const prevHome = process.env.HOME;
+  const prevGrokHome = process.env.GROK_HOME;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "neurolink-grok-eacces-"));
+  try {
+    delete process.env.GROK_HOME;
+    process.env.HOME = root;
+    fs.mkdirSync(__grokTestHooks.getGrokConfigDir(), { recursive: true });
+    const configPath = __grokTestHooks.getGrokConfigPath();
+    fs.writeFileSync(configPath, "do-not-clobber\n", { mode: 0o600 });
+    fs.chmodSync(configPath, 0o000);
+    const wrote = await __grokTestHooks.setGrokProxySettings(
+      "http://127.0.0.1:55669/v1",
+    );
+    fs.chmodSync(configPath, 0o600);
+    if (wrote) {
+      log("Grok apply rewrote an unreadable config.toml", "red");
+      return false;
+    }
+    const after = fs.readFileSync(configPath, "utf8");
+    if (after !== "do-not-clobber\n") {
+      log("Grok apply clobbered an unreadable config.toml", "red");
+      return false;
+    }
+    return true;
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+    if (prevGrokHome === undefined) {
+      delete process.env.GROK_HOME;
+    } else {
+      process.env.GROK_HOME = prevGrokHome;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/**
  * A client config must never be observable in a torn state.
  *
  * Every writer did readFileSync then writeFileSync. writeFileSync opens with
@@ -2757,6 +3392,7 @@ async function testPerClientAttribution(): Promise<boolean | null> {
       expect: "gemini-cli",
     },
     { ua: "codex_exec/0.147.0 (Mac OS 26.6.0; arm64)", expect: "codex" },
+    { ua: "grok-shell/1.0.30 (macos; aarch64)", expect: "grok" },
     { ua: "some-unreleased-cli/9.9.9", expect: "unknown" },
     // Copilot CLI's own request.
     { ua: "OpenAI/JS 5.20.1", expect: "unknown" },
@@ -4679,7 +5315,7 @@ async function testProxyClientRoster(): Promise<boolean> {
   const { PROXY_CLIENT_CONFIGURATORS } =
     await import("../src/cli/proxy-clients/registry.js");
   const ids = PROXY_CLIENT_CONFIGURATORS.map((c) => c.id).join(",");
-  if (ids !== "claude-code,opencode,codex,qwen-code,copilot,gemini-cli") {
+  if (ids !== "claude-code,opencode,codex,qwen-code,copilot,gemini-cli,grok") {
     log(
       "configurator roster or order changed — apply order is behaviour",
       "red",
@@ -4704,7 +5340,7 @@ async function testApplyAllReportsPerClient(): Promise<boolean> {
     const applied = await applyAllClients("http://127.0.0.1:55669");
     if (
       applied.map((r) => r.id).join(",") !==
-      "claude-code,opencode,codex,qwen-code,copilot,gemini-cli"
+      "claude-code,opencode,codex,qwen-code,copilot,gemini-cli,grok"
     ) {
       log("applyAllClients returned results out of registry order", "red");
       return false;
@@ -4730,6 +5366,7 @@ async function testApplyAllReportsPerClient(): Promise<boolean> {
       "qwen-code",
       "copilot",
       "gemini-cli",
+      "grok",
     ]) {
       if (byId.get(id)?.error !== undefined) {
         log("an absent client was attempted instead of being skipped", "red");
@@ -8622,6 +9259,51 @@ const tests: TestFunction[] = [
   {
     name: "Proxy clients: Codex apply/restore round-trips a real config",
     fn: testCodexConfiguratorRoundTrip,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok configurator probes before writing",
+    fn: testGrokConfiguratorDetectsInstall,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok apply/restore round-trips a real config",
+    fn: testGrokConfiguratorRoundTrip,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok restore refuses without a snapshot",
+    fn: testGrokRestoreRefusesWithoutSnapshot,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok restore refuses a foreign proxy URL",
+    fn: testGrokRestoreRefusesForeignUrl,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok catalog windows and backends match upstream",
+    fn: testGrokCatalogWindowsAndBackends,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok catalog reads YAML model-mappings",
+    fn: testGrokYamlRoutedMappings,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok catalog follows proxy --config path",
+    fn: testGrokCustomConfigPath,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok routed aliases use target windows and backends",
+    fn: testGrokRoutedAliasUsesTargetMetadata,
+    category: "proxy-config",
+  },
+  {
+    name: "Proxy clients: Grok apply refuses an unreadable config.toml",
+    fn: testGrokApplyRefusesUnreadableConfig,
     category: "proxy-config",
   },
   {

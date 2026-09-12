@@ -1,5 +1,6 @@
 import { logger } from "../../lib/utils/logger.js";
 import type {
+  CliProxyClientApplyOptions,
   CliProxyClientApplyResult,
   CliProxyClientConfigurator,
   CliProxyClientRestoreResult,
@@ -10,6 +11,7 @@ import { codexConfigurator } from "./codex.js";
 import { qwenCodeConfigurator } from "./qwenCode.js";
 import { copilotConfigurator } from "./copilot.js";
 import { geminiConfigurator } from "./gemini.js";
+import { grokConfigurator } from "./grok.js";
 
 /**
  * Every CLI the proxy auto-configures, in apply order.
@@ -25,6 +27,7 @@ export const PROXY_CLIENT_CONFIGURATORS: readonly CliProxyClientConfigurator[] =
     qwenCodeConfigurator,
     copilotConfigurator,
     geminiConfigurator,
+    grokConfigurator,
   ];
 
 /**
@@ -37,12 +40,13 @@ export const PROXY_CLIENT_CONFIGURATORS: readonly CliProxyClientConfigurator[] =
  */
 export async function applyAllClients(
   proxyBaseUrl: string,
+  options?: CliProxyClientApplyOptions,
 ): Promise<CliProxyClientApplyResult[]> {
   const results: CliProxyClientApplyResult[] = [];
   for (const client of PROXY_CLIENT_CONFIGURATORS) {
     try {
       const applied = (await client.detect())
-        ? await client.apply(proxyBaseUrl)
+        ? await client.apply(proxyBaseUrl, options)
         : false;
       // Only ask for a note when something was actually written: a note on a
       // client that was skipped would read as an instruction to act on a
