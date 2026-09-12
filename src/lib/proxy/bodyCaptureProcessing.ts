@@ -262,10 +262,20 @@ export function redactProxyHeadersForLogging(
  */
 export async function processProxyBodyCapture(
   entry: ProxyBodyCaptureEntry,
-  logDir: string,
+  logDir: string | null,
 ): Promise<ProcessedProxyBodyCapture> {
   const headers = redactHeaders(entry.headers);
   const prepared = prepareRedactedBody(entry.body);
+  if (logDir === null) {
+    return {
+      headers,
+      stored: {
+        redactedBody: prepared.value,
+        redactedBodyBytes: prepared.bytes,
+        bodyTruncated: prepared.truncated,
+      },
+    };
+  }
   let stored: StoredBodyArtifact;
   try {
     stored = await writeBodyArtifact(

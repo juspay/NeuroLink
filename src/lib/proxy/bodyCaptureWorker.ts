@@ -152,7 +152,7 @@ function getWorker(): Worker {
 /** Bounded bulk capture. Failures are indexed; never fall back to blocking work. */
 export async function captureProxyBody(
   entry: ProxyBodyCaptureEntry,
-  logDir: string,
+  logDir: string | null,
   consume: (result: ProcessedProxyBodyCapture) => Promise<void>,
 ): Promise<void> {
   snapshot.attempted += 1;

@@ -3313,7 +3313,7 @@ const tests: TestFunction[] = [
     },
   },
   {
-    name: "launchd: proxy install calls writeTrampoline before buildPlist",
+    name: "launchd: proxy install calls writeTrampoline before buildProxyLaunchdPlist",
     category: "launchd-regression",
     fn: async () => {
       const { readFileSync } = await import("fs");
@@ -3322,9 +3322,9 @@ const tests: TestFunction[] = [
         pathJoin(process.cwd(), "src/cli/commands/proxy.ts"),
         "utf-8",
       );
-      // writeTrampoline() must appear before buildPlist() in the install handler
+      // writeTrampoline() must appear before buildProxyLaunchdPlist() in the install handler
       const installIdx = src.indexOf("writeTrampoline()");
-      const plistIdx = src.indexOf("const plist = buildPlist(");
+      const plistIdx = src.indexOf("const plist = buildProxyLaunchdPlist(");
       return installIdx > 0 && plistIdx > installIdx;
     },
   },
@@ -3612,7 +3612,10 @@ const tests: TestFunction[] = [
         "probeBinVersion(TRAMPOLINE_PATH)",
         installIdx,
       );
-      const plistIdx = src.indexOf("const plist = buildPlist(", installIdx);
+      const plistIdx = src.indexOf(
+        "const plist = buildProxyLaunchdPlist(",
+        installIdx,
+      );
       return (
         installIdx > 0 &&
         probeIdx > installIdx &&

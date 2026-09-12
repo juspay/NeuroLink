@@ -1,3 +1,8 @@
+import {
+  emitProxyOtelEvent,
+  isProxyOtelOnly,
+  initializeProxyOtelLogs,
+} from "./otelLogSink.js";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile } from "node:fs/promises";
@@ -354,6 +359,28 @@ export function configureProxyLifecycleLogger(
     DEFAULT_FLUSH_INTERVAL_MS,
   );
 
+  if (options.enabled && isProxyOtelOnly()) {
+    initializeProxyOtelLogs(
+      options.filePrefix === "proxy-supervisor" ? "supervisor" : "worker",
+    );
+    loggerEnabled = true;
+    sessionHashKey = process.env.NEUROLINK_PROXY_SESSION_SECRET
+      ? createHash("sha256")
+          .update(process.env.NEUROLINK_PROXY_SESSION_SECRET)
+          .digest()
+      : sessionHashKey;
+    stopRuntimeMetrics = startProxyRuntimeMetrics((runtimeSample) => {
+      logProxyLifecycleEvent({
+        event: "runtime_sample",
+        requestId: "-",
+        method: "-",
+        path: "-",
+        runtimeSample,
+      });
+    });
+    return;
+  }
+
   if (options.enabled && options.logDir) {
     try {
       mkdirSync(options.logDir, { recursive: true, mode: 0o700 });
@@ -398,7 +425,7 @@ function enqueueLifecycleEvent(
   input: ProxyLifecycleEventInput,
   onPersisted?: (confirmed: boolean) => void,
 ): void {
-  if (!loggerEnabled || !lifecycleLogDir) {
+  if (!loggerEnabled || (!lifecycleLogDir && !isProxyOtelOnly())) {
     onPersisted?.(false);
     return;
   }
@@ -472,9 +499,16 @@ function enqueueLifecycleEvent(
         : {}),
       ...(input.runtimeSample ? { runtimeSample: input.runtimeSample } : {}),
     };
+    if (isProxyOtelOnly()) {
+      emitProxyOtelEvent(
+        filePrefix === "proxy-supervisor" ? "supervisor" : "lifecycle",
+        record,
+      );
+      return;
+    }
     queue.push({
       filePrefix,
-      logDir: lifecycleLogDir,
+      logDir: lifecycleLogDir!,
       date: String(record.timestamp).slice(0, 10),
       record,
       writeRetries: 0,
@@ -498,6 +532,10 @@ export async function persistProxyLifecycleAcceptance(
   timeoutMs = LIFECYCLE_APPEND_TIMEOUT_MS,
 ): Promise<void> {
   if (!loggerRequired) {
+    return;
+  }
+  if (isProxyOtelOnly()) {
+    enqueueLifecycleEvent({ ...input, event: "request_accepted" });
     return;
   }
   const confirmed = new Promise<boolean>((resolve) => {
@@ -548,6 +586,8 @@ export async function flushProxyLifecycleEvents(
 export function getProxyLifecycleLoggerSnapshot(): ProxyLifecycleLoggerSnapshot {
   return {
     enabled: loggerEnabled,
+    sink: isProxyOtelOnly() ? "otel" : "file",
+    admissionPolicy: isProxyOtelOnly() ? "best-effort" : "durable-file",
     schemaVersion: SCHEMA_VERSION,
     processInstanceId,
     nextSequence,

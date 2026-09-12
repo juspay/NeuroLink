@@ -8,7 +8,7 @@
 
 > **AccountQuotaWindow** = `object`
 
-Defined in: [types/proxy.ts:1392](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1392)
+Defined in: [types/proxy.ts:1396](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1396)
 
 One dynamic limit bucket from the usage API. Provider vocabulary (`kind`,
 `group`, `severity`) is preserved verbatim so buckets Anthropic adds later
@@ -20,7 +20,7 @@ survive storage and display without a code change.
 
 > **kind**: `string`
 
-Defined in: [types/proxy.ts:1394](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1394)
+Defined in: [types/proxy.ts:1398](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1398)
 
 Provider kind, verbatim ("session", "weekly_all", "weekly_scoped", ...).
 
@@ -30,7 +30,7 @@ Provider kind, verbatim ("session", "weekly_all", "weekly_scoped", ...).
 
 > `optional` **group?**: `string`
 
-Defined in: [types/proxy.ts:1396](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1396)
+Defined in: [types/proxy.ts:1400](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1400)
 
 Provider group, verbatim ("session" | "weekly" | future values).
 
@@ -40,7 +40,7 @@ Provider group, verbatim ("session" | "weekly" | future values).
 
 > **used**: `number`
 
-Defined in: [types/proxy.ts:1398](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1398)
+Defined in: [types/proxy.ts:1402](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1402)
 
 0.0-1.0 utilization (provider percent / 100).
 
@@ -50,7 +50,7 @@ Defined in: [types/proxy.ts:1398](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **severity?**: `string`
 
-Defined in: [types/proxy.ts:1400](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1400)
+Defined in: [types/proxy.ts:1404](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1404)
 
 Provider severity, verbatim ("normal", ...).
 
@@ -60,7 +60,7 @@ Provider severity, verbatim ("normal", ...).
 
 > **status**: `string`
 
-Defined in: [types/proxy.ts:1402](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1402)
+Defined in: [types/proxy.ts:1406](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1406)
 
 Derived "allowed" | "rejected" (see usageToQuota status mapping).
 
@@ -70,7 +70,7 @@ Derived "allowed" | "rejected" (see usageToQuota status mapping).
 
 > **resetsAt**: `number`
 
-Defined in: [types/proxy.ts:1404](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1404)
+Defined in: [types/proxy.ts:1408](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1408)
 
 Unix timestamp (seconds) when this window resets; 0 when unparseable.
 
@@ -80,7 +80,7 @@ Unix timestamp (seconds) when this window resets; 0 when unparseable.
 
 > `optional` **isActive?**: `boolean`
 
-Defined in: [types/proxy.ts:1405](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1405)
+Defined in: [types/proxy.ts:1409](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1409)
 
 ---
 
@@ -88,7 +88,7 @@ Defined in: [types/proxy.ts:1405](https://github.com/juspay/neurolink/blob/relea
 
 > `optional` **scopeModel?**: `string`
 
-Defined in: [types/proxy.ts:1407](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1407)
+Defined in: [types/proxy.ts:1411](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1411)
 
 Model display name for model-scoped windows (e.g. "Fable").
 
@@ -98,7 +98,7 @@ Model display name for model-scoped windows (e.g. "Fable").
 
 > `optional` **scopeModelId?**: `string`
 
-Defined in: [types/proxy.ts:1411](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1411)
+Defined in: [types/proxy.ts:1415](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1415)
 
 Wire model id for the scope when the provider reports one
 (`scope.model.id`), which matches a request's `model` exactly and so beats
@@ -110,7 +110,7 @@ display-name matching. Often null in practice.
 
 > `optional` **scopeSurface?**: `string`
 
-Defined in: [types/proxy.ts:1413](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1413)
+Defined in: [types/proxy.ts:1417](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1417)
 
 Surface scope when the provider reports one.
 
@@ -120,7 +120,7 @@ Surface scope when the provider reports one.
 
 > `optional` **updatedAt?**: `number`
 
-Defined in: [types/proxy.ts:1418](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1418)
+Defined in: [types/proxy.ts:1422](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1422)
 
 Epoch ms this individual window was observed. Lets a header-derived window
 and a usage-API window on the same account age independently — the flat
@@ -133,7 +133,7 @@ days-old scoped window look current.
 
 > `optional` **source?**: [`AccountQuotaSource`](AccountQuotaSource.md)
 
-Defined in: [types/proxy.ts:1420](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1420)
+Defined in: [types/proxy.ts:1424](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1424)
 
 Provenance of this window, mirroring AccountQuotaSource.
 
@@ -143,6 +143,6 @@ Provenance of this window, mirroring AccountQuotaSource.
 
 > `optional` **headerWindow?**: `string`
 
-Defined in: [types/proxy.ts:1422](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1422)
+Defined in: [types/proxy.ts:1426](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxy.ts#L1426)
 
 Raw unified header token for header-derived windows, e.g. "7d_oi".

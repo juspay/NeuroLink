@@ -6,6 +6,12 @@
  * Useful for debugging and auditing proxy traffic.
  */
 
+import {
+  emitProxyOtelEvent,
+  getProxyOtelLogSnapshot,
+  initializeProxyOtelLogs,
+  isProxyOtelOnly,
+} from "./otelLogSink.js";
 import { join } from "path";
 import { homedir } from "os";
 import { logger } from "../utils/logger.js";
@@ -76,6 +82,8 @@ const metadataSinks = {
 export function getRequestLoggerSnapshot(): ProxyRequestLoggerSnapshot {
   return {
     enabled: logEnabled,
+    diskEnabled: logEnabled && !isProxyOtelOnly(),
+    otel: getProxyOtelLogSnapshot(),
     requests: { ...metadataSinks.requests },
     attempts: { ...metadataSinks.attempts },
     debug: { ...metadataSinks.debug },
@@ -216,6 +224,13 @@ export function initRequestLogger(
     return;
   }
 
+  if (isProxyOtelOnly()) {
+    initializeProxyOtelLogs();
+    logDir = null;
+    configureProxyLifecycleLogger({ enabled: true });
+    return;
+  }
+
   try {
     logDir = customLogsDir ?? join(homedir(), ".neurolink", "logs");
     if (!existsSync(logDir)) {
@@ -246,7 +261,7 @@ export async function logRequest(entry: RequestLogEntry): Promise<void> {
           ? "handler_error"
           : "completed";
   notifyProxyFinalLog(entry);
-  if (!logEnabled || !logDir) {
+  if (!logEnabled || (!logDir && !isProxyOtelOnly())) {
     return;
   }
 
@@ -262,8 +277,12 @@ export async function logRequest(entry: RequestLogEntry): Promise<void> {
     }
   }
 
+  if (isProxyOtelOnly()) {
+    await emitOtlpLogRecord(entry);
+    return;
+  }
   const logFile = join(
-    logDir,
+    logDir!,
     `proxy-${new Date().toISOString().split("T")[0]}.jsonl`,
   );
   const line = JSON.stringify(entry) + "\n";
@@ -275,7 +294,7 @@ export async function logRequest(entry: RequestLogEntry): Promise<void> {
   }
 
   // Emit OTLP log record (additive — file logging is the primary sink)
-  emitOtlpLogRecord(entry);
+  void emitOtlpLogRecord(entry);
 }
 
 /**
@@ -286,7 +305,7 @@ export async function logRequest(entry: RequestLogEntry): Promise<void> {
 export async function logRequestAttempt(
   entry: RequestAttemptLogEntry,
 ): Promise<void> {
-  if (!logEnabled || !logDir) {
+  if (!logEnabled || (!logDir && !isProxyOtelOnly())) {
     return;
   }
 
@@ -299,8 +318,12 @@ export async function logRequestAttempt(
     }
   }
 
+  if (isProxyOtelOnly()) {
+    emitProxyOtelEvent("attempt", entry);
+    return;
+  }
   const logFile = join(
-    logDir,
+    logDir!,
     `proxy-attempts-${new Date().toISOString().split("T")[0]}.jsonl`,
   );
   const line = JSON.stringify(entry) + "\n";
@@ -320,6 +343,9 @@ export async function logRequestAttempt(
  * where OTel initialization completes after the first log request.
  */
 async function resolveLoggerProvider(): Promise<LoggerProvider | undefined> {
+  if (isProxyOtelOnly()) {
+    return initializeProxyOtelLogs();
+  }
   if (otelLoggerProvider === false) {
     return undefined;
   } // permanently unavailable
@@ -353,8 +379,8 @@ async function resolveLoggerProvider(): Promise<LoggerProvider | undefined> {
  * Emit a RequestLogEntry as an OTLP log record.
  * Non-blocking, non-fatal — failures are silently swallowed.
  */
-function emitOtlpLogRecord(entry: RequestLogEntry): void {
-  resolveLoggerProvider()
+function emitOtlpLogRecord(entry: RequestLogEntry): Promise<void> {
+  return resolveLoggerProvider()
     .then((provider) => {
       if (!provider) {
         return;
@@ -375,8 +401,11 @@ function emitOtlpLogRecord(entry: RequestLogEntry): void {
       otelLogger.emit({
         severityNumber,
         severityText,
-        body: `${entry.method} ${entry.path} → ${entry.responseStatus} (${entry.responseTimeMs}ms)`,
+        body: isProxyOtelOnly()
+          ? JSON.stringify(entry)
+          : `${entry.method} ${entry.path} → ${entry.responseStatus} (${entry.responseTimeMs}ms)`,
         attributes: {
+          "proxy.record_kind": "request_final",
           // Core request fields
           "request.id": entry.requestId,
           "http.method": entry.method,
@@ -559,6 +588,7 @@ function emitOtlpBodyLogRecord(
           body: chunk,
           attributes: {
             "event.name": "proxy.body_capture",
+            "proxy.record_kind": "body",
             "request.id": entry.requestId,
             "body.phase": entry.phase,
             "body.chunk_index": chunkIndex,
@@ -606,7 +636,7 @@ function emitOtlpBodyLogRecord(
 export async function logBodyCapture(
   entry: ProxyBodyCaptureEntry,
 ): Promise<void> {
-  if (!logEnabled || !logDir) {
+  if (!logEnabled || (!logDir && !isProxyOtelOnly())) {
     return;
   }
   // Borrowed traffic is somebody else's conversation. Capturing it would leave
@@ -634,7 +664,9 @@ export async function logBodyCapture(
     const stored = processed.stored;
 
     const dateStr = new Date(metadata.timestamp).toISOString().split("T")[0];
-    const logFile = join(destination, `proxy-debug-${dateStr}.jsonl`);
+    const logFile = destination
+      ? join(destination, `proxy-debug-${dateStr}.jsonl`)
+      : undefined;
     const indexEntry: Record<string, unknown> = {
       timestamp: metadata.timestamp,
       type: "body_capture",
@@ -667,13 +699,18 @@ export async function logBodyCapture(
       indexEntry.spanId = traceCtx.spanId;
     }
 
+    if (isProxyOtelOnly()) {
+      emitProxyOtelEvent("body_capture_index", indexEntry);
+    }
     try {
-      await appendMetadataRecord(
-        logFile,
-        JSON.stringify(indexEntry) + "\n",
-        "debug",
-        { waitForPersistence: true },
-      );
+      if (logFile) {
+        await appendMetadataRecord(
+          logFile,
+          JSON.stringify(indexEntry) + "\n",
+          "debug",
+          { waitForPersistence: true },
+        );
+      }
     } catch {
       // Non-fatal
     }
@@ -757,17 +794,13 @@ export async function logStreamError(entry: {
   errorMessage: string;
   durationMs: number;
 }): Promise<void> {
-  if (!logEnabled || !logDir) {
+  if (!logEnabled || (!logDir && !isProxyOtelOnly())) {
     return;
   }
 
   const bridge = new OtelBridge();
   const traceCtx = bridge.getCurrentTraceContext();
 
-  const logFile = join(
-    logDir,
-    `proxy-${new Date().toISOString().split("T")[0]}.jsonl`,
-  );
   const logEntry: Record<string, unknown> = {
     ...entry,
     responseStatus: 200,
@@ -781,6 +814,14 @@ export async function logStreamError(entry: {
     logEntry.spanId = traceCtx.spanId;
   }
 
+  if (isProxyOtelOnly()) {
+    emitProxyOtelEvent("stream_error", logEntry);
+    return;
+  }
+  const logFile = join(
+    logDir!,
+    `proxy-${new Date().toISOString().split("T")[0]}.jsonl`,
+  );
   try {
     await appendMetadataRecord(
       logFile,
