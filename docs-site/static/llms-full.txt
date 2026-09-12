@@ -3,7 +3,7 @@
 > Enterprise AI Development Platform - Unified provider access, MCP integration, professional CLI
 
 Summary version: https://docs.neurolink.ink/llms.txt
-Total files: 3884
+Total files: 3887
 
 ---
 
@@ -1620,11 +1620,14 @@ Total files: 3884
 - Type Alias: CliFinanceAnalyticsConfig
 - Type Alias: CliGeminiSnapshot
 - Type Alias: CliGenerateResult
+- Type Alias: CliGrokProxyModelSpec
+- Type Alias: CliGrokSnapshot
 - Type Alias: CliHealthcareAnalyticsConfig
 - Type Alias: CliNetworkCommandArgs
 - Type Alias: CliNeuroLinkConfig
 - Type Alias: CliOpenCodeSnapshot
 - Type Alias: CliProcessingResult
+- Type Alias: CliProxyClientApplyOptions
 - Type Alias: CliProxyClientApplyResult
 - Type Alias: CliProxyClientConfigurator
 - Type Alias: CliProxyClientRestoreResult
@@ -250123,7 +250126,7 @@ Allowed origins
 
 > **inputTokens**: `number`
 
-Defined in: [types/proxyClient.ts:120](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L120)
+Defined in: [types/proxyClient.ts:159](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L159)
 
 ---
 
@@ -250131,7 +250134,7 @@ Defined in: [types/proxyClient.ts:120](https://github.com/juspay/neurolink/blob/
 
 > **outputTokens**: `number`
 
-Defined in: [types/proxyClient.ts:121](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L121)
+Defined in: [types/proxyClient.ts:160](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L160)
 
 ---
 
@@ -250139,7 +250142,7 @@ Defined in: [types/proxyClient.ts:121](https://github.com/juspay/neurolink/blob/
 
 > **cacheReadTokens**: `number`
 
-Defined in: [types/proxyClient.ts:122](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L122)
+Defined in: [types/proxyClient.ts:161](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L161)
 
 ---
 
@@ -250147,7 +250150,7 @@ Defined in: [types/proxyClient.ts:122](https://github.com/juspay/neurolink/blob/
 
 > **cacheCreationTokens**: `number`
 
-Defined in: [types/proxyClient.ts:123](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L123)
+Defined in: [types/proxyClient.ts:162](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L162)
 
 ---
 
@@ -250155,7 +250158,7 @@ Defined in: [types/proxyClient.ts:123](https://github.com/juspay/neurolink/blob/
 
 > **costUsd**: `number`
 
-Defined in: [types/proxyClient.ts:124](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L124)
+Defined in: [types/proxyClient.ts:163](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L163)
 
 ---
 
@@ -250163,7 +250166,7 @@ Defined in: [types/proxyClient.ts:124](https://github.com/juspay/neurolink/blob/
 
 > **unpricedRequests**: `number`
 
-Defined in: [types/proxyClient.ts:126](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L126)
+Defined in: [types/proxyClient.ts:165](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L165)
 
 Requests whose model carried no pricing row, so contributed no cost.
 
@@ -250173,7 +250176,7 @@ Requests whose model carried no pricing row, so contributed no cost.
 
 > **unpricedModels**: `string`[]
 
-Defined in: [types/proxyClient.ts:128](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L128)
+Defined in: [types/proxyClient.ts:167](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L167)
 
 Distinct models with no pricing row, so an operator can chase them.
 
@@ -250183,7 +250186,7 @@ Distinct models with no pricing row, so an operator can chase them.
 
 > **byClient**: `Record`\
 
-Defined in: [types/proxyClient.ts:135](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L135)
+Defined in: [types/proxyClient.ts:174](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L174)
 
 Same totals split by calling CLI, keyed by the derived client name.
 
@@ -250202,7 +250205,7 @@ User-Agent, and guessing one retroactively would invent history.
 
 > **usageDate**: `string`
 
-Defined in: [types/proxyClient.ts:191](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L191)
+Defined in: [types/proxyClient.ts:230](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L230)
 
 UTC date whose request log the usage totals cover.
 
@@ -250212,7 +250215,7 @@ UTC date whose request log the usage totals cover.
 
 > **quotaFromSnapshot**: `boolean`
 
-Defined in: [types/proxyClient.ts:193](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L193)
+Defined in: [types/proxyClient.ts:232](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L232)
 
 True when quota came from the stored snapshot rather than a live fetch.
 
@@ -250222,7 +250225,7 @@ True when quota came from the stored snapshot rather than a live fetch.
 
 > **usageError**: `string` \| `null`
 
-Defined in: [types/proxyClient.ts:195](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L195)
+Defined in: [types/proxyClient.ts:234](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L234)
 
 Set when the usage totals could not be read at all.
 
@@ -250232,7 +250235,7 @@ Set when the usage totals could not be read at all.
 
 > **quotaError**: `string` \| `null`
 
-Defined in: [types/proxyClient.ts:197](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L197)
+Defined in: [types/proxyClient.ts:236](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L236)
 
 Set when the quota snapshot could not be read; rows still carry status.
 
@@ -250242,7 +250245,7 @@ Set when the quota snapshot could not be read; rows still carry status.
 
 > **costBasis**: `"api-equivalent"`
 
-Defined in: [types/proxyClient.ts:198](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L198)
+Defined in: [types/proxyClient.ts:237](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L237)
 
 ---
 
@@ -250250,7 +250253,7 @@ Defined in: [types/proxyClient.ts:198](https://github.com/juspay/neurolink/blob/
 
 > **accounts**: [`CliAccountsRow`](/docs/cliaccountsrow)[]
 
-Defined in: [types/proxyClient.ts:199](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L199)
+Defined in: [types/proxyClient.ts:238](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L238)
 
 ---
 
@@ -250264,7 +250267,7 @@ Defined in: [types/proxyClient.ts:199](https://github.com/juspay/neurolink/blob/
 
 > **key**: `string` \| `null`
 
-Defined in: [types/proxyClient.ts:159](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L159)
+Defined in: [types/proxyClient.ts:198](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L198)
 
 Full pool key, e.g. "anthropic:someone@example.com" or
 "codex:someone@example.com". Null only for plumbing rows.
@@ -250275,7 +250278,7 @@ Full pool key, e.g. "anthropic:someone@example.com" or
 
 > `optional` **provider?**: `"anthropic"` \| `"codex"`
 
-Defined in: [types/proxyClient.ts:164](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L164)
+Defined in: [types/proxyClient.ts:203](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L203)
 
 Which pool engine owns this login. Absent on plumbing rows. Consumers
 that key a list by row must key by `key`, not `label` — see above.
@@ -250286,7 +250289,7 @@ that key a list by row must key by `key`, not `label` — see above.
 
 > **kind**: `"account"` \| `"internal"` \| `"translation"`
 
-Defined in: [types/proxyClient.ts:170](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L170)
+Defined in: [types/proxyClient.ts:209](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L209)
 
 What this row actually is. Only "account" rows are real logins; the proxy
 also tracks internal and translation pseudo-accounts, which have no quota
@@ -250298,7 +250301,7 @@ and should not be rendered as credentials.
 
 > **type**: `string`
 
-Defined in: [types/proxyClient.ts:171](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L171)
+Defined in: [types/proxyClient.ts:210](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L210)
 
 ---
 
@@ -250306,7 +250309,7 @@ Defined in: [types/proxyClient.ts:171](https://github.com/juspay/neurolink/blob/
 
 > **status**: `string` \| `null`
 
-Defined in: [types/proxyClient.ts:172](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L172)
+Defined in: [types/proxyClient.ts:211](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L211)
 
 ---
 
@@ -250314,7 +250317,7 @@ Defined in: [types/proxyClient.ts:172](https://github.com/juspay/neurolink/blob/
 
 > **cooling**: `boolean`
 
-Defined in: [types/proxyClient.ts:173](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L173)
+Defined in: [types/proxyClient.ts:212](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L212)
 
 ---
 
@@ -250322,7 +250325,7 @@ Defined in: [types/proxyClient.ts:173](https://github.com/juspay/neurolink/blob/
 
 > **allowed**: `boolean` \| `null`
 
-Defined in: [types/proxyClient.ts:174](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L174)
+Defined in: [types/proxyClient.ts:213](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L213)
 
 ---
 
@@ -250330,7 +250333,7 @@ Defined in: [types/proxyClient.ts:174](https://github.com/juspay/neurolink/blob/
 
 > **expired**: `boolean` \| `null`
 
-Defined in: [types/proxyClient.ts:175](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L175)
+Defined in: [types/proxyClient.ts:214](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L214)
 
 ---
 
@@ -250338,7 +250341,7 @@ Defined in: [types/proxyClient.ts:175](https://github.com/juspay/neurolink/blob/
 
 > **isPrimary**: `boolean`
 
-Defined in: [types/proxyClient.ts:176](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L176)
+Defined in: [types/proxyClient.ts:215](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L215)
 
 ---
 
@@ -250346,7 +250349,7 @@ Defined in: [types/proxyClient.ts:176](https://github.com/juspay/neurolink/blob/
 
 > **requests**: `number` \| `null`
 
-Defined in: [types/proxyClient.ts:177](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L177)
+Defined in: [types/proxyClient.ts:216](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L216)
 
 ---
 
@@ -250354,7 +250357,7 @@ Defined in: [types/proxyClient.ts:177](https://github.com/juspay/neurolink/blob/
 
 > **errors**: `number` \| `null`
 
-Defined in: [types/proxyClient.ts:178](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L178)
+Defined in: [types/proxyClient.ts:217](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L217)
 
 ---
 
@@ -250362,7 +250365,7 @@ Defined in: [types/proxyClient.ts:178](https://github.com/juspay/neurolink/blob/
 
 > **rateLimits**: `number` \| `null`
 
-Defined in: [types/proxyClient.ts:179](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L179)
+Defined in: [types/proxyClient.ts:218](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L218)
 
 ---
 
@@ -250370,7 +250373,7 @@ Defined in: [types/proxyClient.ts:179](https://github.com/juspay/neurolink/blob/
 
 > **quotaRateLimits**: `number` \| `null`
 
-Defined in: [types/proxyClient.ts:180](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L180)
+Defined in: [types/proxyClient.ts:219](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L219)
 
 ---
 
@@ -250378,7 +250381,7 @@ Defined in: [types/proxyClient.ts:180](https://github.com/juspay/neurolink/blob/
 
 > **quota**: [`JsonObject`](/docs/jsonobject) \| `null`
 
-Defined in: [types/proxyClient.ts:182](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L182)
+Defined in: [types/proxyClient.ts:221](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L221)
 
 Quota block from the limits snapshot, timestamps normalised to ms.
 
@@ -250388,7 +250391,7 @@ Quota block from the limits snapshot, timestamps normalised to ms.
 
 > **usage**: [`CliAccountUsageTotals`](/docs/cliaccountusagetotals) \| `null`
 
-Defined in: [types/proxyClient.ts:184](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L184)
+Defined in: [types/proxyClient.ts:223](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L223)
 
 Today's usage from the request log, or null when the log is unreadable.
 
@@ -250666,7 +250669,7 @@ LLM-classifier hard timeout in ms (--classifier-timeout).
 
 > **inputTokens**: `number`
 
-Defined in: [types/proxyClient.ts:141](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L141)
+Defined in: [types/proxyClient.ts:180](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L180)
 
 ---
 
@@ -250674,7 +250677,7 @@ Defined in: [types/proxyClient.ts:141](https://github.com/juspay/neurolink/blob/
 
 > **outputTokens**: `number`
 
-Defined in: [types/proxyClient.ts:142](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L142)
+Defined in: [types/proxyClient.ts:181](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L181)
 
 ---
 
@@ -250682,7 +250685,7 @@ Defined in: [types/proxyClient.ts:142](https://github.com/juspay/neurolink/blob/
 
 > **cacheReadTokens**: `number`
 
-Defined in: [types/proxyClient.ts:143](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L143)
+Defined in: [types/proxyClient.ts:182](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L182)
 
 ---
 
@@ -250690,7 +250693,7 @@ Defined in: [types/proxyClient.ts:143](https://github.com/juspay/neurolink/blob/
 
 > **cacheCreationTokens**: `number`
 
-Defined in: [types/proxyClient.ts:144](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L144)
+Defined in: [types/proxyClient.ts:183](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L183)
 
 ---
 
@@ -250698,7 +250701,7 @@ Defined in: [types/proxyClient.ts:144](https://github.com/juspay/neurolink/blob/
 
 > **costUsd**: `number`
 
-Defined in: [types/proxyClient.ts:145](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L145)
+Defined in: [types/proxyClient.ts:184](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L184)
 
 ---
 
@@ -250862,7 +250865,7 @@ Defined in: [types/cli.ts:1838](https://github.com/juspay/neurolink/blob/release
 
 > `optional` **written?**: `object`
 
-Defined in: [types/proxyClient.ts:100](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L100)
+Defined in: [types/proxyClient.ts:139](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L139)
 
 What the writer last wrote for each managed variable. Compared against the
 file on disk to detect a snapshot that has gone stale — one left behind by
@@ -250984,6 +250987,66 @@ PPT generation result when ppt mode is enabled
 ### imageOutput?
 
 > `optional` **imageOutput?**: \{ `base64`: `string`; `savedPath?`: `string`; \} \| `null`
+
+---
+
+## Type Alias: CliGrokProxyModelSpec
+
+<!-- Source: api/type-aliases/CliGrokProxyModelSpec.md -->
+
+[**NeuroLink API Reference**](/docs/readme)
+
+### name
+
+> **name**: `string`
+
+Defined in: [types/proxyClient.ts:108](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L108)
+
+---
+
+### apiBackend
+
+> **apiBackend**: `"messages"` \| `"chat_completions"`
+
+Defined in: [types/proxyClient.ts:109](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L109)
+
+---
+
+### contextWindow
+
+> **contextWindow**: `number`
+
+Defined in: [types/proxyClient.ts:110](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L110)
+
+---
+
+### maxCompletionTokens
+
+> **maxCompletionTokens**: `number`
+
+Defined in: [types/proxyClient.ts:111](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L111)
+
+---
+
+### supportsReasoningEffort
+
+> **supportsReasoningEffort**: `boolean`
+
+Defined in: [types/proxyClient.ts:112](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L112)
+
+---
+
+## Type Alias: CliGrokSnapshot
+
+<!-- Source: api/type-aliases/CliGrokSnapshot.md -->
+
+[**NeuroLink API Reference**](/docs/readme)
+
+### writtenBaseUrl
+
+> **writtenBaseUrl**: `string`
+
+Defined in: [types/proxyClient.ts:121](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L121)
 
 ---
 
@@ -251365,7 +251428,7 @@ Defined in: [types/cli.ts:1906](https://github.com/juspay/neurolink/blob/release
 
 > `optional` **written?**: `unknown`
 
-Defined in: [types/proxyClient.ts:82](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L82)
+Defined in: [types/proxyClient.ts:96](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L96)
 
 What the writer last wrote, so apply() can recognise its own block.
 
@@ -251407,6 +251470,39 @@ Error message if processing failed
 
 ---
 
+## Type Alias: CliProxyClientApplyOptions
+
+<!-- Source: api/type-aliases/CliProxyClientApplyOptions.md -->
+
+[**NeuroLink API Reference**](/docs/readme)
+
+---
+
+[NeuroLink API Reference](/docs/readme) / CliProxyClientApplyOptions
+
+# Type Alias: CliProxyClientApplyOptions
+
+> **CliProxyClientApplyOptions** = `object`
+
+Defined in: [types/proxyClient.ts:4](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L4)
+
+Options forwarded through `applyAllClients` into a configurator's `apply`.
+
+## Properties
+
+### configPath?
+
+> `optional` **configPath?**: `string`
+
+Defined in: [types/proxyClient.ts:11](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L11)
+
+Absolute path of the proxy routing config this process loaded.
+The Grok writer reads `routing.model-mappings` from this file so a
+`proxy start --config` catalog matches `/v1/models`. Omit to use
+`~/.neurolink/proxy-config.yaml`.
+
+---
+
 ## Type Alias: CliProxyClientApplyResult
 
 <!-- Source: api/type-aliases/CliProxyClientApplyResult.md -->
@@ -251417,7 +251513,7 @@ Error message if processing failed
 
 > **displayName**: `string`
 
-Defined in: [types/proxyClient.ts:49](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L49)
+Defined in: [types/proxyClient.ts:63](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L63)
 
 ---
 
@@ -251425,7 +251521,7 @@ Defined in: [types/proxyClient.ts:49](https://github.com/juspay/neurolink/blob/r
 
 > **applied**: `boolean`
 
-Defined in: [types/proxyClient.ts:51](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L51)
+Defined in: [types/proxyClient.ts:65](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L65)
 
 True only when the configurator actually wrote configuration.
 
@@ -251435,7 +251531,7 @@ True only when the configurator actually wrote configuration.
 
 > `optional` **note?**: `string`
 
-Defined in: [types/proxyClient.ts:57](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L57)
+Defined in: [types/proxyClient.ts:71](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L71)
 
 Set when the write landed but is not yet in effect — see
 CliProxyClientConfigurator.postApplyNote. Callers must render this; a
@@ -251447,7 +251543,7 @@ silent note is the failure it exists to prevent.
 
 > `optional` **error?**: `Error`
 
-Defined in: [types/proxyClient.ts:59](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L59)
+Defined in: [types/proxyClient.ts:73](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L73)
 
 Present when the configurator threw; the caller decides how loud to be.
 
@@ -251463,7 +251559,7 @@ Present when the configurator threw; the caller decides how loud to be.
 
 > **displayName**: `string`
 
-Defined in: [types/proxyClient.ts:14](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L14)
+Defined in: [types/proxyClient.ts:25](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L25)
 
 Human-readable name used in CLI output, e.g. "Claude Code".
 
@@ -251473,7 +251569,7 @@ Human-readable name used in CLI output, e.g. "Claude Code".
 
 > **detect**: () => `Promise`\
 
-Defined in: [types/proxyClient.ts:19](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L19)
+Defined in: [types/proxyClient.ts:30](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L30)
 
 Whether this CLI appears to be installed. Configurators must not create
 config files for a CLI the user never installed.
@@ -251486,9 +251582,9 @@ config files for a CLI the user never installed.
 
 ### apply
 
-> **apply**: (`proxyBaseUrl`) => `Promise`\
+> **apply**: (`proxyBaseUrl`, `options?`) => `Promise`\
 
-Defined in: [types/proxyClient.ts:26](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L26)
+Defined in: [types/proxyClient.ts:37](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L37)
 
 Point the CLI at the proxy. `proxyBaseUrl` is the bare proxy origin
 (e.g. "http://127.0.0.1:55669"); the configurator appends whatever path
@@ -251501,6 +251597,10 @@ never print a success message for work that did not happen.
 
 `string`
 
+##### options?
+
+[`CliProxyClientApplyOptions`](/docs/cliproxyclientapplyoptions)
+
 #### Returns
 
 `Promise`\
@@ -251511,7 +251611,7 @@ never print a success message for work that did not happen.
 
 > **restore**: (`proxyBaseUrl`) => `Promise`\
 
-Defined in: [types/proxyClient.ts:32](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L32)
+Defined in: [types/proxyClient.ts:46](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L46)
 
 Restore the user's previous configuration. `proxyBaseUrl` is the same bare
 origin; a configurator that finds a different URL configured must leave it
@@ -251533,7 +251633,7 @@ alone and return false.
 
 > `optional` **postApplyNote?**: (`proxyBaseUrl`) => `Promise`\
 
-Defined in: [types/proxyClient.ts:43](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L43)
+Defined in: [types/proxyClient.ts:57](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L57)
 
 Something the user must still do for apply() to take effect.
 
@@ -251566,7 +251666,7 @@ Return null when nothing is outstanding.
 
 > **displayName**: `string`
 
-Defined in: [types/proxyClient.ts:65](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L65)
+Defined in: [types/proxyClient.ts:79](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L79)
 
 ---
 
@@ -251574,7 +251674,7 @@ Defined in: [types/proxyClient.ts:65](https://github.com/juspay/neurolink/blob/r
 
 > **restored**: `boolean`
 
-Defined in: [types/proxyClient.ts:67](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L67)
+Defined in: [types/proxyClient.ts:81](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L81)
 
 True only when a previous configuration was actually restored.
 
@@ -251584,7 +251684,7 @@ True only when a previous configuration was actually restored.
 
 > `optional` **error?**: `Error`
 
-Defined in: [types/proxyClient.ts:68](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L68)
+Defined in: [types/proxyClient.ts:82](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L82)
 
 ---
 
@@ -251624,7 +251724,7 @@ Defined in: [types/proxy.ts:3075](https://github.com/juspay/neurolink/blob/relea
 
 > **CliQwenSettings** = `Record`\
 
-Defined in: [types/proxyClient.ts:108](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L108)
+Defined in: [types/proxyClient.ts:147](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L147)
 
 Raw contents of a Qwen Code `settings.json`. Deliberately open-ended: the
 configurator rewrites only `security.auth` and must round-trip every other
@@ -313405,7 +313505,7 @@ Defined in: [types/proxy.ts:2061](https://github.com/juspay/neurolink/blob/relea
 
 > **accountKey**: `string`
 
-Defined in: [types/proxyClient.ts:211](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L211)
+Defined in: [types/proxyClient.ts:250](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L250)
 
 Provider-qualified identity, "anthropic:" or "codex:".
 Read from the log row when present; derived from `accountType` for rows
@@ -313418,7 +313518,7 @@ one email can be logged in to both engines.
 
 > **clientApp**: `string`
 
-Defined in: [types/proxyClient.ts:213](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L213)
+Defined in: [types/proxyClient.ts:252](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L252)
 
 Derived calling CLI; see CliAccountUsageTotals.byClient.
 
@@ -313428,7 +313528,7 @@ Derived calling CLI; see CliAccountUsageTotals.byClient.
 
 > **accountType**: `string`
 
-Defined in: [types/proxyClient.ts:214](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L214)
+Defined in: [types/proxyClient.ts:253](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L253)
 
 ---
 
@@ -313436,7 +313536,7 @@ Defined in: [types/proxyClient.ts:214](https://github.com/juspay/neurolink/blob/
 
 > **model**: `string`
 
-Defined in: [types/proxyClient.ts:215](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L215)
+Defined in: [types/proxyClient.ts:254](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L254)
 
 ---
 
@@ -313444,7 +313544,7 @@ Defined in: [types/proxyClient.ts:215](https://github.com/juspay/neurolink/blob/
 
 > `optional` **provider?**: `string`
 
-Defined in: [types/proxyClient.ts:216](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L216)
+Defined in: [types/proxyClient.ts:255](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L255)
 
 ---
 
@@ -313452,7 +313552,7 @@ Defined in: [types/proxyClient.ts:216](https://github.com/juspay/neurolink/blob/
 
 > **inputTokens**: `number`
 
-Defined in: [types/proxyClient.ts:217](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L217)
+Defined in: [types/proxyClient.ts:256](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L256)
 
 ---
 
@@ -313460,7 +313560,7 @@ Defined in: [types/proxyClient.ts:217](https://github.com/juspay/neurolink/blob/
 
 > **outputTokens**: `number`
 
-Defined in: [types/proxyClient.ts:218](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L218)
+Defined in: [types/proxyClient.ts:257](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L257)
 
 ---
 
@@ -313468,7 +313568,7 @@ Defined in: [types/proxyClient.ts:218](https://github.com/juspay/neurolink/blob/
 
 > **cacheReadTokens**: `number`
 
-Defined in: [types/proxyClient.ts:219](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L219)
+Defined in: [types/proxyClient.ts:258](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L258)
 
 ---
 
@@ -313476,7 +313576,7 @@ Defined in: [types/proxyClient.ts:219](https://github.com/juspay/neurolink/blob/
 
 > **cacheCreationTokens**: `number`
 
-Defined in: [types/proxyClient.ts:220](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L220)
+Defined in: [types/proxyClient.ts:259](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L259)
 
 ---
 
@@ -313490,7 +313590,7 @@ Defined in: [types/proxyClient.ts:220](https://github.com/juspay/neurolink/blob/
 
 > **size**: `number`
 
-Defined in: [types/proxyClient.ts:227](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L227)
+Defined in: [types/proxyClient.ts:266](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L266)
 
 ---
 
@@ -313498,7 +313598,7 @@ Defined in: [types/proxyClient.ts:227](https://github.com/juspay/neurolink/blob/
 
 > **entries**: `Map`\
 
-Defined in: [types/proxyClient.ts:229](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L229)
+Defined in: [types/proxyClient.ts:268](https://github.com/juspay/neurolink/blob/release/src/lib/types/proxyClient.ts#L268)
 
 requestId -> latest known entry, so a re-logged request cannot double count.
 
